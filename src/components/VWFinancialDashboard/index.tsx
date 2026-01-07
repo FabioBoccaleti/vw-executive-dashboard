@@ -4,13 +4,16 @@ import { Button } from "@/components/ui/button"
 import { TrendingDown, Download, Upload, Calendar, BarChart3 } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend, LabelList } from "recharts"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 
 export function VWFinancialDashboard() {
   // Estado para controlar categorias de despesas selecionadas
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['pessoal', 'terceiros', 'ocupacao', 'funcionamento', 'vendas'])
   const [viewMode, setViewMode] = useState<'mensal' | 'bimestral' | 'trimestral' | 'semestral'>('mensal')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Estado para dados DRE
+  const [dreData, setDreData] = useState<any[]>([])
 
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
@@ -51,26 +54,70 @@ export function VWFinancialDashboard() {
 
   // Função para baixar template
   const downloadTemplate = () => {
-    const template = {
-      descricao: "Exemplo: RECEITA OPERACIONAL LIQUIDA",
-      total: 95954132,
-      percentTotal: 100.00,
-      meses: [8328316, 8483342, 7902231, 7138470, 7226733, 8336360, 8485005, 10826922, 8927513, 9761159, 8538082, 0],
-      isHighlight: false,
-      isFinal: false
+    // Função para formatar valores em moeda brasileira
+    const formatCurrency = (value: number) => {
+      if (value === 0) return 'R$ 0'
+      const formatted = Math.abs(value).toLocaleString('pt-BR')
+      return value < 0 ? `-R$ ${formatted}` : `R$ ${formatted}`
     }
     
-    const templateData = {
-      estrutura: template,
-      instrucoes: "Cada linha da DRE deve seguir este formato. Os 'meses' devem conter 12 valores (Jan a Dez).",
-      exemplo_completo: dreData
+    // Função para formatar percentual
+    const formatPercent = (value: number | null) => {
+      if (value === null || value === 0) return '-'
+      return `${value.toFixed(2)}%`
     }
     
-    const blob = new Blob([JSON.stringify(templateData, null, 2)], { type: 'application/json' })
+    // Criar cabeçalho
+    const header = [
+      'DESCRIÇÃO'.padEnd(50),
+      'TOTAL'.padStart(20),
+      '%'.padStart(12),
+      'JAN'.padStart(18),
+      'FEV'.padStart(18),
+      'MAR'.padStart(18),
+      'ABR'.padStart(18),
+      'MAI'.padStart(18),
+      'JUN'.padStart(18),
+      'JUL'.padStart(18),
+      'AGO'.padStart(18),
+      'SET'.padStart(18),
+      'OUT'.padStart(18),
+      'NOV'.padStart(18),
+      'DEZ'.padStart(18),
+      'HIGHLIGHT'.padStart(10),
+      'FINAL'.padStart(10)
+    ].join('\t')
+    
+    // Criar linhas de exemplo
+    const lines = dreData.map(item => {
+      const mesesFormatted = item.meses.map(m => formatCurrency(m ?? 0).padStart(18))
+      return [
+        item.descricao.padEnd(50),
+        formatCurrency(item.total ?? 0).padStart(20),
+        formatPercent(item.percentTotal).padStart(12),
+        ...mesesFormatted,
+        String(item.isHighlight ?? false).padStart(10),
+        String(item.isFinal ?? false).padStart(10)
+      ].join('\t')
+    })
+    
+    const content = [
+      '# TEMPLATE DRE - FORMATO TABULAR COM MOEDA BRASILEIRA',
+      '# Instruções: Cada linha representa um item da DRE',
+      '# Os valores devem ser separados por TAB',
+      '# Valores monetários devem estar no formato: R$ 1.234.567 ou -R$ 1.234.567',
+      '# Percentuais devem estar no formato: 12.34%',
+      '# HIGHLIGHT e FINAL devem ser "true" ou "false"',
+      '',
+      header,
+      ...lines
+    ].join('\n')
+    
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'template-dre.json'
+    a.download = 'template-dre.txt'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -85,10 +132,69 @@ export function VWFinancialDashboard() {
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
-        const importedData = JSON.parse(e.target?.result as string)
-        console.log('Dados importados:', importedData)
-        // Aqui você pode adicionar lógica para atualizar o estado com os dados importados
-        alert('Dados importados com sucesso! (Funcionalidade de atualização em desenvolvimento)')
+        const content = e.target?.result as string
+        
+        // Tentar parsear como JSON (formato antigo)
+        if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
+          const importedData = JSON.parse(content)
+          console.log('Dados importados (JSON):', importedData)
+          alert('Dados importados com sucesso! (Funcionalidade de atualização em desenvolvimento)')
+          return
+        }
+        
+        // Parsear formato tabular TXT
+        const lines = content.split('\n').filter(line => 
+          line.trim() && !line.trim().startsWith('#')
+        )
+        
+        if (lines.length < 2) {
+          throw new Error('Arquivo vazio ou inválido')
+        }
+        
+        // Pular o cabeçalho (primeira linha não comentada)
+        const dataLines = lines.slice(1)
+        
+        const parseCurrency = (value: string): number => {
+          if (value === '-' || !value.trim()) return 0
+          const cleaned = value.replace(/R\$\s*/g, '').replace(/\./g, '').replace(',', '.')
+          return parseFloat(cleaned) || 0
+        }
+        
+        const parsePercent = (value: string): number | null => {
+          if (value === '-' || !value.trim()) return null
+          return parseFloat(value.replace('%', '').replace(',', '.')) || null
+        }
+        
+        const importedData = dataLines.map(line => {
+          const columns = line.split('\t').map(col => col.trim())
+          
+          return {
+            descricao: columns[0] || '',
+            total: parseCurrency(columns[1] || '0'),
+            percentTotal: parsePercent(columns[2] || '-'),
+            meses: [
+              parseCurrency(columns[3] || '0'),
+              parseCurrency(columns[4] || '0'),
+              parseCurrency(columns[5] || '0'),
+              parseCurrency(columns[6] || '0'),
+              parseCurrency(columns[7] || '0'),
+              parseCurrency(columns[8] || '0'),
+              parseCurrency(columns[9] || '0'),
+              parseCurrency(columns[10] || '0'),
+              parseCurrency(columns[11] || '0'),
+              parseCurrency(columns[12] || '0'),
+              parseCurrency(columns[13] || '0'),
+              parseCurrency(columns[14] || '0')
+            ],
+            isHighlight: columns[15] === 'true',
+            isFinal: columns[16] === 'true'
+          }
+        })
+        
+        console.log('Dados importados (TXT):', importedData)
+        setDreData(importedData)
+        alert(`${importedData.length} linhas importadas e atualizadas com sucesso!`)
+        
       } catch (error) {
         alert('Erro ao importar dados. Verifique se o arquivo está no formato correto.')
         console.error('Erro ao importar:', error)
@@ -129,8 +235,8 @@ export function VWFinancialDashboard() {
     { mes: "Novembro", volume: 118, receitaLiquida: 11200, lucroBruto: 550, rendasOperacionais: 480, lucroOperacional: 220, pessoal: 182, terceiros: 75, ocupacao: 38, funcionamento: 148, vendas: 557 },
   ]
 
-  // Dados DRE - Demonstrativo de Resultados
-  const dreData = [
+  // Dados iniciais DRE - Demonstrativo de Resultados
+  const initialDreData = [
     {
       descricao: "VOLUME DE VENDAS",
       total: 934,
@@ -269,6 +375,11 @@ export function VWFinancialDashboard() {
       isFinal: true
     }
   ]
+  
+  // Inicializar dreData se estiver vazio
+  if (dreData.length === 0) {
+    setDreData(initialDreData)
+  }
 
   // Totais do período
   const totais = {
@@ -310,6 +421,36 @@ export function VWFinancialDashboard() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value)
+  }
+  
+  // Formatador para tooltips de gráficos (valores em milhares)
+  const formatChartValue = (value: number) => {
+    if (value === 0) return 'R$ 0'
+    const formatted = Math.abs(value).toLocaleString('pt-BR')
+    return value < 0 ? `-R$ ${formatted}` : `R$ ${formatted}`
+  }
+  
+  // Formatador para valores absolutos (sem moeda)
+  const formatNumber = (value: number) => {
+    return value.toLocaleString('pt-BR')
+  }
+  
+  // Inicializar dreData com dados iniciais
+  useEffect(() => {
+    if (dreData.length === 0) {
+      setDreData(initialDreData)
+    }
+  }, [])
+  
+  // Verificar se os dados estão carregados
+  if (dreData.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="text-center">
+          <div className="text-lg font-semibold text-slate-900 dark:text-white">Carregando...</div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -533,7 +674,7 @@ export function VWFinancialDashboard() {
                     })()}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => formatNumber(value)} />
                       <ChartTooltip 
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
@@ -543,7 +684,7 @@ export function VWFinancialDashboard() {
                                 <div className="space-y-1">
                                   <p className="text-sm">
                                     <span className="text-slate-600 dark:text-slate-400">Receita Líquida: </span>
-                                    <span className="font-bold text-slate-900 dark:text-white">R$ {payload[0].value?.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                    <span className="font-bold text-slate-900 dark:text-white">{formatChartValue((payload[0].value || 0) * 1000)}</span>
                                   </p>
                                 </div>
                               </div>
@@ -622,7 +763,7 @@ export function VWFinancialDashboard() {
                     })()}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => formatNumber(value)} />
                       <ChartTooltip 
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
@@ -632,7 +773,7 @@ export function VWFinancialDashboard() {
                                 <div className="space-y-1">
                                   <p className="text-sm">
                                     <span className="text-slate-600 dark:text-slate-400">Volume: </span>
-                                    <span className="font-bold text-slate-900 dark:text-white">{payload[0].value?.toLocaleString('pt-BR')} unidades</span>
+                                    <span className="font-bold text-slate-900 dark:text-white">{formatNumber(payload[0].value || 0)} unidades</span>
                                   </p>
                                 </div>
                               </div>
@@ -709,7 +850,7 @@ export function VWFinancialDashboard() {
                     })()}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => formatNumber(value)} />
                       <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: '#059669' }} axisLine={false} tickLine={false} domain={[0, 10]} tickFormatter={(value) => `${value}%`} />
                       <ChartTooltip 
                         content={({ active, payload }) => {
@@ -720,7 +861,7 @@ export function VWFinancialDashboard() {
                                 <div className="space-y-1">
                                   <p className="text-sm">
                                     <span className="text-slate-600 dark:text-slate-400">Lucro Bruto: </span>
-                                    <span className="font-bold text-slate-900 dark:text-white">R$ {payload[0].value?.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                    <span className="font-bold text-slate-900 dark:text-white">{formatChartValue((payload[0].value || 0) * 1000)}</span>
                                   </p>
                                   <p className="text-sm">
                                     <span className="text-slate-600 dark:text-slate-400">Margem: </span>
@@ -819,7 +960,7 @@ export function VWFinancialDashboard() {
                     })()}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => formatNumber(value)} />
                       <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: '#2563eb' }} axisLine={false} tickLine={false} domain={[0, 15]} tickFormatter={(value) => `${value}%`} />
                       <ChartTooltip 
                         content={({ active, payload }) => {
@@ -830,7 +971,7 @@ export function VWFinancialDashboard() {
                                 <div className="space-y-1">
                                   <p className="text-sm">
                                     <span className="text-slate-600 dark:text-slate-400">Margem Contribuição: </span>
-                                    <span className="font-bold text-slate-900 dark:text-white">R$ {payload[0].value?.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                    <span className="font-bold text-slate-900 dark:text-white">{formatChartValue((payload[0].value || 0) * 1000)}</span>
                                   </p>
                                   <p className="text-sm">
                                     <span className="text-slate-600 dark:text-slate-400">% sobre Receita: </span>
