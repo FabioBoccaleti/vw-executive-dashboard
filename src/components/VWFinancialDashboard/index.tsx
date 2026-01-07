@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { TrendingDown } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend, LabelList } from "recharts"
 import { useState } from "react"
 
 export function VWFinancialDashboard() {
@@ -171,7 +171,7 @@ export function VWFinancialDashboard() {
       descricao: "LUCRO LIQUIDO DO EXERCICIO",
       total: 476215,
       percentTotal: 0.50,
-      meses: [292222, 264860, 415322, 389575, 392905, 293033, 399105, 525973, 494420, 378461, 236175, 476215],
+      meses: [292222, 264860, 415322, 389575, 392905, 293033, 399105, 525973, 494420, 378461, 236175, 0],
       isHighlight: true,
       isFinal: true
     }
@@ -859,81 +859,118 @@ export function VWFinancialDashboard() {
         </div>
 
         {/* Resultado Operacional - Destaque */}
-        <Card className="bg-gradient-to-br from-[#1e293b] via-[#0f172a] to-[#020617] dark:from-slate-950 dark:to-slate-900 shadow-xl border-0 overflow-hidden">
-          <CardHeader className="border-b border-slate-700/50 pb-6">
-            <div className="flex items-start justify-between mb-6">
+        <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <CardTitle className="text-2xl font-bold text-white mb-2">Resultado Operacional Líquido</CardTitle>
-                <CardDescription className="text-slate-300 text-base">Desempenho operacional consolidado após todas as despesas</CardDescription>
+                <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Lucro Líquido do Exercício</CardTitle>
+                <CardDescription className="text-sm">Resultado final após todas as despesas e impostos</CardDescription>
               </div>
-              <Badge className="bg-purple-500/20 text-purple-300 border border-purple-400/30 text-sm px-4 py-2 font-semibold">
-                {dreData[12].percentTotal?.toFixed(2)}% ROL
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-purple-50 text-purple-700 text-xs">{dreData[21].percentTotal?.toFixed(2)}% ROL</Badge>
+              </div>
             </div>
-            
-            <div className="grid grid-cols-4 gap-8 mt-6">
+
+            <div className="grid grid-cols-4 gap-6 mt-4">
               <div>
-                <p className="text-xs text-slate-400 mb-2 uppercase tracking-wide">Total do Período</p>
-                <p className="text-3xl font-bold text-white">R$ {(dreData[12].total / 1000).toFixed(0)} <span className="text-lg text-slate-400 font-normal">mil</span></p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">R$ {(dreData[21].total / 1000).toFixed(0)} mil</p>
               </div>
               
-              <div className="border-l border-slate-700/50 pl-8">
-                <p className="text-xs text-slate-400 mb-2 uppercase tracking-wide">Margem Operacional</p>
-                <p className="text-3xl font-bold text-purple-400">{dreData[12].percentTotal?.toFixed(2)}%</p>
+              <div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Líquida</p>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{dreData[21].percentTotal?.toFixed(2)}%</p>
               </div>
               
-              <div className="border-l border-slate-700/50 pl-8">
-                <p className="text-xs text-slate-400 mb-2 uppercase tracking-wide">Resultado/Unidade</p>
-                <p className="text-3xl font-bold text-purple-300">R$ {(dreData[12].total / dreData[0].total).toFixed(0)}</p>
+              <div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Lucro/Unidade</p>
+                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">R$ {(dreData[21].total / dreData[0].total).toFixed(0)}</p>
               </div>
               
-              <div className="border-l border-slate-700/50 pl-8">
-                <p className="text-xs text-slate-400 mb-2 uppercase tracking-wide">Média Mensal</p>
-                <p className="text-3xl font-bold text-slate-200">R$ {(dreData[12].total / 12 / 1000).toFixed(0)} <span className="text-lg text-slate-400 font-normal">mil</span></p>
+              <div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">R$ {(dreData[21].total / 12 / 1000).toFixed(0)} mil</p>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-6 pb-8 bg-gradient-to-b from-transparent to-slate-950/30">
+          <CardContent className="pt-6">
             <ChartContainer config={chartConfig} className="h-[280px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dreData[12].meses.map((val, idx) => ({ 
-                  mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
-                  valor: val / 1000
-                }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} opacity={0.3} />
+                <BarChart data={(() => {
+                  const media = dreData[21].total / 12;
+                  return dreData[21].meses.map((val, idx) => ({
+                    mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                    valor: val / 1000,
+                    percentual: ((val / dreData[1].meses[idx]) * 100).toFixed(2),
+                    fill: val > media * 1.05 ? '#0ea5e9' : val < media * 0.95 ? '#f97316' : '#10b981'
+                  }));
+                })()}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                   <XAxis 
                     dataKey="mes" 
-                    tick={{ fontSize: 11, fill: '#94a3b8' }} 
+                    tick={{ fontSize: 12, fill: '#64748b' }} 
                     axisLine={false} 
                     tickLine={false}
-                    dy={10}
                   />
                   <YAxis 
-                    tick={{ fontSize: 11, fill: '#94a3b8' }} 
+                    tick={{ fontSize: 12, fill: '#64748b' }} 
                     axisLine={false} 
                     tickLine={false}
-                    dx={-10}
                   />
                   <ChartTooltip 
-                    content={<ChartTooltipContent />}
-                    cursor={{ stroke: '#8b5cf6', strokeWidth: 1, strokeDasharray: '4 4' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                            <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                            <div className="space-y-1">
+                              <p className="text-sm">
+                                <span className="text-slate-600 dark:text-slate-400">Lucro Líquido: </span>
+                                <span className="font-bold text-slate-900 dark:text-white">R$ {payload[0].value?.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                              </p>
+                              <p className="text-sm">
+                                <span className="text-slate-600 dark:text-slate-400">% sobre Receita: </span>
+                                <span className="font-bold text-purple-600">{payload[0].payload.percentual}%</span>
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
                   />
-                  <defs>
-                    <linearGradient id="gradientResultado" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a855f7" stopOpacity={0.5}/>
-                      <stop offset="50%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                      <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.05}/>
-                    </linearGradient>
-                  </defs>
-                  <Area 
-                    type="monotone" 
+                  <Legend 
+                    wrapperStyle={{ fontSize: '12px' }} 
+                    content={() => (
+                      <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#0ea5e9' }}></div>
+                          <span>Acima da Média</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#10b981' }}></div>
+                          <span>Média</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#f97316' }}></div>
+                          <span>Abaixo da Média</span>
+                        </div>
+                      </div>
+                    )}
+                  />
+                  <Bar 
                     dataKey="valor" 
-                    stroke="#a855f7" 
-                    strokeWidth={2.5}
-                    fill="url(#gradientResultado)"
-                    name="Resultado Operacional"
-                  />
-                </AreaChart>
+                    radius={[6, 6, 0, 0]}
+                    name="Lucro Líquido (mil)"
+                  >
+                    <LabelList 
+                      dataKey="percentual" 
+                      position="top" 
+                      formatter={(value: number) => `${value}%`}
+                      style={{ fontSize: '11px', fontWeight: '600', fill: '#64748b' }}
+                    />
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
@@ -949,24 +986,24 @@ export function VWFinancialDashboard() {
           <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800 overflow-hidden">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                      <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300 sticky left-0 bg-slate-50 dark:bg-slate-800 z-10 min-w-[300px]">Descrição</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[120px]">Total</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[80px]">%</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Jan</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Fev</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Mar</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Abr</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Mai</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Jun</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Jul</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Ago</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Set</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Out</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Nov</th>
-                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Dez</th>
+                    <tr className="bg-slate-800 dark:bg-slate-950 border border-slate-700">
+                      <th className="text-left px-2 py-2 font-semibold text-white sticky left-0 bg-slate-800 dark:bg-slate-950 z-10 min-w-[220px] text-[10px] uppercase tracking-wider border-r border-slate-700">Descrição</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[90px] text-[10px] uppercase tracking-wider border-r border-slate-700">Total</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[50px] text-[10px] uppercase tracking-wider border-r border-slate-700">%</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[80px] text-[10px] uppercase tracking-wider border-r border-slate-700">Jan</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[80px] text-[10px] uppercase tracking-wider border-r border-slate-700">Fev</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[80px] text-[10px] uppercase tracking-wider border-r border-slate-700">Mar</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[80px] text-[10px] uppercase tracking-wider border-r border-slate-700">Abr</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[80px] text-[10px] uppercase tracking-wider border-r border-slate-700">Mai</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[80px] text-[10px] uppercase tracking-wider border-r border-slate-700">Jun</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[80px] text-[10px] uppercase tracking-wider border-r border-slate-700">Jul</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[80px] text-[10px] uppercase tracking-wider border-r border-slate-700">Ago</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[80px] text-[10px] uppercase tracking-wider border-r border-slate-700">Set</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[80px] text-[10px] uppercase tracking-wider border-r border-slate-700">Out</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[80px] text-[10px] uppercase tracking-wider border-r border-slate-700">Nov</th>
+                      <th className="text-right px-2 py-2 font-semibold text-white min-w-[80px] text-[10px] uppercase tracking-wider">Dez</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -974,23 +1011,25 @@ export function VWFinancialDashboard() {
                       <tr 
                         key={index}
                         className={`
-                          ${item.isHighlight ? 'bg-blue-50 dark:bg-blue-950/20 font-semibold' : ''}
-                          ${item.isFinal ? 'bg-slate-100 dark:bg-slate-800 font-bold border-t-2 border-slate-300 dark:border-slate-600' : ''}
-                          ${!item.isHighlight && !item.isFinal ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}
-                          border-b border-slate-100 dark:border-slate-800
+                          ${item.isHighlight && !item.isFinal ? 'bg-blue-50 dark:bg-blue-950/30 font-semibold' : ''}
+                          ${item.isFinal ? 'bg-purple-100 dark:from-purple-950/40 font-bold' : ''}
+                          ${!item.isHighlight && !item.isFinal ? 'hover:bg-slate-50 dark:hover:bg-slate-800/30' : ''}
+                          border-b border-slate-300 dark:border-slate-700
                         `}
                       >
-                        <td className="p-4 text-slate-900 dark:text-white sticky left-0 bg-inherit z-10">{item.descricao}</td>
-                        <td className={`p-4 text-right ${item.total < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>
+                        <td className={`px-2 py-1.5 sticky left-0 bg-inherit z-10 border-r border-slate-200 dark:border-slate-700 ${item.isFinal ? 'text-purple-900 dark:text-purple-200 text-[11px] font-bold' : item.isHighlight ? 'text-blue-900 dark:text-blue-200 text-[10px] font-semibold' : 'text-slate-700 dark:text-slate-300 text-[10px]'}`}>
+                          {item.descricao}
+                        </td>
+                        <td className={`px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700 ${item.total < 0 ? 'text-red-600 dark:text-red-400 text-[10px] font-medium' : item.isFinal ? 'text-purple-900 dark:text-purple-200 text-[10px] font-bold' : item.isHighlight ? 'text-blue-900 dark:text-blue-200 text-[10px] font-semibold' : 'text-slate-900 dark:text-white text-[10px]'}`}>
                           {index === 0 ? item.total.toLocaleString('pt-BR') : formatCurrency(item.total)}
                         </td>
-                        <td className="p-4 text-right text-slate-600 dark:text-slate-400">
+                        <td className={`px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700 ${item.isFinal ? 'text-purple-700 dark:text-purple-300 text-[10px] font-bold' : 'text-slate-600 dark:text-slate-400 text-[10px]'}`}>
                           {item.percentTotal !== undefined && item.percentTotal !== null ? `${item.percentTotal.toFixed(2)}%` : '-'}
                         </td>
                         {item.meses.map((valor, mesIdx) => (
                           <td 
                             key={mesIdx}
-                            className={`p-4 text-right ${valor < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}
+                            className={`px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700 last:border-r-0 ${valor < 0 ? 'text-red-600 dark:text-red-400 text-[10px]' : item.isFinal ? 'text-purple-900 dark:text-purple-200 text-[10px] font-bold' : item.isHighlight ? 'text-blue-900 dark:text-blue-200 text-[10px] font-semibold' : 'text-slate-900 dark:text-white text-[10px]'} ${valor === 0 && index !== 0 ? 'text-slate-400 dark:text-slate-600' : ''}`}
                           >
                             {index === 0 ? valor.toLocaleString('pt-BR') : formatCurrency(valor)}
                           </td>
