@@ -1,13 +1,106 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { TrendingDown } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { TrendingDown, Download, Upload, Calendar, BarChart3 } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend, LabelList } from "recharts"
-import { useState } from "react"
+import { useState, useRef } from "react"
 
 export function VWFinancialDashboard() {
   // Estado para controlar categorias de despesas selecionadas
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['pessoal', 'terceiros', 'ocupacao', 'funcionamento', 'vendas'])
+  const [viewMode, setViewMode] = useState<'mensal' | 'bimestral' | 'trimestral' | 'semestral'>('mensal')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Função para agregar dados por período
+  const aggregateData = (meses: number[]) => {
+    if (viewMode === 'mensal') return meses
+    
+    const periods: number[] = []
+    if (viewMode === 'bimestral') {
+      // 6 períodos de 2 meses
+      for (let i = 0; i < 12; i += 2) {
+        periods.push(meses[i] + meses[i + 1])
+      }
+    } else if (viewMode === 'trimestral') {
+      // 4 períodos de 3 meses
+      for (let i = 0; i < 12; i += 3) {
+        periods.push(meses[i] + meses[i + 1] + meses[i + 2])
+      }
+    } else if (viewMode === 'semestral') {
+      // 2 períodos de 6 meses
+      for (let i = 0; i < 12; i += 6) {
+        periods.push(meses[i] + meses[i + 1] + meses[i + 2] + meses[i + 3] + meses[i + 4] + meses[i + 5])
+      }
+    }
+    return periods
+  }
+
+  // Função para obter labels de períodos
+  const getPeriodLabels = () => {
+    if (viewMode === 'mensal') {
+      return ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    } else if (viewMode === 'bimestral') {
+      return ['Jan-Fev', 'Mar-Abr', 'Mai-Jun', 'Jul-Ago', 'Set-Out', 'Nov-Dez']
+    } else if (viewMode === 'trimestral') {
+      return ['1º Tri', '2º Tri', '3º Tri', '4º Tri']
+    } else {
+      return ['1º Sem', '2º Sem']
+    }
+  }
+
+  // Função para baixar template
+  const downloadTemplate = () => {
+    const template = {
+      descricao: "Exemplo: RECEITA OPERACIONAL LIQUIDA",
+      total: 95954132,
+      percentTotal: 100.00,
+      meses: [8328316, 8483342, 7902231, 7138470, 7226733, 8336360, 8485005, 10826922, 8927513, 9761159, 8538082, 0],
+      isHighlight: false,
+      isFinal: false
+    }
+    
+    const templateData = {
+      estrutura: template,
+      instrucoes: "Cada linha da DRE deve seguir este formato. Os 'meses' devem conter 12 valores (Jan a Dez).",
+      exemplo_completo: dreData
+    }
+    
+    const blob = new Blob([JSON.stringify(templateData, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'template-dre.json'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  // Função para importar dados
+  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target?.result as string)
+        console.log('Dados importados:', importedData)
+        // Aqui você pode adicionar lógica para atualizar o estado com os dados importados
+        alert('Dados importados com sucesso! (Funcionalidade de atualização em desenvolvimento)')
+      } catch (error) {
+        alert('Erro ao importar dados. Verifique se o arquivo está no formato correto.')
+        console.error('Erro ao importar:', error)
+      }
+    }
+    reader.readAsText(file)
+    
+    // Limpar o input para permitir reimportação do mesmo arquivo
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   // Função para toggle de categoria
   const toggleCategory = (category: string) => {
@@ -247,6 +340,72 @@ export function VWFinancialDashboard() {
               </Badge>
             </div>
           </div>
+
+          {/* Seleção de Visualização */}
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">Visualização</CardTitle>
+              </div>
+              <CardDescription className="text-xs">Selecione o período de agregação dos dados</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <button
+                  onClick={() => setViewMode('mensal')}
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                    viewMode === 'mensal'
+                      ? 'bg-amber-500 border-amber-500 text-white shadow-lg'
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <Calendar className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">Mensal</span>
+                  <span className="text-xs opacity-80">(Sorana)</span>
+                </button>
+
+                <button
+                  onClick={() => setViewMode('bimestral')}
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                    viewMode === 'bimestral'
+                      ? 'bg-amber-500 border-amber-500 text-white shadow-lg'
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <BarChart3 className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">Bimestral</span>
+                  <span className="text-xs opacity-80">(Sorana)</span>
+                </button>
+
+                <button
+                  onClick={() => setViewMode('trimestral')}
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                    viewMode === 'trimestral'
+                      ? 'bg-amber-500 border-amber-500 text-white shadow-lg'
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <BarChart3 className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">Trimestral</span>
+                  <span className="text-xs opacity-80">(Sorana)</span>
+                </button>
+
+                <button
+                  onClick={() => setViewMode('semestral')}
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                    viewMode === 'semestral'
+                      ? 'bg-amber-500 border-amber-500 text-white shadow-lg'
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <BarChart3 className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">Semestral</span>
+                  <span className="text-xs opacity-80">(Sorana)</span>
+                </button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -363,11 +522,13 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="h-[280px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={(() => {
-                      const media = dreData[1].total / 12;
-                      return dreData[1].meses.map((val, idx) => ({
-                        mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                      const periodData = aggregateData(dreData[1].meses);
+                      const labels = getPeriodLabels();
+                      const media = periodData.reduce((a, b) => a + b, 0) / periodData.length;
+                      return periodData.map((val, idx) => ({
+                        mes: labels[idx],
                         valor: val / 1000,
-                        fill: val > media * 1.05 ? '#06b6d4' : val < media * 0.95 ? '#ef4444' : '#f59e0b'
+                        fill: val > media * 1.05 ? '#14b8a6' : val < media * 0.95 ? '#dc2626' : '#f97316'
                       }));
                     })()}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -450,9 +611,11 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="h-[280px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={(() => {
-                      const media = dreData[0].total / 12;
-                      return dreData[0].meses.map((vol, idx) => ({
-                        mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                      const periodData = aggregateData(dreData[0].meses);
+                      const labels = getPeriodLabels();
+                      const media = periodData.reduce((a, b) => a + b, 0) / periodData.length;
+                      return periodData.map((vol, idx) => ({
+                        mes: labels[idx],
                         volume: vol,
                         fill: vol > media * 1.05 ? '#0284c7' : vol < media * 0.95 ? '#b91c1c' : '#ea580c'
                       }));
@@ -533,11 +696,14 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="h-[280px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={(() => {
-                      const media = dreData[3].total / 12;
-                      return dreData[3].meses.map((val, idx) => ({
-                        mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                      const periodDataLucro = aggregateData(dreData[3].meses);
+                      const periodDataReceita = aggregateData(dreData[1].meses);
+                      const labels = getPeriodLabels();
+                      const media = periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length;
+                      return periodDataLucro.map((val, idx) => ({
+                        mes: labels[idx],
                         valor: val / 1000,
-                        margem: parseFloat((val / dreData[1].meses[idx] * 100).toFixed(1)),
+                        margem: parseFloat((val / periodDataReceita[idx] * 100).toFixed(1)),
                         fill: val > media * 1.05 ? '#059669' : val < media * 0.95 ? '#991b1b' : '#d97706'
                       }));
                     })()}>
@@ -640,11 +806,14 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="h-[280px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={(() => {
-                      const media = dreData[7].total / 12;
-                      return dreData[7].meses.map((val, idx) => ({
-                        mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                      const periodDataMargem = aggregateData(dreData[7].meses);
+                      const periodDataReceita = aggregateData(dreData[1].meses);
+                      const labels = getPeriodLabels();
+                      const media = periodDataMargem.reduce((a, b) => a + b, 0) / periodDataMargem.length;
+                      return periodDataMargem.map((val, idx) => ({
+                        mes: labels[idx],
                         valor: val / 1000,
-                        margem: parseFloat((val / dreData[1].meses[idx] * 100).toFixed(1)),
+                        margem: parseFloat((val / periodDataReceita[idx] * 100).toFixed(1)),
                         fill: val > media * 1.05 ? '#2563eb' : val < media * 0.95 ? '#7f1d1d' : '#c2410c'
                       }));
                     })()}>
@@ -795,27 +964,45 @@ export function VWFinancialDashboard() {
                         <div className="w-4 h-4 rounded-full bg-[#001E50] mx-auto mb-2"></div>
                         <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Pessoal</p>
                         <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[8].total) / 1000)} mil</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[8].total) / dreData[1].total * 100).toFixed(2)}%</p>
                       </div>
                       <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                         <div className="w-4 h-4 rounded-full bg-[#0089EF] mx-auto mb-2"></div>
                         <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Terceiros</p>
                         <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[9].total) / 1000)} mil</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[9].total) / dreData[1].total * 100).toFixed(2)}%</p>
                       </div>
                       <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                         <div className="w-4 h-4 rounded-full bg-[#F59E0B] mx-auto mb-2"></div>
                         <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Ocupação</p>
                         <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[10].total) / 1000)} mil</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[10].total) / dreData[1].total * 100).toFixed(2)}%</p>
                       </div>
                       <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                         <div className="w-4 h-4 rounded-full bg-[#EF4444] mx-auto mb-2"></div>
                         <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Funcionamento</p>
                         <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[11].total) / 1000)} mil</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[11].total) / dreData[1].total * 100).toFixed(2)}%</p>
                       </div>
                       <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                         <div className="w-4 h-4 rounded-full bg-[#8B5CF6] mx-auto mb-2"></div>
                         <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Vendas</p>
                         <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[4].total) / 1000)} mil</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[4].total) / dreData[1].total * 100).toFixed(2)}%</p>
                       </div>
+                    </div>
+                    
+                    <div className="mt-4 p-4 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-700 rounded-lg border-2 border-slate-300 dark:border-slate-600">
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Total de Despesas</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                          {formatCurrency((Math.abs(dreData[8].total) + Math.abs(dreData[9].total) + Math.abs(dreData[10].total) + Math.abs(dreData[11].total) + Math.abs(dreData[4].total)) / 1000)} mil
+                        </p>
+                        <p className="text-lg font-bold text-slate-700 dark:text-slate-300">
+                          {((Math.abs(dreData[8].total) + Math.abs(dreData[9].total) + Math.abs(dreData[10].total) + Math.abs(dreData[11].total) + Math.abs(dreData[4].total)) / dreData[1].total * 100).toFixed(2)}%
+                        </p>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">do total da receita</p>
                     </div>
                   </div>
                 </div>
@@ -823,18 +1010,81 @@ export function VWFinancialDashboard() {
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="h-[320px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={dreData[8].meses.map((_, idx) => ({ 
-                      mes: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][idx],
-                      pessoal: Math.abs(dreData[8].meses[idx]),
-                      terceiros: Math.abs(dreData[9].meses[idx]),
-                      ocupacao: Math.abs(dreData[10].meses[idx]),
-                      funcionamento: Math.abs(dreData[11].meses[idx]),
-                      vendas: Math.abs(dreData[4].meses[idx])
-                    }))}>
+                    <BarChart data={(() => {
+                      const aggregatedPessoal = aggregateData(dreData[8].meses.map(v => Math.abs(v)));
+                      const aggregatedTerceiros = aggregateData(dreData[9].meses.map(v => Math.abs(v)));
+                      const aggregatedOcupacao = aggregateData(dreData[10].meses.map(v => Math.abs(v)));
+                      const aggregatedFuncionamento = aggregateData(dreData[11].meses.map(v => Math.abs(v)));
+                      const aggregatedVendas = aggregateData(dreData[4].meses.map(v => Math.abs(v)));
+                      const aggregatedReceita = aggregateData(dreData[1].meses);
+                      const periodLabels = getPeriodLabels();
+                      
+                      return aggregatedPessoal.map((_, idx) => ({
+                        mes: periodLabels[idx],
+                        pessoal: aggregatedPessoal[idx],
+                        terceiros: aggregatedTerceiros[idx],
+                        ocupacao: aggregatedOcupacao[idx],
+                        funcionamento: aggregatedFuncionamento[idx],
+                        vendas: aggregatedVendas[idx],
+                        total: aggregatedPessoal[idx] + aggregatedTerceiros[idx] + aggregatedOcupacao[idx] + aggregatedFuncionamento[idx] + aggregatedVendas[idx],
+                        totalPct: (((aggregatedPessoal[idx] + aggregatedTerceiros[idx] + aggregatedOcupacao[idx] + aggregatedFuncionamento[idx] + aggregatedVendas[idx]) / aggregatedReceita[idx]) * 100).toFixed(1),
+                        pessoalPct: ((aggregatedPessoal[idx] / aggregatedReceita[idx]) * 100).toFixed(2),
+                        terceirosPct: ((aggregatedTerceiros[idx] / aggregatedReceita[idx]) * 100).toFixed(2),
+                        ocupacaoPct: ((aggregatedOcupacao[idx] / aggregatedReceita[idx]) * 100).toFixed(2),
+                        funcionamentoPct: ((aggregatedFuncionamento[idx] / aggregatedReceita[idx]) * 100).toFixed(2),
+                        vendasPct: ((aggregatedVendas[idx] / aggregatedReceita[idx]) * 100).toFixed(2)
+                      }));
+                    })()}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartTooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                                <div className="space-y-1 mb-3">
+                                  {payload.map((entry: any) => (
+                                    <div key={entry.name} className="flex items-center justify-between gap-4">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded" style={{ backgroundColor: entry.color }}></div>
+                                        <span className="text-xs text-slate-600 dark:text-slate-400">{entry.name}:</span>
+                                      </div>
+                                      <div className="text-right">
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white">
+                                          {formatCurrency(entry.value)}
+                                        </span>
+                                        <span className="text-xs text-slate-600 dark:text-slate-400 ml-2">
+                                          ({entry.name === 'Pessoal' ? payload[0].payload.pessoalPct :
+                                            entry.name === 'Terceiros' ? payload[0].payload.terceirosPct :
+                                            entry.name === 'Ocupação' ? payload[0].payload.ocupacaoPct :
+                                            entry.name === 'Funcionamento' ? payload[0].payload.funcionamentoPct :
+                                            payload[0].payload.vendasPct}%)
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Total:</span>
+                                    <div className="text-right">
+                                      <span className="text-sm font-bold text-slate-900 dark:text-white">
+                                        {formatCurrency(payload[0].payload.total)}
+                                      </span>
+                                      <span className="text-xs font-bold text-slate-600 dark:text-slate-400 ml-2">
+                                        ({payload[0].payload.totalPct}%)
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
                       {selectedCategories.includes('pessoal') && (
                         <Bar dataKey="pessoal" stackId="a" fill="#001E50" name="Pessoal" />
                       )}
@@ -897,11 +1147,14 @@ export function VWFinancialDashboard() {
             <ChartContainer config={chartConfig} className="h-[280px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={(() => {
-                  const media = dreData[21].total / 12;
-                  return dreData[21].meses.map((val, idx) => ({
-                    mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                  const periodDataLucro = aggregateData(dreData[21].meses);
+                  const periodDataReceita = aggregateData(dreData[1].meses);
+                  const labels = getPeriodLabels();
+                  const media = periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length;
+                  return periodDataLucro.map((val, idx) => ({
+                    mes: labels[idx],
                     valor: val / 1000,
-                    percentual: ((val / dreData[1].meses[idx]) * 100).toFixed(2),
+                    percentual: ((val / periodDataReceita[idx]) * 100).toFixed(2),
                     fill: val > media * 1.05 ? '#0ea5e9' : val < media * 0.95 ? '#f97316' : '#10b981'
                   }));
                 })()}>
@@ -978,9 +1231,38 @@ export function VWFinancialDashboard() {
 
         {/* DRE - Demonstrativo de Resultados do Exercício */}
         <div>
-          <div className="mb-4">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Demonstrativo de Resultados (DRE)</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400">Relatório detalhado de desempenho mensal - Ano Fiscal 2025</p>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Demonstrativo de Resultados (DRE)</h2>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Relatório detalhado de desempenho mensal - Ano Fiscal 2025</p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleImportData}
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Importar Dados
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadTemplate}
+                className="gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Baixar Template
+              </Button>
+            </div>
           </div>
 
           <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -1040,43 +1322,6 @@ export function VWFinancialDashboard() {
                 </table>
               </div>
             </CardContent>
-          </Card>
-        </div>
-
-        {/* Insights Executivos */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/50 border-blue-200 dark:border-blue-800">
-            <CardHeader className="pb-3">
-              <CardDescription className="text-xs font-semibold text-blue-700 dark:text-blue-400">Receita Operacional Líquida</CardDescription>
-              <CardTitle className="text-2xl text-blue-900 dark:text-blue-100">{formatCurrency(95954132)}</CardTitle>
-            </CardHeader>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/50 dark:to-emerald-900/50 border-emerald-200 dark:border-emerald-800">
-            <CardHeader className="pb-3">
-              <CardDescription className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Margem de Contribuição</CardDescription>
-              <CardTitle className="text-2xl text-emerald-900 dark:text-emerald-100">
-                {formatCurrency(8365271)} <span className="text-sm">(8,72%)</span>
-              </CardTitle>
-            </CardHeader>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/50 dark:to-purple-900/50 border-purple-200 dark:border-purple-800">
-            <CardHeader className="pb-3">
-              <CardDescription className="text-xs font-semibold text-purple-700 dark:text-purple-400">Lucro Operacional</CardDescription>
-              <CardTitle className="text-2xl text-purple-900 dark:text-purple-100">
-                {formatCurrency(4189348)} <span className="text-sm">(4,37%)</span>
-              </CardTitle>
-            </CardHeader>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/50 dark:to-amber-900/50 border-amber-200 dark:border-amber-800">
-            <CardHeader className="pb-3">
-              <CardDescription className="text-xs font-semibold text-amber-700 dark:text-amber-400">Lucro Líquido</CardDescription>
-              <CardTitle className="text-2xl text-amber-900 dark:text-amber-100">
-                {formatCurrency(476215)} <span className="text-sm">(0,50%)</span>
-              </CardTitle>
-            </CardHeader>
           </Card>
         </div>
       </div>
