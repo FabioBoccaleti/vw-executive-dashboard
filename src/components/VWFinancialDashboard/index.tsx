@@ -3,8 +3,24 @@ import { Badge } from "@/components/ui/badge"
 import { TrendingDown } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend } from "recharts"
+import { useState } from "react"
 
 export function VWFinancialDashboard() {
+  // Estado para controlar categorias de despesas selecionadas
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['pessoal', 'terceiros', 'ocupacao', 'funcionamento', 'vendas'])
+
+  // Função para toggle de categoria
+  const toggleCategory = (category: string) => {
+    setSelectedCategories(prev => {
+      if (prev.includes(category)) {
+        // Não permitir desselecionar todas
+        if (prev.length === 1) return prev
+        return prev.filter(c => c !== category)
+      } else {
+        return [...prev, category]
+      }
+    })
+  }
   // Dados mensais
   const monthlyData = [
     { mes: "Janeiro", volume: 120, receitaLiquida: 8900, lucroBruto: 520, rendasOperacionais: 420, lucroOperacional: 190, pessoal: 145, terceiros: 48, ocupacao: 22, funcionamento: 95, vendas: 390 },
@@ -204,271 +220,472 @@ export function VWFinancialDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-6">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="bg-[#001E50] rounded-lg p-3">
-              <span className="text-white font-bold text-2xl">VW</span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:to-slate-900">
+      {/* Executive Header */}
+      <div className="bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="max-w-[1800px] mx-auto px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="bg-gradient-to-br from-[#001E50] to-[#003875] rounded-xl p-3 shadow-lg">
+                <span className="text-white font-bold text-3xl">VW</span>
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+                  Dashboard Executivo
+                </h1>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                  Veículos Usados • Análise Gerencial • Atualizado em 07/01/2026
+                </p>
+              </div>
             </div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-              Dashboard Financeiro VW - Dados Mensais - Veículos Usados
-            </h1>
+            <div className="flex items-center gap-3">
+              <Badge className="bg-green-100 text-green-800 border-green-200 px-4 py-2 text-sm">
+                Ano Fiscal 2025
+              </Badge>
+              <Badge className="bg-blue-100 text-blue-800 border-blue-200 px-4 py-2 text-sm">
+                Confidencial
+              </Badge>
+            </div>
           </div>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Análise Executiva de Performance • Atualizado em 07/01/2026
-          </p>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <Card className="bg-gradient-to-br from-[#001E50] to-[#003875] text-white border-0 shadow-lg">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-blue-100 text-xs font-medium">VOLUME TOTAL</CardDescription>
-            <CardTitle className="text-4xl font-bold">{totais.volumeTotal.toLocaleString('pt-BR')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-blue-100">unidades</p>
-          </CardContent>
-        </Card>
+      <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
+        {/* Executive Summary - KPIs */}
+        <div>
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Resumo Executivo</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Principais indicadores de performance</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-blue-600 shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <CardDescription className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Volume Total</CardDescription>
+                <CardTitle className="text-3xl font-bold text-slate-900 dark:text-white">{totais.volumeTotal.toLocaleString('pt-BR')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-blue-50 text-blue-700 text-xs">unidades</Badge>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-gradient-to-br from-[#00396B] to-[#004D8C] text-white border-0 shadow-lg">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-blue-100 text-xs font-medium">RECEITA LÍQUIDA</CardDescription>
-            <CardTitle className="text-4xl font-bold">{formatCurrency(totais.receitaLiquida)}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-blue-100">total do período</p>
-          </CardContent>
-        </Card>
+            <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-emerald-600 shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <CardDescription className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Receita Líquida</CardDescription>
+                <CardTitle className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(totais.receitaLiquida)}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-emerald-50 text-emerald-700 text-xs">100,00%</Badge>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-gradient-to-br from-[#004D8C] to-[#0061AD] text-white border-0 shadow-lg">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-blue-100 text-xs font-medium">LUCRO OPERACIONAL</CardDescription>
-            <CardTitle className="text-4xl font-bold">{formatCurrency(totais.lucroOperacional)}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Badge variant="destructive" className="bg-red-500/90">
-                <TrendingDown className="w-3 h-3 mr-1" />
-                -2,48%
+            <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-purple-600 shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <CardDescription className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Lucro Operacional</CardDescription>
+                <CardTitle className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(totais.lucroOperacional)}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <Badge variant="destructive" className="bg-red-50 text-red-700 border-red-200 text-xs">
+                    <TrendingDown className="w-3 h-3 mr-1" />
+                    -2,48%
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-amber-600 shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <CardDescription className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Margem Operacional</CardDescription>
+                <CardTitle className="text-3xl font-bold text-slate-900 dark:text-white">{totais.margemOperacional.toFixed(2)}%</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-amber-50 text-amber-700 text-xs">Abaixo do Target</Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-slate-600 shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <CardDescription className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Ticket Médio</CardDescription>
+                <CardTitle className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(totais.ticketMedio)}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-slate-50 text-slate-700 text-xs">por unidade</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        </div>
+
+        {/* Performance Analytics - Charts */}
+        <div>
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Análise de Performance</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Evolução dos principais indicadores operacionais e financeiros</p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Receita de Vendas Líquidas */}
+            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Receita de Vendas Líquidas</CardTitle>
+                    <CardDescription className="text-sm">Receita operacional líquida por período</CardDescription>
+                  </div>
+                  <Badge className="bg-cyan-50 text-cyan-700 border-cyan-200">100%</Badge>
+                </div>
+                <div className="mt-4 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(dreData[1].total / 1000)}</span>
+                  <span className="text-sm text-slate-600">mil</span>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <ChartContainer config={chartConfig} className="h-[280px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={dreData[1].meses.map((val, idx) => ({ 
+                      mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                      valor: val / 1000
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <defs>
+                        <linearGradient id="gradientReceita" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.4}/>
+                          <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.05}/>
+                        </linearGradient>
+                      </defs>
+                      <Area 
+                        type="monotone" 
+                        dataKey="valor" 
+                        stroke="#06b6d4" 
+                        strokeWidth={2.5}
+                        fill="url(#gradientReceita)"
+                        name="Receita Líquida"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* Volume de Vendas */}
+            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Volume de Vendas</CardTitle>
+                    <CardDescription className="text-sm">Unidades comercializadas por período</CardDescription>
+                  </div>
+                  <Badge className="bg-blue-50 text-blue-700 border-blue-200">2025</Badge>
+                </div>
+                <div className="mt-4 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold text-slate-900 dark:text-white">{dreData[0].total.toLocaleString('pt-BR')}</span>
+                  <span className="text-sm text-slate-600">unidades</span>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <ChartContainer config={chartConfig} className="h-[280px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dreData[0].meses.map((vol, idx) => ({ 
+                      mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                      volume: vol 
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar dataKey="volume" fill="#0ea5e9" name="Volume" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* Lucro Bruto */}
+            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Lucro Bruto</CardTitle>
+                    <CardDescription className="text-sm">Resultado bruto das operações</CardDescription>
+                  </div>
+                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">{dreData[3].percentTotal?.toFixed(2)}%</Badge>
+                </div>
+                <div className="mt-4 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(dreData[3].total / 1000)}</span>
+                  <span className="text-sm text-slate-600">mil</span>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <ChartContainer config={chartConfig} className="h-[280px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={dreData[3].meses.map((val, idx) => ({ 
+                      mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                      valor: val / 1000
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <defs>
+                        <linearGradient id="gradientLucroBruto" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10b981" stopOpacity={0.4}/>
+                          <stop offset="100%" stopColor="#10b981" stopOpacity={0.05}/>
+                        </linearGradient>
+                      </defs>
+                      <Area 
+                        type="monotone" 
+                        dataKey="valor" 
+                        stroke="#10b981" 
+                        strokeWidth={2.5}
+                        fill="url(#gradientLucroBruto)"
+                        name="Lucro Bruto"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* Margem de Contribuição */}
+            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Margem de Contribuição</CardTitle>
+                    <CardDescription className="text-sm">Contribuição marginal do negócio</CardDescription>
+                  </div>
+                  <Badge className="bg-blue-50 text-blue-700 border-blue-200">{dreData[7].percentTotal?.toFixed(2)}%</Badge>
+                </div>
+                <div className="mt-4 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(dreData[7].total / 1000)}</span>
+                  <span className="text-sm text-slate-600">mil</span>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <ChartContainer config={chartConfig} className="h-[280px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={dreData[7].meses.map((val, idx) => ({ 
+                      mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                      valor: val / 1000
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="valor" 
+                        stroke="#3b82f6" 
+                        strokeWidth={3}
+                        dot={{ fill: "#3b82f6", r: 4, strokeWidth: 2, stroke: '#fff' }}
+                        name="Margem"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* Despesas por Categoria */}
+            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800 lg:col-span-2">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-6">
+                <div className="flex items-start justify-between mb-6">
+                  <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white">Despesas por Categoria</CardTitle>
+                  <div className="text-right">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total de Despesas</p>
+                    <p className="text-3xl font-bold text-slate-900 dark:text-white">
+                      {formatCurrency(Math.abs(dreData[8].total + dreData[9].total + dreData[10].total + dreData[11].total + dreData[4].total))}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Categorias de Despesa:</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge 
+                        className={`cursor-pointer transition-all ${
+                          selectedCategories.includes('pessoal') 
+                            ? 'bg-[#001E50] text-white border-[#001E50] hover:bg-[#003875]' 
+                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                        }`}
+                        onClick={() => toggleCategory('pessoal')}
+                      >
+                        Pessoal
+                      </Badge>
+                      <Badge 
+                        className={`cursor-pointer transition-all ${
+                          selectedCategories.includes('terceiros') 
+                            ? 'bg-[#0089EF] text-white border-[#0089EF] hover:bg-[#0075CE]' 
+                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                        }`}
+                        onClick={() => toggleCategory('terceiros')}
+                      >
+                        Terceiros
+                      </Badge>
+                      <Badge 
+                        className={`cursor-pointer transition-all ${
+                          selectedCategories.includes('ocupacao') 
+                            ? 'bg-[#F59E0B] text-white border-[#F59E0B] hover:bg-[#D97706]' 
+                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                        }`}
+                        onClick={() => toggleCategory('ocupacao')}
+                      >
+                        Ocupação
+                      </Badge>
+                      <Badge 
+                        className={`cursor-pointer transition-all ${
+                          selectedCategories.includes('funcionamento') 
+                            ? 'bg-[#EF4444] text-white border-[#EF4444] hover:bg-[#DC2626]' 
+                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                        }`}
+                        onClick={() => toggleCategory('funcionamento')}
+                      >
+                        Funcionamento
+                      </Badge>
+                      <Badge 
+                        className={`cursor-pointer transition-all ${
+                          selectedCategories.includes('vendas') 
+                            ? 'bg-[#8B5CF6] text-white border-[#8B5CF6] hover:bg-[#7C3AED]' 
+                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                        }`}
+                        onClick={() => toggleCategory('vendas')}
+                      >
+                        Vendas
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">Total do Período por Categoria:</p>
+                    <div className="grid grid-cols-5 gap-4">
+                      <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className="w-4 h-4 rounded-full bg-[#001E50] mx-auto mb-2"></div>
+                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Pessoal</p>
+                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[8].total) / 1000)} mil</p>
+                      </div>
+                      <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className="w-4 h-4 rounded-full bg-[#0089EF] mx-auto mb-2"></div>
+                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Terceiros</p>
+                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[9].total) / 1000)} mil</p>
+                      </div>
+                      <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className="w-4 h-4 rounded-full bg-[#F59E0B] mx-auto mb-2"></div>
+                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Ocupação</p>
+                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[10].total) / 1000)} mil</p>
+                      </div>
+                      <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className="w-4 h-4 rounded-full bg-[#EF4444] mx-auto mb-2"></div>
+                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Funcionamento</p>
+                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[11].total) / 1000)} mil</p>
+                      </div>
+                      <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className="w-4 h-4 rounded-full bg-[#8B5CF6] mx-auto mb-2"></div>
+                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Vendas</p>
+                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[4].total) / 1000)} mil</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <ChartContainer config={chartConfig} className="h-[320px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dreData[8].meses.map((_, idx) => ({ 
+                      mes: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][idx],
+                      pessoal: Math.abs(dreData[8].meses[idx]),
+                      terceiros: Math.abs(dreData[9].meses[idx]),
+                      ocupacao: Math.abs(dreData[10].meses[idx]),
+                      funcionamento: Math.abs(dreData[11].meses[idx]),
+                      vendas: Math.abs(dreData[4].meses[idx])
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      {selectedCategories.includes('pessoal') && (
+                        <Bar dataKey="pessoal" stackId="a" fill="#001E50" name="Pessoal" />
+                      )}
+                      {selectedCategories.includes('terceiros') && (
+                        <Bar dataKey="terceiros" stackId="a" fill="#0089EF" name="Terceiros" />
+                      )}
+                      {selectedCategories.includes('ocupacao') && (
+                        <Bar dataKey="ocupacao" stackId="a" fill="#F59E0B" name="Ocupação" />
+                      )}
+                      {selectedCategories.includes('funcionamento') && (
+                        <Bar dataKey="funcionamento" stackId="a" fill="#EF4444" name="Funcionamento" />
+                      )}
+                      {selectedCategories.includes('vendas') && (
+                        <Bar dataKey="vendas" stackId="a" fill="#8B5CF6" name="Vendas" />
+                      )}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Resultado Operacional - Destaque */}
+        <Card className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 shadow-xl border-0">
+          <CardHeader className="border-b border-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-2xl font-bold text-white">Resultado Operacional Líquido</CardTitle>
+                <CardDescription className="text-slate-300 text-base">Desempenho operacional consolidado</CardDescription>
+              </div>
+              <Badge className="bg-purple-500/20 text-purple-300 border-purple-400/30 text-base px-4 py-2">
+                {dreData[12].percentTotal?.toFixed(2)}%
               </Badge>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-[#0061AD] to-[#0075CE] text-white border-0 shadow-lg">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-blue-100 text-xs font-medium">MARGEM OPERACIONAL</CardDescription>
-            <CardTitle className="text-4xl font-bold">{totais.margemOperacional.toFixed(2)}%</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Badge variant="destructive" className="bg-red-500/90">
-                <TrendingDown className="w-3 h-3 mr-1" />
-                baixa
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-[#0075CE] to-[#0089EF] text-white border-0 shadow-lg">
-          <CardHeader className="pb-3">
-            <CardDescription className="text-blue-100 text-xs font-medium">TICKET MÉDIO</CardDescription>
-            <CardTitle className="text-4xl font-bold">{formatCurrency(totais.ticketMedio)}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-blue-100">por unidade</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Gráficos DRE */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        {/* Volume de Vendas */}
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Volume de Vendas (DRE)</CardTitle>
-            <CardDescription>Unidades vendidas por mês - 2025</CardDescription>
-            <div className="mt-2">
-              <p className="text-2xl font-bold">{dreData[0].total.toLocaleString('pt-BR')} unidades</p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dreData[0].meses.map((vol, idx) => ({ 
-                  mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
-                  volume: vol 
-                }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                  <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="volume" fill="#001E50" name="Volume" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        {/* Lucro Bruto */}
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Lucro Bruto (DRE)</CardTitle>
-            <CardDescription>Evolução mensal do lucro bruto - 2025</CardDescription>
-            <div className="mt-2">
-              <p className="text-2xl font-bold">{formatCurrency(dreData[3].total)}</p>
-              <p className="text-sm text-slate-600">Margem: {dreData[3].percentTotal?.toFixed(2)}%</p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={dreData[3].meses.map((val, idx) => ({ 
-                  mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
-                  valor: val 
-                }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                  <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <defs>
-                    <linearGradient id="colorLucroBruto" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
-                  <Area 
-                    type="monotone" 
-                    dataKey="valor" 
-                    stroke="#10b981" 
-                    strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorLucroBruto)"
-                    name="Lucro Bruto"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        {/* Margem de Contribuição */}
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Margem de Contribuição (DRE)</CardTitle>
-            <CardDescription>Evolução mensal da margem - 2025</CardDescription>
-            <div className="mt-2">
-              <p className="text-2xl font-bold text-blue-600">{formatCurrency(dreData[7].total)}</p>
-              <p className="text-sm text-slate-600">Margem: {dreData[7].percentTotal?.toFixed(2)}%</p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={dreData[7].meses.map((val, idx) => ({ 
-                  mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
-                  valor: val 
-                }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                  <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line 
-                    type="monotone" 
-                    dataKey="valor" 
-                    stroke="#2563eb" 
-                    strokeWidth={3}
-                    dot={{ fill: "#2563eb", r: 5 }}
-                    name="Margem Contribuição"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        {/* Despesas Totais */}
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Despesas por Categoria (DRE)</CardTitle>
-            <CardDescription>Distribuição mensal de despesas - 2025</CardDescription>
-            <div className="mt-2">
-              <p className="text-2xl font-bold text-red-600">
-                {formatCurrency(
-                  dreData[8].total + dreData[9].total + dreData[10].total + dreData[11].total
-                )}
-              </p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dreData[8].meses.map((_, idx) => ({ 
-                  mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
-                  pessoal: Math.abs(dreData[8].meses[idx]),
-                  terceiros: Math.abs(dreData[9].meses[idx]),
-                  ocupacao: Math.abs(dreData[10].meses[idx]),
-                  funcionamento: Math.abs(dreData[11].meses[idx])
-                }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                  <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  <Bar dataKey="pessoal" stackId="a" fill="#dc2626" name="Pessoal" />
-                  <Bar dataKey="terceiros" stackId="a" fill="#ea580c" name="Terceiros" />
-                  <Bar dataKey="ocupacao" stackId="a" fill="#f59e0b" name="Ocupação" />
-                  <Bar dataKey="funcionamento" stackId="a" fill="#fbbf24" name="Funcionamento" />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        {/* Resultado Operacional Líquido */}
-        <Card className="shadow-lg lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Resultado Operacional Líquido (DRE)</CardTitle>
-            <CardDescription>Evolução do resultado operacional - 2025</CardDescription>
-            <div className="mt-2 flex items-center gap-6">
+            <div className="mt-6 flex items-center gap-8">
               <div>
-                <p className="text-sm text-slate-600">Total</p>
-                <p className="text-3xl font-bold text-purple-600">{formatCurrency(dreData[12].total)}</p>
+                <p className="text-sm text-slate-400 mb-1">Total do Período</p>
+                <p className="text-4xl font-bold text-white">{formatCurrency(dreData[12].total / 1000)} <span className="text-2xl text-slate-400">mil</span></p>
               </div>
+              <div className="h-12 w-px bg-slate-700"></div>
               <div>
-                <p className="text-sm text-slate-600">Margem Operacional</p>
-                <p className="text-2xl font-bold">{dreData[12].percentTotal?.toFixed(2)}%</p>
+                <p className="text-sm text-slate-400 mb-1">Margem Operacional</p>
+                <p className="text-4xl font-bold text-purple-400">{dreData[12].percentTotal?.toFixed(2)}%</p>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-[350px] w-full">
+          <CardContent className="pt-6">
+            <ChartContainer config={chartConfig} className="h-[320px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={dreData[12].meses.map((val, idx) => ({ 
                   mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
-                  valor: val 
+                  valor: val / 1000
                 }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                  <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#475569" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fontSize: 13, fill: '#cbd5e1' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 13, fill: '#cbd5e1' }} axisLine={false} tickLine={false} />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <defs>
-                    <linearGradient id="colorResultado" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.1}/>
+                    <linearGradient id="gradientResultado" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#a855f7" stopOpacity={0.6}/>
+                      <stop offset="100%" stopColor="#a855f7" stopOpacity={0.05}/>
                     </linearGradient>
                   </defs>
                   <Area 
                     type="monotone" 
                     dataKey="valor" 
-                    stroke="#7c3aed" 
+                    stroke="#a855f7" 
                     strokeWidth={3}
-                    fillOpacity={1} 
-                    fill="url(#colorResultado)"
+                    fill="url(#gradientResultado)"
                     name="Resultado Operacional"
                   />
                 </AreaChart>
@@ -476,106 +693,108 @@ export function VWFinancialDashboard() {
             </ChartContainer>
           </CardContent>
         </Card>
-      </div>
 
-      {/* DRE - Demonstrativo de Resultados */}
-      <Card className="shadow-lg mt-6">
-        <CardHeader>
-          <CardTitle className="text-2xl">DRE - Demonstrativo de Resultados do Exercício</CardTitle>
-          <CardDescription>Análise detalhada mensal - Ano 2025</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-[#001E50] text-white">
-                  <th className="p-3 text-left font-semibold sticky left-0 bg-[#001E50] z-10">Descrição</th>
-                  <th className="p-3 text-right font-semibold">Total</th>
-                  <th className="p-3 text-right font-semibold">%</th>
-                  <th className="p-3 text-right font-semibold">Jan/25</th>
-                  <th className="p-3 text-right font-semibold">Fev/25</th>
-                  <th className="p-3 text-right font-semibold">Mar/25</th>
-                  <th className="p-3 text-right font-semibold">Abr/25</th>
-                  <th className="p-3 text-right font-semibold">Mai/25</th>
-                  <th className="p-3 text-right font-semibold">Jun/25</th>
-                  <th className="p-3 text-right font-semibold">Jul/25</th>
-                  <th className="p-3 text-right font-semibold">Ago/25</th>
-                  <th className="p-3 text-right font-semibold">Set/25</th>
-                  <th className="p-3 text-right font-semibold">Out/25</th>
-                  <th className="p-3 text-right font-semibold">Nov/25</th>
-                  <th className="p-3 text-right font-semibold">Dez/25</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dreData.map((linha, index) => (
-                  <tr 
-                    key={index} 
-                    className={`
-                      border-b border-slate-200 dark:border-slate-700
-                      ${linha.isHighlight ? 'bg-blue-50 dark:bg-blue-900/20 font-semibold' : ''}
-                      ${linha.isFinal ? 'bg-green-50 dark:bg-green-900/20 font-bold' : ''}
-                      hover:bg-slate-50 dark:hover:bg-slate-800
-                    `}
-                  >
-                    <td className="p-3 sticky left-0 bg-inherit z-10 font-medium">
-                      {linha.descricao}
-                    </td>
-                    <td className="p-3 text-right font-medium">
-                      {linha.descricao === "VOLUME DE VENDAS" 
-                        ? linha.total.toLocaleString('pt-BR')
-                        : formatCurrency(linha.total)
-                      }
-                    </td>
-                    <td className={`p-3 text-right ${linha.percentTotal && linha.percentTotal < 0 ? 'text-red-600' : ''}`}>
-                      {linha.percentTotal !== null ? `${linha.percentTotal.toFixed(2)}%` : '-'}
-                    </td>
-                    {linha.meses.map((valor, mesIndex) => (
-                      <td key={mesIndex} className="p-3 text-right">
-                        {valor === 0 ? '-' : (
-                          linha.descricao === "VOLUME DE VENDAS"
-                            ? valor.toLocaleString('pt-BR')
-                            : new Intl.NumberFormat('pt-BR', {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 0,
-                              }).format(valor)
-                        )}
-                      </td>
+        {/* DRE - Demonstrativo de Resultados do Exercício */}
+        <div>
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Demonstrativo de Resultados (DRE)</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Relatório detalhado de desempenho mensal - Ano Fiscal 2025</p>
+          </div>
+
+          <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800 overflow-hidden">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                      <th className="text-left p-4 font-semibold text-slate-700 dark:text-slate-300 sticky left-0 bg-slate-50 dark:bg-slate-800 z-10 min-w-[300px]">Descrição</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[120px]">Total</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[80px]">%</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Jan</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Fev</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Mar</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Abr</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Mai</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Jun</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Jul</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Ago</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Set</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Out</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Nov</th>
+                      <th className="text-right p-4 font-semibold text-slate-700 dark:text-slate-300 min-w-[100px]">Dez</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dreData.map((item, index) => (
+                      <tr 
+                        key={index}
+                        className={`
+                          ${item.isHighlight ? 'bg-blue-50 dark:bg-blue-950/20 font-semibold' : ''}
+                          ${item.isFinal ? 'bg-slate-100 dark:bg-slate-800 font-bold border-t-2 border-slate-300 dark:border-slate-600' : ''}
+                          ${!item.isHighlight && !item.isFinal ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}
+                          border-b border-slate-100 dark:border-slate-800
+                        `}
+                      >
+                        <td className="p-4 text-slate-900 dark:text-white sticky left-0 bg-inherit z-10">{item.descricao}</td>
+                        <td className={`p-4 text-right ${item.total < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>
+                          {index === 0 ? item.total.toLocaleString('pt-BR') : formatCurrency(item.total)}
+                        </td>
+                        <td className="p-4 text-right text-slate-600 dark:text-slate-400">
+                          {item.percentTotal !== undefined && item.percentTotal !== null ? `${item.percentTotal.toFixed(2)}%` : '-'}
+                        </td>
+                        {item.meses.map((valor, mesIdx) => (
+                          <td 
+                            key={mesIdx}
+                            className={`p-4 text-right ${valor < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}
+                          >
+                            {index === 0 ? valor.toLocaleString('pt-BR') : formatCurrency(valor)}
+                          </td>
+                        ))}
+                      </tr>
                     ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          {/* Resumo dos principais indicadores */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800 p-4 rounded-lg">
-              <p className="text-xs text-slate-600 dark:text-slate-300 mb-1">Receita Operacional</p>
-              <p className="text-lg font-bold text-blue-900 dark:text-blue-100">
-                {formatCurrency(95954132)}
-              </p>
-            </div>
-            <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800 p-4 rounded-lg">
-              <p className="text-xs text-slate-600 dark:text-slate-300 mb-1">Margem de Contribuição</p>
-              <p className="text-lg font-bold text-green-900 dark:text-green-100">
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Insights Executivos */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/50 border-blue-200 dark:border-blue-800">
+            <CardHeader className="pb-3">
+              <CardDescription className="text-xs font-semibold text-blue-700 dark:text-blue-400">Receita Operacional Líquida</CardDescription>
+              <CardTitle className="text-2xl text-blue-900 dark:text-blue-100">{formatCurrency(95954132)}</CardTitle>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/50 dark:to-emerald-900/50 border-emerald-200 dark:border-emerald-800">
+            <CardHeader className="pb-3">
+              <CardDescription className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Margem de Contribuição</CardDescription>
+              <CardTitle className="text-2xl text-emerald-900 dark:text-emerald-100">
                 {formatCurrency(8365271)} <span className="text-sm">(8,72%)</span>
-              </p>
-            </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900 dark:to-purple-800 p-4 rounded-lg">
-              <p className="text-xs text-slate-600 dark:text-slate-300 mb-1">Lucro Operacional</p>
-              <p className="text-lg font-bold text-purple-900 dark:text-purple-100">
+              </CardTitle>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/50 dark:to-purple-900/50 border-purple-200 dark:border-purple-800">
+            <CardHeader className="pb-3">
+              <CardDescription className="text-xs font-semibold text-purple-700 dark:text-purple-400">Lucro Operacional</CardDescription>
+              <CardTitle className="text-2xl text-purple-900 dark:text-purple-100">
                 {formatCurrency(4189348)} <span className="text-sm">(4,37%)</span>
-              </p>
-            </div>
-            <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900 dark:to-amber-800 p-4 rounded-lg">
-              <p className="text-xs text-slate-600 dark:text-slate-300 mb-1">Lucro Líquido</p>
-              <p className="text-lg font-bold text-amber-900 dark:text-amber-100">
+              </CardTitle>
+            </CardHeader>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/50 dark:to-amber-900/50 border-amber-200 dark:border-amber-800">
+            <CardHeader className="pb-3">
+              <CardDescription className="text-xs font-semibold text-amber-700 dark:text-amber-400">Lucro Líquido</CardDescription>
+              <CardTitle className="text-2xl text-amber-900 dark:text-amber-100">
                 {formatCurrency(476215)} <span className="text-sm">(0,50%)</span>
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+              </CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+      </div>
   )
 }
