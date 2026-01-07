@@ -1113,8 +1113,8 @@ export function VWFinancialDashboard() {
           <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Lucro Líquido do Exercício</CardTitle>
-                <CardDescription className="text-sm">Resultado final após todas as despesas e impostos</CardDescription>
+                <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Lucro (Prejuízo) Antes dos Impostos</CardTitle>
+                <CardDescription className="text-sm">Resultado operacional antes da tributação</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 <Badge className="bg-purple-50 text-purple-700 text-xs">{dreData[18].percentTotal?.toFixed(2)}% ROL</Badge>
