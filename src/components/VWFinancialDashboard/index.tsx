@@ -336,45 +336,86 @@ export function VWFinancialDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Receita de Vendas Líquidas */}
             <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                <div className="flex items-center justify-between">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div className="flex items-center justify-between mb-3">
                   <div>
                     <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Receita de Vendas Líquidas</CardTitle>
                     <CardDescription className="text-sm">Receita operacional líquida por período</CardDescription>
                   </div>
-                  <Badge className="bg-cyan-50 text-cyan-700 border-cyan-200">100%</Badge>
+                  <Badge className="bg-cyan-50 text-cyan-700 border-cyan-200">100% Base</Badge>
                 </div>
-                <div className="mt-4 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(dreData[1].total / 1000)}</span>
-                  <span className="text-sm text-slate-600">mil</span>
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Acumulado</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(dreData[1].total / 1000)} mil</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Ticket Médio</p>
+                    <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{formatCurrency(dreData[1].total / dreData[0].total)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(dreData[1].total / 12 / 1000)} mil</p>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="h-[280px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={dreData[1].meses.map((val, idx) => ({ 
-                      mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
-                      valor: val / 1000
-                    }))}>
+                    <BarChart data={(() => {
+                      const media = dreData[1].total / 12;
+                      return dreData[1].meses.map((val, idx) => ({
+                        mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                        valor: val / 1000,
+                        fill: val > media * 1.05 ? '#06b6d4' : val < media * 0.95 ? '#ef4444' : '#f59e0b'
+                      }));
+                    })()}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <defs>
-                        <linearGradient id="gradientReceita" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.4}/>
-                          <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.05}/>
-                        </linearGradient>
-                      </defs>
-                      <Area 
-                        type="monotone" 
-                        dataKey="valor" 
-                        stroke="#06b6d4" 
-                        strokeWidth={2.5}
-                        fill="url(#gradientReceita)"
-                        name="Receita Líquida"
+                      <ChartTooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                                <div className="space-y-1">
+                                  <p className="text-sm">
+                                    <span className="text-slate-600 dark:text-slate-400">Receita Líquida: </span>
+                                    <span className="font-bold text-slate-900 dark:text-white">R$ {payload[0].value?.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
                       />
-                    </AreaChart>
+                      <Legend 
+                        wrapperStyle={{ fontSize: '12px' }} 
+                        content={() => (
+                          <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#06b6d4' }}></div>
+                              <span>Acima da Média</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#f59e0b' }}></div>
+                              <span>Média</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#ef4444' }}></div>
+                              <span>Abaixo da Média</span>
+                            </div>
+                          </div>
+                        )}
+                      />
+                      <Bar 
+                        dataKey="valor" 
+                        radius={[6, 6, 0, 0]}
+                        name="Receita Líquida (mil)"
+                      />
+                    </BarChart>
                   </ResponsiveContainer>
                 </ChartContainer>
               </CardContent>
@@ -382,31 +423,81 @@ export function VWFinancialDashboard() {
 
             {/* Volume de Vendas */}
             <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                <div className="flex items-center justify-between">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div className="flex items-center justify-between mb-3">
                   <div>
                     <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Volume de Vendas</CardTitle>
                     <CardDescription className="text-sm">Unidades comercializadas por período</CardDescription>
                   </div>
                   <Badge className="bg-blue-50 text-blue-700 border-blue-200">2025</Badge>
                 </div>
-                <div className="mt-4 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-slate-900 dark:text-white">{dreData[0].total.toLocaleString('pt-BR')}</span>
-                  <span className="text-sm text-slate-600">unidades</span>
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Anual</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{dreData[0].total.toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{Math.round(dreData[0].total / 12).toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Maior Volume</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{Math.max(...dreData[0].meses).toLocaleString('pt-BR')}</p>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="h-[280px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={dreData[0].meses.map((vol, idx) => ({ 
-                      mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
-                      volume: vol 
-                    }))}>
+                    <BarChart data={(() => {
+                      const media = dreData[0].total / 12;
+                      return dreData[0].meses.map((vol, idx) => ({
+                        mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                        volume: vol,
+                        fill: vol > media * 1.05 ? '#0284c7' : vol < media * 0.95 ? '#b91c1c' : '#ea580c'
+                      }));
+                    })()}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="volume" fill="#0ea5e9" name="Volume" radius={[6, 6, 0, 0]} />
+                      <ChartTooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                                <div className="space-y-1">
+                                  <p className="text-sm">
+                                    <span className="text-slate-600 dark:text-slate-400">Volume: </span>
+                                    <span className="font-bold text-slate-900 dark:text-white">{payload[0].value?.toLocaleString('pt-BR')} unidades</span>
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend 
+                        wrapperStyle={{ fontSize: '12px' }} 
+                        content={() => (
+                          <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#0284c7' }}></div>
+                              <span>Acima da Média</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#ea580c' }}></div>
+                              <span>Média</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#b91c1c' }}></div>
+                              <span>Abaixo da Média</span>
+                            </div>
+                          </div>
+                        )}
+                      />
+                      <Bar dataKey="volume" name="Volume" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartContainer>
@@ -415,45 +506,106 @@ export function VWFinancialDashboard() {
 
             {/* Lucro Bruto */}
             <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                <div className="flex items-center justify-between">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div className="flex items-center justify-between mb-3">
                   <div>
                     <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Lucro Bruto</CardTitle>
                     <CardDescription className="text-sm">Resultado bruto das operações</CardDescription>
                   </div>
-                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">{dreData[3].percentTotal?.toFixed(2)}%</Badge>
+                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">{dreData[3].percentTotal?.toFixed(2)}% ROL</Badge>
                 </div>
-                <div className="mt-4 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(dreData[3].total / 1000)}</span>
-                  <span className="text-sm text-slate-600">mil</span>
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Acumulado</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(dreData[3].total / 1000)} mil</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Bruta</p>
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{dreData[3].percentTotal?.toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Por Unidade</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(dreData[3].total / dreData[0].total)}</p>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="h-[280px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={dreData[3].meses.map((val, idx) => ({ 
-                      mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
-                      valor: val / 1000
-                    }))}>
+                    <BarChart data={(() => {
+                      const media = dreData[3].total / 12;
+                      return dreData[3].meses.map((val, idx) => ({
+                        mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                        valor: val / 1000,
+                        margem: parseFloat((val / dreData[1].meses[idx] * 100).toFixed(1)),
+                        fill: val > media * 1.05 ? '#059669' : val < media * 0.95 ? '#991b1b' : '#d97706'
+                      }));
+                    })()}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <defs>
-                        <linearGradient id="gradientLucroBruto" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#10b981" stopOpacity={0.4}/>
-                          <stop offset="100%" stopColor="#10b981" stopOpacity={0.05}/>
-                        </linearGradient>
-                      </defs>
-                      <Area 
-                        type="monotone" 
-                        dataKey="valor" 
-                        stroke="#10b981" 
-                        strokeWidth={2.5}
-                        fill="url(#gradientLucroBruto)"
-                        name="Lucro Bruto"
+                      <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: '#059669' }} axisLine={false} tickLine={false} domain={[0, 10]} tickFormatter={(value) => `${value}%`} />
+                      <ChartTooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                                <div className="space-y-1">
+                                  <p className="text-sm">
+                                    <span className="text-slate-600 dark:text-slate-400">Lucro Bruto: </span>
+                                    <span className="font-bold text-slate-900 dark:text-white">R$ {payload[0].value?.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                  </p>
+                                  <p className="text-sm">
+                                    <span className="text-slate-600 dark:text-slate-400">Margem: </span>
+                                    <span className="font-bold text-emerald-600">{payload[0].payload.margem}%</span>
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
                       />
-                    </AreaChart>
+                      <Legend 
+                        wrapperStyle={{ fontSize: '12px' }} 
+                        content={() => (
+                          <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#059669' }}></div>
+                              <span>Acima da Média</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#d97706' }}></div>
+                              <span>Média</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#991b1b' }}></div>
+                              <span>Abaixo da Média</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 border-2 border-emerald-600 rounded"></div>
+                              <span>Margem %</span>
+                            </div>
+                          </div>
+                        )}
+                      />
+                      <Bar 
+                        yAxisId="left"
+                        dataKey="valor" 
+                        radius={[6, 6, 0, 0]}
+                        name="Lucro Bruto (mil)"
+                      />
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="margem" 
+                        stroke="#059669" 
+                        strokeWidth={2}
+                        dot={{ fill: "#059669", r: 3 }}
+                        name="Margem %"
+                      />
+                    </BarChart>
                   </ResponsiveContainer>
                 </ChartContainer>
               </CardContent>
@@ -461,39 +613,106 @@ export function VWFinancialDashboard() {
 
             {/* Margem de Contribuição */}
             <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-800">
-                <div className="flex items-center justify-between">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div className="flex items-center justify-between mb-3">
                   <div>
                     <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Margem de Contribuição</CardTitle>
                     <CardDescription className="text-sm">Contribuição marginal do negócio</CardDescription>
                   </div>
-                  <Badge className="bg-blue-50 text-blue-700 border-blue-200">{dreData[7].percentTotal?.toFixed(2)}%</Badge>
+                  <Badge className="bg-blue-50 text-blue-700 border-blue-200">{dreData[7].percentTotal?.toFixed(2)}% ROL</Badge>
                 </div>
-                <div className="mt-4 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(dreData[7].total / 1000)}</span>
-                  <span className="text-sm text-slate-600">mil</span>
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Período</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(dreData[7].total / 1000)} mil</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{dreData[7].percentTotal?.toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Contribuição/Un</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(dreData[7].total / dreData[0].total)}</p>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="h-[280px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={dreData[7].meses.map((val, idx) => ({ 
-                      mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
-                      valor: val / 1000
-                    }))}>
+                    <BarChart data={(() => {
+                      const media = dreData[7].total / 12;
+                      return dreData[7].meses.map((val, idx) => ({
+                        mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
+                        valor: val / 1000,
+                        margem: parseFloat((val / dreData[1].meses[idx] * 100).toFixed(1)),
+                        fill: val > media * 1.05 ? '#2563eb' : val < media * 0.95 ? '#7f1d1d' : '#c2410c'
+                      }));
+                    })()}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="valor" 
-                        stroke="#3b82f6" 
-                        strokeWidth={3}
-                        dot={{ fill: "#3b82f6", r: 4, strokeWidth: 2, stroke: '#fff' }}
-                        name="Margem"
+                      <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: '#2563eb' }} axisLine={false} tickLine={false} domain={[0, 15]} tickFormatter={(value) => `${value}%`} />
+                      <ChartTooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                                <div className="space-y-1">
+                                  <p className="text-sm">
+                                    <span className="text-slate-600 dark:text-slate-400">Margem Contribuição: </span>
+                                    <span className="font-bold text-slate-900 dark:text-white">R$ {payload[0].value?.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                  </p>
+                                  <p className="text-sm">
+                                    <span className="text-slate-600 dark:text-slate-400">% sobre Receita: </span>
+                                    <span className="font-bold text-blue-600">{payload[0].payload.margem}%</span>
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
                       />
-                    </LineChart>
+                      <Legend 
+                        wrapperStyle={{ fontSize: '12px' }} 
+                        content={() => (
+                          <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#2563eb' }}></div>
+                              <span>Acima da Média</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#c2410c' }}></div>
+                              <span>Média</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#7f1d1d' }}></div>
+                              <span>Abaixo da Média</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 border-2 border-blue-700 rounded"></div>
+                              <span>Margem %</span>
+                            </div>
+                          </div>
+                        )}
+                      />
+                      <Bar 
+                        yAxisId="left"
+                        dataKey="valor" 
+                        radius={[6, 6, 0, 0]}
+                        name="Margem (mil)"
+                      />
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="margem" 
+                        stroke="#1d4ed8" 
+                        strokeWidth={2}
+                        dot={{ fill: "#1d4ed8", r: 3 }}
+                        name="Margem %"
+                      />
+                    </BarChart>
                   </ResponsiveContainer>
                 </ChartContainer>
               </CardContent>
@@ -640,51 +859,77 @@ export function VWFinancialDashboard() {
         </div>
 
         {/* Resultado Operacional - Destaque */}
-        <Card className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 shadow-xl border-0">
-          <CardHeader className="border-b border-slate-700">
-            <div className="flex items-center justify-between">
+        <Card className="bg-gradient-to-br from-[#1e293b] via-[#0f172a] to-[#020617] dark:from-slate-950 dark:to-slate-900 shadow-xl border-0 overflow-hidden">
+          <CardHeader className="border-b border-slate-700/50 pb-6">
+            <div className="flex items-start justify-between mb-6">
               <div>
-                <CardTitle className="text-2xl font-bold text-white">Resultado Operacional Líquido</CardTitle>
-                <CardDescription className="text-slate-300 text-base">Desempenho operacional consolidado</CardDescription>
+                <CardTitle className="text-2xl font-bold text-white mb-2">Resultado Operacional Líquido</CardTitle>
+                <CardDescription className="text-slate-300 text-base">Desempenho operacional consolidado após todas as despesas</CardDescription>
               </div>
-              <Badge className="bg-purple-500/20 text-purple-300 border-purple-400/30 text-base px-4 py-2">
-                {dreData[12].percentTotal?.toFixed(2)}%
+              <Badge className="bg-purple-500/20 text-purple-300 border border-purple-400/30 text-sm px-4 py-2 font-semibold">
+                {dreData[12].percentTotal?.toFixed(2)}% ROL
               </Badge>
             </div>
-            <div className="mt-6 flex items-center gap-8">
+            
+            <div className="grid grid-cols-4 gap-8 mt-6">
               <div>
-                <p className="text-sm text-slate-400 mb-1">Total do Período</p>
-                <p className="text-4xl font-bold text-white">{formatCurrency(dreData[12].total / 1000)} <span className="text-2xl text-slate-400">mil</span></p>
+                <p className="text-xs text-slate-400 mb-2 uppercase tracking-wide">Total do Período</p>
+                <p className="text-3xl font-bold text-white">R$ {(dreData[12].total / 1000).toFixed(0)} <span className="text-lg text-slate-400 font-normal">mil</span></p>
               </div>
-              <div className="h-12 w-px bg-slate-700"></div>
-              <div>
-                <p className="text-sm text-slate-400 mb-1">Margem Operacional</p>
-                <p className="text-4xl font-bold text-purple-400">{dreData[12].percentTotal?.toFixed(2)}%</p>
+              
+              <div className="border-l border-slate-700/50 pl-8">
+                <p className="text-xs text-slate-400 mb-2 uppercase tracking-wide">Margem Operacional</p>
+                <p className="text-3xl font-bold text-purple-400">{dreData[12].percentTotal?.toFixed(2)}%</p>
+              </div>
+              
+              <div className="border-l border-slate-700/50 pl-8">
+                <p className="text-xs text-slate-400 mb-2 uppercase tracking-wide">Resultado/Unidade</p>
+                <p className="text-3xl font-bold text-purple-300">R$ {(dreData[12].total / dreData[0].total).toFixed(0)}</p>
+              </div>
+              
+              <div className="border-l border-slate-700/50 pl-8">
+                <p className="text-xs text-slate-400 mb-2 uppercase tracking-wide">Média Mensal</p>
+                <p className="text-3xl font-bold text-slate-200">R$ {(dreData[12].total / 12 / 1000).toFixed(0)} <span className="text-lg text-slate-400 font-normal">mil</span></p>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-6">
-            <ChartContainer config={chartConfig} className="h-[320px] w-full">
+          <CardContent className="pt-6 pb-8 bg-gradient-to-b from-transparent to-slate-950/30">
+            <ChartContainer config={chartConfig} className="h-[280px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={dreData[12].meses.map((val, idx) => ({ 
                   mes: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][idx],
                   valor: val / 1000
                 }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#475569" vertical={false} />
-                  <XAxis dataKey="mes" tick={{ fontSize: 13, fill: '#cbd5e1' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 13, fill: '#cbd5e1' }} axisLine={false} tickLine={false} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} opacity={0.3} />
+                  <XAxis 
+                    dataKey="mes" 
+                    tick={{ fontSize: 11, fill: '#94a3b8' }} 
+                    axisLine={false} 
+                    tickLine={false}
+                    dy={10}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 11, fill: '#94a3b8' }} 
+                    axisLine={false} 
+                    tickLine={false}
+                    dx={-10}
+                  />
+                  <ChartTooltip 
+                    content={<ChartTooltipContent />}
+                    cursor={{ stroke: '#8b5cf6', strokeWidth: 1, strokeDasharray: '4 4' }}
+                  />
                   <defs>
                     <linearGradient id="gradientResultado" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#a855f7" stopOpacity={0.6}/>
-                      <stop offset="100%" stopColor="#a855f7" stopOpacity={0.05}/>
+                      <stop offset="0%" stopColor="#a855f7" stopOpacity={0.5}/>
+                      <stop offset="50%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                      <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.05}/>
                     </linearGradient>
                   </defs>
                   <Area 
                     type="monotone" 
                     dataKey="valor" 
                     stroke="#a855f7" 
-                    strokeWidth={3}
+                    strokeWidth={2.5}
                     fill="url(#gradientResultado)"
                     name="Resultado Operacional"
                   />
