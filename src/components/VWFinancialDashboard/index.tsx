@@ -1117,29 +1117,29 @@ export function VWFinancialDashboard() {
                 <CardDescription className="text-sm">Resultado final após todas as despesas e impostos</CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className="bg-purple-50 text-purple-700 text-xs">{dreData[21].percentTotal?.toFixed(2)}% ROL</Badge>
+                <Badge className="bg-purple-50 text-purple-700 text-xs">{dreData[18].percentTotal?.toFixed(2)}% ROL</Badge>
               </div>
             </div>
 
             <div className="grid grid-cols-4 gap-6 mt-4">
               <div>
                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">R$ {(dreData[21].total / 1000).toFixed(0)} mil</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(dreData[18].total / 1000)} mil</p>
               </div>
               
               <div>
                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Líquida</p>
-                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{dreData[21].percentTotal?.toFixed(2)}%</p>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{dreData[18].percentTotal?.toFixed(2)}%</p>
               </div>
               
               <div>
                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Lucro/Unidade</p>
-                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">R$ {(dreData[21].total / dreData[0].total).toFixed(0)}</p>
+                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(dreData[18].total / dreData[0].total)}</p>
               </div>
               
               <div>
                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">R$ {(dreData[21].total / 12 / 1000).toFixed(0)} mil</p>
+                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(dreData[18].total / 12 / 1000)} mil</p>
               </div>
             </div>
           </CardHeader>
@@ -1147,7 +1147,7 @@ export function VWFinancialDashboard() {
             <ChartContainer config={chartConfig} className="h-[280px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={(() => {
-                  const periodDataLucro = aggregateData(dreData[21].meses);
+                  const periodDataLucro = aggregateData(dreData[18].meses);
                   const periodDataReceita = aggregateData(dreData[1].meses);
                   const labels = getPeriodLabels();
                   const media = periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length;
@@ -1178,8 +1178,8 @@ export function VWFinancialDashboard() {
                             <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
                             <div className="space-y-1">
                               <p className="text-sm">
-                                <span className="text-slate-600 dark:text-slate-400">Lucro Líquido: </span>
-                                <span className="font-bold text-slate-900 dark:text-white">R$ {payload[0].value?.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                <span className="text-slate-600 dark:text-slate-400">Lucro Antes dos Impostos: </span>
+                                <span className="font-bold text-slate-900 dark:text-white">R$ {Number(payload[0].value).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
                               </p>
                               <p className="text-sm">
                                 <span className="text-slate-600 dark:text-slate-400">% sobre Receita: </span>
