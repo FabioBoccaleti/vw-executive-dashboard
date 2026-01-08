@@ -8,7 +8,7 @@ import { useState, useRef, useEffect } from "react"
 
 export function VWFinancialDashboard() {
   // Estado para controlar categorias de despesas selecionadas
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(['pessoal', 'terceiros', 'ocupacao', 'funcionamento', 'vendas'])
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['pessoal', 'terceiros', 'ocupacao', 'funcionamento'])
   const [viewMode, setViewMode] = useState<'mensal' | 'bimestral' | 'trimestral' | 'semestral'>('mensal')
   const fileInputRef = useRef<HTMLInputElement>(null)
   
@@ -155,9 +155,22 @@ export function VWFinancialDashboard() {
         const dataLines = lines.slice(1)
         
         const parseCurrency = (value: string): number => {
-          if (value === '-' || !value.trim()) return 0
-          const cleaned = value.replace(/R\$\s*/g, '').replace(/\./g, '').replace(',', '.')
-          return parseFloat(cleaned) || 0
+          if (value === '-' || !value.trim() || value === 'R$ 0') return 0
+          
+          // Verificar se é negativo
+          const isNegative = value.trim().startsWith('-')
+          
+          // Remover R$, espaços, sinais negativos e pontos de milhares
+          const cleaned = value
+            .replace(/-/g, '')
+            .replace(/R\$/g, '')
+            .replace(/\s/g, '')
+            .replace(/\./g, '')
+            .replace(',', '.')
+            .trim()
+          
+          const num = parseFloat(cleaned) || 0
+          return isNegative ? -num : num
         }
         
         const parsePercent = (value: string): number | null => {
@@ -166,10 +179,11 @@ export function VWFinancialDashboard() {
         }
         
         const importedData = dataLines.map(line => {
+          // Dividir por TAB e remover espaços extras do padding
           const columns = line.split('\t').map(col => col.trim())
           
           return {
-            descricao: columns[0] || '',
+            descricao: columns[0]?.trim() || '',
             total: parseCurrency(columns[1] || '0'),
             percentTotal: parsePercent(columns[2] || '-'),
             meses: [
@@ -186,8 +200,8 @@ export function VWFinancialDashboard() {
               parseCurrency(columns[13] || '0'),
               parseCurrency(columns[14] || '0')
             ],
-            isHighlight: columns[15] === 'true',
-            isFinal: columns[16] === 'true'
+            isHighlight: columns[15]?.trim() === 'true',
+            isFinal: columns[16]?.trim() === 'true'
           }
         })
         
@@ -1402,6 +1416,18 @@ export function VWFinancialDashboard() {
               >
                 <Download className="w-4 h-4" />
                 Baixar Template
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setDreData(initialDreData)
+                  alert('Dados revertidos para o estado inicial!')
+                }}
+                className="gap-2 text-orange-600 hover:text-orange-700 hover:border-orange-300"
+              >
+                <TrendingDown className="w-4 h-4" />
+                Reverter Dados
               </Button>
             </div>
           </div>
