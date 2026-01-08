@@ -1939,6 +1939,148 @@ export function VWFinancialDashboard() {
                 </ChartContainer>
               </CardContent>
             </Card>
+
+            {/* Amortizações e Depreciações */}
+            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Amortizações e Depreciações</CardTitle>
+                    <CardDescription className="text-sm">Despesas não caixa do período</CardDescription>
+                  </div>
+                  <Badge className="bg-slate-50 text-slate-700 border-slate-200">{((Math.abs(activeDreData[13].total) / activeDreData[1].total) * 100).toFixed(2)}% ROL</Badge>
+                </div>
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[13].total) / 1000)} mil</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{((Math.abs(activeDreData[13].total) / activeDreData[1].total) * 100).toFixed(2)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(Math.abs(activeDreData[13].total) / 12 / 1000)} mil</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <ChartContainer config={chartConfig} className="w-full">
+                  {showComparison && projectionMode ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart 
+                        data={(() => {
+                          const periodData = aggregateData(projectedData[activeScenario][13].meses.map(v => Math.abs(v)));
+                          const periodDataOriginal = aggregateData(dreData[13].meses.map(v => Math.abs(v)));
+                          const labels = getPeriodLabels();
+                          return labels.map((mes, idx) => ({
+                            mes,
+                            original: periodDataOriginal[idx] / 1000,
+                            projecao: periodData[idx] / 1000
+                          }));
+                        })()} 
+                        barGap={4}
+                        barCategoryGap="20%"
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                        <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => formatNumber(value)} />
+                        <ChartTooltip 
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                  <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                                  <div className="space-y-1">
+                                    <p className="text-sm">
+                                      <span className="text-slate-600 dark:text-slate-400">Original: </span>
+                                      <span className="font-bold text-blue-600">{formatChartValue((payload[0]?.value || 0) * 1000)}</span>
+                                    </p>
+                                    <p className="text-sm">
+                                      <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
+                                      <span className="font-bold text-emerald-600">{formatChartValue((payload[1]?.value || 0) * 1000)}</span>
+                                    </p>
+                                    <p className="text-sm">
+                                      <span className="text-slate-600 dark:text-slate-400">Variação: </span>
+                                      <span className="font-bold text-purple-600">
+                                        {formatChartValue(((payload[1]?.value || 0) - (payload[0]?.value || 0)) * 1000)}
+                                      </span>
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend 
+                          wrapperStyle={{ fontSize: '12px' }} 
+                          content={() => (
+                            <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                              <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#3b82f6' }}></div>
+                                <span>Original</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#10b981' }}></div>
+                                <span>Projeção</span>
+                              </div>
+                            </div>
+                          )}
+                        />
+                        <Bar dataKey="original" fill="#3b82f6" name="Original (mil)" maxBarSize={50} radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="projecao" fill="#10b981" name="Projeção (mil)" maxBarSize={50} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart 
+                        data={(() => {
+                          const periodData = aggregateData(activeDreData[13].meses.map(v => Math.abs(v)));
+                          const periodDataReceita = aggregateData(activeDreData[1].meses);
+                          const periodLabels = getPeriodLabels();
+                          
+                          return periodData.map((value, idx) => ({
+                            mes: periodLabels[idx],
+                            valor: value / 1000,
+                            percentual: ((value / periodDataReceita[idx]) * 100).toFixed(2)
+                          }));
+                        })()} 
+                        barCategoryGap="20%"
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                        <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => formatNumber(value)} />
+                        <ChartTooltip 
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                  <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                                  <div className="space-y-1">
+                                    <p className="text-sm">
+                                      <span className="text-slate-600 dark:text-slate-400">Valor: </span>
+                                      <span className="font-bold text-slate-900 dark:text-white">{formatChartValue(payload[0].value * 1000)}</span>
+                                    </p>
+                                    <p className="text-sm">
+                                      <span className="text-slate-600 dark:text-slate-400">% Receita: </span>
+                                      <span className="font-bold text-slate-700 dark:text-slate-300">{payload[0].payload.percentual}%</span>
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="valor" fill="#64748b" name="Amortizações (mil)" maxBarSize={50} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </ChartContainer>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
