@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2 } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend, LabelList } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, Legend, LabelList } from "recharts"
 import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 
@@ -1095,8 +1095,9 @@ export function VWFinancialDashboard() {
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
-                    <ResponsiveContainer width="100%" height={220}>
                       <BarChart 
+                        width="100%"
+                        height={220}
                         data={(() => {
                           const periodData = aggregateData(projectedData[activeScenario][0].meses);
                           const periodDataOriginal = aggregateData(dreData[0].meses);
@@ -1157,10 +1158,11 @@ export function VWFinancialDashboard() {
                         <Bar dataKey="original" fill="#3b82f6" name="Original" maxBarSize={50} />
                         <Bar dataKey="projecao" fill="#10b981" name="Projeção" maxBarSize={50} />
                       </BarChart>
-                    </ResponsiveContainer>
                   ) : (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={(() => {
+                      <BarChart
+                        width="100%"
+                        height={220}
+                      data={(() => {
                         const periodData = aggregateData(activeDreData[0].meses);
                         const labels = getPeriodLabels();
                         const media = periodData.reduce((a, b) => a + b, 0) / periodData.length;
@@ -1212,7 +1214,6 @@ export function VWFinancialDashboard() {
                         />
                         <Bar dataKey="volume" name="Volume" radius={[6, 6, 0, 0]} />
                       </BarChart>
-                    </ResponsiveContainer>
                   )}
                 </ChartContainer>
               </CardContent>
@@ -1247,8 +1248,9 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
                     // Gráfico de comparação com duas barras
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart 
+                    <BarChart
+                        width="100%"
+                        height={220}
                         data={(() => {
                           const periodData = aggregateData(projectedData[activeScenario][1].meses);
                           const periodDataOriginal = aggregateData(dreData[1].meses);
@@ -1316,11 +1318,12 @@ export function VWFinancialDashboard() {
                         <Bar dataKey="original" fill="#3b82f6" name="Original (mil)" maxBarSize={50} />
                         <Bar dataKey="projecao" fill="#10b981" name="Projeção (mil)" maxBarSize={50} />
                       </BarChart>
-                    </ResponsiveContainer>
                   ) : (
                     // Gráfico normal com uma barra
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={(() => {
+                    <BarChart
+                        width="100%"
+                        height={220}
+                        data={(() => {
                         const periodData = aggregateData(activeDreData[1].meses);
                         const labels = getPeriodLabels();
                         const media = periodData.reduce((a, b) => a + b, 0) / periodData.length;
@@ -1377,7 +1380,6 @@ export function VWFinancialDashboard() {
                         />
                         <Bar dataKey="valor" radius={[6, 6, 0, 0]} name="Receita Líquida (mil)" />
                       </BarChart>
-                    </ResponsiveContainer>
                   )}
                 </ChartContainer>
               </CardContent>
@@ -1411,8 +1413,9 @@ export function VWFinancialDashboard() {
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart
+                    <BarChart
+                        width="100%"
+                        height={220}
                         data={(() => {
                           const periodData = aggregateData(projectedData[activeScenario][3].meses);
                           const periodDataOriginal = aggregateData(dreData[3].meses);
@@ -1475,10 +1478,11 @@ export function VWFinancialDashboard() {
                         <Bar dataKey="original" fill="#3b82f6" name="Original (mil)" maxBarSize={50} />
                         <Bar dataKey="projecao" fill="#10b981" name="Projeção (mil)" maxBarSize={50} />
                       </BarChart>
-                    </ResponsiveContainer>
                   ) : (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={(() => {
+                    <BarChart
+                        width="100%"
+                        height={220}
+                        data={(() => {
                         const periodDataLucro = aggregateData(activeDreData[3].meses);
                         const periodDataReceita = aggregateData(activeDreData[1].meses);
                         const labels = getPeriodLabels();
@@ -1555,7 +1559,6 @@ export function VWFinancialDashboard() {
                         name="Margem %"
                       />
                       </BarChart>
-                    </ResponsiveContainer>
                   )}
                 </ChartContainer>
               </CardContent>
@@ -1589,8 +1592,9 @@ export function VWFinancialDashboard() {
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart 
+                    <BarChart
+                        width="100%"
+                        height={220}
                         data={(() => {
                           const periodData = aggregateData(projectedData[activeScenario][6].meses);
                           const periodDataOriginal = aggregateData(dreData[6].meses);
@@ -1653,10 +1657,11 @@ export function VWFinancialDashboard() {
                         <Bar dataKey="original" fill="#3b82f6" name="Original (mil)" maxBarSize={50} />
                         <Bar dataKey="projecao" fill="#10b981" name="Projeção (mil)" maxBarSize={50} />
                       </BarChart>
-                    </ResponsiveContainer>
                   ) : (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={(() => {
+                    <BarChart
+                        width="100%"
+                        height={220}
+                        data={(() => {
                         const periodDataMargem = aggregateData(activeDreData[6].meses);
                         const periodDataReceita = aggregateData(activeDreData[1].meses);
                         const labels = getPeriodLabels();
@@ -1733,7 +1738,6 @@ export function VWFinancialDashboard() {
                         name="Margem %"
                       />
                     </BarChart>
-                  </ResponsiveContainer>
                   )}
                 </ChartContainer>
               </CardContent>
@@ -1824,8 +1828,10 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
                     // Gráfico de comparação entre original e projeção
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={(() => {
+                    <BarChart
+                        width="100%"
+                        height={220}
+                        data={(() => {
                         // Dados originais
                         const aggregatedPessoalOrig = aggregateData(dreData[7].meses.map(v => Math.abs(v)));
                         const aggregatedTerceirosOrig = aggregateData(dreData[8].meses.map(v => Math.abs(v)));
@@ -1886,10 +1892,11 @@ export function VWFinancialDashboard() {
                         <Bar dataKey="original" fill="#64748b" name="Original" radius={[4, 4, 0, 0]} />
                         <Bar dataKey="projecao" fill="#0ea5e9" name="Projeção" radius={[4, 4, 0, 0]} />
                       </BarChart>
-                    </ResponsiveContainer>
                   ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={(() => {
+                  <BarChart
+                        width="100%"
+                        height={220}
+                        data={(() => {
                       const aggregatedPessoal = aggregateData(activeDreData[7].meses.map(v => Math.abs(v)));
                       const aggregatedTerceiros = aggregateData(activeDreData[8].meses.map(v => Math.abs(v)));
                       const aggregatedOcupacao = aggregateData(activeDreData[9].meses.map(v => Math.abs(v)));
@@ -1980,7 +1987,6 @@ export function VWFinancialDashboard() {
                         <Bar dataKey="vendas" stackId="a" fill="#8B5CF6" name="Vendas" maxBarSize={45} />
                       )}
                     </BarChart>
-                  </ResponsiveContainer>
                   )}
                 </ChartContainer>
               </CardContent>
@@ -2014,8 +2020,9 @@ export function VWFinancialDashboard() {
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart 
+                    <BarChart
+                        width="100%"
+                        height={220}
                         data={(() => {
                           const periodData = aggregateData(projectedData[activeScenario][13].meses.map(v => Math.abs(v)));
                           const periodDataOriginal = aggregateData(dreData[13].meses.map(v => Math.abs(v)));
@@ -2078,10 +2085,10 @@ export function VWFinancialDashboard() {
                         <Bar dataKey="original" fill="#3b82f6" name="Original (mil)" maxBarSize={50} radius={[4, 4, 0, 0]} />
                         <Bar dataKey="projecao" fill="#10b981" name="Projeção (mil)" maxBarSize={50} radius={[4, 4, 0, 0]} />
                       </BarChart>
-                    </ResponsiveContainer>
                   ) : (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart 
+                    <BarChart
+                        width="100%"
+                        height={220}
                         data={(() => {
                           const periodData = aggregateData(activeDreData[13].meses.map(v => Math.abs(v)));
                           const periodDataReceita = aggregateData(activeDreData[1].meses);
@@ -2122,7 +2129,6 @@ export function VWFinancialDashboard() {
                         />
                         <Bar dataKey="valor" fill="#64748b" name="Amortizações (mil)" maxBarSize={50} radius={[4, 4, 0, 0]} />
                       </BarChart>
-                    </ResponsiveContainer>
                   )}
                 </ChartContainer>
               </CardContent>
@@ -2229,8 +2235,7 @@ export function VWFinancialDashboard() {
                     <Bar dataKey="original" fill="#3b82f6" name="Original (mil)" maxBarSize={50} />
                     <Bar dataKey="projecao" fill="#10b981" name="Projeção (mil)" maxBarSize={50} />
                   </BarChart>
-                </ResponsiveContainer>
-              ) : (
+                  ) : (
                 <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={(() => {
                   const periodDataLucro = aggregateData(activeDreData[18].meses);
@@ -2310,8 +2315,7 @@ export function VWFinancialDashboard() {
                     />
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
-              )}
+                  )}
             </ChartContainer>
           </CardContent>
         </Card>
