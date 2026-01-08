@@ -1813,6 +1813,72 @@ export function VWFinancialDashboard() {
               </CardHeader>
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="w-full">
+                  {showComparison && projectionMode ? (
+                    // Gráfico de comparação entre original e projeção
+                    <ResponsiveContainer width="100%" height={320}>
+                      <BarChart data={(() => {
+                        // Dados originais
+                        const aggregatedPessoalOrig = aggregateData(dreData[7].meses.map(v => Math.abs(v)));
+                        const aggregatedTerceirosOrig = aggregateData(dreData[8].meses.map(v => Math.abs(v)));
+                        const aggregatedOcupacaoOrig = aggregateData(dreData[9].meses.map(v => Math.abs(v)));
+                        const aggregatedFuncionamentoOrig = aggregateData(dreData[10].meses.map(v => Math.abs(v)));
+                        const aggregatedVendasOrig = aggregateData(dreData[11].meses.map(v => Math.abs(v)));
+                        
+                        // Dados projetados
+                        const aggregatedPessoalProj = aggregateData(projectedData[activeScenario][7].meses.map(v => Math.abs(v)));
+                        const aggregatedTerceirosProj = aggregateData(projectedData[activeScenario][8].meses.map(v => Math.abs(v)));
+                        const aggregatedOcupacaoProj = aggregateData(projectedData[activeScenario][9].meses.map(v => Math.abs(v)));
+                        const aggregatedFuncionamentoProj = aggregateData(projectedData[activeScenario][10].meses.map(v => Math.abs(v)));
+                        const aggregatedVendasProj = aggregateData(projectedData[activeScenario][11].meses.map(v => Math.abs(v)));
+                        
+                        const periodLabels = getPeriodLabels();
+                        
+                        return aggregatedPessoalOrig.map((_, idx) => ({
+                          mes: periodLabels[idx],
+                          original: aggregatedPessoalOrig[idx] + aggregatedTerceirosOrig[idx] + aggregatedOcupacaoOrig[idx] + aggregatedFuncionamentoOrig[idx] + aggregatedVendasOrig[idx],
+                          projecao: aggregatedPessoalProj[idx] + aggregatedTerceirosProj[idx] + aggregatedOcupacaoProj[idx] + aggregatedFuncionamentoProj[idx] + aggregatedVendasProj[idx]
+                        }));
+                      })()} 
+                      barGap={4}
+                      barCategoryGap="20%"
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                        <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => formatNumber(value)} />
+                        <ChartTooltip 
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                  <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                                  <div className="space-y-1">
+                                    <p className="text-sm">
+                                      <span className="text-slate-600 dark:text-slate-400">Original: </span>
+                                      <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(payload[0].value || 0)}</span>
+                                    </p>
+                                    <p className="text-sm">
+                                      <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
+                                      <span className="font-bold text-blue-600 dark:text-blue-400">{formatCurrency(payload[1]?.value || 0)}</span>
+                                    </p>
+                                    <p className="text-sm pt-2 border-t border-slate-200 dark:border-slate-700">
+                                      <span className="text-slate-600 dark:text-slate-400">Diferença: </span>
+                                      <span className={`font-bold ${((payload[1]?.value || 0) - (payload[0].value || 0)) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                        {formatCurrency(Math.abs((payload[1]?.value || 0) - (payload[0].value || 0)))}
+                                        {((payload[1]?.value || 0) - (payload[0].value || 0)) > 0 ? ' ↑' : ' ↓'}
+                                      </span>
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="original" fill="#64748b" name="Original" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="projecao" fill="#0ea5e9" name="Projeção" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
                   <ResponsiveContainer width="100%" height={320}>
                     <BarChart data={(() => {
                       const aggregatedPessoal = aggregateData(activeDreData[7].meses.map(v => Math.abs(v)));
@@ -1906,6 +1972,7 @@ export function VWFinancialDashboard() {
                       )}
                     </BarChart>
                   </ResponsiveContainer>
+                  )}
                 </ChartContainer>
               </CardContent>
             </Card>
