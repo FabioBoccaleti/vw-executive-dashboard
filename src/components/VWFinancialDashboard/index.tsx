@@ -1695,125 +1695,86 @@ export function VWFinancialDashboard() {
 
             {/* Despesas por Categoria */}
             <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-6">
-                <div className="flex items-start justify-between mb-6">
-                  <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white">Despesas por Categoria</CardTitle>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total de Despesas</p>
-                    <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                      {formatCurrency(Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total))}
-                    </p>
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Despesas por Categoria</CardTitle>
+                    <CardDescription className="text-sm">Composição das despesas operacionais</CardDescription>
                   </div>
+                  <Badge className="bg-slate-50 text-slate-700 border-slate-200">{((Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / activeDreData[1].total) * 100).toFixed(2)}% ROL</Badge>
                 </div>
-                
-                <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Categorias de Despesa:</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge 
-                        className={`cursor-pointer transition-all ${
-                          selectedCategories.includes('pessoal') 
-                            ? 'bg-[#001E50] text-white border-[#001E50] hover:bg-[#003875]' 
-                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                        onClick={() => toggleCategory('pessoal')}
-                      >
-                        Pessoal
-                      </Badge>
-                      <Badge 
-                        className={`cursor-pointer transition-all ${
-                          selectedCategories.includes('terceiros') 
-                            ? 'bg-[#0089EF] text-white border-[#0089EF] hover:bg-[#0075CE]' 
-                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                        onClick={() => toggleCategory('terceiros')}
-                      >
-                        Terceiros
-                      </Badge>
-                      <Badge 
-                        className={`cursor-pointer transition-all ${
-                          selectedCategories.includes('ocupacao') 
-                            ? 'bg-[#F59E0B] text-white border-[#F59E0B] hover:bg-[#D97706]' 
-                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                        onClick={() => toggleCategory('ocupacao')}
-                      >
-                        Ocupação
-                      </Badge>
-                      <Badge 
-                        className={`cursor-pointer transition-all ${
-                          selectedCategories.includes('funcionamento') 
-                            ? 'bg-[#EF4444] text-white border-[#EF4444] hover:bg-[#DC2626]' 
-                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                        onClick={() => toggleCategory('funcionamento')}
-                      >
-                        Funcionamento
-                      </Badge>
-                      <Badge 
-                        className={`cursor-pointer transition-all ${
-                          selectedCategories.includes('vendas') 
-                            ? 'bg-[#8B5CF6] text-white border-[#8B5CF6] hover:bg-[#7C3AED]' 
-                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                        }`}
-                        onClick={() => toggleCategory('vendas')}
-                      >
-                        Vendas
-                      </Badge>
-                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total de Despesas</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / 1000)} mil</p>
                   </div>
-
                   <div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">Total do Período por Categoria:</p>
-                    <div className="grid grid-cols-5 gap-4">
-                      <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <div className="w-4 h-4 rounded-full bg-[#001E50] mx-auto mb-2"></div>
-                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Pessoal</p>
-                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[7].total) / 1000)} mil</p>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(activeDreData[7].total) / activeDreData[1].total * 100).toFixed(2)}%</p>
-                      </div>
-                      <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <div className="w-4 h-4 rounded-full bg-[#0089EF] mx-auto mb-2"></div>
-                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Terceiros</p>
-                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[8].total) / 1000)} mil</p>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(activeDreData[8].total) / activeDreData[1].total * 100).toFixed(2)}%</p>
-                      </div>
-                      <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <div className="w-4 h-4 rounded-full bg-[#F59E0B] mx-auto mb-2"></div>
-                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Ocupação</p>
-                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[9].total) / 1000)} mil</p>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(activeDreData[9].total) / activeDreData[1].total * 100).toFixed(2)}%</p>
-                      </div>
-                      <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <div className="w-4 h-4 rounded-full bg-[#EF4444] mx-auto mb-2"></div>
-                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Funcionamento</p>
-                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[10].total) / 1000)} mil</p>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(activeDreData[10].total) / activeDreData[1].total * 100).toFixed(2)}%</p>
-                      </div>
-                      <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <div className="w-4 h-4 rounded-full bg-[#8B5CF6] mx-auto mb-2"></div>
-                        <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Vendas</p>
-                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[11].total) / 1000)} mil</p>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(activeDreData[11].total) / activeDreData[1].total * 100).toFixed(2)}%</p>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-4 p-4 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-700 rounded-lg border-2 border-slate-300 dark:border-slate-600">
-                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Total de Despesas</p>
-                      <div className="flex items-center justify-between">
-                        <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                          {formatCurrency((Math.abs(activeDreData[7].total) + Math.abs(activeDreData[8].total) + Math.abs(activeDreData[9].total) + Math.abs(activeDreData[10].total) + Math.abs(activeDreData[11].total)) / 1000)} mil
-                        </p>
-                        <p className="text-lg font-bold text-slate-700 dark:text-slate-300">
-                          {((Math.abs(activeDreData[7].total) + Math.abs(activeDreData[8].total) + Math.abs(activeDreData[9].total) + Math.abs(activeDreData[10].total) + Math.abs(activeDreData[11].total)) / activeDreData[1].total * 100).toFixed(2)}%
-                        </p>
-                      </div>
-                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">do total da receita</p>
-                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{((Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / activeDreData[1].total) * 100).toFixed(2)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / 12 / 1000)} mil</p>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-6">
+                <div className="mb-4">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Categorias de Despesa:</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge 
+                      className={`cursor-pointer transition-all ${
+                        selectedCategories.includes('pessoal') 
+                          ? 'bg-[#001E50] text-white border-[#001E50] hover:bg-[#003875]' 
+                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                      }`}
+                      onClick={() => toggleCategory('pessoal')}
+                    >
+                      Pessoal
+                    </Badge>
+                    <Badge 
+                      className={`cursor-pointer transition-all ${
+                        selectedCategories.includes('terceiros') 
+                          ? 'bg-[#0089EF] text-white border-[#0089EF] hover:bg-[#0075CE]' 
+                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                      }`}
+                      onClick={() => toggleCategory('terceiros')}
+                    >
+                      Terceiros
+                    </Badge>
+                    <Badge 
+                      className={`cursor-pointer transition-all ${
+                        selectedCategories.includes('ocupacao') 
+                          ? 'bg-[#F59E0B] text-white border-[#F59E0B] hover:bg-[#D97706]' 
+                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                      }`}
+                      onClick={() => toggleCategory('ocupacao')}
+                    >
+                      Ocupação
+                    </Badge>
+                    <Badge 
+                      className={`cursor-pointer transition-all ${
+                        selectedCategories.includes('funcionamento') 
+                          ? 'bg-[#EF4444] text-white border-[#EF4444] hover:bg-[#DC2626]' 
+                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                      }`}
+                      onClick={() => toggleCategory('funcionamento')}
+                    >
+                      Funcionamento
+                    </Badge>
+                    <Badge 
+                      className={`cursor-pointer transition-all ${
+                        selectedCategories.includes('vendas') 
+                          ? 'bg-[#8B5CF6] text-white border-[#8B5CF6] hover:bg-[#7C3AED]' 
+                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                      }`}
+                      onClick={() => toggleCategory('vendas')}
+                    >
+                      Vendas
+                    </Badge>
+                  </div>
+                </div>
+                
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
                     // Gráfico de comparação entre original e projeção
