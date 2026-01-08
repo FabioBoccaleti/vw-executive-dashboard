@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2 } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, Legend, LabelList } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend, LabelList } from "recharts"
 import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 
@@ -2235,9 +2235,10 @@ export function VWFinancialDashboard() {
                     <Bar dataKey="original" fill="#3b82f6" name="Original (mil)" maxBarSize={50} />
                     <Bar dataKey="projecao" fill="#10b981" name="Projeção (mil)" maxBarSize={50} />
                   </BarChart>
+                </ResponsiveContainer>
                   ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={(() => {
+                  <BarChart data={(() => {
                   const periodDataLucro = aggregateData(activeDreData[18].meses);
                   const periodDataReceita = aggregateData(activeDreData[1].meses);
                   const labels = getPeriodLabels();
@@ -2315,7 +2316,8 @@ export function VWFinancialDashboard() {
                     />
                   </Bar>
                 </BarChart>
-                  )}
+                </ResponsiveContainer>
+              )}
             </ChartContainer>
           </CardContent>
         </Card>
