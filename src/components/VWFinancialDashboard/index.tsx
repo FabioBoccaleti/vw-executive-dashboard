@@ -152,7 +152,7 @@ export function VWFinancialDashboard() {
         }
         
         // Pular o cabeçalho (primeira linha não comentada)
-        const dataLines = lines.slice(1)
+        const dataLines = lines
         
         const parseCurrency = (value: string): number => {
           if (value === '-' || !value.trim() || value === 'R$ 0') return 0
@@ -940,20 +940,20 @@ export function VWFinancialDashboard() {
                     <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Margem de Contribuição</CardTitle>
                     <CardDescription className="text-sm">Contribuição marginal do negócio</CardDescription>
                   </div>
-                  <Badge className="bg-blue-50 text-blue-700 border-blue-200">{dreData[7].percentTotal?.toFixed(2)}% ROL</Badge>
+                  <Badge className="bg-blue-50 text-blue-700 border-blue-200">{dreData[6].percentTotal?.toFixed(2)}% ROL</Badge>
                 </div>
                 <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Período</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(dreData[7].total / 1000)} mil</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(dreData[6].total / 1000)} mil</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{dreData[7].percentTotal?.toFixed(1)}%</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{dreData[6].percentTotal?.toFixed(1)}%</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Contribuição/Un</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(dreData[7].total / dreData[0].total)}</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(dreData[6].total / dreData[0].total)}</p>
                   </div>
                 </div>
               </CardHeader>
@@ -961,7 +961,7 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="h-[280px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={(() => {
-                      const periodDataMargem = aggregateData(dreData[7].meses);
+                      const periodDataMargem = aggregateData(dreData[6].meses);
                       const periodDataReceita = aggregateData(dreData[1].meses);
                       const labels = getPeriodLabels();
                       const media = periodDataMargem.reduce((a, b) => a + b, 0) / periodDataMargem.length;
@@ -1050,7 +1050,7 @@ export function VWFinancialDashboard() {
                   <div className="text-right">
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total de Despesas</p>
                     <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                      {formatCurrency(Math.abs(dreData[8].total + dreData[9].total + dreData[10].total + dreData[11].total + dreData[4].total))}
+                      {formatCurrency(Math.abs(dreData[7].total + dreData[8].total + dreData[9].total + dreData[10].total + dreData[11].total))}
                     </p>
                   </div>
                 </div>
@@ -1118,32 +1118,32 @@ export function VWFinancialDashboard() {
                       <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                         <div className="w-4 h-4 rounded-full bg-[#001E50] mx-auto mb-2"></div>
                         <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Pessoal</p>
-                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[8].total) / 1000)} mil</p>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[8].total) / dreData[1].total * 100).toFixed(2)}%</p>
+                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[7].total) / 1000)} mil</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[7].total) / dreData[1].total * 100).toFixed(2)}%</p>
                       </div>
                       <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                         <div className="w-4 h-4 rounded-full bg-[#0089EF] mx-auto mb-2"></div>
                         <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Terceiros</p>
-                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[9].total) / 1000)} mil</p>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[9].total) / dreData[1].total * 100).toFixed(2)}%</p>
+                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[8].total) / 1000)} mil</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[8].total) / dreData[1].total * 100).toFixed(2)}%</p>
                       </div>
                       <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                         <div className="w-4 h-4 rounded-full bg-[#F59E0B] mx-auto mb-2"></div>
                         <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Ocupação</p>
-                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[10].total) / 1000)} mil</p>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[10].total) / dreData[1].total * 100).toFixed(2)}%</p>
+                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[9].total) / 1000)} mil</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[9].total) / dreData[1].total * 100).toFixed(2)}%</p>
                       </div>
                       <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                         <div className="w-4 h-4 rounded-full bg-[#EF4444] mx-auto mb-2"></div>
                         <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Funcionamento</p>
-                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[11].total) / 1000)} mil</p>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[11].total) / dreData[1].total * 100).toFixed(2)}%</p>
+                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[10].total) / 1000)} mil</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[10].total) / dreData[1].total * 100).toFixed(2)}%</p>
                       </div>
                       <div className="text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                         <div className="w-4 h-4 rounded-full bg-[#8B5CF6] mx-auto mb-2"></div>
                         <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Vendas</p>
-                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[4].total) / 1000)} mil</p>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[4].total) / dreData[1].total * 100).toFixed(2)}%</p>
+                        <p className="text-base font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(dreData[11].total) / 1000)} mil</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{(Math.abs(dreData[11].total) / dreData[1].total * 100).toFixed(2)}%</p>
                       </div>
                     </div>
                     
@@ -1151,10 +1151,10 @@ export function VWFinancialDashboard() {
                       <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Total de Despesas</p>
                       <div className="flex items-center justify-between">
                         <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                          {formatCurrency((Math.abs(dreData[8].total) + Math.abs(dreData[9].total) + Math.abs(dreData[10].total) + Math.abs(dreData[11].total) + Math.abs(dreData[4].total)) / 1000)} mil
+                          {formatCurrency((Math.abs(dreData[7].total) + Math.abs(dreData[8].total) + Math.abs(dreData[9].total) + Math.abs(dreData[10].total) + Math.abs(dreData[11].total)) / 1000)} mil
                         </p>
                         <p className="text-lg font-bold text-slate-700 dark:text-slate-300">
-                          {((Math.abs(dreData[8].total) + Math.abs(dreData[9].total) + Math.abs(dreData[10].total) + Math.abs(dreData[11].total) + Math.abs(dreData[4].total)) / dreData[1].total * 100).toFixed(2)}%
+                          {((Math.abs(dreData[7].total) + Math.abs(dreData[8].total) + Math.abs(dreData[9].total) + Math.abs(dreData[10].total) + Math.abs(dreData[11].total)) / dreData[1].total * 100).toFixed(2)}%
                         </p>
                       </div>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">do total da receita</p>
@@ -1166,11 +1166,11 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="h-[320px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={(() => {
-                      const aggregatedPessoal = aggregateData(dreData[8].meses.map(v => Math.abs(v)));
-                      const aggregatedTerceiros = aggregateData(dreData[9].meses.map(v => Math.abs(v)));
-                      const aggregatedOcupacao = aggregateData(dreData[10].meses.map(v => Math.abs(v)));
-                      const aggregatedFuncionamento = aggregateData(dreData[11].meses.map(v => Math.abs(v)));
-                      const aggregatedVendas = aggregateData(dreData[4].meses.map(v => Math.abs(v)));
+                      const aggregatedPessoal = aggregateData(dreData[7].meses.map(v => Math.abs(v)));
+                      const aggregatedTerceiros = aggregateData(dreData[8].meses.map(v => Math.abs(v)));
+                      const aggregatedOcupacao = aggregateData(dreData[9].meses.map(v => Math.abs(v)));
+                      const aggregatedFuncionamento = aggregateData(dreData[10].meses.map(v => Math.abs(v)));
+                      const aggregatedVendas = aggregateData(dreData[11].meses.map(v => Math.abs(v)));
                       const aggregatedReceita = aggregateData(dreData[1].meses);
                       const periodLabels = getPeriodLabels();
                       
