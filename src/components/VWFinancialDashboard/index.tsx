@@ -782,89 +782,93 @@ export function VWFinancialDashboard() {
               <Badge className="bg-blue-100 text-blue-800 border-blue-200 px-4 py-2 text-sm">
                 Confidencial
               </Badge>
-              <Button
-                onClick={createProjectionScenario}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-              >
-                <TrendingUp className="w-4 h-4" />
-                Criar Projeção
-              </Button>
-              
-              {/* Controles de Cenários */}
-              {projectionScenarios.length > 0 && (
-                <div className="flex items-center gap-2 ml-2">
-                  <span className="text-xs text-slate-600">Cenários:</span>
-                  {projectionScenarios.map(scenario => (
-                    <Button
-                      key={scenario.id}
-                      onClick={() => {
-                        setActiveScenario(scenario.id)
-                        setProjectionMode(true)
-                      }}
-                      variant={activeScenario === scenario.id ? "default" : "outline"}
-                      size="sm"
-                      className="text-xs"
-                    >
-                      {scenario.name}
-                    </Button>
-                  ))}
+            </div>
+          </div>
+          
+          {/* Controles de Projeção e Cenários */}
+          <div className="flex flex-wrap items-center gap-3 mt-4">
+            <Button
+              onClick={createProjectionScenario}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <TrendingUp className="w-4 h-4" />
+              Criar Projeção
+            </Button>
+            
+            {/* Controles de Cenários */}
+            {projectionScenarios.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-600 dark:text-slate-400">Cenários:</span>
+                {projectionScenarios.map(scenario => (
                   <Button
+                    key={scenario.id}
                     onClick={() => {
-                      setProjectionMode(false)
-                      setActiveScenario(null)
-                      setShowComparison(false)
+                      setActiveScenario(scenario.id)
+                      setProjectionMode(true)
                     }}
-                    variant="ghost"
+                    variant={activeScenario === scenario.id ? "default" : "outline"}
                     size="sm"
                     className="text-xs"
                   >
-                    Ver Original
+                    {scenario.name}
                   </Button>
-                </div>
-              )}
-              
-              {/* Toggle de Visualização (só aparece em modo projeção) */}
-              {projectionMode && activeScenario && (
-                <div className="flex items-center gap-2 ml-2">
-                  <Button
-                    onClick={() => setShowComparison(false)}
-                    variant={!showComparison ? "default" : "outline"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Eye className="w-4 h-4" />
-                    Só Projeção
-                  </Button>
-                  <Button
-                    onClick={() => setShowComparison(true)}
-                    variant={showComparison ? "default" : "outline"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <GitCompare className="w-4 h-4" />
-                    Comparar
-                  </Button>
-                  <Button
-                    onClick={() => setShowProjectionModal(true)}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Editar %
-                  </Button>
-                  <Button
-                    onClick={deleteProjection}
-                    variant="destructive"
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Deletar
-                  </Button>
-                </div>
-              )}
-            </div>
+                ))}
+                <Button
+                  onClick={() => {
+                    setProjectionMode(false)
+                    setActiveScenario(null)
+                    setShowComparison(false)
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
+                >
+                  Ver Original
+                </Button>
+              </div>
+            )}
+            
+            {/* Toggle de Visualização (só aparece em modo projeção) */}
+            {projectionMode && activeScenario && (
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setShowComparison(false)}
+                  variant={!showComparison ? "default" : "outline"}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  Só Projeção
+                </Button>
+                <Button
+                  onClick={() => setShowComparison(true)}
+                  variant={showComparison ? "default" : "outline"}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <GitCompare className="w-4 h-4" />
+                  Comparar
+                </Button>
+                <Button
+                  onClick={() => setShowProjectionModal(true)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Editar %
+                </Button>
+                <Button
+                  onClick={deleteProjection}
+                  variant="destructive"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Deletar
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Seleção de Visualização */}
