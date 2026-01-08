@@ -276,12 +276,6 @@ export function VWFinancialDashboard() {
       meses: [492776, 503732, 621259, 517432, 592411, 583358, 519092, 732680, 728463, 612356, 515927, 0]
     },
     {
-      descricao: "DESPESAS C/ VENDAS",
-      total: -4122456,
-      percentTotal: -4.30,
-      meses: [-307898, -328716, -305425, -273361, -317639, -370988, -426223, -441343, -440566, -438685, -471612, 0]
-    },
-    {
       descricao: "OUTRAS DESPESAS OPERACIONAIS",
       total: 1710743,
       percentTotal: 1.78,
@@ -325,6 +319,12 @@ export function VWFinancialDashboard() {
       meses: [-162040, -177923, -124227, -135629, -134151, -117842, -130073, -149322, -165388, -160983, -185006, 0]
     },
     {
+      descricao: "DESPESAS C/ VENDAS",
+      total: -4122456,
+      percentTotal: -4.30,
+      meses: [-307898, -328716, -305425, -273361, -317639, -370988, -426223, -441343, -440566, -438685, -471612, 0]
+    },
+    {
       descricao: "LUCRO (PREJUIZO) OPERACIONAL LIQUIDO",
       total: 4189348,
       percentTotal: 4.37,
@@ -363,7 +363,7 @@ export function VWFinancialDashboard() {
     },
     {
       descricao: "LUCRO (PREJUIZO) ANTES IMPOSTOS",
-      total: 4082051,
+      total: 14082051,
       percentTotal: 4.25,
       meses: [292222, 264860, 415322, 389575, 392905, 293033, 399105, 525973, 494420, 378461, 236175, 0],
       isHighlight: true
@@ -375,7 +375,7 @@ export function VWFinancialDashboard() {
       meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     },
     {
-      descricao: "PARTICIPACÕES",
+      descricao: "PARTICIPAÇÕES",
       total: 0,
       percentTotal: 0.00,
       meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
