@@ -936,6 +936,52 @@ export function VWFinancialDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Dados Adicionais */}
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">Dados Adicionais</CardTitle>
+              </div>
+              <CardDescription className="text-xs">Configurações e filtros complementares</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <button
+                  className="flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700"
+                >
+                  <Calendar className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">Opção 1</span>
+                  <span className="text-xs opacity-80">(Disponível)</span>
+                </button>
+
+                <button
+                  className="flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700"
+                >
+                  <BarChart3 className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">Opção 2</span>
+                  <span className="text-xs opacity-80">(Disponível)</span>
+                </button>
+
+                <button
+                  className="flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700"
+                >
+                  <BarChart3 className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">Opção 3</span>
+                  <span className="text-xs opacity-80">(Disponível)</span>
+                </button>
+
+                <button
+                  className="flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700"
+                >
+                  <BarChart3 className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">Opção 4</span>
+                  <span className="text-xs opacity-80">(Disponível)</span>
+                </button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
