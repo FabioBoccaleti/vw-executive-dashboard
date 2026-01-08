@@ -1013,8 +1013,6 @@ export function VWFinancialDashboard() {
           </div>
         </div>
 
-        </div>
-
         {/* Performance Analytics - Charts */}
         <div>
           <div className="mb-4">
@@ -1023,6 +1021,157 @@ export function VWFinancialDashboard() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Volume de Vendas */}
+            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
+              <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Volume de Vendas</CardTitle>
+                    <CardDescription className="text-sm">Unidades comercializadas por período</CardDescription>
+                  </div>
+                  <Badge className="bg-blue-50 text-blue-700 border-blue-200">2025</Badge>
+                </div>
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Anual</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeDreData[0].total.toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{Math.round(activeDreData[0].total / 12).toLocaleString('pt-BR')}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Maior Volume</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{Math.max(...activeDreData[0].meses).toLocaleString('pt-BR')}</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <ChartContainer config={chartConfig} className="w-full">
+                  {showComparison && projectionMode ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart 
+                        data={(() => {
+                          const periodData = aggregateData(projectedData[activeScenario][0].meses);
+                          const periodDataOriginal = aggregateData(dreData[0].meses);
+                          const labels = getPeriodLabels();
+                          return labels.map((mes, idx) => ({
+                            mes,
+                            original: periodDataOriginal[idx],
+                            projecao: periodData[idx]
+                          }));
+                        })()} 
+                        barGap={4}
+                        barCategoryGap="20%"
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                        <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => formatNumber(value)} />
+                        <ChartTooltip 
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                  <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                                  <div className="space-y-1">
+                                    <p className="text-sm">
+                                      <span className="text-slate-600 dark:text-slate-400">Original: </span>
+                                      <span className="font-bold text-blue-600">{formatNumber(payload[0]?.value || 0)} unidades</span>
+                                    </p>
+                                    <p className="text-sm">
+                                      <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
+                                      <span className="font-bold text-emerald-600">{formatNumber(payload[1]?.value || 0)} unidades</span>
+                                    </p>
+                                    <p className="text-sm">
+                                      <span className="text-slate-600 dark:text-slate-400">Variação: </span>
+                                      <span className="font-bold text-purple-600">{formatNumber((payload[1]?.value || 0) - (payload[0]?.value || 0))} unidades</span>
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend 
+                          wrapperStyle={{ fontSize: '12px' }} 
+                          content={() => (
+                            <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                              <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#3b82f6' }}></div>
+                                <span>Original</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#10b981' }}></div>
+                                <span>Projeção</span>
+                              </div>
+                            </div>
+                          )}
+                        />
+                        <Bar dataKey="original" fill="#3b82f6" name="Original" maxBarSize={50} />
+                        <Bar dataKey="projecao" fill="#10b981" name="Projeção" maxBarSize={50} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={(() => {
+                        const periodData = aggregateData(activeDreData[0].meses);
+                        const labels = getPeriodLabels();
+                        const media = periodData.reduce((a, b) => a + b, 0) / periodData.length;
+                        return periodData.map((vol, idx) => ({
+                          mes: labels[idx],
+                          volume: vol,
+                          fill: vol > media * 1.05 ? '#0284c7' : vol < media * 0.95 ? '#b91c1c' : '#ea580c'
+                        }));
+                      })()}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                        <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => formatNumber(value)} />
+                        <ChartTooltip 
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                  <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                                  <div className="space-y-1">
+                                    <p className="text-sm">
+                                      <span className="text-slate-600 dark:text-slate-400">Volume: </span>
+                                      <span className="font-bold text-slate-900 dark:text-white">{formatNumber(payload[0].value || 0)} unidades</span>
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Legend 
+                          wrapperStyle={{ fontSize: '12px' }} 
+                          content={() => (
+                            <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                              <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#0284c7' }}></div>
+                                <span>Acima da Média</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#ea580c' }}></div>
+                                <span>Média</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#b91c1c' }}></div>
+                                <span>Abaixo da Média</span>
+                              </div>
+                            </div>
+                          )}
+                        />
+                        <Bar dataKey="volume" name="Volume" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
             {/* Receita de Vendas Líquidas */}
             <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
               <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
@@ -1052,7 +1201,7 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
                     // Gráfico de comparação com duas barras
-                    <ResponsiveContainer width="100%" height={280}>
+                    <ResponsiveContainer width="100%" height={220}>
                       <BarChart 
                         data={(() => {
                           const periodData = aggregateData(projectedData[activeScenario][1].meses);
@@ -1124,7 +1273,7 @@ export function VWFinancialDashboard() {
                     </ResponsiveContainer>
                   ) : (
                     // Gráfico normal com uma barra
-                    <ResponsiveContainer width="100%" height={280}>
+                    <ResponsiveContainer width="100%" height={220}>
                       <BarChart data={(() => {
                         const periodData = aggregateData(activeDreData[1].meses);
                         const labels = getPeriodLabels();
@@ -1188,157 +1337,6 @@ export function VWFinancialDashboard() {
               </CardContent>
             </Card>
 
-            {/* Volume de Vendas */}
-            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Volume de Vendas</CardTitle>
-                    <CardDescription className="text-sm">Unidades comercializadas por período</CardDescription>
-                  </div>
-                  <Badge className="bg-blue-50 text-blue-700 border-blue-200">2025</Badge>
-                </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Anual</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeDreData[0].total.toLocaleString('pt-BR')}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{Math.round(activeDreData[0].total / 12).toLocaleString('pt-BR')}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Maior Volume</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{Math.max(...activeDreData[0].meses).toLocaleString('pt-BR')}</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <ChartContainer config={chartConfig} className="w-full">
-                  {showComparison && projectionMode ? (
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart 
-                        data={(() => {
-                          const periodData = aggregateData(projectedData[activeScenario][0].meses);
-                          const periodDataOriginal = aggregateData(dreData[0].meses);
-                          const labels = getPeriodLabels();
-                          return labels.map((mes, idx) => ({
-                            mes,
-                            original: periodDataOriginal[idx],
-                            projecao: periodData[idx]
-                          }));
-                        })()} 
-                        barGap={4}
-                        barCategoryGap="20%"
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                        <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => formatNumber(value)} />
-                        <ChartTooltip 
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              return (
-                                <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
-                                  <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
-                                  <div className="space-y-1">
-                                    <p className="text-sm">
-                                      <span className="text-slate-600 dark:text-slate-400">Original: </span>
-                                      <span className="font-bold text-blue-600">{formatNumber(payload[0]?.value || 0)} unidades</span>
-                                    </p>
-                                    <p className="text-sm">
-                                      <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
-                                      <span className="font-bold text-emerald-600">{formatNumber(payload[1]?.value || 0)} unidades</span>
-                                    </p>
-                                    <p className="text-sm">
-                                      <span className="text-slate-600 dark:text-slate-400">Variação: </span>
-                                      <span className="font-bold text-purple-600">{formatNumber((payload[1]?.value || 0) - (payload[0]?.value || 0))} unidades</span>
-                                    </p>
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Legend 
-                          wrapperStyle={{ fontSize: '12px' }} 
-                          content={() => (
-                            <div className="flex items-center justify-center gap-4 text-xs mt-2">
-                              <div className="flex items-center gap-1">
-                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#3b82f6' }}></div>
-                                <span>Original</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#10b981' }}></div>
-                                <span>Projeção</span>
-                              </div>
-                            </div>
-                          )}
-                        />
-                        <Bar dataKey="original" fill="#3b82f6" name="Original" maxBarSize={50} />
-                        <Bar dataKey="projecao" fill="#10b981" name="Projeção" maxBarSize={50} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart data={(() => {
-                        const periodData = aggregateData(activeDreData[0].meses);
-                        const labels = getPeriodLabels();
-                        const media = periodData.reduce((a, b) => a + b, 0) / periodData.length;
-                        return periodData.map((vol, idx) => ({
-                          mes: labels[idx],
-                          volume: vol,
-                          fill: vol > media * 1.05 ? '#0284c7' : vol < media * 0.95 ? '#b91c1c' : '#ea580c'
-                        }));
-                      })()}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                        <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => formatNumber(value)} />
-                        <ChartTooltip 
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              return (
-                                <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
-                                  <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
-                                  <div className="space-y-1">
-                                    <p className="text-sm">
-                                      <span className="text-slate-600 dark:text-slate-400">Volume: </span>
-                                      <span className="font-bold text-slate-900 dark:text-white">{formatNumber(payload[0].value || 0)} unidades</span>
-                                    </p>
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Legend 
-                          wrapperStyle={{ fontSize: '12px' }} 
-                          content={() => (
-                            <div className="flex items-center justify-center gap-4 text-xs mt-2">
-                              <div className="flex items-center gap-1">
-                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#0284c7' }}></div>
-                                <span>Acima da Média</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#ea580c' }}></div>
-                                <span>Média</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#b91c1c' }}></div>
-                                <span>Abaixo da Média</span>
-                              </div>
-                            </div>
-                          )}
-                        />
-                        <Bar dataKey="volume" name="Volume" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </ChartContainer>
-              </CardContent>
-            </Card>
-
             {/* Lucro Bruto */}
             <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
               <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
@@ -1367,8 +1365,8 @@ export function VWFinancialDashboard() {
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart 
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart
                         data={(() => {
                           const periodData = aggregateData(projectedData[activeScenario][3].meses);
                           const periodDataOriginal = aggregateData(dreData[3].meses);
@@ -1433,7 +1431,7 @@ export function VWFinancialDashboard() {
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <ResponsiveContainer width="100%" height={280}>
+                    <ResponsiveContainer width="100%" height={220}>
                       <BarChart data={(() => {
                         const periodDataLucro = aggregateData(activeDreData[3].meses);
                         const periodDataReceita = aggregateData(activeDreData[1].meses);
@@ -1545,7 +1543,7 @@ export function VWFinancialDashboard() {
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
-                    <ResponsiveContainer width="100%" height={280}>
+                    <ResponsiveContainer width="100%" height={220}>
                       <BarChart 
                         data={(() => {
                           const periodData = aggregateData(projectedData[activeScenario][6].meses);
@@ -1611,7 +1609,7 @@ export function VWFinancialDashboard() {
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <ResponsiveContainer width="100%" height={280}>
+                    <ResponsiveContainer width="100%" height={220}>
                       <BarChart data={(() => {
                         const periodDataMargem = aggregateData(activeDreData[6].meses);
                         const periodDataReceita = aggregateData(activeDreData[1].meses);
@@ -1696,7 +1694,7 @@ export function VWFinancialDashboard() {
             </Card>
 
             {/* Despesas por Categoria */}
-            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800 lg:col-span-2">
+            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
               <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-6">
                 <div className="flex items-start justify-between mb-6">
                   <CardTitle className="text-xl font-semibold text-slate-900 dark:text-white">Despesas por Categoria</CardTitle>
@@ -1819,7 +1817,7 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
                     // Gráfico de comparação entre original e projeção
-                    <ResponsiveContainer width="100%" height={320}>
+                    <ResponsiveContainer width="100%" height={220}>
                       <BarChart data={(() => {
                         // Dados originais
                         const aggregatedPessoalOrig = aggregateData(dreData[7].meses.map(v => Math.abs(v)));
@@ -1883,7 +1881,7 @@ export function VWFinancialDashboard() {
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                  <ResponsiveContainer width="100%" height={320}>
+                  <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={(() => {
                       const aggregatedPessoal = aggregateData(activeDreData[7].meses.map(v => Math.abs(v)));
                       const aggregatedTerceiros = aggregateData(activeDreData[8].meses.map(v => Math.abs(v)));
@@ -1895,12 +1893,12 @@ export function VWFinancialDashboard() {
                       
                       return aggregatedPessoal.map((_, idx) => ({
                         mes: periodLabels[idx],
-                        pessoal: aggregatedPessoal[idx],
-                        terceiros: aggregatedTerceiros[idx],
-                        ocupacao: aggregatedOcupacao[idx],
-                        funcionamento: aggregatedFuncionamento[idx],
-                        vendas: aggregatedVendas[idx],
-                        total: aggregatedPessoal[idx] + aggregatedTerceiros[idx] + aggregatedOcupacao[idx] + aggregatedFuncionamento[idx] + aggregatedVendas[idx],
+                        pessoal: aggregatedPessoal[idx] / 1000,
+                        terceiros: aggregatedTerceiros[idx] / 1000,
+                        ocupacao: aggregatedOcupacao[idx] / 1000,
+                        funcionamento: aggregatedFuncionamento[idx] / 1000,
+                        vendas: aggregatedVendas[idx] / 1000,
+                        total: (aggregatedPessoal[idx] + aggregatedTerceiros[idx] + aggregatedOcupacao[idx] + aggregatedFuncionamento[idx] + aggregatedVendas[idx]) / 1000,
                         totalPct: (((aggregatedPessoal[idx] + aggregatedTerceiros[idx] + aggregatedOcupacao[idx] + aggregatedFuncionamento[idx] + aggregatedVendas[idx]) / aggregatedReceita[idx]) * 100).toFixed(1),
                         pessoalPct: ((aggregatedPessoal[idx] / aggregatedReceita[idx]) * 100).toFixed(2),
                         terceirosPct: ((aggregatedTerceiros[idx] / aggregatedReceita[idx]) * 100).toFixed(2),
@@ -1908,10 +1906,10 @@ export function VWFinancialDashboard() {
                         funcionamentoPct: ((aggregatedFuncionamento[idx] / aggregatedReceita[idx]) * 100).toFixed(2),
                         vendasPct: ((aggregatedVendas[idx] / aggregatedReceita[idx]) * 100).toFixed(2)
                       }));
-                    })()}>
+                    })()} barCategoryGap="15%">
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => formatNumber(value)} />
                       <ChartTooltip 
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
@@ -1927,7 +1925,7 @@ export function VWFinancialDashboard() {
                                       </div>
                                       <div className="text-right">
                                         <span className="text-sm font-bold text-slate-900 dark:text-white">
-                                          {formatCurrency(entry.value)}
+                                          {formatChartValue(entry.value * 1000)}
                                         </span>
                                         <span className="text-xs text-slate-600 dark:text-slate-400 ml-2">
                                           ({entry.name === 'Pessoal' ? payload[0].payload.pessoalPct :
@@ -1945,7 +1943,7 @@ export function VWFinancialDashboard() {
                                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Total:</span>
                                     <div className="text-right">
                                       <span className="text-sm font-bold text-slate-900 dark:text-white">
-                                        {formatCurrency(payload[0].payload.total)}
+                                        {formatChartValue(payload[0].payload.total * 1000)}
                                       </span>
                                       <span className="text-xs font-bold text-slate-600 dark:text-slate-400 ml-2">
                                         ({payload[0].payload.totalPct}%)
@@ -1960,19 +1958,19 @@ export function VWFinancialDashboard() {
                         }}
                       />
                       {selectedCategories.includes('pessoal') && (
-                        <Bar dataKey="pessoal" stackId="a" fill="#001E50" name="Pessoal" />
+                        <Bar dataKey="pessoal" stackId="a" fill="#001E50" name="Pessoal" maxBarSize={45} />
                       )}
                       {selectedCategories.includes('terceiros') && (
-                        <Bar dataKey="terceiros" stackId="a" fill="#0089EF" name="Terceiros" />
+                        <Bar dataKey="terceiros" stackId="a" fill="#0089EF" name="Terceiros" maxBarSize={45} />
                       )}
                       {selectedCategories.includes('ocupacao') && (
-                        <Bar dataKey="ocupacao" stackId="a" fill="#F59E0B" name="Ocupação" />
+                        <Bar dataKey="ocupacao" stackId="a" fill="#F59E0B" name="Ocupação" maxBarSize={45} />
                       )}
                       {selectedCategories.includes('funcionamento') && (
-                        <Bar dataKey="funcionamento" stackId="a" fill="#EF4444" name="Funcionamento" />
+                        <Bar dataKey="funcionamento" stackId="a" fill="#EF4444" name="Funcionamento" maxBarSize={45} />
                       )}
                       {selectedCategories.includes('vendas') && (
-                        <Bar dataKey="vendas" stackId="a" fill="#8B5CF6" name="Vendas" />
+                        <Bar dataKey="vendas" stackId="a" fill="#8B5CF6" name="Vendas" maxBarSize={45} />
                       )}
                     </BarChart>
                   </ResponsiveContainer>
@@ -2016,7 +2014,7 @@ export function VWFinancialDashboard() {
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            <ChartContainer config={chartConfig} className="h-[280px] w-full">
+            <ChartContainer config={chartConfig} className="h-[220px] w-full">
               {showComparison && projectionMode ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart 
@@ -2277,6 +2275,7 @@ export function VWFinancialDashboard() {
           </Card>
         </div>
       </div>
+    </div>
     </>
   )
 }
