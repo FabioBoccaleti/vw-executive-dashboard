@@ -5,11 +5,21 @@ import {
 } from 'recharts';
 import { businessMetricsData } from '@/data/businessMetricsData';
 import { 
-  TrendingUp, Package, CreditCard, Award, Building2, PiggyBank, 
+  TrendingUp, TrendingDown, Package, CreditCard, Award, Building2, PiggyBank, 
   ShoppingCart, Percent, DollarSign, AlertCircle
 } from 'lucide-react';
 
 const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#14b8a6'];
+
+const COLORS = {
+  primary: '#3b82f6',
+  secondary: '#8b5cf6',
+  success: '#10b981',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  info: '#06b6d4',
+  dark: '#1e293b'
+};
 
 // Formatar valores em reais
 const formatCurrency = (value: number) => {

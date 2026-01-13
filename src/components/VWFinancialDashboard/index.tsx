@@ -1060,14 +1060,12 @@ export function VWFinancialDashboard() {
                       ID 1 - % de Trocas em Veículos Novos
                     </h3>
                     <ChartContainer config={{}} className="h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={businessMetricsData.months.map((month, index) => ({
-                          month,
-                          vendas: businessMetricsData.vendasNovos.vendas[index],
-                          trocas: businessMetricsData.vendasNovos.volumeTrocas[index],
-                          percentual: businessMetricsData.vendasNovos.percentualTrocas[index]
-                        }))}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <ComposedChart data={businessMetricsData.months.map((month, index) => ({
+                        month,
+                        vendas: businessMetricsData.vendasNovos.vendas[index],
+                        trocas: businessMetricsData.vendasNovos.volumeTrocas[index],
+                        percentual: businessMetricsData.vendasNovos.percentualTrocas[index]
+                      }))} width={1654} height={300}>
                           <XAxis 
                             dataKey="month" 
                             tick={{ fill: '#64748b', fontSize: 12 }}
@@ -1135,7 +1133,6 @@ export function VWFinancialDashboard() {
                             dot={{ fill: '#f97316', r: 4 }}
                           />
                         </ComposedChart>
-                      </ResponsiveContainer>
                     </ChartContainer>
                     </div>
 
@@ -1145,14 +1142,12 @@ export function VWFinancialDashboard() {
                       ID 2 - % de Trocas em Veículos Novos VD
                     </h3>
                     <ChartContainer config={{}} className="h-[300px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={businessMetricsData.months.map((month, index) => ({
-                          month,
-                          vendas: businessMetricsData.vendasNovosVD.vendas[index],
-                          trocas: businessMetricsData.vendasNovosVD.volumeTrocas[index],
-                          percentual: businessMetricsData.vendasNovosVD.percentualTrocas[index]
-                        }))}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <ComposedChart data={businessMetricsData.months.map((month, index) => ({
+                        month,
+                        vendas: businessMetricsData.vendasNovosVD.vendas[index],
+                        trocas: businessMetricsData.vendasNovosVD.volumeTrocas[index],
+                        percentual: businessMetricsData.vendasNovosVD.percentualTrocas[index]
+                      }))} width={1654} height={300}>
                           <XAxis 
                             dataKey="month" 
                             tick={{ fill: '#64748b', fontSize: 12 }}
@@ -1220,7 +1215,6 @@ export function VWFinancialDashboard() {
                             dot={{ fill: '#ec4899', r: 4 }}
                           />
                         </ComposedChart>
-                      </ResponsiveContainer>
                     </ChartContainer>
                     </div>
 
@@ -1230,14 +1224,12 @@ export function VWFinancialDashboard() {
                         ID 3 - % de Trocas em Veículos Usados
                       </h3>
                       <ChartContainer config={{}} className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <ComposedChart data={businessMetricsData.months.map((month, index) => ({
-                            month,
-                            vendas: businessMetricsData.vendasUsados.vendas[index],
-                            trocas: businessMetricsData.vendasUsados.volumeTrocas[index],
-                            percentual: businessMetricsData.vendasUsados.percentualTrocas[index]
-                          }))}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <ComposedChart data={businessMetricsData.months.map((month, index) => ({
+                          month,
+                          vendas: businessMetricsData.vendasUsados.vendas[index],
+                          trocas: businessMetricsData.vendasUsados.volumeTrocas[index],
+                          percentual: businessMetricsData.vendasUsados.percentualTrocas[index]
+                        }))} width={1654} height={300}>
                             <XAxis 
                               dataKey="month" 
                               tick={{ fill: '#64748b', fontSize: 12 }}
@@ -1305,7 +1297,6 @@ export function VWFinancialDashboard() {
                               dot={{ fill: '#14b8a6', r: 4 }}
                             />
                           </ComposedChart>
-                        </ResponsiveContainer>
                       </ChartContainer>
                     </div>
                   </div>
