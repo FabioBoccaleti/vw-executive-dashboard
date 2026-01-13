@@ -7,6 +7,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend, LabelList } from "recharts"
 import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
+import { DetailedMetricsTable } from "@/components/DetailedMetricsTable"
 
 export function VWFinancialDashboard() {
   // Estado para controlar categorias de despesas selecionadas
@@ -25,6 +26,9 @@ export function VWFinancialDashboard() {
   const [projectedData, setProjectedData] = useState<{[scenarioId: string]: any[]}>({})
   const [showComparison, setShowComparison] = useState(false)
   const [showProjectionModal, setShowProjectionModal] = useState(false)
+  
+  // Estado para controlar exibição da tabela de métricas detalhadas
+  const [showDetailedMetrics, setShowDetailedMetrics] = useState(false)
 
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
@@ -949,11 +953,16 @@ export function VWFinancialDashboard() {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <button
-                  className="flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700"
+                  onClick={() => setShowDetailedMetrics(!showDetailedMetrics)}
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                    showDetailedMetrics 
+                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400 dark:border-amber-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700`}
                 >
-                  <Calendar className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-semibold">Opção 1</span>
-                  <span className="text-xs opacity-80">(Disponível)</span>
+                  <BarChart3 className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">Tabela de Dados</span>
+                  <span className="text-xs opacity-80">Métricas Completas</span>
                 </button>
 
                 <button
@@ -971,17 +980,36 @@ export function VWFinancialDashboard() {
                   <span className="text-sm font-semibold">Opção 3</span>
                   <span className="text-xs opacity-80">(Disponível)</span>
                 </button>
-
-                <button
-                  className="flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700"
-                >
-                  <BarChart3 className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-semibold">Opção 4</span>
-                  <span className="text-xs opacity-80">(Disponível)</span>
-                </button>
               </div>
             </CardContent>
           </Card>
+          
+          {/* Card de Tabela Detalhada de Métricas */}
+          {showDetailedMetrics && (
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                      Métricas Detalhadas - Análise Consolidada 2025
+                    </CardTitle>
+                    <CardDescription className="text-sm mt-1">
+                      Tabela completa com todos os indicadores mensais de vendas, estoques, juros, custos, bônus e créditos fiscais
+                    </CardDescription>
+                  </div>
+                  <button
+                    onClick={() => setShowDetailedMetrics(false)}
+                    className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                  >
+                    <TrendingDown className="w-5 h-5" />
+                  </button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <DetailedMetricsTable />
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
