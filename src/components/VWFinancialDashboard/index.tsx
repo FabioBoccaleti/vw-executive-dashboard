@@ -887,7 +887,10 @@ export function VWFinancialDashboard() {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <button
-                  onClick={() => setViewMode('mensal')}
+                  onClick={() => {
+                    setViewMode('mensal')
+                    setShowDetailedMetrics(false)
+                  }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     viewMode === 'mensal'
                       ? 'bg-amber-500 border-amber-500 text-white shadow-lg'
@@ -900,7 +903,10 @@ export function VWFinancialDashboard() {
                 </button>
 
                 <button
-                  onClick={() => setViewMode('bimestral')}
+                  onClick={() => {
+                    setViewMode('bimestral')
+                    setShowDetailedMetrics(false)
+                  }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     viewMode === 'bimestral'
                       ? 'bg-amber-500 border-amber-500 text-white shadow-lg'
@@ -913,7 +919,10 @@ export function VWFinancialDashboard() {
                 </button>
 
                 <button
-                  onClick={() => setViewMode('trimestral')}
+                  onClick={() => {
+                    setViewMode('trimestral')
+                    setShowDetailedMetrics(false)
+                  }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     viewMode === 'trimestral'
                       ? 'bg-amber-500 border-amber-500 text-white shadow-lg'
@@ -926,7 +935,10 @@ export function VWFinancialDashboard() {
                 </button>
 
                 <button
-                  onClick={() => setViewMode('semestral')}
+                  onClick={() => {
+                    setViewMode('semestral')
+                    setShowDetailedMetrics(false)
+                  }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     viewMode === 'semestral'
                       ? 'bg-amber-500 border-amber-500 text-white shadow-lg'
@@ -951,7 +963,7 @@ export function VWFinancialDashboard() {
               <CardDescription className="text-xs">Configurações e filtros complementares</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <button
                   onClick={() => setShowDetailedMetrics(!showDetailedMetrics)}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
@@ -963,22 +975,6 @@ export function VWFinancialDashboard() {
                   <BarChart3 className="w-6 h-6 mb-2" />
                   <span className="text-sm font-semibold">Tabela de Dados</span>
                   <span className="text-xs opacity-80">Métricas Completas</span>
-                </button>
-
-                <button
-                  className="flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700"
-                >
-                  <BarChart3 className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-semibold">Opção 2</span>
-                  <span className="text-xs opacity-80">(Disponível)</span>
-                </button>
-
-                <button
-                  className="flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700"
-                >
-                  <BarChart3 className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-semibold">Opção 3</span>
-                  <span className="text-xs opacity-80">(Disponível)</span>
                 </button>
               </div>
             </CardContent>
@@ -1013,7 +1009,8 @@ export function VWFinancialDashboard() {
         </div>
       </div>
 
-      <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
+      {!showDetailedMetrics && (
+        <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
         {/* Executive Summary - KPIs */}
         <div>
           <div className="mb-4">
@@ -2514,6 +2511,7 @@ export function VWFinancialDashboard() {
           </Card>
         </div>
       </div>
+      )}
     </div>
     </>
   )
