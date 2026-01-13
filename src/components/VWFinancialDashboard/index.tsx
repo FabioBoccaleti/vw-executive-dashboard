@@ -1989,6 +1989,62 @@ export function VWFinancialDashboard() {
                     </BarChart>
                   )}
                 </ChartContainer>
+
+                {/* Total do Período por Categoria */}
+                <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">Total do Período por Categoria:</p>
+                  <div className="grid grid-cols-5 gap-4">
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: '#001E50' }}></div>
+                        <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Pessoal</p>
+                      </div>
+                      <p className="text-lg font-bold text-slate-900 dark:text-white">
+                        {formatCurrency(Math.abs(activeDreData[7].total))}
+                      </p>
+                    </div>
+                    
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: '#0089EF' }}></div>
+                        <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Terceiros</p>
+                      </div>
+                      <p className="text-lg font-bold text-slate-900 dark:text-white">
+                        {formatCurrency(Math.abs(activeDreData[8].total))}
+                      </p>
+                    </div>
+                    
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: '#F59E0B' }}></div>
+                        <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Ocupação</p>
+                      </div>
+                      <p className="text-lg font-bold text-slate-900 dark:text-white">
+                        {formatCurrency(Math.abs(activeDreData[9].total))}
+                      </p>
+                    </div>
+                    
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: '#EF4444' }}></div>
+                        <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Funcionamento</p>
+                      </div>
+                      <p className="text-lg font-bold text-slate-900 dark:text-white">
+                        {formatCurrency(Math.abs(activeDreData[10].total))}
+                      </p>
+                    </div>
+                    
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 rounded" style={{ backgroundColor: '#8B5CF6' }}></div>
+                        <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Vendas</p>
+                      </div>
+                      <p className="text-lg font-bold text-slate-900 dark:text-white">
+                        {formatCurrency(Math.abs(activeDreData[11].total))}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
