@@ -45,6 +45,9 @@ export function VWFinancialDashboard() {
   
   // Estado para controlar exibição do card de Estoque de Peças
   const [showEstoquePecas, setShowEstoquePecas] = useState(false)
+  
+  // Estado para controlar exibição do card de Venda de Peças
+  const [showVendaPecas, setShowVendaPecas] = useState(false)
 
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
@@ -983,7 +986,7 @@ export function VWFinancialDashboard() {
               <CardDescription className="text-xs">Configurações e filtros complementares</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <button
                   onClick={() => {
                     setShowDetailedMetrics(!showDetailedMetrics)
@@ -992,16 +995,17 @@ export function VWFinancialDashboard() {
                     setShowEstoqueNovos(false)
                     setShowEstoqueUsados(false)
                     setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
                   }}
-                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showDetailedMetrics 
                       ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400 dark:border-amber-600' 
                       : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                   } text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700`}
                 >
-                  <BarChart3 className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-semibold">Tabela de Dados</span>
-                  <span className="text-xs opacity-80">Métricas Completas</span>
+                  <BarChart3 className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Tabela de Dados</span>
+                  <span className="text-[10px] opacity-80">Métricas Completas</span>
                 </button>
 
                 <button
@@ -1012,16 +1016,17 @@ export function VWFinancialDashboard() {
                     setShowEstoqueNovos(false)
                     setShowEstoqueUsados(false)
                     setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
                   }}
-                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showTrocasChart 
                       ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400 dark:border-amber-600' 
                       : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                   } text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700`}
                 >
-                  <TrendingUp className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-semibold">Volume de Troca</span>
-                  <span className="text-xs opacity-80">Análise de Conversão</span>
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Volume de Troca</span>
+                  <span className="text-[10px] opacity-80">Análise de Conversão</span>
                 </button>
 
                 <button
@@ -1032,16 +1037,17 @@ export function VWFinancialDashboard() {
                     setShowEstoqueNovos(false)
                     setShowEstoqueUsados(false)
                     setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
                   }}
-                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showRepasseChart 
                       ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-400 dark:border-rose-600' 
                       : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                   } text-slate-700 dark:text-slate-300 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-slate-700`}
                 >
-                  <GitCompare className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-semibold">% de Repasse</span>
-                  <span className="text-xs opacity-80">Vendas de Repasse</span>
+                  <GitCompare className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">% de Repasse</span>
+                  <span className="text-[10px] opacity-80">Vendas de Repasse</span>
                 </button>
 
                 <button
@@ -1052,16 +1058,17 @@ export function VWFinancialDashboard() {
                     setShowRepasseChart(false)
                     setShowEstoqueUsados(false)
                     setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
                   }}
-                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showEstoqueNovos 
                       ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-600' 
                       : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                   } text-slate-700 dark:text-slate-300 hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-slate-700`}
                 >
-                  <BarChart3 className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-semibold">Estoque de Novos</span>
-                  <span className="text-xs opacity-80">Evolução do Estoque</span>
+                  <BarChart3 className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Estoque de Novos</span>
+                  <span className="text-[10px] opacity-80">Evolução do Estoque</span>
                 </button>
 
                 <button
@@ -1072,16 +1079,17 @@ export function VWFinancialDashboard() {
                     setShowRepasseChart(false)
                     setShowEstoqueNovos(false)
                     setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
                   }}
-                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showEstoqueUsados 
                       ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-600' 
                       : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                   } text-slate-700 dark:text-slate-300 hover:border-purple-300 hover:bg-purple-50 dark:hover:bg-slate-700`}
                 >
-                  <BarChart3 className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-semibold">Estoque de Usados</span>
-                  <span className="text-xs opacity-80">Evolução do Estoque</span>
+                  <BarChart3 className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Estoque de Usados</span>
+                  <span className="text-[10px] opacity-80">Evolução do Estoque</span>
                 </button>
 
                 <button
@@ -1092,16 +1100,38 @@ export function VWFinancialDashboard() {
                     setShowRepasseChart(false)
                     setShowEstoqueNovos(false)
                     setShowEstoqueUsados(false)
+                    setShowVendaPecas(false)
                   }}
-                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showEstoquePecas 
                       ? 'bg-teal-50 dark:bg-teal-900/20 border-teal-400 dark:border-teal-600' 
                       : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
                   } text-slate-700 dark:text-slate-300 hover:border-teal-300 hover:bg-teal-50 dark:hover:bg-slate-700`}
                 >
-                  <BarChart3 className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-semibold">Estoque de Peças</span>
-                  <span className="text-xs opacity-80">Evolução do Estoque</span>
+                  <BarChart3 className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Estoque de Peças</span>
+                  <span className="text-[10px] opacity-80">Evolução do Estoque</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowVendaPecas(!showVendaPecas)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showVendaPecas 
+                      ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-400 dark:border-indigo-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Venda de Peças</span>
+                  <span className="text-[10px] opacity-80">Por Departamento</span>
                 </button>
               </div>
             </CardContent>
@@ -1109,6 +1139,581 @@ export function VWFinancialDashboard() {
           
           {/* Renderização condicional dos cards de dados adicionais */}
           <>
+            {/* Card de Venda de Peças por Departamento */}
+            {showVendaPecas && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Venda de Peças por Departamento
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Análise de receita, lucro e margem por departamento - 2025
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowVendaPecas(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6">
+                    {/* Gráfico 1: Balcão (ID 8) */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                          Peças Balcão
+                        </h3>
+                        {(() => {
+                          const receitaTotal = businessMetricsData.vendasPecas.balcao.vendas.reduce((a, b) => a + b, 0);
+                          const lucroTotal = businessMetricsData.vendasPecas.balcao.lucro.reduce((a, b) => a + b, 0);
+                          const margemMedia = businessMetricsData.vendasPecas.balcao.margem.reduce((a, b) => a + b, 0) / 12;
+                          const ultimaReceita = businessMetricsData.vendasPecas.balcao.vendas[11];
+                          const penultimaReceita = businessMetricsData.vendasPecas.balcao.vendas[10];
+                          const variacao = ((ultimaReceita - penultimaReceita) / penultimaReceita) * 100;
+                          
+                          return (
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-semibold ${variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {variacao >= 0 ? '↗' : '↘'} {variacao.toFixed(1)}%
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      
+                      {(() => {
+                        const receitaTotal = businessMetricsData.vendasPecas.balcao.vendas.reduce((a, b) => a + b, 0);
+                        const lucroTotal = businessMetricsData.vendasPecas.balcao.lucro.reduce((a, b) => a + b, 0);
+                        const margemMedia = businessMetricsData.vendasPecas.balcao.margem.reduce((a, b) => a + b, 0) / 12;
+
+                        const chartData = businessMetricsData.months.map((month, index) => {
+                          const receitaAtual = businessMetricsData.vendasPecas.balcao.vendas[index];
+                          const receitaAnterior = index > 0 ? businessMetricsData.vendasPecas.balcao.vendas[index - 1] : receitaAtual;
+                          const variacao = ((receitaAtual - receitaAnterior) / receitaAnterior) * 100;
+
+                          return {
+                            month,
+                            receita: receitaAtual,
+                            margem: businessMetricsData.vendasPecas.balcao.margem[index],
+                            variacao: index === 0 ? 0 : variacao
+                          };
+                        });
+
+                        return (
+                          <>
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Receita Total</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">R$ {(receitaTotal / 1000000).toFixed(2)}M</p>
+                              </div>
+                              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Lucro Bruto</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">R$ {(lucroTotal / 1000000).toFixed(2)}M</p>
+                              </div>
+                              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Média</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">{margemMedia.toFixed(2)}%</p>
+                              </div>
+                            </div>
+
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={chartData} width={1151} height={350}>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Receita (mil R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Percentual (%)', angle: 90, position: 'insideRight', fill: '#64748b' }}
+                                  domain={[-20, 60]}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                                          <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
+                                          <p className="text-lg font-bold text-blue-600 mb-2">R$ {((payload[0]?.value || 0) / 1000).toFixed(1)}k</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
+                                          <p className="text-lg font-bold text-green-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
+                                          <p className="text-lg font-bold text-orange-600">{(payload[2]?.value || 0).toFixed(2)}%</p>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={36}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="receita" 
+                                  fill="#3b82f6" 
+                                  name="Receita Líquida"
+                                  radius={[4, 4, 0, 0]}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="margem" 
+                                  stroke="#10b981" 
+                                  strokeWidth={3}
+                                  name="Margem %"
+                                  dot={{ fill: '#10b981', r: 4 }}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#f59e0b" 
+                                  strokeWidth={2}
+                                  strokeDasharray="5 5"
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#f59e0b', r: 3 }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Gráfico 2: Oficina (ID 9) */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                          Peças Oficina
+                        </h3>
+                        {(() => {
+                          const ultimaReceita = businessMetricsData.vendasPecas.oficina.vendas[11];
+                          const penultimaReceita = businessMetricsData.vendasPecas.oficina.vendas[10];
+                          const variacao = ((ultimaReceita - penultimaReceita) / penultimaReceita) * 100;
+                          
+                          return (
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-semibold ${variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {variacao >= 0 ? '↗' : '↘'} {variacao.toFixed(1)}%
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      
+                      {(() => {
+                        const receitaTotal = businessMetricsData.vendasPecas.oficina.vendas.reduce((a, b) => a + b, 0);
+                        const lucroTotal = businessMetricsData.vendasPecas.oficina.lucro.reduce((a, b) => a + b, 0);
+                        const margemMedia = businessMetricsData.vendasPecas.oficina.margem.reduce((a, b) => a + b, 0) / 12;
+
+                        const chartData = businessMetricsData.months.map((month, index) => {
+                          const receitaAtual = businessMetricsData.vendasPecas.oficina.vendas[index];
+                          const receitaAnterior = index > 0 ? businessMetricsData.vendasPecas.oficina.vendas[index - 1] : receitaAtual;
+                          const variacao = ((receitaAtual - receitaAnterior) / receitaAnterior) * 100;
+
+                          return {
+                            month,
+                            receita: receitaAtual,
+                            margem: businessMetricsData.vendasPecas.oficina.margem[index],
+                            variacao: index === 0 ? 0 : variacao
+                          };
+                        });
+
+                        return (
+                          <>
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Receita Total</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">R$ {(receitaTotal / 1000000).toFixed(2)}M</p>
+                              </div>
+                              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Lucro Bruto</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">R$ {(lucroTotal / 1000000).toFixed(2)}M</p>
+                              </div>
+                              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Média</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">{margemMedia.toFixed(2)}%</p>
+                              </div>
+                            </div>
+
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={chartData} width={1151} height={350}>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Receita (mil R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Percentual (%)', angle: 90, position: 'insideRight', fill: '#64748b' }}
+                                  domain={[-30, 70]}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                                          <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
+                                          <p className="text-lg font-bold text-purple-600 mb-2">R$ {((payload[0]?.value || 0) / 1000).toFixed(1)}k</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
+                                          <p className="text-lg font-bold text-teal-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
+                                          <p className="text-lg font-bold text-orange-600">{(payload[2]?.value || 0).toFixed(2)}%</p>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={36}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="receita" 
+                                  fill="#8b5cf6" 
+                                  name="Receita Líquida"
+                                  radius={[4, 4, 0, 0]}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="margem" 
+                                  stroke="#14b8a6" 
+                                  strokeWidth={3}
+                                  name="Margem %"
+                                  dot={{ fill: '#14b8a6', r: 4 }}
+                                  dot={{ fill: '#14b8a6', r: 4 }}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#f59e0b" 
+                                  strokeWidth={2}
+                                  strokeDasharray="5 5"
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#f59e0b', r: 3 }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Gráfico 3: Funilaria (ID 10) */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                          Peças Funilaria
+                        </h3>
+                        {(() => {
+                          const ultimaReceita = businessMetricsData.vendasPecas.funilaria.vendas[11];
+                          const penultimaReceita = businessMetricsData.vendasPecas.funilaria.vendas[10];
+                          const variacao = ((ultimaReceita - penultimaReceita) / penultimaReceita) * 100;
+                          
+                          return (
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-semibold ${variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {variacao >= 0 ? '↗' : '↘'} {variacao.toFixed(1)}%
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      
+                      {(() => {
+                        const receitaTotal = businessMetricsData.vendasPecas.funilaria.vendas.reduce((a, b) => a + b, 0);
+                        const lucroTotal = businessMetricsData.vendasPecas.funilaria.lucro.reduce((a, b) => a + b, 0);
+                        const margemMedia = businessMetricsData.vendasPecas.funilaria.margem.reduce((a, b) => a + b, 0) / 12;
+
+                        const chartData = businessMetricsData.months.map((month, index) => {
+                          const receitaAtual = businessMetricsData.vendasPecas.funilaria.vendas[index];
+                          const receitaAnterior = index > 0 ? businessMetricsData.vendasPecas.funilaria.vendas[index - 1] : receitaAtual;
+                          const variacao = ((receitaAtual - receitaAnterior) / receitaAnterior) * 100;
+
+                          return {
+                            month,
+                            receita: receitaAtual,
+                            margem: businessMetricsData.vendasPecas.funilaria.margem[index],
+                            variacao: index === 0 ? 0 : variacao
+                          };
+                        });
+
+                        return (
+                          <>
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Receita Total</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">R$ {(receitaTotal / 1000000).toFixed(2)}M</p>
+                              </div>
+                              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Lucro Bruto</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">R$ {(lucroTotal / 1000000).toFixed(2)}M</p>
+                              </div>
+                              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Média</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">{margemMedia.toFixed(2)}%</p>
+                              </div>
+                            </div>
+
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={chartData} width={1151} height={350}>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Receita (mil R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Percentual (%)', angle: 90, position: 'insideRight', fill: '#64748b' }}
+                                  domain={[-60, 120]}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                                          <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
+                                          <p className="text-lg font-bold text-purple-600 mb-2">R$ {((payload[0]?.value || 0) / 1000).toFixed(1)}k</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
+                                          <p className="text-lg font-bold text-green-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
+                                          <p className="text-lg font-bold text-orange-600">{(payload[2]?.value || 0).toFixed(2)}%</p>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={36}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="receita" 
+                                  fill="#a855f7" 
+                                  name="Receita Líquida"
+                                  radius={[4, 4, 0, 0]}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="margem" 
+                                  stroke="#10b981" 
+                                  strokeWidth={3}
+                                  name="Margem %"
+                                  dot={{ fill: '#10b981', r: 4 }}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#f59e0b" 
+                                  strokeWidth={2}
+                                  strokeDasharray="5 5"
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#f59e0b', r: 3 }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Gráfico 4: Acessórios (ID 11) */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                          Peças Acessórios
+                        </h3>
+                        {(() => {
+                          const ultimaReceita = businessMetricsData.vendasPecas.acessorios.vendas[11];
+                          const penultimaReceita = businessMetricsData.vendasPecas.acessorios.vendas[10];
+                          const variacao = ((ultimaReceita - penultimaReceita) / penultimaReceita) * 100;
+                          
+                          return (
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-semibold ${variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {variacao >= 0 ? '↗' : '↘'} {variacao.toFixed(1)}%
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      
+                      {(() => {
+                        const receitaTotal = businessMetricsData.vendasPecas.acessorios.vendas.reduce((a, b) => a + b, 0);
+                        const lucroTotal = businessMetricsData.vendasPecas.acessorios.lucro.reduce((a, b) => a + b, 0);
+                        const margemMedia = businessMetricsData.vendasPecas.acessorios.margem.reduce((a, b) => a + b, 0) / 12;
+
+                        const chartData = businessMetricsData.months.map((month, index) => {
+                          const receitaAtual = businessMetricsData.vendasPecas.acessorios.vendas[index];
+                          const receitaAnterior = index > 0 ? businessMetricsData.vendasPecas.acessorios.vendas[index - 1] : receitaAtual;
+                          const variacao = ((receitaAtual - receitaAnterior) / receitaAnterior) * 100;
+
+                          return {
+                            month,
+                            receita: receitaAtual,
+                            margem: businessMetricsData.vendasPecas.acessorios.margem[index],
+                            variacao: index === 0 ? 0 : variacao
+                          };
+                        });
+
+                        return (
+                          <>
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Receita Total</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">R$ {(receitaTotal / 1000000).toFixed(2)}M</p>
+                              </div>
+                              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Lucro Bruto</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">R$ {(lucroTotal / 1000000).toFixed(2)}M</p>
+                              </div>
+                              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Média</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">{margemMedia.toFixed(2)}%</p>
+                              </div>
+                            </div>
+
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={chartData} width={1151} height={350}>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Receita (mil R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Percentual (%)', angle: 90, position: 'insideRight', fill: '#64748b' }}
+                                  domain={[-60, 120]}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                                          <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
+                                          <p className="text-lg font-bold text-blue-600 mb-2">R$ {((payload[0]?.value || 0) / 1000).toFixed(1)}k</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
+                                          <p className="text-lg font-bold text-green-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
+                                          <p className="text-lg font-bold text-orange-600">{(payload[2]?.value || 0).toFixed(2)}%</p>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={36}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="receita" 
+                                  fill="#3b82f6" 
+                                  name="Receita Líquida"
+                                  radius={[4, 4, 0, 0]}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="margem" 
+                                  stroke="#10b981" 
+                                  strokeWidth={3}
+                                  name="Margem %"
+                                  dot={{ fill: '#10b981', r: 4 }}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#f59e0b" 
+                                  strokeWidth={2}
+                                  strokeDasharray="5 5"
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#f59e0b', r: 3 }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Card de % de Trocas - Análise de Conversão */}
             {showTrocasChart && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
@@ -2053,7 +2658,7 @@ export function VWFinancialDashboard() {
         </div>
       </div>
 
-      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && (
+      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && (
         <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
         {/* Executive Summary - KPIs */}
         <div>
