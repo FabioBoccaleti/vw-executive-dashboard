@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2 } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend, LabelList } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend, LabelList, ComposedChart } from "recharts"
 import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { DetailedMetricsTable } from "@/components/DetailedMetricsTable"
+import { businessMetricsData } from "@/data/businessMetricsData"
 
 export function VWFinancialDashboard() {
   // Estado para controlar categorias de despesas selecionadas
@@ -29,6 +30,9 @@ export function VWFinancialDashboard() {
   
   // Estado para controlar exibição da tabela de métricas detalhadas
   const [showDetailedMetrics, setShowDetailedMetrics] = useState(false)
+  
+  // Estado para controlar exibição do card de % de Trocas
+  const [showTrocasChart, setShowTrocasChart] = useState(false)
 
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
@@ -890,6 +894,7 @@ export function VWFinancialDashboard() {
                   onClick={() => {
                     setViewMode('mensal')
                     setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
                   }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     viewMode === 'mensal'
@@ -906,6 +911,7 @@ export function VWFinancialDashboard() {
                   onClick={() => {
                     setViewMode('bimestral')
                     setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
                   }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     viewMode === 'bimestral'
@@ -922,6 +928,7 @@ export function VWFinancialDashboard() {
                   onClick={() => {
                     setViewMode('trimestral')
                     setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
                   }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     viewMode === 'trimestral'
@@ -938,6 +945,7 @@ export function VWFinancialDashboard() {
                   onClick={() => {
                     setViewMode('semestral')
                     setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
                   }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     viewMode === 'semestral'
@@ -963,9 +971,12 @@ export function VWFinancialDashboard() {
               <CardDescription className="text-xs">Configurações e filtros complementares</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
                 <button
-                  onClick={() => setShowDetailedMetrics(!showDetailedMetrics)}
+                  onClick={() => {
+                    setShowDetailedMetrics(!showDetailedMetrics)
+                    setShowTrocasChart(false)
+                  }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     showDetailedMetrics 
                       ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400 dark:border-amber-600' 
@@ -976,9 +987,307 @@ export function VWFinancialDashboard() {
                   <span className="text-sm font-semibold">Tabela de Dados</span>
                   <span className="text-xs opacity-80">Métricas Completas</span>
                 </button>
+
+                <button
+                  onClick={() => {
+                    setShowTrocasChart(!showTrocasChart)
+                    setShowDetailedMetrics(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                    showTrocasChart 
+                      ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400 dark:border-amber-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">Volume de Troca</span>
+                  <span className="text-xs opacity-80">Análise de Conversão</span>
+                </button>
               </div>
             </CardContent>
           </Card>
+          
+          {/* Card de % de Trocas - Análise de Conversão */}
+          {showTrocasChart && (
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                      Volume de Troca - Análise de Conversão 2025
+                    </CardTitle>
+                    <CardDescription className="text-sm mt-1">
+                      Evolução mensal dos percentuais de trocas em vendas de veículos novos, VD e usados
+                    </CardDescription>
+                  </div>
+                  <button
+                    onClick={() => setShowTrocasChart(false)}
+                    className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                  >
+                    <TrendingDown className="w-5 h-5" />
+                  </button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-6">
+                  {/* Gráfico 1: % de Trocas Novos */}
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">
+                      ID 1 - % de Trocas em Veículos Novos
+                    </h3>
+                    <ChartContainer config={{}} className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={businessMetricsData.months.map((month, index) => ({
+                          month,
+                          vendas: businessMetricsData.vendasNovos.vendas[index],
+                          trocas: businessMetricsData.vendasNovos.volumeTrocas[index],
+                          percentual: businessMetricsData.vendasNovos.percentualTrocas[index]
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                          <XAxis 
+                            dataKey="month" 
+                            tick={{ fill: '#64748b', fontSize: 12 }}
+                            axisLine={{ stroke: '#cbd5e1' }}
+                          />
+                          <YAxis 
+                            yAxisId="left"
+                            tick={{ fill: '#64748b', fontSize: 12 }}
+                            axisLine={{ stroke: '#cbd5e1' }}
+                            label={{ value: 'Volume', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                          />
+                          <YAxis 
+                            yAxisId="right"
+                            orientation="right"
+                            tick={{ fill: '#64748b', fontSize: 12 }}
+                            axisLine={{ stroke: '#cbd5e1' }}
+                            tickFormatter={(value) => `${value}%`}
+                            label={{ value: '% de Trocas', angle: 90, position: 'insideRight', fill: '#64748b' }}
+                          />
+                          <ChartTooltip 
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                return (
+                                  <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                                    <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">TOTAL DE VENDAS</p>
+                                    <p className="text-xl font-bold text-slate-900 dark:text-white mb-2">{payload[0].payload.vendas}</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">VENDAS COM TROCA</p>
+                                    <p className="text-xl font-bold text-teal-600 mb-2">{payload[0].payload.trocas}</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">% DE TROCAS</p>
+                                    <p className="text-xl font-bold text-emerald-600">{payload[0].payload.percentual.toFixed(2)}%</p>
+                                  </div>
+                                )
+                              }
+                              return null
+                            }}
+                          />
+                          <Legend 
+                            verticalAlign="bottom" 
+                            height={36}
+                            iconType="circle"
+                            wrapperStyle={{ paddingTop: '20px' }}
+                          />
+                          <Bar 
+                            yAxisId="left"
+                            dataKey="vendas" 
+                            fill="#0f172a" 
+                            name="Vendas"
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Bar 
+                            yAxisId="left"
+                            dataKey="trocas" 
+                            fill="#14b8a6" 
+                            name="Trocas"
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Line 
+                            yAxisId="right"
+                            type="monotone" 
+                            dataKey="percentual" 
+                            stroke="#f97316" 
+                            strokeWidth={3}
+                            name="% Troca"
+                            dot={{ fill: '#f97316', r: 4 }}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </div>
+
+                  {/* Gráfico 2: % de Trocas VD */}
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">
+                      ID 2 - % de Trocas em Veículos Novos VD
+                    </h3>
+                    <ChartContainer config={{}} className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={businessMetricsData.months.map((month, index) => ({
+                          month,
+                          vendas: businessMetricsData.vendasNovosVD.vendas[index],
+                          trocas: businessMetricsData.vendasNovosVD.volumeTrocas[index],
+                          percentual: businessMetricsData.vendasNovosVD.percentualTrocas[index]
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                          <XAxis 
+                            dataKey="month" 
+                            tick={{ fill: '#64748b', fontSize: 12 }}
+                            axisLine={{ stroke: '#cbd5e1' }}
+                          />
+                          <YAxis 
+                            yAxisId="left"
+                            tick={{ fill: '#64748b', fontSize: 12 }}
+                            axisLine={{ stroke: '#cbd5e1' }}
+                            label={{ value: 'Volume', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                          />
+                          <YAxis 
+                            yAxisId="right"
+                            orientation="right"
+                            tick={{ fill: '#64748b', fontSize: 12 }}
+                            axisLine={{ stroke: '#cbd5e1' }}
+                            tickFormatter={(value) => `${value}%`}
+                            label={{ value: '% de Trocas', angle: 90, position: 'insideRight', fill: '#64748b' }}
+                          />
+                          <ChartTooltip 
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                return (
+                                  <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                                    <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">TOTAL DE VENDAS</p>
+                                    <p className="text-xl font-bold text-slate-900 dark:text-white mb-2">{payload[0].payload.vendas}</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">VENDAS COM TROCA</p>
+                                    <p className="text-xl font-bold text-teal-600 mb-2">{payload[0].payload.trocas}</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">% DE TROCAS</p>
+                                    <p className="text-xl font-bold text-emerald-600">{payload[0].payload.percentual.toFixed(2)}%</p>
+                                  </div>
+                                )
+                              }
+                              return null
+                            }}
+                          />
+                          <Legend 
+                            verticalAlign="bottom" 
+                            height={36}
+                            iconType="circle"
+                            wrapperStyle={{ paddingTop: '20px' }}
+                          />
+                          <Bar 
+                            yAxisId="left"
+                            dataKey="vendas" 
+                            fill="#0f172a" 
+                            name="Vendas"
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Bar 
+                            yAxisId="left"
+                            dataKey="trocas" 
+                            fill="#14b8a6" 
+                            name="Trocas"
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Line 
+                            yAxisId="right"
+                            type="monotone" 
+                            dataKey="percentual" 
+                            stroke="#f97316" 
+                            strokeWidth={3}
+                            name="% Troca"
+                            dot={{ fill: '#f97316', r: 4 }}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </div>
+
+                  {/* Gráfico 3: % de Trocas Usados */}
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">
+                      ID 3 - % de Trocas em Veículos Usados
+                    </h3>
+                    <ChartContainer config={{}} className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={businessMetricsData.months.map((month, index) => ({
+                          month,
+                          vendas: businessMetricsData.vendasUsados.vendas[index],
+                          trocas: businessMetricsData.vendasUsados.volumeTrocas[index],
+                          percentual: businessMetricsData.vendasUsados.percentualTrocas[index]
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                          <XAxis 
+                            dataKey="month" 
+                            tick={{ fill: '#64748b', fontSize: 12 }}
+                            axisLine={{ stroke: '#cbd5e1' }}
+                          />
+                          <YAxis 
+                            yAxisId="left"
+                            tick={{ fill: '#64748b', fontSize: 12 }}
+                            axisLine={{ stroke: '#cbd5e1' }}
+                            label={{ value: 'Volume', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                          />
+                          <YAxis 
+                            yAxisId="right"
+                            orientation="right"
+                            tick={{ fill: '#64748b', fontSize: 12 }}
+                            axisLine={{ stroke: '#cbd5e1' }}
+                            tickFormatter={(value) => `${value}%`}
+                            label={{ value: '% de Trocas', angle: 90, position: 'insideRight', fill: '#64748b' }}
+                          />
+                          <ChartTooltip 
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                return (
+                                  <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                                    <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">TOTAL DE VENDAS</p>
+                                    <p className="text-xl font-bold text-slate-900 dark:text-white mb-2">{payload[0].payload.vendas}</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">VENDAS COM TROCA</p>
+                                    <p className="text-xl font-bold text-teal-600 mb-2">{payload[0].payload.trocas}</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">% DE TROCAS</p>
+                                    <p className="text-xl font-bold text-emerald-600">{payload[0].payload.percentual.toFixed(2)}%</p>
+                                  </div>
+                                )
+                              }
+                              return null
+                            }}
+                          />
+                          <Legend 
+                            verticalAlign="bottom" 
+                            height={36}
+                            iconType="circle"
+                            wrapperStyle={{ paddingTop: '20px' }}
+                          />
+                          <Bar 
+                            yAxisId="left"
+                            dataKey="vendas" 
+                            fill="#0f172a" 
+                            name="Vendas"
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Bar 
+                            yAxisId="left"
+                            dataKey="trocas" 
+                            fill="#14b8a6" 
+                            name="Trocas"
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Line 
+                            yAxisId="right"
+                            type="monotone" 
+                            dataKey="percentual" 
+                            stroke="#f97316" 
+                            strokeWidth={3}
+                            name="% Troca"
+                            dot={{ fill: '#f97316', r: 4 }}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           
           {/* Card de Tabela Detalhada de Métricas */}
           {showDetailedMetrics && (
@@ -1009,7 +1318,7 @@ export function VWFinancialDashboard() {
         </div>
       </div>
 
-      {!showDetailedMetrics && (
+      {!showDetailedMetrics && !showTrocasChart && (
         <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
         {/* Executive Summary - KPIs */}
         <div>
