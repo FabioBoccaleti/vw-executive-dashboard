@@ -36,6 +36,12 @@ export function VWFinancialDashboard() {
   
   // Estado para controlar exibição do card de % de Repasse
   const [showRepasseChart, setShowRepasseChart] = useState(false)
+  
+  // Estado para controlar exibição do card de Estoque de Novos
+  const [showEstoqueNovos, setShowEstoqueNovos] = useState(false)
+  
+  // Estado para controlar exibição do card de Estoque de Usados
+  const [showEstoqueUsados, setShowEstoqueUsados] = useState(false)
 
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
@@ -980,6 +986,8 @@ export function VWFinancialDashboard() {
                     setShowDetailedMetrics(!showDetailedMetrics)
                     setShowTrocasChart(false)
                     setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
                   }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     showDetailedMetrics 
@@ -997,6 +1005,8 @@ export function VWFinancialDashboard() {
                     setShowTrocasChart(!showTrocasChart)
                     setShowDetailedMetrics(false)
                     setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
                   }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     showTrocasChart 
@@ -1014,6 +1024,8 @@ export function VWFinancialDashboard() {
                     setShowRepasseChart(!showRepasseChart)
                     setShowDetailedMetrics(false)
                     setShowTrocasChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
                   }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     showRepasseChart 
@@ -1024,6 +1036,44 @@ export function VWFinancialDashboard() {
                   <GitCompare className="w-6 h-6 mb-2" />
                   <span className="text-sm font-semibold">% de Repasse</span>
                   <span className="text-xs opacity-80">Vendas de Repasse</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowEstoqueNovos(!showEstoqueNovos)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueUsados(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                    showEstoqueNovos 
+                      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-slate-700`}
+                >
+                  <BarChart3 className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">Estoque de Novos</span>
+                  <span className="text-xs opacity-80">Evolução do Estoque</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowEstoqueUsados(!showEstoqueUsados)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                    showEstoqueUsados 
+                      ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-purple-300 hover:bg-purple-50 dark:hover:bg-slate-700`}
+                >
+                  <BarChart3 className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">Estoque de Usados</span>
+                  <span className="text-xs opacity-80">Evolução do Estoque</span>
                 </button>
               </div>
             </CardContent>
@@ -1304,6 +1354,342 @@ export function VWFinancialDashboard() {
               </Card>
             )}
           
+            {/* Card de Estoque de Novos */}
+            {showEstoqueNovos && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Evolução do Estoque de Usados
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Análise temporal com variação mensal
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowEstoqueNovos(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const mesAtual = businessMetricsData.months[11]; // dezembro
+                    const estoqueAtual = businessMetricsData.estoqueNovos.valor[11];
+                    const aPagarAtual = businessMetricsData.estoqueNovos.aPagar[11];
+                    const pagoAtual = businessMetricsData.estoqueNovos.pagos[11];
+                    
+                    // Calcular médias anuais
+                    const mediaEstoque = businessMetricsData.estoqueNovos.valor.reduce((a, b) => a + b, 0) / 12;
+                    const mediaAPagar = businessMetricsData.estoqueNovos.aPagar.reduce((a, b) => a + b, 0) / 12;
+                    const mediaPago = businessMetricsData.estoqueNovos.pagos.reduce((a, b) => a + b, 0) / 12;
+                    const percentualAPagar = (aPagarAtual / estoqueAtual) * 100;
+                    const percentualPago = (pagoAtual / estoqueAtual) * 100;
+
+                    // Preparar dados para o gráfico com variação mês anterior
+                    const estoqueChartData = businessMetricsData.months.map((month, index) => {
+                      const valorAtual = businessMetricsData.estoqueNovos.valor[index];
+                      const valorAnterior = index > 0 ? businessMetricsData.estoqueNovos.valor[index - 1] : valorAtual;
+                      const variacao = ((valorAtual - valorAnterior) / valorAnterior) * 100;
+
+                      return {
+                        month,
+                        aPagar: businessMetricsData.estoqueNovos.aPagar[index],
+                        pago: businessMetricsData.estoqueNovos.pagos[index],
+                        variacao: index === 0 ? 0 : variacao
+                      };
+                    });
+
+                    return (
+                      <>
+                        {/* Cards de Resumo */}
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                          <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Estoque Atual</p>
+                            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">R$ {(estoqueAtual / 1000000).toFixed(1)}M</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{mesAtual}</p>
+                          </div>
+                          <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">A Pagar Atual</p>
+                            <p className="text-2xl font-bold text-slate-900 dark:text-white">R$ {(aPagarAtual / 1000000).toFixed(1)}M</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{mesAtual}</p>
+                          </div>
+                          <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Pago Atual</p>
+                            <p className="text-2xl font-bold text-slate-900 dark:text-white">R$ {(pagoAtual / 1000000).toFixed(1)}M</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{mesAtual}</p>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Média % A Pagar</p>
+                            <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{percentualAPagar.toFixed(2)}%</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">12 meses</p>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Média % Pago</p>
+                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{percentualPago.toFixed(2)}%</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">12 meses</p>
+                          </div>
+                        </div>
+
+                        {/* Gráfico */}
+                        <ChartContainer config={{}} className="h-[400px] w-full">
+                          <ComposedChart data={estoqueChartData} width={1151} height={400}>
+                            <XAxis 
+                              dataKey="month" 
+                              tick={{ fill: '#64748b', fontSize: 12 }}
+                              axisLine={{ stroke: '#cbd5e1' }}
+                            />
+                            <YAxis 
+                              yAxisId="left"
+                              tick={{ fill: '#64748b', fontSize: 12 }}
+                              axisLine={{ stroke: '#cbd5e1' }}
+                              tickFormatter={(value) => `R$ ${(value / 1000000).toFixed(0)}M`}
+                              label={{ value: '$', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                            />
+                            <YAxis 
+                              yAxisId="right"
+                              orientation="right"
+                              tick={{ fill: '#64748b', fontSize: 12 }}
+                              axisLine={{ stroke: '#cbd5e1' }}
+                              tickFormatter={(value) => `${value}%`}
+                              label={{ value: 'Var. Mês Anterior (%)', angle: 90, position: 'insideRight', fill: '#64748b' }}
+                              domain={[-35, 105]}
+                            />
+                            <ChartTooltip 
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const aPagar = payload[0]?.value || 0;
+                                  const pago = payload[1]?.value || 0;
+                                  const total = Number(aPagar) + Number(pago);
+                                  const variacao = payload[2]?.value || 0;
+                                  return (
+                                    <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                                      <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
+                                      <p className="text-sm text-slate-600 dark:text-slate-400">ESTOQUE TOTAL</p>
+                                      <p className="text-xl font-bold text-slate-900 dark:text-white mb-2">R$ {(total / 1000000).toFixed(2)}M</p>
+                                      <p className="text-sm text-slate-600 dark:text-slate-400">ESTOQUE A PAGAR</p>
+                                      <p className="text-xl font-bold text-orange-600 mb-2">R$ {(Number(aPagar) / 1000000).toFixed(2)}M</p>
+                                      <p className="text-sm text-slate-600 dark:text-slate-400">ESTOQUE PAGO</p>
+                                      <p className="text-xl font-bold text-green-600 mb-2">R$ {(Number(pago) / 1000000).toFixed(2)}M</p>
+                                      <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANTERIOR</p>
+                                      <p className="text-xl font-bold text-purple-600">{Number(variacao).toFixed(2)}%</p>
+                                    </div>
+                                  )
+                                }
+                                return null
+                              }}
+                            />
+                            <Legend 
+                              verticalAlign="bottom" 
+                              height={36}
+                              iconType="circle"
+                              wrapperStyle={{ paddingTop: '20px' }}
+                            />
+                            <Bar 
+                              yAxisId="left"
+                              dataKey="aPagar" 
+                              fill="#fb923c" 
+                              name="Estoque A Pagar"
+                              stackId="stack"
+                              radius={[0, 0, 0, 0]}
+                            />
+                            <Bar 
+                              yAxisId="left"
+                              dataKey="pago" 
+                              fill="#22c55e" 
+                              name="Estoque Pago"
+                              stackId="stack"
+                              radius={[4, 4, 0, 0]}
+                            />
+                            <Line 
+                              yAxisId="right"
+                              type="monotone" 
+                              dataKey="variacao" 
+                              stroke="#8b5cf6" 
+                              strokeWidth={3}
+                              name="Var. Mês Anterior (%)"
+                              dot={{ fill: '#8b5cf6', r: 4 }}
+                            />
+                          </ComposedChart>
+                        </ChartContainer>
+                      </>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Card de Estoque de Usados */}
+            {showEstoqueUsados && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Evolução do Estoque de Usados
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Análise temporal com variação mensal
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowEstoqueUsados(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const mesAtual = businessMetricsData.months[11]; // dezembro
+                    const estoqueAtual = businessMetricsData.estoqueUsados.valor[11];
+                    const aPagarAtual = businessMetricsData.estoqueUsados.aPagar[11];
+                    const pagoAtual = businessMetricsData.estoqueUsados.pagos[11];
+                    
+                    // Calcular médias anuais
+                    const mediaEstoque = businessMetricsData.estoqueUsados.valor.reduce((a, b) => a + b, 0) / 12;
+                    const mediaAPagar = businessMetricsData.estoqueUsados.aPagar.reduce((a, b) => a + b, 0) / 12;
+                    const mediaPago = businessMetricsData.estoqueUsados.pagos.reduce((a, b) => a + b, 0) / 12;
+                    const percentualAPagar = (aPagarAtual / estoqueAtual) * 100;
+                    const percentualPago = (pagoAtual / estoqueAtual) * 100;
+
+                    // Preparar dados para o gráfico com variação mês anterior
+                    const estoqueChartData = businessMetricsData.months.map((month, index) => {
+                      const valorAtual = businessMetricsData.estoqueUsados.valor[index];
+                      const valorAnterior = index > 0 ? businessMetricsData.estoqueUsados.valor[index - 1] : valorAtual;
+                      const variacao = ((valorAtual - valorAnterior) / valorAnterior) * 100;
+
+                      return {
+                        month,
+                        aPagar: businessMetricsData.estoqueUsados.aPagar[index],
+                        pago: businessMetricsData.estoqueUsados.pagos[index],
+                        variacao: index === 0 ? 0 : variacao
+                      };
+                    });
+
+                    return (
+                      <>
+                        {/* Cards de Resumo */}
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                          <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Estoque Atual</p>
+                            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">R$ {(estoqueAtual / 1000000).toFixed(1)}M</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{mesAtual}</p>
+                          </div>
+                          <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">A Pagar Atual</p>
+                            <p className="text-2xl font-bold text-slate-900 dark:text-white">R$ {(aPagarAtual / 1000000).toFixed(1)}M</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{mesAtual}</p>
+                          </div>
+                          <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Pago Atual</p>
+                            <p className="text-2xl font-bold text-slate-900 dark:text-white">R$ {(pagoAtual / 1000000).toFixed(1)}M</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{mesAtual}</p>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Média % A Pagar</p>
+                            <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{percentualAPagar.toFixed(2)}%</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">12 meses</p>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Média % Pago</p>
+                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{percentualPago.toFixed(2)}%</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">12 meses</p>
+                          </div>
+                        </div>
+
+                        {/* Gráfico */}
+                        <ChartContainer config={{}} className="h-[400px] w-full">
+                          <ComposedChart data={estoqueChartData} width={1151} height={400}>
+                            <XAxis 
+                              dataKey="month" 
+                              tick={{ fill: '#64748b', fontSize: 12 }}
+                              axisLine={{ stroke: '#cbd5e1' }}
+                            />
+                            <YAxis 
+                              yAxisId="left"
+                              tick={{ fill: '#64748b', fontSize: 12 }}
+                              axisLine={{ stroke: '#cbd5e1' }}
+                              tickFormatter={(value) => `R$ ${(value / 1000000).toFixed(0)}M`}
+                              label={{ value: '$', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                            />
+                            <YAxis 
+                              yAxisId="right"
+                              orientation="right"
+                              tick={{ fill: '#64748b', fontSize: 12 }}
+                              axisLine={{ stroke: '#cbd5e1' }}
+                              tickFormatter={(value) => `${value}%`}
+                              label={{ value: 'Var. Mês Anterior (%)', angle: 90, position: 'insideRight', fill: '#64748b' }}
+                              domain={[-35, 105]}
+                            />
+                            <ChartTooltip 
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const aPagar = payload[0]?.value || 0;
+                                  const pago = payload[1]?.value || 0;
+                                  const total = Number(aPagar) + Number(pago);
+                                  const variacao = payload[2]?.value || 0;
+                                  return (
+                                    <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                                      <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
+                                      <p className="text-sm text-slate-600 dark:text-slate-400">ESTOQUE TOTAL</p>
+                                      <p className="text-xl font-bold text-slate-900 dark:text-white mb-2">R$ {(total / 1000000).toFixed(2)}M</p>
+                                      <p className="text-sm text-slate-600 dark:text-slate-400">ESTOQUE A PAGAR</p>
+                                      <p className="text-xl font-bold text-orange-600 mb-2">R$ {(Number(aPagar) / 1000000).toFixed(2)}M</p>
+                                      <p className="text-sm text-slate-600 dark:text-slate-400">ESTOQUE PAGO</p>
+                                      <p className="text-xl font-bold text-green-600 mb-2">R$ {(Number(pago) / 1000000).toFixed(2)}M</p>
+                                      <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANTERIOR</p>
+                                      <p className="text-xl font-bold text-purple-600">{Number(variacao).toFixed(2)}%</p>
+                                    </div>
+                                  )
+                                }
+                                return null
+                              }}
+                            />
+                            <Legend 
+                              verticalAlign="bottom" 
+                              height={36}
+                              iconType="circle"
+                              wrapperStyle={{ paddingTop: '20px' }}
+                            />
+                            <Bar 
+                              yAxisId="left"
+                              dataKey="aPagar" 
+                              fill="#fb923c" 
+                              name="Estoque A Pagar"
+                              stackId="stack"
+                              radius={[0, 0, 0, 0]}
+                            />
+                            <Bar 
+                              yAxisId="left"
+                              dataKey="pago" 
+                              fill="#22c55e" 
+                              name="Estoque Pago"
+                              stackId="stack"
+                              radius={[4, 4, 0, 0]}
+                            />
+                            <Line 
+                              yAxisId="right"
+                              type="monotone" 
+                              dataKey="variacao" 
+                              stroke="#8b5cf6" 
+                              strokeWidth={3}
+                              name="Var. Mês Anterior (%)"
+                              dot={{ fill: '#8b5cf6', r: 4 }}
+                            />
+                          </ComposedChart>
+                        </ChartContainer>
+                      </>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Card de % de Vendas de Repasse */}
             {showRepasseChart && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
@@ -1471,7 +1857,7 @@ export function VWFinancialDashboard() {
         </div>
       </div>
 
-      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && (
+      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && (
         <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
         {/* Executive Summary - KPIs */}
         <div>
