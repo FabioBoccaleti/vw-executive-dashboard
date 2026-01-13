@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2 } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend, LabelList, ComposedChart } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend, LabelList, ComposedChart, Cell } from "recharts"
 import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { DetailedMetricsTable } from "@/components/DetailedMetricsTable"
@@ -33,6 +33,9 @@ export function VWFinancialDashboard() {
   
   // Estado para controlar exibição do card de % de Trocas
   const [showTrocasChart, setShowTrocasChart] = useState(false)
+  
+  // Estado para controlar exibição do card de % de Repasse
+  const [showRepasseChart, setShowRepasseChart] = useState(false)
 
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
@@ -976,6 +979,7 @@ export function VWFinancialDashboard() {
                   onClick={() => {
                     setShowDetailedMetrics(!showDetailedMetrics)
                     setShowTrocasChart(false)
+                    setShowRepasseChart(false)
                   }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     showDetailedMetrics 
@@ -992,6 +996,7 @@ export function VWFinancialDashboard() {
                   onClick={() => {
                     setShowTrocasChart(!showTrocasChart)
                     setShowDetailedMetrics(false)
+                    setShowRepasseChart(false)
                   }}
                   className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
                     showTrocasChart 
@@ -1002,6 +1007,23 @@ export function VWFinancialDashboard() {
                   <TrendingUp className="w-6 h-6 mb-2" />
                   <span className="text-sm font-semibold">Volume de Troca</span>
                   <span className="text-xs opacity-80">Análise de Conversão</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowRepasseChart(!showRepasseChart)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
+                    showRepasseChart 
+                      ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-400 dark:border-rose-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-slate-700`}
+                >
+                  <GitCompare className="w-6 h-6 mb-2" />
+                  <span className="text-sm font-semibold">% de Repasse</span>
+                  <span className="text-xs opacity-80">Vendas de Repasse</span>
                 </button>
               </div>
             </CardContent>
@@ -1291,6 +1313,143 @@ export function VWFinancialDashboard() {
               </Card>
             )}
           
+            {/* Card de % de Vendas de Repasse */}
+            {showRepasseChart && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Porcentagem de Vendas de Repasse 2025
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Análise mensal do percentual de vendas de repasse em relação ao volume total
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowRepasseChart(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    // Calcular totais e média
+                    const totalVendas = businessMetricsData.volumeVendas.usados.reduce((a, b) => a + b, 0);
+                    const totalRepasse = businessMetricsData.volumeVendas.repasse.reduce((a, b) => a + b, 0);
+                    const mediaPercentual = (totalRepasse / totalVendas) * 100;
+
+                    // Preparar dados para o gráfico com cores condicionais
+                    const repasseChartData = businessMetricsData.months.map((month, index) => {
+                      const percentual = businessMetricsData.volumeVendas.percentualRepasse[index];
+                      const limiteVariacao = mediaPercentual * 0.10; // 10% da média
+                      let cor = '#0ea5e9'; // Azul - dentro da média
+                      
+                      if (percentual >= mediaPercentual + limiteVariacao) {
+                        cor = '#ef4444'; // Vermelho - acima da média +10%
+                      } else if (percentual <= mediaPercentual - limiteVariacao) {
+                        cor = '#10b981'; // Verde - abaixo da média -10%
+                      }
+
+                      return {
+                        month,
+                        percentual,
+                        cor,
+                        usados: businessMetricsData.volumeVendas.usados[index],
+                        repasse: businessMetricsData.volumeVendas.repasse[index]
+                      };
+                    });
+
+                    return (
+                      <>
+                        {/* Cards de Resumo */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Vendas Totais</p>
+                            <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalVendas.toLocaleString('pt-BR')}</p>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Vendas Repasse</p>
+                            <p className="text-2xl font-bold text-slate-900 dark:text-white">{totalRepasse}</p>
+                          </div>
+                          <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-lg border border-rose-200 dark:border-rose-800">
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">% de Repasse</p>
+                            <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">{mediaPercentual.toFixed(2)}%</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">% MÉDIO ANUAL</p>
+                          </div>
+                        </div>
+
+                        {/* Gráfico */}
+                        <ChartContainer config={{}} className="h-[400px] w-full">
+                          <BarChart data={repasseChartData} width={1151} height={400}>
+                            <XAxis 
+                              dataKey="month" 
+                              tick={{ fill: '#64748b', fontSize: 12 }}
+                              axisLine={{ stroke: '#cbd5e1' }}
+                            />
+                            <YAxis 
+                              tick={{ fill: '#64748b', fontSize: 12 }}
+                              axisLine={{ stroke: '#cbd5e1' }}
+                              tickFormatter={(value) => `${value}%`}
+                              label={{ value: '% Repasse', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                              domain={[0, 70]}
+                            />
+                            <ChartTooltip 
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  return (
+                                    <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                                      <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
+                                      <p className="text-sm text-slate-600 dark:text-slate-400">VENDAS USADOS</p>
+                                      <p className="text-xl font-bold text-slate-900 dark:text-white mb-2">{payload[0].payload.usados}</p>
+                                      <p className="text-sm text-slate-600 dark:text-slate-400">VENDAS REPASSE</p>
+                                      <p className="text-xl font-bold text-teal-600 mb-2">{payload[0].payload.repasse}</p>
+                                      <p className="text-sm text-slate-600 dark:text-slate-400">% DE REPASSE</p>
+                                      <p className="text-xl font-bold text-rose-600">{payload[0].payload.percentual.toFixed(2)}%</p>
+                                    </div>
+                                  )
+                                }
+                                return null
+                              }}
+                            />
+                            <Bar 
+                              dataKey="percentual" 
+                              radius={[4, 4, 0, 0]}
+                            >
+                              {repasseChartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.cor} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ChartContainer>
+
+                        {/* Legenda */}
+                        <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">LEGENDA DE CORES</p>
+                          <div className="flex flex-wrap gap-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#ef4444' }}></div>
+                              <span className="text-sm text-slate-600 dark:text-slate-400">Acima da média (+10%)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#0ea5e9' }}></div>
+                              <span className="text-sm text-slate-600 dark:text-slate-400">Dentro da média (±10%)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#10b981' }}></div>
+                              <span className="text-sm text-slate-600 dark:text-slate-400">Abaixo da média (-10%)</span>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Card de Tabela Detalhada de Métricas */}
             {showDetailedMetrics && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
@@ -1321,7 +1480,7 @@ export function VWFinancialDashboard() {
         </div>
       </div>
 
-      {!showDetailedMetrics && !showTrocasChart && (
+      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && (
         <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
         {/* Executive Summary - KPIs */}
         <div>
