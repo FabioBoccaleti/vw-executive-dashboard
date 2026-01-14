@@ -3608,9 +3608,11 @@ export function VWFinancialDashboard() {
                 </ChartContainer>
               </CardContent>
             </Card>
+          </div>
+        </div>
 
-            {/* Despesas por Categoria */}
-            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
+        {/* Despesas por Categoria - Largura Total */}
+        <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
               <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div className="flex items-center justify-between mb-3">
                   <div>
@@ -3691,7 +3693,7 @@ export function VWFinancialDashboard() {
                   </div>
                 </div>
                 
-                <ChartContainer config={chartConfig} className="w-full">
+                <ChartContainer config={chartConfig} className="h-[220px] w-full">
                   {showComparison && projectionMode ? (
                     // Gráfico de comparação entre original e projeção
                     <BarChart
@@ -3914,9 +3916,9 @@ export function VWFinancialDashboard() {
               </CardContent>
             </Card>
 
-            {/* Amortizações e Depreciações */}
+            {/* Amortizações e Depreciações - Largura Total */}
             <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
-              <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Amortizações e Depreciações</CardTitle>
@@ -3940,7 +3942,7 @@ export function VWFinancialDashboard() {
                 </div>
               </CardHeader>
               <CardContent className="pt-6">
-                <ChartContainer config={chartConfig} className="w-full">
+                <ChartContainer config={chartConfig} className="h-[220px] w-full">
                   {showComparison && projectionMode ? (
                     <BarChart
                         width="100%"
@@ -4055,11 +4057,9 @@ export function VWFinancialDashboard() {
                 </ChartContainer>
               </CardContent>
             </Card>
-          </div>
-        </div>
 
-        {/* Resultado Operacional - Destaque */}
-        <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
+            {/* Resultado Operacional - Destaque */}
+            <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
           <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
             <div className="flex items-center justify-between mb-3">
               <div>
