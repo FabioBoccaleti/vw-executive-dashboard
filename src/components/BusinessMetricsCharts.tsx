@@ -46,17 +46,35 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return (
       <div className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
         <p className="font-semibold text-slate-900 dark:text-white mb-2">{label}</p>
-        {payload.map((entry: any, index: number) => (
-          <p key={index} className="text-sm" style={{ color: entry.color }}>
-            {entry.name}: {
-              entry.value && typeof entry.value === 'number' 
-                ? entry.value > 100 
-                  ? formatCurrency(entry.value) 
-                  : `${entry.value.toFixed(2)}%`
-                : entry.value
+        {payload.map((entry: any, index: number) => {
+          let formattedValue = entry.value;
+          
+          // Verifica se é um valor de estoque (nome contém 'Valor' ou 'R$' ou 'Estoque')
+          if (entry.name && (entry.name.includes('R$') || entry.name.includes('Valor') || entry.name.includes('Estoque'))) {
+            // Para valores já em milhões (como novosValor = 44, 48, etc.)
+            // Multiplicar por 1.000.000 para obter o valor completo: R$ 44.000.000
+            const realValue = entry.value * 1000000;
+            // Formatar com separadores de milhares (ponto para pt-BR)
+            const formatted = new Intl.NumberFormat('pt-BR', {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0
+            }).format(realValue);
+            formattedValue = `R$ ${formatted}`;
+          } else if (entry.value && typeof entry.value === 'number') {
+            // Formato padrão para outros valores
+            if (entry.value > 100) {
+              formattedValue = formatCurrency(entry.value);
+            } else {
+              formattedValue = `${entry.value.toFixed(2)}%`;
             }
-          </p>
-        ))}
+          }
+          
+          return (
+            <p key={index} className="text-sm" style={{ color: entry.color }}>
+              {entry.name}: {formattedValue}
+            </p>
+          );
+        })}
       </div>
     );
   }
@@ -350,8 +368,8 @@ export function BusinessMetricsCharts() {
                 <YAxis stroke="#64748b" style={{ fontSize: '11px' }} unit="M" />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <Line type="monotone" dataKey="novosValor" name="Novos (R$)" stroke={COLORS.primary} strokeWidth={3} dot={{ r: 4 }} />
-                <Line type="monotone" dataKey="usadosValor" name="Usados (R$)" stroke={COLORS.warning} strokeWidth={3} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="novosValor" name="Estoque Novos: Valor (R$)" stroke={COLORS.primary} strokeWidth={3} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="usadosValor" name="Estoque Usados: Valor (R$)" stroke={COLORS.warning} strokeWidth={3} dot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
