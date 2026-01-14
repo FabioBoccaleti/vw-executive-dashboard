@@ -1223,6 +1223,12 @@ export function VWFinancialDashboard() {
 
                             <ChartContainer config={{}} className="h-[350px] w-full">
                               <ComposedChart data={chartData} width={1151} height={350}>
+                                <defs>
+                                  <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={1}/>
+                                    <stop offset="100%" stopColor="#93c5fd" stopOpacity={1}/>
+                                  </linearGradient>
+                                </defs>
                                 <XAxis 
                                   dataKey="month" 
                                   tick={{ fill: '#64748b', fontSize: 12 }}
@@ -1271,9 +1277,9 @@ export function VWFinancialDashboard() {
                                 <Bar 
                                   yAxisId="left"
                                   dataKey="receita" 
-                                  fill="#3b82f6" 
+                                  fill="url(#blueGradient)" 
                                   name="Receita Líquida"
-                                  radius={[4, 4, 0, 0]}
+                                  radius={[8, 8, 0, 0]}
                                 />
                                 <Line 
                                   yAxisId="right"
@@ -1359,6 +1365,12 @@ export function VWFinancialDashboard() {
 
                             <ChartContainer config={{}} className="h-[350px] w-full">
                               <ComposedChart data={chartData} width={1151} height={350}>
+                                <defs>
+                                  <linearGradient id="purpleGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={1}/>
+                                    <stop offset="100%" stopColor="#c4b5fd" stopOpacity={1}/>
+                                  </linearGradient>
+                                </defs>
                                 <XAxis 
                                   dataKey="month" 
                                   tick={{ fill: '#64748b', fontSize: 12 }}
@@ -1407,9 +1419,9 @@ export function VWFinancialDashboard() {
                                 <Bar 
                                   yAxisId="left"
                                   dataKey="receita" 
-                                  fill="#8b5cf6" 
+                                  fill="url(#purpleGradient)" 
                                   name="Receita Líquida"
-                                  radius={[4, 4, 0, 0]}
+                                  radius={[8, 8, 0, 0]}
                                 />
                                 <Line 
                                   yAxisId="right"
@@ -1418,7 +1430,6 @@ export function VWFinancialDashboard() {
                                   stroke="#14b8a6" 
                                   strokeWidth={3}
                                   name="Margem %"
-                                  dot={{ fill: '#14b8a6', r: 4 }}
                                   dot={{ fill: '#14b8a6', r: 4 }}
                                 />
                                 <Line 
@@ -1496,6 +1507,12 @@ export function VWFinancialDashboard() {
 
                             <ChartContainer config={{}} className="h-[350px] w-full">
                               <ComposedChart data={chartData} width={1151} height={350}>
+                                <defs>
+                                  <linearGradient id="violetGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#a855f7" stopOpacity={1}/>
+                                    <stop offset="100%" stopColor="#ddd6fe" stopOpacity={1}/>
+                                  </linearGradient>
+                                </defs>
                                 <XAxis 
                                   dataKey="month" 
                                   tick={{ fill: '#64748b', fontSize: 12 }}
@@ -1544,9 +1561,9 @@ export function VWFinancialDashboard() {
                                 <Bar 
                                   yAxisId="left"
                                   dataKey="receita" 
-                                  fill="#a855f7" 
+                                  fill="url(#violetGradient)" 
                                   name="Receita Líquida"
-                                  radius={[4, 4, 0, 0]}
+                                  radius={[8, 8, 0, 0]}
                                 />
                                 <Line 
                                   yAxisId="right"
@@ -1632,6 +1649,12 @@ export function VWFinancialDashboard() {
 
                             <ChartContainer config={{}} className="h-[350px] w-full">
                               <ComposedChart data={chartData} width={1151} height={350}>
+                                <defs>
+                                  <linearGradient id="cyanGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#06b6d4" stopOpacity={1}/>
+                                    <stop offset="100%" stopColor="#a5f3fc" stopOpacity={1}/>
+                                  </linearGradient>
+                                </defs>
                                 <XAxis 
                                   dataKey="month" 
                                   tick={{ fill: '#64748b', fontSize: 12 }}
@@ -1660,7 +1683,7 @@ export function VWFinancialDashboard() {
                                         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                                           <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
-                                          <p className="text-lg font-bold text-blue-600 mb-2">R$ {((payload[0]?.value || 0) / 1000).toFixed(1)}k</p>
+                                          <p className="text-lg font-bold text-cyan-600 mb-2">R$ {((payload[0]?.value || 0) / 1000).toFixed(1)}k</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
                                           <p className="text-lg font-bold text-green-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
@@ -1680,9 +1703,178 @@ export function VWFinancialDashboard() {
                                 <Bar 
                                   yAxisId="left"
                                   dataKey="receita" 
-                                  fill="#3b82f6" 
+                                  fill="url(#cyanGradient)" 
                                   name="Receita Líquida"
-                                  radius={[4, 4, 0, 0]}
+                                  radius={[8, 8, 0, 0]}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="margem" 
+                                  stroke="#10b981" 
+                                  strokeWidth={3}
+                                  name="Margem %"
+                                  dot={{ fill: '#10b981', r: 4 }}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#f59e0b" 
+                                  strokeWidth={2}
+                                  strokeDasharray="5 5"
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#f59e0b', r: 3 }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Gráfico 5: Total Consolidado (ID 8 + ID 9 + ID 10 + ID 11) */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                          Total Consolidado
+                        </h3>
+                        {(() => {
+                          // Calcular vendas consolidadas (soma de Balcão + Oficina + Funilaria + Acessórios)
+                          const vendasConsolidadas = businessMetricsData.months.map((_, index) => 
+                            businessMetricsData.vendasPecas.balcao.vendas[index] +
+                            businessMetricsData.vendasPecas.oficina.vendas[index] +
+                            businessMetricsData.vendasPecas.funilaria.vendas[index] +
+                            businessMetricsData.vendasPecas.acessorios.vendas[index]
+                          );
+                          
+                          const ultimaReceita = vendasConsolidadas[11];
+                          const penultimaReceita = vendasConsolidadas[10];
+                          const variacao = ((ultimaReceita - penultimaReceita) / penultimaReceita) * 100;
+                          
+                          return (
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-semibold ${variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {variacao >= 0 ? '↗' : '↘'} {variacao.toFixed(1)}%
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      
+                      {(() => {
+                        // Calcular totais consolidados
+                        const vendasConsolidadas = businessMetricsData.months.map((_, index) => 
+                          businessMetricsData.vendasPecas.balcao.vendas[index] +
+                          businessMetricsData.vendasPecas.oficina.vendas[index] +
+                          businessMetricsData.vendasPecas.funilaria.vendas[index] +
+                          businessMetricsData.vendasPecas.acessorios.vendas[index]
+                        );
+                        
+                        const lucroConsolidado = businessMetricsData.months.map((_, index) => 
+                          businessMetricsData.vendasPecas.balcao.lucro[index] +
+                          businessMetricsData.vendasPecas.oficina.lucro[index] +
+                          businessMetricsData.vendasPecas.funilaria.lucro[index] +
+                          businessMetricsData.vendasPecas.acessorios.lucro[index]
+                        );
+                        
+                        const margemConsolidada = businessMetricsData.months.map((_, index) => 
+                          (lucroConsolidado[index] / vendasConsolidadas[index]) * 100
+                        );
+                        
+                        const receitaTotal = vendasConsolidadas.reduce((a, b) => a + b, 0);
+                        const lucroTotal = lucroConsolidado.reduce((a, b) => a + b, 0);
+                        const margemMedia = margemConsolidada.reduce((a, b) => a + b, 0) / 12;
+
+                        const chartData = businessMetricsData.months.map((month, index) => {
+                          const receitaAtual = vendasConsolidadas[index];
+                          const receitaAnterior = index > 0 ? vendasConsolidadas[index - 1] : receitaAtual;
+                          const variacao = ((receitaAtual - receitaAnterior) / receitaAnterior) * 100;
+
+                          return {
+                            month,
+                            receita: receitaAtual,
+                            margem: margemConsolidada[index],
+                            variacao: index === 0 ? 0 : variacao
+                          };
+                        });
+
+                        return (
+                          <>
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                              <div className="bg-cyan-50 dark:bg-cyan-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Receita Total</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">R$ {(receitaTotal / 1000000).toFixed(2)}M</p>
+                              </div>
+                              <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Lucro Bruto</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">R$ {(lucroTotal / 1000000).toFixed(2)}M</p>
+                              </div>
+                              <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Média</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-white">{margemMedia.toFixed(2)}%</p>
+                              </div>
+                            </div>
+
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={chartData} width={1151} height={350}>
+                                <defs>
+                                  <linearGradient id="cyanGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#06b6d4" stopOpacity={1}/>
+                                    <stop offset="100%" stopColor="#67e8f9" stopOpacity={1}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Receita (mil R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 12 }}
+                                  axisLine={{ stroke: '#cbd5e1' }}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Percentual (%)', angle: 90, position: 'insideRight', fill: '#64748b' }}
+                                  domain={[-20, 60]}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
+                                          <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
+                                          <p className="text-lg font-bold text-cyan-600 mb-2">R$ {((payload[0]?.value || 0) / 1000).toFixed(1)}k</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
+                                          <p className="text-lg font-bold text-emerald-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
+                                          <p className="text-lg font-bold text-amber-600">{(payload[2]?.value || 0).toFixed(2)}%</p>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={36}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="receita" 
+                                  fill="url(#cyanGradient)" 
+                                  name="Receita Líquida"
+                                  radius={[8, 8, 0, 0]}
                                 />
                                 <Line 
                                   yAxisId="right"
