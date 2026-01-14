@@ -61,6 +61,9 @@ export function VWFinancialDashboard() {
   // Estado para controlar exibição do card de Despesas Financeiras Usados
   const [showDespesasFinanceirasUsados, setShowDespesasFinanceirasUsados] = useState(false)
 
+  // Estado para controlar exibição do card de Despesas Financeiras Peças
+  const [showDespesasFinanceirasPecas, setShowDespesasFinanceirasPecas] = useState(false)
+
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
     if (viewMode === 'mensal') return meses
@@ -1247,6 +1250,7 @@ export function VWFinancialDashboard() {
                     setShowVendasSeguradora(false)
                     setShowVendasMercadoLivre(false)
                     setShowDespesasFinanceirasNovos(false)
+                    setShowDespesasFinanceirasPecas(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showDespesasFinanceirasUsados 
@@ -1256,6 +1260,32 @@ export function VWFinancialDashboard() {
                 >
                   <TrendingUp className="w-4 h-4 mb-1" />
                   <span className="text-xs font-semibold">Despesas Financeiras Usados</span>
+                  <span className="text-[10px] opacity-80">Juros e Despesas</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowDespesasFinanceirasPecas(!showDespesasFinanceirasPecas)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                    setShowVendasMercadoLivre(false)
+                    setShowDespesasFinanceirasNovos(false)
+                    setShowDespesasFinanceirasUsados(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showDespesasFinanceirasPecas 
+                      ? 'bg-teal-50 dark:bg-teal-900/20 border-teal-400 dark:border-teal-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-teal-300 hover:bg-teal-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Despesas Financeiras Peças</span>
                   <span className="text-[10px] opacity-80">Juros e Despesas</span>
                 </button>
               </div>
@@ -1289,26 +1319,10 @@ export function VWFinancialDashboard() {
                   <div className="grid grid-cols-1 gap-6">
                     {/* Gráfico 1: Balcão (ID 8) */}
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="mb-4">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                           Peças Balcão
                         </h3>
-                        {(() => {
-                          const receitaTotal = businessMetricsData.vendasPecas.balcao.vendas.reduce((a, b) => a + b, 0);
-                          const lucroTotal = businessMetricsData.vendasPecas.balcao.lucro.reduce((a, b) => a + b, 0);
-                          const margemMedia = businessMetricsData.vendasPecas.balcao.margem.reduce((a, b) => a + b, 0) / 12;
-                          const ultimaReceita = businessMetricsData.vendasPecas.balcao.vendas[11];
-                          const penultimaReceita = businessMetricsData.vendasPecas.balcao.vendas[10];
-                          const variacao = ((ultimaReceita - penultimaReceita) / penultimaReceita) * 100;
-                          
-                          return (
-                            <div className="flex items-center gap-2">
-                              <span className={`text-sm font-semibold ${variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {variacao >= 0 ? '↗' : '↘'} {variacao.toFixed(1)}%
-                              </span>
-                            </div>
-                          );
-                        })()}
                       </div>
                       
                       {(() => {
@@ -1434,23 +1448,10 @@ export function VWFinancialDashboard() {
 
                     {/* Gráfico 2: Oficina (ID 9) */}
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="mb-4">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                           Peças Oficina
                         </h3>
-                        {(() => {
-                          const ultimaReceita = businessMetricsData.vendasPecas.oficina.vendas[11];
-                          const penultimaReceita = businessMetricsData.vendasPecas.oficina.vendas[10];
-                          const variacao = ((ultimaReceita - penultimaReceita) / penultimaReceita) * 100;
-                          
-                          return (
-                            <div className="flex items-center gap-2">
-                              <span className={`text-sm font-semibold ${variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {variacao >= 0 ? '↗' : '↘'} {variacao.toFixed(1)}%
-                              </span>
-                            </div>
-                          );
-                        })()}
                       </div>
                       
                       {(() => {
@@ -1576,23 +1577,10 @@ export function VWFinancialDashboard() {
 
                     {/* Gráfico 3: Funilaria (ID 10) */}
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="mb-4">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                           Peças Funilaria
                         </h3>
-                        {(() => {
-                          const ultimaReceita = businessMetricsData.vendasPecas.funilaria.vendas[11];
-                          const penultimaReceita = businessMetricsData.vendasPecas.funilaria.vendas[10];
-                          const variacao = ((ultimaReceita - penultimaReceita) / penultimaReceita) * 100;
-                          
-                          return (
-                            <div className="flex items-center gap-2">
-                              <span className={`text-sm font-semibold ${variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {variacao >= 0 ? '↗' : '↘'} {variacao.toFixed(1)}%
-                              </span>
-                            </div>
-                          );
-                        })()}
                       </div>
                       
                       {(() => {
@@ -1718,23 +1706,10 @@ export function VWFinancialDashboard() {
 
                     {/* Gráfico 4: Acessórios (ID 11) */}
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="mb-4">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                           Peças Acessórios
                         </h3>
-                        {(() => {
-                          const ultimaReceita = businessMetricsData.vendasPecas.acessorios.vendas[11];
-                          const penultimaReceita = businessMetricsData.vendasPecas.acessorios.vendas[10];
-                          const variacao = ((ultimaReceita - penultimaReceita) / penultimaReceita) * 100;
-                          
-                          return (
-                            <div className="flex items-center gap-2">
-                              <span className={`text-sm font-semibold ${variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {variacao >= 0 ? '↗' : '↘'} {variacao.toFixed(1)}%
-                              </span>
-                            </div>
-                          );
-                        })()}
                       </div>
                       
                       {(() => {
@@ -2067,14 +2042,10 @@ export function VWFinancialDashboard() {
                         
                         return (
                           <>
-                            <div className="px-6 py-4 flex items-center justify-between">
+                            <div className="px-6 py-4">
                               <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                                 Porto Seguro
                               </h3>
-                              <div className="flex items-center gap-2 text-green-600">
-                                <TrendingUp className="w-5 h-5" />
-                                <span className="text-lg font-bold">{Math.abs(variacaoMes).toFixed(1)}%</span>
-                              </div>
                             </div>
                             <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-y border-slate-200 dark:border-slate-700">
                               <div className="grid grid-cols-3 gap-6">
@@ -2235,14 +2206,10 @@ export function VWFinancialDashboard() {
                         
                         return (
                           <>
-                            <div className="px-6 py-4 flex items-center justify-between">
+                            <div className="px-6 py-4">
                               <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                                 Azul Seguros
                               </h3>
-                              <div className={`flex items-center gap-2 ${variacaoMes >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {variacaoMes >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                                <span className="text-lg font-bold">{Math.abs(variacaoMes).toFixed(1)}%</span>
-                              </div>
                             </div>
                             <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-y border-slate-200 dark:border-slate-700">
                               <div className="grid grid-cols-3 gap-6">
@@ -2403,14 +2370,10 @@ export function VWFinancialDashboard() {
                         
                         return (
                           <>
-                            <div className="px-6 py-4 flex items-center justify-between">
+                            <div className="px-6 py-4">
                               <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                                 Allianz
                               </h3>
-                              <div className={`flex items-center gap-2 ${variacaoMes >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {variacaoMes >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                                <span className="text-lg font-bold">{Math.abs(variacaoMes).toFixed(1)}%</span>
-                              </div>
                             </div>
                             <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-y border-slate-200 dark:border-slate-700">
                               <div className="grid grid-cols-3 gap-6">
@@ -2758,14 +2721,10 @@ export function VWFinancialDashboard() {
                         
                         return (
                           <>
-                            <div className="px-6 py-4 flex items-center justify-between">
+                            <div className="px-6 py-4">
                               <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                                 Total Consolidado
                               </h3>
-                              <div className={`flex items-center gap-2 ${variacaoMes >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {variacaoMes >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                                <span className="text-lg font-bold">{Math.abs(variacaoMes).toFixed(1)}%</span>
-                              </div>
                             </div>
                             <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-y border-slate-200 dark:border-slate-700">
                               <div className="grid grid-cols-3 gap-6">
@@ -2961,21 +2920,9 @@ export function VWFinancialDashboard() {
                         return (
                           <>
                             <div className="bg-white dark:bg-slate-800 p-6 border-b border-slate-200 dark:border-slate-700">
-                              <div className="flex items-center justify-between">
-                                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                                  Mercado Livre
-                                </h3>
-                                <div className="flex items-center gap-2">
-                                  {variacao >= 0 ? (
-                                    <TrendingUp className="w-5 h-5 text-green-600" />
-                                  ) : (
-                                    <TrendingDown className="w-5 h-5 text-red-600" />
-                                  )}
-                                  <span className={`text-lg font-semibold ${variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {variacao >= 0 ? '+' : ''}{variacao.toFixed(2)}%
-                                  </span>
-                                </div>
-                              </div>
+                              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                                Mercado Livre
+                              </h3>
                               
                               {/* KPI Cards */}
                               <div className="grid grid-cols-3 gap-4 mt-4">
@@ -3177,14 +3124,10 @@ export function VWFinancialDashboard() {
 
                       return (
                         <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
-                          <div className="bg-red-50 dark:bg-red-900/20 px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+                          <div className="bg-red-50 dark:bg-red-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
                             <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                               Juros Veículos Novos
                             </h3>
-                            <div className={`flex items-center gap-2 ${variacaoJuros >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              {variacaoJuros >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                              <span className="text-lg font-bold">{Math.abs(variacaoJuros).toFixed(1)}%</span>
-                            </div>
                           </div>
 
                           <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
@@ -3321,14 +3264,10 @@ export function VWFinancialDashboard() {
 
                       return (
                         <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
-                          <div className="bg-orange-50 dark:bg-orange-900/20 px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+                          <div className="bg-orange-50 dark:bg-orange-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
                             <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                               Despesas Cartão Novos
                             </h3>
-                            <div className={`flex items-center gap-2 ${variacaoDespesas >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              {variacaoDespesas >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                              <span className="text-lg font-bold">{Math.abs(variacaoDespesas).toFixed(1)}%</span>
-                            </div>
                           </div>
 
                           <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
@@ -3494,14 +3433,10 @@ export function VWFinancialDashboard() {
 
                       return (
                         <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
-                          <div className="bg-purple-50 dark:bg-purple-900/20 px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+                          <div className="bg-purple-50 dark:bg-purple-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
                             <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                               Juros Veículos Usados
                             </h3>
-                            <div className={`flex items-center gap-2 ${variacaoJuros >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              {variacaoJuros >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                              <span className="text-lg font-bold">{Math.abs(variacaoJuros).toFixed(1)}%</span>
-                            </div>
                           </div>
 
                           <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
@@ -3638,14 +3573,10 @@ export function VWFinancialDashboard() {
 
                       return (
                         <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
-                          <div className="bg-teal-50 dark:bg-teal-900/20 px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+                          <div className="bg-teal-50 dark:bg-teal-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
                             <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                               Despesas Cartão Usados
                             </h3>
-                            <div className={`flex items-center gap-2 ${variacaoDespesas >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              {variacaoDespesas >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                              <span className="text-lg font-bold">{Math.abs(variacaoDespesas).toFixed(1)}%</span>
-                            </div>
                           </div>
 
                           <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
@@ -3740,6 +3671,311 @@ export function VWFinancialDashboard() {
                                   dataKey="valor" 
                                   fill="url(#barGradientTealUsados)"
                                   name="Despesas Cartão Usados"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Card de Despesas Financeiras Peças */}
+            {showDespesasFinanceirasPecas && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Despesas Financeiras Peças - Análise 2025
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Evolução das despesas financeiras com juros e cartão de crédito
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowDespesasFinanceirasPecas(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    
+                    {/* Gráfico 1: ID20 - Juros Peças */}
+                    {(() => {
+                      const jurosData = [27108, 28252, 19131, 17773, 15994, 21702, 46573, 26607, 35907, 34762, 23603, 25691];
+                      const totalJuros = jurosData.reduce((a, b) => a + b, 0);
+                      const mediaJuros = totalJuros / 12;
+                      const ultimoJuros = jurosData[11];
+
+                      const jurosChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = jurosData[index];
+                        const valorAnterior = index > 0 ? jurosData[index - 1] : valorAtual;
+                        const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-cyan-50 dark:bg-cyan-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Juros Peças
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalJuros.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaJuros.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimoJuros.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={jurosChartData} width={1654} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientCyanPecas" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#67e8f9" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#06b6d4" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#0891b2" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Juros</p>
+                                              <p className="text-lg font-bold text-cyan-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientCyanPecas)"
+                                  name="Juros Peças"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Gráfico 2: ID27 - Despesas Cartão Peças */}
+                    {(() => {
+                      const despesasData = [19928, 20177, 23357, 21477, 15082, 23933, 25923, 20052, 22291, 26477, 26153, 127996];
+                      const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
+                      const mediaDespesas = totalDespesas / 12;
+                      const ultimaDespesa = despesasData[11];
+
+                      const despesasChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = despesasData[index];
+                        const valorAnterior = index > 0 ? despesasData[index - 1] : valorAtual;
+                        const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-amber-50 dark:bg-amber-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Despesas Cartão Peças
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalDespesas.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaDespesas.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimaDespesa.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={despesasChartData} width={1654} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientAmberPecas" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#fbbf24" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#f59e0b" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#d97706" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Despesa Cartão</p>
+                                              <p className="text-lg font-bold text-amber-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientAmberPecas)"
+                                  name="Despesas Cartão Peças"
                                   radius={[8, 8, 0, 0]}
                                   barSize={55}
                                 />
@@ -4708,7 +4944,7 @@ export function VWFinancialDashboard() {
         </div>
       </div>
 
-      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && !showVendasSeguradora && !showVendasMercadoLivre && !showDespesasFinanceirasNovos && !showDespesasFinanceirasUsados && (
+      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && !showVendasSeguradora && !showVendasMercadoLivre && !showDespesasFinanceirasNovos && !showDespesasFinanceirasUsados && !showDespesasFinanceirasPecas && (
         <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
         {/* Executive Summary - KPIs */}
         <div>
