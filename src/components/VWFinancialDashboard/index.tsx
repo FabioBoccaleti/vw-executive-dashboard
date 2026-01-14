@@ -52,6 +52,9 @@ export function VWFinancialDashboard() {
   // Estado para controlar exibição do card de Vendas por Seguradora
   const [showVendasSeguradora, setShowVendasSeguradora] = useState(false)
 
+  // Estado para controlar exibição do card de Vendas Mercado Livre
+  const [showVendasMercadoLivre, setShowVendasMercadoLivre] = useState(false)
+
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
     if (viewMode === 'mensal') return meses
@@ -1165,6 +1168,30 @@ export function VWFinancialDashboard() {
                   <BarChart3 className="w-4 h-4 mb-1" />
                   <span className="text-xs font-semibold">Vendas por Seguradora</span>
                   <span className="text-[10px] opacity-80">Performance Seguradoras</span>
+                </button>
+                
+                {/* Botão para Vendas Mercado Livre */}
+                <button
+                  onClick={() => {
+                    setShowVendasMercadoLivre(!showVendasMercadoLivre)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showVendasMercadoLivre 
+                      ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-orange-300 hover:bg-orange-50 dark:hover:bg-slate-700`}
+                >
+                  <BarChart3 className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Vendas Mercado Livre</span>
+                  <span className="text-[10px] opacity-80">Performance Marketplace</span>
                 </button>
               </div>
             </CardContent>
@@ -2298,7 +2325,7 @@ export function VWFinancialDashboard() {
                       </div>
                     </div>
 
-                    {/* Gráfico 3: ALL Seguros */}
+                    {/* Gráfico 3: Allianz */}
                     <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
                       {/* Header com título e variação */}
                       {(() => {
@@ -2313,7 +2340,7 @@ export function VWFinancialDashboard() {
                           <>
                             <div className="px-6 py-4 flex items-center justify-between">
                               <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                                ALL Seguros
+                                Allianz
                               </h3>
                               <div className={`flex items-center gap-2 ${variacaoMes >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 {variacaoMes >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
@@ -2654,11 +2681,14 @@ export function VWFinancialDashboard() {
                     <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
                       {/* Header com título e variação */}
                       {(() => {
-                        const totalVendas = businessMetricsData.seguradoras.tokioMarine.vendas.reduce((a, b) => a + b, 0);
-                        const totalLucro = businessMetricsData.seguradoras.tokioMarine.lucro.reduce((a, b) => a + b, 0);
-                        const margemMedia = businessMetricsData.seguradoras.tokioMarine.margem.reduce((a, b) => a + b, 0) / 12;
-                        const ultimaVenda = businessMetricsData.seguradoras.tokioMarine.vendas[11];
-                        const penultimaVenda = businessMetricsData.seguradoras.tokioMarine.vendas[10];
+                        const vendas = [988075, 812288, 682001, 669198, 1081065, 846304, 590311, 573663, 816041, 1125948, 1035220, 1090539];
+                        const lucros = [33025, 33059, 30884, 32074, 57252, 37751, 19413, 9997, 23681, 8626, 28212, 12352];
+                        
+                        const totalVendas = vendas.reduce((a, b) => a + b, 0);
+                        const totalLucro = lucros.reduce((a, b) => a + b, 0);
+                        const margemMedia = (totalLucro / totalVendas * 100);
+                        const ultimaVenda = vendas[11];
+                        const penultimaVenda = vendas[10];
                         const variacaoMes = ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100;
                         
                         return (
@@ -2677,7 +2707,7 @@ export function VWFinancialDashboard() {
                                 <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                   <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Receita Total</p>
                                   <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                    R$ {totalVendas.toLocaleString('pt-BR')}
+                                    R$ {totalVendas.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                   </p>
                                 </div>
                                 <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
@@ -2702,14 +2732,18 @@ export function VWFinancialDashboard() {
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
                           <ComposedChart data={businessMetricsData.months.map((month, index) => {
-                            const vendaAtual = businessMetricsData.seguradoras.tokioMarine.vendas[index];
-                            const vendaAnterior = index > 0 ? businessMetricsData.seguradoras.tokioMarine.vendas[index - 1] : vendaAtual;
+                            const vendas = [988075, 812288, 682001, 669198, 1081065, 846304, 590311, 573663, 816041, 1125948, 1035220, 1090539];
+                            const lucros = [33025, 33059, 30884, 32074, 57252, 37751, 19413, 9997, 23681, 8626, 28212, 12352];
+                            
+                            const vendaAtual = vendas[index];
+                            const vendaAnterior = index > 0 ? vendas[index - 1] : vendaAtual;
                             const variacaoMesAnt = index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
+                            const margem = (lucros[index] / vendaAtual) * 100;
                             
                             return {
                               month,
                               receitaLiquida: vendaAtual,
-                              margem: businessMetricsData.seguradoras.tokioMarine.margem[index],
+                              margem: margem,
                               variacaoMesAnt: variacaoMesAnt
                             };
                           })} width={1654} height={350}>
@@ -2789,6 +2823,216 @@ export function VWFinancialDashboard() {
                               yAxisId="left"
                               dataKey="receitaLiquida" 
                               fill="url(#barGradientGrayDark)"
+                              name="Receita Líquida"
+                              radius={[8, 8, 0, 0]}
+                              barSize={55}
+                            />
+                            <Line 
+                              yAxisId="right"
+                              type="monotone" 
+                              dataKey="margem" 
+                              stroke="#10b981" 
+                              strokeWidth={3}
+                              name="Margem %"
+                              dot={{ fill: '#10b981', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                            />
+                            <Line 
+                              yAxisId="right"
+                              type="monotone" 
+                              dataKey="variacaoMesAnt" 
+                              stroke="#f97316" 
+                              strokeWidth={2}
+                              strokeDasharray="5 5"
+                              name="Var. Mês Ant. %"
+                              dot={{ fill: '#f97316', r: 4, strokeWidth: 2, stroke: '#fff' }}
+                            />
+                          </ComposedChart>
+                        </ChartContainer>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Card de Vendas Mercado Livre */}
+            {showVendasMercadoLivre && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Vendas Mercado Livre - Performance 2025
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Análise de vendas, lucro e margem no marketplace
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowVendasMercadoLivre(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    {/* Gráfico Mercado Livre */}
+                    <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                      {/* Header com título e variação */}
+                      {(() => {
+                        const vendas = [295637, 226990, 152428, 231056, 186334, 224765, 274123, 261008, 177273, 146230, 161814, 107544];
+                        const lucros = [36424, 24968, 14607, 24554, 16823, 23176, 7967, 1135, 3679, 6500, 5067, 6230];
+                        
+                        const totalVendas = vendas.reduce((a, b) => a + b, 0);
+                        const totalLucro = lucros.reduce((a, b) => a + b, 0);
+                        const margemMedia = (totalLucro / totalVendas * 100);
+                        
+                        const ultimaVenda = vendas[11];
+                        const penultimaVenda = vendas[10];
+                        const variacao = ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100;
+                        
+                        return (
+                          <>
+                            <div className="bg-white dark:bg-slate-800 p-6 border-b border-slate-200 dark:border-slate-700">
+                              <div className="flex items-center justify-between">
+                                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                                  Mercado Livre
+                                </h3>
+                                <div className="flex items-center gap-2">
+                                  {variacao >= 0 ? (
+                                    <TrendingUp className="w-5 h-5 text-green-600" />
+                                  ) : (
+                                    <TrendingDown className="w-5 h-5 text-red-600" />
+                                  )}
+                                  <span className={`text-lg font-semibold ${variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {variacao >= 0 ? '+' : ''}{variacao.toFixed(2)}%
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {/* KPI Cards */}
+                              <div className="grid grid-cols-3 gap-4 mt-4">
+                                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Receita Total</p>
+                                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                    R$ {totalVendas.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                  </p>
+                                </div>
+                                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Lucro Bruto</p>
+                                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                    R$ {totalLucro.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                  </p>
+                                </div>
+                                <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Margem Média</p>
+                                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                    {margemMedia.toFixed(2)}%
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+                      
+                      {/* Gráfico */}
+                      <div className="p-6">
+                        <ChartContainer config={{}} className="h-[350px] w-full">
+                          <ComposedChart data={businessMetricsData.months.map((month, index) => {
+                            const vendas = [295637, 226990, 152428, 231056, 186334, 224765, 274123, 261008, 177273, 146230, 161814, 107544];
+                            const lucros = [36424, 24968, 14607, 24554, 16823, 23176, 7967, 1135, 3679, 6500, 5067, 6230];
+                            
+                            const vendaAtual = vendas[index];
+                            const vendaAnterior = index > 0 ? vendas[index - 1] : vendaAtual;
+                            const variacaoMesAnt = index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
+                            const margem = (lucros[index] / vendaAtual) * 100;
+                            
+                            return {
+                              month,
+                              receitaLiquida: vendaAtual,
+                              margem: margem,
+                              variacaoMesAnt: variacaoMesAnt
+                            };
+                          })} width={1654} height={350}>
+                            <defs>
+                              <linearGradient id="barGradientOrange" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#fb923c" stopOpacity={0.9}/>
+                                <stop offset="50%" stopColor="#f97316" stopOpacity={0.8}/>
+                                <stop offset="100%" stopColor="#ea580c" stopOpacity={0.7}/>
+                              </linearGradient>
+                            </defs>
+                            <XAxis 
+                              dataKey="month" 
+                              tick={{ fill: '#64748b', fontSize: 11 }}
+                              axisLine={{ stroke: '#e2e8f0' }}
+                              tickLine={false}
+                            />
+                            <YAxis 
+                              yAxisId="left"
+                              tick={{ fill: '#64748b', fontSize: 11 }}
+                              axisLine={false}
+                              tickLine={false}
+                              label={{ value: 'Receita em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                            />
+                            <YAxis 
+                              yAxisId="right"
+                              orientation="right"
+                              tick={{ fill: '#64748b', fontSize: 11 }}
+                              axisLine={false}
+                              tickLine={false}
+                              tickFormatter={(value) => `${value}%`}
+                              label={{ value: 'Percentual (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                            />
+                            <ChartTooltip 
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const data = payload[0].payload;
+                                  const lucros = [36424, 24968, 14607, 24554, 16823, 23176, 7967, 1135, 3679, 6500, 5067, 6230];
+                                  const monthIndex = businessMetricsData.months.indexOf(data.month);
+                                  const lucroBruto = lucros[monthIndex];
+                                  
+                                  return (
+                                    <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                      <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                      <div className="space-y-2">
+                                        <div>
+                                          <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Receita Líquida</p>
+                                          <p className="text-lg font-bold text-slate-700 dark:text-white">R$ {data.receitaLiquida.toLocaleString('pt-BR')}</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Lucro Bruto</p>
+                                          <p className="text-lg font-bold text-green-600">R$ {lucroBruto.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Margem</p>
+                                          <p className="text-lg font-bold text-red-600">{data.margem.toFixed(2)}%</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                          <p className={`text-lg font-bold ${data.variacaoMesAnt >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {data.variacaoMesAnt >= 0 ? '+' : ''}{data.variacaoMesAnt.toFixed(2)}%
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <Legend 
+                              verticalAlign="bottom" 
+                              height={40}
+                              iconType="circle"
+                              wrapperStyle={{ paddingTop: '20px' }}
+                            />
+                            <Bar 
+                              yAxisId="left"
+                              dataKey="receitaLiquida" 
+                              fill="url(#barGradientOrange)"
                               name="Receita Líquida"
                               radius={[8, 8, 0, 0]}
                               barSize={55}
@@ -3765,7 +4009,7 @@ export function VWFinancialDashboard() {
         </div>
       </div>
 
-      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && !showVendasSeguradora && (
+      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && !showVendasSeguradora && !showVendasMercadoLivre && (
         <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
         {/* Executive Summary - KPIs */}
         <div>
