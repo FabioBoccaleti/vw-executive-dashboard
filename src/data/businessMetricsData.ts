@@ -139,7 +139,7 @@ export const businessMetricsData = {
     administracao: [4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42500]
   },
   
-  // 32-37. Bônus
+  // 31-36. Bônus
   bonus: {
     veiculosNovos: [414012, 417830, 529741, 424534, 478495, 497389, 565955, 596658, 447332, 440594, 293895, 352135],
     veiculosUsados: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -149,13 +149,13 @@ export const businessMetricsData = {
     administracao: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   },
   
-  // 38-39. Receitas de Financiamento
+  // 37-38. Receitas de Financiamento
   receitasFinanciamento: {
     veiculosNovos: [50000, 70000, 90000, 80000, 60000, 40000, 90000, 50000, 60000, 90000, 50000, 60000],
     veiculosUsados: [30000, 40000, 50000, 70000, 80000, 60000, 80000, 30000, 50000, 30000, 80000, 70000]
   },
   
-  // 40-42. Créditos ICMS
+  // 39-41. Créditos ICMS
   creditosICMS: {
     novos: [0, 0, 0, 15000, 0, 0, 0, 48000, 0, 0, 10000, 100000],
     pecas: [200000, 0, 0, 15000, 40000, 0, 0, 70000, 0, 0, 28000, 15000],

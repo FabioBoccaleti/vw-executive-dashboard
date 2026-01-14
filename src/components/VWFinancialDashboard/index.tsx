@@ -70,6 +70,27 @@ export function VWFinancialDashboard() {
   // Estado para controlar exibição do card de Despesas Financeiras Funilaria
   const [showDespesasFinanceirasFunilaria, setShowDespesasFinanceirasFunilaria] = useState(false)
 
+  // Estado para controlar exibição do card de Despesas Financeiras Administração
+  const [showDespesasFinanceirasAdministracao, setShowDespesasFinanceirasAdministracao] = useState(false)
+
+  // Estado para controlar exibição do card de Bonus Novos
+  const [showBonusNovos, setShowBonusNovos] = useState(false)
+
+  // Estado para controlar exibição do card de Bonus Usados
+  const [showBonusUsados, setShowBonusUsados] = useState(false)
+
+  // Estado para controlar exibição do card de Bonus Peças
+  const [showBonusPecas, setShowBonusPecas] = useState(false)
+
+  // Estado para controlar exibição do card de Bonus Oficina
+  const [showBonusOficina, setShowBonusOficina] = useState(false)
+
+  // Estado para controlar exibição do card de Bonus Funilaria
+  const [showBonusFunilaria, setShowBonusFunilaria] = useState(false)
+
+  // Estado para controlar exibição do card de Bonus Administração
+  const [showBonusAdministracao, setShowBonusAdministracao] = useState(false)
+
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
     if (viewMode === 'mensal') return meses
@@ -1285,6 +1306,11 @@ export function VWFinancialDashboard() {
                     setShowDespesasFinanceirasUsados(false)
                     setShowDespesasFinanceirasOficina(false)
                     setShowDespesasFinanceirasFunilaria(false)
+                    setShowDespesasFinanceirasAdministracao(false)
+                    setShowBonusNovos(false)
+                    setShowBonusUsados(false)
+                    setShowBonusPecas(false)
+                    setShowBonusOficina(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showDespesasFinanceirasPecas 
@@ -1313,6 +1339,11 @@ export function VWFinancialDashboard() {
                     setShowDespesasFinanceirasUsados(false)
                     setShowDespesasFinanceirasPecas(false)
                     setShowDespesasFinanceirasFunilaria(false)
+                    setShowDespesasFinanceirasAdministracao(false)
+                    setShowBonusNovos(false)
+                    setShowBonusUsados(false)
+                    setShowBonusPecas(false)
+                    setShowBonusOficina(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showDespesasFinanceirasOficina 
@@ -1341,6 +1372,7 @@ export function VWFinancialDashboard() {
                     setShowDespesasFinanceirasUsados(false)
                     setShowDespesasFinanceirasPecas(false)
                     setShowDespesasFinanceirasOficina(false)
+                    setShowDespesasFinanceirasAdministracao(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showDespesasFinanceirasFunilaria 
@@ -1351,6 +1383,236 @@ export function VWFinancialDashboard() {
                   <TrendingUp className="w-4 h-4 mb-1" />
                   <span className="text-xs font-semibold">Despesas Financeiras Funilaria</span>
                   <span className="text-[10px] opacity-80">Cartão de Crédito</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowDespesasFinanceirasAdministracao(!showDespesasFinanceirasAdministracao)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                    setShowVendasMercadoLivre(false)
+                    setShowDespesasFinanceirasNovos(false)
+                    setShowDespesasFinanceirasUsados(false)
+                    setShowDespesasFinanceirasPecas(false)
+                    setShowDespesasFinanceirasOficina(false)
+                    setShowDespesasFinanceirasFunilaria(false)
+                    setShowBonusNovos(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showDespesasFinanceirasAdministracao 
+                      ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-400 dark:border-indigo-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Despesas Financeiras Administração</span>
+                  <span className="text-[10px] opacity-80">Juros e Despesas</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowBonusNovos(!showBonusNovos)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                    setShowVendasMercadoLivre(false)
+                    setShowDespesasFinanceirasNovos(false)
+                    setShowDespesasFinanceirasUsados(false)
+                    setShowDespesasFinanceirasPecas(false)
+                    setShowDespesasFinanceirasOficina(false)
+                    setShowDespesasFinanceirasFunilaria(false)
+                    setShowDespesasFinanceirasAdministracao(false)
+                    setShowBonusUsados(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showBonusNovos 
+                      ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-green-300 hover:bg-green-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Bonus Novos</span>
+                  <span className="text-[10px] opacity-80">Bônus Veículos Novos</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowBonusUsados(!showBonusUsados)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                    setShowVendasMercadoLivre(false)
+                    setShowDespesasFinanceirasNovos(false)
+                    setShowDespesasFinanceirasUsados(false)
+                    setShowDespesasFinanceirasPecas(false)
+                    setShowDespesasFinanceirasOficina(false)
+                    setShowDespesasFinanceirasFunilaria(false)
+                    setShowDespesasFinanceirasAdministracao(false)
+                    setShowBonusNovos(false)
+                    setShowBonusPecas(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showBonusUsados 
+                      ? 'bg-lime-50 dark:bg-lime-900/20 border-lime-400 dark:border-lime-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-lime-300 hover:bg-lime-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Bonus Usados</span>
+                  <span className="text-[10px] opacity-80">Bônus Veículos Usados</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowBonusPecas(!showBonusPecas)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                    setShowVendasMercadoLivre(false)
+                    setShowDespesasFinanceirasNovos(false)
+                    setShowDespesasFinanceirasUsados(false)
+                    setShowDespesasFinanceirasPecas(false)
+                    setShowDespesasFinanceirasOficina(false)
+                    setShowDespesasFinanceirasFunilaria(false)
+                    setShowDespesasFinanceirasAdministracao(false)
+                    setShowBonusNovos(false)
+                    setShowBonusUsados(false)
+                    setShowBonusOficina(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showBonusPecas 
+                      ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400 dark:border-yellow-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-yellow-300 hover:bg-yellow-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Bonus Peças</span>
+                  <span className="text-[10px] opacity-80">Bônus Peças</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowBonusOficina(!showBonusOficina)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                    setShowVendasMercadoLivre(false)
+                    setShowDespesasFinanceirasNovos(false)
+                    setShowDespesasFinanceirasUsados(false)
+                    setShowDespesasFinanceirasPecas(false)
+                    setShowDespesasFinanceirasOficina(false)
+                    setShowDespesasFinanceirasFunilaria(false)
+                    setShowDespesasFinanceirasAdministracao(false)
+                    setShowBonusNovos(false)
+                    setShowBonusUsados(false)
+                    setShowBonusPecas(false)
+                    setShowBonusFunilaria(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showBonusOficina 
+                      ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-orange-300 hover:bg-orange-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Bonus Oficina</span>
+                  <span className="text-[10px] opacity-80">Bônus Oficina</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowBonusFunilaria(!showBonusFunilaria)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                    setShowVendasMercadoLivre(false)
+                    setShowDespesasFinanceirasNovos(false)
+                    setShowDespesasFinanceirasUsados(false)
+                    setShowDespesasFinanceirasPecas(false)
+                    setShowDespesasFinanceirasOficina(false)
+                    setShowDespesasFinanceirasFunilaria(false)
+                    setShowDespesasFinanceirasAdministracao(false)
+                    setShowBonusNovos(false)
+                    setShowBonusUsados(false)
+                    setShowBonusPecas(false)
+                    setShowBonusOficina(false)
+                    setShowBonusAdministracao(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showBonusFunilaria 
+                      ? 'bg-pink-50 dark:bg-pink-900/20 border-pink-400 dark:border-pink-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-pink-300 hover:bg-pink-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Bonus Funilaria</span>
+                  <span className="text-[10px] opacity-80">Bônus Funilaria</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowBonusAdministracao(!showBonusAdministracao)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                    setShowVendasMercadoLivre(false)
+                    setShowDespesasFinanceirasNovos(false)
+                    setShowDespesasFinanceirasUsados(false)
+                    setShowDespesasFinanceirasPecas(false)
+                    setShowDespesasFinanceirasOficina(false)
+                    setShowDespesasFinanceirasFunilaria(false)
+                    setShowDespesasFinanceirasAdministracao(false)
+                    setShowBonusNovos(false)
+                    setShowBonusUsados(false)
+                    setShowBonusPecas(false)
+                    setShowBonusOficina(false)
+                    setShowBonusFunilaria(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showBonusAdministracao 
+                      ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-purple-300 hover:bg-purple-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Bonus Administração</span>
+                  <span className="text-[10px] opacity-80">Bônus Administração</span>
                 </button>
               </div>
             </CardContent>
@@ -4398,6 +4660,1451 @@ export function VWFinancialDashboard() {
               </Card>
             )}
 
+            {/* Card de Despesas Financeiras Administração */}
+            {showDespesasFinanceirasAdministracao && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Despesas Financeiras Administração - Análise 2025
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Evolução das despesas financeiras com juros e cartão de crédito
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowDespesasFinanceirasAdministracao(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    
+                    {/* Gráfico 1: ID21 - Juros Empréstimos Bancários */}
+                    {(() => {
+                      const jurosData = [91568, 94176, 103735, 90198, 88808, 91752, 106100, 108962, 24386, 217520, 143888, 155248];
+                      const totalJuros = jurosData.reduce((a, b) => a + b, 0);
+                      const mediaJuros = totalJuros / 12;
+                      const ultimoJuros = jurosData[11];
+
+                      const jurosChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = jurosData[index];
+                        const valorAnterior = index > 0 ? jurosData[index - 1] : valorAtual;
+                        const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-indigo-50 dark:bg-indigo-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Juros Empréstimos Bancários
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalJuros.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaJuros.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimoJuros.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={jurosChartData} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientIndigoAdm1" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#818cf8" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#6366f1" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Juros Bancários</p>
+                                              <p className="text-lg font-bold text-indigo-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientIndigoAdm1)"
+                                  name="Juros Empréstimos Bancários"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Gráfico 2: ID22 - Juros Contrato Mútuo */}
+                    {(() => {
+                      const jurosData = [73251, 71147, 69017, 66535, 64025, 61702, 59434, 52781, 45714, 37694, 27627, 24805];
+                      const totalJuros = jurosData.reduce((a, b) => a + b, 0);
+                      const mediaJuros = totalJuros / 12;
+                      const ultimoJuros = jurosData[11];
+
+                      const jurosChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = jurosData[index];
+                        const valorAnterior = index > 0 ? jurosData[index - 1] : valorAtual;
+                        const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-violet-50 dark:bg-violet-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Juros Contrato Mútuo
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalJuros.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaJuros.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimoJuros.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={jurosChartData} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientVioletAdm2" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#7c3aed" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Juros Contrato Mútuo</p>
+                                              <p className="text-lg font-bold text-violet-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientVioletAdm2)"
+                                  name="Juros Contrato Mútuo"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Gráfico 3: ID30 - Despesas Cartão Administração */}
+                    {(() => {
+                      const despesasData = [4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42500];
+                      const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
+                      const mediaDespesas = totalDespesas / 12;
+                      const ultimaDespesa = despesasData[11];
+
+                      const despesasChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = despesasData[index];
+                        const valorAnterior = index > 0 ? despesasData[index - 1] : valorAtual;
+                        const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-fuchsia-50 dark:bg-fuchsia-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Despesas Cartão Administração
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalDespesas.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaDespesas.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimaDespesa.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={despesasChartData} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientFuchsiaAdm3" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#e879f9" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#d946ef" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#c026d3" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Despesa Cartão</p>
+                                              <p className="text-lg font-bold text-fuchsia-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientFuchsiaAdm3)"
+                                  name="Despesas Cartão Administração"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Card de Bonus Novos */}
+            {showBonusNovos && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Bônus Veículos Novos
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Evolução dos valores de bônus recebidos em vendas de veículos novos
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowBonusNovos(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    
+                    {/* Gráfico: ID32 - Bônus Veículos Novos */}
+                    {(() => {
+                      const bonusData = [414012, 417830, 529741, 424534, 478495, 497389, 565955, 596658, 447332, 440594, 293895, 352135];
+                      const totalBonus = bonusData.reduce((a, b) => a + b, 0);
+                      const mediaBonus = totalBonus / 12;
+                      const ultimoBonus = bonusData[11];
+
+                      const bonusChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = bonusData[index];
+                        const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
+                        const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-green-50 dark:bg-green-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Bônus Veículos Novos
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalBonus.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaBonus.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimoBonus.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={bonusChartData} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientGreenBonus" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#4ade80" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#22c55e" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#16a34a" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Bônus</p>
+                                              <p className="text-lg font-bold text-green-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientGreenBonus)"
+                                  name="Bônus Veículos Novos"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Card de Bonus Usados */}
+            {showBonusUsados && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Bônus Veículos Usados
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Evolução dos valores de bônus recebidos em vendas de veículos usados
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowBonusUsados(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    
+                    {/* Gráfico: ID33 - Bônus Veículos Usados */}
+                    {(() => {
+                      const bonusData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                      const totalBonus = bonusData.reduce((a, b) => a + b, 0);
+                      const mediaBonus = totalBonus / 12;
+                      const ultimoBonus = bonusData[11];
+
+                      const bonusChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = bonusData[index];
+                        const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
+                        const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-lime-50 dark:bg-lime-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Bônus Veículos Usados
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalBonus.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaBonus.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimoBonus.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={bonusChartData} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientLimeBonus" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#a3e635" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#84cc16" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#65a30d" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Bônus</p>
+                                              <p className="text-lg font-bold text-lime-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientLimeBonus)"
+                                  name="Bônus Veículos Usados"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Card de Bonus Peças */}
+            {showBonusPecas && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Bônus Peças
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Evolução dos valores de bônus recebidos em vendas de peças
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowBonusPecas(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    
+                    {/* Gráfico: ID34 - Bônus Peças */}
+                    {(() => {
+                      const bonusData = [400000, 500000, 700000, 250000, 380000, 400000, 600000, 800000, 280000, 350000, 420000, 580000];
+                      const totalBonus = bonusData.reduce((a, b) => a + b, 0);
+                      const mediaBonus = totalBonus / 12;
+                      const ultimoBonus = bonusData[11];
+
+                      const bonusChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = bonusData[index];
+                        const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
+                        const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-yellow-50 dark:bg-yellow-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Bônus Peças
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalBonus.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaBonus.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimoBonus.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={bonusChartData} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientYellowBonus" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#facc15" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#eab308" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#ca8a04" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Bônus</p>
+                                              <p className="text-lg font-bold text-yellow-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientYellowBonus)"
+                                  name="Bônus Peças"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Card de Bonus Oficina */}
+            {showBonusOficina && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Bônus Oficina
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Evolução dos valores de bônus recebidos em oficina
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowBonusOficina(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    
+                    {/* Gráfico: ID35 - Bônus Oficina */}
+                    {(() => {
+                      const bonusData = [100000, 200000, 180000, 190000, 70000, 0, 80000, 90000, 0, 50000, 75000, 118800];
+                      const totalBonus = bonusData.reduce((a, b) => a + b, 0);
+                      const mediaBonus = totalBonus / 12;
+                      const ultimoBonus = bonusData[11];
+
+                      const bonusChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = bonusData[index];
+                        const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
+                        const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-orange-50 dark:bg-orange-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Bônus Oficina
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalBonus.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaBonus.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimoBonus.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={bonusChartData} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientOrangeBonus" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#fb923c" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#f97316" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#ea580c" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Bônus</p>
+                                              <p className="text-lg font-bold text-orange-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientOrangeBonus)"
+                                  name="Bônus Oficina"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Card de Bonus Funilaria */}
+            {showBonusFunilaria && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Bônus Funilaria
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Evolução dos valores de bônus recebidos em funilaria
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowBonusFunilaria(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    
+                    {/* Gráfico: ID35 - Bônus Funilaria */}
+                    {(() => {
+                      const bonusData = businessMetricsData.bonus.funilaria;
+                      const totalBonus = bonusData.reduce((a, b) => a + b, 0);
+                      const mediaBonus = totalBonus / 12;
+                      const ultimoBonus = bonusData[11];
+
+                      const bonusChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = bonusData[index];
+                        const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
+                        const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-pink-50 dark:bg-pink-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Bônus Funilaria
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalBonus.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaBonus.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimoBonus.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={bonusChartData} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientPinkBonus" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#f9a8d4" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#ec4899" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#db2777" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Bônus</p>
+                                              <p className="text-lg font-bold text-pink-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientPinkBonus)"
+                                  name="Bônus Funilaria"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Card de Bonus Administração */}
+            {showBonusAdministracao && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Bônus Administração
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Evolução dos valores de bônus recebidos em administração
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowBonusAdministracao(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    
+                    {/* Gráfico: ID36 - Bônus Administração */}
+                    {(() => {
+                      const bonusData = businessMetricsData.bonus.administracao;
+                      const totalBonus = bonusData.reduce((a, b) => a + b, 0);
+                      const mediaBonus = totalBonus / 12;
+                      const ultimoBonus = bonusData[11];
+
+                      const bonusChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = bonusData[index];
+                        const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
+                        const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-purple-50 dark:bg-purple-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Bônus Administração
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalBonus.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaBonus.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimoBonus.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={bonusChartData} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientPurpleBonus" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#c084fc" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#a855f7" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#9333ea" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Bônus</p>
+                                              <p className="text-lg font-bold text-purple-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientPurpleBonus)"
+                                  name="Bônus Administração"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Card de % de Trocas - Análise de Conversão */}
             {showTrocasChart && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
@@ -5342,7 +7049,7 @@ export function VWFinancialDashboard() {
         </div>
       </div>
 
-      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && !showVendasSeguradora && !showVendasMercadoLivre && !showDespesasFinanceirasNovos && !showDespesasFinanceirasUsados && !showDespesasFinanceirasPecas && !showDespesasFinanceirasOficina && !showDespesasFinanceirasFunilaria && (
+      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && !showVendasSeguradora && !showVendasMercadoLivre && !showDespesasFinanceirasNovos && !showDespesasFinanceirasUsados && !showDespesasFinanceirasPecas && !showDespesasFinanceirasOficina && !showDespesasFinanceirasFunilaria && !showDespesasFinanceirasAdministracao && !showBonusNovos && !showBonusUsados && !showBonusPecas && !showBonusOficina && !showBonusFunilaria && !showBonusAdministracao && (
         <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
         {/* Executive Summary - KPIs */}
         <div>
