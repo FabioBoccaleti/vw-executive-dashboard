@@ -1222,7 +1222,7 @@ export function VWFinancialDashboard() {
                             </div>
 
                             <ChartContainer config={{}} className="h-[350px] w-full">
-                              <ComposedChart data={chartData} width={1151} height={350}>
+                              <ComposedChart data={chartData}>
                                 <defs>
                                   <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stopColor="#3b82f6" stopOpacity={1}/>
@@ -1238,8 +1238,8 @@ export function VWFinancialDashboard() {
                                   yAxisId="left"
                                   tick={{ fill: '#64748b', fontSize: 12 }}
                                   axisLine={{ stroke: '#cbd5e1' }}
-                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-                                  label={{ value: 'Receita (mil R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                                  tickFormatter={(value) => `R$ ${(value / 1000000).toFixed(1)}M`}
+                                  label={{ value: 'Receita (milhões R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
                                 />
                                 <YAxis 
                                   yAxisId="right"
@@ -1257,7 +1257,7 @@ export function VWFinancialDashboard() {
                                         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                                           <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
-                                          <p className="text-lg font-bold text-blue-600 mb-2">R$ {((payload[0]?.value || 0) / 1000).toFixed(1)}k</p>
+                                          <p className="text-lg font-bold text-blue-600 mb-2">R$ {((payload[0]?.value || 0) / 1000000).toFixed(2)}M</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
                                           <p className="text-lg font-bold text-green-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
@@ -1364,7 +1364,7 @@ export function VWFinancialDashboard() {
                             </div>
 
                             <ChartContainer config={{}} className="h-[350px] w-full">
-                              <ComposedChart data={chartData} width={1151} height={350}>
+                              <ComposedChart data={chartData}>
                                 <defs>
                                   <linearGradient id="purpleGradient" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stopColor="#8b5cf6" stopOpacity={1}/>
@@ -1380,8 +1380,8 @@ export function VWFinancialDashboard() {
                                   yAxisId="left"
                                   tick={{ fill: '#64748b', fontSize: 12 }}
                                   axisLine={{ stroke: '#cbd5e1' }}
-                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-                                  label={{ value: 'Receita (mil R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                                  tickFormatter={(value) => `R$ ${(value / 1000000).toFixed(1)}M`}
+                                  label={{ value: 'Receita (milhões R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
                                 />
                                 <YAxis 
                                   yAxisId="right"
@@ -1399,7 +1399,7 @@ export function VWFinancialDashboard() {
                                         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                                           <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
-                                          <p className="text-lg font-bold text-purple-600 mb-2">R$ {((payload[0]?.value || 0) / 1000).toFixed(1)}k</p>
+                                          <p className="text-lg font-bold text-purple-600 mb-2">R$ {((payload[0]?.value || 0) / 1000000).toFixed(2)}M</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
                                           <p className="text-lg font-bold text-teal-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
@@ -1506,7 +1506,7 @@ export function VWFinancialDashboard() {
                             </div>
 
                             <ChartContainer config={{}} className="h-[350px] w-full">
-                              <ComposedChart data={chartData} width={1151} height={350}>
+                              <ComposedChart data={chartData}>
                                 <defs>
                                   <linearGradient id="violetGradient" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stopColor="#a855f7" stopOpacity={1}/>
@@ -1522,8 +1522,8 @@ export function VWFinancialDashboard() {
                                   yAxisId="left"
                                   tick={{ fill: '#64748b', fontSize: 12 }}
                                   axisLine={{ stroke: '#cbd5e1' }}
-                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-                                  label={{ value: 'Receita (mil R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                                  tickFormatter={(value) => `R$ ${(value / 1000000).toFixed(1)}M`}
+                                  label={{ value: 'Receita (milhões R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
                                 />
                                 <YAxis 
                                   yAxisId="right"
@@ -1541,7 +1541,7 @@ export function VWFinancialDashboard() {
                                         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                                           <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
-                                          <p className="text-lg font-bold text-purple-600 mb-2">R$ {((payload[0]?.value || 0) / 1000).toFixed(1)}k</p>
+                                          <p className="text-lg font-bold text-purple-600 mb-2">R$ {((payload[0]?.value || 0) / 1000000).toFixed(2)}M</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
                                           <p className="text-lg font-bold text-green-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
@@ -1648,7 +1648,7 @@ export function VWFinancialDashboard() {
                             </div>
 
                             <ChartContainer config={{}} className="h-[350px] w-full">
-                              <ComposedChart data={chartData} width={1151} height={350}>
+                              <ComposedChart data={chartData}>
                                 <defs>
                                   <linearGradient id="cyanGradient" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stopColor="#06b6d4" stopOpacity={1}/>
@@ -1664,8 +1664,8 @@ export function VWFinancialDashboard() {
                                   yAxisId="left"
                                   tick={{ fill: '#64748b', fontSize: 12 }}
                                   axisLine={{ stroke: '#cbd5e1' }}
-                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-                                  label={{ value: 'Receita (mil R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                                  tickFormatter={(value) => `R$ ${(value / 1000000).toFixed(1)}M`}
+                                  label={{ value: 'Receita (milhões R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
                                 />
                                 <YAxis 
                                   yAxisId="right"
@@ -1683,7 +1683,7 @@ export function VWFinancialDashboard() {
                                         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                                           <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
-                                          <p className="text-lg font-bold text-cyan-600 mb-2">R$ {((payload[0]?.value || 0) / 1000).toFixed(1)}k</p>
+                                          <p className="text-lg font-bold text-cyan-600 mb-2">R$ {((payload[0]?.value || 0) / 1000000).toFixed(2)}M</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
                                           <p className="text-lg font-bold text-green-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
@@ -1817,7 +1817,7 @@ export function VWFinancialDashboard() {
                             </div>
 
                             <ChartContainer config={{}} className="h-[350px] w-full">
-                              <ComposedChart data={chartData} width={1151} height={350}>
+                              <ComposedChart data={chartData}>
                                 <defs>
                                   <linearGradient id="cyanGradient" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stopColor="#06b6d4" stopOpacity={1}/>
@@ -1833,8 +1833,8 @@ export function VWFinancialDashboard() {
                                   yAxisId="left"
                                   tick={{ fill: '#64748b', fontSize: 12 }}
                                   axisLine={{ stroke: '#cbd5e1' }}
-                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-                                  label={{ value: 'Receita (mil R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
+                                  tickFormatter={(value) => `R$ ${(value / 1000000).toFixed(1)}M`}
+                                  label={{ value: 'Receita (milhões R$)', angle: -90, position: 'insideLeft', fill: '#64748b' }}
                                 />
                                 <YAxis 
                                   yAxisId="right"
@@ -1852,7 +1852,7 @@ export function VWFinancialDashboard() {
                                         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                                           <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
-                                          <p className="text-lg font-bold text-cyan-600 mb-2">R$ {((payload[0]?.value || 0) / 1000).toFixed(1)}k</p>
+                                          <p className="text-lg font-bold text-cyan-600 mb-2">R$ {((payload[0]?.value || 0) / 1000000).toFixed(2)}M</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
                                           <p className="text-lg font-bold text-emerald-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
@@ -2261,7 +2261,7 @@ export function VWFinancialDashboard() {
 
                         {/* Gráfico */}
                         <ChartContainer config={{}} className="h-[400px] w-full">
-                          <ComposedChart data={estoqueChartData} width={1151} height={400}>
+                          <ComposedChart data={estoqueChartData} >
                             <XAxis 
                               dataKey="month" 
                               tick={{ fill: '#64748b', fontSize: 12 }}
@@ -2429,7 +2429,7 @@ export function VWFinancialDashboard() {
 
                         {/* Gráfico */}
                         <ChartContainer config={{}} className="h-[400px] w-full">
-                          <ComposedChart data={estoqueChartData} width={1151} height={400}>
+                          <ComposedChart data={estoqueChartData} >
                             <XAxis 
                               dataKey="month" 
                               tick={{ fill: '#64748b', fontSize: 12 }}
@@ -2597,7 +2597,7 @@ export function VWFinancialDashboard() {
 
                         {/* Gráfico */}
                         <ChartContainer config={{}} className="h-[400px] w-full">
-                          <ComposedChart data={estoqueChartData} width={1151} height={400}>
+                          <ComposedChart data={estoqueChartData} >
                             <XAxis 
                               dataKey="month" 
                               tick={{ fill: '#64748b', fontSize: 12 }}
@@ -2753,7 +2753,7 @@ export function VWFinancialDashboard() {
 
                         {/* Gráfico */}
                         <ChartContainer config={{}} className="h-[400px] w-full">
-                          <BarChart data={repasseChartData} width={1151} height={400}>
+                          <BarChart data={repasseChartData} >
                             <XAxis 
                               dataKey="month" 
                               tick={{ fill: '#64748b', fontSize: 12 }}
