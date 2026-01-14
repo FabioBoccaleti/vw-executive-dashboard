@@ -55,6 +55,12 @@ export function VWFinancialDashboard() {
   // Estado para controlar exibição do card de Vendas Mercado Livre
   const [showVendasMercadoLivre, setShowVendasMercadoLivre] = useState(false)
 
+  // Estado para controlar exibição do card de Despesas Financeiras Novos
+  const [showDespesasFinanceirasNovos, setShowDespesasFinanceirasNovos] = useState(false)
+
+  // Estado para controlar exibição do card de Despesas Financeiras Usados
+  const [showDespesasFinanceirasUsados, setShowDespesasFinanceirasUsados] = useState(false)
+
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
     if (viewMode === 'mensal') return meses
@@ -416,8 +422,8 @@ export function VWFinancialDashboard() {
 
   // Função para obter dados ativos (original ou projetado)
   const getActiveData = () => {
-    if (projectionMode && activeScenario && projectedData[activeScenario]) {
-      return projectedData[activeScenario]
+    if (projectionMode && activeScenario && projectedData[activeScenario!]) {
+      return projectedData[activeScenario!]
     }
     return dreData
   }
@@ -1004,6 +1010,7 @@ export function VWFinancialDashboard() {
                     setShowEstoquePecas(false)
                     setShowVendaPecas(false)
                     setShowVendasSeguradora(false)
+                    setShowDespesasFinanceirasNovos(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showDetailedMetrics 
@@ -1026,6 +1033,7 @@ export function VWFinancialDashboard() {
                     setShowEstoquePecas(false)
                     setShowVendaPecas(false)
                     setShowVendasSeguradora(false)
+                    setShowDespesasFinanceirasNovos(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showTrocasChart 
@@ -1048,6 +1056,7 @@ export function VWFinancialDashboard() {
                     setShowEstoquePecas(false)
                     setShowVendaPecas(false)
                     setShowVendasSeguradora(false)
+                    setShowDespesasFinanceirasNovos(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showRepasseChart 
@@ -1070,6 +1079,7 @@ export function VWFinancialDashboard() {
                     setShowEstoquePecas(false)
                     setShowVendaPecas(false)
                     setShowVendasSeguradora(false)
+                    setShowDespesasFinanceirasNovos(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showEstoqueNovos 
@@ -1092,6 +1102,7 @@ export function VWFinancialDashboard() {
                     setShowEstoquePecas(false)
                     setShowVendaPecas(false)
                     setShowVendasSeguradora(false)
+                    setShowDespesasFinanceirasNovos(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showEstoqueUsados 
@@ -1114,6 +1125,7 @@ export function VWFinancialDashboard() {
                     setShowEstoqueUsados(false)
                     setShowVendaPecas(false)
                     setShowVendasSeguradora(false)
+                    setShowDespesasFinanceirasNovos(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showEstoquePecas 
@@ -1136,6 +1148,7 @@ export function VWFinancialDashboard() {
                     setShowEstoqueUsados(false)
                     setShowEstoquePecas(false)
                     setShowVendasSeguradora(false)
+                    setShowDespesasFinanceirasNovos(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showVendaPecas 
@@ -1181,7 +1194,9 @@ export function VWFinancialDashboard() {
                     setShowEstoqueUsados(false)
                     setShowEstoquePecas(false)
                     setShowVendaPecas(false)
+                    setShowDespesasFinanceirasNovos(false)
                     setShowVendasSeguradora(false)
+                    setShowDespesasFinanceirasNovos(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showVendasMercadoLivre 
@@ -1192,6 +1207,56 @@ export function VWFinancialDashboard() {
                   <BarChart3 className="w-4 h-4 mb-1" />
                   <span className="text-xs font-semibold">Vendas Mercado Livre</span>
                   <span className="text-[10px] opacity-80">Performance Marketplace</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowDespesasFinanceirasNovos(!showDespesasFinanceirasNovos)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                    setShowVendasMercadoLivre(false)
+                    setShowDespesasFinanceirasUsados(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showDespesasFinanceirasNovos 
+                      ? 'bg-red-50 dark:bg-red-900/20 border-red-400 dark:border-red-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-red-300 hover:bg-red-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Despesas Financeiras Novos</span>
+                  <span className="text-[10px] opacity-80">Juros e Despesas</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowDespesasFinanceirasUsados(!showDespesasFinanceirasUsados)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                    setShowVendasMercadoLivre(false)
+                    setShowDespesasFinanceirasNovos(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showDespesasFinanceirasUsados 
+                      ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-purple-300 hover:bg-purple-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Despesas Financeiras Usados</span>
+                  <span className="text-[10px] opacity-80">Juros e Despesas</span>
                 </button>
               </div>
             </CardContent>
@@ -1317,11 +1382,11 @@ export function VWFinancialDashboard() {
                                         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                                           <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
-                                          <p className="text-lg font-bold text-blue-600 mb-2">R$ {new Intl.NumberFormat("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0}).format((payload[0]?.value || 0))}</p>
+                                          <p className="text-lg font-bold text-blue-600 mb-2">R$ {new Intl.NumberFormat("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0}).format(Number(payload[0]?.value || 0))}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
-                                          <p className="text-lg font-bold text-green-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-lg font-bold text-green-600 mb-2">{Number(payload[1]?.value || 0).toFixed(2)}%</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
-                                          <p className="text-lg font-bold text-orange-600">{(payload[2]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-lg font-bold text-orange-600">{Number(payload[2]?.value || 0).toFixed(2)}%</p>
                                         </div>
                                       );
                                     }
@@ -1459,11 +1524,11 @@ export function VWFinancialDashboard() {
                                         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                                           <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
-                                          <p className="text-lg font-bold text-purple-600 mb-2">R$ {new Intl.NumberFormat("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0}).format((payload[0]?.value || 0))}</p>
+                                          <p className="text-lg font-bold text-purple-600 mb-2">R$ {new Intl.NumberFormat("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0}).format(Number(payload[0]?.value || 0))}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
-                                          <p className="text-lg font-bold text-teal-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-lg font-bold text-teal-600 mb-2">{Number(payload[1]?.value || 0).toFixed(2)}%</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
-                                          <p className="text-lg font-bold text-orange-600">{(payload[2]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-lg font-bold text-orange-600">{Number(payload[2]?.value || 0).toFixed(2)}%</p>
                                         </div>
                                       );
                                     }
@@ -1601,11 +1666,11 @@ export function VWFinancialDashboard() {
                                         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                                           <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
-                                          <p className="text-lg font-bold text-purple-600 mb-2">R$ {new Intl.NumberFormat("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0}).format((payload[0]?.value || 0))}</p>
+                                          <p className="text-lg font-bold text-purple-600 mb-2">R$ {new Intl.NumberFormat("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0}).format(Number(payload[0]?.value || 0))}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
-                                          <p className="text-lg font-bold text-green-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-lg font-bold text-green-600 mb-2">{Number(payload[1]?.value || 0).toFixed(2)}%</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
-                                          <p className="text-lg font-bold text-orange-600">{(payload[2]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-lg font-bold text-orange-600">{Number(payload[2]?.value || 0).toFixed(2)}%</p>
                                         </div>
                                       );
                                     }
@@ -1743,11 +1808,11 @@ export function VWFinancialDashboard() {
                                         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                                           <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
-                                          <p className="text-lg font-bold text-cyan-600 mb-2">R$ {new Intl.NumberFormat("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0}).format((payload[0]?.value || 0))}</p>
+                                          <p className="text-lg font-bold text-cyan-600 mb-2">R$ {new Intl.NumberFormat("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0}).format(Number(payload[0]?.value || 0))}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
-                                          <p className="text-lg font-bold text-green-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-lg font-bold text-green-600 mb-2">{Number(payload[1]?.value || 0).toFixed(2)}%</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
-                                          <p className="text-lg font-bold text-orange-600">{(payload[2]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-lg font-bold text-orange-600">{Number(payload[2]?.value || 0).toFixed(2)}%</p>
                                         </div>
                                       );
                                     }
@@ -1912,11 +1977,11 @@ export function VWFinancialDashboard() {
                                         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700">
                                           <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.month}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">RECEITA LÍQUIDA</p>
-                                          <p className="text-lg font-bold text-cyan-600 mb-2">R$ {new Intl.NumberFormat("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0}).format((payload[0]?.value || 0))}</p>
+                                          <p className="text-lg font-bold text-cyan-600 mb-2">R$ {new Intl.NumberFormat("pt-BR", {minimumFractionDigits: 0, maximumFractionDigits: 0}).format(Number(payload[0]?.value || 0))}</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">MARGEM %</p>
-                                          <p className="text-lg font-bold text-emerald-600 mb-2">{(payload[1]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-lg font-bold text-emerald-600 mb-2">{Number(payload[1]?.value || 0).toFixed(2)}%</p>
                                           <p className="text-sm text-slate-600 dark:text-slate-400">VAR. MÊS ANT.</p>
-                                          <p className="text-lg font-bold text-amber-600">{(payload[2]?.value || 0).toFixed(2)}%</p>
+                                          <p className="text-lg font-bold text-amber-600">{Number(payload[2]?.value || 0).toFixed(2)}%</p>
                                         </div>
                                       );
                                     }
@@ -3065,6 +3130,640 @@ export function VWFinancialDashboard() {
               </Card>
             )}
 
+            {/* Card de Despesas Financeiras Novos */}
+            {showDespesasFinanceirasNovos && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Despesas Financeiras Novos - Análise 2025
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Evolução das despesas financeiras com juros e cartão de crédito
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowDespesasFinanceirasNovos(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    
+                    {/* Gráfico 1: ID18 - Juros Veículos Novos */}
+                    {(() => {
+                      const jurosData = [332440, 171449, 320580, 364834, 164951, 369484, 347702, 243077, 338504, 312814, 133644, 239803];
+                      const totalJuros = jurosData.reduce((a, b) => a + b, 0);
+                      const mediaJuros = totalJuros / 12;
+                      const ultimoJuros = jurosData[11];
+                      const penultimoJuros = jurosData[10];
+                      const variacaoJuros = ((ultimoJuros - penultimoJuros) / penultimoJuros) * 100;
+
+                      const jurosChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = jurosData[index];
+                        const valorAnterior = index > 0 ? jurosData[index - 1] : valorAtual;
+                        const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-red-50 dark:bg-red-900/20 px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Juros Veículos Novos
+                            </h3>
+                            <div className={`flex items-center gap-2 ${variacaoJuros >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {variacaoJuros >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                              <span className="text-lg font-bold">{Math.abs(variacaoJuros).toFixed(1)}%</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalJuros.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaJuros.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimoJuros.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={jurosChartData} width={1654} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientRed" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#f87171" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#ef4444" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#dc2626" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Juros</p>
+                                              <p className="text-lg font-bold text-red-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientRed)"
+                                  name="Juros Veículos Novos"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Gráfico 2: ID25 - Despesas Cartão Novos */}
+                    {(() => {
+                      const despesasData = [819, 1175, 2448, 1277, 850, 1214, 2530, 1391, 1047, 2352, 1673, 76381];
+                      const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
+                      const mediaDespesas = totalDespesas / 12;
+                      const ultimaDespesa = despesasData[11];
+                      const penultimaDespesa = despesasData[10];
+                      const variacaoDespesas = ((ultimaDespesa - penultimaDespesa) / penultimaDespesa) * 100;
+
+                      const despesasChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = despesasData[index];
+                        const valorAnterior = index > 0 ? despesasData[index - 1] : valorAtual;
+                        const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-orange-50 dark:bg-orange-900/20 px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Despesas Cartão Novos
+                            </h3>
+                            <div className={`flex items-center gap-2 ${variacaoDespesas >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {variacaoDespesas >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                              <span className="text-lg font-bold">{Math.abs(variacaoDespesas).toFixed(1)}%</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalDespesas.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaDespesas.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimaDespesa.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={despesasChartData} width={1654} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientOrangeDark" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#fb923c" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#f97316" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#ea580c" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Despesa Cartão</p>
+                                              <p className="text-lg font-bold text-orange-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientOrangeDark)"
+                                  name="Despesas Cartão Novos"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Card de Despesas Financeiras Usados */}
+            {showDespesasFinanceirasUsados && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Despesas Financeiras Usados - Análise 2025
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Evolução das despesas financeiras com juros e cartão de crédito
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowDespesasFinanceirasUsados(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    
+                    {/* Gráfico 1: ID19 - Juros Veículos Usados */}
+                    {(() => {
+                      const jurosData = [40085, 35059, 15811, 12082, 45632, 26790, 30115, 34626, 40943, 35274, 32290, 46203];
+                      const totalJuros = jurosData.reduce((a, b) => a + b, 0);
+                      const mediaJuros = totalJuros / 12;
+                      const ultimoJuros = jurosData[11];
+                      const penultimoJuros = jurosData[10];
+                      const variacaoJuros = ((ultimoJuros - penultimoJuros) / penultimoJuros) * 100;
+
+                      const jurosChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = jurosData[index];
+                        const valorAnterior = index > 0 ? jurosData[index - 1] : valorAtual;
+                        const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-purple-50 dark:bg-purple-900/20 px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Juros Veículos Usados
+                            </h3>
+                            <div className={`flex items-center gap-2 ${variacaoJuros >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {variacaoJuros >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                              <span className="text-lg font-bold">{Math.abs(variacaoJuros).toFixed(1)}%</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalJuros.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaJuros.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimoJuros.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={jurosChartData} width={1654} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientPurpleUsados" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#c084fc" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#a855f7" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#9333ea" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Juros</p>
+                                              <p className="text-lg font-bold text-purple-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientPurpleUsados)"
+                                  name="Juros Veículos Usados"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Gráfico 2: ID26 - Despesas Cartão Usados */}
+                    {(() => {
+                      const despesasData = [1510, 1015, 1414, 1679, 1112, 2694, 1602, 1137, 1746, 1765, 3793, 100062];
+                      const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
+                      const mediaDespesas = totalDespesas / 12;
+                      const ultimaDespesa = despesasData[11];
+                      const penultimaDespesa = despesasData[10];
+                      const variacaoDespesas = ((ultimaDespesa - penultimaDespesa) / penultimaDespesa) * 100;
+
+                      const despesasChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = despesasData[index];
+                        const valorAnterior = index > 0 ? despesasData[index - 1] : valorAtual;
+                        const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-teal-50 dark:bg-teal-900/20 px-6 py-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Despesas Cartão Usados
+                            </h3>
+                            <div className={`flex items-center gap-2 ${variacaoDespesas >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {variacaoDespesas >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                              <span className="text-lg font-bold">{Math.abs(variacaoDespesas).toFixed(1)}%</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalDespesas.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaDespesas.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimaDespesa.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={despesasChartData} width={1654} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientTealUsados" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#5eead4" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#14b8a6" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#0d9488" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Despesa Cartão</p>
+                                              <p className="text-lg font-bold text-teal-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientTealUsados)"
+                                  name="Despesas Cartão Usados"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth={3}
+                                  name="Var. Mês Ant. %"
+                                  dot={{ fill: '#8b5cf6', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Card de % de Trocas - Análise de Conversão */}
             {showTrocasChart && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
@@ -3345,7 +4044,7 @@ export function VWFinancialDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
-                        Evolução do Estoque de Usados
+                        Evolução do Estoque de Novos
                       </CardTitle>
                       <CardDescription className="text-sm mt-1">
                         Análise temporal com variação mensal
@@ -4009,7 +4708,7 @@ export function VWFinancialDashboard() {
         </div>
       </div>
 
-      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && !showVendasSeguradora && !showVendasMercadoLivre && (
+      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && !showVendasSeguradora && !showVendasMercadoLivre && !showDespesasFinanceirasNovos && !showDespesasFinanceirasUsados && (
         <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
         {/* Executive Summary - KPIs */}
         <div>
@@ -4121,10 +4820,9 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
                       <BarChart 
-                        width="100%"
                         height={220}
                         data={(() => {
-                          const periodData = aggregateData(projectedData[activeScenario][0].meses);
+                          const periodData = aggregateData(projectedData[activeScenario!]?.[0]?.meses || []);
                           const periodDataOriginal = aggregateData(dreData[0].meses);
                           const labels = getPeriodLabels();
                           return labels.map((mes, idx) => ({
@@ -4148,15 +4846,15 @@ export function VWFinancialDashboard() {
                                   <div className="space-y-1">
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Original: </span>
-                                      <span className="font-bold text-blue-600">{formatNumber(payload[0]?.value || 0)} unidades</span>
+                                      <span className="font-bold text-blue-600">{formatNumber(Number(payload[0]?.value || 0))} unidades</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
-                                      <span className="font-bold text-emerald-600">{formatNumber(payload[1]?.value || 0)} unidades</span>
+                                      <span className="font-bold text-emerald-600">{formatNumber(Number(payload[1]?.value || 0))} unidades</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Variação: </span>
-                                      <span className="font-bold text-purple-600">{formatNumber((payload[1]?.value || 0) - (payload[0]?.value || 0))} unidades</span>
+                                      <span className="font-bold text-purple-600">{formatNumber(Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0))} unidades</span>
                                     </p>
                                   </div>
                                 </div>
@@ -4185,7 +4883,7 @@ export function VWFinancialDashboard() {
                       </BarChart>
                   ) : (
                       <BarChart
-                        width="100%"
+                        
                         height={220}
                       data={(() => {
                         const periodData = aggregateData(activeDreData[0].meses);
@@ -4209,7 +4907,7 @@ export function VWFinancialDashboard() {
                                   <div className="space-y-1">
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Volume: </span>
-                                      <span className="font-bold text-slate-900 dark:text-white">{formatNumber(payload[0].value || 0)} unidades</span>
+                                      <span className="font-bold text-slate-900 dark:text-white">{formatNumber(Number(payload[0].value || 0))} unidades</span>
                                     </p>
                                   </div>
                                 </div>
@@ -4274,10 +4972,10 @@ export function VWFinancialDashboard() {
                   {showComparison && projectionMode ? (
                     // Gráfico de comparação com duas barras
                     <BarChart
-                        width="100%"
+                        
                         height={220}
                         data={(() => {
-                          const periodData = aggregateData(projectedData[activeScenario][1].meses);
+                          const periodData = aggregateData(projectedData[activeScenario!]?.[1].meses);
                           const periodDataOriginal = aggregateData(dreData[1].meses);
                           const labels = getPeriodLabels();
                           return labels.map((mes, idx) => ({
@@ -4306,16 +5004,16 @@ export function VWFinancialDashboard() {
                                   <div className="space-y-1">
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Original: </span>
-                                      <span className="font-bold text-blue-600">{formatChartValue((payload[0]?.value || 0) * 1000)}</span>
+                                      <span className="font-bold text-blue-600">{formatChartValue(Number(payload[0]?.value || 0) * 1000)}</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
-                                      <span className="font-bold text-emerald-600">{formatChartValue((payload[1]?.value || 0) * 1000)}</span>
+                                      <span className="font-bold text-emerald-600">{formatChartValue(Number(payload[1]?.value || 0) * 1000)}</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Variação: </span>
                                       <span className="font-bold text-purple-600">
-                                        {formatChartValue(((payload[1]?.value || 0) - (payload[0]?.value || 0)) * 1000)}
+                                        {formatChartValue((Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0)) * 1000)}
                                       </span>
                                     </p>
                                   </div>
@@ -4346,7 +5044,7 @@ export function VWFinancialDashboard() {
                   ) : (
                     // Gráfico normal com uma barra
                     <BarChart
-                        width="100%"
+                        
                         height={220}
                         data={(() => {
                         const periodData = aggregateData(activeDreData[1].meses);
@@ -4375,7 +5073,7 @@ export function VWFinancialDashboard() {
                                   <div className="space-y-1">
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Receita Líquida: </span>
-                                      <span className="font-bold text-slate-900 dark:text-white">{formatChartValue((payload[0].value || 0) * 1000)}</span>
+                                      <span className="font-bold text-slate-900 dark:text-white">{formatChartValue(Number(payload[0].value || 0) * 1000)}</span>
                                     </p>
                                   </div>
                                 </div>
@@ -4439,10 +5137,10 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
                     <BarChart
-                        width="100%"
+                        
                         height={220}
                         data={(() => {
-                          const periodData = aggregateData(projectedData[activeScenario][3].meses);
+                          const periodData = aggregateData(projectedData[activeScenario!]?.[3].meses);
                           const periodDataOriginal = aggregateData(dreData[3].meses);
                           const labels = getPeriodLabels();
                           return labels.map((mes, idx) => ({
@@ -4466,16 +5164,16 @@ export function VWFinancialDashboard() {
                                   <div className="space-y-1">
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Original: </span>
-                                      <span className="font-bold text-blue-600">{formatChartValue((payload[0]?.value || 0) * 1000)}</span>
+                                      <span className="font-bold text-blue-600">{formatChartValue(Number(payload[0]?.value || 0) * 1000)}</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
-                                      <span className="font-bold text-emerald-600">{formatChartValue((payload[1]?.value || 0) * 1000)}</span>
+                                      <span className="font-bold text-emerald-600">{formatChartValue(Number(payload[1]?.value || 0) * 1000)}</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Variação: </span>
                                       <span className="font-bold text-purple-600">
-                                        {formatChartValue(((payload[1]?.value || 0) - (payload[0]?.value || 0)) * 1000)}
+                                        {formatChartValue((Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0)) * 1000)}
                                       </span>
                                     </p>
                                   </div>
@@ -4505,7 +5203,7 @@ export function VWFinancialDashboard() {
                       </BarChart>
                   ) : (
                     <BarChart
-                        width="100%"
+                        
                         height={220}
                         data={(() => {
                         const periodDataLucro = aggregateData(activeDreData[3].meses);
@@ -4532,7 +5230,7 @@ export function VWFinancialDashboard() {
                                 <div className="space-y-1">
                                   <p className="text-sm">
                                     <span className="text-slate-600 dark:text-slate-400">Lucro Bruto: </span>
-                                    <span className="font-bold text-slate-900 dark:text-white">{formatChartValue((payload[0].value || 0) * 1000)}</span>
+                                    <span className="font-bold text-slate-900 dark:text-white">{formatChartValue(Number(payload[0].value || 0) * 1000)}</span>
                                   </p>
                                   <p className="text-sm">
                                     <span className="text-slate-600 dark:text-slate-400">Margem: </span>
@@ -4618,10 +5316,10 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="w-full">
                   {showComparison && projectionMode ? (
                     <BarChart
-                        width="100%"
+                        
                         height={220}
                         data={(() => {
-                          const periodData = aggregateData(projectedData[activeScenario][6].meses);
+                          const periodData = aggregateData(projectedData[activeScenario!]?.[6].meses);
                           const periodDataOriginal = aggregateData(dreData[6].meses);
                           const labels = getPeriodLabels();
                           return labels.map((mes, idx) => ({
@@ -4645,16 +5343,16 @@ export function VWFinancialDashboard() {
                                   <div className="space-y-1">
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Original: </span>
-                                      <span className="font-bold text-blue-600">{formatChartValue((payload[0]?.value || 0) * 1000)}</span>
+                                      <span className="font-bold text-blue-600">{formatChartValue(Number(payload[0]?.value || 0) * 1000)}</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
-                                      <span className="font-bold text-emerald-600">{formatChartValue((payload[1]?.value || 0) * 1000)}</span>
+                                      <span className="font-bold text-emerald-600">{formatChartValue(Number(payload[1]?.value || 0) * 1000)}</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Variação: </span>
                                       <span className="font-bold text-purple-600">
-                                        {formatChartValue(((payload[1]?.value || 0) - (payload[0]?.value || 0)) * 1000)}
+                                        {formatChartValue((Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0)) * 1000)}
                                       </span>
                                     </p>
                                   </div>
@@ -4684,7 +5382,7 @@ export function VWFinancialDashboard() {
                       </BarChart>
                   ) : (
                     <BarChart
-                        width="100%"
+                        
                         height={220}
                         data={(() => {
                         const periodDataMargem = aggregateData(activeDreData[6].meses);
@@ -4711,7 +5409,7 @@ export function VWFinancialDashboard() {
                                 <div className="space-y-1">
                                   <p className="text-sm">
                                     <span className="text-slate-600 dark:text-slate-400">Margem Contribuição: </span>
-                                    <span className="font-bold text-slate-900 dark:text-white">{formatChartValue((payload[0].value || 0) * 1000)}</span>
+                                    <span className="font-bold text-slate-900 dark:text-white">{formatChartValue(Number(payload[0].value || 0) * 1000)}</span>
                                   </p>
                                   <p className="text-sm">
                                     <span className="text-slate-600 dark:text-slate-400">% sobre Receita: </span>
@@ -4856,7 +5554,7 @@ export function VWFinancialDashboard() {
                   {showComparison && projectionMode ? (
                     // Gráfico de comparação entre original e projeção
                     <BarChart
-                        width="100%"
+                        
                         height={220}
                         data={(() => {
                         // Dados originais
@@ -4867,11 +5565,11 @@ export function VWFinancialDashboard() {
                         const aggregatedVendasOrig = aggregateData(dreData[11].meses.map(v => Math.abs(v)));
                         
                         // Dados projetados
-                        const aggregatedPessoalProj = aggregateData(projectedData[activeScenario][7].meses.map(v => Math.abs(v)));
-                        const aggregatedTerceirosProj = aggregateData(projectedData[activeScenario][8].meses.map(v => Math.abs(v)));
-                        const aggregatedOcupacaoProj = aggregateData(projectedData[activeScenario][9].meses.map(v => Math.abs(v)));
-                        const aggregatedFuncionamentoProj = aggregateData(projectedData[activeScenario][10].meses.map(v => Math.abs(v)));
-                        const aggregatedVendasProj = aggregateData(projectedData[activeScenario][11].meses.map(v => Math.abs(v)));
+                        const aggregatedPessoalProj = aggregateData(projectedData[activeScenario!]?.[7].meses.map(v => Math.abs(v)));
+                        const aggregatedTerceirosProj = aggregateData(projectedData[activeScenario!]?.[8].meses.map(v => Math.abs(v)));
+                        const aggregatedOcupacaoProj = aggregateData(projectedData[activeScenario!]?.[9].meses.map(v => Math.abs(v)));
+                        const aggregatedFuncionamentoProj = aggregateData(projectedData[activeScenario!][10].meses.map(v => Math.abs(v)));
+                        const aggregatedVendasProj = aggregateData(projectedData[activeScenario!][11].meses.map(v => Math.abs(v)));
                         
                         const periodLabels = getPeriodLabels();
                         
@@ -4896,17 +5594,17 @@ export function VWFinancialDashboard() {
                                   <div className="space-y-1">
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Original: </span>
-                                      <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(payload[0].value || 0)}</span>
+                                      <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(Number(payload[0]?.value || 0))}</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
-                                      <span className="font-bold text-blue-600 dark:text-blue-400">{formatCurrency(payload[1]?.value || 0)}</span>
+                                      <span className="font-bold text-blue-600 dark:text-blue-400">{formatCurrency(Number(payload[1]?.value || 0))}</span>
                                     </p>
                                     <p className="text-sm pt-2 border-t border-slate-200 dark:border-slate-700">
                                       <span className="text-slate-600 dark:text-slate-400">Diferença: </span>
-                                      <span className={`font-bold ${((payload[1]?.value || 0) - (payload[0].value || 0)) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                        {formatCurrency(Math.abs((payload[1]?.value || 0) - (payload[0].value || 0)))}
-                                        {((payload[1]?.value || 0) - (payload[0].value || 0)) > 0 ? ' ↑' : ' ↓'}
+                                      <span className={`font-bold ${Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                        {formatCurrency(Math.abs(Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0)))}
+                                        {Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0) > 0 ? ' ↑' : ' ↓'}
                                       </span>
                                     </p>
                                   </div>
@@ -4921,7 +5619,7 @@ export function VWFinancialDashboard() {
                       </BarChart>
                   ) : (
                   <BarChart
-                        width="100%"
+                        
                         height={220}
                         data={(() => {
                       const aggregatedPessoal = aggregateData(activeDreData[7].meses.map(v => Math.abs(v)));
@@ -5104,10 +5802,10 @@ export function VWFinancialDashboard() {
                 <ChartContainer config={chartConfig} className="h-[220px] w-full">
                   {showComparison && projectionMode ? (
                     <BarChart
-                        width="100%"
+                        
                         height={220}
                         data={(() => {
-                          const periodData = aggregateData(projectedData[activeScenario][13].meses.map(v => Math.abs(v)));
+                          const periodData = aggregateData(projectedData[activeScenario!][13].meses.map(v => Math.abs(v)));
                           const periodDataOriginal = aggregateData(dreData[13].meses.map(v => Math.abs(v)));
                           const labels = getPeriodLabels();
                           return labels.map((mes, idx) => ({
@@ -5131,16 +5829,16 @@ export function VWFinancialDashboard() {
                                   <div className="space-y-1">
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Original: </span>
-                                      <span className="font-bold text-blue-600">{formatChartValue((payload[0]?.value || 0) * 1000)}</span>
+                                      <span className="font-bold text-blue-600">{formatChartValue(Number(payload[0]?.value || 0) * 1000)}</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
-                                      <span className="font-bold text-emerald-600">{formatChartValue((payload[1]?.value || 0) * 1000)}</span>
+                                      <span className="font-bold text-emerald-600">{formatChartValue(Number(payload[1]?.value || 0) * 1000)}</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Variação: </span>
                                       <span className="font-bold text-purple-600">
-                                        {formatChartValue(((payload[1]?.value || 0) - (payload[0]?.value || 0)) * 1000)}
+                                        {formatChartValue((Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0)) * 1000)}
                                       </span>
                                     </p>
                                   </div>
@@ -5170,7 +5868,7 @@ export function VWFinancialDashboard() {
                       </BarChart>
                   ) : (
                     <BarChart
-                        width="100%"
+                        
                         height={220}
                         data={(() => {
                           const periodData = aggregateData(activeDreData[13].meses.map(v => Math.abs(v)));
@@ -5197,7 +5895,7 @@ export function VWFinancialDashboard() {
                                   <div className="space-y-1">
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Valor: </span>
-                                      <span className="font-bold text-slate-900 dark:text-white">{formatChartValue(payload[0].value * 1000)}</span>
+                                      <span className="font-bold text-slate-900 dark:text-white">{formatChartValue(Number(payload[0]?.value || 0) * 1000)}</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">% Receita: </span>
@@ -5252,10 +5950,10 @@ export function VWFinancialDashboard() {
           <CardContent className="pt-6">
             <ChartContainer config={chartConfig} className="h-[220px] w-full">
               {showComparison && projectionMode ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer  height="100%">
                   <BarChart 
                     data={(() => {
-                      const periodData = aggregateData(projectedData[activeScenario][18].meses);
+                      const periodData = aggregateData(projectedData[activeScenario!][18].meses);
                       const periodDataOriginal = aggregateData(dreData[18].meses);
                       const labels = getPeriodLabels();
                       return labels.map((mes, idx) => ({
@@ -5288,7 +5986,7 @@ export function VWFinancialDashboard() {
                                 <p className="text-sm">
                                   <span className="text-slate-600 dark:text-slate-400">Variação: </span>
                                   <span className="font-bold text-purple-600">
-                                    R$ {Number((payload[1]?.value || 0) - (payload[0]?.value || 0)).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil
+                                    R$ {Number(Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0)).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil
                                   </span>
                                 </p>
                               </div>
@@ -5318,7 +6016,7 @@ export function VWFinancialDashboard() {
                   </BarChart>
                 </ResponsiveContainer>
                   ) : (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer  height="100%">
                   <BarChart data={(() => {
                   const periodDataLucro = aggregateData(activeDreData[18].meses);
                   const periodDataReceita = aggregateData(activeDreData[1].meses);
