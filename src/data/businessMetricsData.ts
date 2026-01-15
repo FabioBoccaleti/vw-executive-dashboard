@@ -132,6 +132,7 @@ export const businessMetricsData = {
   // 25-31. Despesas Cartão de Crédito
   despesasCartao: {
     novos: [819, 1175, 2448, 1277, 850, 1214, 2530, 1391, 1047, 2352, 1673, 76381],
+    vendaDireta: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     usados: [1510, 1015, 1414, 1679, 1112, 2694, 1602, 1137, 1746, 1765, 3793, 100062],
     pecas: [19928, 20177, 23357, 21477, 15082, 23933, 25923, 20052, 22291, 26477, 26153, 127996],
     oficina: [8547, 4551, 7997, 5298, 6248, 5375, 5655, 6596, 4385, 5874, 6048, 27810],
@@ -165,5 +166,14 @@ export const businessMetricsData = {
   // 43. Créditos PIS e COFINS
   creditosPISCOFINS: {
     administracao: [10000, 20000, 0, 17000, 0, 0, 45000, 0, 0, 0, 70000, 15000]
-  }
+  },
+  
+  // 44. Receita de Blindagem
+  receitaBlindagem: [10000, 20000, 0, 17000, 0, 0, 45000, 0, 0, 0, 70000, 15000],
+  
+  // 45. Receita de Despachante Usados
+  receitaDespachanteUsados: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  
+  // 46. Receita de Despachante Novos
+  receitaDespachanteNovos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 };

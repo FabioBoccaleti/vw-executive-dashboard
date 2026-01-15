@@ -41,36 +41,46 @@ const allMetrics = [
   { id: 23, bg: 'bg-cyan-50 dark:bg-cyan-900/20', title: 'Custos - Garantia', data: { valor: businessMetricsData.custos.garantia }, fields: ['valor'], labels: ['Custos'] },
   { id: 24, bg: 'bg-teal-50 dark:bg-teal-900/20', title: 'Custos - Reparo de Usados', data: businessMetricsData.custos, fields: ['reparoUsados', 'ticketMedioReparo'], labels: ['Custos Reparo', 'Ticket Médio'] },
   
-  // 25-30: Despesas Cartão
+  // 25-31: Despesas Cartão
   { id: 25, bg: 'bg-purple-50 dark:bg-purple-900/20', title: 'Despesas Cartão - Novos', data: { valor: businessMetricsData.despesasCartao.novos }, fields: ['valor'], labels: ['Despesas'] },
-  { id: 26, bg: 'bg-fuchsia-50 dark:bg-fuchsia-900/20', title: 'Despesas Cartão - Usados', data: { valor: businessMetricsData.despesasCartao.usados }, fields: ['valor'], labels: ['Despesas'] },
-  { id: 27, bg: 'bg-pink-50 dark:bg-pink-900/20', title: 'Despesas Cartão - Peças', data: { valor: businessMetricsData.despesasCartao.pecas }, fields: ['valor'], labels: ['Despesas'] },
-  { id: 28, bg: 'bg-rose-50 dark:bg-rose-900/20', title: 'Despesas Cartão - Oficina', data: { valor: businessMetricsData.despesasCartao.oficina }, fields: ['valor'], labels: ['Despesas'] },
-  { id: 29, bg: 'bg-red-50 dark:bg-red-900/20', title: 'Despesas Cartão - Funilaria', data: { valor: businessMetricsData.despesasCartao.funilaria }, fields: ['valor'], labels: ['Despesas'] },
-  { id: 30, bg: 'bg-orange-50 dark:bg-orange-900/20', title: 'Despesas Cartão - Administração', data: { valor: businessMetricsData.despesasCartao.administracao }, fields: ['valor'], labels: ['Despesas'] },
+  { id: 26, bg: 'bg-fuchsia-50 dark:bg-fuchsia-900/20', title: 'Despesas Cartão - Venda Direta', data: { valor: businessMetricsData.despesasCartao.vendaDireta }, fields: ['valor'], labels: ['Despesas'] },
+  { id: 27, bg: 'bg-pink-50 dark:bg-pink-900/20', title: 'Despesas Cartão - Usados', data: { valor: businessMetricsData.despesasCartao.usados }, fields: ['valor'], labels: ['Despesas'] },
+  { id: 28, bg: 'bg-rose-50 dark:bg-rose-900/20', title: 'Despesas Cartão - Peças', data: { valor: businessMetricsData.despesasCartao.pecas }, fields: ['valor'], labels: ['Despesas'] },
+  { id: 29, bg: 'bg-red-50 dark:bg-red-900/20', title: 'Despesas Cartão - Oficina', data: { valor: businessMetricsData.despesasCartao.oficina }, fields: ['valor'], labels: ['Despesas'] },
+  { id: 30, bg: 'bg-orange-50 dark:bg-orange-900/20', title: 'Despesas Cartão - Funilaria', data: { valor: businessMetricsData.despesasCartao.funilaria }, fields: ['valor'], labels: ['Despesas'] },
+  { id: 31, bg: 'bg-amber-50 dark:bg-amber-900/20', title: 'Despesas Cartão - Administração', data: { valor: businessMetricsData.despesasCartao.administracao }, fields: ['valor'], labels: ['Despesas'] },
   
-  // 31-36: Bônus
-  { id: 31, bg: 'bg-emerald-50 dark:bg-emerald-900/20', title: 'Bônus - Veículos Novos', data: { valor: businessMetricsData.bonus.veiculosNovos }, fields: ['valor'], labels: ['Bônus'] },
-  { id: 32, bg: 'bg-teal-50 dark:bg-teal-900/20', title: 'Bônus - Veículos Usados', data: { valor: businessMetricsData.bonus.veiculosUsados }, fields: ['valor'], labels: ['Bônus'] },
-  { id: 33, bg: 'bg-cyan-50 dark:bg-cyan-900/20', title: 'Bônus - Peças', data: { valor: businessMetricsData.bonus.pecas }, fields: ['valor'], labels: ['Bônus'] },
-  { id: 34, bg: 'bg-sky-50 dark:bg-sky-900/20', title: 'Bônus - Oficina', data: { valor: businessMetricsData.bonus.oficina }, fields: ['valor'], labels: ['Bônus'] },
-  { id: 35, bg: 'bg-blue-50 dark:bg-blue-900/20', title: 'Bônus - Funilaria', data: { valor: businessMetricsData.bonus.funilaria }, fields: ['valor'], labels: ['Bônus'] },
-  { id: 36, bg: 'bg-indigo-50 dark:bg-indigo-900/20', title: 'Bônus - Administração', data: { valor: businessMetricsData.bonus.administracao }, fields: ['valor'], labels: ['Bônus'] },
+  // 32-37: Bônus
+  { id: 32, bg: 'bg-emerald-50 dark:bg-emerald-900/20', title: 'Bônus - Veículos Novos', data: { valor: businessMetricsData.bonus.veiculosNovos }, fields: ['valor'], labels: ['Bônus'] },
+  { id: 33, bg: 'bg-teal-50 dark:bg-teal-900/20', title: 'Bônus - Veículos Usados', data: { valor: businessMetricsData.bonus.veiculosUsados }, fields: ['valor'], labels: ['Bônus'] },
+  { id: 34, bg: 'bg-cyan-50 dark:bg-cyan-900/20', title: 'Bônus - Peças', data: { valor: businessMetricsData.bonus.pecas }, fields: ['valor'], labels: ['Bônus'] },
+  { id: 35, bg: 'bg-sky-50 dark:bg-sky-900/20', title: 'Bônus - Oficina', data: { valor: businessMetricsData.bonus.oficina }, fields: ['valor'], labels: ['Bônus'] },
+  { id: 36, bg: 'bg-blue-50 dark:bg-blue-900/20', title: 'Bônus - Funilaria', data: { valor: businessMetricsData.bonus.funilaria }, fields: ['valor'], labels: ['Bônus'] },
+  { id: 37, bg: 'bg-indigo-50 dark:bg-indigo-900/20', title: 'Bônus - Administração', data: { valor: businessMetricsData.bonus.administracao }, fields: ['valor'], labels: ['Bônus'] },
   
-  // 37-38: Receitas de Financiamento
-  { id: 37, bg: 'bg-violet-50 dark:bg-violet-900/20', title: 'Receitas Financiamento - Novos', data: { valor: businessMetricsData.receitasFinanciamento.veiculosNovos }, fields: ['valor'], labels: ['Receitas'] },
-  { id: 38, bg: 'bg-purple-50 dark:bg-purple-900/20', title: 'Receitas Financiamento - Usados', data: { valor: businessMetricsData.receitasFinanciamento.veiculosUsados }, fields: ['valor'], labels: ['Receitas'] },
+  // 38-39: Receitas de Financiamento
+  { id: 38, bg: 'bg-violet-50 dark:bg-violet-900/20', title: 'Receitas Financiamento - Novos', data: { valor: businessMetricsData.receitasFinanciamento.veiculosNovos }, fields: ['valor'], labels: ['Receitas'] },
+  { id: 39, bg: 'bg-purple-50 dark:bg-purple-900/20', title: 'Receitas Financiamento - Usados', data: { valor: businessMetricsData.receitasFinanciamento.veiculosUsados }, fields: ['valor'], labels: ['Receitas'] },
   
-  // 39-41: Créditos ICMS
-  { id: 39, bg: 'bg-fuchsia-50 dark:bg-fuchsia-900/20', title: 'Créditos ICMS - Novos', data: { valor: businessMetricsData.creditosICMS.novos }, fields: ['valor'], labels: ['Créditos'] },
-  { id: 40, bg: 'bg-pink-50 dark:bg-pink-900/20', title: 'Créditos ICMS - Peças', data: { valor: businessMetricsData.creditosICMS.pecas }, fields: ['valor'], labels: ['Créditos'] },
-  { id: 41, bg: 'bg-rose-50 dark:bg-rose-900/20', title: 'Créditos ICMS - Administração', data: { valor: businessMetricsData.creditosICMS.administracao }, fields: ['valor'], labels: ['Créditos'] },
+  // 40-42: Créditos ICMS
+  { id: 40, bg: 'bg-fuchsia-50 dark:bg-fuchsia-900/20', title: 'Créditos ICMS - Novos', data: { valor: businessMetricsData.creditosICMS.novos }, fields: ['valor'], labels: ['Créditos'] },
+  { id: 41, bg: 'bg-pink-50 dark:bg-pink-900/20', title: 'Créditos ICMS - Peças', data: { valor: businessMetricsData.creditosICMS.pecas }, fields: ['valor'], labels: ['Créditos'] },
+  { id: 42, bg: 'bg-rose-50 dark:bg-rose-900/20', title: 'Créditos ICMS - Administração', data: { valor: businessMetricsData.creditosICMS.administracao }, fields: ['valor'], labels: ['Créditos'] },
   
-  // 42: Créditos PIS e COFINS
-  { id: 42, bg: 'bg-red-50 dark:bg-red-900/20', title: 'Créditos PIS/COFINS - Admin', data: { valor: businessMetricsData.creditosPISCOFINS.administracao }, fields: ['valor'], labels: ['Créditos'] },
+  // 43: Créditos PIS e COFINS
+  { id: 43, bg: 'bg-red-50 dark:bg-red-900/20', title: 'Créditos PIS/COFINS - Admin', data: { valor: businessMetricsData.creditosPISCOFINS.administracao }, fields: ['valor'], labels: ['Créditos'] },
   
-  // 43: Resumo
-  { id: 43, bg: 'bg-slate-200 dark:bg-slate-700', title: 'RESUMO CONSOLIDADO', data: { valor: Array(12).fill(0) }, fields: ['valor'], labels: ['TOTAL GERAL'] }
+  // 44: Receita de Blindagem
+  { id: 44, bg: 'bg-amber-50 dark:bg-amber-900/20', title: 'Receita de Blindagem', data: { valor: businessMetricsData.receitaBlindagem }, fields: ['valor'], labels: ['Receitas'] },
+  
+  // 45: Receita de Despachante Usados
+  { id: 45, bg: 'bg-lime-50 dark:bg-lime-900/20', title: 'Receita de Despachante Usados', data: { valor: businessMetricsData.receitaDespachanteUsados }, fields: ['valor'], labels: ['Receitas'] },
+  
+  // 46: Receita de Despachante Novos
+  { id: 46, bg: 'bg-green-50 dark:bg-green-900/20', title: 'Receita de Despachante Novos', data: { valor: businessMetricsData.receitaDespachanteNovos }, fields: ['valor'], labels: ['Receitas'] },
+  
+  // 47: Resumo
+  { id: 47, bg: 'bg-slate-200 dark:bg-slate-700', title: 'RESUMO CONSOLIDADO', data: { valor: Array(12).fill(0) }, fields: ['valor'], labels: ['TOTAL GERAL'] }
 ];
 
 export function DetailedMetricsTable() {
@@ -128,7 +138,7 @@ export function DetailedMetricsTable() {
           
           <tr className="bg-slate-100 dark:bg-slate-800 font-semibold">
             <td colSpan={14} className="border border-slate-300 dark:border-slate-700 px-3 py-3 text-center text-slate-600 dark:text-slate-400 text-xs">
-              Tabela completa com 43 classificações de métricas • Role horizontalmente para ver todos os meses
+              Tabela completa com 47 classificações de métricas • Role horizontalmente para ver todos os meses
             </td>
           </tr>
         </tbody>
