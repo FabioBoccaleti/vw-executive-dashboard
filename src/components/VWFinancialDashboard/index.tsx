@@ -9469,13 +9469,23 @@ export function VWFinancialDashboard() {
                         const periodDataLucro = aggregateData(activeDreData[3].meses);
                         const periodDataReceita = aggregateData(activeDreData[1].meses);
                         const labels = getPeriodLabels();
-                        const media = periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length;
-                        return periodDataLucro.map((val, idx) => ({
-                          mes: labels[idx],
-                          valor: val / 1000,
-                          margem: parseFloat((val / periodDataReceita[idx] * 100).toFixed(1)),
-                          fill: val > media * 1.05 ? '#059669' : val < media * 0.95 ? '#991b1b' : '#ec4899'
-                        }));
+                        const margens = periodDataLucro.map((val, idx) => (val / periodDataReceita[idx] * 100));
+                        const mediaMargens = margens.reduce((a, b) => a + b, 0) / margens.length;
+                        return periodDataLucro.map((val, idx) => {
+                          const margem = margens[idx];
+                          let cor = '#ec4899'; // Rosa (média)
+                          if (margem >= mediaMargens + 0.3) {
+                            cor = '#059669'; // Verde (acima)
+                          } else if (margem <= mediaMargens - 0.3) {
+                            cor = '#991b1b'; // Vermelho (abaixo)
+                          }
+                          return {
+                            mes: labels[idx],
+                            valor: val / 1000,
+                            margem: parseFloat(margem.toFixed(1)),
+                            fill: cor
+                          };
+                        });
                       })()}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                         <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
