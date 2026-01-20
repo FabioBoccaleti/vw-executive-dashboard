@@ -7570,12 +7570,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID45 - Receita de Despachante Usados */}
                     {(() => {
-                      const receitaData = businessMetricsData.receitaDespachanteUsados;
+                      const receitaData = metricsData.receitaDespachanteUsados;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = businessMetricsData.months.map((month, index) => {
+                      const receitaChartData = metricsData.months.map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -7737,12 +7737,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID46 - Receita de Despachante Novos */}
                     {(() => {
-                      const receitaData = businessMetricsData.receitaDespachanteNovos;
+                      const receitaData = metricsData.receitaDespachanteNovos;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = businessMetricsData.months.map((month, index) => {
+                      const receitaChartData = metricsData.months.map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
