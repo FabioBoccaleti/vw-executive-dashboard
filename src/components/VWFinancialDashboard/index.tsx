@@ -9015,12 +9015,6 @@ export function VWFinancialDashboard() {
                 <CardTitle className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(totais.lucroOperacional)}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2">
-                  <Badge variant="destructive" className="bg-red-50 text-red-700 border-red-200 text-xs">
-                    <TrendingDown className="w-3 h-3 mr-1" />
-                    -2,48%
-                  </Badge>
-                </div>
               </CardContent>
             </Card>
 
@@ -9392,7 +9386,7 @@ export function VWFinancialDashboard() {
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Bruta</p>
-                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{activeDreData[3].percentTotal?.toFixed(1)}%</p>
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{activeDreData[3].percentTotal?.toFixed(2)}%</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Por Unidade</p>
@@ -9571,7 +9565,7 @@ export function VWFinancialDashboard() {
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{activeDreData[6].percentTotal?.toFixed(1)}%</p>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{activeDreData[6].percentTotal?.toFixed(2)}%</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Contribuição/Un</p>
