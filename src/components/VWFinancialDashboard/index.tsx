@@ -112,6 +112,9 @@ export function VWFinancialDashboard() {
   // Estado para controlar exibição do card de Receita de Blindagem
   const [showReceitaBlindagem, setShowReceitaBlindagem] = useState(false)
 
+  // Estado para controlar exibição do card de Receita de Despachante Usados
+  const [showReceitaDespachanteUsados, setShowReceitaDespachanteUsados] = useState(false)
+
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
     if (viewMode === 'mensal') return meses
@@ -1742,6 +1745,7 @@ export function VWFinancialDashboard() {
                     setShowCreditoICMSAdministracao(false)
                     setShowCreditoPISCofinsAdministracao(false)
                     setShowReceitaBlindagem(false)
+                    setShowReceitaDespachanteUsados(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showCreditoICMSNovos 
@@ -1784,6 +1788,7 @@ export function VWFinancialDashboard() {
                     setShowCreditoICMSAdministracao(false)
                     setShowCreditoPISCofinsAdministracao(false)
                     setShowReceitaBlindagem(false)
+                    setShowReceitaDespachanteUsados(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showCreditoICMSPecas 
@@ -1826,6 +1831,7 @@ export function VWFinancialDashboard() {
                     setShowCreditoICMSPecas(false)
                     setShowCreditoPISCofinsAdministracao(false)
                     setShowReceitaBlindagem(false)
+                    setShowReceitaDespachanteUsados(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showCreditoICMSAdministracao 
@@ -1909,6 +1915,7 @@ export function VWFinancialDashboard() {
                     setShowCreditoICMSPecas(false)
                     setShowCreditoICMSAdministracao(false)
                     setShowCreditoPISCofinsAdministracao(false)
+                    setShowReceitaDespachanteUsados(false)
                   }}
                   className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
                     showReceitaBlindagem 
@@ -1918,6 +1925,49 @@ export function VWFinancialDashboard() {
                 >
                   <TrendingUp className="w-4 h-4 mb-1" />
                   <span className="text-xs font-semibold">Receita de Blindagem</span>
+                  <span className="text-[10px] opacity-80">Receita Adicional</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowReceitaDespachanteUsados(!showReceitaDespachanteUsados)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                    setShowVendasMercadoLivre(false)
+                    setShowDespesasFinanceirasNovos(false)
+                    setShowDespesasFinanceirasUsados(false)
+                    setShowDespesasFinanceirasPecas(false)
+                    setShowDespesasFinanceirasOficina(false)
+                    setShowDespesasFinanceirasFunilaria(false)
+                    setShowDespesasFinanceirasAdministracao(false)
+                    setShowBonusNovos(false)
+                    setShowBonusUsados(false)
+                    setShowBonusPecas(false)
+                    setShowBonusOficina(false)
+                    setShowBonusFunilaria(false)
+                    setShowBonusAdministracao(false)
+                    setShowReceitaFinanciamentoNovos(false)
+                    setShowReceitaFinanciamentoUsados(false)
+                    setShowCreditoICMSNovos(false)
+                    setShowCreditoICMSPecas(false)
+                    setShowCreditoICMSAdministracao(false)
+                    setShowCreditoPISCofinsAdministracao(false)
+                    setShowReceitaBlindagem(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showReceitaDespachanteUsados 
+                      ? 'bg-teal-50 dark:bg-teal-900/20 border-teal-400 dark:border-teal-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-teal-300 hover:bg-teal-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Receita de Despachante Usados</span>
                   <span className="text-[10px] opacity-80">Receita Adicional</span>
                 </button>
               </div>
@@ -7246,6 +7296,173 @@ export function VWFinancialDashboard() {
               </Card>
             )}
 
+            {/* Card de Receita de Despachante Usados */}
+            {showReceitaDespachanteUsados && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Receita de Despachante Usados
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Evolução da receita de serviços de despachante para veículos usados
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowReceitaDespachanteUsados(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    
+                    {/* Gráfico: ID45 - Receita de Despachante Usados */}
+                    {(() => {
+                      const receitaData = businessMetricsData.receitaDespachanteUsados;
+                      const totalReceita = receitaData.reduce((a, b) => a + b, 0);
+                      const mediaReceita = totalReceita / 12;
+                      const ultimaReceita = receitaData[11];
+
+                      const receitaChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = receitaData[index];
+                        const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
+                        const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-teal-50 dark:bg-teal-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Receita de Despachante Usados
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalReceita.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaReceita.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimaReceita.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={receitaChartData} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientTealDespachante" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#ccfbf1" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#14b8a6" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#0d9488" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Receita Despachante</p>
+                                              <p className="text-lg font-bold text-teal-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientTealDespachante)"
+                                  name="Receita Despachante Usados"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#14b8a6" 
+                                  strokeWidth={3}
+                                  dot={{ fill: '#14b8a6', r: 5 }}
+                                  name="Variação vs Mês Anterior (%)"
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Card de Crédito ICMS Novos */}
             {showCreditoICMSNovos && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
@@ -8524,7 +8741,7 @@ export function VWFinancialDashboard() {
         </div>
       </div>
 
-      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && !showVendasSeguradora && !showVendasMercadoLivre && !showDespesasFinanceirasNovos && !showDespesasFinanceirasUsados && !showDespesasFinanceirasPecas && !showDespesasFinanceirasOficina && !showDespesasFinanceirasFunilaria && !showDespesasFinanceirasAdministracao && !showBonusNovos && !showBonusUsados && !showBonusPecas && !showBonusOficina && !showBonusFunilaria && !showBonusAdministracao && !showReceitaFinanciamentoNovos && !showReceitaFinanciamentoUsados && !showCreditoICMSNovos && !showCreditoICMSPecas && !showCreditoICMSAdministracao && !showCreditoPISCofinsAdministracao && !showReceitaBlindagem && (
+      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && !showVendasSeguradora && !showVendasMercadoLivre && !showDespesasFinanceirasNovos && !showDespesasFinanceirasUsados && !showDespesasFinanceirasPecas && !showDespesasFinanceirasOficina && !showDespesasFinanceirasFunilaria && !showDespesasFinanceirasAdministracao && !showBonusNovos && !showBonusUsados && !showBonusPecas && !showBonusOficina && !showBonusFunilaria && !showBonusAdministracao && !showReceitaFinanciamentoNovos && !showReceitaFinanciamentoUsados && !showCreditoICMSNovos && !showCreditoICMSPecas && !showCreditoICMSAdministracao && !showCreditoPISCofinsAdministracao && !showReceitaBlindagem && !showReceitaDespachanteUsados && (
         <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
         {/* Executive Summary - KPIs */}
         <div>
