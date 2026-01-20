@@ -9207,7 +9207,7 @@ export function VWFinancialDashboard() {
                 <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Acumulado</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[1].total / 1000)} mil</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[1].total)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Ticket Médio</p>
@@ -9215,7 +9215,7 @@ export function VWFinancialDashboard() {
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[1].total / 12 / 1000)} mil</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[1].total / 12)}</p>
                   </div>
                 </div>
               </CardHeader>
@@ -9232,8 +9232,8 @@ export function VWFinancialDashboard() {
                           const labels = getPeriodLabels();
                           return labels.map((mes, idx) => ({
                             mes,
-                            original: periodDataOriginal[idx] / 1000,
-                            projecao: periodData[idx] / 1000
+                            original: periodDataOriginal[idx],
+                            projecao: periodData[idx]
                           }));
                         })()} 
                         barGap={4}
@@ -9245,7 +9245,7 @@ export function VWFinancialDashboard() {
                           tick={{ fontSize: 12, fill: '#64748b' }} 
                           axisLine={false} 
                           tickLine={false} 
-                          tickFormatter={(value) => formatNumber(value)}
+                          tickFormatter={(value) => formatCurrency(value)}
                         />
                         <ChartTooltip 
                           content={({ active, payload }) => {
@@ -9256,16 +9256,16 @@ export function VWFinancialDashboard() {
                                   <div className="space-y-1">
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Original: </span>
-                                      <span className="font-bold text-blue-600">{formatChartValue(Number(payload[0]?.value || 0) * 1000)}</span>
+                                      <span className="font-bold text-blue-600">{formatChartValue(Number(payload[0]?.value || 0))}</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
-                                      <span className="font-bold text-emerald-600">{formatChartValue(Number(payload[1]?.value || 0) * 1000)}</span>
+                                      <span className="font-bold text-emerald-600">{formatChartValue(Number(payload[1]?.value || 0))}</span>
                                     </p>
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Variação: </span>
                                       <span className="font-bold text-purple-600">
-                                        {formatChartValue((Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0)) * 1000)}
+                                        {formatChartValue((Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0)))}
                                       </span>
                                     </p>
                                   </div>
@@ -9290,8 +9290,8 @@ export function VWFinancialDashboard() {
                             </div>
                           )}
                         />
-                        <Bar dataKey="original" fill="#3b82f6" name="Original (mil)" maxBarSize={50} />
-                        <Bar dataKey="projecao" fill="#10b981" name="Projeção (mil)" maxBarSize={50} />
+                        <Bar dataKey="original" fill="#3b82f6" name="Original" maxBarSize={50} />
+                        <Bar dataKey="projecao" fill="#10b981" name="Projeção" maxBarSize={50} />
                       </BarChart>
                   ) : (
                     // Gráfico normal com uma barra
@@ -9304,7 +9304,7 @@ export function VWFinancialDashboard() {
                         const media = periodData.reduce((a, b) => a + b, 0) / periodData.length;
                         return periodData.map((val, idx) => ({
                           mes: labels[idx],
-                          valor: val / 1000,
+                          valor: val,
                           fill: val > media * 1.05 ? '#14b8a6' : val < media * 0.95 ? '#dc2626' : '#8b5cf6'
                         }));
                       })()}>
@@ -9314,7 +9314,7 @@ export function VWFinancialDashboard() {
                           tick={{ fontSize: 12, fill: '#64748b' }} 
                           axisLine={false} 
                           tickLine={false} 
-                          tickFormatter={(value) => formatNumber(value)}
+                          tickFormatter={(value) => formatCurrency(value)}
                         />
                         <ChartTooltip 
                           content={({ active, payload }) => {
@@ -9325,7 +9325,7 @@ export function VWFinancialDashboard() {
                                   <div className="space-y-1">
                                     <p className="text-sm">
                                       <span className="text-slate-600 dark:text-slate-400">Receita Líquida: </span>
-                                      <span className="font-bold text-slate-900 dark:text-white">{formatChartValue(Number(payload[0].value || 0) * 1000)}</span>
+                                      <span className="font-bold text-slate-900 dark:text-white">{formatChartValue(Number(payload[0].value || 0))}</span>
                                     </p>
                                   </div>
                                 </div>
@@ -9353,7 +9353,7 @@ export function VWFinancialDashboard() {
                             </div>
                           )}
                         />
-                        <Bar dataKey="valor" radius={[6, 6, 0, 0]} name="Receita Líquida (mil)" />
+                        <Bar dataKey="valor" radius={[6, 6, 0, 0]} name="Receita Líquida" />
                       </BarChart>
                   )}
                 </ChartContainer>
@@ -9373,7 +9373,7 @@ export function VWFinancialDashboard() {
                 <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Acumulado</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[3].total / 1000)} mil</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[3].total)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Bruta</p>
@@ -9552,7 +9552,7 @@ export function VWFinancialDashboard() {
                 <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Período</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[6].total / 1000)} mil</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[6].total)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
@@ -9733,7 +9733,7 @@ export function VWFinancialDashboard() {
                 <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total de Despesas</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / 1000)} mil</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total))}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
@@ -9741,7 +9741,7 @@ export function VWFinancialDashboard() {
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / 12 / 1000)} mil</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / 12)}</p>
                   </div>
                 </div>
               </CardHeader>
@@ -10038,7 +10038,7 @@ export function VWFinancialDashboard() {
                 <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[13].total) / 1000)} mil</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[13].total))}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
@@ -10046,7 +10046,7 @@ export function VWFinancialDashboard() {
                   </div>
                   <div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(Math.abs(activeDreData[13].total) / 12 / 1000)} mil</p>
+                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(Math.abs(activeDreData[13].total) / 12)}</p>
                   </div>
                 </div>
               </CardHeader>
@@ -10183,7 +10183,7 @@ export function VWFinancialDashboard() {
             <div className="grid grid-cols-4 gap-6 mt-4">
               <div>
                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[18].total / 1000)} mil</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[18].total)}</p>
               </div>
               
               <div>
@@ -10195,7 +10195,7 @@ export function VWFinancialDashboard() {
               
               <div>
                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[18].total / 12 / 1000)} mil</p>
+                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[18].total / 12)}</p>
               </div>
             </div>
           </CardHeader>
