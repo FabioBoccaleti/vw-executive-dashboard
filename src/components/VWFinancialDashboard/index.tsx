@@ -9190,8 +9190,7 @@ export function VWFinancialDashboard() {
                   </BarChart>
                 </>
                   ) : (
-                <>
-                  <BarChart data={(() => {
+                <BarChart data={(() => {
                   const periodDataLucro = aggregateData(activeDreData[18].meses);
                   const periodDataReceita = aggregateData(activeDreData[1].meses);
                   const labels = getPeriodLabels();
@@ -9261,6 +9260,14 @@ export function VWFinancialDashboard() {
                     radius={[6, 6, 0, 0]}
                     name="Lucro Líquido (mil)"
                   >
+                    {(() => {
+                      const periodDataLucro = aggregateData(activeDreData[18].meses);
+                      const media = periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length;
+                      return periodDataLucro.map((val, idx) => {
+                        const fillColor = val > media * 1.05 ? '#0ea5e9' : val < media * 0.95 ? '#f97316' : '#10b981';
+                        return <Cell key={`cell-${idx}`} fill={fillColor} />;
+                      });
+                    })()}
                     <LabelList 
                       dataKey="percentual" 
                       position="top" 
@@ -9269,7 +9276,6 @@ export function VWFinancialDashboard() {
                     />
                   </Bar>
                 </BarChart>
-                </>
               )}
             </ChartContainer>
           </CardContent>
