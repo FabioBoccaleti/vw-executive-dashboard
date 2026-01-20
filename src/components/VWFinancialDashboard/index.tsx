@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2 } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer, Legend, LabelList, ComposedChart, Cell } from "recharts"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, Legend, LabelList, ComposedChart, Cell } from "recharts"
 import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { DetailedMetricsTable } from "@/components/DetailedMetricsTable"
@@ -99,6 +99,9 @@ export function VWFinancialDashboard() {
 
   // Estado para controlar exibição do card de Crédito ICMS Novos
   const [showCreditoICMSNovos, setShowCreditoICMSNovos] = useState(false)
+
+  // Estado para controlar exibição do card de Crédito ICMS Peças
+  const [showCreditoICMSPecas, setShowCreditoICMSPecas] = useState(false)
 
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
@@ -1735,6 +1738,45 @@ export function VWFinancialDashboard() {
                 >
                   <TrendingUp className="w-4 h-4 mb-1" />
                   <span className="text-xs font-semibold">Credito de ICMS Novos</span>
+                  <span className="text-[10px] opacity-80">Crédito de ICMS</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowCreditoICMSPecas(!showCreditoICMSPecas)
+                    setShowDetailedMetrics(false)
+                    setShowTrocasChart(false)
+                    setShowRepasseChart(false)
+                    setShowEstoqueNovos(false)
+                    setShowEstoqueUsados(false)
+                    setShowEstoquePecas(false)
+                    setShowVendaPecas(false)
+                    setShowVendasSeguradora(false)
+                    setShowVendasMercadoLivre(false)
+                    setShowDespesasFinanceirasNovos(false)
+                    setShowDespesasFinanceirasUsados(false)
+                    setShowDespesasFinanceirasPecas(false)
+                    setShowDespesasFinanceirasOficina(false)
+                    setShowDespesasFinanceirasFunilaria(false)
+                    setShowDespesasFinanceirasAdministracao(false)
+                    setShowBonusNovos(false)
+                    setShowBonusUsados(false)
+                    setShowBonusPecas(false)
+                    setShowBonusOficina(false)
+                    setShowBonusFunilaria(false)
+                    setShowBonusAdministracao(false)
+                    setShowReceitaFinanciamentoNovos(false)
+                    setShowReceitaFinanciamentoUsados(false)
+                    setShowCreditoICMSNovos(false)
+                  }}
+                  className={`flex flex-col items-center justify-center p-2 rounded-lg border-2 transition-all ${
+                    showCreditoICMSPecas 
+                      ? 'bg-pink-50 dark:bg-pink-900/20 border-pink-400 dark:border-pink-600' 
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  } text-slate-700 dark:text-slate-300 hover:border-pink-300 hover:bg-pink-50 dark:hover:bg-slate-700`}
+                >
+                  <TrendingUp className="w-4 h-4 mb-1" />
+                  <span className="text-xs font-semibold">Credito de ICMS Pecas</span>
                   <span className="text-[10px] opacity-80">Crédito de ICMS</span>
                 </button>
               </div>
@@ -6395,6 +6437,173 @@ export function VWFinancialDashboard() {
               </Card>
             )}
 
+            {/* Card de Crédito ICMS Peças */}
+            {showCreditoICMSPecas && (
+              <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Crédito de ICMS Peças
+                      </CardTitle>
+                      <CardDescription className="text-sm mt-1">
+                        Evolução dos créditos de ICMS em peças
+                      </CardDescription>
+                    </div>
+                    <button
+                      onClick={() => setShowCreditoICMSPecas(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 gap-6 max-w-full">
+                    
+                    {/* Gráfico: ID41 - Crédito ICMS Peças */}
+                    {(() => {
+                      const creditoData = businessMetricsData.creditosICMS.pecas;
+                      const totalCredito = creditoData.reduce((a, b) => a + b, 0);
+                      const mediaCredito = totalCredito / 12;
+                      const ultimoCredito = creditoData[11];
+
+                      const creditoChartData = businessMetricsData.months.map((month, index) => {
+                        const valorAtual = creditoData[index];
+                        const valorAnterior = index > 0 ? creditoData[index - 1] : valorAtual;
+                        const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        
+                        return {
+                          month,
+                          valor: valorAtual,
+                          variacao: variacao
+                        };
+                      });
+
+                      return (
+                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                          <div className="bg-pink-50 dark:bg-pink-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                              Crédito de ICMS Peças
+                            </h3>
+                          </div>
+
+                          <div className="bg-slate-50 dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                            <div className="grid grid-cols-3 gap-6">
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {totalCredito.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Média Mensal</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {mediaCredito.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
+                                </p>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                                  R$ {ultimoCredito.toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <ChartContainer config={{}} className="h-[350px] w-full">
+                              <ComposedChart data={creditoChartData} height={350}>
+                                <defs>
+                                  <linearGradient id="barGradientPinkCredito" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#fbcfe8" stopOpacity={0.9}/>
+                                    <stop offset="50%" stopColor="#ec4899" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#db2777" stopOpacity={0.7}/>
+                                  </linearGradient>
+                                </defs>
+                                <XAxis 
+                                  dataKey="month" 
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={{ stroke: '#e2e8f0' }}
+                                  tickLine={false}
+                                />
+                                <YAxis 
+                                  yAxisId="left"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                                  label={{ value: 'Valor em R$', angle: -90, position: 'insideLeft', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <YAxis 
+                                  yAxisId="right"
+                                  orientation="right"
+                                  tick={{ fill: '#64748b', fontSize: 11 }}
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tickFormatter={(value) => `${value}%`}
+                                  label={{ value: 'Var. Mês Ant. (%)', angle: 90, position: 'insideRight', fill: '#64748b', style: { fontSize: 11 } }}
+                                />
+                                <ChartTooltip 
+                                  content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      return (
+                                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
+                                          <p className="font-bold text-slate-900 dark:text-white mb-3">{data.month}</p>
+                                          <div className="space-y-2">
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Crédito ICMS</p>
+                                              <p className="text-lg font-bold text-pink-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                            </div>
+                                            <div>
+                                              <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
+                                              <p className={`text-lg font-bold ${data.variacao >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {data.variacao >= 0 ? '+' : ''}{data.variacao.toFixed(2)}%
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  }}
+                                />
+                                <Legend 
+                                  verticalAlign="bottom" 
+                                  height={40}
+                                  iconType="circle"
+                                  wrapperStyle={{ paddingTop: '20px' }}
+                                />
+                                <Bar 
+                                  yAxisId="left"
+                                  dataKey="valor" 
+                                  fill="url(#barGradientPinkCredito)"
+                                  name="Crédito ICMS Peças"
+                                  radius={[8, 8, 0, 0]}
+                                  barSize={55}
+                                />
+                                <Line 
+                                  yAxisId="right"
+                                  type="monotone" 
+                                  dataKey="variacao" 
+                                  stroke="#ec4899" 
+                                  strokeWidth={3}
+                                  dot={{ fill: '#ec4899', r: 5 }}
+                                  name="Variação vs Mês Anterior (%)"
+                                />
+                              </ComposedChart>
+                            </ChartContainer>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Card de Crédito ICMS Novos */}
             {showCreditoICMSNovos && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
@@ -7673,7 +7882,7 @@ export function VWFinancialDashboard() {
         </div>
       </div>
 
-      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && !showVendasSeguradora && !showVendasMercadoLivre && !showDespesasFinanceirasNovos && !showDespesasFinanceirasUsados && !showDespesasFinanceirasPecas && !showDespesasFinanceirasOficina && !showDespesasFinanceirasFunilaria && !showDespesasFinanceirasAdministracao && !showBonusNovos && !showBonusUsados && !showBonusPecas && !showBonusOficina && !showBonusFunilaria && !showBonusAdministracao && !showReceitaFinanciamentoNovos && !showReceitaFinanciamentoUsados && !showCreditoICMSNovos && (
+      {!showDetailedMetrics && !showTrocasChart && !showRepasseChart && !showEstoqueNovos && !showEstoqueUsados && !showEstoquePecas && !showVendaPecas && !showVendasSeguradora && !showVendasMercadoLivre && !showDespesasFinanceirasNovos && !showDespesasFinanceirasUsados && !showDespesasFinanceirasPecas && !showDespesasFinanceirasOficina && !showDespesasFinanceirasFunilaria && !showDespesasFinanceirasAdministracao && !showBonusNovos && !showBonusUsados && !showBonusPecas && !showBonusOficina && !showBonusFunilaria && !showBonusAdministracao && !showReceitaFinanciamentoNovos && !showReceitaFinanciamentoUsados && !showCreditoICMSNovos && !showCreditoICMSPecas && (
         <div className="max-w-[1800px] mx-auto px-8 py-8 space-y-8">
         {/* Executive Summary - KPIs */}
         <div>
@@ -8915,7 +9124,7 @@ export function VWFinancialDashboard() {
           <CardContent className="pt-6">
             <ChartContainer config={chartConfig} className="h-[220px] w-full">
               {showComparison && projectionMode ? (
-                <ResponsiveContainer  height="100%">
+                <>
                   <BarChart 
                     data={(() => {
                       const periodData = aggregateData(projectedData[activeScenario!][18].meses);
@@ -8979,9 +9188,9 @@ export function VWFinancialDashboard() {
                     <Bar dataKey="original" fill="#3b82f6" name="Original (mil)" maxBarSize={50} />
                     <Bar dataKey="projecao" fill="#10b981" name="Projeção (mil)" maxBarSize={50} />
                   </BarChart>
-                </ResponsiveContainer>
+                </>
                   ) : (
-                <ResponsiveContainer  height="100%">
+                <>
                   <BarChart data={(() => {
                   const periodDataLucro = aggregateData(activeDreData[18].meses);
                   const periodDataReceita = aggregateData(activeDreData[1].meses);
@@ -9060,7 +9269,7 @@ export function VWFinancialDashboard() {
                     />
                   </Bar>
                 </BarChart>
-                </ResponsiveContainer>
+                </>
               )}
             </ChartContainer>
           </CardContent>
