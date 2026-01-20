@@ -9377,7 +9377,6 @@ export function VWFinancialDashboard() {
                     <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Lucro Bruto</CardTitle>
                     <CardDescription className="text-sm">Resultado bruto das operações</CardDescription>
                   </div>
-                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">{activeDreData[3].percentTotal?.toFixed(2)}% ROL</Badge>
                 </div>
                 <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
@@ -9556,7 +9555,6 @@ export function VWFinancialDashboard() {
                     <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Margem de Contribuição</CardTitle>
                     <CardDescription className="text-sm">Contribuição marginal do negócio</CardDescription>
                   </div>
-                  <Badge className="bg-blue-50 text-blue-700 border-blue-200">{activeDreData[6].percentTotal?.toFixed(2)}% ROL</Badge>
                 </div>
                 <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
@@ -9737,7 +9735,6 @@ export function VWFinancialDashboard() {
                     <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Despesas por Categoria</CardTitle>
                     <CardDescription className="text-sm">Composição das despesas operacionais</CardDescription>
                   </div>
-                  <Badge className="bg-slate-50 text-slate-700 border-slate-200">{((Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / activeDreData[1].total) * 100).toFixed(2)}% ROL</Badge>
                 </div>
                 <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
@@ -10042,7 +10039,6 @@ export function VWFinancialDashboard() {
                     <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Amortizações e Depreciações</CardTitle>
                     <CardDescription className="text-sm">Despesas não caixa do período</CardDescription>
                   </div>
-                  <Badge className="bg-slate-50 text-slate-700 border-slate-200">{((Math.abs(activeDreData[13].total) / activeDreData[1].total) * 100).toFixed(2)}% ROL</Badge>
                 </div>
                 <div className="grid grid-cols-3 gap-4 mt-4">
                   <div>
@@ -10183,9 +10179,6 @@ export function VWFinancialDashboard() {
               <div>
                 <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Lucro (Prejuízo) Antes dos Impostos</CardTitle>
                 <CardDescription className="text-sm">Resultado operacional antes da tributação</CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge className="bg-purple-50 text-purple-700 text-xs">{activeDreData[18].percentTotal?.toFixed(2)}% ROL</Badge>
               </div>
             </div>
 
