@@ -9664,7 +9664,7 @@ export function VWFinancialDashboard() {
                                     <span className="font-bold text-slate-900 dark:text-white">{formatChartValue(Number(payload[0].value || 0) * 1000)}</span>
                                   </p>
                                   <p className="text-sm">
-                                    <span className="text-slate-600 dark:text-slate-400">% sobre Receita: </span>
+                                    <span className="text-slate-600 dark:text-slate-400">% Margem de Contribuição: </span>
                                     <span className="font-bold text-blue-600">{payload[0].payload.margem}%</span>
                                   </p>
                                 </div>
