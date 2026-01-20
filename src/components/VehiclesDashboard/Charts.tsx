@@ -1,6 +1,7 @@
 import React from 'react'
-import { BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ChartContainer } from '@/components/ui/chart'
 import { vehiclesSalesData, MonthlyData } from '@/data/vehiclesSalesData'
 
 // Cores corporativas profissionais
@@ -44,7 +45,7 @@ export const RevenueChart: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={350}>
+        <ChartContainer config={{}} className="h-[350px] w-full">
           <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={COLORS.light} />
             <XAxis dataKey="month" />
@@ -71,7 +72,7 @@ export const RevenueChart: React.FC = () => {
               name="Custo Operacional"
             />
           </BarChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       </CardContent>
     </Card>
   )
@@ -92,7 +93,7 @@ export const ProfitTrendChart: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={320}>
+        <ChartContainer config={{}} className="h-[320px] w-full">
           <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={COLORS.light} />
             <XAxis dataKey="month" />
@@ -125,7 +126,7 @@ export const ProfitTrendChart: React.FC = () => {
               name="Lucro Líquido"
             />
           </LineChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       </CardContent>
     </Card>
   )
@@ -146,7 +147,7 @@ export const ContributionMarginChart: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
+        <ChartContainer config={{}} className="h-[300px] w-full">
           <AreaChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={COLORS.light} />
             <XAxis dataKey="month" />
@@ -169,7 +170,7 @@ export const ContributionMarginChart: React.FC = () => {
               name="Margem de Contribuição"
             />
           </AreaChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       </CardContent>
     </Card>
   )
@@ -190,7 +191,7 @@ export const VolumeChart: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
+        <ChartContainer config={{}} className="h-[300px] w-full">
           <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={COLORS.light} />
             <XAxis dataKey="month" />
@@ -207,7 +208,7 @@ export const VolumeChart: React.FC = () => {
               name="Volume"
             />
           </BarChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       </CardContent>
     </Card>
   )
@@ -242,7 +243,7 @@ export const ResultsCompositionChart: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
+        <ChartContainer config={{}} className="h-[300px] w-full">
           <PieChart>
             <Pie
               data={compositionData}
@@ -263,7 +264,7 @@ export const ResultsCompositionChart: React.FC = () => {
               contentStyle={{ backgroundColor: '#fff', border: `1px solid ${COLORS.light}` }}
             />
           </PieChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       </CardContent>
     </Card>
   )

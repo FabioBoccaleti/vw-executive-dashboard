@@ -1,7 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ChartContainer } from '@/components/ui/chart';
 import { 
   LineChart, Line, BarChart, Bar, AreaChart, Area, ComposedChart, 
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
 import { businessMetricsData } from '@/data/businessMetricsData';
 import { 
@@ -273,7 +274,7 @@ export function BusinessMetricsCharts() {
           <CardDescription>Comparativo mensal de vendas entre novos, novos VD e usados</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
+          <ChartContainer config={{}} className="h-[350px] w-full">
             <ComposedChart data={vendasVeiculosData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '12px' }} />
@@ -284,7 +285,7 @@ export function BusinessMetricsCharts() {
               <Bar dataKey="novosVD" name="Novos VD" fill={COLORS.secondary} radius={[4, 4, 0, 0]} />
               <Line type="monotone" dataKey="usados" name="Usados" stroke={COLORS.success} strokeWidth={3} dot={{ r: 4 }} />
             </ComposedChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </CardContent>
       </Card>
       
@@ -298,7 +299,7 @@ export function BusinessMetricsCharts() {
           <CardDescription>Evolução mensal do percentual de veículos aceitos em troca</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
+          <ChartContainer config={{}} className="h-[350px] w-full">
             <AreaChart data={trocasData}>
               <defs>
                 <linearGradient id="colorNovos" x1="0" y1="0" x2="0" y2="1">
@@ -323,7 +324,7 @@ export function BusinessMetricsCharts() {
               <Area type="monotone" dataKey="novosVD" name="Novos VD" stroke={COLORS.secondary} fillOpacity={1} fill="url(#colorNovosVD)" />
               <Area type="monotone" dataKey="usados" name="Usados" stroke={COLORS.success} fillOpacity={1} fill="url(#colorUsados)" />
             </AreaChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </CardContent>
       </Card>
       
@@ -338,7 +339,7 @@ export function BusinessMetricsCharts() {
             <CardDescription>Volume de veículos novos e usados em estoque</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ChartContainer config={{}} className="h-[300px] w-full">
               <BarChart data={estoqueData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '11px' }} />
@@ -348,7 +349,7 @@ export function BusinessMetricsCharts() {
                 <Bar dataKey="novosQtd" name="Novos" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
                 <Bar dataKey="usadosQtd" name="Usados" fill={COLORS.warning} radius={[4, 4, 0, 0]} />
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </CardContent>
         </Card>
         
@@ -361,7 +362,7 @@ export function BusinessMetricsCharts() {
             <CardDescription>Valor financeiro do estoque de veículos</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ChartContainer config={{}} className="h-[300px] w-full">
               <LineChart data={estoqueData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '11px' }} />
@@ -371,7 +372,7 @@ export function BusinessMetricsCharts() {
                 <Line type="monotone" dataKey="novosValor" name="Estoque Novos: Valor (R$)" stroke={COLORS.primary} strokeWidth={3} dot={{ r: 4 }} />
                 <Line type="monotone" dataKey="usadosValor" name="Estoque Usados: Valor (R$)" stroke={COLORS.warning} strokeWidth={3} dot={{ r: 4 }} />
               </LineChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </CardContent>
         </Card>
       </div>
@@ -386,7 +387,7 @@ export function BusinessMetricsCharts() {
           <CardDescription>Performance de vendas em balcão, oficina, funilaria e acessórios</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
+          <ChartContainer config={{}} className="h-[350px] w-full">
             <BarChart data={vendasPecasData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '12px' }} />
@@ -398,7 +399,7 @@ export function BusinessMetricsCharts() {
               <Bar dataKey="funilaria" name="Funilaria" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} />
               <Bar dataKey="acessorios" name="Acessórios" fill={CHART_COLORS[3]} radius={[4, 4, 0, 0]} />
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </CardContent>
       </Card>
       
@@ -412,7 +413,7 @@ export function BusinessMetricsCharts() {
           <CardDescription>Análise de lucratividade por canal de vendas</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
+          <ChartContainer config={{}} className="h-[350px] w-full">
             <LineChart data={margensPecasData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '12px' }} />
@@ -424,7 +425,7 @@ export function BusinessMetricsCharts() {
               <Line type="monotone" dataKey="funilaria" name="Funilaria" stroke={CHART_COLORS[2]} strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="acessorios" name="Acessórios" stroke={CHART_COLORS[3]} strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </CardContent>
       </Card>
       
@@ -438,7 +439,7 @@ export function BusinessMetricsCharts() {
           <CardDescription>Distribuição de vendas entre as principais seguradoras</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
+          <ChartContainer config={{}} className="h-[350px] w-full">
             <AreaChart data={seguradorasData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '12px' }} />
@@ -450,7 +451,7 @@ export function BusinessMetricsCharts() {
               <Area type="monotone" dataKey="azul" name="Azul" stackId="1" stroke={CHART_COLORS[2]} fill={CHART_COLORS[2]} fillOpacity={0.8} />
               <Area type="monotone" dataKey="allianz" name="Allianz" stackId="1" stroke={CHART_COLORS[3]} fill={CHART_COLORS[3]} fillOpacity={0.8} />
             </AreaChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </CardContent>
       </Card>
       
@@ -464,7 +465,7 @@ export function BusinessMetricsCharts() {
           <CardDescription>Distribuição mensal dos custos financeiros</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
+          <ChartContainer config={{}} className="h-[350px] w-full">
             <BarChart data={jurosData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '12px' }} />
@@ -477,7 +478,7 @@ export function BusinessMetricsCharts() {
               <Bar dataKey="emprestimos" name="Empréstimos" stackId="a" fill={CHART_COLORS[0]} />
               <Bar dataKey="mutuo" name="Mútuo" stackId="a" fill={CHART_COLORS[1]} />
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </CardContent>
       </Card>
       
@@ -492,7 +493,7 @@ export function BusinessMetricsCharts() {
             <CardDescription>Evolução dos custos operacionais com veículos</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ChartContainer config={{}} className="h-[300px] w-full">
               <ComposedChart data={custosData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '11px' }} />
@@ -502,7 +503,7 @@ export function BusinessMetricsCharts() {
                 <Bar dataKey="garantia" name="Garantia" fill={COLORS.danger} radius={[4, 4, 0, 0]} />
                 <Bar dataKey="reparo" name="Reparo Usados" fill={COLORS.warning} radius={[4, 4, 0, 0]} />
               </ComposedChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </CardContent>
         </Card>
         
@@ -515,7 +516,7 @@ export function BusinessMetricsCharts() {
             <CardDescription>Valor médio gasto por reparo de veículo usado</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ChartContainer config={{}} className="h-[300px] w-full">
               <LineChart data={custosData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '11px' }} />
@@ -524,7 +525,7 @@ export function BusinessMetricsCharts() {
                 <Legend />
                 <Line type="monotone" dataKey="ticketMedio" name="Ticket Médio (R$)" stroke={COLORS.info} strokeWidth={3} dot={{ r: 5 }} />
               </LineChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </CardContent>
         </Card>
       </div>
@@ -539,7 +540,7 @@ export function BusinessMetricsCharts() {
           <CardDescription>Distribuição mensal de bônus pagos</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
+          <ChartContainer config={{}} className="h-[350px] w-full">
             <BarChart data={bonusData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '12px' }} />
@@ -550,7 +551,7 @@ export function BusinessMetricsCharts() {
               <Bar dataKey="pecas" name="Peças" fill={CHART_COLORS[2]} radius={[4, 4, 0, 0]} />
               <Bar dataKey="oficina" name="Oficina" fill={CHART_COLORS[1]} radius={[4, 4, 0, 0]} />
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </CardContent>
       </Card>
       
@@ -564,7 +565,7 @@ export function BusinessMetricsCharts() {
           <CardDescription>Créditos tributários recuperados mensalmente</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
+          <ChartContainer config={{}} className="h-[350px] w-full">
             <BarChart data={creditosFiscaisData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '12px' }} />
@@ -576,7 +577,7 @@ export function BusinessMetricsCharts() {
               <Bar dataKey="icmsAdmin" name="ICMS Admin" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
               <Bar dataKey="pisCofins" name="PIS/COFINS" fill={CHART_COLORS[3]} radius={[4, 4, 0, 0]} />
             </BarChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </CardContent>
       </Card>
       
@@ -590,7 +591,7 @@ export function BusinessMetricsCharts() {
           <CardDescription>Receitas geradas com financiamento de veículos</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
+          <ChartContainer config={{}} className="h-[350px] w-full">
             <ComposedChart data={receitasFinanciamentoData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '12px' }} />
@@ -601,7 +602,7 @@ export function BusinessMetricsCharts() {
               <Bar dataKey="usados" name="Veículos Usados" fill={COLORS.success} radius={[4, 4, 0, 0]} />
               <Line type="monotone" dataKey="novos" stroke={COLORS.dark} strokeWidth={2} />
             </ComposedChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </CardContent>
       </Card>
       
@@ -615,7 +616,7 @@ export function BusinessMetricsCharts() {
           <CardDescription>Custos de taxas de cartão por departamento</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={350}>
+          <ChartContainer config={{}} className="h-[350px] w-full">
             <AreaChart data={despesasCartaoData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="mes" stroke="#64748b" style={{ fontSize: '12px' }} />
@@ -627,7 +628,7 @@ export function BusinessMetricsCharts() {
               <Area type="monotone" dataKey="usados" name="Usados" stackId="1" stroke={CHART_COLORS[2]} fill={CHART_COLORS[2]} fillOpacity={0.7} />
               <Area type="monotone" dataKey="novos" name="Novos" stackId="1" stroke={CHART_COLORS[3]} fill={CHART_COLORS[3]} fillOpacity={0.7} />
             </AreaChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </CardContent>
       </Card>
     </div>
