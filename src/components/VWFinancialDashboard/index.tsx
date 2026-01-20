@@ -9645,7 +9645,7 @@ export function VWFinancialDashboard() {
                           mes: labels[idx],
                           valor: val / 1000,
                           margem: parseFloat((val / periodDataReceita[idx] * 100).toFixed(1)),
-                          fill: val > media * 1.05 ? '#2563eb' : val < media * 0.95 ? '#7f1d1d' : '#c2410c'
+                          fill: val > media * 1.05 ? '#2563eb' : val < media * 0.95 ? '#7f1d1d' : '#4ade80'
                         }));
                       })()}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -9683,7 +9683,7 @@ export function VWFinancialDashboard() {
                               <span>Acima da Média</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#c2410c' }}></div>
+                              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#4ade80' }}></div>
                               <span>Média</span>
                             </div>
                             <div className="flex items-center gap-1">
@@ -10277,7 +10277,7 @@ export function VWFinancialDashboard() {
                     mes: labels[idx],
                     valor: val / 1000,
                     percentual: ((val / periodDataReceita[idx]) * 100).toFixed(2),
-                    fill: val > media * 1.05 ? '#0ea5e9' : val < media * 0.95 ? '#f97316' : '#10b981'
+                    fill: val > media * 1.05 ? '#1e40af' : val < media * 0.95 ? '#f97316' : '#10b981'
                   }));
                 })()}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -10319,7 +10319,7 @@ export function VWFinancialDashboard() {
                     content={() => (
                       <div className="flex items-center justify-center gap-4 text-xs mt-2">
                         <div className="flex items-center gap-1">
-                          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#0ea5e9' }}></div>
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#1e40af' }}></div>
                           <span>Acima da Média</span>
                         </div>
                         <div className="flex items-center gap-1">
@@ -10342,7 +10342,7 @@ export function VWFinancialDashboard() {
                       const periodDataLucro = aggregateData(activeDreData[18].meses);
                       const media = periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length;
                       return periodDataLucro.map((val, idx) => {
-                        const fillColor = val > media * 1.05 ? '#0ea5e9' : val < media * 0.95 ? '#f97316' : '#10b981';
+                        const fillColor = val > media * 1.05 ? '#1e40af' : val < media * 0.95 ? '#f97316' : '#10b981';
                         return <Cell key={`cell-${idx}`} fill={fillColor} />;
                       });
                     })()}
