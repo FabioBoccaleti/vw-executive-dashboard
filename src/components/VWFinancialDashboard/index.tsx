@@ -9144,7 +9144,7 @@ export function VWFinancialDashboard() {
                         return periodData.map((vol, idx) => ({
                           mes: labels[idx],
                           volume: vol,
-                          fill: vol > media * 1.05 ? '#0284c7' : vol < media * 0.95 ? '#b91c1c' : '#ea580c'
+                          fill: vol > media * 1.05 ? '#0284c7' : vol < media * 0.95 ? '#b91c1c' : '#eab308'
                         }));
                       })()}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -9177,7 +9177,7 @@ export function VWFinancialDashboard() {
                                 <span>Acima da Média</span>
                               </div>
                               <div className="flex items-center gap-1">
-                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#ea580c' }}></div>
+                                <div className="w-3 h-3 rounded" style={{ backgroundColor: '#eab308' }}></div>
                                 <span>Média</span>
                               </div>
                               <div className="flex items-center gap-1">
