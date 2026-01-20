@@ -646,24 +646,39 @@ export function VWFinancialDashboard() {
   }
 
   // Totais do período
-  const totais = {
-    volumeTotal: 1249,
-    receitaLiquida: 95952,
-    lucroOperacional: 2380,
-    margemOperacional: 2.48,
-    ticketMedio: 77,
-    totalDespesas: 8386,
-    despesasPessoal: 1705,
-    despesasTerceiros: 651,
-    despesasOcupacao: 264,
-    despesasFuncionamento: 1643,
-    despesasVendas: 4123,
-    lucroBruto: 6420,
-    rendasOperacionais: 4346
-  }
-  
   // Dados ativos (original ou projetado)
   const activeDreData = getActiveData()
+  
+  // Calcular totais dinamicamente a partir dos dados ativos
+  const totais = activeDreData.length > 0 ? {
+    volumeTotal: activeDreData[0]?.total || 0,
+    receitaLiquida: activeDreData[1]?.total || 0,
+    lucroOperacional: activeDreData[21]?.total || 0,
+    margemOperacional: activeDreData[21]?.percentTotal || 0,
+    ticketMedio: activeDreData[0]?.total ? activeDreData[1]?.total / activeDreData[0]?.total : 0,
+    totalDespesas: Math.abs((activeDreData[7]?.total || 0) + (activeDreData[8]?.total || 0) + (activeDreData[9]?.total || 0) + (activeDreData[10]?.total || 0) + (activeDreData[11]?.total || 0)),
+    despesasPessoal: Math.abs(activeDreData[7]?.total || 0),
+    despesasTerceiros: Math.abs(activeDreData[8]?.total || 0),
+    despesasOcupacao: Math.abs(activeDreData[9]?.total || 0),
+    despesasFuncionamento: Math.abs(activeDreData[10]?.total || 0),
+    despesasVendas: Math.abs(activeDreData[11]?.total || 0),
+    lucroBruto: activeDreData[3]?.total || 0,
+    rendasOperacionais: activeDreData[5]?.total || 0
+  } : {
+    volumeTotal: initialDreData[0].total,
+    receitaLiquida: initialDreData[1].total,
+    lucroOperacional: initialDreData[21].total,
+    margemOperacional: initialDreData[21].percentTotal || 0,
+    ticketMedio: initialDreData[1].total / initialDreData[0].total,
+    totalDespesas: Math.abs(initialDreData[7].total + initialDreData[8].total + initialDreData[9].total + initialDreData[10].total + initialDreData[11].total),
+    despesasPessoal: Math.abs(initialDreData[7].total),
+    despesasTerceiros: Math.abs(initialDreData[8].total),
+    despesasOcupacao: Math.abs(initialDreData[9].total),
+    despesasFuncionamento: Math.abs(initialDreData[10].total),
+    despesasVendas: Math.abs(initialDreData[11].total),
+    lucroBruto: initialDreData[3].total,
+    rendasOperacionais: initialDreData[5].total
+  }
 
   // Configuração dos gráficos
   const chartConfig = {
@@ -8996,7 +9011,7 @@ export function VWFinancialDashboard() {
 
             <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-purple-600 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
-                <CardDescription className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Lucro Operacional</CardDescription>
+                <CardDescription className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Lucro Líquido do Exercício</CardDescription>
                 <CardTitle className="text-3xl font-bold text-slate-900 dark:text-white">{formatCurrency(totais.lucroOperacional)}</CardTitle>
               </CardHeader>
               <CardContent>
@@ -9011,7 +9026,7 @@ export function VWFinancialDashboard() {
 
             <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-amber-600 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
-                <CardDescription className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Margem Operacional</CardDescription>
+                <CardDescription className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Margem Líquida</CardDescription>
                 <CardTitle className="text-3xl font-bold text-slate-900 dark:text-white">{totais.margemOperacional.toFixed(2)}%</CardTitle>
               </CardHeader>
               <CardContent>
