@@ -15,6 +15,7 @@ export function VWFinancialDashboard() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['pessoal', 'terceiros', 'ocupacao', 'funcionamento'])
   const [viewMode, setViewMode] = useState<'mensal' | 'bimestral' | 'trimestral' | 'semestral'>('mensal')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const metricsFileInputRef = useRef<HTMLInputElement>(null)
   
   // Estado para dados DRE
   const [dreData, setDreData] = useState<any[]>([])
@@ -30,6 +31,186 @@ export function VWFinancialDashboard() {
   
   // Estado para controlar exibição da tabela de métricas detalhadas
   const [showDetailedMetrics, setShowDetailedMetrics] = useState(false)
+  
+  // Estado para dados de métricas de negócios (para permitir importação/exportação)
+  const [metricsData, setMetricsData] = useState(businessMetricsData)
+  
+  // Handlers para importação e exportação de métricas
+  const handleExportMetrics = () => {
+    // Lógica será chamada do componente filho
+    const event = new CustomEvent('exportMetrics');
+    window.dispatchEvent(event);
+  };
+
+  const handleImportMetrics = () => {
+    metricsFileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    console.log('=== INÍCIO DA IMPORTAÇÃO ===');
+    console.log('📁 Arquivo selecionado:', file.name);
+    console.log('📏 Tamanho:', (file.size / 1024).toFixed(2), 'KB');
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        console.log('📄 Arquivo lido com sucesso');
+        console.log('📊 Primeiras 300 chars:', content.substring(0, 300));
+        
+        // Parsear o conteúdo
+        const lines = content.split('\n').filter(line => 
+          line.trim() && !line.trim().startsWith('#') && !line.trim().startsWith('=')
+        );
+        
+        console.log('✅ Linhas válidas encontradas:', lines.length);
+        
+        if (lines.length < 2) {
+          console.error('❌ Arquivo inválido ou vazio');
+          alert('Arquivo inválido ou vazio');
+          return;
+        }
+        
+        // Pular o cabeçalho
+        const dataLines = lines.slice(1);
+        
+        // Função para parsear valores
+        const parseValue = (value: string, field: string): number => {
+          if (!value || value.trim() === '') return 0;
+          
+          let cleaned = value.trim();
+          
+          if (cleaned.includes('%')) {
+            return parseFloat(cleaned.replace('%', '').replace(',', '.')) || 0;
+          }
+          
+          cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+          return parseFloat(cleaned) || 0;
+        };
+        
+        // Criar novo objeto de dados
+        const newData = JSON.parse(JSON.stringify(metricsData));
+        
+        let currentMetricId: number | null = null;
+        let currentFieldIndex = 0;
+        
+        // Definir métricas para mapear IDs
+        const metricsMap: {[key: number]: {fields: string[], dataPath: string[]}} = {
+          1: {fields: ['vendas', 'volumeTrocas', 'percentualTrocas'], dataPath: ['vendasNovos']},
+          2: {fields: ['vendas', 'volumeTrocas', 'percentualTrocas'], dataPath: ['vendasNovosVD']},
+          3: {fields: ['vendas', 'volumeTrocas', 'percentualTrocas'], dataPath: ['vendasUsados']},
+          4: {fields: ['usados', 'repasse', 'percentualRepasse'], dataPath: ['volumeVendas']},
+          5: {fields: ['quantidade', 'valor', 'aPagar', 'pagos'], dataPath: ['estoqueNovos']},
+          6: {fields: ['quantidade', 'valor', 'aPagar', 'pagos'], dataPath: ['estoqueUsados']},
+          7: {fields: ['valor', 'aPagar', 'pagos'], dataPath: ['estoquePecas']},
+          8: {fields: ['vendas', 'lucro', 'margem'], dataPath: ['vendasPecas', 'balcao']},
+          9: {fields: ['vendas', 'lucro', 'margem'], dataPath: ['vendasPecas', 'oficina']},
+          10: {fields: ['vendas', 'lucro', 'margem'], dataPath: ['vendasPecas', 'funilaria']},
+          11: {fields: ['vendas', 'lucro', 'margem'], dataPath: ['vendasPecas', 'acessorios']},
+          12: {fields: ['vendas', 'lucro', 'margem'], dataPath: ['vendasPecas', 'seguradoraTotal']},
+          13: {fields: ['vendas', 'lucro', 'margem'], dataPath: ['seguradoras', 'portoSeguro']},
+          14: {fields: ['vendas', 'lucro', 'margem'], dataPath: ['seguradoras', 'azul']},
+          15: {fields: ['vendas', 'lucro', 'margem'], dataPath: ['seguradoras', 'allianz']},
+          16: {fields: ['vendas', 'lucro', 'margem'], dataPath: ['seguradoras', 'tokioMarine']},
+          17: {fields: ['vendas', 'lucro', 'margem'], dataPath: ['mercadoLivre']},
+          18: {fields: ['valor'], dataPath: ['juros', 'veiculosNovos']},
+          19: {fields: ['valor'], dataPath: ['juros', 'veiculosUsados']},
+          20: {fields: ['valor'], dataPath: ['juros', 'pecas']},
+          21: {fields: ['valor'], dataPath: ['juros', 'emprestimosBancarios']},
+          22: {fields: ['valor'], dataPath: ['juros', 'contratoMutuo']},
+          23: {fields: ['valor'], dataPath: ['custos', 'garantia']},
+          24: {fields: ['reparoUsados', 'ticketMedioReparo'], dataPath: ['custos']},
+          25: {fields: ['valor'], dataPath: ['despesasCartao', 'novos']},
+          26: {fields: ['valor'], dataPath: ['despesasCartao', 'vendaDireta']},
+          27: {fields: ['valor'], dataPath: ['despesasCartao', 'usados']},
+          28: {fields: ['valor'], dataPath: ['despesasCartao', 'pecas']},
+          29: {fields: ['valor'], dataPath: ['despesasCartao', 'oficina']},
+          30: {fields: ['valor'], dataPath: ['despesasCartao', 'funilaria']},
+          31: {fields: ['valor'], dataPath: ['despesasCartao', 'administracao']},
+          32: {fields: ['valor'], dataPath: ['bonus', 'veiculosNovos']},
+          33: {fields: ['valor'], dataPath: ['bonus', 'veiculosUsados']},
+          34: {fields: ['valor'], dataPath: ['bonus', 'pecas']},
+          35: {fields: ['valor'], dataPath: ['bonus', 'oficina']},
+          36: {fields: ['valor'], dataPath: ['bonus', 'funilaria']},
+          37: {fields: ['valor'], dataPath: ['bonus', 'administracao']},
+          38: {fields: ['valor'], dataPath: ['receitasFinanciamento', 'veiculosNovos']},
+          39: {fields: ['valor'], dataPath: ['receitasFinanciamento', 'veiculosUsados']},
+          40: {fields: ['valor'], dataPath: ['creditosICMS', 'novos']},
+          41: {fields: ['valor'], dataPath: ['creditosICMS', 'pecas']},
+          42: {fields: ['valor'], dataPath: ['creditosICMS', 'administracao']},
+          43: {fields: ['valor'], dataPath: ['creditosPISCOFINS', 'administracao']},
+          44: {fields: ['valor'], dataPath: ['receitaBlindagem']},
+          45: {fields: ['valor'], dataPath: ['receitaDespachanteUsados']},
+          46: {fields: ['valor'], dataPath: ['receitaDespachanteNovos']},
+        };
+        
+        dataLines.forEach(line => {
+          const columns = line.split('\t').map(col => col.trim());
+          
+          if (columns.length < 3) return;
+          
+          const id = columns[0];
+          const values = columns.slice(2, 14);
+          
+          if (id) {
+            currentMetricId = parseInt(id);
+            currentFieldIndex = 0;
+          } else {
+            currentFieldIndex++;
+          }
+          
+          if (!currentMetricId || !metricsMap[currentMetricId]) return;
+          
+          const metric = metricsMap[currentMetricId];
+          const field = metric.fields[currentFieldIndex];
+          if (!field) return;
+          
+          const parsedValues = values.map(v => parseValue(v, field));
+          
+          // Navegar no objeto usando o dataPath
+          let target: any = newData;
+          for (let i = 0; i < metric.dataPath.length - 1; i++) {
+            target = target[metric.dataPath[i]];
+          }
+          
+          // Para métricas 44, 45, 46 que são arrays diretos
+          if (metric.fields[0] === 'valor' && metric.dataPath.length === 1) {
+            newData[metric.dataPath[0]] = parsedValues;
+          } else {
+            const lastPath = metric.dataPath[metric.dataPath.length - 1];
+            if (metric.dataPath.length === 1) {
+              target[lastPath][field] = parsedValues;
+            } else {
+              target[lastPath][field] = parsedValues;
+            }
+          }
+        });
+        
+        console.log('✨ Processamento concluído');
+        console.log('💾 Aplicando novos dados ao estado...');
+        setMetricsData(newData);
+        console.log('✅ Estado atualizado com sucesso!');
+        console.log('=== FIM DA IMPORTAÇÃO ===\n');
+        
+        alert('Dados importados com sucesso!');
+        
+      } catch (error) {
+        console.error('❌ ERRO durante importação:', error);
+        console.error('Stack trace:', (error as Error).stack);
+        alert('Erro ao importar dados. Verifique o formato do arquivo.');
+      }
+    };
+    
+    reader.readAsText(file);
+    
+    // Reset do input
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
   
   // Estado para controlar exibição do card de % de Trocas
   const [showTrocasChart, setShowTrocasChart] = useState(false)
@@ -8958,16 +9139,47 @@ export function VWFinancialDashboard() {
                       Tabela completa com todos os indicadores mensais de vendas, estoques, juros, custos, bônus e créditos fiscais
                     </CardDescription>
                   </div>
-                  <button
-                    onClick={() => setShowDetailedMetrics(false)}
-                    className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
-                  >
-                    <TrendingDown className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleImportMetrics}
+                      className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span className="text-xs font-medium">Importar</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleExportMetrics}
+                      className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-green-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span className="text-xs font-medium">Exportar</span>
+                    </Button>
+                    <button
+                      onClick={() => setShowDetailedMetrics(false)}
+                      className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <TrendingDown className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
                 </CardHeader>
                 <CardContent>
-                  <DetailedMetricsTable />
+                  <input
+                    ref={metricsFileInputRef}
+                    type="file"
+                    accept=".txt"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <DetailedMetricsTable 
+                    data={metricsData}
+                    onDataUpdate={setMetricsData}
+                    fileInputRef={metricsFileInputRef}
+                  />
                 </CardContent>
               </Card>
             )}
