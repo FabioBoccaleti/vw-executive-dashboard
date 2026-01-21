@@ -224,21 +224,6 @@ export function clearFiscalYearData(fiscalYear: 2024 | 2025 | 2026 | 2027): bool
 }
 
 /**
- * Limpa todos os dados de todos os anos fiscais
- */
-export function clearAllData(): boolean {
-  try {
-    Object.values(STORAGE_KEYS).forEach(key => {
-      localStorage.removeItem(key);
-    });
-    return true;
-  } catch (error) {
-    console.error('Erro ao limpar todos os dados:', error);
-    return false;
-  }
-}
-
-/**
  * Verifica se há dados salvos para um ano fiscal específico
  */
 export function hasStoredData(fiscalYear: 2024 | 2025 | 2026 | 2027): boolean {
@@ -318,5 +303,55 @@ export function importAllData(jsonString: string): boolean {
   } catch (error) {
     console.error('Erro ao importar dados:', error);
     return false;
+  }
+}
+
+/**
+ * Limpa os dados de um ano fiscal específico (força volta aos dados padrão)
+ */
+export function clearYearData(fiscalYear: 2024 | 2025 | 2026 | 2027): void {
+  try {
+    let metricsKey: string;
+    let dreKey: string;
+    
+    switch (fiscalYear) {
+      case 2024:
+        metricsKey = STORAGE_KEYS.METRICS_2024;
+        dreKey = STORAGE_KEYS.DRE_2024;
+        break;
+      case 2025:
+        metricsKey = STORAGE_KEYS.METRICS_2025;
+        dreKey = STORAGE_KEYS.DRE_2025;
+        break;
+      case 2026:
+        metricsKey = STORAGE_KEYS.METRICS_2026;
+        dreKey = STORAGE_KEYS.DRE_2026;
+        break;
+      case 2027:
+        metricsKey = STORAGE_KEYS.METRICS_2027;
+        dreKey = STORAGE_KEYS.DRE_2027;
+        break;
+    }
+    
+    localStorage.removeItem(metricsKey);
+    localStorage.removeItem(dreKey);
+    
+    console.log(`✅ Dados do ano ${fiscalYear} limpos com sucesso`);
+  } catch (error) {
+    console.error(`Erro ao limpar dados de ${fiscalYear}:`, error);
+  }
+}
+
+/**
+ * Limpa todos os dados de todos os anos fiscais
+ */
+export function clearAllData(): void {
+  try {
+    Object.values(STORAGE_KEYS).forEach(key => {
+      localStorage.removeItem(key);
+    });
+    console.log('✅ Todos os dados foram limpos com sucesso');
+  } catch (error) {
+    console.error('Erro ao limpar todos os dados:', error);
   }
 }

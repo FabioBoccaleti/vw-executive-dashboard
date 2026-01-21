@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limpar Dados - VW Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1e293b;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #64748b;
+            margin-bottom: 30px;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            margin: 10px 10px 10px 0;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #059669;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+        .section h2 {
+            color: #334155;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .info {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background: #dcfce7;
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            display: none;
+        }
+        .warning {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        code {
+            background: #1e293b;
+            color: #10b981;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Limpar Dados do Dashboard VW</h1>
+        <p class="subtitle">Utilitário para resetar dados dos anos fiscais</p>
+        
+        <div class="info">
+            <strong>ℹ️ Informação:</strong> Esta página permite limpar os dados salvos no localStorage do navegador. 
+            Após limpar, os dados voltarão aos valores padrão (2025 com dados reais, outros anos zerados).
+        </div>
+
+        <div class="section">
+            <h2>Limpar por Ano Fiscal</h2>
+            <p>Selecione um ano específico para limpar apenas seus dados:</p>
+            <button class="button btn-primary" onclick="clearYear(2024)">Limpar 2024</button>
+            <button class="button btn-primary" onclick="clearYear(2025)">Limpar 2025</button>
+            <button class="button btn-primary" onclick="clearYear(2026)">Limpar 2026</button>
+            <button class="button btn-primary" onclick="clearYear(2027)">Limpar 2027</button>
+        </div>
+
+        <div class="section">
+            <h2>Forçar Anos Zerados</h2>
+            <p>Limpa os dados dos anos 2024, 2026 e 2027 (mantém 2025 intacto):</p>
+            <button class="button btn-success" onclick="clearZeroYears()">Zerar 2024, 2026 e 2027</button>
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ Atenção:</strong> A ação abaixo irá limpar TODOS os dados de TODOS os anos fiscais!
+        </div>
+
+        <div class="section">
+            <h2>Limpar Tudo</h2>
+            <p>Remove todos os dados salvos de todos os anos fiscais:</p>
+            <button class="button btn-danger" onclick="clearAll()">🗑️ Limpar Todos os Dados</button>
+        </div>
+
+        <div class="success" id="successMessage">
+            <strong>✅ Sucesso!</strong> <span id="successText"></span>
+            <br><br>
+            <button class="button btn-primary" onclick="location.reload()">Recarregar Página</button>
+        </div>
+    </div>
+
+    <script>
+        function clearYear(year) {
+            const metricsKey = `vw_metrics_${year}`;
+            const dreKey = `vw_dre_${year}`;
+            
+            localStorage.removeItem(metricsKey);
+            localStorage.removeItem(dreKey);
+            
+            showSuccess(`Dados do ano ${year} foram limpos com sucesso!`);
+        }
+
+        function clearZeroYears() {
+            clearYear(2024);
+            clearYear(2026);
+            clearYear(2027);
+            showSuccess('Anos 2024, 2026 e 2027 foram zerados com sucesso!');
+        }
+
+        function clearAll() {
+            if (!confirm('Tem certeza que deseja limpar TODOS os dados de TODOS os anos fiscais?')) {
+                return;
+            }
+
+            const keys = [
+                'vw_metrics_2024', 'vw_dre_2024',
+                'vw_metrics_2025', 'vw_dre_2025',
+                'vw_metrics_2026', 'vw_dre_2026',
+                'vw_metrics_2027', 'vw_dre_2027',
+                'vw_selected_fiscal_year'
+            ];
+
+            keys.forEach(key => localStorage.removeItem(key));
+            
+            showSuccess('Todos os dados foram limpos com sucesso!');
+        }
+
+        function showSuccess(message) {
+            document.getElementById('successText').textContent = message;
+            document.getElementById('successMessage').style.display = 'block';
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+
+        // Mostrar dados atuais
+        console.log('📊 Dados atuais no localStorage:');
+        console.log('2024 Métricas:', localStorage.getItem('vw_metrics_2024') ? 'Existem' : 'Não existem');
+        console.log('2024 DRE:', localStorage.getItem('vw_dre_2024') ? 'Existem' : 'Não existem');
+        console.log('2025 Métricas:', localStorage.getItem('vw_metrics_2025') ? 'Existem' : 'Não existem');
+        console.log('2025 DRE:', localStorage.getItem('vw_dre_2025') ? 'Existem' : 'Não existem');
+        console.log('2026 Métricas:', localStorage.getItem('vw_metrics_2026') ? 'Existem' : 'Não existem');
+        console.log('2026 DRE:', localStorage.getItem('vw_dre_2026') ? 'Existem' : 'Não existem');
+        console.log('2027 Métricas:', localStorage.getItem('vw_metrics_2027') ? 'Existem' : 'Não existem');
+        console.log('2027 DRE:', localStorage.getItem('vw_dre_2027') ? 'Existem' : 'Não existem');
+    </script>
+</body>
+</html>

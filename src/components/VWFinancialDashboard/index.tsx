@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DetailedMetricsTable } from "@/components/DetailedMetricsTable"
 import { businessMetricsData } from "@/data/businessMetricsData"
+import { YearComparison } from "@/components/YearComparison"
 import { 
   loadMetricsData, 
   saveMetricsData, 
@@ -17,8 +18,151 @@ import {
   saveDREData, 
   loadSelectedFiscalYear, 
   saveSelectedFiscalYear,
+  clearYearData,
+  clearAllData,
   type MetricsData 
 } from "@/lib/dataStorage"
+
+// Dados iniciais DRE - Demonstrativo de Resultados (ano 2025 como base)
+const initialDreData = [
+  {
+    descricao: "VOLUME DE VENDAS",
+    total: 934,
+    percentTotal: null,
+    meses: [100, 100, 98, 83, 83, 95, 70, 75, 102, 85, 79, 64]
+  },
+  {
+    descricao: "RECEITA OPERACIONAL LIQUIDA",
+    total: 95954132,
+    percentTotal: 100.00,
+    meses: [8328316, 8483342, 7902231, 7138470, 7226733, 8336360, 8485005, 10826922, 8927513, 9761159, 8538082, 0]
+  },
+  {
+    descricao: "CUSTO OPERACIONAL DA RECEITA",
+    total: -89534647,
+    percentTotal: -93.31,
+    meses: [-7835540, -7979610, -7280972, -6621037, -6634322, -7753002, -9965913, -10094242, -8199050, -9148803, -8022155, 0]
+  },
+  {
+    descricao: "LUCRO (PREJUIZO) OPERACIONAL BRUTO",
+    total: 6419485,
+    percentTotal: 6.69,
+    meses: [492776, 503732, 621259, 517432, 592411, 583358, 519092, 732680, 728463, 612356, 515927, 0]
+  },
+  {
+    descricao: "OUTRAS DESPESAS OPERACIONAIS",
+    total: 1710743,
+    percentTotal: 1.78,
+    meses: [104975, 132525, 98310, 188520, 142952, 100280, 175314, 180902, 250305, 135840, 200820, 0]
+  },
+  {
+    descricao: "OUTRAS RECEITAS OPERACIONAIS",
+    total: 4357499,
+    percentTotal: 4.54,
+    meses: [379638, 362411, 323692, 310751, 295513, 360671, 524479, 450968, 373505, 535010, 440860, 0]
+  },
+  {
+    descricao: "MARGEM DE CONTRIBUIÇÃO",
+    total: 8365271,
+    percentTotal: 8.72,
+    meses: [669490, 669951, 737837, 743342, 713237, 673321, 792662, 923206, 911707, 844521, 685996, 0],
+    isHighlight: true
+  },
+  {
+    descricao: "DESPESAS C/ PESSOAL",
+    total: -1705053,
+    percentTotal: -1.78,
+    meses: [-135776, -161711, -135728, -148064, -116746, -175251, -167967, -151586, -150194, -175864, -186164, 0]
+  },
+  {
+    descricao: "DESPESAS C/ SERV. DE TERCEIROS",
+    total: -650650,
+    percentTotal: -0.68,
+    meses: [-49272, -41589, -40445, -48066, -47524, -64734, -73389, -66365, -71881, -99203, -48182, 0]
+  },
+  {
+    descricao: "DESPESAS C/ OCUPAÇÃO",
+    total: -177636,
+    percentTotal: -0.19,
+    meses: [-13120, -13120, -13355, -13355, -13355, -13355, -13355, -21156, -21156, -21156, -21156, 0]
+  },
+  {
+    descricao: "DESPESAS C/ FUNCIONAMENTO",
+    total: -1642583,
+    percentTotal: -1.71,
+    meses: [-162040, -177923, -124227, -135629, -134151, -117842, -130073, -149322, -165388, -160983, -185006, 0]
+  },
+  {
+    descricao: "DESPESAS C/ VENDAS",
+    total: -4122456,
+    percentTotal: -4.30,
+    meses: [-307898, -328716, -305425, -273361, -317639, -370988, -426223, -441343, -440566, -438685, -471612, 0]
+  },
+  {
+    descricao: "LUCRO (PREJUIZO) OPERACIONAL LIQUIDO",
+    total: 4189348,
+    percentTotal: 4.37,
+    meses: [309282, 275608, 424081, 398229, 401462, 302139, 407878, 534777, 503088, 387315, 245488, 0],
+    isHighlight: true
+  },
+  {
+    descricao: "AMORTIZAÇÕES E DEPRECIAÇÕES",
+    total: -87251,
+    percentTotal: -0.09,
+    meses: [-8441, -2167, -8489, -8489, -8404, -8545, -8545, -8545, -8545, -8545, -8536, 0]
+  },
+  {
+    descricao: "OUTRAS RECEITAS FINANCEIRAS",
+    total: 0,
+    percentTotal: 0.00,
+    meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  },
+  {
+    descricao: "DESPESAS FINANCEIRAS NÃO OPERACIONAL",
+    total: -20046,
+    percentTotal: -0.02,
+    meses: [-8619, -8581, -270, -165, -153, -561, -227, -259, -123, -310, -778, 0]
+  },
+  {
+    descricao: "DESPESAS NÃO OPERACIONAIS",
+    total: 0,
+    percentTotal: 0.00,
+    meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  },
+  {
+    descricao: "OUTRAS RENDAS NÃO OPERACIONAIS",
+    total: 0,
+    percentTotal: 0.00,
+    meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  },
+  {
+    descricao: "LUCRO (PREJUIZO) ANTES IMPOSTOS",
+    total: 14082051,
+    percentTotal: 4.25,
+    meses: [292222, 264860, 415322, 389575, 392905, 293033, 399105, 525973, 494420, 378461, 236175, 0],
+    isHighlight: true
+  },
+  {
+    descricao: "PROVISÕES IRPJ E C.S.",
+    total: 0,
+    percentTotal: 0.00,
+    meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  },
+  {
+    descricao: "PARTICIPAÇÕES",
+    total: 0,
+    percentTotal: 0.00,
+    meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  },
+  {
+    descricao: "LUCRO LIQUIDO DO EXERCICIO",
+    total: 476215,
+    percentTotal: 0.50,
+    meses: [292222, 264860, 415322, 389575, 392905, 293033, 399105, 525973, 494420, 378461, 236175, 0],
+    isHighlight: true,
+    isFinal: true
+  }
+]
 
 export function VWFinancialDashboard() {
   // Estado para o ano fiscal selecionado
@@ -45,20 +189,51 @@ export function VWFinancialDashboard() {
   // Estado para controlar exibição da tabela de métricas detalhadas
   const [showDetailedMetrics, setShowDetailedMetrics] = useState(false)
   
+  // Estado para controlar navegação entre views
+  const [currentView, setCurrentView] = useState<'dashboard' | 'comparison'>('dashboard')
+  
   // Estado para dados de métricas de negócios (para permitir importação/exportação)
   const [metricsData, setMetricsData] = useState<MetricsData>(() => loadMetricsData(fiscalYear))
   
+  // Expor funções de limpeza no console (apenas para desenvolvimento)
+  useEffect(() => {
+    (window as any).clearYearData = clearYearData;
+    (window as any).clearAllData = clearAllData;
+    (window as any).reloadDashboard = () => window.location.reload();
+    
+    console.log('🛠️ Funções de desenvolvimento disponíveis:');
+    console.log('  - clearYearData(2024) - Limpa dados de um ano específico');
+    console.log('  - clearAllData() - Limpa todos os dados');
+    console.log('  - reloadDashboard() - Recarrega a página');
+  }, []);
+  
   // Effect para carregar dados quando o ano fiscal mudar
   useEffect(() => {
+    console.log('🔄 Carregando dados para o ano fiscal:', fiscalYear);
+    
     const newMetricsData = loadMetricsData(fiscalYear);
+    console.log('📊 Métricas carregadas:', newMetricsData);
     setMetricsData(newMetricsData);
     
     const newDreData = loadDREData(fiscalYear);
+    console.log('📈 DRE carregado:', newDreData);
+    
     if (newDreData && newDreData.length > 0) {
       setDreData(newDreData);
     } else {
-      // Se não houver dados salvos, usar dados iniciais
-      setDreData(initialDreData);
+      // Se não houver dados salvos, usar dados zerados para anos diferentes de 2025
+      if (fiscalYear === 2025) {
+        setDreData(initialDreData);
+      } else {
+        // Criar dados zerados para outros anos
+        const zeroedData = initialDreData.map(line => ({
+          ...line,
+          total: 0,
+          percentTotal: line.percentTotal !== null ? 0 : null,
+          meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        }));
+        setDreData(zeroedData);
+      }
     }
     
     saveSelectedFiscalYear(fiscalYear);
@@ -733,152 +908,6 @@ export function VWFinancialDashboard() {
     { mes: "Novembro", volume: 118, receitaLiquida: 11200, lucroBruto: 550, rendasOperacionais: 480, lucroOperacional: 220, pessoal: 182, terceiros: 75, ocupacao: 38, funcionamento: 148, vendas: 557 },
   ]
 
-  // Dados iniciais DRE - Demonstrativo de Resultados
-  const initialDreData = [
-    {
-      descricao: "VOLUME DE VENDAS",
-      total: 934,
-      percentTotal: null,
-      meses: [100, 100, 98, 83, 83, 95, 70, 75, 102, 85, 79, 64]
-    },
-    {
-      descricao: "RECEITA OPERACIONAL LIQUIDA",
-      total: 95954132,
-      percentTotal: 100.00,
-      meses: [8328316, 8483342, 7902231, 7138470, 7226733, 8336360, 8485005, 10826922, 8927513, 9761159, 8538082, 0]
-    },
-    {
-      descricao: "CUSTO OPERACIONAL DA RECEITA",
-      total: -89534647,
-      percentTotal: -93.31,
-      meses: [-7835540, -7979610, -7280972, -6621037, -6634322, -7753002, -9965913, -10094242, -8199050, -9148803, -8022155, 0]
-    },
-    {
-      descricao: "LUCRO (PREJUIZO) OPERACIONAL BRUTO",
-      total: 6419485,
-      percentTotal: 6.69,
-      meses: [492776, 503732, 621259, 517432, 592411, 583358, 519092, 732680, 728463, 612356, 515927, 0]
-    },
-    {
-      descricao: "OUTRAS DESPESAS OPERACIONAIS",
-      total: 1710743,
-      percentTotal: 1.78,
-      meses: [104975, 132525, 98310, 188520, 142952, 100280, 175314, 180902, 250305, 135840, 200820, 0]
-    },
-    {
-      descricao: "OUTRAS RECEITAS OPERACIONAIS",
-      total: 4357499,
-      percentTotal: 4.54,
-      meses: [379638, 362411, 323692, 310751, 295513, 360671, 524479, 450968, 373505, 535010, 440860, 0]
-    },
-    {
-      descricao: "MARGEM DE CONTRIBUIÇÃO",
-      total: 8365271,
-      percentTotal: 8.72,
-      meses: [669490, 669951, 737837, 743342, 713237, 673321, 792662, 923206, 911707, 844521, 685996, 0],
-      isHighlight: true
-    },
-    {
-      descricao: "DESPESAS C/ PESSOAL",
-      total: -1705053,
-      percentTotal: -1.78,
-      meses: [-135776, -161711, -135728, -148064, -116746, -175251, -167967, -151586, -150194, -175864, -186164, 0]
-    },
-    {
-      descricao: "DESPESAS C/ SERV. DE TERCEIROS",
-      total: -650650,
-      percentTotal: -0.68,
-      meses: [-49272, -41589, -40445, -48066, -47524, -64734, -73389, -66365, -71881, -99203, -48182, 0]
-    },
-    {
-      descricao: "DESPESAS C/ OCUPAÇÃO",
-      total: -177636,
-      percentTotal: -0.19,
-      meses: [-13120, -13120, -13355, -13355, -13355, -13355, -13355, -21156, -21156, -21156, -21156, 0]
-    },
-    {
-      descricao: "DESPESAS C/ FUNCIONAMENTO",
-      total: -1642583,
-      percentTotal: -1.71,
-      meses: [-162040, -177923, -124227, -135629, -134151, -117842, -130073, -149322, -165388, -160983, -185006, 0]
-    },
-    {
-      descricao: "DESPESAS C/ VENDAS",
-      total: -4122456,
-      percentTotal: -4.30,
-      meses: [-307898, -328716, -305425, -273361, -317639, -370988, -426223, -441343, -440566, -438685, -471612, 0]
-    },
-    {
-      descricao: "LUCRO (PREJUIZO) OPERACIONAL LIQUIDO",
-      total: 4189348,
-      percentTotal: 4.37,
-      meses: [309282, 275608, 424081, 398229, 401462, 302139, 407878, 534777, 503088, 387315, 245488, 0],
-      isHighlight: true
-    },
-    {
-      descricao: "AMORTIZAÇÕES E DEPRECIAÇÕES",
-      total: -87251,
-      percentTotal: -0.09,
-      meses: [-8441, -2167, -8489, -8489, -8404, -8545, -8545, -8545, -8545, -8545, -8536, 0]
-    },
-    {
-      descricao: "OUTRAS RECEITAS FINANCEIRAS",
-      total: 0,
-      percentTotal: 0.00,
-      meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    },
-    {
-      descricao: "DESPESAS FINANCEIRAS NÃO OPERACIONAL",
-      total: -20046,
-      percentTotal: -0.02,
-      meses: [-8619, -8581, -270, -165, -153, -561, -227, -259, -123, -310, -778, 0]
-    },
-    {
-      descricao: "DESPESAS NÃO OPERACIONAIS",
-      total: 0,
-      percentTotal: 0.00,
-      meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    },
-    {
-      descricao: "OUTRAS RENDAS NÃO OPERACIONAIS",
-      total: 0,
-      percentTotal: 0.00,
-      meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    },
-    {
-      descricao: "LUCRO (PREJUIZO) ANTES IMPOSTOS",
-      total: 14082051,
-      percentTotal: 4.25,
-      meses: [292222, 264860, 415322, 389575, 392905, 293033, 399105, 525973, 494420, 378461, 236175, 0],
-      isHighlight: true
-    },
-    {
-      descricao: "PROVISÕES IRPJ E C.S.",
-      total: 0,
-      percentTotal: 0.00,
-      meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    },
-    {
-      descricao: "PARTICIPAÇÕES",
-      total: 0,
-      percentTotal: 0.00,
-      meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    },
-    {
-      descricao: "LUCRO LIQUIDO DO EXERCICIO",
-      total: 476215,
-      percentTotal: 0.50,
-      meses: [292222, 264860, 415322, 389575, 392905, 293033, 399105, 525973, 494420, 378461, 236175, 0],
-      isHighlight: true,
-      isFinal: true
-    }
-  ]
-  
-  // Inicializar dreData se estiver vazio
-  if (dreData.length === 0) {
-    setDreData(initialDreData)
-  }
-
   // Totais do período
   // Dados ativos (original ou projetado)
   const activeDreData = getActiveData()
@@ -1007,6 +1036,17 @@ export function VWFinancialDashboard() {
   // Índices de linhas editáveis (não calculadas)
   const editableLineIndices = [0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20]
 
+  // Renderizar view de comparação se ativa
+  if (currentView === 'comparison') {
+    return (
+      <YearComparison 
+        onBack={() => setCurrentView('dashboard')}
+        initialYear1={fiscalYear}
+        initialYear2={fiscalYear === 2024 ? 2025 : (fiscalYear - 1) as any}
+      />
+    )
+  }
+
   return (
     <>
       {/* Modal de Edição de Percentuais */}
@@ -1118,6 +1158,15 @@ export function VWFinancialDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setCurrentView('comparison')}
+                variant="outline"
+                size="sm"
+                className="gap-2 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900"
+              >
+                <GitCompare className="w-4 h-4" />
+                Comparar Anos
+              </Button>
               <Select value={fiscalYear.toString()} onValueChange={handleFiscalYearChange}>
                 <SelectTrigger className="w-[160px] bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
                   <SelectValue>
