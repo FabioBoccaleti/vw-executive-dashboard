@@ -763,22 +763,38 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          // Calcular receita líquida do período para calcular a margem
+                          const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
+                          const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaValues1 = aggregateData(receitaLine1?.meses || [])
+                          const receitaValues2 = aggregateData(receitaLine2?.meses || [])
+                          const receitaPeriodo1 = receitaValues1[periodoIndex] || 0
+                          const receitaPeriodo2 = receitaValues2[periodoIndex] || 0
+                          
+                          const valor1 = Number(payload[0]?.value || 0)
+                          const valor2 = Number(payload[1]?.value || 0)
+                          const margem1 = receitaPeriodo1 > 0 ? (valor1 / receitaPeriodo1) * 100 : 0
+                          const margem2 = receitaPeriodo2 > 0 ? (valor2 / receitaPeriodo2) * 100 : 0
+                          
                           return (
                             <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                               <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
                               <div className="space-y-1">
                                 <p className="text-sm">
                                   <span className="text-blue-600 dark:text-blue-400">▪ {year1}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor1)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem1.toFixed(2)}%)</span>
                                 </p>
                                 <p className="text-sm">
                                   <span className="text-green-600 dark:text-green-400">▪ {year2}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[1]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor2)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem2.toFixed(2)}%)</span>
                                 </p>
                                 <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
                                   <p className="text-xs text-slate-600 dark:text-slate-400">
-                                    Diferença: <span className={`font-bold ${getDifferenceColor(Number(payload[0]?.value || 0) - Number(payload[1]?.value || 0))}`}>
-                                      {formatCurrency(Number(payload[0]?.value || 0) - Number(payload[1]?.value || 0))}
+                                    Diferença: <span className={`font-bold ${getDifferenceColor(valor1 - valor2)}`}>
+                                      {formatCurrency(valor1 - valor2)}
                                     </span>
                                   </p>
                                 </div>
@@ -904,22 +920,37 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
+                          const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaValues1 = aggregateData(receitaLine1?.meses || [])
+                          const receitaValues2 = aggregateData(receitaLine2?.meses || [])
+                          const receitaPeriodo1 = receitaValues1[periodoIndex] || 0
+                          const receitaPeriodo2 = receitaValues2[periodoIndex] || 0
+                          
+                          const valor1 = Number(payload[0]?.value || 0)
+                          const valor2 = Number(payload[1]?.value || 0)
+                          const margem1 = receitaPeriodo1 > 0 ? (valor1 / receitaPeriodo1) * 100 : 0
+                          const margem2 = receitaPeriodo2 > 0 ? (valor2 / receitaPeriodo2) * 100 : 0
+                          
                           return (
                             <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                               <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
                               <div className="space-y-1">
                                 <p className="text-sm">
                                   <span className="text-blue-600 dark:text-blue-400">▪ {year1}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor1)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem1.toFixed(2)}%)</span>
                                 </p>
                                 <p className="text-sm">
                                   <span className="text-green-600 dark:text-green-400">▪ {year2}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[1]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor2)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem2.toFixed(2)}%)</span>
                                 </p>
                                 <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
                                   <p className="text-xs text-slate-600 dark:text-slate-400">
-                                    Diferença: <span className={`font-bold ${getDifferenceColor(Number(payload[0]?.value || 0) - Number(payload[1]?.value || 0))}`}>
-                                      {formatCurrency(Number(payload[0]?.value || 0) - Number(payload[1]?.value || 0))}
+                                    Diferença: <span className={`font-bold ${getDifferenceColor(valor1 - valor2)}`}>
+                                      {formatCurrency(valor1 - valor2)}
                                     </span>
                                   </p>
                                 </div>
@@ -1045,22 +1076,37 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
+                          const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaValues1 = aggregateData(receitaLine1?.meses || [])
+                          const receitaValues2 = aggregateData(receitaLine2?.meses || [])
+                          const receitaPeriodo1 = receitaValues1[periodoIndex] || 0
+                          const receitaPeriodo2 = receitaValues2[periodoIndex] || 0
+                          
+                          const valor1 = Number(payload[0]?.value || 0)
+                          const valor2 = Number(payload[1]?.value || 0)
+                          const margem1 = receitaPeriodo1 > 0 ? (valor1 / receitaPeriodo1) * 100 : 0
+                          const margem2 = receitaPeriodo2 > 0 ? (valor2 / receitaPeriodo2) * 100 : 0
+                          
                           return (
                             <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                               <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
                               <div className="space-y-1">
                                 <p className="text-sm">
                                   <span className="text-red-600 dark:text-red-400">▪ {year1}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor1)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem1.toFixed(2)}%)</span>
                                 </p>
                                 <p className="text-sm">
                                   <span className="text-orange-600 dark:text-orange-400">▪ {year2}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[1]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor2)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem2.toFixed(2)}%)</span>
                                 </p>
                                 <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
                                   <p className="text-xs text-slate-600 dark:text-slate-400">
                                     Diferença: <span className="font-bold">
-                                      {formatCurrency(Math.abs(Number(payload[0]?.value || 0) - Number(payload[1]?.value || 0)))}
+                                      {formatCurrency(Math.abs(valor1 - valor2))}
                                     </span>
                                   </p>
                                 </div>
@@ -1186,22 +1232,37 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
+                          const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaValues1 = aggregateData(receitaLine1?.meses || [])
+                          const receitaValues2 = aggregateData(receitaLine2?.meses || [])
+                          const receitaPeriodo1 = receitaValues1[periodoIndex] || 0
+                          const receitaPeriodo2 = receitaValues2[periodoIndex] || 0
+                          
+                          const valor1 = Number(payload[0]?.value || 0)
+                          const valor2 = Number(payload[1]?.value || 0)
+                          const margem1 = receitaPeriodo1 > 0 ? (valor1 / receitaPeriodo1) * 100 : 0
+                          const margem2 = receitaPeriodo2 > 0 ? (valor2 / receitaPeriodo2) * 100 : 0
+                          
                           return (
                             <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                               <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
                               <div className="space-y-1">
                                 <p className="text-sm">
                                   <span className="text-red-600 dark:text-red-400">▪ {year1}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor1)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem1.toFixed(2)}%)</span>
                                 </p>
                                 <p className="text-sm">
                                   <span className="text-orange-600 dark:text-orange-400">▪ {year2}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[1]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor2)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem2.toFixed(2)}%)</span>
                                 </p>
                                 <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
                                   <p className="text-xs text-slate-600 dark:text-slate-400">
                                     Diferença: <span className="font-bold">
-                                      {formatCurrency(Math.abs(Number(payload[0]?.value || 0) - Number(payload[1]?.value || 0)))}
+                                      {formatCurrency(Math.abs(valor1 - valor2))}
                                     </span>
                                   </p>
                                 </div>
@@ -1327,22 +1388,37 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
+                          const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaValues1 = aggregateData(receitaLine1?.meses || [])
+                          const receitaValues2 = aggregateData(receitaLine2?.meses || [])
+                          const receitaPeriodo1 = receitaValues1[periodoIndex] || 0
+                          const receitaPeriodo2 = receitaValues2[periodoIndex] || 0
+                          
+                          const valor1 = Number(payload[0]?.value || 0)
+                          const valor2 = Number(payload[1]?.value || 0)
+                          const margem1 = receitaPeriodo1 > 0 ? (valor1 / receitaPeriodo1) * 100 : 0
+                          const margem2 = receitaPeriodo2 > 0 ? (valor2 / receitaPeriodo2) * 100 : 0
+                          
                           return (
                             <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                               <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
                               <div className="space-y-1">
                                 <p className="text-sm">
                                   <span className="text-red-600 dark:text-red-400">▪ {year1}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor1)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem1.toFixed(2)}%)</span>
                                 </p>
                                 <p className="text-sm">
                                   <span className="text-orange-600 dark:text-orange-400">▪ {year2}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[1]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor2)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem2.toFixed(2)}%)</span>
                                 </p>
                                 <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
                                   <p className="text-xs text-slate-600 dark:text-slate-400">
                                     Diferença: <span className="font-bold">
-                                      {formatCurrency(Math.abs(Number(payload[0]?.value || 0) - Number(payload[1]?.value || 0)))}
+                                      {formatCurrency(Math.abs(valor1 - valor2))}
                                     </span>
                                   </p>
                                 </div>
@@ -1468,22 +1544,37 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
+                          const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaValues1 = aggregateData(receitaLine1?.meses || [])
+                          const receitaValues2 = aggregateData(receitaLine2?.meses || [])
+                          const receitaPeriodo1 = receitaValues1[periodoIndex] || 0
+                          const receitaPeriodo2 = receitaValues2[periodoIndex] || 0
+                          
+                          const valor1 = Number(payload[0]?.value || 0)
+                          const valor2 = Number(payload[1]?.value || 0)
+                          const margem1 = receitaPeriodo1 > 0 ? (valor1 / receitaPeriodo1) * 100 : 0
+                          const margem2 = receitaPeriodo2 > 0 ? (valor2 / receitaPeriodo2) * 100 : 0
+                          
                           return (
                             <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                               <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
                               <div className="space-y-1">
                                 <p className="text-sm">
                                   <span className="text-red-600 dark:text-red-400">▪ {year1}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor1)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem1.toFixed(2)}%)</span>
                                 </p>
                                 <p className="text-sm">
                                   <span className="text-orange-600 dark:text-orange-400">▪ {year2}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[1]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor2)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem2.toFixed(2)}%)</span>
                                 </p>
                                 <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
                                   <p className="text-xs text-slate-600 dark:text-slate-400">
                                     Diferença: <span className="font-bold">
-                                      {formatCurrency(Math.abs(Number(payload[0]?.value || 0) - Number(payload[1]?.value || 0)))}
+                                      {formatCurrency(Math.abs(valor1 - valor2))}
                                     </span>
                                   </p>
                                 </div>
@@ -1609,22 +1700,37 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
+                          const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaValues1 = aggregateData(receitaLine1?.meses || [])
+                          const receitaValues2 = aggregateData(receitaLine2?.meses || [])
+                          const receitaPeriodo1 = receitaValues1[periodoIndex] || 0
+                          const receitaPeriodo2 = receitaValues2[periodoIndex] || 0
+                          
+                          const valor1 = Number(payload[0]?.value || 0)
+                          const valor2 = Number(payload[1]?.value || 0)
+                          const margem1 = receitaPeriodo1 > 0 ? (valor1 / receitaPeriodo1) * 100 : 0
+                          const margem2 = receitaPeriodo2 > 0 ? (valor2 / receitaPeriodo2) * 100 : 0
+                          
                           return (
                             <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                               <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
                               <div className="space-y-1">
                                 <p className="text-sm">
                                   <span className="text-red-600 dark:text-red-400">▪ {year1}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor1)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem1.toFixed(2)}%)</span>
                                 </p>
                                 <p className="text-sm">
                                   <span className="text-orange-600 dark:text-orange-400">▪ {year2}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[1]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor2)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem2.toFixed(2)}%)</span>
                                 </p>
                                 <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
                                   <p className="text-xs text-slate-600 dark:text-slate-400">
                                     Diferença: <span className="font-bold">
-                                      {formatCurrency(Math.abs(Number(payload[0]?.value || 0) - Number(payload[1]?.value || 0)))}
+                                      {formatCurrency(Math.abs(valor1 - valor2))}
                                     </span>
                                   </p>
                                 </div>
@@ -1748,22 +1854,37 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
+                          const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaValues1 = aggregateData(receitaLine1?.meses || [])
+                          const receitaValues2 = aggregateData(receitaLine2?.meses || [])
+                          const receitaPeriodo1 = receitaValues1[periodoIndex] || 0
+                          const receitaPeriodo2 = receitaValues2[periodoIndex] || 0
+                          
+                          const valor1 = Number(payload[0]?.value || 0)
+                          const valor2 = Number(payload[1]?.value || 0)
+                          const margem1 = receitaPeriodo1 > 0 ? (valor1 / receitaPeriodo1) * 100 : 0
+                          const margem2 = receitaPeriodo2 > 0 ? (valor2 / receitaPeriodo2) * 100 : 0
+                          
                           return (
                             <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                               <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
                               <div className="space-y-1">
                                 <p className="text-sm">
                                   <span className="text-slate-600 dark:text-slate-400">▪ {year1}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor1)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem1.toFixed(2)}%)</span>
                                 </p>
                                 <p className="text-sm">
                                   <span className="text-slate-600 dark:text-slate-400">▪ {year2}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[1]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor2)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem2.toFixed(2)}%)</span>
                                 </p>
                                 <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
                                   <p className="text-xs text-slate-600 dark:text-slate-400">
                                     Diferença: <span className="font-bold">
-                                      {formatCurrency(Math.abs(Number(payload[0]?.value || 0) - Number(payload[1]?.value || 0)))}
+                                      {formatCurrency(Math.abs(valor1 - valor2))}
                                     </span>
                                   </p>
                                 </div>
@@ -1889,22 +2010,37 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
+                          const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                          const receitaValues1 = aggregateData(receitaLine1?.meses || [])
+                          const receitaValues2 = aggregateData(receitaLine2?.meses || [])
+                          const receitaPeriodo1 = receitaValues1[periodoIndex] || 0
+                          const receitaPeriodo2 = receitaValues2[periodoIndex] || 0
+                          
+                          const valor1 = Number(payload[0]?.value || 0)
+                          const valor2 = Number(payload[1]?.value || 0)
+                          const margem1 = receitaPeriodo1 > 0 ? (valor1 / receitaPeriodo1) * 100 : 0
+                          const margem2 = receitaPeriodo2 > 0 ? (valor2 / receitaPeriodo2) * 100 : 0
+                          
                           return (
                             <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                               <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
                               <div className="space-y-1">
                                 <p className="text-sm">
                                   <span className="text-indigo-600 dark:text-indigo-400">▪ {year1}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor1)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem1.toFixed(2)}%)</span>
                                 </p>
                                 <p className="text-sm">
                                   <span className="text-purple-600 dark:text-purple-400">▪ {year2}: </span>
-                                  <span className="font-bold">{formatCurrency(Number(payload[1]?.value || 0))}</span>
+                                  <span className="font-bold">{formatCurrency(valor2)}</span>
+                                  <span className="text-xs text-slate-500 ml-1">({margem2.toFixed(2)}%)</span>
                                 </p>
                                 <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
                                   <p className="text-xs text-slate-600 dark:text-slate-400">
-                                    Diferença: <span className={`font-bold ${getDifferenceColor(Number(payload[0]?.value || 0) - Number(payload[1]?.value || 0))}`}>
-                                      {formatCurrency(Number(payload[0]?.value || 0) - Number(payload[1]?.value || 0))}
+                                    Diferença: <span className={`font-bold ${getDifferenceColor(valor1 - valor2)}`}>
+                                      {formatCurrency(valor1 - valor2)}
                                     </span>
                                   </p>
                                 </div>
