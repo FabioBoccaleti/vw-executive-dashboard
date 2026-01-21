@@ -328,7 +328,7 @@ export function VWFinancialDashboard() {
     if (viewMode === 'mensal') {
       return ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
     } else if (viewMode === 'bimestral') {
-      return ['Jan-Fev', 'Mar-Abr', 'Mai-Jun', 'Jul-Ago', 'Set-Out', 'Nov-Dez']
+      return ['1º Bim', '2º Bim', '3º Bim', '4º Bim', '5º Bim', '6º Bim']
     } else if (viewMode === 'trimestral') {
       return ['1º Tri', '2º Tri', '3º Tri', '4º Tri']
     } else {
@@ -1247,7 +1247,7 @@ export function VWFinancialDashboard() {
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2 mb-2">
                 <TrendingUp className="w-5 h-5 text-slate-700 dark:text-slate-300" />
-                <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">INSIGHTS MENSAIS</CardTitle>
+                <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">INSIGHTS</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
