@@ -126,20 +126,18 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
 
   // Totalizadores principais
   const totals1 = useMemo(() => {
-    const volumeNovos = calculateAnnualTotal(data1, ['vendasNovos', 'vendas'])
-    const volumeUsados = calculateAnnualTotal(data1, ['vendasUsados', 'vendas'])
+    const volumeTotal = dre1?.[0]?.meses?.reduce((a: number, b: number) => a + b, 0) || 0
     const receitaLiquida = getDRELineTotal(dre1, 'RECEITA OPERACIONAL LIQUIDA')
     const lucro = getDRELineTotal(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')
-    return { volumeNovos, volumeUsados, volumeTotal: volumeNovos + volumeUsados, receitaLiquida, lucro }
-  }, [data1, dre1])
+    return { volumeNovos: 0, volumeUsados: 0, volumeTotal, receitaLiquida, lucro }
+  }, [dre1])
 
   const totals2 = useMemo(() => {
-    const volumeNovos = calculateAnnualTotal(data2, ['vendasNovos', 'vendas'])
-    const volumeUsados = calculateAnnualTotal(data2, ['vendasUsados', 'vendas'])
+    const volumeTotal = dre2?.[0]?.meses?.reduce((a: number, b: number) => a + b, 0) || 0
     const receitaLiquida = getDRELineTotal(dre2, 'RECEITA OPERACIONAL LIQUIDA')
     const lucro = getDRELineTotal(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')
-    return { volumeNovos, volumeUsados, volumeTotal: volumeNovos + volumeUsados, receitaLiquida, lucro }
-  }, [data2, dre2])
+    return { volumeNovos: 0, volumeUsados: 0, volumeTotal, receitaLiquida, lucro }
+  }, [dre2])
 
   // Dados para gráfico comparativo
   const chartData = [
@@ -479,14 +477,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
                     data={getPeriodLabels().map((label, index) => {
-                      const volumeNovos1 = aggregateData(data1?.vendasNovos?.vendas || [])[index] || 0
-                      const volumeUsados1 = aggregateData(data1?.vendasUsados?.vendas || [])[index] || 0
-                      const volumeNovos2 = aggregateData(data2?.vendasNovos?.vendas || [])[index] || 0
-                      const volumeUsados2 = aggregateData(data2?.vendasUsados?.vendas || [])[index] || 0
+                      const volumeLine1 = dre1?.[0]
+                      const volumeLine2 = dre2?.[0]
+                      const values1 = aggregateData(volumeLine1?.meses || [])
+                      const values2 = aggregateData(volumeLine2?.meses || [])
                       return {
                         name: label,
-                        [year1]: volumeNovos1 + volumeUsados1,
-                        [year2]: volumeNovos2 + volumeUsados2
+                        [year1]: values1[index] || 0,
+                        [year2]: values2[index] || 0
                       }
                     })}
                     barGap={4}
@@ -809,8 +807,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       wrapperStyle={{ paddingTop: '20px' }}
                       formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                     />
-                    <Bar dataKey={String(year1)} fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#a78bfa" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -838,8 +836,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
                     {(() => {
-                      const margem1 = dre1?.find(line => line.descricao === 'MARGEM DE CONTRIBUIÇÃO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const margem2 = dre2?.find(line => line.descricao === 'MARGEM DE CONTRIBUIÇÃO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const margem1 = dre1?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const margem2 = dre2?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
@@ -857,8 +855,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const margem1 = dre1?.find(line => line.descricao === 'MARGEM DE CONTRIBUIÇÃO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const margem2 = dre2?.find(line => line.descricao === 'MARGEM DE CONTRIBUIÇÃO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const margem1 = dre1?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const margem2 = dre2?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
                       const percent1 = totals1.receitaLiquida > 0 ? (margem1 / totals1.receitaLiquida) * 100 : 0
                       const percent2 = totals2.receitaLiquida > 0 ? (margem2 / totals2.receitaLiquida) * 100 : 0
                       return (
@@ -878,8 +876,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const margem1 = dre1?.find(line => line.descricao === 'MARGEM DE CONTRIBUIÇÃO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const margem2 = dre2?.find(line => line.descricao === 'MARGEM DE CONTRIBUIÇÃO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const margem1 = dre1?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const margem2 = dre2?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
                       const diff = calculateDifference(margem1, margem2)
                       return (
                         <div className={`flex items-center gap-1 ${getDifferenceColor(diff.absolute)}`}>
@@ -902,8 +900,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
                     data={getPeriodLabels().map((label, index) => {
-                      const margemLine1 = dre1?.find(line => line.descricao === 'MARGEM DE CONTRIBUIÇÃO')
-                      const margemLine2 = dre2?.find(line => line.descricao === 'MARGEM DE CONTRIBUIÇÃO')
+                      const margemLine1 = dre1?.[6]
+                      const margemLine2 = dre2?.[6]
                       const values1 = aggregateData(margemLine1?.meses || [])
                       const values2 = aggregateData(margemLine2?.meses || [])
                       return {
@@ -965,8 +963,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       wrapperStyle={{ paddingTop: '20px' }}
                       formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                     />
-                    <Bar dataKey={String(year1)} fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#fbbf24" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -998,11 +996,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
-                          <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {formatCurrency(despesa1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
-                          <p className="text-lg font-bold text-red-600 dark:text-red-400 mt-2">
+                          <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
@@ -1038,7 +1036,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
-                        <div className={`flex items-center gap-1 ${getDifferenceColor(-diff.absolute)}`}>
+                        <div className="flex items-center gap-1 text-slate-900 dark:text-white">
                           {getDifferenceIcon(-diff.absolute)}
                           <div>
                             <p className="text-lg font-bold">
@@ -1122,7 +1120,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                     />
                     <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#f97316" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1154,11 +1152,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
-                          <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {formatCurrency(despesa1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
-                          <p className="text-lg font-bold text-red-600 dark:text-red-400 mt-2">
+                          <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
@@ -1194,7 +1192,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
-                        <div className={`flex items-center gap-1 ${getDifferenceColor(-diff.absolute)}`}>
+                        <div className="flex items-center gap-1 text-slate-900 dark:text-white">
                           {getDifferenceIcon(-diff.absolute)}
                           <div>
                             <p className="text-lg font-bold">
@@ -1277,8 +1275,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       wrapperStyle={{ paddingTop: '20px' }}
                       formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                     />
-                    <Bar dataKey={String(year1)} fill="#dc2626" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#ea580c" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1306,15 +1304,15 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ OCUPAÇÃO')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ OCUPAÇÃO')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = Math.abs(dre1?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = Math.abs(dre2?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
-                          <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {formatCurrency(despesa1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
-                          <p className="text-lg font-bold text-red-600 dark:text-red-400 mt-2">
+                          <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
@@ -1325,8 +1323,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ OCUPAÇÃO')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ OCUPAÇÃO')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = Math.abs(dre1?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = Math.abs(dre2?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const percent1 = totals1.receitaLiquida > 0 ? (despesa1 / totals1.receitaLiquida) * 100 : 0
                       const percent2 = totals2.receitaLiquida > 0 ? (despesa2 / totals2.receitaLiquida) * 100 : 0
                       return (
@@ -1346,11 +1344,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ OCUPAÇÃO')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ OCUPAÇÃO')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = Math.abs(dre1?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = Math.abs(dre2?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
-                        <div className={`flex items-center gap-1 ${getDifferenceColor(-diff.absolute)}`}>
+                        <div className="flex items-center gap-1 text-slate-900 dark:text-white">
                           {getDifferenceIcon(-diff.absolute)}
                           <div>
                             <p className="text-lg font-bold">
@@ -1370,8 +1368,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
                     data={getPeriodLabels().map((label, index) => {
-                      const despesaLine1 = dre1?.find(line => line.descricao === 'DESPESAS C/ OCUPAÇÃO')
-                      const despesaLine2 = dre2?.find(line => line.descricao === 'DESPESAS C/ OCUPAÇÃO')
+                      const despesaLine1 = dre1?.[9]
+                      const despesaLine2 = dre2?.[9]
                       const values1 = aggregateData(despesaLine1?.meses || [])
                       const values2 = aggregateData(despesaLine2?.meses || [])
                       return {
@@ -1433,8 +1431,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       wrapperStyle={{ paddingTop: '20px' }}
                       formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                     />
-                    <Bar dataKey={String(year1)} fill="#b91c1c" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#c2410c" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1466,11 +1464,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
-                          <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {formatCurrency(despesa1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
-                          <p className="text-lg font-bold text-red-600 dark:text-red-400 mt-2">
+                          <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
@@ -1506,7 +1504,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
-                        <div className={`flex items-center gap-1 ${getDifferenceColor(-diff.absolute)}`}>
+                        <div className="flex items-center gap-1 text-slate-900 dark:text-white">
                           {getDifferenceIcon(-diff.absolute)}
                           <div>
                             <p className="text-lg font-bold">
@@ -1589,8 +1587,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       wrapperStyle={{ paddingTop: '20px' }}
                       formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                     />
-                    <Bar dataKey={String(year1)} fill="#991b1b" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#9a3412" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1622,11 +1620,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
-                          <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {formatCurrency(despesa1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
-                          <p className="text-lg font-bold text-red-600 dark:text-red-400 mt-2">
+                          <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
@@ -1662,7 +1660,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
-                        <div className={`flex items-center gap-1 ${getDifferenceColor(-diff.absolute)}`}>
+                        <div className="flex items-center gap-1 text-slate-900 dark:text-white">
                           {getDifferenceIcon(-diff.absolute)}
                           <div>
                             <p className="text-lg font-bold">
@@ -1745,8 +1743,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       wrapperStyle={{ paddingTop: '20px' }}
                       formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                     />
-                    <Bar dataKey={String(year1)} fill="#7f1d1d" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#7c2d12" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1774,8 +1772,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
                     {(() => {
-                      const valor1 = Math.abs(dre1?.find(line => line.descricao === 'AMORTIZAÇÕES E DEPRECIAÇÕES')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const valor2 = Math.abs(dre2?.find(line => line.descricao === 'AMORTIZAÇÕES E DEPRECIAÇÕES')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const valor1 = Math.abs(dre1?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const valor2 = Math.abs(dre2?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-600 dark:text-slate-400">
@@ -1793,8 +1791,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Média Mensal</p>
                     {(() => {
-                      const valor1 = Math.abs(dre1?.find(line => line.descricao === 'AMORTIZAÇÕES E DEPRECIAÇÕES')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const valor2 = Math.abs(dre2?.find(line => line.descricao === 'AMORTIZAÇÕES E DEPRECIAÇÕES')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const valor1 = Math.abs(dre1?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const valor2 = Math.abs(dre2?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
@@ -1812,11 +1810,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const valor1 = Math.abs(dre1?.find(line => line.descricao === 'AMORTIZAÇÕES E DEPRECIAÇÕES')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const valor2 = Math.abs(dre2?.find(line => line.descricao === 'AMORTIZAÇÕES E DEPRECIAÇÕES')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const valor1 = Math.abs(dre1?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const valor2 = Math.abs(dre2?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(valor1, valor2)
                       return (
-                        <div className={`flex items-center gap-1 ${getDifferenceColor(-diff.absolute)}`}>
+                        <div className="flex items-center gap-1 text-slate-900 dark:text-white">
                           {getDifferenceIcon(-diff.absolute)}
                           <div>
                             <p className="text-lg font-bold">
@@ -1836,8 +1834,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
                     data={getPeriodLabels().map((label, index) => {
-                      const linha1 = dre1?.find(line => line.descricao === 'AMORTIZAÇÕES E DEPRECIAÇÕES')
-                      const linha2 = dre2?.find(line => line.descricao === 'AMORTIZAÇÕES E DEPRECIAÇÕES')
+                      const linha1 = dre1?.[13]
+                      const linha2 = dre2?.[13]
                       const values1 = aggregateData(linha1?.meses || [])
                       const values2 = aggregateData(linha2?.meses || [])
                       return {
@@ -2055,8 +2053,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       wrapperStyle={{ paddingTop: '20px' }}
                       formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                     />
-                    <Bar dataKey={String(year1)} fill="#6366f1" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
