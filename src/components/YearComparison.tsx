@@ -148,13 +148,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
     },
     {
       name: 'Receita Líquida',
-      [year1]: totals1.receitaLiquida / 1000000,
-      [year2]: totals2.receitaLiquida / 1000000
+      [year1]: totals1.receitaLiquida,
+      [year2]: totals2.receitaLiquida
     },
     {
       name: 'Lucro',
-      [year1]: totals1.lucro / 1000000,
-      [year2]: totals2.lucro / 1000000
+      [year1]: totals1.lucro,
+      [year2]: totals2.lucro
     }
   ]
 
@@ -2081,11 +2081,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             <div className="space-y-1">
                               <p className="text-sm">
                                 <span className="text-blue-600 dark:text-blue-400">▪ {year1}: </span>
-                                <span className="font-bold">{formatNumber(Number(payload[0]?.value || 0))}</span>
+                                <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
                               </p>
                               <p className="text-sm">
                                 <span className="text-green-600 dark:text-green-400">▪ {year2}: </span>
-                                <span className="font-bold">{formatNumber(Number(payload[1]?.value || 0))}</span>
+                                <span className="font-bold">{formatCurrency(Number(payload[1]?.value || 0))}</span>
                               </p>
                             </div>
                           </div>
@@ -2098,8 +2098,30 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     wrapperStyle={{ paddingTop: '20px' }}
                     formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                   />
-                  <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar 
+                    dataKey={String(year1)} 
+                    fill="#3b82f6" 
+                    radius={[4, 4, 0, 0]}
+                    label={{
+                      position: 'top',
+                      fill: '#1e40af',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      formatter: (value: number) => formatCurrency(value)
+                    }}
+                  />
+                  <Bar 
+                    dataKey={String(year2)} 
+                    fill="#10b981" 
+                    radius={[4, 4, 0, 0]}
+                    label={{
+                      position: 'top',
+                      fill: '#047857',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      formatter: (value: number) => formatCurrency(value)
+                    }}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
