@@ -18,10 +18,14 @@ import {
   saveDREData, 
   loadSelectedFiscalYear, 
   saveSelectedFiscalYear,
+  loadSelectedDepartment,
+  saveSelectedDepartment,
   clearYearData,
   clearAllData,
-  type MetricsData 
+  type MetricsData,
+  type Department
 } from "@/lib/dataStorage"
+import { DEPARTMENT_LABELS, DEPARTMENTS } from "@/lib/types"
 
 // Dados iniciais DRE - Demonstrativo de Resultados (ano 2025 como base)
 const initialDreData = [
@@ -165,8 +169,9 @@ const initialDreData = [
 ]
 
 export function VWFinancialDashboard() {
-  // Estado para o ano fiscal selecionado
+  // Estado para o ano fiscal selecionado e departamento
   const [fiscalYear, setFiscalYear] = useState<2024 | 2025 | 2026 | 2027>(() => loadSelectedFiscalYear())
+  const [department, setDepartment] = useState<Department>(() => loadSelectedDepartment())
   
   // Estado para controlar categorias de despesas selecionadas
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['pessoal', 'terceiros', 'ocupacao', 'funcionamento'])
@@ -193,7 +198,7 @@ export function VWFinancialDashboard() {
   const [currentView, setCurrentView] = useState<'dashboard' | 'comparison'>('dashboard')
   
   // Estado para dados de métricas de negócios (para permitir importação/exportação)
-  const [metricsData, setMetricsData] = useState<MetricsData>(() => loadMetricsData(fiscalYear))
+  const [metricsData, setMetricsData] = useState<MetricsData>(() => loadMetricsData(fiscalYear, department))
   
   // Expor funções de limpeza no console (apenas para desenvolvimento)
   useEffect(() => {
@@ -207,25 +212,25 @@ export function VWFinancialDashboard() {
     console.log('  - reloadDashboard() - Recarrega a página');
   }, []);
   
-  // Effect para carregar dados quando o ano fiscal mudar
+  // Effect para carregar dados quando o ano fiscal ou departamento mudarem
   useEffect(() => {
-    console.log('🔄 Carregando dados para o ano fiscal:', fiscalYear);
+    console.log('🔄 Carregando dados para:', fiscalYear, '-', DEPARTMENT_LABELS[department]);
     
-    const newMetricsData = loadMetricsData(fiscalYear);
+    const newMetricsData = loadMetricsData(fiscalYear, department);
     console.log('📊 Métricas carregadas:', newMetricsData);
     setMetricsData(newMetricsData);
     
-    const newDreData = loadDREData(fiscalYear);
+    const newDreData = loadDREData(fiscalYear, department);
     console.log('📈 DRE carregado:', newDreData);
     
     if (newDreData && newDreData.length > 0) {
       setDreData(newDreData);
     } else {
-      // Se não houver dados salvos, usar dados zerados para anos diferentes de 2025
-      if (fiscalYear === 2025) {
+      // Se não houver dados salvos, usar dados zerados para anos diferentes de 2025 ou departamentos diferentes de usados
+      if (fiscalYear === 2025 && department === 'usados') {
         setDreData(initialDreData);
       } else {
-        // Criar dados zerados para outros anos
+        // Criar dados zerados para outros casos
         const zeroedData = initialDreData.map(line => ({
           ...line,
           total: 0,
@@ -237,19 +242,20 @@ export function VWFinancialDashboard() {
     }
     
     saveSelectedFiscalYear(fiscalYear);
-  }, [fiscalYear]);
+    saveSelectedDepartment(department);
+  }, [fiscalYear, department]);
   
   // Effect para salvar dados de métricas quando mudarem
   useEffect(() => {
-    saveMetricsData(fiscalYear, metricsData);
-  }, [metricsData, fiscalYear]);
+    saveMetricsData(fiscalYear, metricsData, department);
+  }, [metricsData, fiscalYear, department]);
   
   // Effect para salvar dados de DRE quando mudarem
   useEffect(() => {
     if (dreData.length > 0) {
-      saveDREData(fiscalYear, dreData);
+      saveDREData(fiscalYear, dreData, department);
     }
-  }, [dreData, fiscalYear]);
+  }, [dreData, fiscalYear, department]);
   
   // Handler para mudança de ano fiscal
   const handleFiscalYearChange = (year: string) => {
@@ -1043,6 +1049,7 @@ export function VWFinancialDashboard() {
         onBack={() => setCurrentView('dashboard')}
         initialYear1={fiscalYear}
         initialYear2={fiscalYear === 2024 ? 2025 : (fiscalYear - 1) as any}
+        department={department}
       />
     )
   }
@@ -1153,7 +1160,7 @@ export function VWFinancialDashboard() {
                   Dashboard Executivo
                 </h1>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  Veículos Usados • Análise Gerencial • Atualizado em 07/01/2026
+                  {DEPARTMENT_LABELS[department]} • Análise Gerencial • Atualizado em 07/01/2026
                 </p>
               </div>
             </div>
@@ -1193,6 +1200,27 @@ export function VWFinancialDashboard() {
               <Badge className="bg-blue-100 text-blue-800 border-blue-200 px-4 py-2 text-sm">
                 Confidencial
               </Badge>
+            </div>
+          </div>
+          
+          {/* Tabs de Departamentos */}
+          <div className="mt-6 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {DEPARTMENTS.map((dept) => (
+                <button
+                  key={dept}
+                  onClick={() => setDepartment(dept)}
+                  className={`
+                    px-6 py-2.5 rounded-t-lg text-sm font-medium transition-all whitespace-nowrap
+                    ${department === dept
+                      ? 'bg-[#001E50] text-white shadow-md'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }
+                  `}
+                >
+                  {DEPARTMENT_LABELS[dept]}
+                </button>
+              ))}
             </div>
           </div>
           

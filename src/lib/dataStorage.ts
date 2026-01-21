@@ -10,6 +10,21 @@ import { businessMetricsData2024 } from '../data/businessMetricsData2024';
 import { businessMetricsData2026 } from '../data/businessMetricsData2026';
 import { businessMetricsData2027 } from '../data/businessMetricsData2027';
 
+// Imports dos departamentos
+import { businessMetricsDataNovos2024 } from '../data/businessMetricsDataNovos2024';
+import { businessMetricsDataVendaDireta2024 } from '../data/businessMetricsDataVendaDireta2024';
+import { businessMetricsDataUsados2024 } from '../data/businessMetricsDataUsados2024';
+import { businessMetricsDataUsados2025 } from '../data/businessMetricsDataUsados2025';
+import { businessMetricsDataUsados2026 } from '../data/businessMetricsDataUsados2026';
+import { businessMetricsDataUsados2027 } from '../data/businessMetricsDataUsados2027';
+import { businessMetricsDataPecas2024 } from '../data/businessMetricsDataPecas2024';
+import { businessMetricsDataOficina2024 } from '../data/businessMetricsDataOficina2024';
+import { businessMetricsDataFunilaria2024 } from '../data/businessMetricsDataFunilaria2024';
+import { businessMetricsDataAdministracao2024 } from '../data/businessMetricsDataAdministracao2024';
+
+// Tipo para departamento
+export type Department = 'novos' | 'vendaDireta' | 'usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'consolidado';
+
 // Tipos para os dados de métricas
 export type MetricsData = typeof businessMetricsData;
 
@@ -35,91 +50,236 @@ const STORAGE_KEYS = {
   DRE_2025: 'vw_dre_2025',
   DRE_2026: 'vw_dre_2026',
   DRE_2027: 'vw_dre_2027',
-  SELECTED_YEAR: 'vw_selected_fiscal_year'
+  SELECTED_YEAR: 'vw_selected_fiscal_year',
+  SELECTED_DEPARTMENT: 'vw_selected_department'
 } as const;
 
 /**
- * Carrega os dados de métricas de um ano fiscal específico
+ * Função auxiliar para obter dados padrão por departamento e ano
  */
-export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027): MetricsData {
-  try {
-    let key: string;
-    let defaultData: MetricsData;
-    
+function getDefaultDataForDepartment(department: Department, fiscalYear: 2024 | 2025 | 2026 | 2027): MetricsData {
+  const key = `${department}_${fiscalYear}`;
+  
+  // Para Usados (dados existentes)
+  if (department === 'usados') {
     switch (fiscalYear) {
-      case 2024:
-        key = STORAGE_KEYS.METRICS_2024;
-        defaultData = businessMetricsData2024;
-        break;
-      case 2025:
-        key = STORAGE_KEYS.METRICS_2025;
-        defaultData = businessMetricsData;
-        break;
-      case 2026:
-        key = STORAGE_KEYS.METRICS_2026;
-        defaultData = businessMetricsData2026;
-        break;
-      case 2027:
-        key = STORAGE_KEYS.METRICS_2027;
-        defaultData = businessMetricsData2027;
-        break;
+      case 2024: return businessMetricsDataUsados2024;
+      case 2025: return businessMetricsDataUsados2025;
+      case 2026: return businessMetricsDataUsados2026;
+      case 2027: return businessMetricsDataUsados2027;
+    }
+  }
+  
+  // Para Novos
+  if (department === 'novos') {
+    return businessMetricsDataNovos2024; // Por enquanto todos os anos têm dados vazios
+  }
+  
+  // Para Venda Direta
+  if (department === 'vendaDireta') {
+    return businessMetricsDataVendaDireta2024;
+  }
+  
+  // Para Peças
+  if (department === 'pecas') {
+    return businessMetricsDataPecas2024;
+  }
+  
+  // Para Oficina
+  if (department === 'oficina') {
+    return businessMetricsDataOficina2024;
+  }
+  
+  // Para Funilaria
+  if (department === 'funilaria') {
+    return businessMetricsDataFunilaria2024;
+  }
+  
+  // Para Administração
+  if (department === 'administracao') {
+    return businessMetricsDataAdministracao2024;
+  }
+  
+  // Para Consolidado (será calculado dinamicamente)
+  if (department === 'consolidado') {
+    return calculateConsolidatedData(fiscalYear);
+  }
+  
+  // Fallback
+  return businessMetricsDataNovos2024;
+}
+
+/**
+ * Calcula os dados consolidados somando todos os departamentos
+ */
+function calculateConsolidatedData(fiscalYear: 2024 | 2025 | 2026 | 2027): MetricsData {
+  const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
+  const allData = departments.map(dept => loadMetricsData(fiscalYear, dept));
+  
+  // Função auxiliar para somar arrays
+  const sumArrays = (arrays: number[][]): number[] => {
+    if (arrays.length === 0) return [];
+    const length = arrays[0].length;
+    return Array.from({ length }, (_, i) => 
+      arrays.reduce((sum, arr) => sum + (arr[i] || 0), 0)
+    );
+  };
+  
+  // Consolida todos os dados
+  const consolidated: MetricsData = {
+    months: allData[0].months,
+    
+    vendasNovos: {
+      vendas: sumArrays(allData.map(d => d.vendasNovos.vendas)),
+      volumeTrocas: sumArrays(allData.map(d => d.vendasNovos.volumeTrocas)),
+      percentualTrocas: sumArrays(allData.map(d => d.vendasNovos.percentualTrocas))
+    },
+    
+    vendasNovosVD: {
+      vendas: sumArrays(allData.map(d => d.vendasNovosVD.vendas)),
+      volumeTrocas: sumArrays(allData.map(d => d.vendasNovosVD.volumeTrocas)),
+      percentualTrocas: sumArrays(allData.map(d => d.vendasNovosVD.percentualTrocas))
+    },
+    
+    vendasUsados: {
+      vendas: sumArrays(allData.map(d => d.vendasUsados.vendas)),
+      volumeTrocas: sumArrays(allData.map(d => d.vendasUsados.volumeTrocas)),
+      percentualTrocas: sumArrays(allData.map(d => d.vendasUsados.percentualTrocas))
+    },
+    
+    volumeVendas: {
+      usados: sumArrays(allData.map(d => d.volumeVendas.usados)),
+      repasse: sumArrays(allData.map(d => d.volumeVendas.repasse)),
+      percentualRepasse: sumArrays(allData.map(d => d.volumeVendas.percentualRepasse))
+    },
+    
+    estoqueNovos: {
+      quantidade: sumArrays(allData.map(d => d.estoqueNovos.quantidade)),
+      valor: sumArrays(allData.map(d => d.estoqueNovos.valor)),
+      aPagar: sumArrays(allData.map(d => d.estoqueNovos.aPagar)),
+      pagos: sumArrays(allData.map(d => d.estoqueNovos.pagos))
+    },
+    
+    estoqueUsados: {
+      quantidade: sumArrays(allData.map(d => d.estoqueUsados.quantidade)),
+      valor: sumArrays(allData.map(d => d.estoqueUsados.valor)),
+      aPagar: sumArrays(allData.map(d => d.estoqueUsados.aPagar)),
+      pagos: sumArrays(allData.map(d => d.estoqueUsados.pagos))
+    },
+    
+    estoquePecas: {
+      quantidade: sumArrays(allData.map(d => d.estoquePecas.quantidade)),
+      valor: sumArrays(allData.map(d => d.estoquePecas.valor)),
+      aPagar: sumArrays(allData.map(d => d.estoquePecas.aPagar)),
+      pagos: sumArrays(allData.map(d => d.estoquePecas.pagos))
+    },
+    
+    margensOperacionais: {
+      novos: sumArrays(allData.map(d => d.margensOperacionais.novos)),
+      usados: sumArrays(allData.map(d => d.margensOperacionais.usados)),
+      oficina: sumArrays(allData.map(d => d.margensOperacionais.oficina)),
+      pecas: sumArrays(allData.map(d => d.margensOperacionais.pecas))
+    },
+    
+    receitaVendas: {
+      novos: sumArrays(allData.map(d => d.receitaVendas.novos)),
+      usados: sumArrays(allData.map(d => d.receitaVendas.usados))
+    },
+    
+    resultadoFinanceiro: {
+      receitas: sumArrays(allData.map(d => d.resultadoFinanceiro.receitas)),
+      despesas: sumArrays(allData.map(d => d.resultadoFinanceiro.despesas)),
+      resultado: sumArrays(allData.map(d => d.resultadoFinanceiro.resultado))
+    },
+    
+    despesasPessoal: {
+      custo: sumArrays(allData.map(d => d.despesasPessoal.custo)),
+      hc: sumArrays(allData.map(d => d.despesasPessoal.hc))
+    },
+    
+    receitasOficina: {
+      garantia: sumArrays(allData.map(d => d.receitasOficina.garantia)),
+      clientePago: sumArrays(allData.map(d => d.receitasOficina.clientePago)),
+      interno: sumArrays(allData.map(d => d.receitasOficina.interno))
+    },
+    
+    receitasPecas: {
+      balcao: sumArrays(allData.map(d => d.receitasPecas.balcao)),
+      oficina: sumArrays(allData.map(d => d.receitasPecas.oficina)),
+      externo: sumArrays(allData.map(d => d.receitasPecas.externo))
+    },
+    
+    fluxoCaixa: {
+      recebimentos: sumArrays(allData.map(d => d.fluxoCaixa.recebimentos)),
+      pagamentos: sumArrays(allData.map(d => d.fluxoCaixa.pagamentos)),
+      saldo: sumArrays(allData.map(d => d.fluxoCaixa.saldo))
+    },
+    
+    capital: {
+      capitalProprio: sumArrays(allData.map(d => d.capital.capitalProprio)),
+      capitalTerceiros: sumArrays(allData.map(d => d.capital.capitalTerceiros)),
+      capitalTotal: sumArrays(allData.map(d => d.capital.capitalTotal))
+    }
+  };
+  
+  return consolidated;
+}
+
+/**
+ * Carrega os dados de métricas de um ano fiscal específico e departamento
+ */
+export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: Department = 'usados'): MetricsData {
+  try {
+    // Se for consolidado, calcula dinamicamente
+    if (department === 'consolidado') {
+      return calculateConsolidatedData(fiscalYear);
     }
     
+    const key = `vw_metrics_${fiscalYear}_${department}`;
     const stored = localStorage.getItem(key);
     
     if (stored) {
       return JSON.parse(stored);
     }
     
-    return defaultData;
+    return getDefaultDataForDepartment(department, fiscalYear);
   } catch (error) {
-    console.error(`Erro ao carregar dados de métricas de ${fiscalYear}:`, error);
-    
-    switch (fiscalYear) {
-      case 2024: return businessMetricsData2024;
-      case 2025: return businessMetricsData;
-      case 2026: return businessMetricsData2026;
-      case 2027: return businessMetricsData2027;
-    }
+    console.error(`Erro ao carregar dados de métricas de ${fiscalYear} - ${department}:`, error);
+    return getDefaultDataForDepartment(department, fiscalYear);
   }
 }
 
 /**
- * Salva os dados de métricas de um ano fiscal específico
+ * Salva os dados de métricas de um ano fiscal específico e departamento
  */
-export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: MetricsData): boolean {
+export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: MetricsData, department: Department = 'usados'): boolean {
   try {
-    let key: string;
-    
-    switch (fiscalYear) {
-      case 2024: key = STORAGE_KEYS.METRICS_2024; break;
-      case 2025: key = STORAGE_KEYS.METRICS_2025; break;
-      case 2026: key = STORAGE_KEYS.METRICS_2026; break;
-      case 2027: key = STORAGE_KEYS.METRICS_2027; break;
+    // Não permite salvar dados do consolidado (é calculado)
+    if (department === 'consolidado') {
+      console.warn('Não é possível salvar dados do consolidado diretamente');
+      return false;
     }
     
+    const key = `vw_metrics_${fiscalYear}_${department}`;
     localStorage.setItem(key, JSON.stringify(data));
     return true;
   } catch (error) {
-    console.error(`Erro ao salvar dados de métricas de ${fiscalYear}:`, error);
+    console.error(`Erro ao salvar dados de métricas de ${fiscalYear} - ${department}:`, error);
     return false;
   }
 }
 
 /**
- * Carrega os dados de DRE de um ano fiscal específico
+ * Carrega os dados de DRE de um ano fiscal específico e departamento
  */
-export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027): DREData | null {
+export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: Department = 'usados'): DREData | null {
   try {
-    let key: string;
-    
-    switch (fiscalYear) {
-      case 2024: key = STORAGE_KEYS.DRE_2024; break;
-      case 2025: key = STORAGE_KEYS.DRE_2025; break;
-      case 2026: key = STORAGE_KEYS.DRE_2026; break;
-      case 2027: key = STORAGE_KEYS.DRE_2027; break;
+    // Se for consolidado, soma todas as DREs
+    if (department === 'consolidado') {
+      return calculateConsolidatedDRE(fiscalYear);
     }
     
+    const key = `vw_dre_${fiscalYear}_${department}`;
     const stored = localStorage.getItem(key);
     
     if (stored) {
@@ -128,29 +288,58 @@ export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027): DREData | nu
     
     return null;
   } catch (error) {
-    console.error(`Erro ao carregar dados de DRE de ${fiscalYear}:`, error);
+    console.error(`Erro ao carregar dados de DRE de ${fiscalYear} - ${department}:`, error);
     return null;
   }
 }
 
 /**
- * Salva os dados de DRE de um ano fiscal específico
+ * Calcula DRE consolidada somando todos os departamentos
  */
-export function saveDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: DREData): boolean {
-  try {
-    let key: string;
+function calculateConsolidatedDRE(fiscalYear: 2024 | 2025 | 2026 | 2027): DREData | null {
+  const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
+  const allDREs = departments.map(dept => loadDREData(fiscalYear, dept)).filter(dre => dre !== null) as DREData[];
+  
+  if (allDREs.length === 0) return null;
+  
+  // Pega a estrutura da primeira DRE
+  const firstDRE = allDREs[0];
+  
+  // Soma os valores de cada linha
+  const consolidated: DREData = firstDRE.map((line, index) => {
+    const meses = line.meses || [];
+    const summedMeses = meses.map((_, monthIndex) => {
+      return allDREs.reduce((sum, dre) => {
+        const dreValue = dre[index]?.meses?.[monthIndex] || 0;
+        return sum + dreValue;
+      }, 0);
+    });
     
-    switch (fiscalYear) {
-      case 2024: key = STORAGE_KEYS.DRE_2024; break;
-      case 2025: key = STORAGE_KEYS.DRE_2025; break;
-      case 2026: key = STORAGE_KEYS.DRE_2026; break;
-      case 2027: key = STORAGE_KEYS.DRE_2027; break;
+    return {
+      ...line,
+      meses: summedMeses
+    };
+  });
+  
+  return consolidated;
+}
+
+/**
+ * Salva os dados de DRE de um ano fiscal específico e departamento
+ */
+export function saveDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: DREData, department: Department = 'usados'): boolean {
+  try {
+    // Não permite salvar dados do consolidado (é calculado)
+    if (department === 'consolidado') {
+      console.warn('Não é possível salvar dados do consolidado diretamente');
+      return false;
     }
     
+    const key = `vw_dre_${fiscalYear}_${department}`;
     localStorage.setItem(key, JSON.stringify(data));
     return true;
   } catch (error) {
-    console.error(`Erro ao salvar dados de DRE de ${fiscalYear}:`, error);
+    console.error(`Erro ao salvar dados de DRE de ${fiscalYear} - ${department}:`, error);
     return false;
   }
 }
@@ -188,34 +377,54 @@ export function saveSelectedFiscalYear(fiscalYear: 2024 | 2025 | 2026 | 2027): b
 }
 
 /**
- * Limpa todos os dados de um ano fiscal específico
+ * Carrega o departamento selecionado
  */
-export function clearFiscalYearData(fiscalYear: 2024 | 2025 | 2026 | 2027): boolean {
+export function loadSelectedDepartment(): Department {
   try {
-    let metricsKey: string;
-    let dreKey: string;
-    
-    switch (fiscalYear) {
-      case 2024:
-        metricsKey = STORAGE_KEYS.METRICS_2024;
-        dreKey = STORAGE_KEYS.DRE_2024;
-        break;
-      case 2025:
-        metricsKey = STORAGE_KEYS.METRICS_2025;
-        dreKey = STORAGE_KEYS.DRE_2025;
-        break;
-      case 2026:
-        metricsKey = STORAGE_KEYS.METRICS_2026;
-        dreKey = STORAGE_KEYS.DRE_2026;
-        break;
-      case 2027:
-        metricsKey = STORAGE_KEYS.METRICS_2027;
-        dreKey = STORAGE_KEYS.DRE_2027;
-        break;
+    const stored = localStorage.getItem(STORAGE_KEYS.SELECTED_DEPARTMENT);
+    if (stored && ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao', 'consolidado'].includes(stored)) {
+      return stored as Department;
     }
-    
-    localStorage.removeItem(metricsKey);
-    localStorage.removeItem(dreKey);
+    return 'usados'; // Padrão: Usados
+  } catch (error) {
+    console.error('Erro ao carregar departamento selecionado:', error);
+    return 'usados';
+  }
+}
+
+/**
+ * Salva o departamento selecionado
+ */
+export function saveSelectedDepartment(department: Department): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEYS.SELECTED_DEPARTMENT, department);
+    return true;
+  } catch (error) {
+    console.error('Erro ao salvar departamento selecionado:', error);
+    return false;
+  }
+}
+
+/**
+ * Limpa todos os dados de um ano fiscal específico e departamento
+ */
+export function clearFiscalYearData(fiscalYear: 2024 | 2025 | 2026 | 2027, department?: Department): boolean {
+  try {
+    if (department) {
+      const metricsKey = `vw_metrics_${fiscalYear}_${department}`;
+      const dreKey = `vw_dre_${fiscalYear}_${department}`;
+      localStorage.removeItem(metricsKey);
+      localStorage.removeItem(dreKey);
+    } else {
+      // Limpa todos os departamentos daquele ano
+      const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
+      departments.forEach(dept => {
+        const metricsKey = `vw_metrics_${fiscalYear}_${dept}`;
+        const dreKey = `vw_dre_${fiscalYear}_${dept}`;
+        localStorage.removeItem(metricsKey);
+        localStorage.removeItem(dreKey);
+      });
+    }
     return true;
   } catch (error) {
     console.error(`Erro ao limpar dados de ${fiscalYear}:`, error);
@@ -224,30 +433,11 @@ export function clearFiscalYearData(fiscalYear: 2024 | 2025 | 2026 | 2027): bool
 }
 
 /**
- * Verifica se há dados salvos para um ano fiscal específico
+ * Verifica se há dados salvos para um ano fiscal específico e departamento
  */
-export function hasStoredData(fiscalYear: 2024 | 2025 | 2026 | 2027): boolean {
-  let metricsKey: string;
-  let dreKey: string;
-  
-  switch (fiscalYear) {
-    case 2024:
-      metricsKey = STORAGE_KEYS.METRICS_2024;
-      dreKey = STORAGE_KEYS.DRE_2024;
-      break;
-    case 2025:
-      metricsKey = STORAGE_KEYS.METRICS_2025;
-      dreKey = STORAGE_KEYS.DRE_2025;
-      break;
-    case 2026:
-      metricsKey = STORAGE_KEYS.METRICS_2026;
-      dreKey = STORAGE_KEYS.DRE_2026;
-      break;
-    case 2027:
-      metricsKey = STORAGE_KEYS.METRICS_2027;
-      dreKey = STORAGE_KEYS.DRE_2027;
-      break;
-  }
+export function hasStoredData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: Department = 'usados'): boolean {
+  const metricsKey = `vw_metrics_${fiscalYear}_${department}`;
+  const dreKey = `vw_dre_${fiscalYear}_${department}`;
   
   return localStorage.getItem(metricsKey) !== null || localStorage.getItem(dreKey) !== null;
 }
@@ -266,18 +456,25 @@ export async function migrateToDatabase(): Promise<boolean> {
  * Exporta todos os dados para backup
  */
 export function exportAllData(): string {
-  const data = {
-    metrics2024: loadMetricsData(2024),
-    metrics2025: loadMetricsData(2025),
-    metrics2026: loadMetricsData(2026),
-    metrics2027: loadMetricsData(2027),
-    dre2024: loadDREData(2024),
-    dre2025: loadDREData(2025),
-    dre2026: loadDREData(2026),
-    dre2027: loadDREData(2027),
+  const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
+  const years: (2024 | 2025 | 2026 | 2027)[] = [2024, 2025, 2026, 2027];
+  
+  const data: any = {
     selectedYear: loadSelectedFiscalYear(),
-    exportDate: new Date().toISOString()
+    selectedDepartment: loadSelectedDepartment(),
+    exportDate: new Date().toISOString(),
+    data: {}
   };
+  
+  years.forEach(year => {
+    data.data[year] = {};
+    departments.forEach(dept => {
+      data.data[year][dept] = {
+        metrics: loadMetricsData(year, dept),
+        dre: loadDREData(year, dept)
+      };
+    });
+  });
   
   return JSON.stringify(data, null, 2);
 }
@@ -287,17 +484,20 @@ export function exportAllData(): string {
  */
 export function importAllData(jsonString: string): boolean {
   try {
-    const data = JSON.parse(jsonString);
+    const backup = JSON.parse(jsonString);
     
-    if (data.metrics2024) saveMetricsData(2024, data.metrics2024);
-    if (data.metrics2025) saveMetricsData(2025, data.metrics2025);
-    if (data.metrics2026) saveMetricsData(2026, data.metrics2026);
-    if (data.metrics2027) saveMetricsData(2027, data.metrics2027);
-    if (data.dre2024) saveDREData(2024, data.dre2024);
-    if (data.dre2025) saveDREData(2025, data.dre2025);
-    if (data.dre2026) saveDREData(2026, data.dre2026);
-    if (data.dre2027) saveDREData(2027, data.dre2027);
-    if (data.selectedYear) saveSelectedFiscalYear(data.selectedYear);
+    if (backup.data) {
+      Object.entries(backup.data).forEach(([year, depts]: [string, any]) => {
+        const fiscalYear = parseInt(year) as 2024 | 2025 | 2026 | 2027;
+        Object.entries(depts).forEach(([dept, data]: [string, any]) => {
+          if (data.metrics) saveMetricsData(fiscalYear, data.metrics, dept as Department);
+          if (data.dre) saveDREData(fiscalYear, data.dre, dept as Department);
+        });
+      });
+    }
+    
+    if (backup.selectedYear) saveSelectedFiscalYear(backup.selectedYear);
+    if (backup.selectedDepartment) saveSelectedDepartment(backup.selectedDepartment);
     
     return true;
   } catch (error) {
@@ -311,30 +511,13 @@ export function importAllData(jsonString: string): boolean {
  */
 export function clearYearData(fiscalYear: 2024 | 2025 | 2026 | 2027): void {
   try {
-    let metricsKey: string;
-    let dreKey: string;
-    
-    switch (fiscalYear) {
-      case 2024:
-        metricsKey = STORAGE_KEYS.METRICS_2024;
-        dreKey = STORAGE_KEYS.DRE_2024;
-        break;
-      case 2025:
-        metricsKey = STORAGE_KEYS.METRICS_2025;
-        dreKey = STORAGE_KEYS.DRE_2025;
-        break;
-      case 2026:
-        metricsKey = STORAGE_KEYS.METRICS_2026;
-        dreKey = STORAGE_KEYS.DRE_2026;
-        break;
-      case 2027:
-        metricsKey = STORAGE_KEYS.METRICS_2027;
-        dreKey = STORAGE_KEYS.DRE_2027;
-        break;
-    }
-    
-    localStorage.removeItem(metricsKey);
-    localStorage.removeItem(dreKey);
+    const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
+    departments.forEach(dept => {
+      const metricsKey = `vw_metrics_${fiscalYear}_${dept}`;
+      const dreKey = `vw_dre_${fiscalYear}_${dept}`;
+      localStorage.removeItem(metricsKey);
+      localStorage.removeItem(dreKey);
+    });
     
     console.log(`✅ Dados do ano ${fiscalYear} limpos com sucesso`);
   } catch (error) {
@@ -343,12 +526,14 @@ export function clearYearData(fiscalYear: 2024 | 2025 | 2026 | 2027): void {
 }
 
 /**
- * Limpa todos os dados de todos os anos fiscais
+ * Limpa todos os dados de todos os anos fiscais e departamentos
  */
 export function clearAllData(): void {
   try {
-    Object.values(STORAGE_KEYS).forEach(key => {
-      localStorage.removeItem(key);
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('vw_')) {
+        localStorage.removeItem(key);
+      }
     });
     console.log('✅ Todos os dados foram limpos com sucesso');
   } catch (error) {

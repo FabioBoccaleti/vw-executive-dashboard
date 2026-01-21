@@ -74,3 +74,28 @@ export const EXPENSE_CATEGORIES: TransactionCategory[] = [
   'education',
   'other-expense',
 ]
+
+// Tipos para departamentos
+export type Department = 'novos' | 'vendaDireta' | 'usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'consolidado'
+
+export const DEPARTMENT_LABELS: Record<Department, string> = {
+  novos: 'Novos',
+  vendaDireta: 'Venda Direta',
+  usados: 'Usados',
+  pecas: 'Peças',
+  oficina: 'Oficina',
+  funilaria: 'Funilaria',
+  administracao: 'Administração',
+  consolidado: 'Consolidado',
+}
+
+export const DEPARTMENTS: Department[] = [
+  'novos',
+  'vendaDireta', 
+  'usados',
+  'pecas',
+  'oficina',
+  'funilaria',
+  'administracao',
+  'consolidado',
+]
