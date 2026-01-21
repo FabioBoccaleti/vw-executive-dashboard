@@ -10918,7 +10918,7 @@ export function VWFinancialDashboard() {
                             <div className="space-y-1">
                               <p className="text-sm">
                                 <span className="text-slate-600 dark:text-slate-400">Lucro Antes dos Impostos: </span>
-                                <span className="font-bold text-slate-900 dark:text-white">R$ {Number(payload[0].value).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                <span className="font-bold text-slate-900 dark:text-white">R$ {(Number(payload[0].value) * 1000).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>
                               </p>
                               <p className="text-sm">
                                 <span className="text-slate-600 dark:text-slate-400">% sobre Receita: </span>
