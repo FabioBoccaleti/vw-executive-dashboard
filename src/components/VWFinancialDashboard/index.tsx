@@ -22,7 +22,7 @@ import {
 
 export function VWFinancialDashboard() {
   // Estado para o ano fiscal selecionado
-  const [fiscalYear, setFiscalYear] = useState<2025 | 2026>(() => loadSelectedFiscalYear())
+  const [fiscalYear, setFiscalYear] = useState<2024 | 2025 | 2026 | 2027>(() => loadSelectedFiscalYear())
   
   // Estado para controlar categorias de despesas selecionadas
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['pessoal', 'terceiros', 'ocupacao', 'funcionamento'])
@@ -78,7 +78,7 @@ export function VWFinancialDashboard() {
   
   // Handler para mudança de ano fiscal
   const handleFiscalYearChange = (year: string) => {
-    const newYear = parseInt(year) as 2025 | 2026;
+    const newYear = parseInt(year) as 2024 | 2025 | 2026 | 2027;
     setFiscalYear(newYear);
   };
   
@@ -1127,11 +1127,17 @@ export function VWFinancialDashboard() {
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="2024">
+                    <span className="font-semibold">Ano Fiscal 2024</span>
+                  </SelectItem>
                   <SelectItem value="2025">
                     <span className="font-semibold">Ano Fiscal 2025</span>
                   </SelectItem>
                   <SelectItem value="2026">
                     <span className="font-semibold">Ano Fiscal 2026</span>
+                  </SelectItem>
+                  <SelectItem value="2027">
+                    <span className="font-semibold">Ano Fiscal 2027</span>
                   </SelectItem>
                 </SelectContent>
               </Select>
