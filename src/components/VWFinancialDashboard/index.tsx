@@ -398,8 +398,8 @@ export function VWFinancialDashboard() {
             target = target[metric.dataPath[i]];
           }
           
-          // Para métricas 44, 45, 46 que são arrays diretos
-          if (metric.fields[0] === 'valor' && metric.dataPath.length === 1) {
+          // Para métricas 44, 45, 46 que são arrays diretos (apenas se tiverem apenas 1 campo 'valor')
+          if (metric.fields.length === 1 && metric.fields[0] === 'valor' && metric.dataPath.length === 1) {
             newData[metric.dataPath[0]] = parsedValues;
           } else {
             const lastPath = metric.dataPath[metric.dataPath.length - 1];
