@@ -221,6 +221,12 @@ export function VWFinancialDashboard() {
   // Estado para controlar exibição do card de Estoque de Novos
   const [showEstoqueNovos, setShowEstoqueNovos] = useState(false)
   
+  // Estado para controlar exibição do card de Insights
+  const [showInsights, setShowInsights] = useState(true)
+  
+  // Estado para controlar exibição do card de Dados Adicionais
+  const [showDadosAdicionais, setShowDadosAdicionais] = useState(true)
+  
   // Estado para controlar exibição do card de Estoque de Usados
   const [showEstoqueUsados, setShowEstoqueUsados] = useState(false)
   
@@ -1242,14 +1248,24 @@ export function VWFinancialDashboard() {
             </CardContent>
           </Card>
 
-          {/* Insights Mensais */}
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-5 h-5 text-slate-700 dark:text-slate-300" />
-                <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">INSIGHTS</CardTitle>
-              </div>
-            </CardHeader>
+          {/* Insights */}
+          {showInsights && (
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                    <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">INSIGHTS</CardTitle>
+                  </div>
+                  <button
+                    onClick={() => setShowInsights(false)}
+                    className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    title="Ocultar Insights"
+                  >
+                    <TrendingDown className="w-5 h-5" />
+                  </button>
+                </div>
+              </CardHeader>
             <CardContent>
               {(() => {
                 // Verificar se dreData tem os dados necessários
@@ -1461,18 +1477,44 @@ export function VWFinancialDashboard() {
                 );
               })()}
             </CardContent>
-          </Card>
+            </Card>
+          )}
+
+          {/* Botão para mostrar Insights quando oculto */}
+          {!showInsights && (
+            <div className="mt-6">
+              <button
+                onClick={() => setShowInsights(true)}
+                className="w-full flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700 transition-all"
+              >
+                <TrendingUp className="w-5 h-5" />
+                <span className="text-sm font-semibold">Mostrar Insights</span>
+              </button>
+            </div>
+          )}
 
           {/* Dados Adicionais */}
-          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <BarChart3 className="w-5 h-5 text-slate-700 dark:text-slate-300" />
-                <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">Dados Adicionais</CardTitle>
-              </div>
-              <CardDescription className="text-xs">Configurações e filtros complementares</CardDescription>
-            </CardHeader>
-            <CardContent>
+          {showDadosAdicionais && (
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <BarChart3 className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                      <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">Dados Adicionais</CardTitle>
+                    </div>
+                    <CardDescription className="text-xs">Configurações e filtros complementares</CardDescription>
+                  </div>
+                  <button
+                    onClick={() => setShowDadosAdicionais(false)}
+                    className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    title="Ocultar Dados Adicionais"
+                  >
+                    <TrendingDown className="w-5 h-5" />
+                  </button>
+                </div>
+              </CardHeader>
+              <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <button
                   onClick={() => {
@@ -2441,7 +2483,21 @@ export function VWFinancialDashboard() {
                 </button>
               </div>
             </CardContent>
-          </Card>
+            </Card>
+          )}
+
+          {/* Botão para mostrar Dados Adicionais quando oculto */}
+          {!showDadosAdicionais && (
+            <div className="mt-6">
+              <button
+                onClick={() => setShowDadosAdicionais(true)}
+                className="w-full flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700 transition-all"
+              >
+                <BarChart3 className="w-5 h-5" />
+                <span className="text-sm font-semibold">Mostrar Dados Adicionais</span>
+              </button>
+            </div>
+          )}
           
           {/* Renderização condicional dos cards de dados adicionais */}
           <>
