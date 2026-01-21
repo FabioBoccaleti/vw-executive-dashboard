@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2 } from "lucide-react"
+import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2, DollarSign } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, Legend, LabelList, ComposedChart, Cell } from "recharts"
 import { useState, useRef, useEffect } from "react"
@@ -1239,6 +1239,227 @@ export function VWFinancialDashboard() {
                   <span className="text-xs opacity-80">(Sorana)</span>
                 </button>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Insights Mensais */}
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">INSIGHTS MENSAIS</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                // Verificar se dreData tem os dados necessários
+                if (!activeDreData || activeDreData.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                      Dados insuficientes para calcular insights
+                    </div>
+                  );
+                }
+                
+                // Usar dados do DRE
+                // Índice 0: Volume de Vendas
+                // Índice 1: Receita Operacional Líquida (Faturamento)
+                // Índice 6: Margem de Contribuição
+                // Índice 7-11: Despesas (Pessoal, Terceiros, Ocupação, Funcionamento, Vendas)
+                // Índice 12: Resultado Operacional Líquido
+                
+                const volumeData = aggregateData(activeDreData[0]?.meses || []);
+                const faturamentoData = aggregateData(activeDreData[1]?.meses || []);
+                const margemContribuicaoData = aggregateData(activeDreData[6]?.meses || []);
+                
+                // Somar todas as categorias de despesas (linhas 7 a 11)
+                const despesasData = aggregateData([...Array(12)].map((_, i) => 
+                  Math.abs(activeDreData[7]?.meses?.[i] || 0) + 
+                  Math.abs(activeDreData[8]?.meses?.[i] || 0) + 
+                  Math.abs(activeDreData[9]?.meses?.[i] || 0) + 
+                  Math.abs(activeDreData[10]?.meses?.[i] || 0) + 
+                  Math.abs(activeDreData[11]?.meses?.[i] || 0)
+                ));
+                
+                const labels = getPeriodLabels();
+                
+                // Encontrar maior e menor
+                const findMaxMin = (data: number[]) => {
+                  const maxValue = Math.max(...data);
+                  const minValue = Math.min(...data);
+                  const maxIndex = data.indexOf(maxValue);
+                  const minIndex = data.indexOf(minValue);
+                  return { maxValue, minValue, maxIndex, minIndex };
+                };
+                
+                const volume = findMaxMin(volumeData);
+                const faturamento = findMaxMin(faturamentoData);
+                const margemContribuicao = findMaxMin(margemContribuicaoData);
+                const despesas = findMaxMin(despesasData);
+                
+                // Usar Lucro (Prejuízo) Antes dos Impostos diretamente do DRE (índice 18)
+                const resultadoData = aggregateData(activeDreData[18]?.meses || []);
+                const resultado = findMaxMin(resultadoData);
+                
+                // Calcular margem % usando Resultado / Receita Operacional Líquida
+                const margemData = resultadoData.map((r, i) => faturamentoData[i] > 0 ? (r / faturamentoData[i]) * 100 : 0);
+                const margem = findMaxMin(margemData);
+
+                return (
+                  <div className="space-y-6">
+                    {/* Insights Mensais */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      {/* Volume */}
+                      <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 font-medium">Volume</p>
+                        <div className="space-y-2">
+                          <div>
+                            <div className="flex items-center gap-1 mb-1">
+                              <TrendingUp className="w-3 h-3 text-emerald-500" />
+                              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Maior</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white">{labels[volume.maxIndex]}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">{volume.maxValue.toLocaleString('pt-BR')} unid.</p>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1 mb-1">
+                              <TrendingDown className="w-3 h-3 text-red-500" />
+                              <span className="text-xs text-red-600 dark:text-red-400 font-medium">Menor</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white">{labels[volume.minIndex]}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">{volume.minValue.toLocaleString('pt-BR')} unid.</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Receita Líquida */}
+                      <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 font-medium">Receita Líquida</p>
+                        <div className="space-y-2">
+                          <div>
+                            <div className="flex items-center gap-1 mb-1">
+                              <TrendingUp className="w-3 h-3 text-emerald-500" />
+                              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Maior</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white">{labels[faturamento.maxIndex]}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">R$ {faturamento.maxValue.toLocaleString('pt-BR')}</p>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1 mb-1">
+                              <TrendingDown className="w-3 h-3 text-red-500" />
+                              <span className="text-xs text-red-600 dark:text-red-400 font-medium">Menor</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white">{labels[faturamento.minIndex]}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">R$ {faturamento.minValue.toLocaleString('pt-BR')}</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Margem de Contribuição */}
+                      <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 font-medium">Margem de Contribuição</p>
+                        <div className="space-y-2">
+                          <div>
+                            <div className="flex items-center gap-1 mb-1">
+                              <TrendingUp className="w-3 h-3 text-emerald-500" />
+                              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Maior</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white">{labels[margemContribuicao.maxIndex]}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">R$ {margemContribuicao.maxValue.toLocaleString('pt-BR')}</p>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1 mb-1">
+                              <TrendingDown className="w-3 h-3 text-red-500" />
+                              <span className="text-xs text-red-600 dark:text-red-400 font-medium">Menor</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white">{labels[margemContribuicao.minIndex]}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">R$ {margemContribuicao.minValue.toLocaleString('pt-BR')}</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Despesas */}
+                      <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 font-medium">Despesas</p>
+                        <div className="space-y-2">
+                          <div>
+                            <div className="flex items-center gap-1 mb-1">
+                              <TrendingUp className="w-3 h-3 text-red-500" />
+                              <span className="text-xs text-red-600 dark:text-red-400 font-medium">Maior</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white">{labels[despesas.maxIndex]}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">R$ {despesas.maxValue.toLocaleString('pt-BR')}</p>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1 mb-1">
+                              <TrendingDown className="w-3 h-3 text-emerald-500" />
+                              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Menor</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white">{labels[despesas.minIndex]}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400">R$ {despesas.minValue.toLocaleString('pt-BR')}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Lucro (Prejuízo) Antes dos Impostos */}
+                    <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <DollarSign className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                        <h3 className="text-base font-semibold text-slate-900 dark:text-white">LUCRO (PREJUÍZO) ANTES DOS IMPOSTOS</h3>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Por Valor Absoluto */}
+                        <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 font-medium">Por Valor Absoluto</p>
+                          <div className="space-y-2">
+                            <div>
+                              <div className="flex items-center gap-1 mb-1">
+                                <TrendingUp className="w-3 h-3 text-emerald-500" />
+                                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Melhor</span>
+                              </div>
+                              <p className="text-sm font-bold text-slate-900 dark:text-white">{labels[resultado.maxIndex]}</p>
+                              <p className="text-xs text-slate-600 dark:text-slate-400">R$ {resultado.maxValue.toLocaleString('pt-BR')}</p>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1 mb-1">
+                                <TrendingDown className="w-3 h-3 text-red-500" />
+                                <span className="text-xs text-red-600 dark:text-red-400 font-medium">Pior</span>
+                              </div>
+                              <p className="text-sm font-bold text-slate-900 dark:text-white">{labels[resultado.minIndex]}</p>
+                              <p className="text-xs text-slate-600 dark:text-slate-400">R$ {resultado.minValue.toLocaleString('pt-BR')}</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Por Margem % */}
+                        <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 font-medium">Por Margem %</p>
+                          <div className="space-y-2">
+                            <div>
+                              <div className="flex items-center gap-1 mb-1">
+                                <TrendingUp className="w-3 h-3 text-emerald-500" />
+                                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Melhor</span>
+                              </div>
+                              <p className="text-sm font-bold text-slate-900 dark:text-white">{labels[margem.maxIndex]}</p>
+                              <p className="text-xs text-slate-600 dark:text-slate-400">{margem.maxValue.toFixed(2)}%</p>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1 mb-1">
+                                <TrendingDown className="w-3 h-3 text-red-500" />
+                                <span className="text-xs text-red-600 dark:text-red-400 font-medium">Pior</span>
+                              </div>
+                              <p className="text-sm font-bold text-slate-900 dark:text-white">{labels[margem.minIndex]}</p>
+                              <p className="text-xs text-slate-600 dark:text-slate-400">{margem.minValue.toFixed(2)}%</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 
