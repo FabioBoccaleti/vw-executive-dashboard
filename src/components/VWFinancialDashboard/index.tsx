@@ -7,10 +7,23 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, Legend, LabelList, ComposedChart, Cell } from "recharts"
 import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DetailedMetricsTable } from "@/components/DetailedMetricsTable"
 import { businessMetricsData } from "@/data/businessMetricsData"
+import { 
+  loadMetricsData, 
+  saveMetricsData, 
+  loadDREData, 
+  saveDREData, 
+  loadSelectedFiscalYear, 
+  saveSelectedFiscalYear,
+  type MetricsData 
+} from "@/lib/dataStorage"
 
 export function VWFinancialDashboard() {
+  // Estado para o ano fiscal selecionado
+  const [fiscalYear, setFiscalYear] = useState<2025 | 2026>(() => loadSelectedFiscalYear())
+  
   // Estado para controlar categorias de despesas selecionadas
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['pessoal', 'terceiros', 'ocupacao', 'funcionamento'])
   const [viewMode, setViewMode] = useState<'mensal' | 'bimestral' | 'trimestral' | 'semestral'>('mensal')
@@ -33,7 +46,41 @@ export function VWFinancialDashboard() {
   const [showDetailedMetrics, setShowDetailedMetrics] = useState(false)
   
   // Estado para dados de métricas de negócios (para permitir importação/exportação)
-  const [metricsData, setMetricsData] = useState(businessMetricsData)
+  const [metricsData, setMetricsData] = useState<MetricsData>(() => loadMetricsData(fiscalYear))
+  
+  // Effect para carregar dados quando o ano fiscal mudar
+  useEffect(() => {
+    const newMetricsData = loadMetricsData(fiscalYear);
+    setMetricsData(newMetricsData);
+    
+    const newDreData = loadDREData(fiscalYear);
+    if (newDreData && newDreData.length > 0) {
+      setDreData(newDreData);
+    } else {
+      // Se não houver dados salvos, usar dados iniciais
+      setDreData(initialDreData);
+    }
+    
+    saveSelectedFiscalYear(fiscalYear);
+  }, [fiscalYear]);
+  
+  // Effect para salvar dados de métricas quando mudarem
+  useEffect(() => {
+    saveMetricsData(fiscalYear, metricsData);
+  }, [metricsData, fiscalYear]);
+  
+  // Effect para salvar dados de DRE quando mudarem
+  useEffect(() => {
+    if (dreData.length > 0) {
+      saveDREData(fiscalYear, dreData);
+    }
+  }, [dreData, fiscalYear]);
+  
+  // Handler para mudança de ano fiscal
+  const handleFiscalYearChange = (year: string) => {
+    const newYear = parseInt(year) as 2025 | 2026;
+    setFiscalYear(newYear);
+  };
   
   // Handlers para importação e exportação de métricas
   const handleExportMetrics = () => {
@@ -1071,9 +1118,23 @@ export function VWFinancialDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Badge className="bg-green-100 text-green-800 border-green-200 px-4 py-2 text-sm">
-                Ano Fiscal 2025
-              </Badge>
+              <Select value={fiscalYear.toString()} onValueChange={handleFiscalYearChange}>
+                <SelectTrigger className="w-[160px] bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                  <SelectValue>
+                    <span className="text-green-800 dark:text-green-200 font-semibold">
+                      Ano Fiscal {fiscalYear}
+                    </span>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2025">
+                    <span className="font-semibold">Ano Fiscal 2025</span>
+                  </SelectItem>
+                  <SelectItem value="2026">
+                    <span className="font-semibold">Ano Fiscal 2026</span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
               <Badge className="bg-blue-100 text-blue-800 border-blue-200 px-4 py-2 text-sm">
                 Confidencial
               </Badge>
