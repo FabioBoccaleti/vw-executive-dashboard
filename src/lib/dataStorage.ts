@@ -114,111 +114,151 @@ function getDefaultDataForDepartment(department: Department, fiscalYear: 2024 | 
  */
 function calculateConsolidatedData(fiscalYear: 2024 | 2025 | 2026 | 2027): MetricsData {
   const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
-  const allData = departments.map(dept => loadMetricsData(fiscalYear, dept));
+  
+  // Carrega dados de cada departamento, evitando recursão infinita
+  const allData = departments.map(dept => {
+    const key = `vw_metrics_${fiscalYear}_${dept}`;
+    const stored = localStorage.getItem(key);
+    
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        console.warn(`Erro ao parsear dados de ${key}, usando dados padrão`);
+      }
+    }
+    
+    // Retorna dados padrão do departamento
+    return getDefaultDataForDepartment(dept, fiscalYear);
+  });
+  
+  // Filtra dados válidos
+  const validData = allData.filter(d => d && typeof d === 'object');
+  
+  if (validData.length === 0) {
+    // Retorna estrutura vazia se não houver dados válidos
+    return businessMetricsDataNovos2024; // Usa estrutura base
+  }
   
   // Função auxiliar para somar arrays
   const sumArrays = (arrays: number[][]): number[] => {
     if (arrays.length === 0) return [];
-    const length = arrays[0].length;
+    
+    // Filtra arrays válidos
+    const validArrays = arrays.filter(arr => Array.isArray(arr) && arr.length > 0);
+    if (validArrays.length === 0) return [];
+    
+    const length = validArrays[0].length;
     return Array.from({ length }, (_, i) => 
-      arrays.reduce((sum, arr) => sum + (arr[i] || 0), 0)
+      validArrays.reduce((sum, arr) => sum + (arr[i] || 0), 0)
     );
+  };
+  
+  // Helper para extrair valores com segurança
+  const safeMap = <T>(mapper: (d: MetricsData) => T): T[] => {
+    return validData.map(d => {
+      try {
+        return mapper(d);
+      } catch (e) {
+        return [] as T;
+      }
+    });
   };
   
   // Consolida todos os dados
   const consolidated: MetricsData = {
-    months: allData[0].months,
+    months: validData[0].months,
     
     vendasNovos: {
-      vendas: sumArrays(allData.map(d => d.vendasNovos.vendas)),
-      volumeTrocas: sumArrays(allData.map(d => d.vendasNovos.volumeTrocas)),
-      percentualTrocas: sumArrays(allData.map(d => d.vendasNovos.percentualTrocas))
+      vendas: sumArrays(safeMap(d => d.vendasNovos?.vendas || [])),
+      volumeTrocas: sumArrays(safeMap(d => d.vendasNovos?.volumeTrocas || [])),
+      percentualTrocas: sumArrays(safeMap(d => d.vendasNovos?.percentualTrocas || []))
     },
     
     vendasNovosVD: {
-      vendas: sumArrays(allData.map(d => d.vendasNovosVD.vendas)),
-      volumeTrocas: sumArrays(allData.map(d => d.vendasNovosVD.volumeTrocas)),
-      percentualTrocas: sumArrays(allData.map(d => d.vendasNovosVD.percentualTrocas))
+      vendas: sumArrays(safeMap(d => d.vendasNovosVD?.vendas || [])),
+      volumeTrocas: sumArrays(safeMap(d => d.vendasNovosVD?.volumeTrocas || [])),
+      percentualTrocas: sumArrays(safeMap(d => d.vendasNovosVD?.percentualTrocas || []))
     },
     
     vendasUsados: {
-      vendas: sumArrays(allData.map(d => d.vendasUsados.vendas)),
-      volumeTrocas: sumArrays(allData.map(d => d.vendasUsados.volumeTrocas)),
-      percentualTrocas: sumArrays(allData.map(d => d.vendasUsados.percentualTrocas))
+      vendas: sumArrays(safeMap(d => d.vendasUsados?.vendas || [])),
+      volumeTrocas: sumArrays(safeMap(d => d.vendasUsados?.volumeTrocas || [])),
+      percentualTrocas: sumArrays(safeMap(d => d.vendasUsados?.percentualTrocas || []))
     },
     
     volumeVendas: {
-      usados: sumArrays(allData.map(d => d.volumeVendas.usados)),
-      repasse: sumArrays(allData.map(d => d.volumeVendas.repasse)),
-      percentualRepasse: sumArrays(allData.map(d => d.volumeVendas.percentualRepasse))
+      usados: sumArrays(safeMap(d => d.volumeVendas?.usados || [])),
+      repasse: sumArrays(safeMap(d => d.volumeVendas?.repasse || [])),
+      percentualRepasse: sumArrays(safeMap(d => d.volumeVendas?.percentualRepasse || []))
     },
     
     estoqueNovos: {
-      quantidade: sumArrays(allData.map(d => d.estoqueNovos.quantidade)),
-      valor: sumArrays(allData.map(d => d.estoqueNovos.valor)),
-      aPagar: sumArrays(allData.map(d => d.estoqueNovos.aPagar)),
-      pagos: sumArrays(allData.map(d => d.estoqueNovos.pagos))
+      quantidade: sumArrays(safeMap(d => d.estoqueNovos?.quantidade || [])),
+      valor: sumArrays(safeMap(d => d.estoqueNovos?.valor || [])),
+      aPagar: sumArrays(safeMap(d => d.estoqueNovos?.aPagar || [])),
+      pagos: sumArrays(safeMap(d => d.estoqueNovos?.pagos || []))
     },
     
     estoqueUsados: {
-      quantidade: sumArrays(allData.map(d => d.estoqueUsados.quantidade)),
-      valor: sumArrays(allData.map(d => d.estoqueUsados.valor)),
-      aPagar: sumArrays(allData.map(d => d.estoqueUsados.aPagar)),
-      pagos: sumArrays(allData.map(d => d.estoqueUsados.pagos))
+      quantidade: sumArrays(safeMap(d => d.estoqueUsados?.quantidade || [])),
+      valor: sumArrays(safeMap(d => d.estoqueUsados?.valor || [])),
+      aPagar: sumArrays(safeMap(d => d.estoqueUsados?.aPagar || [])),
+      pagos: sumArrays(safeMap(d => d.estoqueUsados?.pagos || []))
     },
     
     estoquePecas: {
-      quantidade: sumArrays(allData.map(d => d.estoquePecas.quantidade)),
-      valor: sumArrays(allData.map(d => d.estoquePecas.valor)),
-      aPagar: sumArrays(allData.map(d => d.estoquePecas.aPagar)),
-      pagos: sumArrays(allData.map(d => d.estoquePecas.pagos))
+      quantidade: sumArrays(safeMap(d => d.estoquePecas?.quantidade || [])),
+      valor: sumArrays(safeMap(d => d.estoquePecas?.valor || [])),
+      aPagar: sumArrays(safeMap(d => d.estoquePecas?.aPagar || [])),
+      pagos: sumArrays(safeMap(d => d.estoquePecas?.pagos || []))
     },
     
     margensOperacionais: {
-      novos: sumArrays(allData.map(d => d.margensOperacionais.novos)),
-      usados: sumArrays(allData.map(d => d.margensOperacionais.usados)),
-      oficina: sumArrays(allData.map(d => d.margensOperacionais.oficina)),
-      pecas: sumArrays(allData.map(d => d.margensOperacionais.pecas))
+      novos: sumArrays(safeMap(d => d.margensOperacionais?.novos || [])),
+      usados: sumArrays(safeMap(d => d.margensOperacionais?.usados || [])),
+      oficina: sumArrays(safeMap(d => d.margensOperacionais?.oficina || [])),
+      pecas: sumArrays(safeMap(d => d.margensOperacionais?.pecas || []))
     },
     
     receitaVendas: {
-      novos: sumArrays(allData.map(d => d.receitaVendas.novos)),
-      usados: sumArrays(allData.map(d => d.receitaVendas.usados))
+      novos: sumArrays(safeMap(d => d.receitaVendas?.novos || [])),
+      usados: sumArrays(safeMap(d => d.receitaVendas?.usados || []))
     },
     
     resultadoFinanceiro: {
-      receitas: sumArrays(allData.map(d => d.resultadoFinanceiro.receitas)),
-      despesas: sumArrays(allData.map(d => d.resultadoFinanceiro.despesas)),
-      resultado: sumArrays(allData.map(d => d.resultadoFinanceiro.resultado))
+      receitas: sumArrays(safeMap(d => d.resultadoFinanceiro?.receitas || [])),
+      despesas: sumArrays(safeMap(d => d.resultadoFinanceiro?.despesas || [])),
+      resultado: sumArrays(safeMap(d => d.resultadoFinanceiro?.resultado || []))
     },
     
     despesasPessoal: {
-      custo: sumArrays(allData.map(d => d.despesasPessoal.custo)),
-      hc: sumArrays(allData.map(d => d.despesasPessoal.hc))
+      custo: sumArrays(safeMap(d => d.despesasPessoal?.custo || [])),
+      hc: sumArrays(safeMap(d => d.despesasPessoal?.hc || []))
     },
     
     receitasOficina: {
-      garantia: sumArrays(allData.map(d => d.receitasOficina.garantia)),
-      clientePago: sumArrays(allData.map(d => d.receitasOficina.clientePago)),
-      interno: sumArrays(allData.map(d => d.receitasOficina.interno))
+      garantia: sumArrays(safeMap(d => d.receitasOficina?.garantia || [])),
+      clientePago: sumArrays(safeMap(d => d.receitasOficina?.clientePago || [])),
+      interno: sumArrays(safeMap(d => d.receitasOficina?.interno || []))
     },
     
     receitasPecas: {
-      balcao: sumArrays(allData.map(d => d.receitasPecas.balcao)),
-      oficina: sumArrays(allData.map(d => d.receitasPecas.oficina)),
-      externo: sumArrays(allData.map(d => d.receitasPecas.externo))
+      balcao: sumArrays(safeMap(d => d.receitasPecas?.balcao || [])),
+      oficina: sumArrays(safeMap(d => d.receitasPecas?.oficina || [])),
+      externo: sumArrays(safeMap(d => d.receitasPecas?.externo || []))
     },
     
     fluxoCaixa: {
-      recebimentos: sumArrays(allData.map(d => d.fluxoCaixa.recebimentos)),
-      pagamentos: sumArrays(allData.map(d => d.fluxoCaixa.pagamentos)),
-      saldo: sumArrays(allData.map(d => d.fluxoCaixa.saldo))
+      recebimentos: sumArrays(safeMap(d => d.fluxoCaixa?.recebimentos || [])),
+      pagamentos: sumArrays(safeMap(d => d.fluxoCaixa?.pagamentos || [])),
+      saldo: sumArrays(safeMap(d => d.fluxoCaixa?.saldo || []))
     },
     
     capital: {
-      capitalProprio: sumArrays(allData.map(d => d.capital.capitalProprio)),
-      capitalTerceiros: sumArrays(allData.map(d => d.capital.capitalTerceiros)),
-      capitalTotal: sumArrays(allData.map(d => d.capital.capitalTotal))
+      capitalProprio: sumArrays(safeMap(d => d.capital?.capitalProprio || [])),
+      capitalTerceiros: sumArrays(safeMap(d => d.capital?.capitalTerceiros || [])),
+      capitalTotal: sumArrays(safeMap(d => d.capital?.capitalTotal || []))
     }
   };
   

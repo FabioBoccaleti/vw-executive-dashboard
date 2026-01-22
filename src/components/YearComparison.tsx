@@ -21,6 +21,18 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'mensal' | 'bimestral' | 'trimestral' | 'semestral'>('mensal')
 
+  // Mapeamento de departamento para nome legível
+  const departmentNames: Record<Department, string> = {
+    'novos': 'Veículos Novos',
+    'vendaDireta': 'Venda Direta',
+    'usados': 'Veículos Usados',
+    'pecas': 'Peças',
+    'oficina': 'Oficina',
+    'funilaria': 'Funilaria',
+    'administracao': 'Administração',
+    'consolidado': 'Consolidado'
+  }
+
   // Carregar dados dos dois anos com o departamento
   const data1 = useMemo(() => loadMetricsData(year1, department), [year1, department])
   const data2 = useMemo(() => loadMetricsData(year2, department), [year2, department])
@@ -183,7 +195,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   Comparação de Anos Fiscais
                 </h1>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  Análise Comparativa • Veículos Usados
+                  Análise Comparativa • {departmentNames[department]}
                 </p>
               </div>
             </div>
