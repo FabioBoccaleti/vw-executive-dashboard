@@ -307,7 +307,36 @@ function calculateConsolidatedData(fiscalYear: 2024 | 2025 | 2026 | 2027): Metri
       capitalProprio: sumArrays(safeMap(d => d.capital?.capitalProprio || [])),
       capitalTerceiros: sumArrays(safeMap(d => d.capital?.capitalTerceiros || [])),
       capitalTotal: sumArrays(safeMap(d => d.capital?.capitalTotal || []))
-    }
+    },
+    
+    // Dados Adicionais consolidados
+    bonus: {
+      veiculosNovos: sumArrays(safeMap(d => d.bonus?.veiculosNovos || [])),
+      veiculosUsados: sumArrays(safeMap(d => d.bonus?.veiculosUsados || [])),
+      pecas: sumArrays(safeMap(d => d.bonus?.pecas || [])),
+      oficina: sumArrays(safeMap(d => d.bonus?.oficina || [])),
+      funilaria: sumArrays(safeMap(d => d.bonus?.funilaria || [])),
+      administracao: sumArrays(safeMap(d => d.bonus?.administracao || []))
+    },
+    
+    receitasFinanciamento: {
+      veiculosNovos: sumArrays(safeMap(d => d.receitasFinanciamento?.veiculosNovos || [])),
+      veiculosUsados: sumArrays(safeMap(d => d.receitasFinanciamento?.veiculosUsados || []))
+    },
+    
+    creditosICMS: {
+      novos: sumArrays(safeMap(d => d.creditosICMS?.novos || [])),
+      pecas: sumArrays(safeMap(d => d.creditosICMS?.pecas || [])),
+      administracao: sumArrays(safeMap(d => d.creditosICMS?.administracao || []))
+    },
+    
+    creditosPISCOFINS: {
+      administracao: sumArrays(safeMap(d => d.creditosPISCOFINS?.administracao || []))
+    },
+    
+    receitaBlindagem: sumArrays(safeMap(d => d.receitaBlindagem || [])),
+    receitaDespachanteUsados: sumArrays(safeMap(d => d.receitaDespachanteUsados || [])),
+    receitaDespachanteNovos: sumArrays(safeMap(d => d.receitaDespachanteNovos || []))
   };
   
   return consolidated;
