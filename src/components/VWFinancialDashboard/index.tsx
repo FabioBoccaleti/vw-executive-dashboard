@@ -218,6 +218,9 @@ export function VWFinancialDashboard() {
     
     const newMetricsData = loadMetricsData(fiscalYear, department);
     console.log('📊 Métricas carregadas:', newMetricsData);
+    console.log('🔍 Verificação - Bonus Veículos Usados (ID 33):', newMetricsData.bonus?.veiculosUsados);
+    console.log('🔍 Verificação - Bonus Peças (ID 34):', newMetricsData.bonus?.pecas);
+    console.log('🔍 Verificação - Receitas Financiamento Novos (ID 38):', newMetricsData.receitasFinanciamento?.veiculosNovos);
     setMetricsData(newMetricsData);
     
     const newDreData = loadDREData(fiscalYear, department);
@@ -423,7 +426,18 @@ export function VWFinancialDashboard() {
         
         console.log('✨ Processamento concluído');
         console.log('💾 Aplicando novos dados ao estado...');
+        console.log('📋 Preview dos dados importados:', {
+          bonus33: newData.bonus?.veiculosUsados,
+          bonus34: newData.bonus?.pecas,
+          receitas38: newData.receitasFinanciamento?.veiculosNovos,
+          creditos42: newData.creditosICMS?.administracao
+        });
+        
         setMetricsData(newData);
+        
+        // Salvar explicitamente no localStorage
+        const saved = saveMetricsData(fiscalYear, newData, department);
+        console.log('💾 Salvamento no localStorage:', saved ? '✅ Sucesso' : '❌ Falhou');
         console.log('✅ Estado atualizado com sucesso!');
         console.log('=== FIM DA IMPORTAÇÃO ===\n');
         
@@ -1170,7 +1184,7 @@ export function VWFinancialDashboard() {
                   Dashboard Executivo
                 </h1>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  {DEPARTMENT_LABELS[department]} • Análise Gerencial • Atualizado em 07/01/2026
+                  {DEPARTMENT_LABELS[department]} • Análise Gerencial • Atualizado em {new Date().toLocaleDateString('pt-BR')}
                 </p>
               </div>
             </div>
@@ -9599,6 +9613,20 @@ export function VWFinancialDashboard() {
                     >
                       <Download className="w-4 h-4" />
                       <span className="text-xs font-medium">Exportar</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (confirm('Isso vai limpar todos os dados salvos e recarregar os dados padrão. Continuar?')) {
+                          clearYearData(fiscalYear);
+                          window.location.reload();
+                        }
+                      }}
+                      className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="text-xs font-medium">Reverter Dados</span>
                     </Button>
                     <button
                       onClick={() => setShowDetailedMetrics(false)}
