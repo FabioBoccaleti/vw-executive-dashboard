@@ -9893,12 +9893,12 @@ export function VWFinancialDashboard() {
               </CardContent>
             </Card>
 
-            {/* Receita de Vendas Líquidas */}
+            {/* Receita de Vendas Líquidas Totais */}
             <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
               <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Receita de Vendas Líquidas</CardTitle>
+                    <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Receita de Vendas Líquidas Totais</CardTitle>
                     <CardDescription className="text-sm">Receita operacional líquida por período</CardDescription>
                   </div>
                   <Badge className="bg-cyan-50 text-cyan-700 border-cyan-200">100% Base</Badge>
