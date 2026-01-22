@@ -253,7 +253,11 @@ export function VWFinancialDashboard() {
   // Effect para salvar dados de DRE quando mudarem
   useEffect(() => {
     if (dreData.length > 0) {
-      saveDREData(fiscalYear, dreData, department);
+      // Se for consolidado, usar forceConsolidated=false (dados calculados não são salvos)
+      // Dados importados serão salvos explicitamente na função handleImportData
+      if (department !== 'consolidado') {
+        saveDREData(fiscalYear, dreData, department);
+      }
     }
   }, [dreData, fiscalYear, department]);
   
@@ -725,6 +729,12 @@ export function VWFinancialDashboard() {
         
         console.log('Dados importados (TXT):', importedData)
         setDreData(importedData)
+        
+        // Salvar explicitamente se for consolidado (usando forceConsolidated=true)
+        if (department === 'consolidado') {
+          saveDREData(fiscalYear, importedData, department, true)
+        }
+        
         alert(`${importedData.length} linhas importadas e atualizadas com sucesso!`)
         
       } catch (error) {

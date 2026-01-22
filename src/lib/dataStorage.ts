@@ -314,16 +314,17 @@ export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: Met
  */
 export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: Department = 'usados'): DREData | null {
   try {
-    // Se for consolidado, soma todas as DREs
-    if (department === 'consolidado') {
-      return calculateConsolidatedDRE(fiscalYear);
-    }
-    
     const key = `vw_dre_${fiscalYear}_${department}`;
     const stored = localStorage.getItem(key);
     
+    // Se houver dados salvos, usa eles (incluindo dados importados do consolidado)
     if (stored) {
       return JSON.parse(stored);
+    }
+    
+    // Se for consolidado e não houver dados salvos, calcula dinamicamente
+    if (department === 'consolidado') {
+      return calculateConsolidatedDRE(fiscalYear);
     }
     
     return null;
@@ -367,11 +368,11 @@ function calculateConsolidatedDRE(fiscalYear: 2024 | 2025 | 2026 | 2027): DREDat
 /**
  * Salva os dados de DRE de um ano fiscal específico e departamento
  */
-export function saveDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: DREData, department: Department = 'usados'): boolean {
+export function saveDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: DREData, department: Department = 'usados', forceConsolidated: boolean = false): boolean {
   try {
-    // Não permite salvar dados do consolidado (é calculado)
-    if (department === 'consolidado') {
-      console.warn('Não é possível salvar dados do consolidado diretamente');
+    // Permite salvar dados do consolidado apenas se forceConsolidated for true (dados importados)
+    if (department === 'consolidado' && !forceConsolidated) {
+      console.warn('Não é possível salvar dados do consolidado diretamente (use forceConsolidated=true para dados importados)');
       return false;
     }
     
