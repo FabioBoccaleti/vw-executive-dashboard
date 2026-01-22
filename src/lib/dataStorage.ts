@@ -326,8 +326,24 @@ export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, departmen
     const key = `vw_metrics_${fiscalYear}_${department}`;
     const stored = localStorage.getItem(key);
     
+    // Verifica se os dados em cache estão zerados (dados vazios)
     if (stored) {
-      return JSON.parse(stored);
+      const parsedData = JSON.parse(stored);
+      
+      // Verifica se os dados de bônus estão todos zerados
+      const bonusZerados = parsedData.bonus && 
+        Object.values(parsedData.bonus).every((arr: any) => 
+          Array.isArray(arr) && arr.every((v: number) => v === 0)
+        );
+      
+      // Se os dados estão zerados, remove do cache e usa dados padrão
+      if (bonusZerados) {
+        console.log(`🔄 Dados zerados detectados para ${department} ${fiscalYear}, usando dados padrão`);
+        localStorage.removeItem(key);
+        return getDefaultDataForDepartment(department, fiscalYear);
+      }
+      
+      return parsedData;
     }
     
     return getDefaultDataForDepartment(department, fiscalYear);
