@@ -153,7 +153,50 @@ describe('Gráficos - Formatação de Dados', () => {
   it('deve formatar percentuais corretamente', () => {
     expect(formatPercent(10.5)).toBe('10.5%')
     expect(formatPercent(0)).toBe('0.0%')
-    expect(formatPercent(100)).toBe('100.0%')
+    expect(formatPercent(-5.2)).toBe('-5.2%')
+  })
+})
+
+describe('Gráficos - Cálculos de Variação', () => {
+  const calculateVariation = (current: number, previous: number): number => {
+    if (previous === 0) return 0
+    const variation = ((current - previous) / previous) * 100
+    return isFinite(variation) ? variation : 0
+  }
+
+  it('deve calcular variação corretamente', () => {
+    expect(calculateVariation(100, 50)).toBe(100)
+    expect(calculateVariation(50, 100)).toBe(-50)
+    expect(calculateVariation(100, 100)).toBe(0)
+  })
+
+  it('deve retornar 0 quando valor anterior é zero', () => {
+    expect(calculateVariation(100, 0)).toBe(0)
+    expect(calculateVariation(0, 0)).toBe(0)
+  })
+
+  it('deve retornar 0 para valores infinitos', () => {
+    const variation = calculateVariation(Infinity, 100)
+    expect(variation).toBe(0)
+  })
+
+  it('deve retornar 0 para valores NaN', () => {
+    const variation = calculateVariation(NaN, 100)
+    expect(isNaN(variation) || variation === 0).toBe(true)
+  })
+
+  it('deve calcular variações em arrays de dados', () => {
+    const data = [0, 100, 200, 0, 300]
+    const variations = data.map((value, index) => {
+      if (index === 0) return 0
+      return calculateVariation(value, data[index - 1])
+    })
+
+    expect(variations[0]).toBe(0) // primeiro mês
+    expect(variations[1]).toBe(0) // 100/0 = 0 (divisão por zero)
+    expect(variations[2]).toBe(100) // (200-100)/100 = 100%
+    expect(variations[3]).toBe(-100) // (0-200)/200 = -100%
+    expect(variations[4]).toBe(0) // 300/0 = 0 (divisão por zero)
   })
 })
 

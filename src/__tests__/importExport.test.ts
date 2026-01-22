@@ -150,6 +150,32 @@ describe('Importação de Dados', () => {
     expect(loadSelectedDepartment()).toBe('funilaria')
   })
 
+  it('deve importar dados consolidados quando forceConsolidated está true', () => {
+    const mockDRE: DREData = [
+      { id: '1', label: 'Receita Consolidada', values: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600] },
+    ]
+    
+    // Salva dados consolidados
+    const saved = saveDREData(2025, mockDRE, 'consolidado', true)
+    expect(saved).toBe(true)
+    
+    // Exporta
+    const exported = exportAllData()
+    
+    // Limpa
+    localStorage.clear()
+    
+    // Importa de volta
+    const imported = importAllData(exported)
+    expect(imported).toBe(true)
+    
+    // Verifica que os dados consolidados foram importados
+    const loaded = loadDREData(2025, 'consolidado')
+    expect(loaded).not.toBeNull()
+    expect(loaded![0].label).toBe('Receita Consolidada')
+    expect(loaded![0].values[0]).toBe(500)
+  })
+
   it('deve restaurar dados de métricas', () => {
     const mockData = loadMetricsData(2025, 'usados')
     const modifiedData = {

@@ -92,5 +92,42 @@ export const businessMetricsDataPecas2025 = {
     capitalProprio: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     capitalTerceiros: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     capitalTotal: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-  }
+  },
+
+  // Dados Adicionais - Bônus
+  bonus: {
+    veiculosNovos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    veiculosUsados: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    pecas: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    oficina: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    funilaria: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    administracao: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  },
+
+  // Dados Adicionais - Receitas de Financiamento
+  receitasFinanciamento: {
+    veiculosNovos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    veiculosUsados: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  },
+
+  // Dados Adicionais - Créditos ICMS
+  creditosICMS: {
+    novos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    pecas: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    administracao: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  },
+
+  // Dados Adicionais - Créditos PIS e COFINS
+  creditosPISCOFINS: {
+    administracao: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  },
+
+  // Dados Adicionais - Receita de Blindagem
+  receitaBlindagem: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+
+  // Dados Adicionais - Receita de Despachante Usados
+  receitaDespachanteUsados: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+
+  // Dados Adicionais - Receita de Despachante Novos
+  receitaDespachanteNovos: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 }

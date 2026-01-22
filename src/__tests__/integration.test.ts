@@ -92,6 +92,28 @@ describe('Integração - Fluxo Completo do Usuário', () => {
     expect(loaded![0].label).toBe('Receita Bruta')
   })
 
+  it('deve simular fluxo de importação de DRE consolidado', () => {
+    // Usuário importa DRE consolidado com forceConsolidated
+    const mockDREConsolidado: DREData = [
+      { id: '1', label: 'Total Consolidado', values: [1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 1700000, 1800000, 1900000, 2000000, 2100000] },
+      { id: '2', label: 'Despesas', values: [-100000, -110000, -120000, -130000, -140000, -150000, -160000, -170000, -180000, -190000, -200000, -210000] },
+    ]
+    
+    // Salva DRE consolidado com force
+    const saved = saveDREData(2025, mockDREConsolidado, 'consolidado', true)
+    expect(saved).toBe(true)
+    
+    // Verifica persistência
+    const loaded = loadDREData(2025, 'consolidado')
+    expect(loaded).not.toBeNull()
+    expect(loaded![0].label).toBe('Total Consolidado')
+    expect(loaded![0].values[0]).toBe(1000000)
+    
+    // Verifica que os dados salvos têm prioridade sobre cálculo
+    const reloaded = loadDREData(2025, 'consolidado')
+    expect(reloaded).toEqual(mockDREConsolidado)
+  })
+
   it('deve simular fluxo de backup e restauração', () => {
     // Usuário configura sistema
     saveSelectedFiscalYear(2026)

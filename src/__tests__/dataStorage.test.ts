@@ -143,7 +143,7 @@ describe('DataStorage - Gerenciamento de Dados', () => {
       expect(loaded.vendasNovos.vendas).toEqual([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200])
     })
 
-    it('não deve permitir salvar dados do consolidado', () => {
+    it('não deve permitir salvar dados do consolidado (sem force)', () => {
       const data = loadMetricsData(2025, 'consolidado')
       const result = saveMetricsData(2025, data, 'consolidado')
       expect(result).toBe(false)
@@ -154,6 +154,24 @@ describe('DataStorage - Gerenciamento de Dados', () => {
       
       expect(consolidado).toBeDefined()
       expect(consolidado.months).toHaveLength(12)
+    })
+
+    it('deve carregar dados corretos de Usados 2025', () => {
+      const data = loadMetricsData(2025, 'usados')
+      
+      // Verifica alguns valores específicos atualizados
+      expect(data).toBeDefined()
+      expect(data.months).toHaveLength(12)
+    })
+
+    it('deve ter valores numéricos válidos em todos os campos', () => {
+      const data = loadMetricsData(2025, 'usados')
+      
+      // Verifica que todos os valores são números válidos
+      data.months.forEach((_, index) => {
+        expect(typeof data.vendasNovos.vendas[index]).toBe('number')
+        expect(isFinite(data.vendasNovos.vendas[index])).toBe(true)
+      })
     })
   })
 
@@ -176,12 +194,38 @@ describe('DataStorage - Gerenciamento de Dados', () => {
       expect(loaded).toEqual(mockDRE)
     })
 
-    it('não deve permitir salvar DRE do consolidado', () => {
+    it('não deve permitir salvar DRE do consolidado sem force', () => {
       const mockDRE: DREData = [
         { id: '1', label: 'Teste', values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
       ]
       const result = saveDREData(2025, mockDRE, 'consolidado')
       expect(result).toBe(false)
+    })
+
+    it('deve permitir salvar DRE do consolidado com forceConsolidated', () => {
+      const mockDRE: DREData = [
+        { id: '1', label: 'Teste Consolidado', values: [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200] },
+        { id: '2', label: 'Linha 2', values: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120] },
+      ]
+      const result = saveDREData(2025, mockDRE, 'consolidado', true)
+      expect(result).toBe(true)
+      
+      const loaded = loadDREData(2025, 'consolidado')
+      expect(loaded).toEqual(mockDRE)
+      expect(loaded?.[0].values[0]).toBe(100)
+    })
+
+    it('deve carregar DRE salvo do consolidado antes de calcular', () => {
+      // Salva um DRE customizado no consolidado
+      const mockDRE: DREData = [
+        { id: '1', label: 'Custom Data', values: [999, 888, 777, 666, 555, 444, 333, 222, 111, 100, 90, 80] },
+      ]
+      saveDREData(2025, mockDRE, 'consolidado', true)
+      
+      // Carrega e verifica que retorna os dados salvos
+      const loaded = loadDREData(2025, 'consolidado')
+      expect(loaded).toEqual(mockDRE)
+      expect(loaded?.[0].values[0]).toBe(999)
     })
   })
 

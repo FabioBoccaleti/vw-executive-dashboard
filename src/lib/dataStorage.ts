@@ -12,15 +12,33 @@ import { businessMetricsData2027 } from '../data/businessMetricsData2027';
 
 // Imports dos departamentos
 import { businessMetricsDataNovos2024 } from '../data/businessMetricsDataNovos2024';
+import { businessMetricsDataNovos2025 } from '../data/businessMetricsDataNovos2025';
+import { businessMetricsDataNovos2026 } from '../data/businessMetricsDataNovos2026';
+import { businessMetricsDataNovos2027 } from '../data/businessMetricsDataNovos2027';
 import { businessMetricsDataVendaDireta2024 } from '../data/businessMetricsDataVendaDireta2024';
+import { businessMetricsDataVendaDireta2025 } from '../data/businessMetricsDataVendaDireta2025';
+import { businessMetricsDataVendaDireta2026 } from '../data/businessMetricsDataVendaDireta2026';
+import { businessMetricsDataVendaDireta2027 } from '../data/businessMetricsDataVendaDireta2027';
 import { businessMetricsDataUsados2024 } from '../data/businessMetricsDataUsados2024';
 import { businessMetricsDataUsados2025 } from '../data/businessMetricsDataUsados2025';
 import { businessMetricsDataUsados2026 } from '../data/businessMetricsDataUsados2026';
 import { businessMetricsDataUsados2027 } from '../data/businessMetricsDataUsados2027';
 import { businessMetricsDataPecas2024 } from '../data/businessMetricsDataPecas2024';
+import { businessMetricsDataPecas2025 } from '../data/businessMetricsDataPecas2025';
+import { businessMetricsDataPecas2026 } from '../data/businessMetricsDataPecas2026';
+import { businessMetricsDataPecas2027 } from '../data/businessMetricsDataPecas2027';
 import { businessMetricsDataOficina2024 } from '../data/businessMetricsDataOficina2024';
+import { businessMetricsDataOficina2025 } from '../data/businessMetricsDataOficina2025';
+import { businessMetricsDataOficina2026 } from '../data/businessMetricsDataOficina2026';
+import { businessMetricsDataOficina2027 } from '../data/businessMetricsDataOficina2027';
 import { businessMetricsDataFunilaria2024 } from '../data/businessMetricsDataFunilaria2024';
+import { businessMetricsDataFunilaria2025 } from '../data/businessMetricsDataFunilaria2025';
+import { businessMetricsDataFunilaria2026 } from '../data/businessMetricsDataFunilaria2026';
+import { businessMetricsDataFunilaria2027 } from '../data/businessMetricsDataFunilaria2027';
 import { businessMetricsDataAdministracao2024 } from '../data/businessMetricsDataAdministracao2024';
+import { businessMetricsDataAdministracao2025 } from '../data/businessMetricsDataAdministracao2025';
+import { businessMetricsDataAdministracao2026 } from '../data/businessMetricsDataAdministracao2026';
+import { businessMetricsDataAdministracao2027 } from '../data/businessMetricsDataAdministracao2027';
 
 // Tipo para departamento
 export type Department = 'novos' | 'vendaDireta' | 'usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'consolidado';
@@ -72,32 +90,62 @@ function getDefaultDataForDepartment(department: Department, fiscalYear: 2024 | 
   
   // Para Novos
   if (department === 'novos') {
-    return businessMetricsDataNovos2024; // Por enquanto todos os anos têm dados vazios
+    switch (fiscalYear) {
+      case 2024: return businessMetricsDataNovos2024;
+      case 2025: return businessMetricsDataNovos2025;
+      case 2026: return businessMetricsDataNovos2026;
+      case 2027: return businessMetricsDataNovos2027;
+    }
   }
   
   // Para Venda Direta
   if (department === 'vendaDireta') {
-    return businessMetricsDataVendaDireta2024;
+    switch (fiscalYear) {
+      case 2024: return businessMetricsDataVendaDireta2024;
+      case 2025: return businessMetricsDataVendaDireta2025;
+      case 2026: return businessMetricsDataVendaDireta2026;
+      case 2027: return businessMetricsDataVendaDireta2027;
+    }
   }
   
   // Para Peças
   if (department === 'pecas') {
-    return businessMetricsDataPecas2024;
+    switch (fiscalYear) {
+      case 2024: return businessMetricsDataPecas2024;
+      case 2025: return businessMetricsDataPecas2025;
+      case 2026: return businessMetricsDataPecas2026;
+      case 2027: return businessMetricsDataPecas2027;
+    }
   }
   
   // Para Oficina
   if (department === 'oficina') {
-    return businessMetricsDataOficina2024;
+    switch (fiscalYear) {
+      case 2024: return businessMetricsDataOficina2024;
+      case 2025: return businessMetricsDataOficina2025;
+      case 2026: return businessMetricsDataOficina2026;
+      case 2027: return businessMetricsDataOficina2027;
+    }
   }
   
   // Para Funilaria
   if (department === 'funilaria') {
-    return businessMetricsDataFunilaria2024;
+    switch (fiscalYear) {
+      case 2024: return businessMetricsDataFunilaria2024;
+      case 2025: return businessMetricsDataFunilaria2025;
+      case 2026: return businessMetricsDataFunilaria2026;
+      case 2027: return businessMetricsDataFunilaria2027;
+    }
   }
   
   // Para Administração
   if (department === 'administracao') {
-    return businessMetricsDataAdministracao2024;
+    switch (fiscalYear) {
+      case 2024: return businessMetricsDataAdministracao2024;
+      case 2025: return businessMetricsDataAdministracao2025;
+      case 2026: return businessMetricsDataAdministracao2026;
+      case 2027: return businessMetricsDataAdministracao2027;
+    }
   }
   
   // Para Consolidado (será calculado dinamicamente)
@@ -497,7 +545,7 @@ export async function migrateToDatabase(): Promise<boolean> {
  * Exporta todos os dados para backup
  */
 export function exportAllData(): string {
-  const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
+  const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao', 'consolidado'];
   const years: (2024 | 2025 | 2026 | 2027)[] = [2024, 2025, 2026, 2027];
   
   const data: any = {
@@ -531,8 +579,13 @@ export function importAllData(jsonString: string): boolean {
       Object.entries(backup.data).forEach(([year, depts]: [string, any]) => {
         const fiscalYear = parseInt(year) as 2024 | 2025 | 2026 | 2027;
         Object.entries(depts).forEach(([dept, data]: [string, any]) => {
-          if (data.metrics) saveMetricsData(fiscalYear, data.metrics, dept as Department);
-          if (data.dre) saveDREData(fiscalYear, data.dre, dept as Department);
+          const department = dept as Department;
+          if (data.metrics) saveMetricsData(fiscalYear, data.metrics, department);
+          // Se for consolidado e tiver DRE, usa forceConsolidated = true
+          if (data.dre) {
+            const isConsolidado = department === 'consolidado';
+            saveDREData(fiscalYear, data.dre, department, isConsolidado);
+          }
         });
       });
     }

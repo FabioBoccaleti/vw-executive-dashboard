@@ -6531,12 +6531,18 @@ export function VWFinancialDashboard() {
                       const bonusChartData = metricsData.months.map((month, index) => {
                         const valorAtual = bonusData[index];
                         const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
-                        const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
+                        // Evita divisão por zero e valores infinitos
+                        let variacao = 0;
+                        if (index > 0 && valorAnterior !== 0) {
+                          variacao = ((valorAtual - valorAnterior) / valorAnterior) * 100;
+                        } else if (index > 0 && valorAnterior === 0 && valorAtual > 0) {
+                          variacao = 100; // Aumento de 0 para valor positivo = 100%
+                        }
                         
                         return {
                           month,
                           valor: valorAtual,
-                          variacao: variacao
+                          variacao: isFinite(variacao) ? variacao : 0
                         };
                       });
 
@@ -7692,7 +7698,9 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID43 - Crédito PIS e Cofins Administração */}
                     {(() => {
-                      const creditoData = metricsData.creditosPISCOFINS.administracao;
+                      const creditoData = metricsData.creditosPISCOFINS?.administracao;
+                      if (!creditoData) return null;
+                      
                       const totalCredito = creditoData.reduce((a, b) => a + b, 0);
                       const mediaCredito = totalCredito / 12;
                       const ultimoCredito = creditoData[11];
