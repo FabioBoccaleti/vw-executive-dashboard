@@ -2669,6 +2669,7 @@ export function VWFinancialDashboard() {
                 <CardContent>
                   <div className="grid grid-cols-1 gap-6">
                     {/* Gráfico 1: Balcão (ID 8) */}
+                    {businessMetricsData.vendasPecas?.balcao && (
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
                       <div className="mb-4">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -2677,19 +2678,19 @@ export function VWFinancialDashboard() {
                       </div>
                       
                       {(() => {
-                        const receitaTotal = businessMetricsData.vendasPecas.balcao.vendas.reduce((a, b) => a + b, 0);
-                        const lucroTotal = businessMetricsData.vendasPecas.balcao.lucro.reduce((a, b) => a + b, 0);
-                        const margemMedia = businessMetricsData.vendasPecas.balcao.margem.reduce((a, b) => a + b, 0) / 12;
+                        const receitaTotal = businessMetricsData.vendasPecas?.balcao?.vendas.reduce((a, b) => a + b, 0) || 0;
+                        const lucroTotal = businessMetricsData.vendasPecas?.balcao?.lucro.reduce((a, b) => a + b, 0) || 0;
+                        const margemMedia = (businessMetricsData.vendasPecas?.balcao?.margem.reduce((a, b) => a + b, 0) || 0) / 12;
 
                         const chartData = businessMetricsData.months.map((month, index) => {
-                          const receitaAtual = businessMetricsData.vendasPecas.balcao.vendas[index];
-                          const receitaAnterior = index > 0 ? businessMetricsData.vendasPecas.balcao.vendas[index - 1] : receitaAtual;
-                          const variacao = ((receitaAtual - receitaAnterior) / receitaAnterior) * 100;
+                          const receitaAtual = businessMetricsData.vendasPecas?.balcao?.vendas[index] || 0;
+                          const receitaAnterior = index > 0 ? (businessMetricsData.vendasPecas?.balcao?.vendas[index - 1] || 0) : receitaAtual;
+                          const variacao = receitaAnterior !== 0 ? ((receitaAtual - receitaAnterior) / receitaAnterior) * 100 : 0;
 
                           return {
                             month,
                             receita: receitaAtual,
-                            margem: businessMetricsData.vendasPecas.balcao.margem[index],
+                            margem: businessMetricsData.vendasPecas?.balcao?.margem[index] || 0,
                             variacao: index === 0 ? 0 : variacao
                           };
                         });
@@ -2796,8 +2797,10 @@ export function VWFinancialDashboard() {
                         );
                       })()}
                     </div>
+                    )}
 
                     {/* Gráfico 2: Oficina (ID 9) */}
+                    {businessMetricsData.vendasPecas?.oficina && (
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
                       <div className="mb-4">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -2806,19 +2809,19 @@ export function VWFinancialDashboard() {
                       </div>
                       
                       {(() => {
-                        const receitaTotal = businessMetricsData.vendasPecas.oficina.vendas.reduce((a, b) => a + b, 0);
-                        const lucroTotal = businessMetricsData.vendasPecas.oficina.lucro.reduce((a, b) => a + b, 0);
-                        const margemMedia = businessMetricsData.vendasPecas.oficina.margem.reduce((a, b) => a + b, 0) / 12;
+                        const receitaTotal = businessMetricsData.vendasPecas?.oficina?.vendas.reduce((a, b) => a + b, 0) || 0;
+                        const lucroTotal = businessMetricsData.vendasPecas?.oficina?.lucro.reduce((a, b) => a + b, 0) || 0;
+                        const margemMedia = (businessMetricsData.vendasPecas?.oficina?.margem.reduce((a, b) => a + b, 0) || 0) / 12;
 
                         const chartData = businessMetricsData.months.map((month, index) => {
-                          const receitaAtual = businessMetricsData.vendasPecas.oficina.vendas[index];
-                          const receitaAnterior = index > 0 ? businessMetricsData.vendasPecas.oficina.vendas[index - 1] : receitaAtual;
-                          const variacao = ((receitaAtual - receitaAnterior) / receitaAnterior) * 100;
+                          const receitaAtual = businessMetricsData.vendasPecas?.oficina?.vendas[index] || 0;
+                          const receitaAnterior = index > 0 ? (businessMetricsData.vendasPecas?.oficina?.vendas[index - 1] || 0) : receitaAtual;
+                          const variacao = receitaAnterior !== 0 ? ((receitaAtual - receitaAnterior) / receitaAnterior) * 100 : 0;
 
                           return {
                             month,
                             receita: receitaAtual,
-                            margem: businessMetricsData.vendasPecas.oficina.margem[index],
+                            margem: businessMetricsData.vendasPecas?.oficina?.margem[index] || 0,
                             variacao: index === 0 ? 0 : variacao
                           };
                         });
@@ -2925,8 +2928,10 @@ export function VWFinancialDashboard() {
                         );
                       })()}
                     </div>
+                    )}
 
                     {/* Gráfico 3: Funilaria (ID 10) */}
+                    {businessMetricsData.vendasPecas?.funilaria && (
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
                       <div className="mb-4">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -2935,19 +2940,19 @@ export function VWFinancialDashboard() {
                       </div>
                       
                       {(() => {
-                        const receitaTotal = businessMetricsData.vendasPecas.funilaria.vendas.reduce((a, b) => a + b, 0);
-                        const lucroTotal = businessMetricsData.vendasPecas.funilaria.lucro.reduce((a, b) => a + b, 0);
-                        const margemMedia = businessMetricsData.vendasPecas.funilaria.margem.reduce((a, b) => a + b, 0) / 12;
+                        const receitaTotal = businessMetricsData.vendasPecas?.funilaria?.vendas.reduce((a, b) => a + b, 0) || 0;
+                        const lucroTotal = businessMetricsData.vendasPecas?.funilaria?.lucro.reduce((a, b) => a + b, 0) || 0;
+                        const margemMedia = (businessMetricsData.vendasPecas?.funilaria?.margem.reduce((a, b) => a + b, 0) || 0) / 12;
 
                         const chartData = businessMetricsData.months.map((month, index) => {
-                          const receitaAtual = businessMetricsData.vendasPecas.funilaria.vendas[index];
-                          const receitaAnterior = index > 0 ? businessMetricsData.vendasPecas.funilaria.vendas[index - 1] : receitaAtual;
-                          const variacao = ((receitaAtual - receitaAnterior) / receitaAnterior) * 100;
+                          const receitaAtual = businessMetricsData.vendasPecas?.funilaria?.vendas[index] || 0;
+                          const receitaAnterior = index > 0 ? (businessMetricsData.vendasPecas?.funilaria?.vendas[index - 1] || 0) : receitaAtual;
+                          const variacao = receitaAnterior !== 0 ? ((receitaAtual - receitaAnterior) / receitaAnterior) * 100 : 0;
 
                           return {
                             month,
                             receita: receitaAtual,
-                            margem: businessMetricsData.vendasPecas.funilaria.margem[index],
+                            margem: businessMetricsData.vendasPecas?.funilaria?.margem[index] || 0,
                             variacao: index === 0 ? 0 : variacao
                           };
                         });
@@ -3054,8 +3059,10 @@ export function VWFinancialDashboard() {
                         );
                       })()}
                     </div>
+                    )}
 
                     {/* Gráfico 4: Acessórios (ID 11) */}
+                    {businessMetricsData.vendasPecas?.acessorios && (
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
                       <div className="mb-4">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -3064,19 +3071,19 @@ export function VWFinancialDashboard() {
                       </div>
                       
                       {(() => {
-                        const receitaTotal = businessMetricsData.vendasPecas.acessorios.vendas.reduce((a, b) => a + b, 0);
-                        const lucroTotal = businessMetricsData.vendasPecas.acessorios.lucro.reduce((a, b) => a + b, 0);
-                        const margemMedia = businessMetricsData.vendasPecas.acessorios.margem.reduce((a, b) => a + b, 0) / 12;
+                        const receitaTotal = businessMetricsData.vendasPecas?.acessorios?.vendas.reduce((a, b) => a + b, 0) || 0;
+                        const lucroTotal = businessMetricsData.vendasPecas?.acessorios?.lucro.reduce((a, b) => a + b, 0) || 0;
+                        const margemMedia = (businessMetricsData.vendasPecas?.acessorios?.margem.reduce((a, b) => a + b, 0) || 0) / 12;
 
                         const chartData = businessMetricsData.months.map((month, index) => {
-                          const receitaAtual = businessMetricsData.vendasPecas.acessorios.vendas[index];
-                          const receitaAnterior = index > 0 ? businessMetricsData.vendasPecas.acessorios.vendas[index - 1] : receitaAtual;
-                          const variacao = ((receitaAtual - receitaAnterior) / receitaAnterior) * 100;
+                          const receitaAtual = businessMetricsData.vendasPecas?.acessorios?.vendas[index] || 0;
+                          const receitaAnterior = index > 0 ? (businessMetricsData.vendasPecas?.acessorios?.vendas[index - 1] || 0) : receitaAtual;
+                          const variacao = receitaAnterior !== 0 ? ((receitaAtual - receitaAnterior) / receitaAnterior) * 100 : 0;
 
                           return {
                             month,
                             receita: receitaAtual,
-                            margem: businessMetricsData.vendasPecas.acessorios.margem[index],
+                            margem: businessMetricsData.vendasPecas?.acessorios?.margem[index] || 0,
                             variacao: index === 0 ? 0 : variacao
                           };
                         });
@@ -3183,8 +3190,11 @@ export function VWFinancialDashboard() {
                         );
                       })()}
                     </div>
+                    )}
 
                     {/* Gráfico 5: Total Consolidado (ID 8 + ID 9 + ID 10 + ID 11) */}
+                    {businessMetricsData.vendasPecas?.balcao && businessMetricsData.vendasPecas?.oficina && 
+                     businessMetricsData.vendasPecas?.funilaria && businessMetricsData.vendasPecas?.acessorios && (
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -3193,15 +3203,15 @@ export function VWFinancialDashboard() {
                         {(() => {
                           // Calcular vendas consolidadas (soma de Balcão + Oficina + Funilaria + Acessórios)
                           const vendasConsolidadas = businessMetricsData.months.map((_, index) => 
-                            businessMetricsData.vendasPecas.balcao.vendas[index] +
-                            businessMetricsData.vendasPecas.oficina.vendas[index] +
-                            businessMetricsData.vendasPecas.funilaria.vendas[index] +
-                            businessMetricsData.vendasPecas.acessorios.vendas[index]
+                            (businessMetricsData.vendasPecas?.balcao?.vendas[index] || 0) +
+                            (businessMetricsData.vendasPecas?.oficina?.vendas[index] || 0) +
+                            (businessMetricsData.vendasPecas?.funilaria?.vendas[index] || 0) +
+                            (businessMetricsData.vendasPecas?.acessorios?.vendas[index] || 0)
                           );
                           
                           const ultimaReceita = vendasConsolidadas[11];
                           const penultimaReceita = vendasConsolidadas[10];
-                          const variacao = ((ultimaReceita - penultimaReceita) / penultimaReceita) * 100;
+                          const variacao = penultimaReceita !== 0 ? ((ultimaReceita - penultimaReceita) / penultimaReceita) * 100 : 0;
                           
                           return (
                             <div className="flex items-center gap-2">
@@ -3216,21 +3226,21 @@ export function VWFinancialDashboard() {
                       {(() => {
                         // Calcular totais consolidados
                         const vendasConsolidadas = businessMetricsData.months.map((_, index) => 
-                          businessMetricsData.vendasPecas.balcao.vendas[index] +
-                          businessMetricsData.vendasPecas.oficina.vendas[index] +
-                          businessMetricsData.vendasPecas.funilaria.vendas[index] +
-                          businessMetricsData.vendasPecas.acessorios.vendas[index]
+                          (businessMetricsData.vendasPecas?.balcao?.vendas[index] || 0) +
+                          (businessMetricsData.vendasPecas?.oficina?.vendas[index] || 0) +
+                          (businessMetricsData.vendasPecas?.funilaria?.vendas[index] || 0) +
+                          (businessMetricsData.vendasPecas?.acessorios?.vendas[index] || 0)
                         );
                         
                         const lucroConsolidado = businessMetricsData.months.map((_, index) => 
-                          businessMetricsData.vendasPecas.balcao.lucro[index] +
-                          businessMetricsData.vendasPecas.oficina.lucro[index] +
-                          businessMetricsData.vendasPecas.funilaria.lucro[index] +
-                          businessMetricsData.vendasPecas.acessorios.lucro[index]
+                          (businessMetricsData.vendasPecas?.balcao?.lucro[index] || 0) +
+                          (businessMetricsData.vendasPecas?.oficina?.lucro[index] || 0) +
+                          (businessMetricsData.vendasPecas?.funilaria?.lucro[index] || 0) +
+                          (businessMetricsData.vendasPecas?.acessorios?.lucro[index] || 0)
                         );
                         
                         const margemConsolidada = businessMetricsData.months.map((_, index) => 
-                          (lucroConsolidado[index] / vendasConsolidadas[index]) * 100
+                          vendasConsolidadas[index] !== 0 ? (lucroConsolidado[index] / vendasConsolidadas[index]) * 100 : 0
                         );
                         
                         const receitaTotal = vendasConsolidadas.reduce((a, b) => a + b, 0);
@@ -3240,7 +3250,7 @@ export function VWFinancialDashboard() {
                         const chartData = businessMetricsData.months.map((month, index) => {
                           const receitaAtual = vendasConsolidadas[index];
                           const receitaAnterior = index > 0 ? vendasConsolidadas[index - 1] : receitaAtual;
-                          const variacao = ((receitaAtual - receitaAnterior) / receitaAnterior) * 100;
+                          const variacao = receitaAnterior !== 0 ? ((receitaAtual - receitaAnterior) / receitaAnterior) * 100 : 0;
 
                           return {
                             month,
@@ -3352,6 +3362,7 @@ export function VWFinancialDashboard() {
                         );
                       })()}
                     </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
