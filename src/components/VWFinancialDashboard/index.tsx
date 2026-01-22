@@ -6331,7 +6331,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Bonus Usados */}
-            {showBonusUsados && businessMetricsData.bonus && (
+            {showBonusUsados && metricsData.bonus && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -6356,12 +6356,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID33 - Bônus Veículos Usados */}
                     {(() => {
-                      const bonusData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                      const bonusData = metricsData.bonus.veiculosUsados;
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
                       const mediaBonus = totalBonus / 12;
                       const ultimoBonus = bonusData[11];
 
-                      const bonusChartData = businessMetricsData.months.map((month, index) => {
+                      const bonusChartData = metricsData.months.map((month, index) => {
                         const valorAtual = bonusData[index];
                         const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -6498,7 +6498,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Bonus Peças */}
-            {showBonusPecas && businessMetricsData.bonus && (
+            {showBonusPecas && metricsData.bonus && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -6523,12 +6523,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID34 - Bônus Peças */}
                     {(() => {
-                      const bonusData = [400000, 500000, 700000, 250000, 380000, 400000, 600000, 800000, 280000, 350000, 420000, 580000];
+                      const bonusData = metricsData.bonus.pecas;
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
                       const mediaBonus = totalBonus / 12;
                       const ultimoBonus = bonusData[11];
 
-                      const bonusChartData = businessMetricsData.months.map((month, index) => {
+                      const bonusChartData = metricsData.months.map((month, index) => {
                         const valorAtual = bonusData[index];
                         const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
                         const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -6665,7 +6665,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Bonus Oficina */}
-            {showBonusOficina && businessMetricsData.bonus && (
+            {showBonusOficina && metricsData.bonus && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -6690,12 +6690,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID35 - Bônus Oficina */}
                     {(() => {
-                      const bonusData = [100000, 200000, 180000, 190000, 70000, 0, 80000, 90000, 0, 50000, 75000, 118800];
+                      const bonusData = metricsData.bonus.oficina;
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
                       const mediaBonus = totalBonus / 12;
                       const ultimoBonus = bonusData[11];
 
-                      const bonusChartData = businessMetricsData.months.map((month, index) => {
+                      const bonusChartData = metricsData.months.map((month, index) => {
                         const valorAtual = bonusData[index];
                         const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -6832,7 +6832,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Bonus Funilaria */}
-            {showBonusFunilaria && businessMetricsData.bonus && (
+            {showBonusFunilaria && metricsData.bonus && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -6857,12 +6857,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID35 - Bônus Funilaria */}
                     {(() => {
-                      const bonusData = businessMetricsData.bonus.funilaria;
+                      const bonusData = metricsData.bonus.funilaria;
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
                       const mediaBonus = totalBonus / 12;
                       const ultimoBonus = bonusData[11];
 
-                      const bonusChartData = businessMetricsData.months.map((month, index) => {
+                      const bonusChartData = metricsData.months.map((month, index) => {
                         const valorAtual = bonusData[index];
                         const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -6999,7 +6999,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Bonus Administração */}
-            {showBonusAdministracao && businessMetricsData.bonus && (
+            {showBonusAdministracao && metricsData.bonus && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -7024,12 +7024,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID36 - Bônus Administração */}
                     {(() => {
-                      const bonusData = businessMetricsData.bonus.administracao;
+                      const bonusData = metricsData.bonus.administracao;
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
                       const mediaBonus = totalBonus / 12;
                       const ultimoBonus = bonusData[11];
 
-                      const bonusChartData = businessMetricsData.months.map((month, index) => {
+                      const bonusChartData = metricsData.months.map((month, index) => {
                         const valorAtual = bonusData[index];
                         const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -7166,7 +7166,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Receita de Financiamento Novos */}
-            {showReceitaFinanciamentoNovos && businessMetricsData.receitasFinanciamento && (
+            {showReceitaFinanciamentoNovos && metricsData.receitasFinanciamento && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -7191,12 +7191,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID37 - Receita Financiamento Novos */}
                     {(() => {
-                      const receitaData = businessMetricsData.receitasFinanciamento.veiculosNovos;
+                      const receitaData = metricsData.receitasFinanciamento.veiculosNovos;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = businessMetricsData.months.map((month, index) => {
+                      const receitaChartData = metricsData.months.map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -7333,7 +7333,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Crédito ICMS Peças */}
-            {showCreditoICMSPecas && businessMetricsData.creditosICMS && (
+            {showCreditoICMSPecas && metricsData.creditosICMS && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -7358,12 +7358,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID41 - Crédito ICMS Peças */}
                     {(() => {
-                      const creditoData = businessMetricsData.creditosICMS.pecas;
+                      const creditoData = metricsData.creditosICMS.pecas;
                       const totalCredito = creditoData.reduce((a, b) => a + b, 0);
                       const mediaCredito = totalCredito / 12;
                       const ultimoCredito = creditoData[11];
 
-                      const creditoChartData = businessMetricsData.months.map((month, index) => {
+                      const creditoChartData = metricsData.months.map((month, index) => {
                         const valorAtual = creditoData[index];
                         const valorAnterior = index > 0 ? creditoData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -7500,7 +7500,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Crédito ICMS Administração */}
-            {showCreditoICMSAdministracao && businessMetricsData.creditosICMS && (
+            {showCreditoICMSAdministracao && metricsData.creditosICMS && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -7525,12 +7525,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID42 - Crédito ICMS Administração */}
                     {(() => {
-                      const creditoData = businessMetricsData.creditosICMS.administracao;
+                      const creditoData = metricsData.creditosICMS.administracao;
                       const totalCredito = creditoData.reduce((a, b) => a + b, 0);
                       const mediaCredito = totalCredito / 12;
                       const ultimoCredito = creditoData[11];
 
-                      const creditoChartData = businessMetricsData.months.map((month, index) => {
+                      const creditoChartData = metricsData.months.map((month, index) => {
                         const valorAtual = creditoData[index];
                         const valorAnterior = index > 0 ? creditoData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -7692,12 +7692,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID43 - Crédito PIS e Cofins Administração */}
                     {(() => {
-                      const creditoData = businessMetricsData.creditosPISCOFINS.administracao;
+                      const creditoData = metricsData.creditosPISCOFINS.administracao;
                       const totalCredito = creditoData.reduce((a, b) => a + b, 0);
                       const mediaCredito = totalCredito / 12;
                       const ultimoCredito = creditoData[11];
 
-                      const creditoChartData = businessMetricsData.months.map((month, index) => {
+                      const creditoChartData = metricsData.months.map((month, index) => {
                         const valorAtual = creditoData[index];
                         const valorAnterior = index > 0 ? creditoData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -7834,7 +7834,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Receita de Blindagem */}
-            {showReceitaBlindagem && businessMetricsData.receitaBlindagem && (
+            {showReceitaBlindagem && metricsData.receitaBlindagem && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -7859,12 +7859,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID44 - Receita de Blindagem */}
                     {(() => {
-                      const receitaData = businessMetricsData.receitaBlindagem;
+                      const receitaData = metricsData.receitaBlindagem;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = businessMetricsData.months.map((month, index) => {
+                      const receitaChartData = metricsData.months.map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -8001,7 +8001,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Receita de Despachante Usados */}
-            {showReceitaDespachanteUsados && businessMetricsData.receitaDespachanteUsados && (
+            {showReceitaDespachanteUsados && metricsData.receitaDespachanteUsados && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -8026,12 +8026,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID45 - Receita de Despachante Usados */}
                     {(() => {
-                      const receitaData = businessMetricsData.receitaDespachanteUsados;
+                      const receitaData = metricsData.receitaDespachanteUsados;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = businessMetricsData.months.map((month, index) => {
+                      const receitaChartData = metricsData.months.map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -8168,7 +8168,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Receita de Despachante Novos */}
-            {showReceitaDespachanteNovos && businessMetricsData.receitaDespachanteNovos && (
+            {showReceitaDespachanteNovos && metricsData.receitaDespachanteNovos && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -8193,12 +8193,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID46 - Receita de Despachante Novos */}
                     {(() => {
-                      const receitaData = businessMetricsData.receitaDespachanteNovos;
+                      const receitaData = metricsData.receitaDespachanteNovos;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = businessMetricsData.months.map((month, index) => {
+                      const receitaChartData = metricsData.months.map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -8335,7 +8335,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Crédito ICMS Novos */}
-            {showCreditoICMSNovos && businessMetricsData.creditosICMS && (
+            {showCreditoICMSNovos && metricsData.creditosICMS && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -8360,12 +8360,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID40 - Crédito ICMS Novos */}
                     {(() => {
-                      const creditoData = businessMetricsData.creditosICMS.novos;
+                      const creditoData = metricsData.creditosICMS.novos;
                       const totalCredito = creditoData.reduce((a, b) => a + b, 0);
                       const mediaCredito = totalCredito / 12;
                       const ultimoCredito = creditoData[11];
 
-                      const creditoChartData = businessMetricsData.months.map((month, index) => {
+                      const creditoChartData = metricsData.months.map((month, index) => {
                         const valorAtual = creditoData[index];
                         const valorAnterior = index > 0 ? creditoData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -8502,7 +8502,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Receita de Financiamento Usados */}
-            {showReceitaFinanciamentoUsados && businessMetricsData.receitasFinanciamento && (
+            {showReceitaFinanciamentoUsados && metricsData.receitasFinanciamento && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -8527,12 +8527,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID38 - Receita Financiamento Usados */}
                     {(() => {
-                      const receitaData = businessMetricsData.receitasFinanciamento.veiculosUsados;
+                      const receitaData = metricsData.receitasFinanciamento.veiculosUsados;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = businessMetricsData.months.map((month, index) => {
+                      const receitaChartData = metricsData.months.map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
