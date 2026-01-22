@@ -2678,9 +2678,9 @@ export function VWFinancialDashboard() {
                       </div>
                       
                       {(() => {
-                        const receitaTotal = businessMetricsData.vendasPecas?.balcao?.vendas.reduce((a, b) => a + b, 0) || 0;
-                        const lucroTotal = businessMetricsData.vendasPecas?.balcao?.lucro.reduce((a, b) => a + b, 0) || 0;
-                        const margemMedia = (businessMetricsData.vendasPecas?.balcao?.margem.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const receitaTotal = businessMetricsData.vendasPecas?.balcao?.vendas?.reduce((a, b) => a + b, 0) || 0;
+                        const lucroTotal = businessMetricsData.vendasPecas?.balcao?.lucro?.reduce((a, b) => a + b, 0) || 0;
+                        const margemMedia = (businessMetricsData.vendasPecas?.balcao?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
 
                         const chartData = businessMetricsData.months.map((month, index) => {
                           const receitaAtual = businessMetricsData.vendasPecas?.balcao?.vendas[index] || 0;
@@ -2809,9 +2809,9 @@ export function VWFinancialDashboard() {
                       </div>
                       
                       {(() => {
-                        const receitaTotal = businessMetricsData.vendasPecas?.oficina?.vendas.reduce((a, b) => a + b, 0) || 0;
-                        const lucroTotal = businessMetricsData.vendasPecas?.oficina?.lucro.reduce((a, b) => a + b, 0) || 0;
-                        const margemMedia = (businessMetricsData.vendasPecas?.oficina?.margem.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const receitaTotal = businessMetricsData.vendasPecas?.oficina?.vendas?.reduce((a, b) => a + b, 0) || 0;
+                        const lucroTotal = businessMetricsData.vendasPecas?.oficina?.lucro?.reduce((a, b) => a + b, 0) || 0;
+                        const margemMedia = (businessMetricsData.vendasPecas?.oficina?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
 
                         const chartData = businessMetricsData.months.map((month, index) => {
                           const receitaAtual = businessMetricsData.vendasPecas?.oficina?.vendas[index] || 0;
@@ -2940,9 +2940,9 @@ export function VWFinancialDashboard() {
                       </div>
                       
                       {(() => {
-                        const receitaTotal = businessMetricsData.vendasPecas?.funilaria?.vendas.reduce((a, b) => a + b, 0) || 0;
-                        const lucroTotal = businessMetricsData.vendasPecas?.funilaria?.lucro.reduce((a, b) => a + b, 0) || 0;
-                        const margemMedia = (businessMetricsData.vendasPecas?.funilaria?.margem.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const receitaTotal = businessMetricsData.vendasPecas?.funilaria?.vendas?.reduce((a, b) => a + b, 0) || 0;
+                        const lucroTotal = businessMetricsData.vendasPecas?.funilaria?.lucro?.reduce((a, b) => a + b, 0) || 0;
+                        const margemMedia = (businessMetricsData.vendasPecas?.funilaria?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
 
                         const chartData = businessMetricsData.months.map((month, index) => {
                           const receitaAtual = businessMetricsData.vendasPecas?.funilaria?.vendas[index] || 0;
@@ -3071,9 +3071,9 @@ export function VWFinancialDashboard() {
                       </div>
                       
                       {(() => {
-                        const receitaTotal = businessMetricsData.vendasPecas?.acessorios?.vendas.reduce((a, b) => a + b, 0) || 0;
-                        const lucroTotal = businessMetricsData.vendasPecas?.acessorios?.lucro.reduce((a, b) => a + b, 0) || 0;
-                        const margemMedia = (businessMetricsData.vendasPecas?.acessorios?.margem.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const receitaTotal = businessMetricsData.vendasPecas?.acessorios?.vendas?.reduce((a, b) => a + b, 0) || 0;
+                        const lucroTotal = businessMetricsData.vendasPecas?.acessorios?.lucro?.reduce((a, b) => a + b, 0) || 0;
+                        const margemMedia = (businessMetricsData.vendasPecas?.acessorios?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
 
                         const chartData = businessMetricsData.months.map((month, index) => {
                           const receitaAtual = businessMetricsData.vendasPecas?.acessorios?.vendas[index] || 0;
@@ -3369,7 +3369,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Vendas por Seguradora */}
-            {showVendasSeguradora && (
+            {showVendasSeguradora && businessMetricsData.seguradoras && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -3395,12 +3395,12 @@ export function VWFinancialDashboard() {
                     <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
                       {/* Header com título e variação */}
                       {(() => {
-                        const totalVendas = businessMetricsData.seguradoras.portoSeguro.vendas.reduce((a, b) => a + b, 0);
-                        const totalLucro = businessMetricsData.seguradoras.portoSeguro.lucro.reduce((a, b) => a + b, 0);
-                        const margemMedia = businessMetricsData.seguradoras.portoSeguro.margem.reduce((a, b) => a + b, 0) / 12;
-                        const ultimaVenda = businessMetricsData.seguradoras.portoSeguro.vendas[11];
-                        const penultimaVenda = businessMetricsData.seguradoras.portoSeguro.vendas[10];
-                        const variacaoMes = ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100;
+                        const totalVendas = businessMetricsData.seguradoras?.portoSeguro?.vendas?.reduce((a, b) => a + b, 0) || 0;
+                        const totalLucro = businessMetricsData.seguradoras?.portoSeguro?.lucro?.reduce((a, b) => a + b, 0) || 0;
+                        const margemMedia = (businessMetricsData.seguradoras?.portoSeguro?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const ultimaVenda = businessMetricsData.seguradoras?.portoSeguro?.vendas[11] || 0;
+                        const penultimaVenda = businessMetricsData.seguradoras?.portoSeguro?.vendas[10] || 0;
+                        const variacaoMes = penultimaVenda !== 0 ? ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100 : 0;
                         
                         return (
                           <>
@@ -3439,15 +3439,15 @@ export function VWFinancialDashboard() {
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
                           <ComposedChart data={businessMetricsData.months.map((month, index) => {
-                            const vendaAtual = businessMetricsData.seguradoras.portoSeguro.vendas[index];
-                            const vendaAnterior = index > 0 ? businessMetricsData.seguradoras.portoSeguro.vendas[index - 1] : vendaAtual;
-                            const variacaoMesAnt = index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
+                            const vendaAtual = businessMetricsData.seguradoras?.portoSeguro?.vendas[index] || 0;
+                            const vendaAnterior = index > 0 ? (businessMetricsData.seguradoras?.portoSeguro?.vendas[index - 1] || 0) : vendaAtual;
+                            const variacaoMesAnt = vendaAnterior !== 0 && index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
                             
                             return {
                               month,
                               receitaLiquida: vendaAtual,
                               receitaLiquida3d: vendaAtual * 0.92,
-                              margem: businessMetricsData.seguradoras.portoSeguro.margem[index],
+                              margem: businessMetricsData.seguradoras?.portoSeguro?.margem[index] || 0,
                               variacaoMesAnt: variacaoMesAnt
                             };
                           })} width={1654} height={350}>
@@ -3559,12 +3559,12 @@ export function VWFinancialDashboard() {
                     <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
                       {/* Header com título e variação */}
                       {(() => {
-                        const totalVendas = businessMetricsData.seguradoras.azul.vendas.reduce((a, b) => a + b, 0);
-                        const totalLucro = businessMetricsData.seguradoras.azul.lucro.reduce((a, b) => a + b, 0);
-                        const margemMedia = businessMetricsData.seguradoras.azul.margem.reduce((a, b) => a + b, 0) / 12;
-                        const ultimaVenda = businessMetricsData.seguradoras.azul.vendas[11];
-                        const penultimaVenda = businessMetricsData.seguradoras.azul.vendas[10];
-                        const variacaoMes = ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100;
+                        const totalVendas = businessMetricsData.seguradoras?.azul?.vendas?.reduce((a, b) => a + b, 0) || 0;
+                        const totalLucro = businessMetricsData.seguradoras?.azul?.lucro?.reduce((a, b) => a + b, 0) || 0;
+                        const margemMedia = (businessMetricsData.seguradoras?.azul?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const ultimaVenda = businessMetricsData.seguradoras?.azul?.vendas[11] || 0;
+                        const penultimaVenda = businessMetricsData.seguradoras?.azul?.vendas[10] || 0;
+                        const variacaoMes = penultimaVenda !== 0 ? ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100 : 0;
                         
                         return (
                           <>
@@ -3603,15 +3603,15 @@ export function VWFinancialDashboard() {
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
                           <ComposedChart data={businessMetricsData.months.map((month, index) => {
-                            const vendaAtual = businessMetricsData.seguradoras.azul.vendas[index];
-                            const vendaAnterior = index > 0 ? businessMetricsData.seguradoras.azul.vendas[index - 1] : vendaAtual;
-                            const variacaoMesAnt = index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
+                            const vendaAtual = businessMetricsData.seguradoras?.azul?.vendas[index] || 0;
+                            const vendaAnterior = index > 0 ? (businessMetricsData.seguradoras?.azul?.vendas[index - 1] || 0) : vendaAtual;
+                            const variacaoMesAnt = vendaAnterior !== 0 && index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
                             
                             return {
                               month,
                               receitaLiquida: vendaAtual,
                               receitaLiquida3d: vendaAtual * 0.92,
-                              margem: businessMetricsData.seguradoras.azul.margem[index],
+                              margem: businessMetricsData.seguradoras?.azul?.margem[index] || 0,
                               variacaoMesAnt: variacaoMesAnt
                             };
                           })} width={1654} height={350}>
@@ -3723,12 +3723,12 @@ export function VWFinancialDashboard() {
                     <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
                       {/* Header com título e variação */}
                       {(() => {
-                        const totalVendas = businessMetricsData.seguradoras.allianz.vendas.reduce((a, b) => a + b, 0);
-                        const totalLucro = businessMetricsData.seguradoras.allianz.lucro.reduce((a, b) => a + b, 0);
-                        const margemMedia = businessMetricsData.seguradoras.allianz.margem.reduce((a, b) => a + b, 0) / 12;
-                        const ultimaVenda = businessMetricsData.seguradoras.allianz.vendas[11];
-                        const penultimaVenda = businessMetricsData.seguradoras.allianz.vendas[10];
-                        const variacaoMes = ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100;
+                        const totalVendas = businessMetricsData.seguradoras?.allianz?.vendas?.reduce((a, b) => a + b, 0) || 0;
+                        const totalLucro = businessMetricsData.seguradoras?.allianz?.lucro?.reduce((a, b) => a + b, 0) || 0;
+                        const margemMedia = (businessMetricsData.seguradoras?.allianz?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const ultimaVenda = businessMetricsData.seguradoras?.allianz?.vendas[11] || 0;
+                        const penultimaVenda = businessMetricsData.seguradoras?.allianz?.vendas[10] || 0;
+                        const variacaoMes = penultimaVenda !== 0 ? ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100 : 0;
                         
                         return (
                           <>
@@ -3767,15 +3767,15 @@ export function VWFinancialDashboard() {
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
                           <ComposedChart data={businessMetricsData.months.map((month, index) => {
-                            const vendaAtual = businessMetricsData.seguradoras.allianz.vendas[index];
-                            const vendaAnterior = index > 0 ? businessMetricsData.seguradoras.allianz.vendas[index - 1] : vendaAtual;
-                            const variacaoMesAnt = index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
+                            const vendaAtual = businessMetricsData.seguradoras?.allianz?.vendas[index] || 0;
+                            const vendaAnterior = index > 0 ? (businessMetricsData.seguradoras?.allianz?.vendas[index - 1] || 0) : vendaAtual;
+                            const variacaoMesAnt = vendaAnterior !== 0 && index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
                             
                             return {
                               month,
                               receitaLiquida: vendaAtual,
                               receitaLiquida3d: vendaAtual * 0.92,
-                              margem: businessMetricsData.seguradoras.allianz.margem[index],
+                              margem: businessMetricsData.seguradoras?.allianz?.margem[index] || 0,
                               variacaoMesAnt: variacaoMesAnt
                             };
                           })} width={1654} height={350}>
@@ -6140,7 +6140,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Bonus Novos */}
-            {showBonusNovos && (
+            {showBonusNovos && businessMetricsData.bonus && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -6307,7 +6307,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Bonus Usados */}
-            {showBonusUsados && (
+            {showBonusUsados && businessMetricsData.bonus && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -6474,7 +6474,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Bonus Peças */}
-            {showBonusPecas && (
+            {showBonusPecas && businessMetricsData.bonus && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -6641,7 +6641,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Bonus Oficina */}
-            {showBonusOficina && (
+            {showBonusOficina && businessMetricsData.bonus && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -6808,7 +6808,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Bonus Funilaria */}
-            {showBonusFunilaria && (
+            {showBonusFunilaria && businessMetricsData.bonus && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -6975,7 +6975,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Bonus Administração */}
-            {showBonusAdministracao && (
+            {showBonusAdministracao && businessMetricsData.bonus && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -7142,7 +7142,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Receita de Financiamento Novos */}
-            {showReceitaFinanciamentoNovos && (
+            {showReceitaFinanciamentoNovos && businessMetricsData.receitasFinanciamento && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -7309,7 +7309,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Crédito ICMS Peças */}
-            {showCreditoICMSPecas && (
+            {showCreditoICMSPecas && businessMetricsData.creditosICMS && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -7476,7 +7476,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Crédito ICMS Administração */}
-            {showCreditoICMSAdministracao && (
+            {showCreditoICMSAdministracao && businessMetricsData.creditosICMS && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -7810,7 +7810,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Receita de Blindagem */}
-            {showReceitaBlindagem && (
+            {showReceitaBlindagem && businessMetricsData.receitaBlindagem && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -7977,7 +7977,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Receita de Despachante Usados */}
-            {showReceitaDespachanteUsados && (
+            {showReceitaDespachanteUsados && businessMetricsData.receitaDespachanteUsados && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -8002,12 +8002,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID45 - Receita de Despachante Usados */}
                     {(() => {
-                      const receitaData = metricsData.receitaDespachanteUsados;
+                      const receitaData = businessMetricsData.receitaDespachanteUsados;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = metricsData.months.map((month, index) => {
+                      const receitaChartData = businessMetricsData.months.map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -8144,7 +8144,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Receita de Despachante Novos */}
-            {showReceitaDespachanteNovos && (
+            {showReceitaDespachanteNovos && businessMetricsData.receitaDespachanteNovos && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -8169,12 +8169,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID46 - Receita de Despachante Novos */}
                     {(() => {
-                      const receitaData = metricsData.receitaDespachanteNovos;
+                      const receitaData = businessMetricsData.receitaDespachanteNovos;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = metricsData.months.map((month, index) => {
+                      const receitaChartData = businessMetricsData.months.map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -8311,7 +8311,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Crédito ICMS Novos */}
-            {showCreditoICMSNovos && (
+            {showCreditoICMSNovos && businessMetricsData.creditosICMS && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
@@ -8478,7 +8478,7 @@ export function VWFinancialDashboard() {
             )}
 
             {/* Card de Receita de Financiamento Usados */}
-            {showReceitaFinanciamentoUsados && (
+            {showReceitaFinanciamentoUsados && businessMetricsData.receitasFinanciamento && (
               <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">

@@ -202,6 +202,20 @@ describe('Regressão: VWFinancialDashboard - Erro .reduce() em vendasPecas undef
     const { container } = render(<VWFinancialDashboard />);
     expect(container).toBeTruthy();
   });
+
+  it('deve renderizar sem erro quando seguradoras é undefined', () => {
+    // O componente deve verificar se seguradoras existe antes de renderizar cards
+    const { container } = render(<VWFinancialDashboard />);
+    expect(container).toBeTruthy();
+  });
+
+  it('não deve chamar .reduce() em arrays undefined de seguradoras', () => {
+    // Teste que renderiza o componente e verifica se não há erro de .reduce() em seguradoras
+    expect(() => {
+      const { container } = render(<VWFinancialDashboard />);
+      expect(container).toBeTruthy();
+    }).not.toThrow();
+  });
 });
 
 describe('Regressão: Dados parciais por departamento', () => {
