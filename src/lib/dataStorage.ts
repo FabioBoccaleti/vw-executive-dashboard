@@ -368,6 +368,34 @@ export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, departmen
 }
 
 /**
+ * Carrega os dados de métricas compartilhadas (Dados Adicionais) que são iguais para todos os departamentos
+ */
+export function loadSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027): MetricsData {
+  try {
+    const key = `vw_metrics_shared_${fiscalYear}`;
+    const stored = localStorage.getItem(key);
+    
+    console.log(`🔍 loadSharedMetricsData(${fiscalYear}):`);
+    console.log(`  - Chave: ${key}`);
+    console.log(`  - Encontrou no localStorage: ${stored ? 'SIM' : 'NÃO'}`);
+    
+    // Se houver dados salvos, retorna eles
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      console.log(`  - ✅ Retornando dados compartilhados do localStorage`);
+      return parsed;
+    }
+    
+    // Senão, retorna dados padrão baseados no ano (usa dados de 'usados' como base)
+    console.log(`  - ⚠️ Retornando dados padrão para ${fiscalYear}`);
+    return getDefaultDataForDepartment('usados', fiscalYear);
+  } catch (error) {
+    console.error(`Erro ao carregar dados de métricas compartilhadas de ${fiscalYear}:`, error);
+    return getDefaultDataForDepartment('usados', fiscalYear);
+  }
+}
+
+/**
  * Salva os dados de métricas de um ano fiscal específico e departamento
  */
 export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: MetricsData, department: Department = 'usados'): boolean {
@@ -383,6 +411,31 @@ export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: Met
     return true;
   } catch (error) {
     console.error(`Erro ao salvar dados de métricas de ${fiscalYear} - ${department}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Salva os dados de métricas compartilhadas (Dados Adicionais) que são iguais para todos os departamentos
+ */
+export function saveSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: MetricsData): boolean {
+  try {
+    const key = `vw_metrics_shared_${fiscalYear}`;
+    localStorage.setItem(key, JSON.stringify(data));
+    
+    console.log(`✅ Dados compartilhados salvos: ${key}`);
+    
+    // Verificar se realmente salvou
+    const verification = localStorage.getItem(key);
+    if (verification) {
+      console.log(`✅ Verificação: dados compartilhados persistiram corretamente`);
+      return true;
+    } else {
+      console.error(`❌ Verificação: falha ao persistir dados compartilhados`);
+      return false;
+    }
+  } catch (error) {
+    console.error(`Erro ao salvar dados de métricas compartilhadas de ${fiscalYear}:`, error);
     return false;
   }
 }
@@ -566,8 +619,11 @@ export function clearFiscalYearData(fiscalYear: 2024 | 2025 | 2026 | 2027, depar
 export function hasStoredData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: Department = 'usados'): boolean {
   const metricsKey = `vw_metrics_${fiscalYear}_${department}`;
   const dreKey = `vw_dre_${fiscalYear}_${department}`;
+  const sharedKey = `vw_metrics_shared_${fiscalYear}`;
   
-  return localStorage.getItem(metricsKey) !== null || localStorage.getItem(dreKey) !== null;
+  return localStorage.getItem(metricsKey) !== null || 
+         localStorage.getItem(dreKey) !== null ||
+         localStorage.getItem(sharedKey) !== null;
 }
 
 /**
@@ -591,9 +647,11 @@ export function exportAllData(): string {
     selectedYear: loadSelectedFiscalYear(),
     selectedDepartment: loadSelectedDepartment(),
     exportDate: new Date().toISOString(),
-    data: {}
+    data: {},
+    sharedData: {} // Nova seção para dados compartilhados
   };
   
+  // Dados por departamento (existente)
   years.forEach(year => {
     data.data[year] = {};
     departments.forEach(dept => {
@@ -602,6 +660,13 @@ export function exportAllData(): string {
         dre: loadDREData(year, dept)
       };
     });
+  });
+  
+  // Dados compartilhados (novos)
+  years.forEach(year => {
+    data.sharedData[year] = {
+      metrics: loadSharedMetricsData(year)
+    };
   });
   
   return JSON.stringify(data, null, 2);
@@ -624,6 +689,7 @@ export function importAllData(jsonString: string): boolean {
     let totalItems = 0;
     const failures: string[] = [];
     
+    // Importar dados por departamento (existente)
     Object.entries(backup.data).forEach(([year, depts]: [string, any]) => {
       const fiscalYear = parseInt(year) as 2024 | 2025 | 2026 | 2027;
       
@@ -684,6 +750,38 @@ export function importAllData(jsonString: string): boolean {
         }
       });
     });
+    
+    // Importar dados compartilhados (novos)
+    if (backup.sharedData) {
+      console.log('📤 Importando dados compartilhados...');
+      Object.entries(backup.sharedData).forEach(([year, data]: [string, any]) => {
+        const fiscalYear = parseInt(year) as 2024 | 2025 | 2026 | 2027;
+        
+        if (![2024, 2025, 2026, 2027].includes(fiscalYear)) {
+          console.warn(`⚠️ Ano fiscal inválido ignorado nos dados compartilhados: ${year}`);
+          return;
+        }
+        
+        if (data.metrics) {
+          totalItems++;
+          try {
+            const saved = saveSharedMetricsData(fiscalYear, data.metrics);
+            if (saved) {
+              console.log(`✅ Dados compartilhados importados: ${fiscalYear}`);
+              successCount++;
+            } else {
+              const errorMsg = `Falha ao salvar dados compartilhados: ${fiscalYear}`;
+              console.error(`❌ ${errorMsg}`);
+              failures.push(errorMsg);
+            }
+          } catch (error) {
+            const errorMsg = `Erro ao salvar dados compartilhados: ${fiscalYear} - ${error}`;
+            console.error(`❌ ${errorMsg}`);
+            failures.push(errorMsg);
+          }
+        }
+      });
+    }
     
     // Salvar configurações de seleção
     try {

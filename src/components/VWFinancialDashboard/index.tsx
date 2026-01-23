@@ -24,6 +24,8 @@ import {
   clearAllData,
   importAllData,
   exportAllData,
+  loadSharedMetricsData,
+  saveSharedMetricsData,
   type MetricsData,
   type Department
 } from "@/lib/dataStorage"
@@ -205,6 +207,9 @@ export function VWFinancialDashboard() {
   // Estado para dados de métricas de negócios (para permitir importação/exportação)
   const [metricsData, setMetricsData] = useState<MetricsData>(() => loadMetricsData(fiscalYear, department))
   
+  // Estado para dados compartilhados entre todos os departamentos (Dados Adicionais)
+  const [sharedMetricsData, setSharedMetricsData] = useState<MetricsData>(() => loadSharedMetricsData(fiscalYear))
+  
   // Expor funções de limpeza no console (apenas para desenvolvimento)
   useEffect(() => {
     (window as any).clearYearData = clearYearData;
@@ -337,20 +342,28 @@ export function VWFinancialDashboard() {
     // Função para tentar carregar dados com retry
     const loadDataWithRetry = (retryCount = 0) => {
       const newMetricsData = loadMetricsData(fiscalYear, department);
+      const newSharedMetricsData = loadSharedMetricsData(fiscalYear);
       const newDreData = loadDREData(fiscalYear, department);
       
       console.log('📊 Métricas carregadas:', newMetricsData);
+      console.log('🔗 Métricas compartilhadas carregadas:', newSharedMetricsData);
+      console.log('🔍 Comparação de dados:');
+      console.log('  - Métricas normais (específicas dept):', newMetricsData?.bonus?.veiculosUsados || 'não carregado');
+      console.log('  - Métricas compartilhadas (todos depts):', newSharedMetricsData?.bonus?.veiculosUsados || 'não carregado');
       console.log('📈 DRE carregado:', newDreData);
       console.log('📍 Origem dos dados:', newDreData ? 'localStorage' : 'padrão');
       
       // Verificar se existem dados no localStorage que deveriam ter sido encontrados
       const metricsKey = `vw_metrics_${fiscalYear}_${department}`;
+      const sharedKey = `vw_metrics_shared_${fiscalYear}`;
       const dreKey = `vw_dre_${fiscalYear}_${department}`;
       const hasMetricsInStorage = localStorage.getItem(metricsKey) !== null;
+      const hasSharedInStorage = localStorage.getItem(sharedKey) !== null;
       const hasDREInStorage = localStorage.getItem(dreKey) !== null;
       
       console.log('🔍 Verificação localStorage:');
       console.log(`  - ${metricsKey}: ${hasMetricsInStorage ? '✅' : '❌'}`);
+      console.log(`  - ${sharedKey}: ${hasSharedInStorage ? '✅' : '❌'}`);
       console.log(`  - ${dreKey}: ${hasDREInStorage ? '✅' : '❌'}`);
       
       // Se há dados no localStorage mas loadDREData retornou null, tentar novamente
@@ -360,11 +373,15 @@ export function VWFinancialDashboard() {
         return;
       }
       
-      // Atualizar métricas
+      // Atualizar métricas normais
       console.log('🔍 Verificação - Bonus Veículos Usados (ID 33):', newMetricsData.bonus?.veiculosUsados);
       console.log('🔍 Verificação - Bonus Peças (ID 34):', newMetricsData.bonus?.pecas);
       console.log('🔍 Verificação - Receitas Financiamento Novos (ID 38):', newMetricsData.receitasFinanciamento?.veiculosNovos);
       setMetricsData(newMetricsData);
+      
+      // Atualizar métricas compartilhadas
+      console.log('🔗 Atualizando métricas compartilhadas na interface');
+      setSharedMetricsData(newSharedMetricsData);
       
       // Atualizar DRE
       if (newDreData && newDreData.length > 0) {
@@ -418,9 +435,28 @@ export function VWFinancialDashboard() {
   
   // Handlers para importação e exportação de métricas
   const handleExportMetrics = () => {
-    // Lógica será chamada do componente filho
-    const event = new CustomEvent('exportMetrics');
-    window.dispatchEvent(event);
+    // Exportar dados compartilhados além dos dados normais
+    const allData = {
+      exportDate: new Date().toISOString(),
+      fiscalYear,
+      department,
+      normalMetrics: metricsData,
+      sharedMetrics: sharedMetricsData,
+      message: 'Exportação de Dados Adicionais - Dados Compartilhados entre todos os departamentos'
+    };
+    
+    const jsonString = JSON.stringify(allData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vw-dados-adicionais-${fiscalYear}-${new Date().getTime()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log('✅ Dados Adicionais exportados:', allData);
   };
 
   const handleImportMetrics = () => {
@@ -579,15 +615,41 @@ export function VWFinancialDashboard() {
           creditos42: newData.creditosICMS?.administracao
         });
         
-        setMetricsData(newData);
+        // Detectar se está importando via "Dados Adicionais" (showDetailedMetrics = true)
+        const isSharedImport = showDetailedMetrics;
         
-        // Salvar explicitamente no localStorage
-        const saved = saveMetricsData(fiscalYear, newData, department);
-        console.log('💾 Salvamento no localStorage:', saved ? '✅ Sucesso' : '❌ Falhou');
+        if (isSharedImport) {
+          console.log('📤 Salvando como dados COMPARTILHADOS (visível em todos os departamentos)...');
+          // Salvar como dados compartilhados
+          const sharedSaved = saveSharedMetricsData(fiscalYear, newData);
+          console.log('💾 Salvamento compartilhado:', sharedSaved ? '✅ Sucesso' : '❌ Falhou');
+          
+          if (sharedSaved) {
+            // Atualizar tanto o estado normal quanto o compartilhado
+            setMetricsData(newData);
+            setSharedMetricsData(newData);
+            
+            console.log('🔄 Todos os departamentos agora terão acesso aos dados importados!');
+            alert('Dados importados e compartilhados com TODOS os departamentos!');
+          } else {
+            alert('Erro ao salvar dados compartilhados.');
+          }
+        } else {
+          console.log('📤 Salvando como dados específicos do departamento...');
+          // Salvar apenas para o departamento atual (comportamento antigo)
+          const saved = saveMetricsData(fiscalYear, newData, department);
+          console.log('💾 Salvamento no localStorage:', saved ? '✅ Sucesso' : '❌ Falhou');
+          
+          if (saved) {
+            setMetricsData(newData);
+            alert('Dados importados com sucesso!');
+          } else {
+            alert('Erro ao salvar dados.');
+          }
+        }
+        
         console.log('✅ Estado atualizado com sucesso!');
         console.log('=== FIM DA IMPORTAÇÃO ===\n');
-        
-        alert('Dados importados com sucesso!');
         
       } catch (error) {
         console.error('❌ ERRO durante importação:', error);
@@ -9808,10 +9870,10 @@ export function VWFinancialDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
-                        Métricas Detalhadas - Análise Consolidada 2025
+                        🔗 Dados Adicionais Compartilhados - {DEPARTMENT_LABELS[department]}
                       </CardTitle>
                     <CardDescription className="text-sm mt-1">
-                      Tabela completa com todos os indicadores mensais de vendas, estoques, juros, custos, bônus e créditos fiscais
+                      Dados compartilhados entre TODOS os departamentos - modificações afetam todos os departamentos
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -9822,7 +9884,7 @@ export function VWFinancialDashboard() {
                       className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
                     >
                       <Upload className="w-4 h-4" />
-                      <span className="text-xs font-medium">Importar</span>
+                      <span className="text-xs font-medium">Importar Compartilhados</span>
                     </Button>
                     <Button
                       size="sm"
@@ -9831,7 +9893,7 @@ export function VWFinancialDashboard() {
                       className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-green-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
                     >
                       <Download className="w-4 h-4" />
-                      <span className="text-xs font-medium">Exportar</span>
+                      <span className="text-xs font-medium">Exportar Compartilhados</span>
                     </Button>
                     <Button
                       size="sm"
@@ -9857,6 +9919,26 @@ export function VWFinancialDashboard() {
                 </div>
                 </CardHeader>
                 <CardContent>
+                  {/* Banner informativo sobre dados compartilhados */}
+                  <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0">
+                        <svg className="w-6 h-6 text-amber-600 dark:text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                          ⚡ Sistema de Dados Compartilhados Ativo
+                        </h4>
+                        <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                          Esta tabela contém dados compartilhados entre <strong>todos os departamentos</strong>. 
+                          Importações ou modificações nesta seção serão refletidas em todos os departamentos 
+                          ({Object.values(DEPARTMENT_LABELS).join(', ')}).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   <input
                     ref={metricsFileInputRef}
                     type="file"
@@ -9865,8 +9947,13 @@ export function VWFinancialDashboard() {
                     className="hidden"
                   />
                   <DetailedMetricsTable 
-                    data={metricsData}
-                    onDataUpdate={setMetricsData}
+                    data={sharedMetricsData}
+                    onDataUpdate={(newData) => {
+                      // Atualizar dados compartilhados em vez de dados específicos do departamento
+                      setSharedMetricsData(newData);
+                      saveSharedMetricsData(fiscalYear, newData);
+                      console.log('📊 Dados compartilhados atualizados:', newData);
+                    }}
                     fileInputRef={metricsFileInputRef}
                   />
                 </CardContent>
