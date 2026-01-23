@@ -22,6 +22,8 @@ import {
   saveSelectedDepartment,
   clearYearData,
   clearAllData,
+  importAllData,
+  exportAllData,
   type MetricsData,
   type Department
 } from "@/lib/dataStorage"
@@ -197,6 +199,9 @@ export function VWFinancialDashboard() {
   // Estado para controlar navegação entre views
   const [currentView, setCurrentView] = useState<'dashboard' | 'comparison'>('dashboard')
   
+  // Flag para controlar quando uma importação está acontecendo
+  const [isImporting, setIsImporting] = useState(false)
+  
   // Estado para dados de métricas de negócios (para permitir importação/exportação)
   const [metricsData, setMetricsData] = useState<MetricsData>(() => loadMetricsData(fiscalYear, department))
   
@@ -206,63 +211,204 @@ export function VWFinancialDashboard() {
     (window as any).clearAllData = clearAllData;
     (window as any).reloadDashboard = () => window.location.reload();
     
+    // Função de debug para verificar localStorage
+    (window as any).debugStorage = () => {
+      console.clear();
+      console.log('🔬 === DIAGNÓSTICO DE PERSISTÊNCIA ===\n');
+      
+      const vwKeys = Object.keys(localStorage).filter(k => k.startsWith('vw_'));
+      console.log(`📦 Total de chaves VW: ${vwKeys.length}`);
+      console.log('Chaves encontradas:', vwKeys);
+      console.log('');
+      
+      // Verificar dados por ano e departamento
+      const years = [2024, 2025, 2026, 2027];
+      const departments = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao', 'consolidado'];
+      
+      console.log('📊 MAPA DE DADOS POR ANO/DEPARTAMENTO:');
+      years.forEach(year => {
+        console.log(`\n${year}:`);
+        departments.forEach(dept => {
+          const metricsKey = `vw_metrics_${year}_${dept}`;
+          const dreKey = `vw_dre_${year}_${dept}`;
+          const hasMetrics = localStorage.getItem(metricsKey) !== null;
+          const hasDRE = localStorage.getItem(dreKey) !== null;
+          
+          if (hasMetrics || hasDRE) {
+            console.log(`  ${dept}:`);
+            if (hasMetrics) {
+              try {
+                const metrics = JSON.parse(localStorage.getItem(metricsKey)!);
+                console.log(`    ✅ Métricas: ${Object.keys(metrics).length} propriedades`);
+              } catch (e) {
+                console.log(`    ❌ Métricas: erro de parsing`);
+              }
+            }
+            if (hasDRE) {
+              try {
+                const dre = JSON.parse(localStorage.getItem(dreKey)!);
+                console.log(`    ✅ DRE: ${dre.length} linhas`);
+              } catch (e) {
+                console.log(`    ❌ DRE: erro de parsing`);
+              }
+            }
+          }
+        });
+      });
+      
+      console.log('\n🔍 DADOS ATUAIS NA INTERFACE:');
+      console.log(`  - Ano fiscal: ${fiscalYear}`);
+      console.log(`  - Departamento: ${department}`);
+      console.log(`  - Importando: ${isImporting}`);
+      console.log(`  - Linhas DRE carregadas: ${dreData.length}`);
+      console.log(`  - Métricas carregadas:`, metricsData);
+      
+      console.log('\n🛠️ FUNÇÕES DE TESTE DISPONÍVEIS:');
+      console.log('  - testPersistence() - Testa salvamento/carregamento');
+      console.log('  - clearYearData(ano) - Limpa dados de um ano');
+      console.log('  - clearAllData() - Limpa todos os dados');
+      console.log('  - debugStorage() - Repete este diagnóstico');
+    };
+    
+    // Função para testar persistência
+    (window as any).testPersistence = () => {
+      console.clear();
+      console.log('🧪 === TESTE DE PERSISTÊNCIA ===\n');
+      
+      const testKey = 'vw_test_persistence';
+      const testData = { test: true, timestamp: Date.now() };
+      
+      try {
+        // Teste de escrita
+        console.log('📝 Testando escrita...');
+        localStorage.setItem(testKey, JSON.stringify(testData));
+        console.log('✅ Escrita realizada');
+        
+        // Teste de leitura imediata
+        console.log('📖 Testando leitura imediata...');
+        const immediateRead = localStorage.getItem(testKey);
+        if (immediateRead) {
+          const parsed = JSON.parse(immediateRead);
+          console.log('✅ Leitura imediata bem-sucedida:', parsed);
+        } else {
+          console.log('❌ Falha na leitura imediata');
+          return;
+        }
+        
+        // Teste de leitura após delay
+        console.log('⏳ Testando leitura após delay...');
+        setTimeout(() => {
+          const delayedRead = localStorage.getItem(testKey);
+          if (delayedRead) {
+            const parsed = JSON.parse(delayedRead);
+            console.log('✅ Leitura após delay bem-sucedida:', parsed);
+          } else {
+            console.log('❌ Falha na leitura após delay');
+          }
+          
+          // Limpeza
+          localStorage.removeItem(testKey);
+          console.log('🗑️ Chave de teste removida');
+        }, 500);
+        
+      } catch (error) {
+        console.error('❌ Erro no teste de persistência:', error);
+      }
+    };
+    
     console.log('🛠️ Funções de desenvolvimento disponíveis:');
     console.log('  - clearYearData(2024) - Limpa dados de um ano específico');
     console.log('  - clearAllData() - Limpa todos os dados');
     console.log('  - reloadDashboard() - Recarrega a página');
+    console.log('  - debugStorage() - Diagnóstico completo do localStorage');
+    console.log('  - testPersistence() - Testa funcionamento do localStorage');
   }, []);
   
   // Effect para carregar dados quando o ano fiscal ou departamento mudarem
   useEffect(() => {
+    // Não recarregar durante uma importação para evitar sobrescrita
+    if (isImporting) {
+      console.log('🚫 Carregamento bloqueado - importação em andamento');
+      return;
+    }
+    
     console.log('🔄 Carregando dados para:', fiscalYear, '-', DEPARTMENT_LABELS[department]);
     
-    const newMetricsData = loadMetricsData(fiscalYear, department);
-    console.log('📊 Métricas carregadas:', newMetricsData);
-    console.log('🔍 Verificação - Bonus Veículos Usados (ID 33):', newMetricsData.bonus?.veiculosUsados);
-    console.log('🔍 Verificação - Bonus Peças (ID 34):', newMetricsData.bonus?.pecas);
-    console.log('🔍 Verificação - Receitas Financiamento Novos (ID 38):', newMetricsData.receitasFinanciamento?.veiculosNovos);
-    setMetricsData(newMetricsData);
-    
-    const newDreData = loadDREData(fiscalYear, department);
-    console.log('📈 DRE carregado:', newDreData);
-    
-    if (newDreData && newDreData.length > 0) {
-      setDreData(newDreData);
-    } else {
-      // Se não houver dados salvos, usar dados zerados para anos diferentes de 2025 ou departamentos diferentes de usados
-      if (fiscalYear === 2025 && department === 'usados') {
-        setDreData(initialDreData);
-      } else {
-        // Criar dados zerados para outros casos
-        const zeroedData = initialDreData.map(line => ({
-          ...line,
-          total: 0,
-          percentTotal: line.percentTotal !== null ? 0 : null,
-          meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        }));
-        setDreData(zeroedData);
+    // Função para tentar carregar dados com retry
+    const loadDataWithRetry = (retryCount = 0) => {
+      const newMetricsData = loadMetricsData(fiscalYear, department);
+      const newDreData = loadDREData(fiscalYear, department);
+      
+      console.log('📊 Métricas carregadas:', newMetricsData);
+      console.log('📈 DRE carregado:', newDreData);
+      console.log('📍 Origem dos dados:', newDreData ? 'localStorage' : 'padrão');
+      
+      // Verificar se existem dados no localStorage que deveriam ter sido encontrados
+      const metricsKey = `vw_metrics_${fiscalYear}_${department}`;
+      const dreKey = `vw_dre_${fiscalYear}_${department}`;
+      const hasMetricsInStorage = localStorage.getItem(metricsKey) !== null;
+      const hasDREInStorage = localStorage.getItem(dreKey) !== null;
+      
+      console.log('🔍 Verificação localStorage:');
+      console.log(`  - ${metricsKey}: ${hasMetricsInStorage ? '✅' : '❌'}`);
+      console.log(`  - ${dreKey}: ${hasDREInStorage ? '✅' : '❌'}`);
+      
+      // Se há dados no localStorage mas loadDREData retornou null, tentar novamente
+      if (hasDREInStorage && !newDreData && retryCount < 3) {
+        console.log(`🔄 Retry ${retryCount + 1}/3 - dados existem no localStorage mas não foram carregados`);
+        setTimeout(() => loadDataWithRetry(retryCount + 1), 100);
+        return;
       }
-    }
+      
+      // Atualizar métricas
+      console.log('🔍 Verificação - Bonus Veículos Usados (ID 33):', newMetricsData.bonus?.veiculosUsados);
+      console.log('🔍 Verificação - Bonus Peças (ID 34):', newMetricsData.bonus?.pecas);
+      console.log('🔍 Verificação - Receitas Financiamento Novos (ID 38):', newMetricsData.receitasFinanciamento?.veiculosNovos);
+      setMetricsData(newMetricsData);
+      
+      // Atualizar DRE
+      if (newDreData && newDreData.length > 0) {
+        console.log('✅ Usando dados do localStorage para DRE');
+        setDreData(newDreData);
+      } else {
+        console.log('⚠️ Sem dados no localStorage, usando dados padrão/zerados');
+        // Se não houver dados salvos, usar dados iniciais apenas para 2025/usados
+        if (fiscalYear === 2025 && department === 'usados') {
+          setDreData(initialDreData);
+        } else {
+          // Para outros casos, criar estrutura zerada
+          const zeroedData = initialDreData.map(line => ({
+            ...line,
+            total: 0,
+            percentTotal: line.percentTotal !== null ? 0 : null,
+            meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }));
+          setDreData(zeroedData);
+        }
+      }
+    };
+    
+    loadDataWithRetry();
     
     saveSelectedFiscalYear(fiscalYear);
     saveSelectedDepartment(department);
-  }, [fiscalYear, department]);
+  }, [fiscalYear, department, isImporting]);
   
-  // Effect para salvar dados de métricas quando mudarem
-  useEffect(() => {
-    saveMetricsData(fiscalYear, metricsData, department);
-  }, [metricsData, fiscalYear, department]);
+  // Effect para salvar dados de métricas quando mudarem (DESABILITADO para não sobrescrever importações)
+  // As métricas são salvas apenas durante importação ou edição explícita
+  // useEffect(() => {
+  //   saveMetricsData(fiscalYear, metricsData, department);
+  // }, [metricsData, fiscalYear, department]);
   
-  // Effect para salvar dados de DRE quando mudarem
-  useEffect(() => {
-    if (dreData.length > 0) {
-      // Se for consolidado, usar forceConsolidated=false (dados calculados não são salvos)
-      // Dados importados serão salvos explicitamente na função handleImportData
-      if (department !== 'consolidado') {
-        saveDREData(fiscalYear, dreData, department);
-      }
-    }
-  }, [dreData, fiscalYear, department]);
+  // Effect para salvar dados de DRE quando mudarem (DESABILITADO para não sobrescrever importações)
+  // Os dados são salvos apenas durante a importação manual ou edição explícita
+  // useEffect(() => {
+  //   if (dreData.length > 0) {
+  //     if (department !== 'consolidado') {
+  //       saveDREData(fiscalYear, dreData, department);
+  //     }
+  //   }
+  // }, [dreData, fiscalYear, department]);
   
   // Handler para mudança de ano fiscal
   const handleFiscalYearChange = (year: string) => {
@@ -670,12 +816,54 @@ export function VWFinancialDashboard() {
       try {
         const content = e.target?.result as string
         
-        // Tentar parsear como JSON (formato antigo)
+        // Tentar parsear como JSON (formato de backup completo)
         if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
-          const importedData = JSON.parse(content)
-          console.log('Dados importados (JSON):', importedData)
-          alert('Dados importados com sucesso! (Funcionalidade de atualização em desenvolvimento)')
-          return
+          console.log('📥 Iniciando importação JSON...');
+          setIsImporting(true);
+          
+          try {
+            const success = importAllData(content);
+            if (success) {
+              console.log('✅ Dados importados do JSON e salvos no localStorage');
+              
+              // Verificar que realmente salvou no localStorage
+              const totalKeys = Object.keys(localStorage).filter(k => k.startsWith('vw_')).length;
+              console.log(`📦 Total de chaves VW no localStorage: ${totalKeys}`);
+              
+              // Aguardar um momento para garantir persistência e depois recarregar dados
+              setTimeout(() => {
+                console.log('🔄 Recarregando dados após importação...');
+                
+                // Recarregar dados do localStorage para atualizar a interface
+                const reloadedMetrics = loadMetricsData(fiscalYear, department);
+                const reloadedDRE = loadDREData(fiscalYear, department);
+                
+                console.log('🔍 Dados recarregados:');
+                console.log('  - Métricas:', reloadedMetrics);
+                console.log('  - DRE:', reloadedDRE);
+                
+                if (reloadedMetrics) {
+                  console.log('📊 Atualizando métricas na interface');
+                  setMetricsData(reloadedMetrics);
+                }
+                if (reloadedDRE) {
+                  console.log('📈 Atualizando DRE na interface');
+                  setDreData(reloadedDRE);
+                }
+                
+                setIsImporting(false);
+                alert('Dados importados com sucesso! Interface atualizada.');
+              }, 200);
+            } else {
+              setIsImporting(false);
+              alert('Erro ao importar dados JSON. Verifique o formato do arquivo.');
+            }
+          } catch (error) {
+            console.error('❌ Erro durante importação JSON:', error);
+            setIsImporting(false);
+            alert('Erro ao importar dados JSON. Verifique o formato do arquivo.');
+          }
+          return;
         }
         
         // Parsear formato tabular TXT
@@ -741,15 +929,37 @@ export function VWFinancialDashboard() {
           }
         })
         
-        console.log('Dados importados (TXT):', importedData)
-        setDreData(importedData)
+        console.log('📥 Dados importados (TXT):', importedData);
+        setIsImporting(true);
         
-        // Salvar explicitamente se for consolidado (usando forceConsolidated=true)
-        if (department === 'consolidado') {
-          saveDREData(fiscalYear, importedData, department, true)
+        // SALVAR NO LOCALSTORAGE para persistir os dados importados
+        const isConsolidado = department === 'consolidado';
+        const saved = saveDREData(fiscalYear, importedData, department, isConsolidado);
+        
+        if (saved) {
+          console.log(`✅ DRE salvo no localStorage: vw_dre_${fiscalYear}_${department}`);
+          
+          // Aguardar um momento para garantir persistência e depois atualizar interface
+          setTimeout(() => {
+            console.log('🔄 Atualizando interface após importação TXT...');
+            setDreData(importedData);
+            setIsImporting(false);
+            
+            // Verificar se os dados realmente persistiram
+            const verification = loadDREData(fiscalYear, department);
+            if (verification && verification.length > 0) {
+              console.log('✅ Verificação: dados persistiram corretamente');
+              alert(`${importedData.length} linhas importadas e salvas com sucesso!`);
+            } else {
+              console.warn('⚠️ Verificação: possível problema de persistência');
+              alert(`Dados importados, mas verifique a persistência. ${importedData.length} linhas processadas.`);
+            }
+          }, 100);
+        } else {
+          console.error(`❌ Falha ao salvar DRE no localStorage`);
+          setIsImporting(false);
+          alert('Erro: falha ao salvar dados no localStorage');
         }
-        
-        alert(`${importedData.length} linhas importadas e atualizadas com sucesso!`)
         
       } catch (error) {
         alert('Erro ao importar dados. Verifique se o arquivo está no formato correto.')
@@ -1010,12 +1220,13 @@ export function VWFinancialDashboard() {
     return value.toLocaleString('pt-BR')
   }
   
-  // Inicializar dreData com dados iniciais
-  useEffect(() => {
-    if (dreData.length === 0) {
-      setDreData(initialDreData)
-    }
-  }, [])
+  // REMOVIDO: Este useEffect estava causando conflito com o carregamento do localStorage
+  // O carregamento correto já acontece no useEffect das linhas 240-275
+  // useEffect(() => {
+  //   if (dreData.length === 0) {
+  //     setDreData(initialDreData)
+  //   }
+  // }, [])
   
   // Persistir cenários no localStorage
   useEffect(() => {

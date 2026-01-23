@@ -355,24 +355,9 @@ export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, departmen
     const key = `vw_metrics_${fiscalYear}_${department}`;
     const stored = localStorage.getItem(key);
     
-    // Verifica se os dados em cache estão zerados (dados vazios)
+    // Se houver dados salvos, retorna eles (inclusive dados importados)
     if (stored) {
-      const parsedData = JSON.parse(stored);
-      
-      // Verifica se os dados de bônus estão todos zerados
-      const bonusZerados = parsedData.bonus && 
-        Object.values(parsedData.bonus).every((arr: any) => 
-          Array.isArray(arr) && arr.every((v: number) => v === 0)
-        );
-      
-      // Se os dados estão zerados, remove do cache e usa dados padrão
-      if (bonusZerados) {
-        console.log(`🔄 Dados zerados detectados para ${department} ${fiscalYear}, usando dados padrão`);
-        localStorage.removeItem(key);
-        return getDefaultDataForDepartment(department, fiscalYear);
-      }
-      
-      return parsedData;
+      return JSON.parse(stored);
     }
     
     return getDefaultDataForDepartment(department, fiscalYear);
@@ -410,19 +395,28 @@ export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: D
     const key = `vw_dre_${fiscalYear}_${department}`;
     const stored = localStorage.getItem(key);
     
+    console.log(`🔍 loadDREData(${fiscalYear}, ${department}):`);
+    console.log(`  - Chave: ${key}`);
+    console.log(`  - Encontrou no localStorage: ${stored ? 'SIM' : 'NÃO'}`);
+    
     // Se houver dados salvos, usa eles (incluindo dados importados do consolidado)
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      console.log(`  - ✅ Retornando ${parsed.length} linhas do localStorage`);
+      console.log(`  - Primeira linha:`, parsed[0]);
+      return parsed;
     }
     
     // Se for consolidado e não houver dados salvos, calcula dinamicamente
     if (department === 'consolidado') {
+      console.log(`  - 📊 Calculando DRE consolidada dinamicamente`);
       return calculateConsolidatedDRE(fiscalYear);
     }
     
+    console.log(`  - ⚠️ Retornando null (sem dados)`);
     return null;
   } catch (error) {
-    console.error(`Erro ao carregar dados de DRE de ${fiscalYear} - ${department}:`, error);
+    console.error(`❌ Erro ao carregar dados de DRE de ${fiscalYear} - ${department}:`, error);
     return null;
   }
 }
@@ -618,29 +612,115 @@ export function exportAllData(): string {
  */
 export function importAllData(jsonString: string): boolean {
   try {
+    console.log('📥 Iniciando importação de dados...');
     const backup = JSON.parse(jsonString);
     
-    if (backup.data) {
-      Object.entries(backup.data).forEach(([year, depts]: [string, any]) => {
-        const fiscalYear = parseInt(year) as 2024 | 2025 | 2026 | 2027;
-        Object.entries(depts).forEach(([dept, data]: [string, any]) => {
-          const department = dept as Department;
-          if (data.metrics) saveMetricsData(fiscalYear, data.metrics, department);
-          // Se for consolidado e tiver DRE, usa forceConsolidated = true
-          if (data.dre) {
-            const isConsolidado = department === 'consolidado';
-            saveDREData(fiscalYear, data.dre, department, isConsolidado);
-          }
-        });
-      });
+    if (!backup.data) {
+      console.error('❌ Formato de backup inválido: propriedade "data" não encontrada');
+      return false;
     }
     
-    if (backup.selectedYear) saveSelectedFiscalYear(backup.selectedYear);
-    if (backup.selectedDepartment) saveSelectedDepartment(backup.selectedDepartment);
+    let successCount = 0;
+    let totalItems = 0;
+    const failures: string[] = [];
     
-    return true;
+    Object.entries(backup.data).forEach(([year, depts]: [string, any]) => {
+      const fiscalYear = parseInt(year) as 2024 | 2025 | 2026 | 2027;
+      
+      if (![2024, 2025, 2026, 2027].includes(fiscalYear)) {
+        console.warn(`⚠️ Ano fiscal inválido ignorado: ${year}`);
+        return;
+      }
+      
+      Object.entries(depts).forEach(([dept, data]: [string, any]) => {
+        const department = dept as Department;
+        
+        // Para métricas, salvar diretamente no localStorage (incluindo consolidado)
+        if (data.metrics) {
+          totalItems++;
+          try {
+            const metricsKey = `vw_metrics_${fiscalYear}_${department}`;
+            localStorage.setItem(metricsKey, JSON.stringify(data.metrics));
+            
+            // Verificar se realmente salvou
+            const verification = localStorage.getItem(metricsKey);
+            if (verification) {
+              console.log(`✅ Métricas importadas: ${fiscalYear} - ${department}`);
+              successCount++;
+            } else {
+              const errorMsg = `Falha na verificação de métricas: ${fiscalYear} - ${department}`;
+              console.error(`❌ ${errorMsg}`);
+              failures.push(errorMsg);
+            }
+          } catch (error) {
+            const errorMsg = `Erro ao salvar métricas: ${fiscalYear} - ${department} - ${error}`;
+            console.error(`❌ ${errorMsg}`);
+            failures.push(errorMsg);
+          }
+        }
+        
+        // Para DRE, salvar diretamente no localStorage (incluindo consolidado)
+        if (data.dre) {
+          totalItems++;
+          try {
+            const dreKey = `vw_dre_${fiscalYear}_${department}`;
+            localStorage.setItem(dreKey, JSON.stringify(data.dre));
+            
+            // Verificar se realmente salvou
+            const verification = localStorage.getItem(dreKey);
+            if (verification) {
+              console.log(`✅ DRE importada: ${fiscalYear} - ${department}`);
+              successCount++;
+            } else {
+              const errorMsg = `Falha na verificação de DRE: ${fiscalYear} - ${department}`;
+              console.error(`❌ ${errorMsg}`);
+              failures.push(errorMsg);
+            }
+          } catch (error) {
+            const errorMsg = `Erro ao salvar DRE: ${fiscalYear} - ${department} - ${error}`;
+            console.error(`❌ ${errorMsg}`);
+            failures.push(errorMsg);
+          }
+        }
+      });
+    });
+    
+    // Salvar configurações de seleção
+    try {
+      if (backup.selectedYear) {
+        saveSelectedFiscalYear(backup.selectedYear);
+        console.log(`✅ Ano fiscal selecionado: ${backup.selectedYear}`);
+      }
+      if (backup.selectedDepartment) {
+        saveSelectedDepartment(backup.selectedDepartment);
+        console.log(`✅ Departamento selecionado: ${backup.selectedDepartment}`);
+      }
+    } catch (error) {
+      console.warn('⚠️ Erro ao salvar configurações de seleção:', error);
+    }
+    
+    // Relatório final
+    console.log(`📊 Relatório de importação:`);
+    console.log(`  - Total de itens: ${totalItems}`);
+    console.log(`  - Sucessos: ${successCount}`);
+    console.log(`  - Falhas: ${failures.length}`);
+    
+    if (failures.length > 0) {
+      console.log(`❌ Itens que falharam:`, failures);
+    }
+    
+    const success = successCount > 0 && failures.length === 0;
+    if (success) {
+      console.log('✅ Importação concluída com sucesso total');
+    } else if (successCount > 0) {
+      console.log('⚠️ Importação parcialmente bem-sucedida');
+    } else {
+      console.log('❌ Importação falhou completamente');
+    }
+    
+    return success || successCount > 0; // Considerar sucesso se pelo menos um item foi importado
   } catch (error) {
-    console.error('Erro ao importar dados:', error);
+    console.error('❌ Erro crítico ao importar dados:', error);
     return false;
   }
 }
