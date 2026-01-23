@@ -152,9 +152,9 @@ const initialDreData = [
   },
   {
     descricao: "PROVISÕES IRPJ E C.S.",
-    total: 0,
-    percentTotal: 0.00,
-    meses: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    total: -3521000,
+    percentTotal: -3.67,
+    meses: [-300000, -280000, -320000, -310000, -290000, -305000, -295000, -315000, -298000, -308000, -280000, -320000]
   },
   {
     descricao: "PARTICIPAÇÕES",
@@ -164,9 +164,9 @@ const initialDreData = [
   },
   {
     descricao: "LUCRO LIQUIDO DO EXERCICIO",
-    total: 476215,
-    percentTotal: 0.50,
-    meses: [292222, 264860, 415322, 389575, 392905, 293033, 399105, 525973, 494420, 378461, 236175, 0],
+    total: 10561051,
+    percentTotal: 11.01,
+    meses: [210000, 185000, 220000, 200000, 215000, 195000, 225000, 285000, 275000, 265000, 180000, 906051],
     isHighlight: true,
     isFinal: true
   }
@@ -11343,6 +11343,380 @@ export function VWFinancialDashboard() {
                       const media = periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length;
                       return periodDataLucro.map((val, idx) => {
                         const fillColor = val > media * 1.05 ? '#1e40af' : val < media * 0.95 ? '#f97316' : '#10b981';
+                        return <Cell key={`cell-${idx}`} fill={fillColor} />;
+                      });
+                    })()}
+                    <LabelList 
+                      dataKey="percentual" 
+                      position="top" 
+                      formatter={(value: number) => `${value}%`}
+                      style={{ fontSize: '11px', fontWeight: '600', fill: '#64748b' }}
+                    />
+                  </Bar>
+                </BarChart>
+              )}
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* PROVISÕES IRPJ E C.S. */}
+        <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Provisões IRPJ e Contribuição Social</CardTitle>
+                <CardDescription className="text-sm">Provisões para impostos sobre o resultado</CardDescription>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-6 mt-4">
+              <div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[19].total)}</p>
+              </div>
+              
+              <div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{activeDreData[19].percentTotal?.toFixed(2)}%</p>
+              </div>
+              
+              <div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[19].total / 12)}</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <ChartContainer config={chartConfig} className="h-[220px] w-full">
+              {showComparison && projectionMode ? (
+                <>
+                  <BarChart 
+                    data={(() => {
+                      const periodData = aggregateData(projectedData[activeScenario!][19].meses);
+                      const periodDataOriginal = aggregateData(dreData[19].meses);
+                      const labels = getPeriodLabels();
+                      return labels.map((mes, idx) => ({
+                        mes,
+                        original: Math.abs(periodDataOriginal[idx]) / 1000,
+                        projecao: Math.abs(periodData[idx]) / 1000
+                      }));
+                    })()} 
+                    barGap={4}
+                    barCategoryGap="20%"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <ChartTooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                              <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                              <div className="space-y-1">
+                                <p className="text-sm">
+                                  <span className="text-slate-600 dark:text-slate-400">Original: </span>
+                                  <span className="font-bold text-red-600">R$ {Number(payload[0]?.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                </p>
+                                <p className="text-sm">
+                                  <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
+                                  <span className="font-bold text-orange-600">R$ {Number(payload[1]?.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                </p>
+                                <p className="text-sm">
+                                  <span className="text-slate-600 dark:text-slate-400">Variação: </span>
+                                  <span className="font-bold text-amber-600">
+                                    R$ {Number(Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0)).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Legend 
+                      wrapperStyle={{ fontSize: '12px' }} 
+                      content={() => (
+                        <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#dc2626' }}></div>
+                            <span>Original</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#ea580c' }}></div>
+                            <span>Projeção</span>
+                          </div>
+                        </div>
+                      )}
+                    />
+                    <Bar dataKey="original" fill="#dc2626" name="Original (mil)" maxBarSize={50} />
+                    <Bar dataKey="projecao" fill="#ea580c" name="Projeção (mil)" maxBarSize={50} />
+                  </BarChart>
+                </>
+                  ) : (
+                <BarChart data={(() => {
+                  const periodDataProvisoes = aggregateData(activeDreData[19].meses.map(v => Math.abs(v)));
+                  const periodDataReceita = aggregateData(activeDreData[1].meses);
+                  const labels = getPeriodLabels();
+                  const media = periodDataProvisoes.reduce((a, b) => a + b, 0) / periodDataProvisoes.length;
+                  return periodDataProvisoes.map((val, idx) => ({
+                    mes: labels[idx],
+                    valor: val / 1000,
+                    percentual: ((val / periodDataReceita[idx]) * 100).toFixed(2),
+                    fill: val > media * 1.05 ? '#b91c1c' : val < media * 0.95 ? '#f59e0b' : '#dc2626'
+                  }));
+                })()}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis 
+                    dataKey="mes" 
+                    tick={{ fontSize: 12, fill: '#64748b' }} 
+                    axisLine={false} 
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 12, fill: '#64748b' }} 
+                    axisLine={false} 
+                    tickLine={false}
+                  />
+                  <ChartTooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                            <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                            <div className="space-y-1">
+                              <p className="text-sm">
+                                <span className="text-slate-600 dark:text-slate-400">Provisões IRPJ e C.S.: </span>
+                                <span className="font-bold text-slate-900 dark:text-white">R$ {(Number(payload[0].value) * 1000).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>
+                              </p>
+                              <p className="text-sm">
+                                <span className="text-slate-600 dark:text-slate-400">% sobre Receita: </span>
+                                <span className="font-bold text-red-600">{payload[0].payload.percentual}%</span>
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend 
+                    wrapperStyle={{ fontSize: '12px' }} 
+                    content={() => (
+                      <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#b91c1c' }}></div>
+                          <span>Acima da Média</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#dc2626' }}></div>
+                          <span>Média</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#f59e0b' }}></div>
+                          <span>Abaixo da Média</span>
+                        </div>
+                      </div>
+                    )}
+                  />
+                  <Bar 
+                    dataKey="valor" 
+                    radius={[6, 6, 0, 0]}
+                    name="Provisões IRPJ/CS (mil)"
+                  >
+                    {(() => {
+                      const periodDataProvisoes = aggregateData(activeDreData[19].meses.map(v => Math.abs(v)));
+                      const media = periodDataProvisoes.reduce((a, b) => a + b, 0) / periodDataProvisoes.length;
+                      return periodDataProvisoes.map((val, idx) => {
+                        const fillColor = val > media * 1.05 ? '#b91c1c' : val < media * 0.95 ? '#f59e0b' : '#dc2626';
+                        return <Cell key={`cell-${idx}`} fill={fillColor} />;
+                      });
+                    })()}
+                    <LabelList 
+                      dataKey="percentual" 
+                      position="top" 
+                      formatter={(value: number) => `${value}%`}
+                      style={{ fontSize: '11px', fontWeight: '600', fill: '#64748b' }}
+                    />
+                  </Bar>
+                </BarChart>
+              )}
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* LUCRO LIQUIDO DO EXERCICIO */}
+        <Card className="bg-white dark:bg-slate-900 shadow-sm border-slate-200 dark:border-slate-800">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">Lucro Líquido do Exercício</CardTitle>
+                <CardDescription className="text-sm">Resultado final após todos os impostos e participações</CardDescription>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-6 mt-4">
+              <div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[21].total)}</p>
+              </div>
+              
+              <div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Líquida Final</p>
+                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{activeDreData[21].percentTotal?.toFixed(2)}%</p>
+              </div>
+              
+              <div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[21].total / 12)}</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <ChartContainer config={chartConfig} className="h-[220px] w-full">
+              {showComparison && projectionMode ? (
+                <>
+                  <BarChart 
+                    data={(() => {
+                      const periodData = aggregateData(projectedData[activeScenario!][21].meses);
+                      const periodDataOriginal = aggregateData(dreData[21].meses);
+                      const labels = getPeriodLabels();
+                      return labels.map((mes, idx) => ({
+                        mes,
+                        original: periodDataOriginal[idx] / 1000,
+                        projecao: periodData[idx] / 1000
+                      }));
+                    })()} 
+                    barGap={4}
+                    barCategoryGap="20%"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <ChartTooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                              <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                              <div className="space-y-1">
+                                <p className="text-sm">
+                                  <span className="text-slate-600 dark:text-slate-400">Original: </span>
+                                  <span className="font-bold text-emerald-600">R$ {Number(payload[0]?.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                </p>
+                                <p className="text-sm">
+                                  <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
+                                  <span className="font-bold text-teal-600">R$ {Number(payload[1]?.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                </p>
+                                <p className="text-sm">
+                                  <span className="text-slate-600 dark:text-slate-400">Variação: </span>
+                                  <span className="font-bold text-cyan-600">
+                                    R$ {Number(Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0)).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Legend 
+                      wrapperStyle={{ fontSize: '12px' }} 
+                      content={() => (
+                        <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#059669' }}></div>
+                            <span>Original</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#0d9488' }}></div>
+                            <span>Projeção</span>
+                          </div>
+                        </div>
+                      )}
+                    />
+                    <Bar dataKey="original" fill="#059669" name="Original (mil)" maxBarSize={50} />
+                    <Bar dataKey="projecao" fill="#0d9488" name="Projeção (mil)" maxBarSize={50} />
+                  </BarChart>
+                </>
+                  ) : (
+                <BarChart data={(() => {
+                  const periodDataLucro = aggregateData(activeDreData[21].meses);
+                  const periodDataReceita = aggregateData(activeDreData[1].meses);
+                  const labels = getPeriodLabels();
+                  const media = periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length;
+                  return periodDataLucro.map((val, idx) => ({
+                    mes: labels[idx],
+                    valor: val / 1000,
+                    percentual: ((val / periodDataReceita[idx]) * 100).toFixed(2),
+                    fill: val > media * 1.05 ? '#047857' : val < media * 0.95 ? '#dc2626' : '#eab308'
+                  }));
+                })()}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis 
+                    dataKey="mes" 
+                    tick={{ fontSize: 12, fill: '#64748b' }} 
+                    axisLine={false} 
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 12, fill: '#64748b' }} 
+                    axisLine={false} 
+                    tickLine={false}
+                  />
+                  <ChartTooltip 
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                            <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.mes}</p>
+                            <div className="space-y-1">
+                              <p className="text-sm">
+                                <span className="text-slate-600 dark:text-slate-400">Lucro Líquido: </span>
+                                <span className="font-bold text-slate-900 dark:text-white">R$ {(Number(payload[0].value) * 1000).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>
+                              </p>
+                              <p className="text-sm">
+                                <span className="text-slate-600 dark:text-slate-400">% sobre Receita: </span>
+                                <span className="font-bold text-emerald-600">{payload[0].payload.percentual}%</span>
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Legend 
+                    wrapperStyle={{ fontSize: '12px' }} 
+                    content={() => (
+                      <div className="flex items-center justify-center gap-4 text-xs mt-2">
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#047857' }}></div>
+                          <span>Acima da Média</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#eab308' }}></div>
+                          <span>Média</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#dc2626' }}></div>
+                          <span>Abaixo da Média</span>
+                        </div>
+                      </div>
+                    )}
+                  />
+                  <Bar 
+                    dataKey="valor" 
+                    radius={[6, 6, 0, 0]}
+                    name="Lucro Líquido (mil)"
+                  >
+                    {(() => {
+                      const periodDataLucro = aggregateData(activeDreData[21].meses);
+                      const media = periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length;
+                      return periodDataLucro.map((val, idx) => {
+                        const fillColor = val > media * 1.05 ? '#047857' : val < media * 0.95 ? '#dc2626' : '#eab308';
                         return <Cell key={`cell-${idx}`} fill={fillColor} />;
                       });
                     })()}
