@@ -8307,12 +8307,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID45 - Receita de Despachante Usados */}
                     {(() => {
-                      const receitaData = metricsData.receitaDespachanteUsados;
+                      const receitaData = sharedMetricsData.receitaDespachanteUsados || metricsData.receitaDespachanteUsados;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = metricsData.months.map((month, index) => {
+                      const receitaChartData = (sharedMetricsData.months || metricsData.months).map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -8325,7 +8325,7 @@ export function VWFinancialDashboard() {
                       });
 
                       return (
-                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
+                        <>
                           <div className="bg-teal-50 dark:bg-teal-900/20 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
                             <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                               Receita de Despachante Usados
@@ -8439,7 +8439,7 @@ export function VWFinancialDashboard() {
                               </ComposedChart>
                             </ChartContainer>
                           </div>
-                        </div>
+                        </>
                       );
                     })()}
 
@@ -8474,12 +8474,12 @@ export function VWFinancialDashboard() {
                     
                     {/* Gráfico: ID46 - Receita de Despachante Novos */}
                     {(() => {
-                      const receitaData = metricsData.receitaDespachanteNovos;
+                      const receitaData = sharedMetricsData.receitaDespachanteNovos || metricsData.receitaDespachanteNovos;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = metricsData.months.map((month, index) => {
+                      const receitaChartData = (sharedMetricsData.months || metricsData.months).map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -11467,8 +11467,8 @@ export function VWFinancialDashboard() {
           </Card>
         </div>
       </div>
-      )}
+    )}
     </div>
-    </>
+  </>
   )
 }
