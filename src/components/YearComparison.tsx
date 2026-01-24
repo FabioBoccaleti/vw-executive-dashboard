@@ -2748,6 +2748,8 @@ function DadosAdicionaisComparison({
       campos: [
         { label: 'Volume Trocas Novos', path: (d: any, m: number) => getValue(d?.vendasNovos?.volumeTrocas, m) },
         { label: '% Trocas Novos', path: (d: any, m: number) => getValue(d?.vendasNovos?.percentualTrocas, m, true), isPercentage: true },
+        { label: 'Volume Trocas VD', path: (d: any, m: number) => getValue(d?.vendasNovosVD?.volumeTrocas, m) },
+        { label: '% Trocas VD', path: (d: any, m: number) => getValue(d?.vendasNovosVD?.percentualTrocas, m, true), isPercentage: true },
         { label: 'Volume Trocas Usados', path: (d: any, m: number) => getValue(d?.vendasUsados?.volumeTrocas, m) },
         { label: '% Trocas Usados', path: (d: any, m: number) => getValue(d?.vendasUsados?.percentualTrocas, m, true), isPercentage: true },
       ]
@@ -2797,6 +2799,10 @@ function DadosAdicionaisComparison({
         { label: 'Balcão - Margem %', path: (d: any, m: number) => getValue(d?.vendasPecas?.balcao?.margem, m, true), isPercentage: true },
         { label: 'Oficina - Vendas', path: (d: any, m: number) => getValue(d?.vendasPecas?.oficina?.vendas, m), isCurrency: true },
         { label: 'Oficina - Margem %', path: (d: any, m: number) => getValue(d?.vendasPecas?.oficina?.margem, m, true), isPercentage: true },
+        { label: 'Funilaria - Vendas', path: (d: any, m: number) => getValue(d?.vendasPecas?.funilaria?.vendas, m), isCurrency: true },
+        { label: 'Funilaria - Margem %', path: (d: any, m: number) => getValue(d?.vendasPecas?.funilaria?.margem, m, true), isPercentage: true },
+        { label: 'Acessórios - Vendas', path: (d: any, m: number) => getValue(d?.vendasPecas?.acessorios?.vendas, m), isCurrency: true },
+        { label: 'Acessórios - Margem %', path: (d: any, m: number) => getValue(d?.vendasPecas?.acessorios?.margem, m, true), isPercentage: true },
       ]
     },
     {
@@ -2820,6 +2826,7 @@ function DadosAdicionaisComparison({
       titulo: 'Despesas Financeiras Novos',
       subtitulo: 'Juros e Despesas',
       campos: [
+        { label: 'Juros', path: (d: any, m: number) => getValue(d?.juros?.veiculosNovos, m), isCurrency: true },
         { label: 'Despesas Cartão', path: (d: any, m: number) => getValue(d?.despesasCartao?.novos, m), isCurrency: true },
       ]
     },
@@ -2827,6 +2834,7 @@ function DadosAdicionaisComparison({
       titulo: 'Despesas Financeiras Usados',
       subtitulo: 'Juros e Despesas',
       campos: [
+        { label: 'Juros', path: (d: any, m: number) => getValue(d?.juros?.veiculosUsados, m), isCurrency: true },
         { label: 'Despesas Cartão', path: (d: any, m: number) => getValue(d?.despesasCartao?.usados, m), isCurrency: true },
       ]
     },
@@ -2834,6 +2842,7 @@ function DadosAdicionaisComparison({
       titulo: 'Despesas Financeiras Peças',
       subtitulo: 'Juros e Despesas',
       campos: [
+        { label: 'Juros', path: (d: any, m: number) => getValue(d?.juros?.pecas, m), isCurrency: true },
         { label: 'Despesas Cartão', path: (d: any, m: number) => getValue(d?.despesasCartao?.pecas, m), isCurrency: true },
       ]
     },
@@ -2855,6 +2864,8 @@ function DadosAdicionaisComparison({
       titulo: 'Despesas Financeiras Administração',
       subtitulo: 'Juros e Despesas',
       campos: [
+        { label: 'Juros Emp. Bancários', path: (d: any, m: number) => getValue(d?.juros?.emprestimosBancarios, m), isCurrency: true },
+        { label: 'Juros Contrato Mútuo', path: (d: any, m: number) => getValue(d?.juros?.contratoMutuo, m), isCurrency: true },
         { label: 'Despesas Cartão', path: (d: any, m: number) => getValue(d?.despesasCartao?.administracao, m), isCurrency: true },
       ]
     },
