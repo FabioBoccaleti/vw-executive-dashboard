@@ -2730,11 +2730,15 @@ function DadosAdicionaisComparison({
   }
 
   // Função auxiliar para obter valor baseado no modo de comparação
-  const getValue = (arr?: number[], monthIndex?: number, divideByMonths: boolean = false) => {
+  const getValue = (arr?: number[], monthIndex?: number, divideByMonths: boolean = false, useDecemberOnly: boolean = false) => {
     if (!arr || !Array.isArray(arr)) return 0
     if (comparisonMode === 'mensal') {
       return getMonthValue(arr, monthIndex)
     } else {
+      // Para estoques, usar apenas dezembro no modo anual
+      if (useDecemberOnly) {
+        return arr[11] || 0 // Dezembro = índice 11
+      }
       const sum = arr.reduce((sum, val) => sum + (val || 0), 0)
       return divideByMonths ? sum / 12 : sum
     }
@@ -2764,31 +2768,31 @@ function DadosAdicionaisComparison({
     },
     {
       titulo: 'Estoque de Novos',
-      subtitulo: 'Evolução do Estoque',
+      subtitulo: 'Evolução do Estoque (Dezembro)',
       campos: [
-        { label: 'Quantidade Média', path: (d: any, m: number) => getValue(d?.estoqueNovos?.quantidade, m, true), isInteger: true },
-        { label: 'Valor Total', path: (d: any, m: number) => getValue(d?.estoqueNovos?.valor, m), isCurrency: true },
-        { label: 'A Pagar', path: (d: any, m: number) => getValue(d?.estoqueNovos?.aPagar, m), isCurrency: true },
-        { label: 'Pagos', path: (d: any, m: number) => getValue(d?.estoqueNovos?.pagos, m), isCurrency: true },
+        { label: 'Quantidade', path: (d: any, m: number) => getValue(d?.estoqueNovos?.quantidade, m, false, true), isInteger: true },
+        { label: 'Valor Total', path: (d: any, m: number) => getValue(d?.estoqueNovos?.valor, m, false, true), isCurrency: true },
+        { label: 'A Pagar', path: (d: any, m: number) => getValue(d?.estoqueNovos?.aPagar, m, false, true), isCurrency: true },
+        { label: 'Pagos', path: (d: any, m: number) => getValue(d?.estoqueNovos?.pagos, m, false, true), isCurrency: true },
       ]
     },
     {
       titulo: 'Estoque de Usados',
-      subtitulo: 'Evolução do Estoque',
+      subtitulo: 'Evolução do Estoque (Dezembro)',
       campos: [
-        { label: 'Quantidade Média', path: (d: any, m: number) => getValue(d?.estoqueUsados?.quantidade, m, true), isInteger: true },
-        { label: 'Valor Total', path: (d: any, m: number) => getValue(d?.estoqueUsados?.valor, m), isCurrency: true },
-        { label: 'A Pagar', path: (d: any, m: number) => getValue(d?.estoqueUsados?.aPagar, m), isCurrency: true },
-        { label: 'Pagos', path: (d: any, m: number) => getValue(d?.estoqueUsados?.pagos, m), isCurrency: true },
+        { label: 'Quantidade', path: (d: any, m: number) => getValue(d?.estoqueUsados?.quantidade, m, false, true), isInteger: true },
+        { label: 'Valor Total', path: (d: any, m: number) => getValue(d?.estoqueUsados?.valor, m, false, true), isCurrency: true },
+        { label: 'A Pagar', path: (d: any, m: number) => getValue(d?.estoqueUsados?.aPagar, m, false, true), isCurrency: true },
+        { label: 'Pagos', path: (d: any, m: number) => getValue(d?.estoqueUsados?.pagos, m, false, true), isCurrency: true },
       ]
     },
     {
       titulo: 'Estoque de Peças',
-      subtitulo: 'Evolução do Estoque',
+      subtitulo: 'Evolução do Estoque (Dezembro)',
       campos: [
-        { label: 'Valor Total', path: (d: any, m: number) => getValue(d?.estoquePecas?.valor, m), isCurrency: true },
-        { label: 'A Pagar', path: (d: any, m: number) => getValue(d?.estoquePecas?.aPagar, m), isCurrency: true },
-        { label: 'Pagos', path: (d: any, m: number) => getValue(d?.estoquePecas?.pagos, m), isCurrency: true },
+        { label: 'Valor Total', path: (d: any, m: number) => getValue(d?.estoquePecas?.valor, m, false, true), isCurrency: true },
+        { label: 'A Pagar', path: (d: any, m: number) => getValue(d?.estoquePecas?.aPagar, m, false, true), isCurrency: true },
+        { label: 'Pagos', path: (d: any, m: number) => getValue(d?.estoquePecas?.pagos, m, false, true), isCurrency: true },
       ]
     },
     {
