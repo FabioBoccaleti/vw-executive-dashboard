@@ -193,6 +193,9 @@ export function VWFinancialDashboard() {
   const [projectedData, setProjectedData] = useState<{[scenarioId: string]: any[]}>({})
   const [showComparison, setShowComparison] = useState(false)
   const [showProjectionModal, setShowProjectionModal] = useState(false)
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [passwordInput, setPasswordInput] = useState('')
+  const [passwordAction, setPasswordAction] = useState<'edit' | 'delete' | null>(null)
   
   // Estado para controlar exibição da tabela de métricas detalhadas
   const [showDetailedMetrics, setShowDetailedMetrics] = useState(false)
@@ -1089,8 +1092,41 @@ export function VWFinancialDashboard() {
     setShowProjectionModal(true)
   }
 
+  // Função para validar senha e executar ação
+  const handlePasswordSubmit = () => {
+    const correctPassword = '1985'
+    
+    if (passwordInput === correctPassword) {
+      setShowPasswordDialog(false)
+      setPasswordInput('')
+      
+      if (passwordAction === 'edit') {
+        setShowProjectionModal(true)
+      } else if (passwordAction === 'delete') {
+        executeDeleteProjection()
+      }
+      
+      setPasswordAction(null)
+    } else {
+      alert('Senha incorreta!')
+      setPasswordInput('')
+    }
+  }
+
+  // Função para solicitar senha antes de editar %
+  const handleEditPercentages = () => {
+    setPasswordAction('edit')
+    setShowPasswordDialog(true)
+  }
+
+  // Função para solicitar senha antes de deletar
+  const handleDeleteClick = () => {
+    setPasswordAction('delete')
+    setShowPasswordDialog(true)
+  }
+
   // Função para deletar cenário de projeção
-  const deleteProjection = () => {
+  const executeDeleteProjection = () => {
     if (!activeScenario) return
     
     if (!confirm('Tem certeza que deseja deletar esta projeção?')) return
@@ -1362,6 +1398,53 @@ export function VWFinancialDashboard() {
 
   return (
     <>
+      {/* Diálogo de Senha para Proteção */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Senha Necessária</DialogTitle>
+            <DialogDescription>
+              Digite a senha para {passwordAction === 'edit' ? 'editar percentuais' : 'deletar a projeção'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 mt-4">
+            <div>
+              <Input
+                type="password"
+                placeholder="Digite a senha"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handlePasswordSubmit()
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowPasswordDialog(false)
+                  setPasswordInput('')
+                  setPasswordAction(null)
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handlePasswordSubmit}
+              >
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal de Edição de Percentuais */}
       <Dialog open={showProjectionModal} onOpenChange={setShowProjectionModal}>
         <DialogContent className="max-w-[99vw] w-[99vw] max-h-[96vh] h-[96vh] overflow-y-auto">
@@ -1597,14 +1680,14 @@ export function VWFinancialDashboard() {
                   Comparar
                 </Button>
                 <Button
-                  onClick={() => setShowProjectionModal(true)}
+                  onClick={handleEditPercentages}
                   variant="outline"
                   size="sm"
                 >
                   Editar %
                 </Button>
                 <Button
-                  onClick={deleteProjection}
+                  onClick={handleDeleteClick}
                   variant="destructive"
                   size="sm"
                   className="gap-2"
