@@ -2072,6 +2072,322 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 </ResponsiveContainer>
               </CardContent>
             </Card>
+
+            {/* Provisões IRPJ e Contribuição Social - Apenas para Administração e Consolidado */}
+            {(department === 'administracao' || department === 'consolidado') && (
+              <Card className="bg-white dark:bg-slate-900">
+                <CardHeader className="pb-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Provisões IRPJ e Contribuição Social
+                      </CardTitle>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Provisão para impostos sobre lucro e contribuição social
+                      </p>
+                    </div>
+                    <Badge className="bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300">
+                      Tributos
+                    </Badge>
+                  </div>
+
+                  {/* Estatísticas */}
+                  <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+                    <div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                      {(() => {
+                        const provisao1 = Math.abs(dre1?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const provisao2 = Math.abs(dre2?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        return (
+                          <>
+                            <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                              {formatCurrency(provisao1)}
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                            <p className="text-lg font-bold text-orange-600 dark:text-orange-400 mt-2">
+                              {formatCurrency(provisao2)}
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          </>
+                        )
+                      })()}
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
+                      {(() => {
+                        const provisao1 = Math.abs(dre1?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const provisao2 = Math.abs(dre2?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const percent1 = totals1.receitaLiquida > 0 ? (provisao1 / totals1.receitaLiquida) * 100 : 0
+                        const percent2 = totals2.receitaLiquida > 0 ? (provisao2 / totals2.receitaLiquida) * 100 : 0
+                        return (
+                          <>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white">
+                              {percent1.toFixed(2)}%
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
+                              {percent2.toFixed(2)}%
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          </>
+                        )
+                      })()}
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
+                      {(() => {
+                        const provisao1 = Math.abs(dre1?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const provisao2 = Math.abs(dre2?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const diff = calculateDifference(provisao1, provisao2)
+                        return (
+                          <div className={`flex items-center gap-1 ${getDifferenceColor(diff.absolute)}`}>
+                            {getDifferenceIcon(diff.absolute)}
+                            <div>
+                              <p className="text-lg font-bold">
+                                {diff.percentage > 0 ? '+' : ''}{diff.percentage.toFixed(1)}%
+                              </p>
+                              <p className="text-xs">
+                                {formatCurrency(diff.absolute)}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart 
+                      data={getPeriodLabels().map((label, index) => {
+                        const provisaoLine1 = dre1?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')
+                        const provisaoLine2 = dre2?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')
+                        const values1 = aggregateData(provisaoLine1?.meses || [])
+                        const values2 = aggregateData(provisaoLine2?.meses || [])
+                        return {
+                          name: label,
+                          [year1]: Math.abs(values1[index] || 0),
+                          [year2]: Math.abs(values2[index] || 0)
+                        }
+                      })}
+                      barGap={4}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
+                            const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                            const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                            const receitaValues1 = aggregateData(receitaLine1?.meses || [])
+                            const receitaValues2 = aggregateData(receitaLine2?.meses || [])
+                            const receitaPeriodo1 = receitaValues1[periodoIndex] || 0
+                            const receitaPeriodo2 = receitaValues2[periodoIndex] || 0
+                            
+                            const valor1 = Number(payload[0]?.value || 0)
+                            const valor2 = Number(payload[1]?.value || 0)
+                            const margem1 = receitaPeriodo1 > 0 ? (valor1 / receitaPeriodo1) * 100 : 0
+                            const margem2 = receitaPeriodo2 > 0 ? (valor2 / receitaPeriodo2) * 100 : 0
+                            
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
+                                <div className="space-y-1">
+                                  <p className="text-sm">
+                                    <span className="text-orange-600 dark:text-orange-400">▪ {year1}: </span>
+                                    <span className="font-bold">{formatCurrency(valor1)}</span>
+                                    <span className="text-xs text-slate-500 ml-1">({margem1.toFixed(2)}%)</span>
+                                  </p>
+                                  <p className="text-sm">
+                                    <span className="text-amber-600 dark:text-amber-400">▪ {year2}: </span>
+                                    <span className="font-bold">{formatCurrency(valor2)}</span>
+                                    <span className="text-xs text-slate-500 ml-1">({margem2.toFixed(2)}%)</span>
+                                  </p>
+                                  <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
+                                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                                      Diferença: <span className="font-bold">
+                                        {formatCurrency(Math.abs(valor1 - valor2))}
+                                      </span>
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          }
+                          return null
+                        }}
+                      />
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                      <Bar dataKey={String(year1)} fill="#f97316" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey={String(year2)} fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Lucro Líquido do Exercício - Apenas para Administração e Consolidado */}
+            {(department === 'administracao' || department === 'consolidado') && (
+              <Card className="bg-white dark:bg-slate-900">
+                <CardHeader className="pb-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+                        Lucro Líquido do Exercício
+                      </CardTitle>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Resultado final após todas as deduções e impostos
+                      </p>
+                    </div>
+                    <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                      Resultado Final
+                    </Badge>
+                  </div>
+
+                  {/* Estatísticas */}
+                  <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+                    <div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                      {(() => {
+                        const lucroLiquido1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        return (
+                          <>
+                            <p className={`text-lg font-bold ${lucroLiquido1 >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {formatCurrency(lucroLiquido1)}
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                            <p className={`text-lg font-bold mt-2 ${lucroLiquido2 >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {formatCurrency(lucroLiquido2)}
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          </>
+                        )
+                      })()}
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Margem Líquida (%)</p>
+                      {(() => {
+                        const lucroLiquido1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const margem1 = totals1.receitaLiquida > 0 ? (lucroLiquido1 / totals1.receitaLiquida) * 100 : 0
+                        const margem2 = totals2.receitaLiquida > 0 ? (lucroLiquido2 / totals2.receitaLiquida) * 100 : 0
+                        return (
+                          <>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white">
+                              {margem1.toFixed(2)}%
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
+                              {margem2.toFixed(2)}%
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          </>
+                        )
+                      })()}
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
+                      {(() => {
+                        const lucroLiquido1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const diff = calculateDifference(lucroLiquido1, lucroLiquido2)
+                        return (
+                          <div className={`flex items-center gap-1 ${getDifferenceColor(diff.absolute)}`}>
+                            {getDifferenceIcon(diff.absolute)}
+                            <div>
+                              <p className="text-lg font-bold">
+                                {diff.percentage > 0 ? '+' : ''}{diff.percentage.toFixed(1)}%
+                              </p>
+                              <p className="text-xs">
+                                {formatCurrency(diff.absolute)}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart 
+                      data={getPeriodLabels().map((label, index) => {
+                        const lucroLiquidoLine1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')
+                        const lucroLiquidoLine2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')
+                        const values1 = aggregateData(lucroLiquidoLine1?.meses || [])
+                        const values2 = aggregateData(lucroLiquidoLine2?.meses || [])
+                        return {
+                          name: label,
+                          [year1]: values1[index] || 0,
+                          [year2]: values2[index] || 0
+                        }
+                      })}
+                      barGap={4}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
+                            const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                            const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
+                            const receitaValues1 = aggregateData(receitaLine1?.meses || [])
+                            const receitaValues2 = aggregateData(receitaLine2?.meses || [])
+                            const receitaPeriodo1 = receitaValues1[periodoIndex] || 0
+                            const receitaPeriodo2 = receitaValues2[periodoIndex] || 0
+                            
+                            const valor1 = Number(payload[0]?.value || 0)
+                            const valor2 = Number(payload[1]?.value || 0)
+                            const margem1 = receitaPeriodo1 > 0 ? (valor1 / receitaPeriodo1) * 100 : 0
+                            const margem2 = receitaPeriodo2 > 0 ? (valor2 / receitaPeriodo2) * 100 : 0
+                            
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
+                                <div className="space-y-1">
+                                  <p className="text-sm">
+                                    <span className="text-indigo-600 dark:text-indigo-400">▪ {year1}: </span>
+                                    <span className="font-bold">{formatCurrency(valor1)}</span>
+                                    <span className="text-xs text-slate-500 ml-1">({margem1.toFixed(2)}%)</span>
+                                  </p>
+                                  <p className="text-sm">
+                                    <span className="text-purple-600 dark:text-purple-400">▪ {year2}: </span>
+                                    <span className="font-bold">{formatCurrency(valor2)}</span>
+                                    <span className="text-xs text-slate-500 ml-1">({margem2.toFixed(2)}%)</span>
+                                  </p>
+                                  <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700">
+                                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                                      Diferença: <span className={`font-bold ${getDifferenceColor(valor1 - valor2)}`}>
+                                        {formatCurrency(valor1 - valor2)}
+                                      </span>
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          }
+                          return null
+                        }}
+                      />
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                      <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Gráfico Resumo Geral */}
