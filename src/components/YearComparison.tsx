@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, ArrowLeft } from "lucide-react"
 import { useState, useMemo } from "react"
-import { loadMetricsData, loadDREData, type Department } from "@/lib/dataStorage"
+import { loadMetricsData, loadDREData, loadSharedMetricsData, type Department } from "@/lib/dataStorage"
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from "recharts"
 
@@ -2706,9 +2706,9 @@ function DadosAdicionaisComparison({
   aggregateData
 }: DadosAdicionaisComparisonProps) {
   
-  // Carregar dados dos dois anos
-  const data1 = useMemo(() => loadMetricsData(year1, department === 'consolidado' ? 'usados' : department), [year1, department])
-  const data2 = useMemo(() => loadMetricsData(year2, department === 'consolidado' ? 'usados' : department), [year2, department])
+  // Carregar dados compartilhados dos dois anos (dados adicionais são compartilhados entre departamentos)
+  const data1 = useMemo(() => loadSharedMetricsData(year1), [year1])
+  const data2 = useMemo(() => loadSharedMetricsData(year2), [year2])
 
   // Array de nomes de meses
   const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
