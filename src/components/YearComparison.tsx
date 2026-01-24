@@ -20,6 +20,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
   const [year2, setYear2] = useState<2024 | 2025 | 2026 | 2027>(initialYear2)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'mensal' | 'bimestral' | 'trimestral' | 'semestral'>('mensal')
+  const [comparisonTab, setComparisonTab] = useState<'dre' | 'dadosAdicionais'>('dre')
+  const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState<Department | 'consolidado'>(department)
+  const [comparisonMode, setComparisonMode] = useState<'anual' | 'mensal'>('anual')
+  const [selectedMonth1, setSelectedMonth1] = useState<number>(0) // 0-11 (Jan-Dez)
+  const [selectedMonth2, setSelectedMonth2] = useState<number>(0)
 
   // Mapeamento de departamento para nome legível
   const departmentNames: Record<Department, string> = {
@@ -273,6 +278,126 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 </Button>
               </div>
             </div>
+            
+            {/* Abas de Comparação */}
+            <div className="flex items-center gap-2 ml-6">
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Comparar:</span>
+              <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+                <Button
+                  onClick={() => setComparisonTab('dre')}
+                  variant={comparisonTab === 'dre' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs"
+                >
+                  DRE
+                </Button>
+                <Button
+                  onClick={() => setComparisonTab('dadosAdicionais')}
+                  variant={comparisonTab === 'dadosAdicionais' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs"
+                >
+                  Dados Adicionais
+                </Button>
+              </div>
+            </div>
+
+            {/* Filtro de Departamento (só para Dados Adicionais) */}
+            {comparisonTab === 'dadosAdicionais' && (
+              <>
+                <div className="flex items-center gap-2 ml-6">
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Departamento:</span>
+                  <Select value={selectedDepartmentFilter} onValueChange={(v) => setSelectedDepartmentFilter(v as Department | 'consolidado')}>
+                    <SelectTrigger className="w-[180px] h-7 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="consolidado">Consolidado</SelectItem>
+                      <SelectItem value="novos">Veículos Novos</SelectItem>
+                      <SelectItem value="vendaDireta">Venda Direta</SelectItem>
+                      <SelectItem value="usados">Veículos Usados</SelectItem>
+                      <SelectItem value="pecas">Peças</SelectItem>
+                      <SelectItem value="oficina">Oficina</SelectItem>
+                      <SelectItem value="funilaria">Funilaria</SelectItem>
+                      <SelectItem value="administracao">Administração</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Toggle Anual/Mensal */}
+                <div className="flex items-center gap-2 ml-6">
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Período:</span>
+                  <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+                    <Button
+                      onClick={() => setComparisonMode('anual')}
+                      variant={comparisonMode === 'anual' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="h-7 text-xs"
+                    >
+                      Anual
+                    </Button>
+                    <Button
+                      onClick={() => setComparisonMode('mensal')}
+                      variant={comparisonMode === 'mensal' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="h-7 text-xs"
+                    >
+                      Mensal
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Seletores de Mês (só no modo mensal) */}
+                {comparisonMode === 'mensal' && (
+                  <>
+                    <div className="flex items-center gap-2 ml-6">
+                      <span className="text-sm font-medium text-green-700 dark:text-green-400">Mês {year1}:</span>
+                      <Select value={selectedMonth1.toString()} onValueChange={(v) => setSelectedMonth1(parseInt(v))}>
+                        <SelectTrigger className="w-[140px] h-7 text-xs bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Janeiro</SelectItem>
+                          <SelectItem value="1">Fevereiro</SelectItem>
+                          <SelectItem value="2">Março</SelectItem>
+                          <SelectItem value="3">Abril</SelectItem>
+                          <SelectItem value="4">Maio</SelectItem>
+                          <SelectItem value="5">Junho</SelectItem>
+                          <SelectItem value="6">Julho</SelectItem>
+                          <SelectItem value="7">Agosto</SelectItem>
+                          <SelectItem value="8">Setembro</SelectItem>
+                          <SelectItem value="9">Outubro</SelectItem>
+                          <SelectItem value="10">Novembro</SelectItem>
+                          <SelectItem value="11">Dezembro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Mês {year2}:</span>
+                      <Select value={selectedMonth2.toString()} onValueChange={(v) => setSelectedMonth2(parseInt(v))}>
+                        <SelectTrigger className="w-[140px] h-7 text-xs bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Janeiro</SelectItem>
+                          <SelectItem value="1">Fevereiro</SelectItem>
+                          <SelectItem value="2">Março</SelectItem>
+                          <SelectItem value="3">Abril</SelectItem>
+                          <SelectItem value="4">Maio</SelectItem>
+                          <SelectItem value="5">Junho</SelectItem>
+                          <SelectItem value="6">Julho</SelectItem>
+                          <SelectItem value="7">Agosto</SelectItem>
+                          <SelectItem value="8">Setembro</SelectItem>
+                          <SelectItem value="9">Outubro</SelectItem>
+                          <SelectItem value="10">Novembro</SelectItem>
+                          <SelectItem value="11">Dezembro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -280,6 +405,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
       {/* Conteúdo da Comparação */}
       <div className="max-w-[1800px] mx-auto px-8 py-8">
         <div className="space-y-6">
+          {comparisonTab === 'dre' ? (
+            <>
           {/* Cards de Resumo */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Volume Total */}
@@ -2521,8 +2648,413 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               </CardContent>
             </Card>
           )}
+          </>
+        ) : (
+          /* Comparação de Dados Adicionais */
+          <DadosAdicionaisComparison 
+                year1={year1}
+                year2={year2}
+                department={selectedDepartmentFilter}
+                viewMode={viewMode}
+                comparisonMode={comparisonMode}
+                selectedMonth1={selectedMonth1}
+                selectedMonth2={selectedMonth2}
+                formatCurrency={formatCurrency}
+                formatNumber={formatNumber}
+                calculateDifference={calculateDifference}
+                getDifferenceColor={getDifferenceColor}
+                getDifferenceIcon={getDifferenceIcon}
+                aggregateData={aggregateData}
+              />
+        )}
         </div>
       </div>
     </div>
+  )
+}
+
+// Componente auxiliar para comparação de dados adicionais
+interface DadosAdicionaisComparisonProps {
+  year1: 2024 | 2025 | 2026 | 2027
+  year2: 2024 | 2025 | 2026 | 2027
+  department: Department | 'consolidado'
+  viewMode: 'mensal' | 'bimestral' | 'trimestral' | 'semestral'
+  comparisonMode: 'anual' | 'mensal'
+  selectedMonth1: number
+  selectedMonth2: number
+  formatCurrency: (value: number) => string
+  formatNumber: (value: number) => string
+  calculateDifference: (value1: number, value2: number) => { absolute: number; percentage: number }
+  getDifferenceColor: (diff: number) => string
+  getDifferenceIcon: (diff: number) => React.ReactNode
+  aggregateData: (values: number[]) => number[]
+}
+
+function DadosAdicionaisComparison({
+  year1,
+  year2,
+  department,
+  viewMode,
+  comparisonMode,
+  selectedMonth1,
+  selectedMonth2,
+  formatCurrency,
+  formatNumber,
+  calculateDifference,
+  getDifferenceColor,
+  getDifferenceIcon,
+  aggregateData
+}: DadosAdicionaisComparisonProps) {
+  
+  // Carregar dados dos dois anos
+  const data1 = useMemo(() => loadMetricsData(year1, department === 'consolidado' ? 'usados' : department), [year1, department])
+  const data2 = useMemo(() => loadMetricsData(year2, department === 'consolidado' ? 'usados' : department), [year2, department])
+
+  // Array de nomes de meses
+  const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+
+  // Função auxiliar para somar arrays ou pegar valor específico do mês
+  const sumArray = (arr?: number[]) => {
+    if (!arr) return 0
+    if (comparisonMode === 'mensal') {
+      // No modo mensal, não soma - retorna apenas o valor do mês selecionado
+      return 0
+    }
+    return arr.reduce((sum, val) => sum + (val || 0), 0)
+  }
+
+  // Função para obter valor do mês específico
+  const getMonthValue = (arr?: number[], monthIndex?: number) => {
+    if (!arr || !Array.isArray(arr) || monthIndex === undefined) return 0
+    return arr[monthIndex] || 0
+  }
+
+  // Função auxiliar para obter valor baseado no modo de comparação
+  const getValue = (arr?: number[], monthIndex?: number, divideByMonths: boolean = false) => {
+    if (!arr || !Array.isArray(arr)) return 0
+    if (comparisonMode === 'mensal') {
+      return getMonthValue(arr, monthIndex)
+    } else {
+      const sum = arr.reduce((sum, val) => sum + (val || 0), 0)
+      return divideByMonths ? sum / 12 : sum
+    }
+  }
+
+  // Estrutura dos dados adicionais para comparação
+  const dadosAdicionaisConfig = [
+    {
+      titulo: 'Volume de Troca',
+      subtitulo: 'Análise de Conversão',
+      campos: [
+        { label: 'Volume Trocas Novos', path: (d: any, m: number) => getValue(d?.vendasNovos?.volumeTrocas, m) },
+        { label: '% Trocas Novos', path: (d: any, m: number) => getValue(d?.vendasNovos?.percentualTrocas, m, true), isPercentage: true },
+        { label: 'Volume Trocas Usados', path: (d: any, m: number) => getValue(d?.vendasUsados?.volumeTrocas, m) },
+        { label: '% Trocas Usados', path: (d: any, m: number) => getValue(d?.vendasUsados?.percentualTrocas, m, true), isPercentage: true },
+      ]
+    },
+    {
+      titulo: '% de Repasse',
+      subtitulo: 'Vendas de Repasse',
+      campos: [
+        { label: 'Volume Repasse', path: (d: any, m: number) => getValue(d?.volumeVendas?.repasse, m) },
+        { label: '% Repasse', path: (d: any, m: number) => getValue(d?.volumeVendas?.percentualRepasse, m, true), isPercentage: true },
+      ]
+    },
+    {
+      titulo: 'Estoque de Novos',
+      subtitulo: 'Evolução do Estoque',
+      campos: [
+        { label: 'Quantidade Média', path: (d: any, m: number) => getValue(d?.estoqueNovos?.quantidade, m, true), isInteger: true },
+        { label: 'Valor Total', path: (d: any, m: number) => getValue(d?.estoqueNovos?.valor, m), isCurrency: true },
+        { label: 'A Pagar', path: (d: any, m: number) => getValue(d?.estoqueNovos?.aPagar, m), isCurrency: true },
+        { label: 'Pagos', path: (d: any, m: number) => getValue(d?.estoqueNovos?.pagos, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Estoque de Usados',
+      subtitulo: 'Evolução do Estoque',
+      campos: [
+        { label: 'Quantidade Média', path: (d: any, m: number) => getValue(d?.estoqueUsados?.quantidade, m, true), isInteger: true },
+        { label: 'Valor Total', path: (d: any, m: number) => getValue(d?.estoqueUsados?.valor, m), isCurrency: true },
+        { label: 'A Pagar', path: (d: any, m: number) => getValue(d?.estoqueUsados?.aPagar, m), isCurrency: true },
+        { label: 'Pagos', path: (d: any, m: number) => getValue(d?.estoqueUsados?.pagos, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Estoque de Peças',
+      subtitulo: 'Evolução do Estoque',
+      campos: [
+        { label: 'Valor Total', path: (d: any, m: number) => getValue(d?.estoquePecas?.valor, m), isCurrency: true },
+        { label: 'A Pagar', path: (d: any, m: number) => getValue(d?.estoquePecas?.aPagar, m), isCurrency: true },
+        { label: 'Pagos', path: (d: any, m: number) => getValue(d?.estoquePecas?.pagos, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Vendas de Peças',
+      subtitulo: 'Por Departamento',
+      campos: [
+        { label: 'Balcão - Vendas', path: (d: any, m: number) => getValue(d?.vendasPecas?.balcao?.vendas, m), isCurrency: true },
+        { label: 'Balcão - Margem %', path: (d: any, m: number) => getValue(d?.vendasPecas?.balcao?.margem, m, true), isPercentage: true },
+        { label: 'Oficina - Vendas', path: (d: any, m: number) => getValue(d?.vendasPecas?.oficina?.vendas, m), isCurrency: true },
+        { label: 'Oficina - Margem %', path: (d: any, m: number) => getValue(d?.vendasPecas?.oficina?.margem, m, true), isPercentage: true },
+      ]
+    },
+    {
+      titulo: 'Vendas por Seguradora',
+      subtitulo: 'Performance Seguradoras',
+      campos: [
+        { label: 'Total Vendas', path: (d: any, m: number) => getValue(d?.vendasPecas?.seguradoraTotal?.vendas, m), isCurrency: true },
+        { label: 'Total Margem %', path: (d: any, m: number) => getValue(d?.vendasPecas?.seguradoraTotal?.margem, m, true), isPercentage: true },
+      ]
+    },
+    {
+      titulo: 'Vendas Mercado Livre',
+      subtitulo: 'Performance Marketplace',
+      campos: [
+        { label: 'Total Vendas', path: (d: any, m: number) => getValue(d?.mercadoLivre?.vendas, m), isCurrency: true },
+        { label: 'Lucro', path: (d: any, m: number) => getValue(d?.mercadoLivre?.lucro, m), isCurrency: true },
+        { label: 'Margem %', path: (d: any, m: number) => getValue(d?.mercadoLivre?.margem, m, true), isPercentage: true },
+      ]
+    },
+    {
+      titulo: 'Despesas Financeiras Novos',
+      subtitulo: 'Juros e Despesas',
+      campos: [
+        { label: 'Despesas Cartão', path: (d: any, m: number) => getValue(d?.despesasCartao?.novos, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Despesas Financeiras Usados',
+      subtitulo: 'Juros e Despesas',
+      campos: [
+        { label: 'Despesas Cartão', path: (d: any, m: number) => getValue(d?.despesasCartao?.usados, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Despesas Financeiras Peças',
+      subtitulo: 'Juros e Despesas',
+      campos: [
+        { label: 'Despesas Cartão', path: (d: any, m: number) => getValue(d?.despesasCartao?.pecas, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Despesas Financeiras Oficina',
+      subtitulo: 'Cartão de Crédito',
+      campos: [
+        { label: 'Despesas Cartão', path: (d: any, m: number) => getValue(d?.despesasCartao?.oficina, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Despesas Financeiras Funilaria',
+      subtitulo: 'Cartão de Crédito',
+      campos: [
+        { label: 'Despesas Cartão', path: (d: any, m: number) => getValue(d?.despesasCartao?.funilaria, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Despesas Financeiras Administração',
+      subtitulo: 'Juros e Despesas',
+      campos: [
+        { label: 'Despesas Cartão', path: (d: any, m: number) => getValue(d?.despesasCartao?.administracao, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Bônus Novos',
+      subtitulo: 'Bônus Veículos Novos',
+      campos: [
+        { label: 'Total Bônus', path: (d: any, m: number) => getValue(d?.bonus?.veiculosNovos, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Bônus Usados',
+      subtitulo: 'Bônus Veículos Usados',
+      campos: [
+        { label: 'Total Bônus', path: (d: any, m: number) => getValue(d?.bonus?.veiculosUsados, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Bônus Peças',
+      subtitulo: 'Bônus Peças',
+      campos: [
+        { label: 'Total Bônus', path: (d: any, m: number) => getValue(d?.bonus?.pecas, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Bônus Oficina',
+      subtitulo: 'Bônus Oficina',
+      campos: [
+        { label: 'Total Bônus', path: (d: any, m: number) => getValue(d?.bonus?.oficina, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Bônus Funilaria',
+      subtitulo: 'Bônus Funilaria',
+      campos: [
+        { label: 'Total Bônus', path: (d: any, m: number) => getValue(d?.bonus?.funilaria, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Bônus Administração',
+      subtitulo: 'Bônus Administração',
+      campos: [
+        { label: 'Total Bônus', path: (d: any, m: number) => getValue(d?.bonus?.administracao, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Receita Financiamento Novos',
+      subtitulo: 'Receita Financiamento',
+      campos: [
+        { label: 'Total Receita', path: (d: any, m: number) => getValue(d?.receitasFinanciamento?.veiculosNovos, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Receita Financiamento Usados',
+      subtitulo: 'Receita Financiamento',
+      campos: [
+        { label: 'Total Receita', path: (d: any, m: number) => getValue(d?.receitasFinanciamento?.veiculosUsados, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Crédito de ICMS Novos',
+      subtitulo: 'Crédito de ICMS',
+      campos: [
+        { label: 'Total Crédito', path: (d: any, m: number) => getValue(d?.creditosICMS?.novos, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Crédito de ICMS Peças',
+      subtitulo: 'Crédito de ICMS',
+      campos: [
+        { label: 'Total Crédito', path: (d: any, m: number) => getValue(d?.creditosICMS?.pecas, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Crédito de ICMS Administração',
+      subtitulo: 'Crédito de ICMS',
+      campos: [
+        { label: 'Total Crédito', path: (d: any, m: number) => getValue(d?.creditosICMS?.administracao, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Crédito de PIS e Cofins Administração',
+      subtitulo: 'Crédito PIS/Cofins',
+      campos: [
+        { label: 'Total Crédito', path: (d: any, m: number) => getValue(d?.creditosPISCOFINS?.administracao, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Receita de Blindagem',
+      subtitulo: 'Receita Adicional',
+      campos: [
+        { label: 'Total Receita', path: (d: any, m: number) => getValue(d?.receitaBlindagem, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Receita de Despachante Usados',
+      subtitulo: 'Receita Adicional',
+      campos: [
+        { label: 'Total Receita', path: (d: any, m: number) => getValue(d?.receitaDespachanteUsados, m), isCurrency: true },
+      ]
+    },
+    {
+      titulo: 'Receita de Despachante Novos',
+      subtitulo: 'Receita Adicional',
+      campos: [
+        { label: 'Total Receita', path: (d: any, m: number) => getValue(d?.receitaDespachanteNovos, m), isCurrency: true },
+      ]
+    },
+  ]
+
+  return (
+    <>
+      {dadosAdicionaisConfig.map((secao, idx) => {
+        // Verificar se há dados válidos para essa seção
+        const temDados = secao.campos.some(campo => {
+          const val1 = campo.path(data1, selectedMonth1)
+          const val2 = campo.path(data2, selectedMonth2)
+          return val1 !== 0 || val2 !== 0
+        })
+
+        if (!temDados) return null
+
+        return (
+          <Card key={idx}>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div>
+                  <div className="text-lg font-bold">{secao.titulo}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    {secao.subtitulo}
+                    {comparisonMode === 'mensal' && (
+                      <span className="ml-2 font-semibold">
+                        ({monthNames[selectedMonth1]}/{year1} vs {monthNames[selectedMonth2]}/{year2})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-slate-200 dark:border-slate-700">
+                      <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300">Métrica</th>
+                      <th className="text-right py-3 px-2 font-semibold text-green-700 dark:text-green-400">
+                        {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                      </th>
+                      <th className="text-right py-3 px-2 font-semibold text-blue-700 dark:text-blue-400">
+                        {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                      </th>
+                      <th className="text-right py-3 px-2 font-semibold text-slate-700 dark:text-slate-300">Diferença</th>
+                      <th className="text-right py-3 px-2 font-semibold text-slate-700 dark:text-slate-300">Variação %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {secao.campos.map((campo, campoIdx) => {
+                      const value1 = campo.path(data1, selectedMonth1) || 0
+                      const value2 = campo.path(data2, selectedMonth2) || 0
+                      
+                      // Pular se ambos valores forem zero
+                      if (value1 === 0 && value2 === 0) return null
+                      
+                      const diff = calculateDifference(value1, value2)
+                      
+                      const formatValue = (val: number) => {
+                        if (campo.isCurrency) return formatCurrency(val)
+                        if (campo.isPercentage) return `${val.toFixed(2)}%`
+                        if (campo.isInteger) return Math.round(val).toString()
+                        return formatNumber(val)
+                      }
+
+                      return (
+                        <tr key={campoIdx} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900">
+                          <td className="py-2 px-2">{campo.label}</td>
+                          <td className="text-right py-2 px-2 text-green-700 dark:text-green-400 font-medium">
+                            {formatValue(value1)}
+                          </td>
+                          <td className="text-right py-2 px-2 text-blue-700 dark:text-blue-400 font-medium">
+                            {formatValue(value2)}
+                          </td>
+                          <td className={`text-right py-2 px-2 font-semibold ${getDifferenceColor(diff.absolute)}`}>
+                            <div className="flex items-center justify-end gap-1">
+                              {getDifferenceIcon(diff.absolute)}
+                              {campo.isCurrency ? formatCurrency(diff.absolute) : formatValue(diff.absolute)}
+                            </div>
+                          </td>
+                          <td className={`text-right py-2 px-2 font-semibold ${getDifferenceColor(diff.percentage)}`}>
+                            {diff.percentage > 0 ? '+' : ''}{diff.percentage.toFixed(1)}%
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })}
+    </>
   )
 }
