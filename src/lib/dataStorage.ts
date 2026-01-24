@@ -44,13 +44,191 @@ import { businessMetricsDataAdministracao2027 } from '../data/businessMetricsDat
 export type Department = 'novos' | 'vendaDireta' | 'usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'consolidado';
 
 // Tipos para os dados de métricas
-export type MetricsData = typeof businessMetricsData;
+export interface MetricsData {
+  months: string[];
+  vendasNovos: {
+    vendas: number[];
+    volumeTrocas: number[];
+    percentualTrocas: number[];
+  };
+  vendasNovosVD: {
+    vendas: number[];
+    volumeTrocas: number[];
+    percentualTrocas: number[];
+  };
+  vendasUsados: {
+    vendas: number[];
+    volumeTrocas: number[];
+    percentualTrocas: number[];
+  };
+  volumeVendas: {
+    usados: number[];
+    repasse: number[];
+    percentualRepasse: number[];
+  };
+  estoqueNovos: {
+    quantidade: number[];
+    valor: number[];
+    aPagar: number[];
+    pagos: number[];
+  };
+  estoqueUsados: {
+    quantidade: number[];
+    valor: number[];
+    aPagar: number[];
+    pagos: number[];
+  };
+  estoquePecas: {
+    quantidade?: number[];
+    valor: number[];
+    aPagar: number[];
+    pagos: number[];
+  };
+  vendasPecas?: {
+    balcao?: {
+      vendas: number[];
+      lucro: number[];
+      margem: number[];
+    };
+    oficina?: {
+      vendas: number[];
+      lucro: number[];
+      margem: number[];
+    };
+    funilaria?: {
+      vendas: number[];
+      lucro: number[];
+      margem: number[];
+    };
+    acessorios?: {
+      vendas: number[];
+      lucro: number[];
+      margem: number[];
+    };
+    seguradoraTotal?: {
+      vendas: number[];
+      lucro: number[];
+      margem: number[];
+    };
+  };
+  seguradoras?: {
+    portoSeguro?: {
+      vendas: number[];
+      lucro: number[];
+      margem: number[];
+    };
+    azul?: {
+      vendas: number[];
+      lucro: number[];
+      margem: number[];
+    };
+    allianz?: {
+      vendas: number[];
+      lucro: number[];
+      margem: number[];
+    };
+    tokioMarine?: {
+      vendas: number[];
+      lucro: number[];
+      margem: number[];
+    };
+  };
+  mercadoLivre?: {
+    vendas: number[];
+    lucro: number[];
+    margem: number[];
+  };
+  juros?: {
+    veiculosNovos: number[];
+    veiculosUsados: number[];
+    pecas: number[];
+    emprestimosBancarios: number[];
+    contratoMutuo: number[];
+  };
+  custos?: {
+    garantia: number[];
+    reparoUsados: number[];
+    ticketMedioReparo: number[];
+  };
+  despesasCartao?: {
+    novos: number[];
+    vendaDireta: number[];
+    usados: number[];
+    pecas: number[];
+    oficina: number[];
+    funilaria: number[];
+    administracao: number[];
+  };
+  bonus?: {
+    veiculosNovos: number[];
+    veiculosUsados: number[];
+    pecas: number[];
+    oficina: number[];
+    funilaria: number[];
+    administracao: number[];
+  };
+  receitasFinanciamento?: {
+    veiculosNovos: number[];
+    veiculosUsados: number[];
+  };
+  creditosICMS?: {
+    novos: number[];
+    pecas: number[];
+    administracao: number[];
+  };
+  creditosPISCOFINS?: {
+    administracao: number[];
+  };
+  receitaBlindagem?: number[];
+  receitaDespachanteUsados?: number[];
+  receitaDespachanteNovos?: number[];
+  margensOperacionais?: {
+    novos: number[];
+    usados: number[];
+    oficina: number[];
+    pecas: number[];
+  };
+  receitaVendas?: {
+    novos: number[];
+    usados: number[];
+  };
+  resultadoFinanceiro?: {
+    receitas: number[];
+    despesas: number[];
+    resultado: number[];
+  };
+  despesasPessoal?: {
+    custo: number[];
+    hc: number[];
+  };
+  receitasOficina?: {
+    garantia: number[];
+    clientePago: number[];
+    interno: number[];
+  };
+  receitasPecas?: {
+    balcao: number[];
+    oficina: number[];
+    externo: number[];
+  };
+  fluxoCaixa?: {
+    recebimentos: number[];
+    pagamentos: number[];
+    saldo: number[];
+  };
+  capital?: {
+    capitalProprio: number[];
+    capitalTerceiros: number[];
+    capitalTotal?: number[];
+  };
+}
 
 // Tipos para os dados de DRE
 export interface DRELine {
   id: string;
   label: string;
   values: number[];
+  meses?: number[];
   isTotal?: boolean;
   isSubtotal?: boolean;
   indent?: number;
