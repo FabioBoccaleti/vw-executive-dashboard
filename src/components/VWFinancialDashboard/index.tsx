@@ -510,11 +510,16 @@ export function VWFinancialDashboard() {
           return parseFloat(cleaned) || 0;
         };
         
-        // Criar novo objeto de dados
-        const newData = JSON.parse(JSON.stringify(metricsData));
+        // Criar novo objeto de dados baseado nos dados compartilhados (se importando compartilhado)
+        // ou nos dados normais (se importando específico)
+        const isSharedImport = showDetailedMetrics;
+        const newData = JSON.parse(JSON.stringify(isSharedImport ? sharedMetricsData : metricsData));
+        
+        console.log('🔧 Base de dados para importação:', isSharedImport ? 'sharedMetricsData' : 'metricsData');
         
         let currentMetricId: number | null = null;
         let currentFieldIndex = 0;
+        let processedIds: number[] = [];
         
         // Definir métricas para mapear IDs
         const metricsMap: {[key: number]: {fields: string[], dataPath: string[]}} = {
@@ -577,6 +582,9 @@ export function VWFinancialDashboard() {
           if (id) {
             currentMetricId = parseInt(id);
             currentFieldIndex = 0;
+            if (!isNaN(currentMetricId)) {
+              processedIds.push(currentMetricId);
+            }
           } else {
             currentFieldIndex++;
           }
@@ -589,6 +597,11 @@ export function VWFinancialDashboard() {
           
           const parsedValues = values.map(v => parseValue(v, field));
           
+          // Log para debug de IDs específicos (18-43)
+          if (currentMetricId >= 18 && currentMetricId <= 43) {
+            console.log(`📝 ID ${currentMetricId} - ${metric.dataPath.join('.')} - ${field}:`, parsedValues.slice(0, 3), '...');
+          }
+          
           // Navegar no objeto usando o dataPath e garantir que os objetos intermediários existam
           let target: any = newData;
           for (let i = 0; i < metric.dataPath.length - 1; i++) {
@@ -599,16 +612,26 @@ export function VWFinancialDashboard() {
             target = target[pathPart];
           }
           
-          // Para métricas 44, 45, 46 que são arrays diretos (apenas se tiverem apenas 1 campo 'valor')
-          if (metric.fields.length === 1 && metric.fields[0] === 'valor' && metric.dataPath.length === 1) {
-            newData[metric.dataPath[0]] = parsedValues;
-          } else {
-            const lastPath = metric.dataPath[metric.dataPath.length - 1];
+          const lastPath = metric.dataPath[metric.dataPath.length - 1];
+          
+          // Para métricas com apenas 1 campo 'valor' (IDs 18-23, 25-43, 44-46)
+          // Os dados são arrays diretos, não objetos com campo 'valor'
+          if (metric.fields.length === 1 && metric.fields[0] === 'valor') {
             if (metric.dataPath.length === 1) {
-              if (!target[lastPath]) {
-                target[lastPath] = {};
+              // IDs 44, 45, 46 - arrays no nível raiz
+              newData[lastPath] = parsedValues;
+            } else {
+              // IDs 18-23, 25-43 - arrays dentro de objetos aninhados (ex: juros.veiculosNovos)
+              target[lastPath] = parsedValues;
+            }
+          } else {
+            // Para métricas com múltiplos campos (IDs 1-17, 24)
+            // Os dados são objetos com múltiplas propriedades
+            if (metric.dataPath.length === 1) {
+              if (!newData[lastPath]) {
+                newData[lastPath] = {};
               }
-              target[lastPath][field] = parsedValues;
+              newData[lastPath][field] = parsedValues;
             } else {
               if (!target[lastPath]) {
                 target[lastPath] = {};
@@ -619,16 +642,26 @@ export function VWFinancialDashboard() {
         });
         
         console.log('✨ Processamento concluído');
+        console.log('📊 IDs processados:', processedIds);
         console.log('💾 Aplicando novos dados ao estado...');
-        console.log('📋 Preview dos dados importados:', {
-          bonus33: newData.bonus?.veiculosUsados,
-          bonus34: newData.bonus?.pecas,
-          receitas38: newData.receitasFinanciamento?.veiculosNovos,
-          creditos42: newData.creditosICMS?.administracao
-        });
+        console.log('📋 Preview dos dados importados (IDs 18-43):');
+        console.log('  - ID 18 (Juros Novos):', newData.juros?.veiculosNovos);
+        console.log('  - ID 19 (Juros Usados):', newData.juros?.veiculosUsados);
+        console.log('  - ID 20 (Juros Peças):', newData.juros?.pecas);
+        console.log('  - ID 21 (Juros Emp. Banc.):', newData.juros?.emprestimosBancarios);
+        console.log('  - ID 22 (Juros Contrato Mútuo):', newData.juros?.contratoMutuo);
+        console.log('  - ID 23 (Custos Garantia):', newData.custos?.garantia);
+        console.log('  - ID 25 (Desp Cartão Novos):', newData.despesasCartao?.novos);
+        console.log('  - ID 27 (Desp Cartão Usados):', newData.despesasCartao?.usados);
+        console.log('  - ID 32 (Bônus Novos):', newData.bonus?.veiculosNovos);
+        console.log('  - ID 33 (Bônus Usados):', newData.bonus?.veiculosUsados);
+        console.log('  - ID 34 (Bônus Peças):', newData.bonus?.pecas);
+        console.log('  - ID 38 (Receitas Fin. Novos):', newData.receitasFinanciamento?.veiculosNovos);
+        console.log('  - ID 40 (Créditos ICMS Novos):', newData.creditosICMS?.novos);
+        console.log('  - ID 42 (Créditos ICMS Admin):', newData.creditosICMS?.administracao);
+        console.log('  - ID 43 (Créditos PIS/COFINS):', newData.creditosPISCOFINS?.administracao);
         
-        // Detectar se está importando via "Dados Adicionais" (showDetailedMetrics = true)
-        const isSharedImport = showDetailedMetrics;
+        // isSharedImport já foi definido no início do processamento
         
         if (isSharedImport) {
           console.log('📤 Salvando como dados COMPARTILHADOS (visível em todos os departamentos)...');
@@ -637,9 +670,18 @@ export function VWFinancialDashboard() {
           console.log('💾 Salvamento compartilhado:', sharedSaved ? '✅ Sucesso' : '❌ Falhou');
           
           if (sharedSaved) {
+            // Recarregar dados compartilhados do localStorage para garantir sincronização
+            const reloadedSharedData = loadSharedMetricsData(fiscalYear);
+            console.log('🔄 Dados compartilhados recarregados do localStorage:', reloadedSharedData);
+            console.log('🔍 Verificação pós-importação:');
+            console.log('  - Bonus Veículos Usados (ID 33):', reloadedSharedData.bonus?.veiculosUsados);
+            console.log('  - Bonus Peças (ID 34):', reloadedSharedData.bonus?.pecas);
+            console.log('  - Receitas Financiamento Novos (ID 38):', reloadedSharedData.receitasFinanciamento?.veiculosNovos);
+            console.log('  - Créditos ICMS Administração (ID 42):', reloadedSharedData.creditosICMS?.administracao);
+            
             // Atualizar tanto o estado normal quanto o compartilhado
-            setMetricsData(newData);
-            setSharedMetricsData(newData);
+            setMetricsData(reloadedSharedData);
+            setSharedMetricsData(reloadedSharedData);
             
             console.log('🔄 Todos os departamentos agora terão acesso aos dados importados!');
             alert('Dados importados e compartilhados com TODOS os departamentos!');
@@ -5301,9 +5343,9 @@ export function VWFinancialDashboard() {
                       );
                     })()}
 
-                    {/* Gráfico 2: ID26 - Despesas Cartão Usados */}
+                    {/* Gráfico 2: ID27 - Despesas Cartão Usados */}
                     {(() => {
-                      const despesasData = sharedMetricsData.despesasCartao?.vendaDireta || [];
+                      const despesasData = sharedMetricsData.despesasCartao?.usados || [];
                       const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
                       const mediaDespesas = totalDespesas / 12;
                       const ultimaDespesa = despesasData[11];
@@ -5608,7 +5650,7 @@ export function VWFinancialDashboard() {
                       );
                     })()}
 
-                    {/* Gráfico 2: ID27 - Despesas Cartão Peças */}
+                    {/* Gráfico 2: ID28 - Despesas Cartão Peças */}
                     {(() => {
                       const despesasData = sharedMetricsData.despesasCartao?.pecas || [];
                       const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
@@ -5775,7 +5817,7 @@ export function VWFinancialDashboard() {
                 <CardContent>
                   <div className="grid grid-cols-1 gap-6 max-w-full">
                     
-                    {/* Gráfico: ID28 - Despesas Cartão Oficina */}
+                    {/* Gráfico: ID29 - Despesas Cartão Oficina */}
                     {(() => {
                       const despesasData = sharedMetricsData.despesasCartao?.oficina || [];
                       const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
@@ -5942,7 +5984,7 @@ export function VWFinancialDashboard() {
                 <CardContent>
                   <div className="grid grid-cols-1 gap-6 max-w-full">
                     
-                    {/* Gráfico: ID29 - Despesas Cartão Funilaria */}
+                    {/* Gráfico: ID30 - Despesas Cartão Funilaria */}
                     {(() => {
                       const despesasData = sharedMetricsData.despesasCartao?.funilaria || [];
                       const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
@@ -6385,7 +6427,7 @@ export function VWFinancialDashboard() {
                       );
                     })()}
 
-                    {/* Gráfico 3: ID30 - Despesas Cartão Administração */}
+                    {/* Gráfico 3: ID31 - Despesas Cartão Administração */}
                     {(() => {
                       const despesasData = sharedMetricsData.despesasCartao?.administracao || [];
                       const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
@@ -7226,7 +7268,7 @@ export function VWFinancialDashboard() {
                 <CardContent>
                   <div className="grid grid-cols-1 gap-6 max-w-full">
                     
-                    {/* Gráfico: ID35 - Bônus Funilaria */}
+                    {/* Gráfico: ID36 - Bônus Funilaria */}
                     {(() => {
                       const bonusData = sharedMetricsData.bonus?.funilaria || [];
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
@@ -7393,7 +7435,7 @@ export function VWFinancialDashboard() {
                 <CardContent>
                   <div className="grid grid-cols-1 gap-6 max-w-full">
                     
-                    {/* Gráfico: ID36 - Bônus Administração */}
+                    {/* Gráfico: ID37 - Bônus Administração */}
                     {(() => {
                       const bonusData = sharedMetricsData.bonus?.administracao || [];
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
@@ -7560,7 +7602,7 @@ export function VWFinancialDashboard() {
                 <CardContent>
                   <div className="grid grid-cols-1 gap-6 max-w-full">
                     
-                    {/* Gráfico: ID37 - Receita Financiamento Novos */}
+                    {/* Gráfico: ID38 - Receita Financiamento Novos */}
                     {(() => {
                       const receitaData = sharedMetricsData.receitasFinanciamento?.veiculosNovos || [];
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
@@ -8898,7 +8940,7 @@ export function VWFinancialDashboard() {
                 <CardContent>
                   <div className="grid grid-cols-1 gap-6 max-w-full">
                     
-                    {/* Gráfico: ID38 - Receita Financiamento Usados */}
+                    {/* Gráfico: ID39 - Receita Financiamento Usados */}
                     {(() => {
                       const receitaData = sharedMetricsData.receitasFinanciamento?.veiculosUsados || [];
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
