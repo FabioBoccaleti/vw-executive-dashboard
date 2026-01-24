@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, ArrowLeft } from "lucide-react"
 import { useState, useMemo } from "react"
-import { loadMetricsData, loadDREData, loadSharedMetricsData, type Department } from "@/lib/dataStorage"
+import { loadMetricsData, loadDREData, loadSharedMetricsData, type Department, type Brand } from "@/lib/dataStorage"
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from "recharts"
 
@@ -13,9 +13,10 @@ interface YearComparisonProps {
   initialYear1?: 2024 | 2025 | 2026 | 2027
   initialYear2?: 2024 | 2025 | 2026 | 2027
   department?: Department
+  brand: Brand
 }
 
-export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 2024, department = 'usados' }: YearComparisonProps) {
+export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 2024, department = 'usados', brand }: YearComparisonProps) {
   const [year1, setYear1] = useState<2024 | 2025 | 2026 | 2027>(initialYear1)
   const [year2, setYear2] = useState<2024 | 2025 | 2026 | 2027>(initialYear2)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
@@ -38,11 +39,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
     'consolidado': 'Consolidado'
   }
 
-  // Carregar dados dos dois anos com o departamento
-  const data1 = useMemo(() => loadMetricsData(year1, department), [year1, department])
-  const data2 = useMemo(() => loadMetricsData(year2, department), [year2, department])
-  const dre1 = useMemo(() => loadDREData(year1, department), [year1, department])
-  const dre2 = useMemo(() => loadDREData(year2, department), [year2, department])
+  // Carregar dados dos dois anos com o departamento e marca
+  const data1 = useMemo(() => loadMetricsData(year1, department, brand), [year1, department, brand])
+  const data2 = useMemo(() => loadMetricsData(year2, department, brand), [year2, department, brand])
+  const dre1 = useMemo(() => loadDREData(year1, department, brand), [year1, department, brand])
+  const dre2 = useMemo(() => loadDREData(year2, department, brand), [year2, department, brand])
 
   const toggleSection = (section: string) => {
     const newExpanded = new Set(expandedSections)
@@ -2665,6 +2666,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 getDifferenceColor={getDifferenceColor}
                 getDifferenceIcon={getDifferenceIcon}
                 aggregateData={aggregateData}
+                brand={brand}
               />
         )}
         </div>
@@ -2677,6 +2679,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
 interface DadosAdicionaisComparisonProps {
   year1: 2024 | 2025 | 2026 | 2027
   year2: 2024 | 2025 | 2026 | 2027
+  brand: Brand
   department: Department | 'consolidado'
   viewMode: 'mensal' | 'bimestral' | 'trimestral' | 'semestral'
   comparisonMode: 'anual' | 'mensal'
@@ -2703,12 +2706,13 @@ function DadosAdicionaisComparison({
   calculateDifference,
   getDifferenceColor,
   getDifferenceIcon,
-  aggregateData
+  aggregateData,
+  brand
 }: DadosAdicionaisComparisonProps) {
   
   // Carregar dados compartilhados dos dois anos (dados adicionais são compartilhados entre departamentos)
-  const data1 = useMemo(() => loadSharedMetricsData(year1), [year1])
-  const data2 = useMemo(() => loadSharedMetricsData(year2), [year2])
+  const data1 = useMemo(() => loadSharedMetricsData(year1, brand), [year1, brand])
+  const data2 = useMemo(() => loadSharedMetricsData(year2, brand), [year2, brand])
 
   // Array de nomes de meses
   const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']

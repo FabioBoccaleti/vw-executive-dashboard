@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2, DollarSign } from "lucide-react"
+import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2, DollarSign, Building2 } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, Legend, LabelList, ComposedChart, Cell } from "recharts"
 import { useState, useRef, useEffect } from "react"
@@ -26,9 +26,17 @@ import {
   loadSharedMetricsData,
   saveSharedMetricsData,
   type MetricsData,
-  type Department
+  type Department,
+  type Brand
 } from "@/lib/dataStorage"
 import { DEPARTMENT_LABELS, DEPARTMENTS } from "@/lib/types"
+import { getBrandConfig, BRAND_CONFIGS } from "@/lib/brands"
+
+// Props interface para VWFinancialDashboard
+interface VWFinancialDashboardProps {
+  brand: Brand;
+  onChangeBrand: () => void;
+}
 
 // Dados iniciais DRE - Demonstrativo de Resultados (ano 2025 como base)
 const initialDreData = [
@@ -171,7 +179,10 @@ const initialDreData = [
   }
 ]
 
-export function VWFinancialDashboard() {
+export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashboardProps) {
+  // Configuração da marca atual
+  const brandConfig = getBrandConfig(brand);
+  
   // Estado para o ano fiscal selecionado e departamento
   const [fiscalYear, setFiscalYear] = useState<2024 | 2025 | 2026 | 2027>(() => loadSelectedFiscalYear())
   const [department, setDepartment] = useState<Department>(() => loadSelectedDepartment())
@@ -207,25 +218,25 @@ export function VWFinancialDashboard() {
   const [isImporting, setIsImporting] = useState(false)
   
   // Estado para dados de métricas de negócios (para permitir importação/exportação)
-  const [metricsData, setMetricsData] = useState<MetricsData>(() => loadMetricsData(fiscalYear, department))
+  const [metricsData, setMetricsData] = useState<MetricsData>(() => loadMetricsData(fiscalYear, department, brand))
   
   // Estado para dados compartilhados entre todos os departamentos (Dados Adicionais)
-  const [sharedMetricsData, setSharedMetricsData] = useState<MetricsData>(() => loadSharedMetricsData(fiscalYear))
+  const [sharedMetricsData, setSharedMetricsData] = useState<MetricsData>(() => loadSharedMetricsData(fiscalYear, brand))
   
   // Expor funções de limpeza no console (apenas para desenvolvimento)
   useEffect(() => {
-    (window as any).clearYearData = clearYearData;
-    (window as any).clearAllData = clearAllData;
+    (window as any).clearYearData = (year: 2024 | 2025 | 2026 | 2027) => clearYearData(year, brand);
+    (window as any).clearAllData = () => clearAllData(brand);
     (window as any).reloadDashboard = () => window.location.reload();
     
     // Função de debug para verificar localStorage
     (window as any).debugStorage = () => {
       console.clear();
-      console.log('🔬 === DIAGNÓSTICO DE PERSISTÊNCIA ===\n');
+      console.log(`🔬 === DIAGNÓSTICO DE PERSISTÊNCIA - MARCA: ${brand.toUpperCase()} ===\n`);
       
-      const vwKeys = Object.keys(localStorage).filter(k => k.startsWith('vw_'));
-      console.log(`📦 Total de chaves VW: ${vwKeys.length}`);
-      console.log('Chaves encontradas:', vwKeys);
+      const brandKeys = Object.keys(localStorage).filter(k => k.startsWith(`${brand}_`));
+      console.log(`📦 Total de chaves da marca ${brand}: ${brandKeys.length}`);
+      console.log('Chaves encontradas:', brandKeys);
       console.log('');
       
       // Verificar dados por ano e departamento
@@ -236,8 +247,8 @@ export function VWFinancialDashboard() {
       years.forEach(year => {
         console.log(`\n${year}:`);
         departments.forEach(dept => {
-          const metricsKey = `vw_metrics_${year}_${dept}`;
-          const dreKey = `vw_dre_${year}_${dept}`;
+          const metricsKey = `${brand}_metrics_${year}_${dept}`;
+          const dreKey = `${brand}_dre_${year}_${dept}`;
           const hasMetrics = localStorage.getItem(metricsKey) !== null;
           const hasDRE = localStorage.getItem(dreKey) !== null;
           
@@ -329,9 +340,9 @@ export function VWFinancialDashboard() {
     console.log('  - reloadDashboard() - Recarrega a página');
     console.log('  - debugStorage() - Diagnóstico completo do localStorage');
     console.log('  - testPersistence() - Testa funcionamento do localStorage');
-  }, []);
+  }, [brand]);
   
-  // Effect para carregar dados quando o ano fiscal ou departamento mudarem
+  // Effect para carregar dados quando o ano fiscal, departamento ou marca mudarem
   useEffect(() => {
     // Não recarregar durante uma importação para evitar sobrescrita
     if (isImporting) {
@@ -339,13 +350,13 @@ export function VWFinancialDashboard() {
       return;
     }
     
-    console.log('🔄 Carregando dados para:', fiscalYear, '-', DEPARTMENT_LABELS[department]);
+    console.log(`🔄 Carregando dados para: ${brand.toUpperCase()} - ${fiscalYear} - ${DEPARTMENT_LABELS[department]}`);
     
     // Função para tentar carregar dados com retry
     const loadDataWithRetry = (retryCount = 0) => {
-      const newMetricsData = loadMetricsData(fiscalYear, department);
-      const newSharedMetricsData = loadSharedMetricsData(fiscalYear);
-      const newDreData = loadDREData(fiscalYear, department);
+      const newMetricsData = loadMetricsData(fiscalYear, department, brand);
+      const newSharedMetricsData = loadSharedMetricsData(fiscalYear, brand);
+      const newDreData = loadDREData(fiscalYear, department, brand);
       
       console.log('📊 Métricas carregadas:', newMetricsData);
       console.log('🔗 Métricas compartilhadas carregadas:', newSharedMetricsData);
@@ -356,9 +367,9 @@ export function VWFinancialDashboard() {
       console.log('📍 Origem dos dados:', newDreData ? 'localStorage' : 'padrão');
       
       // Verificar se existem dados no localStorage que deveriam ter sido encontrados
-      const metricsKey = `vw_metrics_${fiscalYear}_${department}`;
-      const sharedKey = `vw_metrics_shared_${fiscalYear}`;
-      const dreKey = `vw_dre_${fiscalYear}_${department}`;
+      const metricsKey = `${brand}_metrics_${fiscalYear}_${department}`;
+      const sharedKey = `${brand}_metrics_shared_${fiscalYear}`;
+      const dreKey = `${brand}_dre_${fiscalYear}_${department}`;
       const hasMetricsInStorage = localStorage.getItem(metricsKey) !== null;
       const hasSharedInStorage = localStorage.getItem(sharedKey) !== null;
       const hasDREInStorage = localStorage.getItem(dreKey) !== null;
@@ -391,8 +402,8 @@ export function VWFinancialDashboard() {
         setDreData(newDreData);
       } else {
         console.log('⚠️ Sem dados no localStorage, usando dados padrão/zerados');
-        // Se não houver dados salvos, usar dados iniciais apenas para 2025/usados
-        if (fiscalYear === 2025 && department === 'usados') {
+        // Se não houver dados salvos e for marca VW, usar dados iniciais apenas para 2025/usados
+        if (brand === 'vw' && fiscalYear === 2025 && department === 'usados') {
           setDreData(initialDreData);
         } else {
           // Para outros casos, criar estrutura zerada
@@ -411,7 +422,7 @@ export function VWFinancialDashboard() {
     
     saveSelectedFiscalYear(fiscalYear);
     saveSelectedDepartment(department);
-  }, [fiscalYear, department, isImporting]);
+  }, [fiscalYear, department, brand, isImporting]);
   
   // Effect para salvar dados de métricas quando mudarem (DESABILITADO para não sobrescrever importações)
   // As métricas são salvas apenas durante importação ou edição explícita
@@ -452,7 +463,7 @@ export function VWFinancialDashboard() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `vw-dados-adicionais-${fiscalYear}-${new Date().getTime()}.json`;
+    a.download = `${brand}-dados-adicionais-${fiscalYear}-${new Date().getTime()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -666,12 +677,12 @@ export function VWFinancialDashboard() {
         if (isSharedImport) {
           console.log('📤 Salvando como dados COMPARTILHADOS (visível em todos os departamentos)...');
           // Salvar como dados compartilhados
-          const sharedSaved = saveSharedMetricsData(fiscalYear, newData);
+          const sharedSaved = saveSharedMetricsData(fiscalYear, newData, brand);
           console.log('💾 Salvamento compartilhado:', sharedSaved ? '✅ Sucesso' : '❌ Falhou');
           
           if (sharedSaved) {
             // Recarregar dados compartilhados do localStorage para garantir sincronização
-            const reloadedSharedData = loadSharedMetricsData(fiscalYear);
+            const reloadedSharedData = loadSharedMetricsData(fiscalYear, brand);
             console.log('🔄 Dados compartilhados recarregados do localStorage:', reloadedSharedData);
             console.log('🔍 Verificação pós-importação:');
             console.log('  - Bonus Veículos Usados (ID 33):', reloadedSharedData.bonus?.veiculosUsados);
@@ -934,25 +945,25 @@ export function VWFinancialDashboard() {
         
         // Tentar parsear como JSON (formato de backup completo)
         if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
-          console.log('📥 Iniciando importação JSON...');
+          console.log(`📥 Iniciando importação JSON para marca: ${brand}...`);
           setIsImporting(true);
           
           try {
-            const success = importAllData(content);
+            const success = importAllData(content, brand);
             if (success) {
               console.log('✅ Dados importados do JSON e salvos no localStorage');
               
               // Verificar que realmente salvou no localStorage
-              const totalKeys = Object.keys(localStorage).filter(k => k.startsWith('vw_')).length;
-              console.log(`📦 Total de chaves VW no localStorage: ${totalKeys}`);
+              const totalKeys = Object.keys(localStorage).filter(k => k.startsWith(`${brand}_`)).length;
+              console.log(`📦 Total de chaves ${brand} no localStorage: ${totalKeys}`);
               
               // Aguardar um momento para garantir persistência e depois recarregar dados
               setTimeout(() => {
                 console.log('🔄 Recarregando dados após importação...');
                 
                 // Recarregar dados do localStorage para atualizar a interface
-                const reloadedMetrics = loadMetricsData(fiscalYear, department);
-                const reloadedDRE = loadDREData(fiscalYear, department);
+                const reloadedMetrics = loadMetricsData(fiscalYear, department, brand);
+                const reloadedDRE = loadDREData(fiscalYear, department, brand);
                 
                 console.log('🔍 Dados recarregados:');
                 console.log('  - Métricas:', reloadedMetrics);
@@ -1050,10 +1061,10 @@ export function VWFinancialDashboard() {
         
         // SALVAR NO LOCALSTORAGE para persistir os dados importados
         const isConsolidado = department === 'consolidado';
-        const saved = saveDREData(fiscalYear, importedData, department, isConsolidado);
+        const saved = saveDREData(fiscalYear, importedData, department, isConsolidado, brand);
         
         if (saved) {
-          console.log(`✅ DRE salvo no localStorage: vw_dre_${fiscalYear}_${department}`);
+          console.log(`✅ DRE salvo no localStorage: ${brand}_dre_${fiscalYear}_${department}`);
           
           // Aguardar um momento para garantir persistência e depois atualizar interface
           setTimeout(() => {
@@ -1062,7 +1073,7 @@ export function VWFinancialDashboard() {
             setIsImporting(false);
             
             // Verificar se os dados realmente persistiram
-            const verification = loadDREData(fiscalYear, department);
+            const verification = loadDREData(fiscalYear, department, brand);
             if (verification && verification.length > 0) {
               console.log('✅ Verificação: dados persistiram corretamente');
               alert(`${importedData.length} linhas importadas e salvas com sucesso!`);
@@ -1434,6 +1445,7 @@ export function VWFinancialDashboard() {
         initialYear1={fiscalYear}
         initialYear2={fiscalYear === 2024 ? 2025 : (fiscalYear - 1) as any}
         department={department}
+        brand={brand}
       />
     )
   }
@@ -1583,12 +1595,17 @@ export function VWFinancialDashboard() {
         <div className="max-w-[1800px] mx-auto px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="bg-gradient-to-br from-[#001E50] to-[#003875] rounded-xl p-3 shadow-lg">
-                <span className="text-white font-bold text-3xl">VW</span>
+              <div 
+                className="rounded-xl p-3 shadow-lg cursor-pointer hover:opacity-80 transition-opacity"
+                style={{ background: `linear-gradient(135deg, ${brandConfig.colors.primary}, ${brandConfig.colors.secondary})` }}
+                onClick={onChangeBrand}
+                title="Clique para trocar de marca"
+              >
+                <span className="text-white font-bold text-3xl">{brandConfig.shortName}</span>
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
-                  Dashboard Executivo
+                  Dashboard Executivo - {brandConfig.name}
                 </h1>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                   {DEPARTMENT_LABELS[department]} • Análise Gerencial • Atualizado em {new Date().toLocaleDateString('pt-BR')}
@@ -1596,6 +1613,20 @@ export function VWFinancialDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                onClick={onChangeBrand}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                style={{ 
+                  backgroundColor: `${brandConfig.colors.primary}10`,
+                  borderColor: `${brandConfig.colors.primary}40`,
+                  color: brandConfig.colors.primary
+                }}
+              >
+                <Building2 className="w-4 h-4" />
+                Trocar Marca
+              </Button>
               <Button
                 onClick={() => setCurrentView('comparison')}
                 variant="outline"
@@ -1628,7 +1659,14 @@ export function VWFinancialDashboard() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <Badge className="bg-blue-100 text-blue-800 border-blue-200 px-4 py-2 text-sm">
+              <Badge 
+                className="px-4 py-2 text-sm"
+                style={{ 
+                  backgroundColor: `${brandConfig.colors.primary}15`,
+                  color: brandConfig.colors.primary,
+                  borderColor: `${brandConfig.colors.primary}30`
+                }}
+              >
                 Confidencial
               </Badge>
             </div>
@@ -10085,7 +10123,7 @@ export function VWFinancialDashboard() {
                     onDataUpdate={(newData) => {
                       // Atualizar dados compartilhados em vez de dados específicos do departamento
                       setSharedMetricsData(newData);
-                      saveSharedMetricsData(fiscalYear, newData);
+                      saveSharedMetricsData(fiscalYear, newData, brand);
                       console.log('📊 Dados compartilhados atualizados:', newData);
                     }}
                     fileInputRef={metricsFileInputRef}

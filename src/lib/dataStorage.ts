@@ -3,6 +3,7 @@
  * 
  * Este módulo gerencia o armazenamento de dados de métricas de negócio e DRE.
  * Atualmente usa localStorage, mas está preparado para futura migração para banco de dados.
+ * Suporta múltiplas marcas (VW, Audi, VW Outros, Audi Outros).
  */
 
 import { businessMetricsData } from '../data/businessMetricsData';
@@ -39,6 +40,8 @@ import { businessMetricsDataAdministracao2024 } from '../data/businessMetricsDat
 import { businessMetricsDataAdministracao2025 } from '../data/businessMetricsDataAdministracao2025';
 import { businessMetricsDataAdministracao2026 } from '../data/businessMetricsDataAdministracao2026';
 import { businessMetricsDataAdministracao2027 } from '../data/businessMetricsDataAdministracao2027';
+
+import { type Brand, getSavedBrand } from './brands';
 
 // Tipo para departamento
 export type Department = 'novos' | 'vendaDireta' | 'usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'consolidado';
@@ -236,7 +239,10 @@ export interface DRELine {
 
 export type DREData = DRELine[];
 
-// Chaves de armazenamento
+// Re-export Brand type
+export type { Brand } from './brands';
+
+// Chaves de armazenamento (mantidas por retrocompatibilidade, usaremos funções com marca)
 const STORAGE_KEYS = {
   METRICS_2024: 'vw_metrics_2024',
   METRICS_2025: 'vw_metrics_2025',
@@ -251,9 +257,40 @@ const STORAGE_KEYS = {
 } as const;
 
 /**
- * Função auxiliar para obter dados padrão por departamento e ano
+ * Gera a chave de armazenamento com a marca
+ * Formato: {brand}_metrics_{year}_{department} ou {brand}_metrics_shared_{year}
  */
-function getDefaultDataForDepartment(department: Department, fiscalYear: 2024 | 2025 | 2026 | 2027): MetricsData {
+function getStorageKeyWithBrand(brand: Brand, baseKey: string): string {
+  return `${brand}_${baseKey}`;
+}
+
+/**
+ * Obtém a marca atual (do parâmetro ou do localStorage)
+ */
+function getCurrentBrand(brand?: Brand): Brand {
+  return brand || getSavedBrand();
+}
+
+/**
+ * Verifica se a marca é VW (para usar dados padrão existentes)
+ */
+function isVWBrand(brand: Brand): boolean {
+  return brand === 'vw';
+}
+
+/**
+ * Função auxiliar para obter dados padrão por departamento e ano
+ * Apenas VW tem dados padrão pré-carregados, outras marcas começam zeradas
+ */
+function getDefaultDataForDepartment(department: Department, fiscalYear: 2024 | 2025 | 2026 | 2027, brand?: Brand): MetricsData {
+  const currentBrand = getCurrentBrand(brand);
+  
+  // Apenas VW tem dados padrão pré-carregados
+  // Outras marcas começam com dados zerados
+  if (!isVWBrand(currentBrand)) {
+    return createEmptyMetricsData(fiscalYear);
+  }
+  
   const key = `${department}_${fiscalYear}`;
   
   // Para Usados (dados existentes)
@@ -336,14 +373,68 @@ function getDefaultDataForDepartment(department: Department, fiscalYear: 2024 | 
 }
 
 /**
+ * Cria dados de métricas zerados para marcas que não são VW
+ * Mantém a estrutura completa mas com todos os valores zerados
+ */
+function createEmptyMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027): MetricsData {
+  const emptyArray = (): number[] => Array(12).fill(0);
+  const yearSuffix = fiscalYear.toString().slice(-2);
+  
+  return {
+    months: [`Jan/${yearSuffix}`, `Fev/${yearSuffix}`, `Mar/${yearSuffix}`, `Abr/${yearSuffix}`, `Mai/${yearSuffix}`, `Jun/${yearSuffix}`, `Jul/${yearSuffix}`, `Ago/${yearSuffix}`, `Set/${yearSuffix}`, `Out/${yearSuffix}`, `Nov/${yearSuffix}`, `Dez/${yearSuffix}`],
+    vendasNovos: { vendas: emptyArray(), volumeTrocas: emptyArray(), percentualTrocas: emptyArray() },
+    vendasNovosVD: { vendas: emptyArray(), volumeTrocas: emptyArray(), percentualTrocas: emptyArray() },
+    vendasUsados: { vendas: emptyArray(), volumeTrocas: emptyArray(), percentualTrocas: emptyArray() },
+    volumeVendas: { usados: emptyArray(), repasse: emptyArray(), percentualRepasse: emptyArray() },
+    estoqueNovos: { quantidade: emptyArray(), valor: emptyArray(), aPagar: emptyArray(), pagos: emptyArray() },
+    estoqueUsados: { quantidade: emptyArray(), valor: emptyArray(), aPagar: emptyArray(), pagos: emptyArray() },
+    estoquePecas: { quantidade: emptyArray(), valor: emptyArray(), aPagar: emptyArray(), pagos: emptyArray() },
+    vendasPecas: {
+      balcao: { vendas: emptyArray(), lucro: emptyArray(), margem: emptyArray() },
+      oficina: { vendas: emptyArray(), lucro: emptyArray(), margem: emptyArray() },
+      funilaria: { vendas: emptyArray(), lucro: emptyArray(), margem: emptyArray() },
+      acessorios: { vendas: emptyArray(), lucro: emptyArray(), margem: emptyArray() },
+      seguradoraTotal: { vendas: emptyArray(), lucro: emptyArray(), margem: emptyArray() }
+    },
+    seguradoras: {
+      portoSeguro: { vendas: emptyArray(), lucro: emptyArray(), margem: emptyArray() },
+      azul: { vendas: emptyArray(), lucro: emptyArray(), margem: emptyArray() },
+      allianz: { vendas: emptyArray(), lucro: emptyArray(), margem: emptyArray() },
+      tokioMarine: { vendas: emptyArray(), lucro: emptyArray(), margem: emptyArray() }
+    },
+    mercadoLivre: { vendas: emptyArray(), lucro: emptyArray(), margem: emptyArray() },
+    juros: { veiculosNovos: emptyArray(), veiculosUsados: emptyArray(), pecas: emptyArray(), emprestimosBancarios: emptyArray(), contratoMutuo: emptyArray() },
+    custos: { garantia: emptyArray(), reparoUsados: emptyArray(), ticketMedioReparo: emptyArray() },
+    despesasCartao: { novos: emptyArray(), vendaDireta: emptyArray(), usados: emptyArray(), pecas: emptyArray(), oficina: emptyArray(), funilaria: emptyArray(), administracao: emptyArray() },
+    bonus: { veiculosNovos: emptyArray(), veiculosUsados: emptyArray(), pecas: emptyArray(), oficina: emptyArray(), funilaria: emptyArray(), administracao: emptyArray() },
+    receitasFinanciamento: { veiculosNovos: emptyArray(), veiculosUsados: emptyArray() },
+    creditosICMS: { novos: emptyArray(), pecas: emptyArray(), administracao: emptyArray() },
+    creditosPISCOFINS: { administracao: emptyArray() },
+    receitaBlindagem: emptyArray(),
+    receitaDespachanteUsados: emptyArray(),
+    receitaDespachanteNovos: emptyArray(),
+    margensOperacionais: { novos: emptyArray(), usados: emptyArray(), oficina: emptyArray(), pecas: emptyArray() },
+    receitaVendas: { novos: emptyArray(), usados: emptyArray() },
+    resultadoFinanceiro: { receitas: emptyArray(), despesas: emptyArray(), resultado: emptyArray() },
+    despesasPessoal: { custo: emptyArray(), hc: emptyArray() },
+    receitasOficina: { garantia: emptyArray(), clientePago: emptyArray(), interno: emptyArray() },
+    receitasPecas: { balcao: emptyArray(), oficina: emptyArray(), externo: emptyArray() },
+    fluxoCaixa: { recebimentos: emptyArray(), pagamentos: emptyArray(), saldo: emptyArray() },
+    capital: { capitalProprio: emptyArray(), capitalTerceiros: emptyArray(), capitalTotal: emptyArray() }
+  };
+}
+
+/**
  * Calcula os dados consolidados somando todos os departamentos
  */
-function calculateConsolidatedData(fiscalYear: 2024 | 2025 | 2026 | 2027): MetricsData {
+function calculateConsolidatedData(fiscalYear: 2024 | 2025 | 2026 | 2027, brand?: Brand): MetricsData {
+  const currentBrand = getCurrentBrand(brand);
   const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
   
   // Carrega dados de cada departamento, evitando recursão infinita
   const allData = departments.map(dept => {
-    const key = `vw_metrics_${fiscalYear}_${dept}`;
+    // Usa chave com marca
+    const key = `${currentBrand}_metrics_${fiscalYear}_${dept}`;
     const stored = localStorage.getItem(key);
     
     if (stored) {
@@ -355,7 +446,7 @@ function calculateConsolidatedData(fiscalYear: 2024 | 2025 | 2026 | 2027): Metri
     }
     
     // Retorna dados padrão do departamento
-    return getDefaultDataForDepartment(dept, fiscalYear);
+    return getDefaultDataForDepartment(dept, fiscalYear, currentBrand);
   });
   
   // Filtra dados válidos
@@ -522,15 +613,20 @@ function calculateConsolidatedData(fiscalYear: 2024 | 2025 | 2026 | 2027): Metri
 
 /**
  * Carrega os dados de métricas de um ano fiscal específico e departamento
+ * @param fiscalYear - Ano fiscal (2024-2027)
+ * @param department - Departamento
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
-export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: Department = 'usados'): MetricsData {
+export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: Department = 'usados', brand?: Brand): MetricsData {
+  const currentBrand = getCurrentBrand(brand);
+  
   try {
     // Se for consolidado, calcula dinamicamente
     if (department === 'consolidado') {
-      return calculateConsolidatedData(fiscalYear);
+      return calculateConsolidatedData(fiscalYear, currentBrand);
     }
     
-    const key = `vw_metrics_${fiscalYear}_${department}`;
+    const key = `${currentBrand}_metrics_${fiscalYear}_${department}`;
     const stored = localStorage.getItem(key);
     
     // Se houver dados salvos, retorna eles (inclusive dados importados)
@@ -538,22 +634,26 @@ export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, departmen
       return JSON.parse(stored);
     }
     
-    return getDefaultDataForDepartment(department, fiscalYear);
+    return getDefaultDataForDepartment(department, fiscalYear, currentBrand);
   } catch (error) {
-    console.error(`Erro ao carregar dados de métricas de ${fiscalYear} - ${department}:`, error);
-    return getDefaultDataForDepartment(department, fiscalYear);
+    console.error(`Erro ao carregar dados de métricas de ${fiscalYear} - ${department} - ${currentBrand}:`, error);
+    return getDefaultDataForDepartment(department, fiscalYear, currentBrand);
   }
 }
 
 /**
  * Carrega os dados de métricas compartilhadas (Dados Adicionais) que são iguais para todos os departamentos
+ * @param fiscalYear - Ano fiscal (2024-2027)
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
-export function loadSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027): MetricsData {
+export function loadSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, brand?: Brand): MetricsData {
+  const currentBrand = getCurrentBrand(brand);
+  
   try {
-    const key = `vw_metrics_shared_${fiscalYear}`;
+    const key = `${currentBrand}_metrics_shared_${fiscalYear}`;
     const stored = localStorage.getItem(key);
     
-    console.log(`🔍 loadSharedMetricsData(${fiscalYear}):`);
+    console.log(`🔍 loadSharedMetricsData(${fiscalYear}, ${currentBrand}):`);
     console.log(`  - Chave: ${key}`);
     console.log(`  - Encontrou no localStorage: ${stored ? 'SIM' : 'NÃO'}`);
     
@@ -566,17 +666,23 @@ export function loadSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027): Me
     
     // Senão, retorna dados padrão baseados no ano (usa dados de 'usados' como base)
     console.log(`  - ⚠️ Retornando dados padrão para ${fiscalYear}`);
-    return getDefaultDataForDepartment('usados', fiscalYear);
+    return getDefaultDataForDepartment('usados', fiscalYear, currentBrand);
   } catch (error) {
-    console.error(`Erro ao carregar dados de métricas compartilhadas de ${fiscalYear}:`, error);
-    return getDefaultDataForDepartment('usados', fiscalYear);
+    console.error(`Erro ao carregar dados de métricas compartilhadas de ${fiscalYear} - ${currentBrand}:`, error);
+    return getDefaultDataForDepartment('usados', fiscalYear, currentBrand);
   }
 }
 
 /**
  * Salva os dados de métricas de um ano fiscal específico e departamento
+ * @param fiscalYear - Ano fiscal (2024-2027)
+ * @param data - Dados de métricas
+ * @param department - Departamento
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
-export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: MetricsData, department: Department = 'usados'): boolean {
+export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: MetricsData, department: Department = 'usados', brand?: Brand): boolean {
+  const currentBrand = getCurrentBrand(brand);
+  
   try {
     // Não permite salvar dados do consolidado (é calculado)
     if (department === 'consolidado') {
@@ -584,21 +690,26 @@ export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: Met
       return false;
     }
     
-    const key = `vw_metrics_${fiscalYear}_${department}`;
+    const key = `${currentBrand}_metrics_${fiscalYear}_${department}`;
     localStorage.setItem(key, JSON.stringify(data));
     return true;
   } catch (error) {
-    console.error(`Erro ao salvar dados de métricas de ${fiscalYear} - ${department}:`, error);
+    console.error(`Erro ao salvar dados de métricas de ${fiscalYear} - ${department} - ${currentBrand}:`, error);
     return false;
   }
 }
 
 /**
  * Salva os dados de métricas compartilhadas (Dados Adicionais) que são iguais para todos os departamentos
+ * @param fiscalYear - Ano fiscal (2024-2027)
+ * @param data - Dados de métricas
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
-export function saveSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: MetricsData): boolean {
+export function saveSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: MetricsData, brand?: Brand): boolean {
+  const currentBrand = getCurrentBrand(brand);
+  
   try {
-    const key = `vw_metrics_shared_${fiscalYear}`;
+    const key = `${currentBrand}_metrics_shared_${fiscalYear}`;
     localStorage.setItem(key, JSON.stringify(data));
     
     console.log(`✅ Dados compartilhados salvos: ${key}`);
@@ -613,20 +724,25 @@ export function saveSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, dat
       return false;
     }
   } catch (error) {
-    console.error(`Erro ao salvar dados de métricas compartilhadas de ${fiscalYear}:`, error);
+    console.error(`Erro ao salvar dados de métricas compartilhadas de ${fiscalYear} - ${currentBrand}:`, error);
     return false;
   }
 }
 
 /**
  * Carrega os dados de DRE de um ano fiscal específico e departamento
+ * @param fiscalYear - Ano fiscal (2024-2027)
+ * @param department - Departamento
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
-export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: Department = 'usados'): DREData | null {
+export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: Department = 'usados', brand?: Brand): DREData | null {
+  const currentBrand = getCurrentBrand(brand);
+  
   try {
-    const key = `vw_dre_${fiscalYear}_${department}`;
+    const key = `${currentBrand}_dre_${fiscalYear}_${department}`;
     const stored = localStorage.getItem(key);
     
-    console.log(`🔍 loadDREData(${fiscalYear}, ${department}):`);
+    console.log(`🔍 loadDREData(${fiscalYear}, ${department}, ${currentBrand}):`);
     console.log(`  - Chave: ${key}`);
     console.log(`  - Encontrou no localStorage: ${stored ? 'SIM' : 'NÃO'}`);
     
@@ -655,9 +771,10 @@ export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: D
 /**
  * Calcula DRE consolidada somando todos os departamentos
  */
-function calculateConsolidatedDRE(fiscalYear: 2024 | 2025 | 2026 | 2027): DREData | null {
+function calculateConsolidatedDRE(fiscalYear: 2024 | 2025 | 2026 | 2027, brand?: Brand): DREData | null {
+  const currentBrand = getCurrentBrand(brand);
   const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
-  const allDREs = departments.map(dept => loadDREData(fiscalYear, dept)).filter(dre => dre !== null) as DREData[];
+  const allDREs = departments.map(dept => loadDREData(fiscalYear, dept, currentBrand)).filter(dre => dre !== null) as DREData[];
   
   if (allDREs.length === 0) return null;
   
@@ -685,8 +802,15 @@ function calculateConsolidatedDRE(fiscalYear: 2024 | 2025 | 2026 | 2027): DREDat
 
 /**
  * Salva os dados de DRE de um ano fiscal específico e departamento
+ * @param fiscalYear - Ano fiscal (2024-2027)
+ * @param data - Dados de DRE
+ * @param department - Departamento
+ * @param forceConsolidated - Permite salvar consolidado (para dados importados)
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
-export function saveDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: DREData, department: Department = 'usados', forceConsolidated: boolean = false): boolean {
+export function saveDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: DREData, department: Department = 'usados', forceConsolidated: boolean = false, brand?: Brand): boolean {
+  const currentBrand = getCurrentBrand(brand);
+  
   try {
     // Permite salvar dados do consolidado apenas se forceConsolidated for true (dados importados)
     if (department === 'consolidado' && !forceConsolidated) {
@@ -694,11 +818,11 @@ export function saveDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: DREData
       return false;
     }
     
-    const key = `vw_dre_${fiscalYear}_${department}`;
+    const key = `${currentBrand}_dre_${fiscalYear}_${department}`;
     localStorage.setItem(key, JSON.stringify(data));
     return true;
   } catch (error) {
-    console.error(`Erro ao salvar dados de DRE de ${fiscalYear} - ${department}:`, error);
+    console.error(`Erro ao salvar dados de DRE de ${fiscalYear} - ${department} - ${currentBrand}:`, error);
     return false;
   }
 }
@@ -766,38 +890,48 @@ export function saveSelectedDepartment(department: Department): boolean {
 
 /**
  * Limpa todos os dados de um ano fiscal específico e departamento
+ * @param fiscalYear - Ano fiscal
+ * @param department - Departamento (opcional, limpa todos se não fornecido)
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
-export function clearFiscalYearData(fiscalYear: 2024 | 2025 | 2026 | 2027, department?: Department): boolean {
+export function clearFiscalYearData(fiscalYear: 2024 | 2025 | 2026 | 2027, department?: Department, brand?: Brand): boolean {
+  const currentBrand = getCurrentBrand(brand);
+  
   try {
     if (department) {
-      const metricsKey = `vw_metrics_${fiscalYear}_${department}`;
-      const dreKey = `vw_dre_${fiscalYear}_${department}`;
+      const metricsKey = `${currentBrand}_metrics_${fiscalYear}_${department}`;
+      const dreKey = `${currentBrand}_dre_${fiscalYear}_${department}`;
       localStorage.removeItem(metricsKey);
       localStorage.removeItem(dreKey);
     } else {
       // Limpa todos os departamentos daquele ano
       const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
       departments.forEach(dept => {
-        const metricsKey = `vw_metrics_${fiscalYear}_${dept}`;
-        const dreKey = `vw_dre_${fiscalYear}_${dept}`;
+        const metricsKey = `${currentBrand}_metrics_${fiscalYear}_${dept}`;
+        const dreKey = `${currentBrand}_dre_${fiscalYear}_${dept}`;
         localStorage.removeItem(metricsKey);
         localStorage.removeItem(dreKey);
       });
     }
     return true;
   } catch (error) {
-    console.error(`Erro ao limpar dados de ${fiscalYear}:`, error);
+    console.error(`Erro ao limpar dados de ${fiscalYear} - ${currentBrand}:`, error);
     return false;
   }
 }
 
 /**
  * Verifica se há dados salvos para um ano fiscal específico e departamento
+ * @param fiscalYear - Ano fiscal
+ * @param department - Departamento
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
-export function hasStoredData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: Department = 'usados'): boolean {
-  const metricsKey = `vw_metrics_${fiscalYear}_${department}`;
-  const dreKey = `vw_dre_${fiscalYear}_${department}`;
-  const sharedKey = `vw_metrics_shared_${fiscalYear}`;
+export function hasStoredData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: Department = 'usados', brand?: Brand): boolean {
+  const currentBrand = getCurrentBrand(brand);
+  
+  const metricsKey = `${currentBrand}_metrics_${fiscalYear}_${department}`;
+  const dreKey = `${currentBrand}_dre_${fiscalYear}_${department}`;
+  const sharedKey = `${currentBrand}_metrics_shared_${fiscalYear}`;
   
   return localStorage.getItem(metricsKey) !== null || 
          localStorage.getItem(dreKey) !== null ||
@@ -816,8 +950,10 @@ export async function migrateToDatabase(): Promise<boolean> {
 
 /**
  * Exporta todos os dados para backup
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
-export function exportAllData(): string {
+export function exportAllData(brand?: Brand): string {
+  const currentBrand = getCurrentBrand(brand);
   const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao', 'consolidado'];
   const years: (2024 | 2025 | 2026 | 2027)[] = [2024, 2025, 2026, 2027];
   
@@ -825,6 +961,7 @@ export function exportAllData(): string {
     selectedYear: loadSelectedFiscalYear(),
     selectedDepartment: loadSelectedDepartment(),
     exportDate: new Date().toISOString(),
+    brand: currentBrand, // Inclui a marca no export para referência
     data: {},
     sharedData: {} // Nova seção para dados compartilhados
   };
@@ -834,8 +971,8 @@ export function exportAllData(): string {
     data.data[year] = {};
     departments.forEach(dept => {
       data.data[year][dept] = {
-        metrics: loadMetricsData(year, dept),
-        dre: loadDREData(year, dept)
+        metrics: loadMetricsData(year, dept, currentBrand),
+        dre: loadDREData(year, dept, currentBrand)
       };
     });
   });
@@ -843,7 +980,7 @@ export function exportAllData(): string {
   // Dados compartilhados (novos)
   years.forEach(year => {
     data.sharedData[year] = {
-      metrics: loadSharedMetricsData(year)
+      metrics: loadSharedMetricsData(year, currentBrand)
     };
   });
   
@@ -852,10 +989,14 @@ export function exportAllData(): string {
 
 /**
  * Importa todos os dados de um backup
+ * @param jsonString - JSON string com os dados
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
-export function importAllData(jsonString: string): boolean {
+export function importAllData(jsonString: string, brand?: Brand): boolean {
+  const currentBrand = getCurrentBrand(brand);
+  
   try {
-    console.log('📥 Iniciando importação de dados...');
+    console.log(`📥 Iniciando importação de dados para marca: ${currentBrand}...`);
     const backup = JSON.parse(jsonString);
     
     if (!backup.data) {
@@ -883,7 +1024,7 @@ export function importAllData(jsonString: string): boolean {
         if (data.metrics) {
           totalItems++;
           try {
-            const metricsKey = `vw_metrics_${fiscalYear}_${department}`;
+            const metricsKey = `${currentBrand}_metrics_${fiscalYear}_${department}`;
             localStorage.setItem(metricsKey, JSON.stringify(data.metrics));
             
             // Verificar se realmente salvou
@@ -907,7 +1048,7 @@ export function importAllData(jsonString: string): boolean {
         if (data.dre) {
           totalItems++;
           try {
-            const dreKey = `vw_dre_${fiscalYear}_${department}`;
+            const dreKey = `${currentBrand}_dre_${fiscalYear}_${department}`;
             localStorage.setItem(dreKey, JSON.stringify(data.dre));
             
             // Verificar se realmente salvou
@@ -943,7 +1084,7 @@ export function importAllData(jsonString: string): boolean {
         if (data.metrics) {
           totalItems++;
           try {
-            const saved = saveSharedMetricsData(fiscalYear, data.metrics);
+            const saved = saveSharedMetricsData(fiscalYear, data.metrics, currentBrand);
             if (saved) {
               console.log(`✅ Dados compartilhados importados: ${fiscalYear}`);
               successCount++;
@@ -1003,35 +1144,70 @@ export function importAllData(jsonString: string): boolean {
 
 /**
  * Limpa os dados de um ano fiscal específico (força volta aos dados padrão)
+ * @param fiscalYear - Ano fiscal
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
-export function clearYearData(fiscalYear: 2024 | 2025 | 2026 | 2027): void {
+export function clearYearData(fiscalYear: 2024 | 2025 | 2026 | 2027, brand?: Brand): void {
+  const currentBrand = getCurrentBrand(brand);
+  
   try {
     const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
     departments.forEach(dept => {
-      const metricsKey = `vw_metrics_${fiscalYear}_${dept}`;
-      const dreKey = `vw_dre_${fiscalYear}_${dept}`;
+      const metricsKey = `${currentBrand}_metrics_${fiscalYear}_${dept}`;
+      const dreKey = `${currentBrand}_dre_${fiscalYear}_${dept}`;
       localStorage.removeItem(metricsKey);
       localStorage.removeItem(dreKey);
     });
     
-    console.log(`✅ Dados do ano ${fiscalYear} limpos com sucesso`);
+    // Também limpa dados compartilhados
+    const sharedKey = `${currentBrand}_metrics_shared_${fiscalYear}`;
+    localStorage.removeItem(sharedKey);
+    
+    console.log(`✅ Dados do ano ${fiscalYear} da marca ${currentBrand} limpos com sucesso`);
   } catch (error) {
-    console.error(`Erro ao limpar dados de ${fiscalYear}:`, error);
+    console.error(`Erro ao limpar dados de ${fiscalYear} - ${currentBrand}:`, error);
   }
 }
 
 /**
- * Limpa todos os dados de todos os anos fiscais e departamentos
+ * Limpa todos os dados de uma marca específica
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
-export function clearAllData(): void {
+export function clearAllData(brand?: Brand): void {
+  const currentBrand = getCurrentBrand(brand);
+  
   try {
     Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('vw_')) {
+      if (key.startsWith(`${currentBrand}_`)) {
         localStorage.removeItem(key);
       }
     });
-    console.log('✅ Todos os dados foram limpos com sucesso');
+    console.log(`✅ Todos os dados da marca ${currentBrand} foram limpos com sucesso`);
   } catch (error) {
-    console.error('Erro ao limpar todos os dados:', error);
+    console.error(`Erro ao limpar todos os dados da marca ${currentBrand}:`, error);
+  }
+}
+
+/**
+ * Limpa TODOS os dados de TODAS as marcas (cuidado!)
+ */
+export function clearAllBrandsData(): void {
+  try {
+    const brands: Brand[] = ['vw', 'audi', 'vw_outros', 'audi_outros'];
+    brands.forEach(brand => {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(`${brand}_`)) {
+          localStorage.removeItem(key);
+        }
+      });
+    });
+    
+    // Também limpa configurações
+    localStorage.removeItem(STORAGE_KEYS.SELECTED_YEAR);
+    localStorage.removeItem(STORAGE_KEYS.SELECTED_DEPARTMENT);
+    
+    console.log('✅ Todos os dados de todas as marcas foram limpos com sucesso');
+  } catch (error) {
+    console.error('Erro ao limpar todos os dados de todas as marcas:', error);
   }
 }
