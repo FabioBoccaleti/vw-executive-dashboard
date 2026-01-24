@@ -193,7 +193,30 @@ export function DetailedMetricsTable({ data = businessMetricsData, onDataUpdate,
                 const isMainRow = fieldIndex === 0;
                 const isPercentageRow = field.includes('percentual') || field === 'margem';
                 const rowBg = isMainRow ? metric.bg : (isPercentageRow ? 'bg-slate-50 dark:bg-slate-800/50' : 'bg-white dark:bg-slate-900');
-                const values = (metric.data[field as keyof typeof metric.data] as number[]) || [];
+                
+                // Garantir que values é sempre um array
+                let values: number[] = [];
+                const fieldData = metric.data[field as keyof typeof metric.data];
+                
+                if (Array.isArray(fieldData)) {
+                  // Caso 1: fieldData já é um array direto
+                  values = fieldData;
+                } else if (fieldData && typeof fieldData === 'object' && 'valor' in fieldData) {
+                  // Caso 2: fieldData é um objeto com propriedade 'valor' que contém o array
+                  // Isso acontece para métricas como juros, despesasCartao, bonus, etc.
+                  const innerValue = (fieldData as any).valor;
+                  if (Array.isArray(innerValue)) {
+                    values = innerValue;
+                  } else {
+                    values = new Array(12).fill(0);
+                  }
+                } else if (fieldData !== undefined && fieldData !== null) {
+                  // Caso 3: Dados inesperados
+                  values = new Array(12).fill(0);
+                } else {
+                  // Caso 4: Sem dados
+                  values = new Array(12).fill(0);
+                }
                 
                 return (
                   <tr key={`${metric.id}-${field}`} className={`${rowBg} ${isMainRow ? 'font-semibold' : ''}`}>

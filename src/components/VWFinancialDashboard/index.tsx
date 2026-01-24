@@ -586,10 +586,14 @@ export function VWFinancialDashboard() {
           
           const parsedValues = values.map(v => parseValue(v, field));
           
-          // Navegar no objeto usando o dataPath
+          // Navegar no objeto usando o dataPath e garantir que os objetos intermediários existam
           let target: any = newData;
           for (let i = 0; i < metric.dataPath.length - 1; i++) {
-            target = target[metric.dataPath[i]];
+            const pathPart = metric.dataPath[i];
+            if (!target[pathPart]) {
+              target[pathPart] = {};
+            }
+            target = target[pathPart];
           }
           
           // Para métricas 44, 45, 46 que são arrays diretos (apenas se tiverem apenas 1 campo 'valor')
@@ -598,8 +602,14 @@ export function VWFinancialDashboard() {
           } else {
             const lastPath = metric.dataPath[metric.dataPath.length - 1];
             if (metric.dataPath.length === 1) {
+              if (!target[lastPath]) {
+                target[lastPath] = {};
+              }
               target[lastPath][field] = parsedValues;
             } else {
+              if (!target[lastPath]) {
+                target[lastPath] = {};
+              }
               target[lastPath][field] = parsedValues;
             }
           }
