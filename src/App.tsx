@@ -6,16 +6,14 @@ import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
 
 function App() {
   const [brand, setBrand] = useState<Brand | null>(null)
-  const [showBrandSelector, setShowBrandSelector] = useState(false)
+  // Sempre mostra o seletor de marca ao iniciar a aplicação
+  const [showBrandSelector, setShowBrandSelector] = useState(true)
   
   useEffect(() => {
-    // Verifica se já existe uma marca salva
+    // Carrega a marca salva para pré-selecionar no seletor, mas não navega automaticamente
     const savedBrand = getSavedBrand()
     if (savedBrand) {
       setBrand(savedBrand)
-      applyBrandTheme(savedBrand)
-    } else {
-      setShowBrandSelector(true)
     }
   }, [])
   
