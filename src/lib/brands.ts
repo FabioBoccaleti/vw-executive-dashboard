@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'vw_outros' | 'audi_outros';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros';
 
 // Interface de configuração visual da marca
 export interface BrandConfig {
@@ -60,6 +60,31 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-primary-light': '#e8f4fc',
       '--brand-secondary': '#00b0f0',
       '--brand-accent': '#6eb9e8',
+    }
+  },
+  consolidado: {
+    id: 'consolidado',
+    name: 'Consolidado',
+    shortName: 'Consolidado',
+    colors: {
+      primary: '#7c3aed',
+      primaryHover: '#6d28d9',
+      primaryLight: '#f5f3ff',
+      secondary: '#a78bfa',
+      accent: '#8b5cf6',
+      headerBg: 'bg-[#7c3aed]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#7c3aed] hover:bg-[#6d28d9]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-violet-100 dark:bg-violet-900/30',
+      badgeText: 'text-violet-800 dark:text-violet-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#7c3aed',
+      '--brand-primary-hover': '#6d28d9',
+      '--brand-primary-light': '#f5f3ff',
+      '--brand-secondary': '#a78bfa',
+      '--brand-accent': '#8b5cf6',
     }
   },
   audi: {
@@ -139,8 +164,8 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
   },
 };
 
-// Lista de marcas disponíveis (para iteração)
-export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'vw_outros', 'audi_outros'];
+// Lista de marcas disponíveis (para iteração) - ordem de exibição
+export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
 
 // Chave de armazenamento para marca selecionada
 export const SELECTED_BRAND_KEY = 'selected_brand';

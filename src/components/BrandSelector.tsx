@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BRAND_CONFIGS, AVAILABLE_BRANDS, type Brand } from '@/lib/brands';
-import { Building2, Car, ChevronRight } from 'lucide-react';
+import { Building2, Car, ChevronRight, Layers } from 'lucide-react';
 
 interface BrandSelectorProps {
   onSelectBrand: (brand: Brand) => void;
@@ -30,17 +30,20 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
   };
 
   const getBrandIcon = (brand: Brand) => {
-    if (brand.includes('vw')) {
-      return <Car className="w-12 h-12" />;
+    if (brand === 'consolidado') {
+      return <Layers className="w-8 h-8" />;
     }
-    return <Building2 className="w-12 h-12" />;
+    if (brand.includes('vw')) {
+      return <Car className="w-8 h-8" />;
+    }
+    return <Building2 className="w-8 h-8" />;
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl">
+      <div className="w-full max-w-6xl">
         {/* Header */}
-        <div className="text-center mb-10">
+        <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-slate-800 dark:text-white mb-3">
             Dashboard Financeiro
           </h1>
@@ -50,7 +53,7 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
         </div>
 
         {/* Brand Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
           {AVAILABLE_BRANDS.map((brand) => {
             const config = BRAND_CONFIGS[brand];
             const isSelected = selectedBrand === brand;
@@ -76,10 +79,10 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
                 onMouseEnter={() => setHoveredBrand(brand)}
                 onMouseLeave={() => setHoveredBrand(null)}
               >
-                <CardContent className="p-6 flex flex-col items-center justify-center min-h-[180px]">
+                <CardContent className="p-4 flex flex-col items-center justify-center min-h-[140px]">
                   {/* Brand Icon with color */}
                   <div
-                    className="mb-4 p-4 rounded-full transition-colors duration-300"
+                    className="mb-3 p-3 rounded-full transition-colors duration-300"
                     style={{
                       backgroundColor: isSelected || isHovered 
                         ? config.colors.primaryLight 
@@ -92,7 +95,7 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
 
                   {/* Brand Name */}
                   <h3
-                    className="text-xl font-bold text-center transition-colors duration-300"
+                    className="text-base font-bold text-center transition-colors duration-300"
                     style={{
                       color: isSelected || isHovered 
                         ? config.colors.primary 
@@ -105,7 +108,7 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
                   {/* Selection indicator */}
                   {isSelected && (
                     <div
-                      className="mt-3 px-3 py-1 rounded-full text-xs font-semibold text-white"
+                      className="mt-2 px-2 py-0.5 rounded-full text-xs font-semibold text-white"
                       style={{ backgroundColor: config.colors.primary }}
                     >
                       Selecionado

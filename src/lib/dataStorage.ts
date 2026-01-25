@@ -42,6 +42,7 @@ import { businessMetricsDataAdministracao2026 } from '../data/businessMetricsDat
 import { businessMetricsDataAdministracao2027 } from '../data/businessMetricsDataAdministracao2027';
 
 import { type Brand, getSavedBrand } from './brands';
+import { consolidateMetricsData } from './dataConsolidation';
 
 // Tipo para departamento
 export type Department = 'novos' | 'vendaDireta' | 'usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'consolidado';
@@ -621,7 +622,14 @@ export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, departmen
   const currentBrand = getCurrentBrand(brand);
   
   try {
-    // Se for consolidado, calcula dinamicamente
+    // Se a marca for 'consolidado', soma dados de VW + Audi
+    if (currentBrand === 'consolidado') {
+      const vwData = loadMetricsData(fiscalYear, department, 'vw');
+      const audiData = loadMetricsData(fiscalYear, department, 'audi');
+      return consolidateMetricsData(vwData, audiData);
+    }
+    
+    // Se for consolidado de departamentos, calcula dinamicamente
     if (department === 'consolidado') {
       return calculateConsolidatedData(fiscalYear, currentBrand);
     }
@@ -739,6 +747,31 @@ export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: D
   const currentBrand = getCurrentBrand(brand);
   
   try {
+    // Se a marca for 'consolidado', soma dados de VW + Audi
+    if (currentBrand === 'consolidado') {
+      const vwDRE = loadDREData(fiscalYear, department, 'vw');
+      const audiDRE = loadDREData(fiscalYear, department, 'audi');
+      
+      // Se ambos os DREs existirem, consolida
+      if (vwDRE && audiDRE) {
+        return vwDRE.map((line, index) => {
+          const meses = line.meses || [];
+          const summedMeses = meses.map((vwValue, monthIndex) => {
+            const audiValue = audiDRE[index]?.meses?.[monthIndex] || 0;
+            return vwValue + audiValue;
+          });
+          
+          return {
+            ...line,
+            meses: summedMeses
+          };
+        });
+      }
+      
+      // Se apenas um existir, retorna ele
+      return vwDRE || audiDRE;
+    }
+    
     const key = `${currentBrand}_dre_${fiscalYear}_${department}`;
     const stored = localStorage.getItem(key);
     
@@ -757,7 +790,7 @@ export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: D
     // Se for consolidado e não houver dados salvos, calcula dinamicamente
     if (department === 'consolidado') {
       console.log(`  - 📊 Calculando DRE consolidada dinamicamente`);
-      return calculateConsolidatedDRE(fiscalYear);
+      return calculateConsolidatedDRE(fiscalYear, currentBrand);
     }
     
     console.log(`  - ⚠️ Retornando null (sem dados)`);
