@@ -2152,6 +2152,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-[10px] opacity-80">Métricas Completas</span>
                 </button>
 
+                {department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowTrocasChart(!showTrocasChart)
@@ -2174,7 +2175,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Volume de Troca</span>
                   <span className="text-[10px] opacity-80">Análise de Conversão</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowRepasseChart(!showRepasseChart)
@@ -2197,7 +2200,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">% de Repasse</span>
                   <span className="text-[10px] opacity-80">Vendas de Repasse</span>
                 </button>
+                )}
 
+                {department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowEstoqueNovos(!showEstoqueNovos)
@@ -2220,7 +2225,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Estoque de Novos</span>
                   <span className="text-[10px] opacity-80">Evolução do Estoque</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowEstoqueUsados(!showEstoqueUsados)
@@ -2243,7 +2250,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Estoque de Usados</span>
                   <span className="text-[10px] opacity-80">Evolução do Estoque</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowEstoquePecas(!showEstoquePecas)
@@ -2266,7 +2275,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Estoque de Peças</span>
                   <span className="text-[10px] opacity-80">Evolução do Estoque</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowVendaPecas(!showVendaPecas)
@@ -2289,7 +2300,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Venda de Peças</span>
                   <span className="text-[10px] opacity-80">Por Departamento</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowVendasSeguradora(!showVendasSeguradora)
@@ -2311,8 +2324,10 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Vendas por Seguradora</span>
                   <span className="text-[10px] opacity-80">Performance Seguradoras</span>
                 </button>
+                )}
                 
                 {/* Botão para Vendas Mercado Livre */}
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowVendasMercadoLivre(!showVendasMercadoLivre)
@@ -2337,7 +2352,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Vendas Mercado Livre</span>
                   <span className="text-[10px] opacity-80">Performance Marketplace</span>
                 </button>
+                )}
 
+                {department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowDespesasFinanceirasNovos(!showDespesasFinanceirasNovos)
@@ -2362,7 +2379,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Despesas Financeiras Novos</span>
                   <span className="text-[10px] opacity-80">Juros e Despesas</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowDespesasFinanceirasUsados(!showDespesasFinanceirasUsados)
@@ -2388,7 +2407,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Despesas Financeiras Usados</span>
                   <span className="text-[10px] opacity-80">Juros e Despesas</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowDespesasFinanceirasPecas(!showDespesasFinanceirasPecas)
@@ -2421,7 +2442,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Despesas Financeiras Peças</span>
                   <span className="text-[10px] opacity-80">Juros e Despesas</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowDespesasFinanceirasOficina(!showDespesasFinanceirasOficina)
@@ -2454,7 +2477,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Despesas Financeiras Oficina</span>
                   <span className="text-[10px] opacity-80">Cartão de Crédito</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowDespesasFinanceirasFunilaria(!showDespesasFinanceirasFunilaria)
@@ -2483,7 +2508,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Despesas Financeiras Funilaria</span>
                   <span className="text-[10px] opacity-80">Cartão de Crédito</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && (
                 <button
                   onClick={() => {
                     setShowDespesasFinanceirasAdministracao(!showDespesasFinanceirasAdministracao)
@@ -2513,7 +2540,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Despesas Financeiras Administração</span>
                   <span className="text-[10px] opacity-80">Juros e Despesas</span>
                 </button>
+                )}
 
+                {department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowBonusNovos(!showBonusNovos)
@@ -2544,7 +2573,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Bonus Novos</span>
                   <span className="text-[10px] opacity-80">Bônus Veículos Novos</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowBonusUsados(!showBonusUsados)
@@ -2576,7 +2607,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Bonus Usados</span>
                   <span className="text-[10px] opacity-80">Bônus Veículos Usados</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowBonusPecas(!showBonusPecas)
@@ -2609,7 +2642,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Bonus Peças</span>
                   <span className="text-[10px] opacity-80">Bônus Peças</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowBonusOficina(!showBonusOficina)
@@ -2643,7 +2678,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Bonus Oficina</span>
                   <span className="text-[10px] opacity-80">Bônus Oficina</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowBonusFunilaria(!showBonusFunilaria)
@@ -2678,7 +2715,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Bonus Funilaria</span>
                   <span className="text-[10px] opacity-80">Bônus Funilaria</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && (
                 <button
                   onClick={() => {
                     setShowBonusAdministracao(!showBonusAdministracao)
@@ -2714,7 +2753,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Bonus Administração</span>
                   <span className="text-[10px] opacity-80">Bônus Administração</span>
                 </button>
+                )}
 
+                {department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowReceitaFinanciamentoNovos(!showReceitaFinanciamentoNovos)
@@ -2751,7 +2792,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Receita Financ. Novos</span>
                   <span className="text-[10px] opacity-80">Receita Financiamento</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowReceitaFinanciamentoUsados(!showReceitaFinanciamentoUsados)
@@ -2789,7 +2832,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Receita Financ. Usados</span>
                   <span className="text-[10px] opacity-80">Receita Financiamento</span>
                 </button>
+                )}
 
+                {department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowCreditoICMSNovos(!showCreditoICMSNovos)
@@ -2833,7 +2878,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Credito de ICMS Novos</span>
                   <span className="text-[10px] opacity-80">Crédito de ICMS</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowCreditoICMSPecas(!showCreditoICMSPecas)
@@ -2877,7 +2924,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Credito de ICMS Pecas</span>
                   <span className="text-[10px] opacity-80">Crédito de ICMS</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && (
                 <button
                   onClick={() => {
                     setShowCreditoICMSAdministracao(!showCreditoICMSAdministracao)
@@ -2921,7 +2970,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Credito de ICMS Administração</span>
                   <span className="text-[10px] opacity-80">Crédito de ICMS</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && (
                 <button
                   onClick={() => {
                     setShowCreditoPISCofinsAdministracao(!showCreditoPISCofinsAdministracao)
@@ -2962,7 +3013,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Credito de PIS e Cofins Administração</span>
                   <span className="text-[10px] opacity-80">Crédito PIS/Cofins</span>
                 </button>
+                )}
 
+                {department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowReceitaBlindagem(!showReceitaBlindagem)
@@ -3006,7 +3059,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Receita de Blindagem</span>
                   <span className="text-[10px] opacity-80">Receita Adicional</span>
                 </button>
+                )}
 
+                {department !== 'novos' && department !== 'vendaDireta' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowReceitaDespachanteUsados(!showReceitaDespachanteUsados)
@@ -3050,7 +3105,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Receita de Despachante Usados</span>
                   <span className="text-[10px] opacity-80">Receita Adicional</span>
                 </button>
+                )}
 
+                {department !== 'vendaDireta' && department !== 'usados' && department !== 'pecas' && department !== 'oficina' && department !== 'funilaria' && department !== 'administracao' && (
                 <button
                   onClick={() => {
                     setShowReceitaDespachanteNovos(!showReceitaDespachanteNovos)
@@ -3094,6 +3151,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <span className="text-xs font-semibold">Receita de Despachante Novos</span>
                   <span className="text-[10px] opacity-80">Receita Adicional</span>
                 </button>
+                )}
               </div>
             </CardContent>
             </Card>
