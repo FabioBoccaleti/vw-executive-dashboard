@@ -45,7 +45,7 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-slate-800 dark:text-white mb-3">
-            Dashboard Financeiro
+            Dashboard Financeiro Sorana
           </h1>
           <p className="text-lg text-slate-600 dark:text-slate-300">
             Selecione a marca para acessar o painel
