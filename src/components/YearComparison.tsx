@@ -147,14 +147,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
   const totals1 = useMemo(() => {
     const volumeTotal = dre1?.[0]?.meses?.reduce((a: number, b: number) => a + b, 0) || 0
     const receitaLiquida = getDRELineTotal(dre1, 'RECEITA OPERACIONAL LIQUIDA')
-    const lucro = getDRELineTotal(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')
+    const lucro = getDRELineTotal(dre1, 'LUCRO LIQUIDO DO EXERCICIO')
     return { volumeNovos: 0, volumeUsados: 0, volumeTotal, receitaLiquida, lucro }
   }, [dre1])
 
   const totals2 = useMemo(() => {
     const volumeTotal = dre2?.[0]?.meses?.reduce((a: number, b: number) => a + b, 0) || 0
     const receitaLiquida = getDRELineTotal(dre2, 'RECEITA OPERACIONAL LIQUIDA')
-    const lucro = getDRELineTotal(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')
+    const lucro = getDRELineTotal(dre2, 'LUCRO LIQUIDO DO EXERCICIO')
     return { volumeNovos: 0, volumeUsados: 0, volumeTotal, receitaLiquida, lucro }
   }, [dre2])
 
@@ -477,7 +477,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                  Lucro Antes dos Impostos
+                  Lucro Líquido do Exercício
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -2224,8 +2224,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
                       {(() => {
-                        const provisao1 = Math.abs(dre1?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                        const provisao2 = Math.abs(dre2?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const provisao1 = Math.abs(dre1?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const provisao2 = Math.abs(dre2?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.reduce((a, b) => a + b, 0) || 0)
                         return (
                           <>
                             <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
@@ -2243,8 +2243,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                       {(() => {
-                        const provisao1 = Math.abs(dre1?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                        const provisao2 = Math.abs(dre2?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const provisao1 = Math.abs(dre1?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const provisao2 = Math.abs(dre2?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.reduce((a, b) => a + b, 0) || 0)
                         const percent1 = totals1.receitaLiquida > 0 ? (provisao1 / totals1.receitaLiquida) * 100 : 0
                         const percent2 = totals2.receitaLiquida > 0 ? (provisao2 / totals2.receitaLiquida) * 100 : 0
                         return (
@@ -2264,8 +2264,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                       {(() => {
-                        const provisao1 = Math.abs(dre1?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                        const provisao2 = Math.abs(dre2?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const provisao1 = Math.abs(dre1?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const provisao2 = Math.abs(dre2?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.reduce((a, b) => a + b, 0) || 0)
                         const diff = calculateDifference(provisao1, provisao2)
                         return (
                           <div className={`flex items-center gap-1 ${getDifferenceColor(diff.absolute)}`}>
@@ -2288,8 +2288,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <ResponsiveContainer width="100%" height={320}>
                     <BarChart 
                       data={getPeriodLabels().map((label, index) => {
-                        const provisaoLine1 = dre1?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')
-                        const provisaoLine2 = dre2?.find(line => line.descricao === 'PROVISOES IRPJ E CSLL')
+                        const provisaoLine1 = dre1?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))
+                        const provisaoLine2 = dre2?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))
                         const values1 = aggregateData(provisaoLine1?.meses || [])
                         const values2 = aggregateData(provisaoLine2?.meses || [])
                         return {
@@ -2382,8 +2382,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
                       {(() => {
-                        const lucroLiquido1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                        const lucroLiquido2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido1 = dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido2 = dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
                         return (
                           <>
                             <p className={`text-lg font-bold ${lucroLiquido1 >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -2401,8 +2401,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Margem Líquida (%)</p>
                       {(() => {
-                        const lucroLiquido1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                        const lucroLiquido2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido1 = dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido2 = dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
                         const margem1 = totals1.receitaLiquida > 0 ? (lucroLiquido1 / totals1.receitaLiquida) * 100 : 0
                         const margem2 = totals2.receitaLiquida > 0 ? (lucroLiquido2 / totals2.receitaLiquida) * 100 : 0
                         return (
@@ -2422,8 +2422,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                       {(() => {
-                        const lucroLiquido1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                        const lucroLiquido2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido1 = dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido2 = dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
                         const diff = calculateDifference(lucroLiquido1, lucroLiquido2)
                         return (
                           <div className={`flex items-center gap-1 ${getDifferenceColor(diff.absolute)}`}>
@@ -2446,8 +2446,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <ResponsiveContainer width="100%" height={320}>
                     <BarChart 
                       data={getPeriodLabels().map((label, index) => {
-                        const lucroLiquidoLine1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')
-                        const lucroLiquidoLine2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) DO EXERCICIO')
+                        const lucroLiquidoLine1 = dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')
+                        const lucroLiquidoLine2 = dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')
                         const values1 = aggregateData(lucroLiquidoLine1?.meses || [])
                         const values2 = aggregateData(lucroLiquidoLine2?.meses || [])
                         return {
