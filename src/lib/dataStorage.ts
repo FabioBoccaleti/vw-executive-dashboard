@@ -755,21 +755,40 @@ export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: D
       // Se ambos os DREs existirem, consolida
       if (vwDRE && audiDRE) {
         return vwDRE.map((line, index) => {
+          const audiLine = audiDRE[index];
           const meses = line.meses || [];
           const summedMeses = meses.map((vwValue, monthIndex) => {
-            const audiValue = audiDRE[index]?.meses?.[monthIndex] || 0;
+            const audiValue = audiLine?.meses?.[monthIndex] || 0;
             return vwValue + audiValue;
           });
           
+          // Soma também o total
+          const vwTotal = line.total || 0;
+          const audiTotal = audiLine?.total || 0;
+          const summedTotal = vwTotal + audiTotal;
+          
           return {
             ...line,
+            total: summedTotal,
             meses: summedMeses
           };
         });
       }
       
-      // Se apenas um existir, retorna ele
-      return vwDRE || audiDRE;
+      // Se apenas VW existir, soma com Audi vazio (zeros)
+      if (vwDRE && !audiDRE) {
+        console.warn('⚠️ DRE Audi não encontrado, consolidando apenas VW');
+        return vwDRE;
+      }
+      
+      // Se apenas Audi existir, soma com VW vazio (zeros)
+      if (!vwDRE && audiDRE) {
+        console.warn('⚠️ DRE VW não encontrado, consolidando apenas Audi');
+        return audiDRE;
+      }
+      
+      // Se nenhum existir, retorna null
+      return null;
     }
     
     const key = `${currentBrand}_dre_${fiscalYear}_${department}`;
