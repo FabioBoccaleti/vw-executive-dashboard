@@ -227,6 +227,17 @@ export interface MetricsData {
   };
 }
 
+// Interface para Fatos Relevantes no Resultado
+export interface FatoRelevante {
+  id: string;
+  mes: string;
+  descricao: string;
+  impacto: 'Positivo' | 'Negativo' | 'Nulo';
+  valor: number;
+}
+
+export type FatosRelevantesData = FatoRelevante[];
+
 // Tipos para os dados de DRE
 export interface DRELine {
   id: string;
@@ -1261,5 +1272,63 @@ export function clearAllBrandsData(): void {
     console.log('✅ Todos os dados de todas as marcas foram limpos com sucesso');
   } catch (error) {
     console.error('Erro ao limpar todos os dados de todas as marcas:', error);
+  }
+}
+
+/**
+ * Carrega os dados de Fatos Relevantes no Resultado
+ * Dados são específicos por marca, departamento e ano fiscal
+ * @param fiscalYear - Ano fiscal
+ * @param department - Departamento
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
+ * @returns Array de fatos relevantes
+ */
+export function loadFatosRelevantes(
+  fiscalYear: 2024 | 2025 | 2026 | 2027,
+  department: Department,
+  brand?: Brand
+): FatosRelevantesData {
+  const currentBrand = getCurrentBrand(brand);
+  
+  try {
+    const key = `${currentBrand}_fatos_relevantes_${fiscalYear}_${department}`;
+    const data = localStorage.getItem(key);
+    
+    if (data) {
+      const parsedData = JSON.parse(data);
+      console.log(`✅ Fatos Relevantes carregados: ${currentBrand} - ${department} - ${fiscalYear}`);
+      return parsedData;
+    }
+    
+    console.log(`ℹ️ Nenhum dado de Fatos Relevantes encontrado para: ${currentBrand} - ${department} - ${fiscalYear}`);
+    return [];
+  } catch (error) {
+    console.error(`Erro ao carregar Fatos Relevantes (${currentBrand} - ${department} - ${fiscalYear}):`, error);
+    return [];
+  }
+}
+
+/**
+ * Salva os dados de Fatos Relevantes no Resultado
+ * Dados são específicos por marca, departamento e ano fiscal
+ * @param fiscalYear - Ano fiscal
+ * @param department - Departamento
+ * @param data - Array de fatos relevantes
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
+ */
+export function saveFatosRelevantes(
+  fiscalYear: 2024 | 2025 | 2026 | 2027,
+  department: Department,
+  data: FatosRelevantesData,
+  brand?: Brand
+): void {
+  const currentBrand = getCurrentBrand(brand);
+  
+  try {
+    const key = `${currentBrand}_fatos_relevantes_${fiscalYear}_${department}`;
+    localStorage.setItem(key, JSON.stringify(data));
+    console.log(`✅ Fatos Relevantes salvos: ${currentBrand} - ${department} - ${fiscalYear}`, data);
+  } catch (error) {
+    console.error(`Erro ao salvar Fatos Relevantes (${currentBrand} - ${department} - ${fiscalYear}):`, error);
   }
 }

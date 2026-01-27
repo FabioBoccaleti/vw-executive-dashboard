@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2, DollarSign, Building2 } from "lucide-react"
+import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2, DollarSign, Building2, Plus, Edit, Save, X, ChevronDown } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, Legend, LabelList, ComposedChart, Cell } from "recharts"
 import { useState, useRef, useEffect } from "react"
@@ -25,9 +25,13 @@ import {
   exportAllData,
   loadSharedMetricsData,
   saveSharedMetricsData,
+  loadFatosRelevantes,
+  saveFatosRelevantes,
   type MetricsData,
   type Department,
-  type Brand
+  type Brand,
+  type FatoRelevante,
+  type FatosRelevantesData
 } from "@/lib/dataStorage"
 import { DEPARTMENT_LABELS, DEPARTMENTS } from "@/lib/types"
 import { getBrandConfig, BRAND_CONFIGS } from "@/lib/brands"
@@ -422,6 +426,15 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     
     saveSelectedFiscalYear(fiscalYear);
     saveSelectedDepartment(department);
+  }, [fiscalYear, department, brand, isImporting]);
+  
+  // Effect para carregar Fatos Relevantes quando mudar departamento, ano ou marca
+  useEffect(() => {
+    if (!isImporting) {
+      const loadedFatos = loadFatosRelevantes(fiscalYear, department, brand);
+      setFatosRelevantes(loadedFatos);
+      console.log(`✅ Fatos Relevantes carregados: ${brand} - ${department} - ${fiscalYear}`, loadedFatos);
+    }
   }, [fiscalYear, department, brand, isImporting]);
   
   // Effect para salvar dados de métricas quando mudarem (DESABILITADO para não sobrescrever importações)
@@ -823,6 +836,18 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
 
   // Estado para controlar exibição do card de Receita de Despachante Novos
   const [showReceitaDespachanteNovos, setShowReceitaDespachanteNovos] = useState(false)
+
+  // Estado para controlar exibição do card de Fatos Relevantes
+  const [showFatosRelevantes, setShowFatosRelevantes] = useState(true)
+  
+  // Estado para controlar se o toggle de Fatos Relevantes está aberto/fechado
+  const [fatosRelevantesExpanded, setFatosRelevantesExpanded] = useState(false)
+  
+  // Estado para os dados de Fatos Relevantes
+  const [fatosRelevantes, setFatosRelevantes] = useState<FatosRelevantesData>([])
+  
+  // Estado para controlar qual linha está em modo de edição
+  const [editingFatoId, setEditingFatoId] = useState<string | null>(null)
 
   // Função para agregar dados por período
   const aggregateData = (meses: number[]) => {
@@ -1358,6 +1383,54 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
       color: "hsl(var(--chart-3))",
     },
   }
+
+  // ========== HANDLERS PARA FATOS RELEVANTES ==========
+  
+  const mesesOptions = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+  
+  const handleAddFatoRelevante = () => {
+    const novoFato: FatoRelevante = {
+      id: Date.now().toString(),
+      mes: 'Janeiro',
+      descricao: '',
+      impacto: 'Positivo',
+      valor: 0
+    };
+    const novosFatos = [...fatosRelevantes, novoFato];
+    setFatosRelevantes(novosFatos);
+    setEditingFatoId(novoFato.id);
+  };
+  
+  const handleEditFato = (id: string) => {
+    setEditingFatoId(id);
+  };
+  
+  const handleSaveFato = (id: string) => {
+    setEditingFatoId(null);
+    saveFatosRelevantes(fiscalYear, department, fatosRelevantes, brand);
+  };
+  
+  const handleDeleteFato = (id: string) => {
+    const novosFatos = fatosRelevantes.filter(fato => fato.id !== id);
+    setFatosRelevantes(novosFatos);
+    saveFatosRelevantes(fiscalYear, department, novosFatos, brand);
+    if (editingFatoId === id) {
+      setEditingFatoId(null);
+    }
+  };
+  
+  const handleChangeFato = (id: string, field: 'mes' | 'descricao' | 'impacto' | 'valor', value: string | number) => {
+    const novosFatos = fatosRelevantes.map(fato => {
+      if (fato.id === id) {
+        return { ...fato, [field]: value };
+      }
+      return fato;
+    });
+    setFatosRelevantes(novosFatos);
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -3166,6 +3239,234 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               >
                 <BarChart3 className="w-5 h-5" />
                 <span className="text-sm font-semibold">Mostrar Dados Adicionais</span>
+              </button>
+            </div>
+          )}
+
+          {/* Fatos Relevantes no Resultado */}
+          {showFatosRelevantes && (
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 mt-6">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+                      <CardTitle className="text-base font-semibold text-slate-900 dark:text-white">Fatos Relevantes no Resultado</CardTitle>
+                    </div>
+                    <CardDescription className="text-xs">Registro de fatos relevantes que impactaram o resultado</CardDescription>
+                  </div>
+                  <button
+                    onClick={() => setShowFatosRelevantes(false)}
+                    className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+                    title="Ocultar Fatos Relevantes"
+                  >
+                    <TrendingDown className="w-5 h-5" />
+                  </button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Toggle "Fatos Relevantes" */}
+                <div className="space-y-4">
+                  <button
+                    onClick={() => setFatosRelevantesExpanded(!fatosRelevantesExpanded)}
+                    className="w-full flex items-center justify-center p-4 rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all relative"
+                  >
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      <span className="text-sm font-semibold text-red-600 dark:text-red-400">Fatos Relevantes</span>
+                      {fatosRelevantes.length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {fatosRelevantes.length} {fatosRelevantes.length === 1 ? 'item' : 'itens'}
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronDown 
+                      className={`w-5 h-5 text-slate-500 dark:text-slate-400 transition-transform duration-200 absolute right-4 ${
+                        fatosRelevantesExpanded ? 'transform rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {/* Conteúdo do Toggle */}
+                  {fatosRelevantesExpanded && (
+                    <div className="space-y-4 animate-in fade-in-50 duration-200">
+                      {/* Botão Adicionar Linha */}
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={handleAddFatoRelevante}
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Adicionar Linha
+                        </Button>
+                      </div>
+
+                      {/* Tabela */}
+                      {fatosRelevantes.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-slate-100 dark:bg-slate-800">
+                                <th className="border border-slate-300 dark:border-slate-600 px-4 py-2 text-left text-sm font-semibold w-32">Mês</th>
+                                <th className="border border-slate-300 dark:border-slate-600 px-4 py-2 text-left text-sm font-semibold">Descrição do Fato Relevante</th>
+                                <th className="border border-slate-300 dark:border-slate-600 px-4 py-2 text-left text-sm font-semibold w-32">Impacto</th>
+                                <th className="border border-slate-300 dark:border-slate-600 px-4 py-2 text-left text-sm font-semibold w-40">Valor</th>
+                                <th className="border border-slate-300 dark:border-slate-600 px-4 py-2 text-center text-sm font-semibold w-24">Ações</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {fatosRelevantes.map((fato) => {
+                                const isEditing = editingFatoId === fato.id;
+                                return (
+                                  <tr key={fato.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                    <td className="border border-slate-300 dark:border-slate-600 px-4 py-2">
+                                      {isEditing ? (
+                                        <Select
+                                          value={fato.mes}
+                                          onValueChange={(value) => handleChangeFato(fato.id, 'mes', value)}
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {mesesOptions.map((mes) => (
+                                              <SelectItem key={mes} value={mes}>
+                                                {mes}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      ) : (
+                                        <span className="text-sm">{fato.mes}</span>
+                                      )}
+                                    </td>
+                                    <td className="border border-slate-300 dark:border-slate-600 px-4 py-2">
+                                      {isEditing ? (
+                                        <Input
+                                          type="text"
+                                          value={fato.descricao}
+                                          onChange={(e) => handleChangeFato(fato.id, 'descricao', e.target.value)}
+                                          className="w-full"
+                                          placeholder="Digite a descrição"
+                                        />
+                                      ) : (
+                                        <span className="text-sm">{fato.descricao}</span>
+                                      )}
+                                    </td>
+                                    <td className="border border-slate-300 dark:border-slate-600 px-4 py-2">
+                                      {isEditing ? (
+                                        <Select
+                                          value={fato.impacto}
+                                          onValueChange={(value) => handleChangeFato(fato.id, 'impacto', value as 'Positivo' | 'Negativo' | 'Nulo')}
+                                        >
+                                          <SelectTrigger className="w-full">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="Positivo">Positivo</SelectItem>
+                                            <SelectItem value="Negativo">Negativo</SelectItem>
+                                            <SelectItem value="Nulo">Nulo</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      ) : (
+                                        <span className="text-sm">{fato.impacto}</span>
+                                      )}
+                                    </td>
+                                    <td className="border border-slate-300 dark:border-slate-600 px-4 py-2">
+                                      {isEditing ? (
+                                        <Input
+                                          type="number"
+                                          value={fato.valor}
+                                          onChange={(e) => handleChangeFato(fato.id, 'valor', parseFloat(e.target.value) || 0)}
+                                          className="w-full"
+                                          placeholder="0.00"
+                                          step="0.01"
+                                        />
+                                      ) : (
+                                        <span className="text-sm">
+                                          {new Intl.NumberFormat('pt-BR', {
+                                            style: 'currency',
+                                            currency: 'BRL'
+                                          }).format(fato.valor)}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="border border-slate-300 dark:border-slate-600 px-4 py-2">
+                                      <div className="flex items-center justify-center gap-2">
+                                        {isEditing ? (
+                                          <>
+                                            <Button
+                                              size="sm"
+                                              variant="default"
+                                              onClick={() => handleSaveFato(fato.id)}
+                                              className="p-2"
+                                              title="Salvar"
+                                            >
+                                              <Save className="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              onClick={() => setEditingFatoId(null)}
+                                              className="p-2"
+                                              title="Cancelar"
+                                            >
+                                              <X className="w-4 h-4" />
+                                            </Button>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => handleEditFato(fato.id)}
+                                              className="p-2"
+                                              title="Editar"
+                                            >
+                                              <Edit className="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="destructive"
+                                              onClick={() => handleDeleteFato(fato.id)}
+                                              className="p-2"
+                                              title="Excluir"
+                                            >
+                                              <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                          <p className="text-sm">Nenhum fato relevante registrado.</p>
+                          <p className="text-xs mt-1">Clique em "Adicionar Linha" para começar.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Botão para mostrar Fatos Relevantes quando oculto */}
+          {!showFatosRelevantes && (
+            <div className="mt-6">
+              <button
+                onClick={() => setShowFatosRelevantes(true)}
+                className="w-full flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-slate-700 transition-all"
+              >
+                <DollarSign className="w-5 h-5" />
+                <span className="text-sm font-semibold">Mostrar Fatos Relevantes</span>
               </button>
             </div>
           )}
