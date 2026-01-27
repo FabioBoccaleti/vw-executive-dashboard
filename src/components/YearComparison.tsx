@@ -2984,9 +2984,88 @@ function DadosAdicionaisComparison({
     },
   ]
 
+  // Filtrar dados adicionais por departamento quando viewMode for 'mensal'
+  const filteredDadosAdicionaisConfig = useMemo(() => {
+    if (viewMode === 'mensal') {
+      // Venda Direta - mostrar apenas Volume de Troca
+      if (department === 'vendaDireta') {
+        return dadosAdicionaisConfig.filter(secao => secao.titulo === 'Volume de Troca')
+      }
+      // Veículos Novos - mostrar métricas específicas
+      if (department === 'novos') {
+        const metricasNovos = [
+          'Volume de Troca',
+          'Estoque de Novos',
+          'Despesas Financeiras Novos',
+          'Bônus Novos',
+          'Receita Financiamento Novos',
+          'Crédito de ICMS Novos',
+          'Receita de Blindagem',
+          'Receita de Despachante Novos'
+        ]
+        return dadosAdicionaisConfig.filter(secao => metricasNovos.includes(secao.titulo))
+      }
+      // Veículos Usados - mostrar métricas específicas
+      if (department === 'usados') {
+        const metricasUsados = [
+          'Volume de Troca',
+          '% de Repasse',
+          'Estoque de Usados',
+          'Despesas Financeiras Usados',
+          'Bônus Usados',
+          'Receita Financiamento Usados',
+          'Receita de Despachante Usados'
+        ]
+        return dadosAdicionaisConfig.filter(secao => metricasUsados.includes(secao.titulo))
+      }
+      // Peças - mostrar métricas específicas
+      if (department === 'pecas') {
+        const metricasPecas = [
+          'Estoque de Peças',
+          'Vendas de Peças',
+          'Vendas por Seguradora',
+          'Vendas Mercado Livre',
+          'Despesas Financeiras Peças',
+          'Bônus Peças',
+          'Crédito de ICMS Peças'
+        ]
+        return dadosAdicionaisConfig.filter(secao => metricasPecas.includes(secao.titulo))
+      }
+      // Oficina - mostrar métricas específicas
+      if (department === 'oficina') {
+        const metricasOficina = [
+          'Vendas de Peças',
+          'Despesas Financeiras Oficina',
+          'Bônus Oficina'
+        ]
+        return dadosAdicionaisConfig.filter(secao => metricasOficina.includes(secao.titulo))
+      }
+      // Funilaria - mostrar métricas específicas
+      if (department === 'funilaria') {
+        const metricasFunilaria = [
+          'Vendas de Peças',
+          'Despesas Financeiras Funilaria',
+          'Bônus Funilaria'
+        ]
+        return dadosAdicionaisConfig.filter(secao => metricasFunilaria.includes(secao.titulo))
+      }
+      // Administração - mostrar métricas específicas
+      if (department === 'administracao') {
+        const metricasAdministracao = [
+          'Despesas Financeiras Administração',
+          'Bônus Administração',
+          'Crédito de ICMS Administração',
+          'Crédito de PIS e Cofins Administração'
+        ]
+        return dadosAdicionaisConfig.filter(secao => metricasAdministracao.includes(secao.titulo))
+      }
+    }
+    return dadosAdicionaisConfig
+  }, [department, viewMode, dadosAdicionaisConfig])
+
   return (
     <>
-      {dadosAdicionaisConfig.map((secao, idx) => {
+      {filteredDadosAdicionaisConfig.map((secao, idx) => {
         // Verificar se há dados válidos para essa seção
         const temDados = secao.campos.some(campo => {
           const val1 = campo.path(data1, selectedMonth1)
