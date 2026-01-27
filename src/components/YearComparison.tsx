@@ -39,11 +39,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
     'consolidado': 'Consolidado'
   }
 
-  // Carregar dados dos dois anos com o departamento e marca
-  const data1 = useMemo(() => loadMetricsData(year1, department, brand), [year1, department, brand])
-  const data2 = useMemo(() => loadMetricsData(year2, department, brand), [year2, department, brand])
-  const dre1 = useMemo(() => loadDREData(year1, department, brand), [year1, department, brand])
-  const dre2 = useMemo(() => loadDREData(year2, department, brand), [year2, department, brand])
+  // Carregar dados dos dois anos com o departamento selecionado e marca
+  const data1 = useMemo(() => loadMetricsData(year1, selectedDepartmentFilter as Department, brand), [year1, selectedDepartmentFilter, brand])
+  const data2 = useMemo(() => loadMetricsData(year2, selectedDepartmentFilter as Department, brand), [year2, selectedDepartmentFilter, brand])
+  const dre1 = useMemo(() => loadDREData(year1, selectedDepartmentFilter as Department, brand), [year1, selectedDepartmentFilter, brand])
+  const dre2 = useMemo(() => loadDREData(year2, selectedDepartmentFilter as Department, brand), [year2, selectedDepartmentFilter, brand])
 
   const toggleSection = (section: string) => {
     const newExpanded = new Set(expandedSections)
@@ -303,29 +303,29 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               </div>
             </div>
 
-            {/* Filtro de Departamento (só para Dados Adicionais) */}
+            {/* Filtro de Departamento */}
+            <div className="flex items-center gap-2 ml-6">
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Departamento:</span>
+              <Select value={selectedDepartmentFilter} onValueChange={(v) => setSelectedDepartmentFilter(v as Department | 'consolidado')}>
+                <SelectTrigger className="w-[180px] h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="consolidado">Consolidado</SelectItem>
+                  <SelectItem value="novos">Veículos Novos</SelectItem>
+                  <SelectItem value="vendaDireta">Venda Direta</SelectItem>
+                  <SelectItem value="usados">Veículos Usados</SelectItem>
+                  <SelectItem value="pecas">Peças</SelectItem>
+                  <SelectItem value="oficina">Oficina</SelectItem>
+                  <SelectItem value="funilaria">Funilaria</SelectItem>
+                  <SelectItem value="administracao">Administração</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Toggle Anual/Mensal (só para Dados Adicionais) */}
             {comparisonTab === 'dadosAdicionais' && (
               <>
-                <div className="flex items-center gap-2 ml-6">
-                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Departamento:</span>
-                  <Select value={selectedDepartmentFilter} onValueChange={(v) => setSelectedDepartmentFilter(v as Department | 'consolidado')}>
-                    <SelectTrigger className="w-[180px] h-7 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="consolidado">Consolidado</SelectItem>
-                      <SelectItem value="novos">Veículos Novos</SelectItem>
-                      <SelectItem value="vendaDireta">Venda Direta</SelectItem>
-                      <SelectItem value="usados">Veículos Usados</SelectItem>
-                      <SelectItem value="pecas">Peças</SelectItem>
-                      <SelectItem value="oficina">Oficina</SelectItem>
-                      <SelectItem value="funilaria">Funilaria</SelectItem>
-                      <SelectItem value="administracao">Administração</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Toggle Anual/Mensal */}
                 <div className="flex items-center gap-2 ml-6">
                   <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Período:</span>
                   <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
