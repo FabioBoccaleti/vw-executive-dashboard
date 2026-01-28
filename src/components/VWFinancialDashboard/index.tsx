@@ -9808,7 +9808,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
                             <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Estoque Atual</p>
-                            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">R$ {(estoqueAtual ).toLocaleString("pt-BR")}</p>
+                            <p className="text-lg font-bold text-blue-600 dark:text-blue-400">R$ {(estoqueAtual ).toLocaleString("pt-BR")}</p>
                             <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{mesAtual}</p>
                           </div>
                           <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
@@ -10581,20 +10581,45 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   </div>
                   <Badge className="bg-blue-50 text-blue-700 border-blue-200">{fiscalYear}</Badge>
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Anual</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeDreData[0].total.toLocaleString('pt-BR')}</p>
+                {showComparison && projectionMode ? (
+                  <div className="grid grid-cols-4 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Original</p>
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{dreData[0].total.toLocaleString('pt-BR')}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Projetado</p>
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{(projectedData[activeScenario!]?.[0]?.total || 0).toLocaleString('pt-BR')}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação</p>
+                      <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[0]?.total || 0) - dreData[0].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {((projectedData[activeScenario!]?.[0]?.total || 0) - dreData[0].total) >= 0 ? '+' : ''}{((projectedData[activeScenario!]?.[0]?.total || 0) - dreData[0].total).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação %</p>
+                      <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[0]?.total || 0) - dreData[0].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {((projectedData[activeScenario!]?.[0]?.total || 0) - dreData[0].total) >= 0 ? '+' : ''}{(((projectedData[activeScenario!]?.[0]?.total || 0) - dreData[0].total) / dreData[0].total * 100).toFixed(2)}%
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{Math.round(activeDreData[0].total / 12).toLocaleString('pt-BR')}</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Anual</p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeDreData[0].total.toLocaleString('pt-BR')}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{Math.round(activeDreData[0].total / 12).toLocaleString('pt-BR')}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Maior Volume</p>
+                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{Math.max(...activeDreData[0].meses).toLocaleString('pt-BR')}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Maior Volume</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{Math.max(...activeDreData[0].meses).toLocaleString('pt-BR')}</p>
-                  </div>
-                </div>
+                )}
               </CardHeader>
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="w-full">
@@ -10732,20 +10757,45 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   </div>
                   <Badge className="bg-cyan-50 text-cyan-700 border-cyan-200">100% Base</Badge>
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Acumulado</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[1].total)}</p>
+                {showComparison && projectionMode ? (
+                  <div className="grid grid-cols-4 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Original</p>
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(dreData[1].total)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Projetado</p>
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(projectedData[activeScenario!]?.[1]?.total || 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação</p>
+                      <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[1]?.total || 0) - dreData[1].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {((projectedData[activeScenario!]?.[1]?.total || 0) - dreData[1].total) >= 0 ? '+' : ''}{formatCurrency((projectedData[activeScenario!]?.[1]?.total || 0) - dreData[1].total)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação %</p>
+                      <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[1]?.total || 0) - dreData[1].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {((projectedData[activeScenario!]?.[1]?.total || 0) - dreData[1].total) >= 0 ? '+' : ''}{(((projectedData[activeScenario!]?.[1]?.total || 0) - dreData[1].total) / dreData[1].total * 100).toFixed(2)}%
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Ticket Médio</p>
-                    <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{formatCurrency(activeDreData[1].total / activeDreData[0].total)}</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Acumulado</p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[1].total)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Ticket Médio</p>
+                      <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{formatCurrency(activeDreData[1].total / activeDreData[0].total)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[1].total / 12)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[1].total / 12)}</p>
-                  </div>
-                </div>
+                )}
               </CardHeader>
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="w-full">
@@ -10897,20 +10947,45 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     <CardDescription className="text-sm">Resultado bruto das operações</CardDescription>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Acumulado</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[3].total)}</p>
+                {showComparison && projectionMode ? (
+                  <div className="grid grid-cols-4 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Original</p>
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(dreData[3].total)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Projetado</p>
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(projectedData[activeScenario!]?.[3]?.total || 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação</p>
+                      <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[3]?.total || 0) - dreData[3].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {((projectedData[activeScenario!]?.[3]?.total || 0) - dreData[3].total) >= 0 ? '+' : ''}{formatCurrency((projectedData[activeScenario!]?.[3]?.total || 0) - dreData[3].total)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação %</p>
+                      <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[3]?.total || 0) - dreData[3].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {((projectedData[activeScenario!]?.[3]?.total || 0) - dreData[3].total) >= 0 ? '+' : ''}{(((projectedData[activeScenario!]?.[3]?.total || 0) - dreData[3].total) / dreData[3].total * 100).toFixed(2)}%
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Bruta</p>
-                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{activeDreData[3].percentTotal?.toFixed(2)}%</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Acumulado</p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[3].total)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Bruta</p>
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{activeDreData[3].percentTotal?.toFixed(2)}%</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Por Unidade</p>
+                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[3].total / activeDreData[0].total)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Por Unidade</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[3].total / activeDreData[0].total)}</p>
-                  </div>
-                </div>
+                )}
               </CardHeader>
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="w-full">
@@ -11085,20 +11160,45 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     <CardDescription className="text-sm">Contribuição marginal do negócio</CardDescription>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Período</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[6].total)}</p>
+                {showComparison && projectionMode ? (
+                  <div className="grid grid-cols-4 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Original</p>
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(dreData[6].total)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Projetado</p>
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(projectedData[activeScenario!]?.[6]?.total || 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação</p>
+                      <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[6]?.total || 0) - dreData[6].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {((projectedData[activeScenario!]?.[6]?.total || 0) - dreData[6].total) >= 0 ? '+' : ''}{formatCurrency((projectedData[activeScenario!]?.[6]?.total || 0) - dreData[6].total)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação %</p>
+                      <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[6]?.total || 0) - dreData[6].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {((projectedData[activeScenario!]?.[6]?.total || 0) - dreData[6].total) >= 0 ? '+' : ''}{(((projectedData[activeScenario!]?.[6]?.total || 0) - dreData[6].total) / dreData[6].total * 100).toFixed(2)}%
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{activeDreData[6].percentTotal?.toFixed(2)}%</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Período</p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[6].total)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{activeDreData[6].percentTotal?.toFixed(2)}%</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Contribuição/Un</p>
+                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[6].total / activeDreData[0].total)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Contribuição/Un</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[6].total / activeDreData[0].total)}</p>
-                  </div>
-                </div>
+                )}
               </CardHeader>
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="w-full">
@@ -11265,20 +11365,60 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     <CardDescription className="text-sm">Composição das despesas operacionais</CardDescription>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total de Despesas</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total))}</p>
+                {showComparison && projectionMode ? (
+                  <div className="grid grid-cols-4 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Original</p>
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(Math.abs(dreData[7].total + dreData[8].total + dreData[9].total + dreData[10].total + dreData[11].total))}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Projetado</p>
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(Math.abs((projectedData[activeScenario!]?.[7]?.total || 0) + (projectedData[activeScenario!]?.[8]?.total || 0) + (projectedData[activeScenario!]?.[9]?.total || 0) + (projectedData[activeScenario!]?.[10]?.total || 0) + (projectedData[activeScenario!]?.[11]?.total || 0)))}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação</p>
+                      {(() => {
+                        const totalOriginal = Math.abs(dreData[7].total + dreData[8].total + dreData[9].total + dreData[10].total + dreData[11].total);
+                        const totalProjetado = Math.abs((projectedData[activeScenario!]?.[7]?.total || 0) + (projectedData[activeScenario!]?.[8]?.total || 0) + (projectedData[activeScenario!]?.[9]?.total || 0) + (projectedData[activeScenario!]?.[10]?.total || 0) + (projectedData[activeScenario!]?.[11]?.total || 0));
+                        const variacao = totalProjetado - totalOriginal;
+                        return (
+                          <p className={`text-lg font-bold ${variacao <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {variacao >= 0 ? '+' : ''}{formatCurrency(variacao)}
+                          </p>
+                        );
+                      })()}
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação %</p>
+                      {(() => {
+                        const totalOriginal = Math.abs(dreData[7].total + dreData[8].total + dreData[9].total + dreData[10].total + dreData[11].total);
+                        const totalProjetado = Math.abs((projectedData[activeScenario!]?.[7]?.total || 0) + (projectedData[activeScenario!]?.[8]?.total || 0) + (projectedData[activeScenario!]?.[9]?.total || 0) + (projectedData[activeScenario!]?.[10]?.total || 0) + (projectedData[activeScenario!]?.[11]?.total || 0));
+                        const variacao = totalProjetado - totalOriginal;
+                        const variacaoPercent = (variacao / totalOriginal * 100);
+                        return (
+                          <p className={`text-lg font-bold ${variacao <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {variacao >= 0 ? '+' : ''}{variacaoPercent.toFixed(2)}%
+                          </p>
+                        );
+                      })()}
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{((Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / activeDreData[1].total) * 100).toFixed(2)}%</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total de Despesas</p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total))}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
+                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{((Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / activeDreData[1].total) * 100).toFixed(2)}%</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / 12)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / 12)}</p>
-                  </div>
-                </div>
+                )}
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="mb-4">
@@ -11569,20 +11709,58 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     <CardDescription className="text-sm">Despesas não caixa do período</CardDescription>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[13].total))}</p>
+                {showComparison && projectionMode ? (
+                  <div className="grid grid-cols-4 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Original</p>
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(Math.abs(dreData[13].total))}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Projetado</p>
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(Math.abs(projectedData[activeScenario!]?.[13]?.total || 0))}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação</p>
+                      {(() => {
+                        const variacao = Math.abs(projectedData[activeScenario!]?.[13]?.total || 0) - Math.abs(dreData[13].total);
+                        return (
+                          <p className={`text-lg font-bold ${variacao <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {variacao >= 0 ? '+' : ''}{formatCurrency(variacao)}
+                          </p>
+                        );
+                      })()}
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação %</p>
+                      {(() => {
+                        const totalOriginal = Math.abs(dreData[13].total);
+                        const totalProjetado = Math.abs(projectedData[activeScenario!]?.[13]?.total || 0);
+                        const variacao = totalProjetado - totalOriginal;
+                        const variacaoPercent = totalOriginal !== 0 ? (variacao / totalOriginal * 100) : 0;
+                        return (
+                          <p className={`text-lg font-bold ${variacao <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {variacao >= 0 ? '+' : ''}{variacaoPercent.toFixed(2)}%
+                          </p>
+                        );
+                      })()}
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{((Math.abs(activeDreData[13].total) / activeDreData[1].total) * 100).toFixed(2)}%</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(Math.abs(activeDreData[13].total))}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
+                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{((Math.abs(activeDreData[13].total) / activeDreData[1].total) * 100).toFixed(2)}%</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(Math.abs(activeDreData[13].total) / 12)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                    <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(Math.abs(activeDreData[13].total) / 12)}</p>
-                  </div>
-                </div>
+                )}
               </CardHeader>
               <CardContent className="pt-6">
                 <ChartContainer config={chartConfig} className="h-[220px] w-full">
@@ -11711,24 +11889,49 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-6 mt-4">
-              <div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[18].total)}</p>
+            {showComparison && projectionMode ? (
+              <div className="grid grid-cols-4 gap-4 mt-4">
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Original</p>
+                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(dreData[18].total)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Projetado</p>
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(projectedData[activeScenario!]?.[18]?.total || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação</p>
+                  <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[18]?.total || 0) - dreData[18].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {((projectedData[activeScenario!]?.[18]?.total || 0) - dreData[18].total) >= 0 ? '+' : ''}{formatCurrency((projectedData[activeScenario!]?.[18]?.total || 0) - dreData[18].total)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação %</p>
+                  <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[18]?.total || 0) - dreData[18].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {((projectedData[activeScenario!]?.[18]?.total || 0) - dreData[18].total) >= 0 ? '+' : ''}{dreData[18].total !== 0 ? (((projectedData[activeScenario!]?.[18]?.total || 0) - dreData[18].total) / Math.abs(dreData[18].total) * 100).toFixed(2) : 0}%
+                  </p>
+                </div>
               </div>
-              
-              <div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Líquida</p>
-                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{activeDreData[18].percentTotal?.toFixed(2)}%</p>
+            ) : (
+              <div className="grid grid-cols-4 gap-6 mt-4">
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[18].total)}</p>
+                </div>
+                
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Líquida</p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{activeDreData[18].percentTotal?.toFixed(2)}%</p>
+                </div>
+                
+                
+                
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[18].total / 12)}</p>
+                </div>
               </div>
-              
-              
-              
-              <div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[18].total / 12)}</p>
-              </div>
-            </div>
+            )}
           </CardHeader>
           <CardContent className="pt-6">
             <ChartContainer config={chartConfig} className="h-[220px] w-full">
@@ -11900,22 +12103,60 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-6 mt-4">
-              <div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[19].total)}</p>
+            {showComparison && projectionMode ? (
+              <div className="grid grid-cols-4 gap-4 mt-4">
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Original</p>
+                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(Math.abs(dreData[19].total))}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Projetado</p>
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(Math.abs(projectedData[activeScenario!]?.[19]?.total || 0))}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação</p>
+                  {(() => {
+                    const variacao = Math.abs(projectedData[activeScenario!]?.[19]?.total || 0) - Math.abs(dreData[19].total);
+                    return (
+                      <p className={`text-lg font-bold ${variacao <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {variacao >= 0 ? '+' : ''}{formatCurrency(variacao)}
+                      </p>
+                    );
+                  })()}
+                </div>
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação %</p>
+                  {(() => {
+                    const totalOriginal = Math.abs(dreData[19].total);
+                    const totalProjetado = Math.abs(projectedData[activeScenario!]?.[19]?.total || 0);
+                    const variacao = totalProjetado - totalOriginal;
+                    const variacaoPercent = totalOriginal !== 0 ? (variacao / totalOriginal * 100) : 0;
+                    return (
+                      <p className={`text-lg font-bold ${variacao <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {variacao >= 0 ? '+' : ''}{variacaoPercent.toFixed(2)}%
+                      </p>
+                    );
+                  })()}
+                </div>
               </div>
-              
-              <div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
-                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{activeDreData[19].percentTotal?.toFixed(2)}%</p>
+            ) : (
+              <div className="grid grid-cols-4 gap-6 mt-4">
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[19].total)}</p>
+                </div>
+                
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">% sobre Receita</p>
+                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">{activeDreData[19].percentTotal?.toFixed(2)}%</p>
+                </div>
+                
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[19].total / 12)}</p>
+                </div>
               </div>
-              
-              <div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[19].total / 12)}</p>
-              </div>
-            </div>
+            )}
           </CardHeader>
           <CardContent className="pt-6">
             <ChartContainer config={chartConfig} className="h-[220px] w-full">
@@ -12087,22 +12328,47 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-6 mt-4">
-              <div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[21].total)}</p>
+            {showComparison && projectionMode ? (
+              <div className="grid grid-cols-4 gap-4 mt-4">
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Original</p>
+                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(dreData[21].total)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Projetado</p>
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(projectedData[activeScenario!]?.[21]?.total || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação</p>
+                  <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[21]?.total || 0) - dreData[21].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {((projectedData[activeScenario!]?.[21]?.total || 0) - dreData[21].total) >= 0 ? '+' : ''}{formatCurrency((projectedData[activeScenario!]?.[21]?.total || 0) - dreData[21].total)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação %</p>
+                  <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[21]?.total || 0) - dreData[21].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {((projectedData[activeScenario!]?.[21]?.total || 0) - dreData[21].total) >= 0 ? '+' : ''}{dreData[21].total !== 0 ? (((projectedData[activeScenario!]?.[21]?.total || 0) - dreData[21].total) / Math.abs(dreData[21].total) * 100).toFixed(2) : 0}%
+                  </p>
+                </div>
               </div>
-              
-              <div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Líquida Final</p>
-                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{activeDreData[21].percentTotal?.toFixed(2)}%</p>
+            ) : (
+              <div className="grid grid-cols-4 gap-6 mt-4">
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[21].total)}</p>
+                </div>
+                
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Líquida Final</p>
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{activeDreData[21].percentTotal?.toFixed(2)}%</p>
+                </div>
+                
+                <div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[21].total / 12)}</p>
+                </div>
               </div>
-              
-              <div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[21].total / 12)}</p>
-              </div>
-            </div>
+            )}
           </CardHeader>
           <CardContent className="pt-6">
             <ChartContainer config={chartConfig} className="h-[220px] w-full">
