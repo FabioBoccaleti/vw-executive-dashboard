@@ -11936,7 +11936,6 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
           <CardContent className="pt-6">
             <ChartContainer config={chartConfig} className="h-[220px] w-full">
               {showComparison && projectionMode ? (
-                <>
                   <BarChart 
                     data={(() => {
                       const periodData = aggregateData(projectedData[activeScenario!][18].meses);
@@ -12000,7 +11999,6 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     <Bar dataKey="original" fill="#3b82f6" name="Original (mil)" maxBarSize={50} />
                     <Bar dataKey="projecao" fill="#10b981" name="Projeção (mil)" maxBarSize={50} />
                   </BarChart>
-                </>
                   ) : (
                 <BarChart data={(() => {
                   const periodDataLucro = aggregateData(activeDreData[18].meses);
@@ -12161,7 +12159,6 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
           <CardContent className="pt-6">
             <ChartContainer config={chartConfig} className="h-[220px] w-full">
               {showComparison && projectionMode ? (
-                <>
                   <BarChart 
                     data={(() => {
                       const periodData = aggregateData(projectedData[activeScenario!][19].meses);
@@ -12225,7 +12222,6 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     <Bar dataKey="original" fill="#dc2626" name="Original (mil)" maxBarSize={50} />
                     <Bar dataKey="projecao" fill="#ea580c" name="Projeção (mil)" maxBarSize={50} />
                   </BarChart>
-                </>
                   ) : (
                 <BarChart data={(() => {
                   const periodDataProvisoes = aggregateData(activeDreData[19].meses.map(v => Math.abs(v)));
@@ -12373,7 +12369,6 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
           <CardContent className="pt-6">
             <ChartContainer config={chartConfig} className="h-[220px] w-full">
               {showComparison && projectionMode ? (
-                <>
                   <BarChart 
                     data={(() => {
                       const periodData = aggregateData(projectedData[activeScenario!][21].meses);
@@ -12437,7 +12432,6 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     <Bar dataKey="original" fill="#059669" name="Original (mil)" maxBarSize={50} />
                     <Bar dataKey="projecao" fill="#0d9488" name="Projeção (mil)" maxBarSize={50} />
                   </BarChart>
-                </>
                   ) : (
                 <BarChart data={(() => {
                   const periodDataLucro = aggregateData(activeDreData[21].meses);
