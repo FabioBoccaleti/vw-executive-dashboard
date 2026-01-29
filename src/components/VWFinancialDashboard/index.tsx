@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2, DollarSign, Building2, Plus, Edit, Save, X, ChevronDown } from "lucide-react"
+import { PasswordDialog } from "@/components/PasswordDialog"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, Legend, LabelList, ComposedChart, Cell } from "recharts"
 import { useState, useRef, useEffect, useCallback } from "react"
@@ -237,6 +238,11 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   // Estado para dados compartilhados entre todos os departamentos (Dados Adicionais)
   const [sharedMetricsData, setSharedMetricsData] = useState<MetricsData>(() => loadSharedMetricsData(fiscalYear, brand))
   
+  // Estados para controle dos diálogos de senha
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
+  const [dataPasswordAction, setDataPasswordAction] = useState<'import' | 'export' | 'template' | 'revert' | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  
   // Expor funções de limpeza no console (apenas para desenvolvimento)
   useEffect(() => {
     (window as any).clearYearData = (year: 2024 | 2025 | 2026 | 2027) => clearYearData(year, brand);
@@ -469,7 +475,12 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     setFiscalYear(newYear);
   };
   
-  // Handlers para importação e exportação de métricas
+  // Handlers para importação e exportação de métricas (protegido por senha)
+  const requestExportMetrics = () => {
+    setDataPasswordAction('export')
+    setPasswordDialogOpen(true)
+  }
+
   const handleExportMetrics = () => {
     // Exportar dados compartilhados além dos dados normais
     const allData = {
@@ -896,7 +907,60 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     }
   }
 
-  // Função para baixar template
+  // Função executada após validação de senha bem-sucedida
+  const executePasswordProtectedAction = () => {
+    switch (dataPasswordAction) {
+      case 'template':
+        downloadTemplate()
+        break
+      case 'import':
+        if (pendingFile) {
+          processImportFile(pendingFile)
+          setPendingFile(null)
+        }
+        break
+      case 'export':
+        handleExportMetrics()
+        break
+      case 'revert':
+        executeRevertData()
+        break
+    }
+    setDataPasswordAction(null)
+  }
+
+  // Função para processar arquivo de importação
+  const processImportFile = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string
+        handleImportDataContent(content)
+      } catch (error) {
+        alert('Erro ao importar dados. Verifique o formato do arquivo.')
+        console.error('Erro ao importar:', error)
+      }
+    }
+    reader.readAsText(file)
+  }
+  
+  // Função de reverter dados após validação de senha
+  const executeRevertData = () => {
+    setDreData(initialDreData)
+    alert('Dados revertidos para o estado inicial!')
+  }
+  
+  // Função para requisitar reversão com senha
+  const requestRevertData = () => {
+    setDataPasswordAction('revert')
+    setPasswordDialogOpen(true)
+  }
+
+  const requestDownloadTemplate = () => {
+    setDataPasswordAction('template')
+    setPasswordDialogOpen(true)
+  }
+
   const downloadTemplate = () => {
     // Função para formatar valores em moeda brasileira
     const formatCurrency = (value: number) => {
@@ -968,7 +1032,19 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     URL.revokeObjectURL(url)
   }
 
-  // Função para importar dados
+  // Função para importar dados (protegida por senha)
+  const requestImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    
+    setPendingFile(file)
+    setDataPasswordAction('import')
+    setPasswordDialogOpen(true)
+    
+    // Resetar o input para permitir selecionar o mesmo arquivo novamente
+    event.target.value = ''
+  }
+
   const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -977,162 +1053,165 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string
-        
-        // Tentar parsear como JSON (formato de backup completo)
-        if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
-          console.log(`📥 Iniciando importação JSON para marca: ${brand}...`);
-          setIsImporting(true);
-          
-          try {
-            const success = importAllData(content, brand);
-            if (success) {
-              console.log('✅ Dados importados do JSON e salvos no localStorage');
-              
-              // Verificar que realmente salvou no localStorage
-              const totalKeys = Object.keys(localStorage).filter(k => k.startsWith(`${brand}_`)).length;
-              console.log(`📦 Total de chaves ${brand} no localStorage: ${totalKeys}`);
-              
-              // Aguardar um momento para garantir persistência e depois recarregar dados
-              setTimeout(() => {
-                console.log('🔄 Recarregando dados após importação...');
-                
-                // Recarregar dados do localStorage para atualizar a interface
-                const reloadedMetrics = loadMetricsData(fiscalYear, department, brand);
-                const reloadedDRE = loadDREData(fiscalYear, department, brand);
-                
-                console.log('🔍 Dados recarregados:');
-                console.log('  - Métricas:', reloadedMetrics);
-                console.log('  - DRE:', reloadedDRE);
-                
-                if (reloadedMetrics) {
-                  console.log('📊 Atualizando métricas na interface');
-                  setMetricsData(reloadedMetrics);
-                }
-                if (reloadedDRE) {
-                  console.log('📈 Atualizando DRE na interface');
-                  setDreData(reloadedDRE);
-                }
-                
-                setIsImporting(false);
-                alert('Dados importados com sucesso! Interface atualizada.');
-              }, 200);
-            } else {
-              setIsImporting(false);
-              alert('Erro ao importar dados JSON. Verifique o formato do arquivo.');
-            }
-          } catch (error) {
-            console.error('❌ Erro durante importação JSON:', error);
-            setIsImporting(false);
-            alert('Erro ao importar dados JSON. Verifique o formato do arquivo.');
-          }
-          return;
-        }
-        
-        // Parsear formato tabular TXT
-        const lines = content.split('\n').filter(line => 
-          line.trim() && !line.trim().startsWith('#')
-        )
-        
-        if (lines.length < 2) {
-          throw new Error('Arquivo vazio ou inválido')
-        }
-        
-        // Pular o cabeçalho (primeira linha não comentada)
-        const dataLines = lines
-        
-        const parseCurrency = (value: string): number => {
-          if (value === '-' || !value.trim() || value === 'R$ 0') return 0
-          
-          // Verificar se é negativo
-          const isNegative = value.trim().startsWith('-')
-          
-          // Remover R$, espaços, sinais negativos e pontos de milhares
-          const cleaned = value
-            .replace(/-/g, '')
-            .replace(/R\$/g, '')
-            .replace(/\s/g, '')
-            .replace(/\./g, '')
-            .replace(',', '.')
-            .trim()
-          
-          const num = parseFloat(cleaned) || 0
-          return isNegative ? -num : num
-        }
-        
-        const parsePercent = (value: string): number | null => {
-          if (value === '-' || !value.trim()) return null
-          return parseFloat(value.replace('%', '').replace(',', '.')) || null
-        }
-        
-        const importedData = dataLines.map(line => {
-          // Dividir por TAB e remover espaços extras do padding
-          const columns = line.split('\t').map(col => col.trim())
-          
-          return {
-            descricao: columns[0]?.trim() || '',
-            total: parseCurrency(columns[1] || '0'),
-            percentTotal: parsePercent(columns[2] || '-'),
-            meses: [
-              parseCurrency(columns[3] || '0'),
-              parseCurrency(columns[4] || '0'),
-              parseCurrency(columns[5] || '0'),
-              parseCurrency(columns[6] || '0'),
-              parseCurrency(columns[7] || '0'),
-              parseCurrency(columns[8] || '0'),
-              parseCurrency(columns[9] || '0'),
-              parseCurrency(columns[10] || '0'),
-              parseCurrency(columns[11] || '0'),
-              parseCurrency(columns[12] || '0'),
-              parseCurrency(columns[13] || '0'),
-              parseCurrency(columns[14] || '0')
-            ],
-            isHighlight: columns[15]?.trim() === 'true',
-            isFinal: columns[16]?.trim() === 'true'
-          }
-        })
-        
-        console.log('📥 Dados importados (TXT):', importedData);
-        setIsImporting(true);
-        
-        // SALVAR NO LOCALSTORAGE para persistir os dados importados
-        const isConsolidado = department === 'consolidado';
-        const saved = saveDREData(fiscalYear, importedData, department, isConsolidado, brand);
-        
-        if (saved) {
-          console.log(`✅ DRE salvo no localStorage: ${brand}_dre_${fiscalYear}_${department}`);
-          
-          // Aguardar um momento para garantir persistência e depois atualizar interface
-          setTimeout(() => {
-            console.log('🔄 Atualizando interface após importação TXT...');
-            setDreData(importedData);
-            setIsImporting(false);
-            
-            // Verificar se os dados realmente persistiram
-            const verification = loadDREData(fiscalYear, department, brand);
-            if (verification && verification.length > 0) {
-              console.log('✅ Verificação: dados persistiram corretamente');
-              alert(`${importedData.length} linhas importadas e salvas com sucesso!`);
-            } else {
-              console.warn('⚠️ Verificação: possível problema de persistência');
-              alert(`Dados importados, mas verifique a persistência. ${importedData.length} linhas processadas.`);
-            }
-          }, 100);
-        } else {
-          console.error(`❌ Falha ao salvar DRE no localStorage`);
-          setIsImporting(false);
-          alert('Erro: falha ao salvar dados no localStorage');
-        }
-        
+        handleImportDataContent(content)
       } catch (error) {
-        alert('Erro ao importar dados. Verifique se o arquivo está no formato correto.')
+        alert('Erro ao importar dados. Verifique o formato do arquivo.')
         console.error('Erro ao importar:', error)
       }
     }
     reader.readAsText(file)
-    
-    // Limpar o input para permitir reimportação do mesmo arquivo
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+  }
+
+  // Função auxiliar para processar o conteúdo do arquivo de importação
+  const handleImportDataContent = (content: string) => {
+    try {
+      // Tentar parsear como JSON (formato de backup completo)
+      if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
+        console.log(`📥 Iniciando importação JSON para marca: ${brand}...`);
+        setIsImporting(true);
+        
+        try {
+          const success = importAllData(content, brand);
+          if (success) {
+            console.log('✅ Dados importados do JSON e salvos no localStorage');
+            
+            // Verificar que realmente salvou no localStorage
+            const totalKeys = Object.keys(localStorage).filter(k => k.startsWith(`${brand}_`)).length;
+            console.log(`📦 Total de chaves ${brand} no localStorage: ${totalKeys}`);
+            
+            // Aguardar um momento para garantir persistência e depois recarregar dados
+            setTimeout(() => {
+              console.log('🔄 Recarregando dados após importação...');
+              
+              // Recarregar dados do localStorage para atualizar a interface
+              const reloadedMetrics = loadMetricsData(fiscalYear, department, brand);
+              const reloadedDRE = loadDREData(fiscalYear, department, brand);
+              
+              console.log('🔍 Dados recarregados:');
+              console.log('  - Métricas:', reloadedMetrics);
+              console.log('  - DRE:', reloadedDRE);
+              
+              if (reloadedMetrics) {
+                console.log('📊 Atualizando métricas na interface');
+                setMetricsData(reloadedMetrics);
+              }
+              if (reloadedDRE) {
+                console.log('📈 Atualizando DRE na interface');
+                setDreData(reloadedDRE);
+              }
+              
+              setIsImporting(false);
+              alert('Dados importados com sucesso! Interface atualizada.');
+            }, 200);
+          } else {
+            setIsImporting(false);
+            alert('Erro ao importar dados JSON. Verifique o formato do arquivo.');
+          }
+        } catch (error) {
+          console.error('❌ Erro durante importação JSON:', error);
+          setIsImporting(false);
+          alert('Erro ao importar dados JSON. Verifique o formato do arquivo.');
+        }
+        return;
+      }
+      
+      // Parsear formato tabular TXT
+      const lines = content.split('\n').filter(line => 
+        line.trim() && !line.trim().startsWith('#')
+      )
+      
+      if (lines.length < 2) {
+        throw new Error('Arquivo vazio ou inválido')
+      }
+      
+      // Pular o cabeçalho (primeira linha não comentada)
+      const dataLines = lines
+      
+      const parseCurrency = (value: string): number => {
+        if (value === '-' || !value.trim() || value === 'R$ 0') return 0
+        
+        // Verificar se é negativo
+        const isNegative = value.trim().startsWith('-')
+        
+        // Remover R$, espaços, sinais negativos e pontos de milhares
+        const cleaned = value
+          .replace(/-/g, '')
+          .replace(/R\$/g, '')
+          .replace(/\s/g, '')
+          .replace(/\./g, '')
+          .replace(',', '.')
+          .trim()
+        
+        const num = parseFloat(cleaned) || 0
+        return isNegative ? -num : num
+      }
+      
+      const parsePercent = (value: string): number | null => {
+        if (value === '-' || !value.trim()) return null
+        return parseFloat(value.replace('%', '').replace(',', '.')) || null
+      }
+      
+      const importedData = dataLines.map(line => {
+        // Dividir por TAB e remover espaços extras do padding
+        const columns = line.split('\t').map(col => col.trim())
+        
+        return {
+          descricao: columns[0]?.trim() || '',
+          total: parseCurrency(columns[1] || '0'),
+          percentTotal: parsePercent(columns[2] || '-'),
+          meses: [
+            parseCurrency(columns[3] || '0'),
+            parseCurrency(columns[4] || '0'),
+            parseCurrency(columns[5] || '0'),
+            parseCurrency(columns[6] || '0'),
+            parseCurrency(columns[7] || '0'),
+            parseCurrency(columns[8] || '0'),
+            parseCurrency(columns[9] || '0'),
+            parseCurrency(columns[10] || '0'),
+            parseCurrency(columns[11] || '0'),
+            parseCurrency(columns[12] || '0'),
+            parseCurrency(columns[13] || '0'),
+            parseCurrency(columns[14] || '0')
+          ],
+          isHighlight: columns[15]?.trim() === 'true',
+          isFinal: columns[16]?.trim() === 'true'
+        }
+      })
+      
+      console.log('📥 Dados importados (TXT):', importedData);
+      setIsImporting(true);
+      
+      // SALVAR NO LOCALSTORAGE para persistir os dados importados
+      const isConsolidado = department === 'consolidado';
+      const saved = saveDREData(fiscalYear, importedData, department, isConsolidado, brand);
+      
+      if (saved) {
+        console.log(`✅ DRE salvo no localStorage: ${brand}_dre_${fiscalYear}_${department}`);
+        
+        // Aguardar um momento para garantir persistência e depois atualizar interface
+        setTimeout(() => {
+          console.log('🔄 Atualizando interface após importação TXT...');
+          setDreData(importedData);
+          setIsImporting(false);
+          
+          // Verificar se os dados realmente persistiram
+          const verification = loadDREData(fiscalYear, department, brand);
+          if (verification && verification.length > 0) {
+            console.log('✅ Verificação: dados persistiram corretamente');
+            alert(`${importedData.length} linhas importadas e salvas com sucesso!`);
+          } else {
+            console.warn('⚠️ Verificação: possível problema de persistência');
+            alert(`Dados importados, mas verifique a persistência. ${importedData.length} linhas processadas.`);
+          }
+        }, 100);
+      } else {
+        console.error(`❌ Falha ao salvar DRE no localStorage`);
+        setIsImporting(false);
+        alert('Erro: falha ao salvar dados no localStorage');
+      }
+    } catch (error) {
+      alert('Erro ao importar dados. Verifique o formato do arquivo.')
+      console.error('Erro ao importar:', error)
     }
   }
 
@@ -10484,7 +10563,11 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={handleImportMetrics}
+                      onClick={() => {
+                        setDataPasswordAction('import')
+                        setPasswordDialogOpen(true)
+                        setTimeout(() => metricsFileInputRef.current?.click(), 100)
+                      }}
                       className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
                     >
                       <Upload className="w-4 h-4" />
@@ -10493,7 +10576,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={handleExportMetrics}
+                      onClick={requestExportMetrics}
                       className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-green-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
                     >
                       <Download className="w-4 h-4" />
@@ -10503,10 +10586,8 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        if (confirm('Isso vai limpar todos os dados salvos e recarregar os dados padrão. Continuar?')) {
-                          clearYearData(fiscalYear);
-                          window.location.reload();
-                        }
+                        setDataPasswordAction('revert')
+                        setPasswordDialogOpen(true)
                       }}
                       className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
                     >
@@ -12608,8 +12689,8 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".json"
-                onChange={handleImportData}
+                accept=".json,.txt"
+                onChange={requestImportData}
                 className="hidden"
               />
               <Button
@@ -12624,7 +12705,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               <Button
                 variant="outline"
                 size="sm"
-                onClick={downloadTemplate}
+                onClick={requestDownloadTemplate}
                 className="gap-2"
               >
                 <Download className="w-4 h-4" />
@@ -12633,10 +12714,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setDreData(initialDreData)
-                  alert('Dados revertidos para o estado inicial!')
-                }}
+                onClick={requestRevertData}
                 className="gap-2 text-orange-600 hover:text-orange-700 hover:border-orange-300"
               >
                 <TrendingDown className="w-4 h-4" />
@@ -12706,6 +12784,15 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
         </div>
       </div>
     )}
+    
+    {/* Diálogo de Senha */}
+    <PasswordDialog
+      open={passwordDialogOpen}
+      onOpenChange={setPasswordDialogOpen}
+      onSuccess={executePasswordProtectedAction}
+      title="Autorização Necessária"
+      description="Digite a senha para prosseguir:"
+    />
     </div>
   </>
   )
