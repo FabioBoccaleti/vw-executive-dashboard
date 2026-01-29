@@ -1833,7 +1833,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   Dashboard Executivo - {brandConfig.name}
                 </h1>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  {DEPARTMENT_LABELS[department]} • Análise Gerencial • Atualizado em {new Date().toLocaleDateString('pt-BR')}
+                  {DEPARTMENT_LABELS[department]} • Análise Gerencial • Atualizado em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
             </div>
