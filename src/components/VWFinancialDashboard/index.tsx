@@ -34,6 +34,12 @@ import {
   type FatoRelevante,
   type FatosRelevantesData
 } from "@/lib/dataStorage"
+import { 
+  importAllDataToCloudAndLocal,
+  preloadFromCloud,
+  hasAnyData,
+  isCloudMode
+} from "@/lib/hybridStorage"
 import { DEPARTMENT_LABELS, DEPARTMENTS } from "@/lib/types"
 import { getBrandConfig, BRAND_CONFIGS } from "@/lib/brands"
 
@@ -360,6 +366,21 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     console.log('  - reloadDashboard() - Recarrega a página');
     console.log('  - debugStorage() - Diagnóstico completo do localStorage');
     console.log('  - testPersistence() - Testa funcionamento do localStorage');
+  }, [brand]);
+  
+  // Effect para pré-carregar dados da nuvem (Redis) na inicialização
+  useEffect(() => {
+    const initCloudData = async () => {
+      console.log('☁️ Verificando dados na nuvem...');
+      try {
+        await preloadFromCloud(brand);
+        console.log('☁️ Pré-carregamento da nuvem concluído');
+      } catch (error) {
+        console.warn('⚠️ Erro ao pré-carregar dados da nuvem:', error);
+      }
+    };
+    
+    initCloudData();
   }, [brand]);
   
   // Effect para carregar dados quando o ano fiscal, departamento ou marca mudarem
@@ -932,10 +953,10 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   // Função para processar arquivo de importação
   const processImportFile = (file: File) => {
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const content = e.target?.result as string
-        handleImportDataContent(content)
+        await handleImportDataContent(content)
       } catch (error) {
         alert('Erro ao importar dados. Verifique o formato do arquivo.')
         console.error('Erro ao importar:', error)
@@ -1050,10 +1071,10 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     if (!file) return
 
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const content = e.target?.result as string
-        handleImportDataContent(content)
+        await handleImportDataContent(content)
       } catch (error) {
         alert('Erro ao importar dados. Verifique o formato do arquivo.')
         console.error('Erro ao importar:', error)
@@ -1063,7 +1084,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   }
 
   // Função auxiliar para processar o conteúdo do arquivo de importação
-  const handleImportDataContent = (content: string) => {
+  const handleImportDataContent = async (content: string) => {
     try {
       // Tentar parsear como JSON (formato de backup completo)
       if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
@@ -1071,9 +1092,16 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
         setIsImporting(true);
         
         try {
-          const success = importAllData(content, brand);
-          if (success) {
-            console.log('✅ Dados importados do JSON e salvos no localStorage');
+          // Primeiro salva no localStorage usando a função original
+          const localSuccess = importAllData(content, brand);
+          
+          // Depois tenta salvar no Redis (nuvem) para compartilhar com outros usuários
+          const cloudResult = await importAllDataToCloudAndLocal(content, brand);
+          
+          if (localSuccess || cloudResult.success) {
+            console.log('✅ Dados importados:');
+            console.log(`  - localStorage: ${localSuccess ? '✅' : '❌'}`);
+            console.log(`  - Redis (nuvem): ${cloudResult.cloudSaved ? '✅' : '⏭️ não disponível'}`);
             
             // Verificar que realmente salvou no localStorage
             const totalKeys = Object.keys(localStorage).filter(k => k.startsWith(`${brand}_`)).length;
@@ -1101,7 +1129,13 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               }
               
               setIsImporting(false);
-              alert('Dados importados com sucesso! Interface atualizada.');
+              
+              // Mensagem de sucesso com informação sobre sincronização na nuvem
+              if (cloudResult.cloudSaved) {
+                alert('Dados importados com sucesso! ☁️ Sincronizado com a nuvem - outros usuários verão os dados ao recarregar.');
+              } else {
+                alert('Dados importados com sucesso! ⚠️ Salvos apenas localmente (nuvem indisponível).');
+              }
             }, 200);
           } else {
             setIsImporting(false);
