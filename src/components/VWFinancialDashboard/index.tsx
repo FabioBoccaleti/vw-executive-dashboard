@@ -1461,22 +1461,31 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   //   }
   // }, [])
   
+  // Chaves de localStorage específicas por marca, ano e departamento
+  const getProjectionStorageKey = (suffix: string) => `${brand}_projection_${fiscalYear}_${department}_${suffix}`
+  
   // Persistir cenários no localStorage
   useEffect(() => {
     if (projectionScenarios.length > 0) {
-      localStorage.setItem('vw-projection-scenarios', JSON.stringify(projectionScenarios))
-      localStorage.setItem('vw-projection-percentages', JSON.stringify(projectionPercentages))
-      localStorage.setItem('vw-projected-data', JSON.stringify(projectedData))
-      localStorage.setItem('vw-active-scenario', activeScenario || '')
+      localStorage.setItem(getProjectionStorageKey('scenarios'), JSON.stringify(projectionScenarios))
+      localStorage.setItem(getProjectionStorageKey('percentages'), JSON.stringify(projectionPercentages))
+      localStorage.setItem(getProjectionStorageKey('data'), JSON.stringify(projectedData))
+      localStorage.setItem(getProjectionStorageKey('active'), activeScenario || '')
+    } else {
+      // Se não há cenários, limpar os dados do localStorage para este departamento
+      localStorage.removeItem(getProjectionStorageKey('scenarios'))
+      localStorage.removeItem(getProjectionStorageKey('percentages'))
+      localStorage.removeItem(getProjectionStorageKey('data'))
+      localStorage.removeItem(getProjectionStorageKey('active'))
     }
-  }, [projectionScenarios, projectionPercentages, projectedData, activeScenario])
+  }, [projectionScenarios, projectionPercentages, projectedData, activeScenario, brand, fiscalYear, department])
   
-  // Carregar cenários do localStorage na inicialização
+  // Carregar cenários do localStorage quando mudar marca, ano ou departamento
   useEffect(() => {
-    const savedScenarios = localStorage.getItem('vw-projection-scenarios')
-    const savedPercentages = localStorage.getItem('vw-projection-percentages')
-    const savedProjectedData = localStorage.getItem('vw-projected-data')
-    const savedActiveScenario = localStorage.getItem('vw-active-scenario')
+    const savedScenarios = localStorage.getItem(getProjectionStorageKey('scenarios'))
+    const savedPercentages = localStorage.getItem(getProjectionStorageKey('percentages'))
+    const savedProjectedData = localStorage.getItem(getProjectionStorageKey('data'))
+    const savedActiveScenario = localStorage.getItem(getProjectionStorageKey('active'))
     
     if (savedScenarios) {
       try {
@@ -1486,12 +1495,28 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
         if (savedActiveScenario && savedActiveScenario !== '') {
           setActiveScenario(savedActiveScenario)
           setProjectionMode(true)
+        } else {
+          setActiveScenario(null)
+          setProjectionMode(false)
         }
       } catch (e) {
         console.error('Erro ao carregar projeções salvas:', e)
+        // Em caso de erro, resetar estado
+        setProjectionScenarios([])
+        setProjectionPercentages({})
+        setProjectedData({})
+        setActiveScenario(null)
+        setProjectionMode(false)
       }
+    } else {
+      // Não há projeções salvas para este departamento - resetar estado
+      setProjectionScenarios([])
+      setProjectionPercentages({})
+      setProjectedData({})
+      setActiveScenario(null)
+      setProjectionMode(false)
     }
-  }, [])
+  }, [brand, fiscalYear, department])
   
   // Verificar se os dados estão carregados
   if (dreData.length === 0) {
