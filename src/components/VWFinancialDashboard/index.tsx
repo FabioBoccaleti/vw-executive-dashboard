@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { TrendingDown, Download, Upload, Calendar, BarChart3, TrendingUp, Eye, GitCompare, Trash2, DollarSign, Building2, Plus, Edit, Save, X, ChevronDown } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis, Legend, LabelList, ComposedChart, Cell } from "recharts"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DetailedMetricsTable } from "@/components/DetailedMetricsTable"
@@ -200,7 +200,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   // Estado para dados DRE
   const [dreData, setDreData] = useState<any[]>([])
   
-  // Estados para sistema de projeções
+  // Estados para sistema de projeções - ISOLADOS POR DEPARTAMENTO/ANO/MARCA
   const [projectionMode, setProjectionMode] = useState(false)
   const [projectionScenarios, setProjectionScenarios] = useState<{id: string, name: string}[]>([])
   const [activeScenario, setActiveScenario] = useState<string | null>(null)
@@ -211,6 +211,16 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordAction, setPasswordAction] = useState<'edit' | 'delete' | null>(null)
+  
+  // Referência para controlar se está carregando projeções (evita salvar durante carregamento)
+  const isLoadingProjections = useRef(false)
+  // Referência para rastrear o contexto atual (departamento/ano/marca)
+  const currentProjectionContext = useRef(`${brand}_${fiscalYear}_${department}`)
+  
+  // Chaves de localStorage específicas por marca, ano e departamento para projeções
+  const getProjectionStorageKey = useCallback((suffix: string) => {
+    return `${brand}_projection_${fiscalYear}_${department}_${suffix}`
+  }, [brand, fiscalYear, department])
   
   // Estado para controlar exibição da tabela de métricas detalhadas
   const [showDetailedMetrics, setShowDetailedMetrics] = useState(false)
@@ -1143,8 +1153,8 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   const createProjectionScenario = () => {
     const newScenarioNumber = projectionScenarios.length + 1
     const newScenario = {
-      id: `projection-${Date.now()}`,
-      name: `Projeção ${newScenarioNumber}`
+      id: `projection-${department}-${Date.now()}`,
+      name: `projecao_${department}_${newScenarioNumber}`
     }
     
     setProjectionScenarios(prev => [...prev, newScenario])
@@ -1225,11 +1235,11 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
       return updated
     })
     
-    // Limpar do localStorage
-    localStorage.removeItem('vw-projection-scenarios')
-    localStorage.removeItem('vw-projection-percentages')
-    localStorage.removeItem('vw-projected-data')
-    localStorage.removeItem('vw-active-scenario')
+    // Limpar do localStorage (usando chaves específicas por departamento)
+    localStorage.removeItem(getProjectionStorageKey('scenarios'))
+    localStorage.removeItem(getProjectionStorageKey('percentages'))
+    localStorage.removeItem(getProjectionStorageKey('data'))
+    localStorage.removeItem(getProjectionStorageKey('active'))
     
     // Voltar ao modo original
     setProjectionMode(false)
@@ -1461,37 +1471,38 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   //   }
   // }, [])
   
-  // Chaves de localStorage específicas por marca, ano e departamento
-  const getProjectionStorageKey = (suffix: string) => `${brand}_projection_${fiscalYear}_${department}_${suffix}`
-  
-  // Persistir cenários no localStorage
+  // Carregar projeções do localStorage quando mudar departamento/ano/marca
   useEffect(() => {
-    if (projectionScenarios.length > 0) {
-      localStorage.setItem(getProjectionStorageKey('scenarios'), JSON.stringify(projectionScenarios))
-      localStorage.setItem(getProjectionStorageKey('percentages'), JSON.stringify(projectionPercentages))
-      localStorage.setItem(getProjectionStorageKey('data'), JSON.stringify(projectedData))
-      localStorage.setItem(getProjectionStorageKey('active'), activeScenario || '')
-    } else {
-      // Se não há cenários, limpar os dados do localStorage para este departamento
-      localStorage.removeItem(getProjectionStorageKey('scenarios'))
-      localStorage.removeItem(getProjectionStorageKey('percentages'))
-      localStorage.removeItem(getProjectionStorageKey('data'))
-      localStorage.removeItem(getProjectionStorageKey('active'))
-    }
-  }, [projectionScenarios, projectionPercentages, projectedData, activeScenario, brand, fiscalYear, department])
-  
-  // Carregar cenários do localStorage quando mudar marca, ano ou departamento
-  useEffect(() => {
-    const savedScenarios = localStorage.getItem(getProjectionStorageKey('scenarios'))
-    const savedPercentages = localStorage.getItem(getProjectionStorageKey('percentages'))
-    const savedProjectedData = localStorage.getItem(getProjectionStorageKey('data'))
-    const savedActiveScenario = localStorage.getItem(getProjectionStorageKey('active'))
+    const newContext = `${brand}_${fiscalYear}_${department}`
+    
+    // Sempre resetar e recarregar quando o contexto mudar
+    isLoadingProjections.current = true
+    currentProjectionContext.current = newContext
+    
+    console.log(`[Projeções] Carregando para contexto: ${newContext}`)
+    
+    const scenariosKey = getProjectionStorageKey('scenarios')
+    const percentagesKey = getProjectionStorageKey('percentages')
+    const dataKey = getProjectionStorageKey('data')
+    const activeKey = getProjectionStorageKey('active')
+    
+    const savedScenarios = localStorage.getItem(scenariosKey)
+    const savedPercentages = localStorage.getItem(percentagesKey)
+    const savedProjectedData = localStorage.getItem(dataKey)
+    const savedActiveScenario = localStorage.getItem(activeKey)
     
     if (savedScenarios) {
       try {
-        setProjectionScenarios(JSON.parse(savedScenarios))
-        if (savedPercentages) setProjectionPercentages(JSON.parse(savedPercentages))
-        if (savedProjectedData) setProjectedData(JSON.parse(savedProjectedData))
+        const scenarios = JSON.parse(savedScenarios)
+        const percentages = savedPercentages ? JSON.parse(savedPercentages) : {}
+        const data = savedProjectedData ? JSON.parse(savedProjectedData) : {}
+        
+        console.log(`[Projeções] Encontrado ${scenarios.length} cenário(s) para ${department}`)
+        
+        setProjectionScenarios(scenarios)
+        setProjectionPercentages(percentages)
+        setProjectedData(data)
+        
         if (savedActiveScenario && savedActiveScenario !== '') {
           setActiveScenario(savedActiveScenario)
           setProjectionMode(true)
@@ -1500,8 +1511,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
           setProjectionMode(false)
         }
       } catch (e) {
-        console.error('Erro ao carregar projeções salvas:', e)
-        // Em caso de erro, resetar estado
+        console.error('[Projeções] Erro ao carregar:', e)
         setProjectionScenarios([])
         setProjectionPercentages({})
         setProjectedData({})
@@ -1509,14 +1519,52 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
         setProjectionMode(false)
       }
     } else {
-      // Não há projeções salvas para este departamento - resetar estado
+      console.log(`[Projeções] Nenhuma projeção salva para ${department}`)
       setProjectionScenarios([])
       setProjectionPercentages({})
       setProjectedData({})
       setActiveScenario(null)
       setProjectionMode(false)
     }
-  }, [brand, fiscalYear, department])
+    
+    // Permitir salvamento após um pequeno delay
+    setTimeout(() => {
+      isLoadingProjections.current = false
+    }, 100)
+  }, [brand, fiscalYear, department, getProjectionStorageKey])
+  
+  // Persistir projeções no localStorage (apenas quando não está carregando)
+  useEffect(() => {
+    // Não salvar durante o carregamento inicial
+    if (isLoadingProjections.current) {
+      return
+    }
+    
+    // Verificar se o contexto ainda é o mesmo
+    const currentContext = `${brand}_${fiscalYear}_${department}`
+    if (currentProjectionContext.current !== currentContext) {
+      return
+    }
+    
+    const scenariosKey = getProjectionStorageKey('scenarios')
+    const percentagesKey = getProjectionStorageKey('percentages')
+    const dataKey = getProjectionStorageKey('data')
+    const activeKey = getProjectionStorageKey('active')
+    
+    if (projectionScenarios.length > 0) {
+      console.log(`[Projeções] Salvando ${projectionScenarios.length} cenário(s) para ${department}`)
+      localStorage.setItem(scenariosKey, JSON.stringify(projectionScenarios))
+      localStorage.setItem(percentagesKey, JSON.stringify(projectionPercentages))
+      localStorage.setItem(dataKey, JSON.stringify(projectedData))
+      localStorage.setItem(activeKey, activeScenario || '')
+    } else {
+      console.log(`[Projeções] Limpando projeções de ${department}`)
+      localStorage.removeItem(scenariosKey)
+      localStorage.removeItem(percentagesKey)
+      localStorage.removeItem(dataKey)
+      localStorage.removeItem(activeKey)
+    }
+  }, [projectionScenarios, projectionPercentages, projectedData, activeScenario, brand, fiscalYear, department, getProjectionStorageKey])
   
   // Verificar se os dados estão carregados
   if (dreData.length === 0) {
