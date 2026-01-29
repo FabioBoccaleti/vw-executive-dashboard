@@ -1336,7 +1336,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     if (!percentages) return
     
     // Clonar dados originais
-    const projected = JSON.parse(JSON.stringify(dreData))
+    const projected = JSON.parse(JSON.stringify(safeDreData))
     
     // Índices de linhas editáveis (não calculadas)
     const editableIndices = [0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20]
@@ -1344,7 +1344,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     // Aplicar percentuais às linhas editáveis
     editableIndices.forEach(index => {
       if (percentages[index]) {
-        projected[index].meses = dreData[index].meses.map((val: number, monthIdx: number) => {
+        projected[index].meses = safeDreData[index].meses.map((val: number, monthIdx: number) => {
           const percentage = percentages[index][monthIdx] || 0
           return val * (1 + percentage / 100)
         })
@@ -1405,8 +1405,13 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     if (projectionMode && activeScenario && projectedData[activeScenario!]) {
       return projectedData[activeScenario!]
     }
-    return dreData
+    // Retorna initialDreData se dreData estiver vazio para evitar erros durante renderização inicial
+    return dreData.length > 0 ? dreData : initialDreData
   }
+  
+  // Dados DRE com fallback para initialDreData (evita erros quando dreData está vazio)
+  const safeDreData = dreData.length > 0 ? dreData : initialDreData
+  
   // Dados mensais
   const monthlyData = [
     { mes: "Janeiro", volume: 120, receitaLiquida: 8900, lucroBruto: 520, rendasOperacionais: 420, lucroOperacional: 190, pessoal: 145, terceiros: 48, ocupacao: 22, funcionamento: 95, vendas: 390 },
@@ -12482,7 +12487,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               <div className="grid grid-cols-4 gap-4 mt-4">
                 <div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Original</p>
-                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(dreData[21].total)}</p>
+                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(dreData[21]?.total || 0)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Projetado</p>
@@ -12490,14 +12495,14 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                 </div>
                 <div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação</p>
-                  <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[21]?.total || 0) - dreData[21].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {((projectedData[activeScenario!]?.[21]?.total || 0) - dreData[21].total) >= 0 ? '+' : ''}{formatCurrency((projectedData[activeScenario!]?.[21]?.total || 0) - dreData[21].total)}
+                  <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[21]?.total || 0) - (dreData[21]?.total || 0)) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {((projectedData[activeScenario!]?.[21]?.total || 0) - (dreData[21]?.total || 0)) >= 0 ? '+' : ''}{formatCurrency((projectedData[activeScenario!]?.[21]?.total || 0) - (dreData[21]?.total || 0))}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação %</p>
-                  <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[21]?.total || 0) - dreData[21].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {((projectedData[activeScenario!]?.[21]?.total || 0) - dreData[21].total) >= 0 ? '+' : ''}{dreData[21].total !== 0 ? (((projectedData[activeScenario!]?.[21]?.total || 0) - dreData[21].total) / Math.abs(dreData[21].total) * 100).toFixed(2) : 0}%
+                  <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[21]?.total || 0) - (dreData[21]?.total || 0)) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {((projectedData[activeScenario!]?.[21]?.total || 0) - (dreData[21]?.total || 0)) >= 0 ? '+' : ''}{(dreData[21]?.total || 0) !== 0 ? (((projectedData[activeScenario!]?.[21]?.total || 0) - (dreData[21]?.total || 0)) / Math.abs(dreData[21]?.total || 1) * 100).toFixed(2) : 0}%
                   </p>
                 </div>
               </div>
@@ -12505,17 +12510,17 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               <div className="grid grid-cols-4 gap-6 mt-4">
                 <div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total do Período</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[21].total)}</p>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(activeDreData[21]?.total || 0)}</p>
                 </div>
                 
                 <div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Margem Líquida Final</p>
-                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{activeDreData[21].percentTotal?.toFixed(2)}%</p>
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{activeDreData[21]?.percentTotal?.toFixed(2) || '0.00'}%</p>
                 </div>
                 
                 <div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[21].total / 12)}</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency((activeDreData[21]?.total || 0) / 12)}</p>
                 </div>
               </div>
             )}
@@ -12525,13 +12530,13 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               {showComparison && projectionMode ? (
                   <BarChart 
                     data={(() => {
-                      const periodData = aggregateData(projectedData[activeScenario!][21].meses);
-                      const periodDataOriginal = aggregateData(dreData[21].meses);
+                      const periodData = aggregateData(projectedData[activeScenario!]?.[21]?.meses || []);
+                      const periodDataOriginal = aggregateData(dreData[21]?.meses || []);
                       const labels = getPeriodLabels();
                       return labels.map((mes, idx) => ({
                         mes,
-                        original: periodDataOriginal[idx] / 1000,
-                        projecao: periodData[idx] / 1000
+                        original: (periodDataOriginal[idx] || 0) / 1000,
+                        projecao: (periodData[idx] || 0) / 1000
                       }));
                     })()} 
                     barGap={4}
@@ -12588,14 +12593,14 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   </BarChart>
                   ) : (
                 <BarChart data={(() => {
-                  const periodDataLucro = aggregateData(activeDreData[21].meses);
-                  const periodDataReceita = aggregateData(activeDreData[1].meses);
+                  const periodDataLucro = aggregateData(activeDreData[21]?.meses || []);
+                  const periodDataReceita = aggregateData(activeDreData[1]?.meses || []);
                   const labels = getPeriodLabels();
-                  const media = periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length;
+                  const media = periodDataLucro.length > 0 ? periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length : 0;
                   return periodDataLucro.map((val, idx) => ({
                     mes: labels[idx],
                     valor: val / 1000,
-                    percentual: ((val / periodDataReceita[idx]) * 100).toFixed(2),
+                    percentual: periodDataReceita[idx] ? ((val / periodDataReceita[idx]) * 100).toFixed(2) : '0.00',
                     fill: val > media * 1.05 ? '#047857' : val < media * 0.95 ? '#dc2626' : '#eab308'
                   }));
                 })()}>
@@ -12658,8 +12663,8 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     name="Lucro Líquido (mil)"
                   >
                     {(() => {
-                      const periodDataLucro = aggregateData(activeDreData[21].meses);
-                      const media = periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length;
+                      const periodDataLucro = aggregateData(activeDreData[21]?.meses || []);
+                      const media = periodDataLucro.length > 0 ? periodDataLucro.reduce((a, b) => a + b, 0) / periodDataLucro.length : 0;
                       return periodDataLucro.map((val, idx) => {
                         const fillColor = val > media * 1.05 ? '#047857' : val < media * 0.95 ? '#dc2626' : '#eab308';
                         return <Cell key={`cell-${idx}`} fill={fillColor} />;
@@ -12667,7 +12672,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     })()}
                     <LabelList 
                       dataKey="percentual" 
-                      position="top" 
+                      position="top"
                       formatter={(value: number) => `${value}%`}
                       style={{ fontSize: '11px', fontWeight: '600', fill: '#64748b' }}
                     />
