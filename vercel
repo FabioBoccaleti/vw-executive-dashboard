@@ -1,0 +1,20 @@
+#!/bin/bash
+# Script para fazer deploy rápido
+
+echo "📝 Preparando deploy..."
+
+# Adiciona todas as mudanças
+git add .
+
+# Pede mensagem de commit
+echo "Digite a mensagem do commit:"
+read -r commit_msg
+
+# Commit
+git commit -m "$commit_msg"
+
+# Push para GitHub (Vercel faz deploy automático)
+git push
+
+echo "✅ Código enviado! Vercel está fazendo deploy..."
+echo "🌐 Acompanhe em: https://vercel.com/dashboard"
