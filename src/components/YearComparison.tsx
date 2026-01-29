@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, ArrowLeft } from "lucide-react"
 import { useState, useMemo } from "react"
 import { loadMetricsData, loadDREData, loadSharedMetricsData, type Department, type Brand } from "@/lib/dataStorage"
+import { getBrandConfig } from "@/lib/brands"
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from "recharts"
 
@@ -26,6 +27,9 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
   const [comparisonMode, setComparisonMode] = useState<'anual' | 'mensal'>('anual')
   const [selectedMonth1, setSelectedMonth1] = useState<number>(0) // 0-11 (Jan-Dez)
   const [selectedMonth2, setSelectedMonth2] = useState<number>(0)
+
+  // Configuração da marca
+  const brandConfig = getBrandConfig(brand)
 
   // Mapeamento de departamento para nome legível
   const departmentNames: Record<Department, string> = {
@@ -193,8 +197,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <ArrowLeft className="w-4 h-4" />
                 Voltar
               </Button>
-              <div className="bg-gradient-to-br from-[#001E50] to-[#003875] rounded-xl p-3 shadow-lg">
-                <span className="text-white font-bold text-3xl">VW</span>
+              <div 
+                className="rounded-xl p-3 shadow-lg"
+                style={{ background: `linear-gradient(135deg, ${brandConfig.colors.primary}, ${brandConfig.colors.secondary})` }}
+              >
+                <span className="text-white font-bold text-3xl">{brandConfig.shortName}</span>
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
