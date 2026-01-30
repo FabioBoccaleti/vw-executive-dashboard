@@ -946,6 +946,8 @@ export function saveSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, dat
 
 /**
  * Carrega os dados de DRE de um ano fiscal específico e departamento
+ * Em PRODUÇÃO: busca do banco de dados (cache)
+ * Em DESENVOLVIMENTO: usa localStorage
  * @param fiscalYear - Ano fiscal (2024-2027)
  * @param department - Departamento
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
@@ -999,6 +1001,18 @@ export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: D
     }
     
     const key = `${currentBrand}_dre_${fiscalYear}_${department}`;
+    
+    // Em PRODUÇÃO: verifica cache do banco de dados primeiro
+    if (isProduction()) {
+      const cached = dbCache.get(key);
+      if (cached) {
+        console.log(`✅ [PROD] DRE do cache DB: ${key}`);
+        return cached.data;
+      }
+      console.log(`⚠️ [PROD] Cache DB vazio para DRE: ${key}`);
+    }
+    
+    // Em DESENVOLVIMENTO ou fallback: usa localStorage
     const stored = localStorage.getItem(key);
     
     console.log(`🔍 loadDREData(${fiscalYear}, ${department}, ${currentBrand}):`);
