@@ -5549,7 +5549,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {totalDespesas.toLocaleString('pt-BR')}
+                                  R$ {totalDespesas.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
@@ -5561,7 +5561,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {ultimaDespesa.toLocaleString('pt-BR')}
+                                  R$ {ultimaDespesa.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                             </div>
@@ -5610,7 +5610,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                                           <div className="space-y-2">
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Despesa Cartão</p>
-                                              <p className="text-lg font-bold text-orange-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                              <p className="text-lg font-bold text-orange-600">R$ {data.valor.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
                                             </div>
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
@@ -6497,7 +6497,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {totalDespesas.toLocaleString('pt-BR')}
+                                  R$ {totalDespesas.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
@@ -6509,7 +6509,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {ultimaDespesa.toLocaleString('pt-BR')}
+                                  R$ {ultimaDespesa.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                             </div>
@@ -6558,7 +6558,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                                           <div className="space-y-2">
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Despesa Cartão</p>
-                                              <p className="text-lg font-bold text-blue-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                              <p className="text-lg font-bold text-blue-600">R$ {data.valor.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
                                             </div>
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
@@ -6940,7 +6940,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {totalDespesas.toLocaleString('pt-BR')}
+                                  R$ {totalDespesas.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
@@ -6952,7 +6952,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {ultimaDespesa.toLocaleString('pt-BR')}
+                                  R$ {ultimaDespesa.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                             </div>
@@ -7001,7 +7001,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                                           <div className="space-y-2">
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Despesa Cartão</p>
-                                              <p className="text-lg font-bold text-fuchsia-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                              <p className="text-lg font-bold text-fuchsia-600">R$ {data.valor.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
                                             </div>
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
@@ -7614,7 +7614,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {totalBonus.toLocaleString('pt-BR')}
+                                  R$ {totalBonus.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
@@ -7626,7 +7626,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {ultimoBonus.toLocaleString('pt-BR')}
+                                  R$ {ultimoBonus.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                             </div>
@@ -7675,7 +7675,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                                           <div className="space-y-2">
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Bônus</p>
-                                              <p className="text-lg font-bold text-orange-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                              <p className="text-lg font-bold text-orange-600">R$ {data.valor.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
                                             </div>
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
@@ -8449,7 +8449,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {totalCredito.toLocaleString('pt-BR')}
+                                  R$ {totalCredito.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
@@ -8461,7 +8461,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {ultimoCredito.toLocaleString('pt-BR')}
+                                  R$ {ultimoCredito.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                             </div>
@@ -8510,7 +8510,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                                           <div className="space-y-2">
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Crédito ICMS</p>
-                                              <p className="text-lg font-bold text-violet-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                              <p className="text-lg font-bold text-violet-600">R$ {data.valor.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
                                             </div>
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
@@ -8618,7 +8618,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {totalCredito.toLocaleString('pt-BR')}
+                                  R$ {totalCredito.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
@@ -8630,7 +8630,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {ultimoCredito.toLocaleString('pt-BR')}
+                                  R$ {ultimoCredito.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                             </div>
@@ -8679,7 +8679,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                                           <div className="space-y-2">
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Crédito PIS/Cofins</p>
-                                              <p className="text-lg font-bold text-amber-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                              <p className="text-lg font-bold text-amber-600">R$ {data.valor.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
                                             </div>
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
@@ -8785,7 +8785,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Total Anual</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {totalReceita.toLocaleString('pt-BR')}
+                                  R$ {totalReceita.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
@@ -8797,7 +8797,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                                 <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">Dezembro/25</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                                  R$ {ultimaReceita.toLocaleString('pt-BR')}
+                                  R$ {ultimaReceita.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}
                                 </p>
                               </div>
                             </div>
@@ -8846,7 +8846,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                                           <div className="space-y-2">
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Receita Blindagem</p>
-                                              <p className="text-lg font-bold text-indigo-600">R$ {data.valor.toLocaleString('pt-BR')}</p>
+                                              <p className="text-lg font-bold text-indigo-600">R$ {data.valor.toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
                                             </div>
                                             <div>
                                               <p className="text-xs text-slate-600 dark:text-slate-400 uppercase">Var. Mês Ant.</p>
