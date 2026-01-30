@@ -42,10 +42,22 @@ function App() {
     }
   }, [])
   
-  const handleBrandSelect = (selectedBrand: Brand) => {
+  const handleBrandSelect = async (selectedBrand: Brand) => {
     saveBrand(selectedBrand)
     setBrand(selectedBrand)
     applyBrandTheme(selectedBrand)
+    
+    // Inicializa o banco de dados para a nova marca (se em produção)
+    if (isProduction()) {
+      console.log(`🔄 [APP] Inicializando banco de dados para marca: ${selectedBrand}`);
+      try {
+        await initializeFromDatabase(selectedBrand);
+        console.log(`✅ [APP] Banco de dados inicializado para ${selectedBrand}`);
+      } catch (error) {
+        console.error(`❌ [APP] Erro ao inicializar banco para ${selectedBrand}:`, error);
+      }
+    }
+    
     setShowBrandSelector(false)
   }
   

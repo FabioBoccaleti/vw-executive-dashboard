@@ -101,9 +101,30 @@ export function clearDbCache(): void {
 }
 
 /**
- * Flag para controlar se a inicialização já foi feita
+ * Marcas já inicializadas - permite recarregar quando muda de marca
  */
-let dbInitialized = false;
+const initializedBrands: Set<Brand> = new Set();
+
+/**
+ * Reinicializa o cache para uma marca específica
+ * Força recarregamento do Redis mesmo se já foi inicializada antes
+ */
+export async function reinitializeForBrand(brand: Brand): Promise<boolean> {
+  console.log(`🔄 [DB] Reinicializando cache para marca: ${brand}`);
+  
+  // Remove a marca das inicializadas para forçar recarga
+  initializedBrands.delete(brand);
+  
+  // Limpa dados da marca do cache
+  for (const key of dbCache.keys()) {
+    if (key.startsWith(`${brand}_`)) {
+      dbCache.delete(key);
+    }
+  }
+  
+  // Reinicializa
+  return initializeFromDatabase(brand);
+}
 
 /**
  * Inicializa o cache carregando dados do banco de dados Redis
@@ -113,12 +134,13 @@ export async function initializeFromDatabase(brand?: Brand): Promise<boolean> {
   // Em produção, SEMPRE inicializa do banco Redis
   // Em desenvolvimento, também usamos Redis quando disponível
   
-  if (dbInitialized) {
-    console.log('✅ [DB] Banco de dados já inicializado');
+  const currentBrand = brand || getSavedBrand();
+  
+  // Verifica se já inicializou para esta marca específica
+  if (initializedBrands.has(currentBrand)) {
+    console.log(`✅ [DB] Banco de dados já inicializado para ${currentBrand}`);
     return true;
   }
-  
-  const currentBrand = brand || getSavedBrand();
   const years: (2024 | 2025 | 2026 | 2027)[] = [2024, 2025, 2026, 2027];
   const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
   
@@ -159,24 +181,37 @@ export async function initializeFromDatabase(brand?: Brand): Promise<boolean> {
           }
         })
       );
+      
+      // Carrega projeções por departamento
+      for (const dept of departments) {
+        const projectionKey = `${currentBrand}_projection_${year}_${dept}`;
+        promises.push(
+          getFromDbWithCache(projectionKey).then(data => {
+            if (data) {
+              console.log(`✅ [DB] Carregado projeção: ${projectionKey}`);
+            }
+          })
+        );
+      }
     }
     
     await Promise.all(promises);
     
-    dbInitialized = true;
-    console.log(`🎉 [DB] Inicialização concluída! ${dbCache.size} itens no cache.`);
+    initializedBrands.add(currentBrand);
+    console.log(`🎉 [DB] Inicialização concluída para ${currentBrand}! ${dbCache.size} itens no cache.`);
     return true;
   } catch (error) {
-    console.error('❌ [DB] Erro na inicialização do banco:', error);
+    console.error(`❌ [DB] Erro na inicialização do banco para ${currentBrand}:`, error);
     return false;
   }
 }
 
 /**
- * Verifica se o banco foi inicializado
+ * Verifica se o banco foi inicializado para uma marca específica
  */
-export function isDatabaseInitialized(): boolean {
-  return dbInitialized;
+export function isDatabaseInitialized(brand?: Brand): boolean {
+  const currentBrand = brand || getSavedBrand();
+  return initializedBrands.has(currentBrand);
 }
 
 /**

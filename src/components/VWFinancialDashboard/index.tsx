@@ -31,6 +31,7 @@ import {
   loadProjectionData,
   saveProjectionData,
   deleteProjectionData,
+  initializeFromDatabase,
   type MetricsData,
   type Department,
   type Brand,
@@ -283,12 +284,18 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   }, [brand, fiscalYear, department, isImporting, dreData.length, metricsData]);
   
   // Effect para pré-carregar dados da nuvem (Redis) na inicialização
+  // IMPORTANTE: Inicializa o cache do banco de dados para a marca selecionada
   useEffect(() => {
     const initCloudData = async () => {
-      console.log('☁️ Verificando dados na nuvem...');
+      console.log(`☁️ Inicializando dados na nuvem para marca: ${brand}...`);
       try {
+        // Primeiro, inicializa o cache do banco de dados para esta marca
+        // Isso garante que o dbCache tenha os dados da marca correta
+        await initializeFromDatabase(brand);
+        
+        // Depois, pré-carrega dados adicionais da nuvem
         await preloadFromCloud(brand);
-        console.log('☁️ Pré-carregamento da nuvem concluído');
+        console.log(`☁️ Pré-carregamento da nuvem concluído para ${brand}`);
       } catch (error) {
         console.warn('⚠️ Erro ao pré-carregar dados da nuvem:', error);
       }
