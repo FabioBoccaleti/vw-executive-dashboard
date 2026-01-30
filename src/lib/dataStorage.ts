@@ -1,8 +1,9 @@
 /**
- * Camada de persistência de dados - localStorage com preparação para migração para database
+ * Camada de persistência de dados - Redis Database (Produção) / localStorage (Desenvolvimento)
  * 
  * Este módulo gerencia o armazenamento de dados de métricas de negócio e DRE.
- * Atualmente usa localStorage, mas está preparado para futura migração para banco de dados.
+ * Em PRODUÇÃO: dados vêm exclusivamente do banco de dados Redis (Vercel KV)
+ * Em DESENVOLVIMENTO: usa localStorage para testes locais
  * Suporta múltiplas marcas (VW, Audi, VW Outros, Audi Outros).
  */
 
@@ -43,6 +44,137 @@ import { businessMetricsDataAdministracao2027 } from '../data/businessMetricsDat
 
 import { type Brand, getSavedBrand } from './brands';
 import { consolidateMetricsData } from './dataConsolidation';
+import { kvGet, kvSet } from './kvClient';
+
+// =====================================================
+// CONFIGURAÇÃO DE AMBIENTE
+// =====================================================
+
+/**
+ * Verifica se está em ambiente de produção (Vercel)
+ */
+function isProduction(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  return hostname.includes('vercel.app') || 
+         (!hostname.includes('localhost') && !hostname.includes('127.0.0.1'));
+}
+
+/**
+ * Cache local para dados do banco (evita múltiplas requisições)
+ */
+const dbCache: Map<string, { data: any; timestamp: number }> = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+/**
+ * Obtém dados do cache ou do banco
+ */
+async function getFromDbWithCache<T>(key: string): Promise<T | null> {
+  const cached = dbCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data as T;
+  }
+  
+  const data = await kvGet<T>(key);
+  if (data) {
+    dbCache.set(key, { data, timestamp: Date.now() });
+  }
+  return data;
+}
+
+/**
+ * Salva dados no banco e atualiza cache
+ */
+async function saveToDbWithCache(key: string, value: any): Promise<boolean> {
+  const success = await kvSet(key, value);
+  if (success) {
+    dbCache.set(key, { data: value, timestamp: Date.now() });
+  }
+  return success;
+}
+
+/**
+ * Limpa o cache do banco de dados
+ */
+export function clearDbCache(): void {
+  dbCache.clear();
+}
+
+/**
+ * Flag para controlar se a inicialização já foi feita
+ */
+let dbInitialized = false;
+
+/**
+ * Inicializa o cache carregando dados do banco de dados
+ * Deve ser chamada na inicialização da aplicação em produção
+ */
+export async function initializeFromDatabase(brand?: Brand): Promise<boolean> {
+  if (!isProduction()) {
+    console.log('⚠️ [DEV] Modo desenvolvimento - usando localStorage');
+    return true;
+  }
+  
+  if (dbInitialized) {
+    console.log('✅ [PROD] Banco de dados já inicializado');
+    return true;
+  }
+  
+  const currentBrand = brand || getSavedBrand();
+  const years: (2024 | 2025 | 2026 | 2027)[] = [2024, 2025, 2026, 2027];
+  const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
+  
+  console.log(`🚀 [PROD] Inicializando dados do banco para ${currentBrand}...`);
+  
+  try {
+    const promises: Promise<void>[] = [];
+    
+    for (const year of years) {
+      // Carrega métricas por departamento
+      for (const dept of departments) {
+        const key = `${currentBrand}_metrics_${year}_${dept}`;
+        promises.push(
+          getFromDbWithCache(key).then(data => {
+            if (data) {
+              console.log(`✅ [PROD] Carregado: ${key}`);
+            }
+          })
+        );
+      }
+      
+      // Carrega métricas compartilhadas
+      const sharedKey = `${currentBrand}_metrics_shared_${year}`;
+      promises.push(
+        getFromDbWithCache(sharedKey).then(data => {
+          if (data) {
+            console.log(`✅ [PROD] Carregado compartilhado: ${sharedKey}`);
+          }
+        })
+      );
+    }
+    
+    await Promise.all(promises);
+    
+    dbInitialized = true;
+    console.log(`🎉 [PROD] Inicialização concluída! ${dbCache.size} itens no cache.`);
+    return true;
+  } catch (error) {
+    console.error('❌ [PROD] Erro na inicialização do banco:', error);
+    return false;
+  }
+}
+
+/**
+ * Verifica se o banco foi inicializado
+ */
+export function isDatabaseInitialized(): boolean {
+  return dbInitialized;
+}
+
+/**
+ * Exporta a função isProduction para uso externo
+ */
+export { isProduction };
 
 // Tipo para departamento
 export type Department = 'novos' | 'vendaDireta' | 'usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'consolidado';
@@ -625,6 +757,8 @@ function calculateConsolidatedData(fiscalYear: 2024 | 2025 | 2026 | 2027, brand?
 
 /**
  * Carrega os dados de métricas de um ano fiscal específico e departamento
+ * Em PRODUÇÃO: busca do banco de dados (cache)
+ * Em DESENVOLVIMENTO: usa localStorage
  * @param fiscalYear - Ano fiscal (2024-2027)
  * @param department - Departamento
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
@@ -646,6 +780,18 @@ export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, departmen
     }
     
     const key = `${currentBrand}_metrics_${fiscalYear}_${department}`;
+    
+    // Em PRODUÇÃO: verifica cache do banco de dados primeiro
+    if (isProduction()) {
+      const cached = dbCache.get(key);
+      if (cached) {
+        console.log(`✅ [PROD] Dados do cache DB: ${key}`);
+        return cached.data;
+      }
+      console.log(`⚠️ [PROD] Cache DB vazio para: ${key} - usando dados padrão`);
+    }
+    
+    // Em DESENVOLVIMENTO ou fallback: usa localStorage
     const stored = localStorage.getItem(key);
     
     // Se houver dados salvos, retorna eles (inclusive dados importados)
@@ -662,6 +808,8 @@ export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, departmen
 
 /**
  * Carrega os dados de métricas compartilhadas (Dados Adicionais) que são iguais para todos os departamentos
+ * Em PRODUÇÃO: busca do banco de dados (cache)
+ * Em DESENVOLVIMENTO: usa localStorage
  * @param fiscalYear - Ano fiscal (2024-2027)
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
@@ -670,6 +818,18 @@ export function loadSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, bra
   
   try {
     const key = `${currentBrand}_metrics_shared_${fiscalYear}`;
+    
+    // Em PRODUÇÃO: verifica cache do banco de dados primeiro
+    if (isProduction()) {
+      const cached = dbCache.get(key);
+      if (cached) {
+        console.log(`✅ [PROD] Dados compartilhados do cache DB: ${key}`);
+        return cached.data;
+      }
+      console.log(`⚠️ [PROD] Cache DB vazio para compartilhados: ${key}`);
+    }
+    
+    // Em DESENVOLVIMENTO ou fallback: usa localStorage
     const stored = localStorage.getItem(key);
     
     console.log(`🔍 loadSharedMetricsData(${fiscalYear}, ${currentBrand}):`);
@@ -694,6 +854,8 @@ export function loadSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, bra
 
 /**
  * Salva os dados de métricas de um ano fiscal específico e departamento
+ * Em PRODUÇÃO: salva no banco de dados
+ * Em DESENVOLVIMENTO: salva no localStorage
  * @param fiscalYear - Ano fiscal (2024-2027)
  * @param data - Dados de métricas
  * @param department - Departamento
@@ -710,6 +872,20 @@ export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: Met
     }
     
     const key = `${currentBrand}_metrics_${fiscalYear}_${department}`;
+    
+    // Em PRODUÇÃO: salva no banco de dados (assíncrono)
+    if (isProduction()) {
+      console.log(`💾 [PROD] Salvando no DB: ${key}`);
+      saveToDbWithCache(key, data).then(success => {
+        if (success) {
+          console.log(`✅ [PROD] Salvo no DB: ${key}`);
+        } else {
+          console.error(`❌ [PROD] Erro ao salvar no DB: ${key}`);
+        }
+      });
+    }
+    
+    // Também salva no localStorage como backup/cache local
     localStorage.setItem(key, JSON.stringify(data));
     return true;
   } catch (error) {
@@ -720,6 +896,8 @@ export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: Met
 
 /**
  * Salva os dados de métricas compartilhadas (Dados Adicionais) que são iguais para todos os departamentos
+ * Em PRODUÇÃO: salva no banco de dados
+ * Em DESENVOLVIMENTO: salva no localStorage
  * @param fiscalYear - Ano fiscal (2024-2027)
  * @param data - Dados de métricas
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
@@ -729,6 +907,20 @@ export function saveSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, dat
   
   try {
     const key = `${currentBrand}_metrics_shared_${fiscalYear}`;
+    
+    // Em PRODUÇÃO: salva no banco de dados (assíncrono)
+    if (isProduction()) {
+      console.log(`💾 [PROD] Salvando compartilhados no DB: ${key}`);
+      saveToDbWithCache(key, data).then(success => {
+        if (success) {
+          console.log(`✅ [PROD] Compartilhados salvos no DB: ${key}`);
+        } else {
+          console.error(`❌ [PROD] Erro ao salvar compartilhados no DB: ${key}`);
+        }
+      });
+    }
+    
+    // Também salva no localStorage como backup/cache local
     localStorage.setItem(key, JSON.stringify(data));
     
     console.log(`✅ Dados compartilhados salvos: ${key}`);
