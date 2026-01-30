@@ -852,6 +852,13 @@ export function loadSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, bra
   const currentBrand = getCurrentBrand(brand);
   
   try {
+    // Se a marca for 'consolidado', soma dados de VW + Audi
+    if (currentBrand === 'consolidado') {
+      const vwData = loadSharedMetricsData(fiscalYear, 'vw');
+      const audiData = loadSharedMetricsData(fiscalYear, 'audi');
+      return consolidateMetricsData(vwData, audiData);
+    }
+    
     const key = `${currentBrand}_metrics_shared_${fiscalYear}`;
     
     // Verifica cache do banco de dados (Redis)
@@ -884,9 +891,15 @@ export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: Met
   const currentBrand = getCurrentBrand(brand);
   
   try {
-    // Não permite salvar dados do consolidado (é calculado)
+    // Não permite salvar dados do consolidado (é calculado dinamicamente)
     if (department === 'consolidado') {
       console.warn('Não é possível salvar dados do consolidado diretamente');
+      return false;
+    }
+    
+    // Não permite salvar dados quando a MARCA é 'consolidado' (dados são calculados de VW + Audi)
+    if (currentBrand === 'consolidado') {
+      console.warn('⚠️ Marca Consolidado: dados são calculados dinamicamente de VW + Audi. Não é possível salvar.');
       return false;
     }
     
@@ -922,6 +935,12 @@ export function saveSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, dat
   const currentBrand = getCurrentBrand(brand);
   
   try {
+    // Não permite salvar dados quando a MARCA é 'consolidado' (dados são calculados de VW + Audi)
+    if (currentBrand === 'consolidado') {
+      console.warn('⚠️ Marca Consolidado: dados compartilhados são calculados dinamicamente de VW + Audi. Não é possível salvar.');
+      return false;
+    }
+    
     const key = `${currentBrand}_metrics_shared_${fiscalYear}`;
     
     // Salva EXCLUSIVAMENTE no banco de dados Redis
@@ -1071,6 +1090,12 @@ export function saveDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: DREData
     // Permite salvar dados do consolidado apenas se forceConsolidated for true (dados importados)
     if (department === 'consolidado' && !forceConsolidated) {
       console.warn('Não é possível salvar dados do consolidado diretamente (use forceConsolidated=true para dados importados)');
+      return false;
+    }
+    
+    // Não permite salvar dados quando a MARCA é 'consolidado' (dados são calculados de VW + Audi)
+    if (currentBrand === 'consolidado') {
+      console.warn('⚠️ Marca Consolidado: dados DRE são calculados dinamicamente de VW + Audi. Não é possível salvar.');
       return false;
     }
     

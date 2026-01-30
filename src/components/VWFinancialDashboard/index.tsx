@@ -10488,44 +10488,68 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                         🔗 Dados Adicionais Compartilhados - {DEPARTMENT_LABELS[department]}
                       </CardTitle>
                     <CardDescription className="text-sm mt-1">
-                      Dados compartilhados entre TODOS os departamentos - modificações afetam todos os departamentos
+                      {brand === 'consolidado' 
+                        ? 'Dados consolidados de VW + Audi (somente visualização)'
+                        : 'Dados compartilhados entre TODOS os departamentos - modificações afetam todos os departamentos'
+                      }
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setDataPasswordAction('import')
-                        setPasswordDialogOpen(true)
-                        setTimeout(() => metricsFileInputRef.current?.click(), 100)
-                      }}
-                      className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
-                    >
-                      <Upload className="w-4 h-4" />
-                      <span className="text-xs font-medium">Importar Compartilhados</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={requestExportMetrics}
-                      className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-green-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span className="text-xs font-medium">Exportar Compartilhados</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setDataPasswordAction('revert')
-                        setPasswordDialogOpen(true)
-                      }}
-                      className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span className="text-xs font-medium">Reverter Dados</span>
-                    </Button>
+                    {/* Botões de importar/reverter desabilitados para marca Consolidado */}
+                    {brand !== 'consolidado' ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setDataPasswordAction('import')
+                            setPasswordDialogOpen(true)
+                            setTimeout(() => metricsFileInputRef.current?.click(), 100)
+                          }}
+                          className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
+                        >
+                          <Upload className="w-4 h-4" />
+                          <span className="text-xs font-medium">Importar Compartilhados</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={requestExportMetrics}
+                          className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-green-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span className="text-xs font-medium">Exportar Compartilhados</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setDataPasswordAction('revert')
+                            setPasswordDialogOpen(true)
+                          }}
+                          className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span className="text-xs font-medium">Reverter Dados</span>
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        {/* Marca Consolidado - apenas exportação */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={requestExportMetrics}
+                          className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-green-50 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span className="text-xs font-medium">Exportar Consolidado</span>
+                        </Button>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                          📊 VW + Audi
+                        </div>
+                      </>
+                    )}
                     <button
                       onClick={() => setShowDetailedMetrics(false)}
                       className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
@@ -10546,7 +10570,10 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       </div>
                       <div className="flex-1">
                         <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-200">
-                          ⚡ Sistema de Dados Compartilhados Ativo
+                          {brand === 'consolidado' 
+                            ? '📊 Visualização Consolidada (VW + Audi)'
+                            : '⚡ Sistema de Dados Compartilhados Ativo'
+                          }
                         </h4>
                         <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
                           Esta tabela contém dados compartilhados entre <strong>todos os departamentos</strong>. 
@@ -12624,34 +12651,44 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                 accept=".json,.txt"
                 onChange={requestImportData}
                 className="hidden"
+                disabled={brand === 'consolidado'}
               />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                className="gap-2"
-              >
-                <Upload className="w-4 h-4" />
-                Importar Dados
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={requestDownloadTemplate}
-                className="gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Baixar Template
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={requestRevertData}
-                className="gap-2 text-orange-600 hover:text-orange-700 hover:border-orange-300"
-              >
-                <TrendingDown className="w-4 h-4" />
-                Reverter Dados
-              </Button>
+              {/* Botões de Importar/Reverter desabilitados para marca Consolidado (dados são calculados de VW + Audi) */}
+              {brand !== 'consolidado' ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Importar Dados
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={requestDownloadTemplate}
+                    className="gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Baixar Template
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={requestRevertData}
+                    className="gap-2 text-orange-600 hover:text-orange-700 hover:border-orange-300"
+                  >
+                    <TrendingDown className="w-4 h-4" />
+                    Reverter Dados
+                  </Button>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded">
+                  <span>📊 Dados consolidados de VW + Audi (somente leitura)</span>
+                </div>
+              )}
             </div>
           </div>
 
