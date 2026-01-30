@@ -1,13 +1,14 @@
 /**
- * Módulo de integração entre localStorage e Redis (nuvem)
+ * Módulo de persistência de dados - Redis Database (Nuvem)
  * 
  * Este módulo fornece funções que:
- * 1. Tentam carregar dados do Redis primeiro
- * 2. Caem para localStorage se Redis não estiver disponível
- * 3. Na importação, salvam em ambos (Redis + localStorage)
+ * 1. Carregam/salvam dados EXCLUSIVAMENTE no Redis (banco de dados)
+ * 2. Usam cache de sessão (em memória) para performance
+ * 3. NÃO usam localStorage para dados de negócio
  * 
- * Isso garante compatibilidade com o código existente enquanto
- * adiciona suporte a dados compartilhados na nuvem.
+ * IMPORTANTE: Dados são compartilhados entre todos os usuários via Redis.
+ * O localStorage NÃO é usado para dados de métricas/DRE - apenas para 
+ * preferências locais do usuário (como marca selecionada).
  */
 
 import { kvGet, kvSet, kvBulkSet, kvBulkGet, kvKeys, kvClearPattern, kvHasData } from './kvClient'
@@ -54,10 +55,11 @@ function getCurrentBrand(brand?: Brand): Brand {
   return brand || getSavedBrand()
 }
 
-// ============== FUNÇÕES DE CARREGAMENTO (CLOUD-FIRST) ==============
+// ============== FUNÇÕES DE CARREGAMENTO (REDIS ONLY) ==============
 
 /**
- * Carrega dados de métricas - tenta Redis primeiro, depois localStorage
+ * Carrega dados de métricas - EXCLUSIVAMENTE do Redis (banco de dados)
+ * NÃO usa localStorage para dados de negócio
  */
 export async function loadMetricsFromCloudFirst(
   fiscalYear: 2024 | 2025 | 2026 | 2027,
@@ -67,7 +69,7 @@ export async function loadMetricsFromCloudFirst(
   const currentBrand = getCurrentBrand(brand)
   const key = `${currentBrand}_metrics_${fiscalYear}_${department}`
   
-  // Verifica cache de sessão
+  // Verifica cache de sessão (memória)
   if (sessionCache.has(key)) {
     return sessionCache.get(key) as MetricsData
   }
@@ -83,28 +85,19 @@ export async function loadMetricsFromCloudFirst(
         return cloudData
       }
     } catch (error) {
-      console.warn(`⚠️ Erro ao carregar do Redis, tentando localStorage: ${key}`)
+      console.error(`❌ Erro ao carregar métricas do Redis: ${key}`, error)
     }
+  } else {
+    console.warn(`⚠️ Redis não disponível - não foi possível carregar: ${key}`)
   }
   
-  // Fallback para localStorage
-  const localData = localStorage.getItem(key)
-  if (localData) {
-    try {
-      const parsed = JSON.parse(localData)
-      sessionCache.set(key, parsed)
-      console.log(`💾 Métricas carregadas do localStorage: ${key}`)
-      return parsed
-    } catch (e) {
-      console.error(`Erro ao parsear métricas do localStorage: ${key}`)
-    }
-  }
-  
+  // SEM fallback para localStorage - dados devem vir do Redis
   return null
 }
 
 /**
- * Carrega dados de DRE - tenta Redis primeiro, depois localStorage
+ * Carrega dados de DRE - EXCLUSIVAMENTE do Redis (banco de dados)
+ * NÃO usa localStorage para dados de negócio
  */
 export async function loadDREFromCloudFirst(
   fiscalYear: 2024 | 2025 | 2026 | 2027,
@@ -114,7 +107,7 @@ export async function loadDREFromCloudFirst(
   const currentBrand = getCurrentBrand(brand)
   const key = `${currentBrand}_dre_${fiscalYear}_${department}`
   
-  // Verifica cache de sessão
+  // Verifica cache de sessão (memória)
   if (sessionCache.has(key)) {
     return sessionCache.get(key) as DREData
   }
@@ -130,28 +123,19 @@ export async function loadDREFromCloudFirst(
         return cloudData
       }
     } catch (error) {
-      console.warn(`⚠️ Erro ao carregar DRE do Redis, tentando localStorage: ${key}`)
+      console.error(`❌ Erro ao carregar DRE do Redis: ${key}`, error)
     }
+  } else {
+    console.warn(`⚠️ Redis não disponível - não foi possível carregar DRE: ${key}`)
   }
   
-  // Fallback para localStorage
-  const localData = localStorage.getItem(key)
-  if (localData) {
-    try {
-      const parsed = JSON.parse(localData)
-      sessionCache.set(key, parsed)
-      console.log(`💾 DRE carregado do localStorage: ${key}`)
-      return parsed
-    } catch (e) {
-      console.error(`Erro ao parsear DRE do localStorage: ${key}`)
-    }
-  }
-  
+  // SEM fallback para localStorage - dados devem vir do Redis
   return null
 }
 
 /**
- * Carrega dados compartilhados - tenta Redis primeiro, depois localStorage
+ * Carrega dados compartilhados - EXCLUSIVAMENTE do Redis (banco de dados)
+ * NÃO usa localStorage para dados de negócio
  */
 export async function loadSharedMetricsFromCloudFirst(
   fiscalYear: 2024 | 2025 | 2026 | 2027,
@@ -175,29 +159,21 @@ export async function loadSharedMetricsFromCloudFirst(
         return cloudData
       }
     } catch (error) {
-      console.warn(`⚠️ Erro ao carregar métricas compartilhadas do Redis`)
+      console.error(`❌ Erro ao carregar métricas compartilhadas do Redis: ${key}`, error)
     }
+  } else {
+    console.warn(`⚠️ Redis não disponível - não foi possível carregar compartilhados: ${key}`)
   }
   
-  // Fallback para localStorage
-  const localData = localStorage.getItem(key)
-  if (localData) {
-    try {
-      const parsed = JSON.parse(localData)
-      sessionCache.set(key, parsed)
-      return parsed
-    } catch (e) {
-      console.error(`Erro ao parsear métricas compartilhadas do localStorage`)
-    }
-  }
-  
+  // SEM fallback para localStorage - dados devem vir do Redis
   return null
 }
 
-// ============== FUNÇÕES DE SALVAMENTO (CLOUD + LOCAL) ==============
+// ============== FUNÇÕES DE SALVAMENTO (REDIS ONLY) ==============
 
 /**
- * Salva dados de métricas - salva no Redis E no localStorage
+ * Salva dados de métricas - EXCLUSIVAMENTE no Redis (banco de dados)
+ * NÃO salva no localStorage para dados de negócio
  */
 export async function saveMetricsToCloudAndLocal(
   fiscalYear: 2024 | 2025 | 2026 | 2027,
@@ -208,13 +184,8 @@ export async function saveMetricsToCloudAndLocal(
   const currentBrand = getCurrentBrand(brand)
   const key = `${currentBrand}_metrics_${fiscalYear}_${department}`
   
-  // Salva no localStorage primeiro (garantia)
-  try {
-    localStorage.setItem(key, JSON.stringify(data))
-    sessionCache.set(key, data)
-  } catch (e) {
-    console.error(`Erro ao salvar métricas no localStorage: ${key}`)
-  }
+  // Atualiza cache de sessão (memória)
+  sessionCache.set(key, data)
   
   // Tenta salvar no Redis
   const isCloud = await checkCloudMode()
@@ -224,17 +195,23 @@ export async function saveMetricsToCloudAndLocal(
       if (success) {
         console.log(`☁️ Métricas salvas no Redis: ${key}`)
         return true
+      } else {
+        console.error(`❌ Falha ao salvar métricas no Redis: ${key}`)
+        return false
       }
     } catch (error) {
-      console.warn(`⚠️ Erro ao salvar métricas no Redis: ${key}`)
+      console.error(`❌ Erro ao salvar métricas no Redis: ${key}`, error)
+      return false
     }
   }
   
-  return true // localStorage foi salvo com sucesso
+  console.error(`❌ Redis não disponível - não foi possível salvar: ${key}`)
+  return false
 }
 
 /**
- * Salva dados de DRE - salva no Redis E no localStorage
+ * Salva dados de DRE - EXCLUSIVAMENTE no Redis (banco de dados)
+ * NÃO salva no localStorage para dados de negócio
  */
 export async function saveDREToCloudAndLocal(
   fiscalYear: 2024 | 2025 | 2026 | 2027,
@@ -245,13 +222,8 @@ export async function saveDREToCloudAndLocal(
   const currentBrand = getCurrentBrand(brand)
   const key = `${currentBrand}_dre_${fiscalYear}_${department}`
   
-  // Salva no localStorage primeiro
-  try {
-    localStorage.setItem(key, JSON.stringify(data))
-    sessionCache.set(key, data)
-  } catch (e) {
-    console.error(`Erro ao salvar DRE no localStorage: ${key}`)
-  }
+  // Atualiza cache de sessão (memória)
+  sessionCache.set(key, data)
   
   // Tenta salvar no Redis
   const isCloud = await checkCloudMode()
@@ -261,17 +233,23 @@ export async function saveDREToCloudAndLocal(
       if (success) {
         console.log(`☁️ DRE salvo no Redis: ${key}`)
         return true
+      } else {
+        console.error(`❌ Falha ao salvar DRE no Redis: ${key}`)
+        return false
       }
     } catch (error) {
-      console.warn(`⚠️ Erro ao salvar DRE no Redis: ${key}`)
+      console.error(`❌ Erro ao salvar DRE no Redis: ${key}`, error)
+      return false
     }
   }
   
-  return true
+  console.error(`❌ Redis não disponível - não foi possível salvar DRE: ${key}`)
+  return false
 }
 
 /**
- * Salva dados compartilhados - salva no Redis E no localStorage
+ * Salva dados compartilhados - EXCLUSIVAMENTE no Redis (banco de dados)
+ * NÃO salva no localStorage para dados de negócio
  */
 export async function saveSharedMetricsToCloudAndLocal(
   fiscalYear: 2024 | 2025 | 2026 | 2027,
@@ -281,13 +259,8 @@ export async function saveSharedMetricsToCloudAndLocal(
   const currentBrand = getCurrentBrand(brand)
   const key = `${currentBrand}_metrics_shared_${fiscalYear}`
   
-  // Salva no localStorage primeiro
-  try {
-    localStorage.setItem(key, JSON.stringify(data))
-    sessionCache.set(key, data)
-  } catch (e) {
-    console.error(`Erro ao salvar métricas compartilhadas no localStorage`)
-  }
+  // Atualiza cache de sessão (memória)
+  sessionCache.set(key, data)
   
   // Tenta salvar no Redis
   const isCloud = await checkCloudMode()
@@ -297,20 +270,25 @@ export async function saveSharedMetricsToCloudAndLocal(
       if (success) {
         console.log(`☁️ Métricas compartilhadas salvas no Redis: ${key}`)
         return true
+      } else {
+        console.error(`❌ Falha ao salvar métricas compartilhadas no Redis: ${key}`)
+        return false
       }
     } catch (error) {
-      console.warn(`⚠️ Erro ao salvar métricas compartilhadas no Redis`)
+      console.error(`❌ Erro ao salvar métricas compartilhadas no Redis: ${key}`, error)
+      return false
     }
   }
   
-  return true
+  console.error(`❌ Redis não disponível - não foi possível salvar compartilhados: ${key}`)
+  return false
 }
 
 // ============== IMPORTAÇÃO EM LOTE ==============
 
 /**
- * Importa todos os dados - salva no Redis E no localStorage
- * Retorna sucesso mesmo se apenas localStorage funcionar
+ * Importa todos os dados - EXCLUSIVAMENTE no Redis (banco de dados)
+ * NÃO salva no localStorage para dados de negócio
  */
 export async function importAllDataToCloudAndLocal(
   jsonString: string, 
@@ -328,7 +306,6 @@ export async function importAllDataToCloudAndLocal(
     }
     
     const cloudItems: Array<{ key: string; value: unknown }> = []
-    let localSaveSuccess = true
     
     // Processar dados por departamento
     Object.entries(backup.data).forEach(([year, depts]: [string, any]) => {
@@ -342,13 +319,8 @@ export async function importAllDataToCloudAndLocal(
         if (data.metrics) {
           const key = `${currentBrand}_metrics_${fiscalYear}_${department}`
           
-          // Salva no localStorage
-          try {
-            localStorage.setItem(key, JSON.stringify(data.metrics))
-            sessionCache.set(key, data.metrics)
-          } catch (e) {
-            localSaveSuccess = false
-          }
+          // Atualiza cache de sessão (memória)
+          sessionCache.set(key, data.metrics)
           
           // Prepara para Redis
           cloudItems.push({ key, value: data.metrics })
@@ -357,13 +329,8 @@ export async function importAllDataToCloudAndLocal(
         if (data.dre) {
           const key = `${currentBrand}_dre_${fiscalYear}_${department}`
           
-          // Salva no localStorage
-          try {
-            localStorage.setItem(key, JSON.stringify(data.dre))
-            sessionCache.set(key, data.dre)
-          } catch (e) {
-            localSaveSuccess = false
-          }
+          // Atualiza cache de sessão (memória)
+          sessionCache.set(key, data.dre)
           
           // Prepara para Redis
           cloudItems.push({ key, value: data.dre })
@@ -381,13 +348,8 @@ export async function importAllDataToCloudAndLocal(
         if (data.metrics) {
           const key = `${currentBrand}_metrics_shared_${fiscalYear}`
           
-          // Salva no localStorage
-          try {
-            localStorage.setItem(key, JSON.stringify(data.metrics))
-            sessionCache.set(key, data.metrics)
-          } catch (e) {
-            localSaveSuccess = false
-          }
+          // Atualiza cache de sessão (memória)
+          sessionCache.set(key, data.metrics)
           
           // Prepara para Redis
           cloudItems.push({ key, value: data.metrics })
@@ -395,7 +357,7 @@ export async function importAllDataToCloudAndLocal(
       })
     }
     
-    // Tentar salvar no Redis
+    // Salvar EXCLUSIVAMENTE no Redis
     let cloudSaveSuccess = false
     const isCloud = await checkCloudMode()
     
@@ -404,20 +366,24 @@ export async function importAllDataToCloudAndLocal(
         cloudSaveSuccess = await kvBulkSet(cloudItems)
         if (cloudSaveSuccess) {
           console.log(`☁️ ${cloudItems.length} itens salvos no Redis`)
+        } else {
+          console.error('❌ Falha ao salvar itens no Redis')
         }
       } catch (error) {
-        console.warn('⚠️ Erro ao salvar no Redis, mas localStorage foi salvo')
+        console.error('❌ Erro ao salvar no Redis:', error)
       }
+    } else if (!isCloud) {
+      console.error('❌ Redis não disponível - importação não foi salva no banco de dados')
     }
     
     console.log(`📊 Importação concluída:`)
-    console.log(`  - localStorage: ${localSaveSuccess ? '✅' : '❌'}`)
-    console.log(`  - Redis: ${cloudSaveSuccess ? '✅' : '⏭️ (não disponível)'}`)
+    console.log(`  - Redis: ${cloudSaveSuccess ? '✅' : '❌ FALHOU'}`)
+    console.log(`  - Cache de sessão: ✅`)
     
     return {
-      success: localSaveSuccess,
+      success: cloudSaveSuccess,
       cloudSaved: cloudSaveSuccess,
-      localSaved: localSaveSuccess
+      localSaved: true // Cache de sessão sempre funciona
     }
   } catch (error) {
     console.error('❌ Erro crítico na importação:', error)
@@ -444,38 +410,21 @@ export async function hasCloudData(brand?: Brand): Promise<boolean> {
 }
 
 /**
- * Verifica se existem dados no localStorage para uma marca
- */
-export function hasLocalData(brand?: Brand): boolean {
-  const currentBrand = getCurrentBrand(brand)
-  const keys = Object.keys(localStorage).filter(k => k.startsWith(`${currentBrand}_`))
-  return keys.length > 0
-}
-
-/**
- * Verifica se existem dados (cloud ou local) para uma marca
+ * Verifica se existem dados (SOMENTE no Redis) para uma marca
+ * NÃO verifica localStorage para dados de negócio
  */
 export async function hasAnyData(brand?: Brand): Promise<boolean> {
-  const hasLocal = hasLocalData(brand)
-  if (hasLocal) return true
-  
   return await hasCloudData(brand)
 }
 
 // ============== LIMPEZA ==============
 
 /**
- * Limpa todos os dados de uma marca (cloud + local)
+ * Limpa todos os dados de uma marca (Redis + cache de sessão)
+ * NÃO gerencia dados no localStorage (não usamos para dados de negócio)
  */
 export async function clearAllDataCloudAndLocal(brand?: Brand): Promise<void> {
   const currentBrand = getCurrentBrand(brand)
-  
-  // Limpa localStorage
-  Object.keys(localStorage).forEach(key => {
-    if (key.startsWith(`${currentBrand}_`)) {
-      localStorage.removeItem(key)
-    }
-  })
   
   // Limpa cache de sessão
   for (const key of sessionCache.keys()) {
@@ -491,7 +440,7 @@ export async function clearAllDataCloudAndLocal(brand?: Brand): Promise<void> {
       await kvClearPattern(`${currentBrand}_*`)
       console.log(`☁️ Dados limpos do Redis para ${currentBrand}`)
     } catch (error) {
-      console.warn('⚠️ Erro ao limpar Redis')
+      console.error('❌ Erro ao limpar Redis:', error)
     }
   }
   
@@ -509,7 +458,7 @@ export async function preloadFromCloud(brand?: Brand): Promise<boolean> {
   
   const isCloud = await checkCloudMode()
   if (!isCloud) {
-    console.log('☁️ Modo cloud não disponível, usando localStorage')
+    console.warn('⚠️ Redis não disponível - dados não serão carregados')
     return false
   }
   

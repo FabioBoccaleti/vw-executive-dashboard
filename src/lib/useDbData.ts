@@ -251,7 +251,7 @@ export function useDbData(options: UseDbDataOptions): UseDbDataResult {
   
   const reload = useCallback(async () => {
     if (!isProduction()) {
-      console.log('⚠️ [DB] Modo desenvolvimento - usando localStorage');
+      console.log('⚠️ [DB] Modo desenvolvimento - dados em memória local');
       setLoading(false);
       return;
     }

@@ -1,8 +1,10 @@
 /**
- * Camada de persistência de dados - Redis Database (Produção) / localStorage (Desenvolvimento)
+ * Camada de persistência de dados - Redis Database (Produção e Desenvolvimento)
  * 
- * Em PRODUÇÃO: dados vêm exclusivamente do banco de dados Redis (Vercel KV)
- * Em DESENVOLVIMENTO: usa localStorage para testes locais
+ * TODOS os dados de negócio (DRE, Métricas) são armazenados no Redis (Vercel KV)
+ * para garantir que todos os usuários vejam os mesmos dados.
+ * 
+ * O localStorage NÃO é usado para dados de negócio.
  */
 
 import { kvGet, kvSet, kvBulkGet, kvKeys } from './kvClient';

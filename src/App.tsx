@@ -26,7 +26,7 @@ function App() {
           setDbError('Erro ao carregar dados do servidor');
         }
       } else {
-        console.log('⚠️ [APP] Ambiente de desenvolvimento - usando localStorage');
+        console.log('⚠️ [APP] Ambiente de desenvolvimento - dados em memória local');
       }
       setDbLoading(false);
     }

@@ -28,11 +28,15 @@ import {
   saveSharedMetricsData,
   loadFatosRelevantes,
   saveFatosRelevantes,
+  loadProjectionData,
+  saveProjectionData,
+  deleteProjectionData,
   type MetricsData,
   type Department,
   type Brand,
   type FatoRelevante,
-  type FatosRelevantesData
+  type FatosRelevantesData,
+  type ProjectionData
 } from "@/lib/dataStorage"
 import { 
   importAllDataToCloudAndLocal,
@@ -224,11 +228,6 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   // Referência para rastrear o contexto atual (departamento/ano/marca)
   const currentProjectionContext = useRef(`${brand}_${fiscalYear}_${department}`)
   
-  // Chaves de localStorage específicas por marca, ano e departamento para projeções
-  const getProjectionStorageKey = useCallback((suffix: string) => {
-    return `${brand}_projection_${fiscalYear}_${department}_${suffix}`
-  }, [brand, fiscalYear, department])
-  
   // Estado para controlar exibição da tabela de métricas detalhadas
   const [showDetailedMetrics, setShowDetailedMetrics] = useState(false)
   
@@ -255,118 +254,33 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     (window as any).clearAllData = () => clearAllData(brand);
     (window as any).reloadDashboard = () => window.location.reload();
     
-    // Função de debug para verificar localStorage
+    // Função de debug para verificar estado do cache
     (window as any).debugStorage = () => {
       console.clear();
       console.log(`🔬 === DIAGNÓSTICO DE PERSISTÊNCIA - MARCA: ${brand.toUpperCase()} ===\n`);
+      console.log('ℹ️ NOTA: TODOS os dados são armazenados no Redis (banco de dados na nuvem)');
+      console.log('ℹ️ Isso inclui: DRE, Métricas, Dados Adicionais, Fatos Relevantes e Projeções.\n');
       
-      const brandKeys = Object.keys(localStorage).filter(k => k.startsWith(`${brand}_`));
-      console.log(`📦 Total de chaves da marca ${brand}: ${brandKeys.length}`);
-      console.log('Chaves encontradas:', brandKeys);
-      console.log('');
-      
-      // Verificar dados por ano e departamento
-      const years = [2024, 2025, 2026, 2027];
-      const departments = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao', 'consolidado'];
-      
-      console.log('📊 MAPA DE DADOS POR ANO/DEPARTAMENTO:');
-      years.forEach(year => {
-        console.log(`\n${year}:`);
-        departments.forEach(dept => {
-          const metricsKey = `${brand}_metrics_${year}_${dept}`;
-          const dreKey = `${brand}_dre_${year}_${dept}`;
-          const hasMetrics = localStorage.getItem(metricsKey) !== null;
-          const hasDRE = localStorage.getItem(dreKey) !== null;
-          
-          if (hasMetrics || hasDRE) {
-            console.log(`  ${dept}:`);
-            if (hasMetrics) {
-              try {
-                const metrics = JSON.parse(localStorage.getItem(metricsKey)!);
-                console.log(`    ✅ Métricas: ${Object.keys(metrics).length} propriedades`);
-              } catch (e) {
-                console.log(`    ❌ Métricas: erro de parsing`);
-              }
-            }
-            if (hasDRE) {
-              try {
-                const dre = JSON.parse(localStorage.getItem(dreKey)!);
-                console.log(`    ✅ DRE: ${dre.length} linhas`);
-              } catch (e) {
-                console.log(`    ❌ DRE: erro de parsing`);
-              }
-            }
-          }
-        });
-      });
-      
-      console.log('\n🔍 DADOS ATUAIS NA INTERFACE:');
+      console.log('🔍 DADOS ATUAIS NA INTERFACE:');
       console.log(`  - Ano fiscal: ${fiscalYear}`);
       console.log(`  - Departamento: ${department}`);
       console.log(`  - Importando: ${isImporting}`);
       console.log(`  - Linhas DRE carregadas: ${dreData.length}`);
       console.log(`  - Métricas carregadas:`, metricsData);
       
-      console.log('\n🛠️ FUNÇÕES DE TESTE DISPONÍVEIS:');
-      console.log('  - testPersistence() - Testa salvamento/carregamento');
-      console.log('  - clearYearData(ano) - Limpa dados de um ano');
-      console.log('  - clearAllData() - Limpa todos os dados');
+      console.log('\n🛠️ FUNÇÕES DISPONÍVEIS:');
+      console.log('  - clearYearData(ano) - Limpa dados de um ano no Redis');
+      console.log('  - clearAllData() - Limpa todos os dados no Redis');
+      console.log('  - reloadDashboard() - Recarrega a página');
       console.log('  - debugStorage() - Repete este diagnóstico');
-    };
-    
-    // Função para testar persistência
-    (window as any).testPersistence = () => {
-      console.clear();
-      console.log('🧪 === TESTE DE PERSISTÊNCIA ===\n');
-      
-      const testKey = 'vw_test_persistence';
-      const testData = { test: true, timestamp: Date.now() };
-      
-      try {
-        // Teste de escrita
-        console.log('📝 Testando escrita...');
-        localStorage.setItem(testKey, JSON.stringify(testData));
-        console.log('✅ Escrita realizada');
-        
-        // Teste de leitura imediata
-        console.log('📖 Testando leitura imediata...');
-        const immediateRead = localStorage.getItem(testKey);
-        if (immediateRead) {
-          const parsed = JSON.parse(immediateRead);
-          console.log('✅ Leitura imediata bem-sucedida:', parsed);
-        } else {
-          console.log('❌ Falha na leitura imediata');
-          return;
-        }
-        
-        // Teste de leitura após delay
-        console.log('⏳ Testando leitura após delay...');
-        setTimeout(() => {
-          const delayedRead = localStorage.getItem(testKey);
-          if (delayedRead) {
-            const parsed = JSON.parse(delayedRead);
-            console.log('✅ Leitura após delay bem-sucedida:', parsed);
-          } else {
-            console.log('❌ Falha na leitura após delay');
-          }
-          
-          // Limpeza
-          localStorage.removeItem(testKey);
-          console.log('🗑️ Chave de teste removida');
-        }, 500);
-        
-      } catch (error) {
-        console.error('❌ Erro no teste de persistência:', error);
-      }
     };
     
     console.log('🛠️ Funções de desenvolvimento disponíveis:');
     console.log('  - clearYearData(2024) - Limpa dados de um ano específico');
     console.log('  - clearAllData() - Limpa todos os dados');
     console.log('  - reloadDashboard() - Recarrega a página');
-    console.log('  - debugStorage() - Diagnóstico completo do localStorage');
-    console.log('  - testPersistence() - Testa funcionamento do localStorage');
-  }, [brand]);
+    console.log('  - debugStorage() - Diagnóstico do estado atual');
+  }, [brand, fiscalYear, department, isImporting, dreData.length, metricsData]);
   
   // Effect para pré-carregar dados da nuvem (Redis) na inicialização
   useEffect(() => {
@@ -405,24 +319,17 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
       console.log('  - Métricas normais (específicas dept):', newMetricsData?.bonus?.veiculosUsados || 'não carregado');
       console.log('  - Métricas compartilhadas (todos depts):', newSharedMetricsData?.bonus?.veiculosUsados || 'não carregado');
       console.log('📈 DRE carregado:', newDreData);
-      console.log('📍 Origem dos dados:', newDreData ? 'localStorage' : 'padrão');
+      console.log('📍 Origem dos dados: cache Redis');
       
-      // Verificar se existem dados no localStorage que deveriam ter sido encontrados
-      const metricsKey = `${brand}_metrics_${fiscalYear}_${department}`;
-      const sharedKey = `${brand}_metrics_shared_${fiscalYear}`;
-      const dreKey = `${brand}_dre_${fiscalYear}_${department}`;
-      const hasMetricsInStorage = localStorage.getItem(metricsKey) !== null;
-      const hasSharedInStorage = localStorage.getItem(sharedKey) !== null;
-      const hasDREInStorage = localStorage.getItem(dreKey) !== null;
+      // Logs de verificação de carregamento (dados vêm do cache Redis)
+      console.log('🔍 Verificação de carregamento:');
+      console.log(`  - Métricas ${fiscalYear}/${department}: ${newMetricsData ? '✅ carregado' : '❌ não encontrado'}`);
+      console.log(`  - Métricas compartilhadas ${fiscalYear}: ${newSharedMetricsData ? '✅ carregado' : '❌ não encontrado'}`);
+      console.log(`  - DRE ${fiscalYear}/${department}: ${newDreData ? '✅ carregado' : '❌ não encontrado'}`);
       
-      console.log('🔍 Verificação localStorage:');
-      console.log(`  - ${metricsKey}: ${hasMetricsInStorage ? '✅' : '❌'}`);
-      console.log(`  - ${sharedKey}: ${hasSharedInStorage ? '✅' : '❌'}`);
-      console.log(`  - ${dreKey}: ${hasDREInStorage ? '✅' : '❌'}`);
-      
-      // Se há dados no localStorage mas loadDREData retornou null, tentar novamente
-      if (hasDREInStorage && !newDreData && retryCount < 3) {
-        console.log(`🔄 Retry ${retryCount + 1}/3 - dados existem no localStorage mas não foram carregados`);
+      // Se DRE não foi carregado do cache e deveria tentar novamente
+      if (!newDreData && retryCount < 3) {
+        console.log(`🔄 Retry ${retryCount + 1}/3 - tentando recarregar dados do cache`);
         setTimeout(() => loadDataWithRetry(retryCount + 1), 100);
         return;
       }
@@ -439,10 +346,10 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
       
       // Atualizar DRE
       if (newDreData && newDreData.length > 0) {
-        console.log('✅ Usando dados do localStorage para DRE');
+        console.log('✅ Usando dados do cache Redis para DRE');
         setDreData(newDreData);
       } else {
-        console.log('⚠️ Sem dados no localStorage, usando dados padrão/zerados');
+        console.log('⚠️ Sem dados no cache Redis, usando dados padrão/zerados');
         // Se não houver dados salvos e for marca VW, usar dados iniciais apenas para 2025/usados
         if (brand === 'vw' && fiscalYear === 2025 && department === 'usados') {
           setDreData(initialDreData);
@@ -736,9 +643,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
           console.log('💾 Salvamento compartilhado:', sharedSaved ? '✅ Sucesso' : '❌ Falhou');
           
           if (sharedSaved) {
-            // Recarregar dados compartilhados do localStorage para garantir sincronização
+            // Recarregar dados compartilhados do Redis para garantir sincronização
             const reloadedSharedData = loadSharedMetricsData(fiscalYear, brand);
-            console.log('🔄 Dados compartilhados recarregados do localStorage:', reloadedSharedData);
+            console.log('🔄 Dados compartilhados recarregados do Redis:', reloadedSharedData);
             console.log('🔍 Verificação pós-importação:');
             console.log('  - Bonus Veículos Usados (ID 33):', reloadedSharedData.bonus?.veiculosUsados);
             console.log('  - Bonus Peças (ID 34):', reloadedSharedData.bonus?.pecas);
@@ -758,7 +665,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
           console.log('📤 Salvando como dados específicos do departamento...');
           // Salvar apenas para o departamento atual (comportamento antigo)
           const saved = saveMetricsData(fiscalYear, newData, department);
-          console.log('💾 Salvamento no localStorage:', saved ? '✅ Sucesso' : '❌ Falhou');
+          console.log('💾 Salvamento no Redis:', saved ? '✅ Sucesso' : '❌ Falhou');
           
           if (saved) {
             setMetricsData(newData);
@@ -1092,30 +999,27 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
         setIsImporting(true);
         
         try {
-          // Primeiro salva no localStorage usando a função original
-          const localSuccess = importAllData(content, brand);
-          
-          // Depois tenta salvar no Redis (nuvem) para compartilhar com outros usuários
+          // Salva EXCLUSIVAMENTE no Redis (nuvem) para compartilhar com todos os usuários
+          // NÃO usa localStorage para dados de negócio
           const cloudResult = await importAllDataToCloudAndLocal(content, brand);
           
-          if (localSuccess || cloudResult.success) {
+          // Também atualiza o cache local via importAllData (que agora salva no cache + Redis)
+          const localCacheSuccess = importAllData(content, brand);
+          
+          if (cloudResult.success || localCacheSuccess) {
             console.log('✅ Dados importados:');
-            console.log(`  - localStorage: ${localSuccess ? '✅' : '❌'}`);
-            console.log(`  - Redis (nuvem): ${cloudResult.cloudSaved ? '✅' : '⏭️ não disponível'}`);
-            
-            // Verificar que realmente salvou no localStorage
-            const totalKeys = Object.keys(localStorage).filter(k => k.startsWith(`${brand}_`)).length;
-            console.log(`📦 Total de chaves ${brand} no localStorage: ${totalKeys}`);
+            console.log(`  - Redis (nuvem): ${cloudResult.cloudSaved ? '✅' : '❌ FALHOU'}`);
+            console.log(`  - Cache local: ${localCacheSuccess ? '✅' : '❌'}`);
             
             // Aguardar um momento para garantir persistência e depois recarregar dados
             setTimeout(() => {
               console.log('🔄 Recarregando dados após importação...');
               
-              // Recarregar dados do localStorage para atualizar a interface
+              // Recarregar dados do cache Redis para atualizar a interface
               const reloadedMetrics = loadMetricsData(fiscalYear, department, brand);
               const reloadedDRE = loadDREData(fiscalYear, department, brand);
               
-              console.log('🔍 Dados recarregados:');
+              console.log('🔍 Dados recarregados do cache:');
               console.log('  - Métricas:', reloadedMetrics);
               console.log('  - DRE:', reloadedDRE);
               
@@ -1130,16 +1034,16 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               
               setIsImporting(false);
               
-              // Mensagem de sucesso com informação sobre sincronização na nuvem
+              // Mensagem de sucesso
               if (cloudResult.cloudSaved) {
-                alert('Dados importados com sucesso! ☁️ Sincronizado com a nuvem - outros usuários verão os dados ao recarregar.');
+                alert('Dados importados com sucesso! ☁️ Sincronizado com a nuvem - todos os usuários verão os mesmos dados.');
               } else {
-                alert('Dados importados com sucesso! ⚠️ Salvos apenas localmente (nuvem indisponível).');
+                alert('⚠️ ERRO: Dados NÃO foram salvos no banco de dados. Verifique a conexão com o servidor e tente novamente.');
               }
             }, 200);
           } else {
             setIsImporting(false);
-            alert('Erro ao importar dados JSON. Verifique o formato do arquivo.');
+            alert('❌ ERRO: Não foi possível salvar os dados no banco de dados. Verifique a conexão com o servidor.');
           }
         } catch (error) {
           console.error('❌ Erro durante importação JSON:', error);
@@ -1215,12 +1119,12 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
       console.log('📥 Dados importados (TXT):', importedData);
       setIsImporting(true);
       
-      // SALVAR NO LOCALSTORAGE para persistir os dados importados
+      // SALVAR NO REDIS para persistir os dados importados
       const isConsolidado = department === 'consolidado';
       const saved = saveDREData(fiscalYear, importedData, department, isConsolidado, brand);
       
       if (saved) {
-        console.log(`✅ DRE salvo no localStorage: ${brand}_dre_${fiscalYear}_${department}`);
+        console.log(`✅ DRE salvo no Redis: ${brand}_dre_${fiscalYear}_${department}`);
         
         // Aguardar um momento para garantir persistência e depois atualizar interface
         setTimeout(() => {
@@ -1239,9 +1143,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
           }
         }, 100);
       } else {
-        console.error(`❌ Falha ao salvar DRE no localStorage`);
+        console.error(`❌ Falha ao salvar DRE no Redis`);
         setIsImporting(false);
-        alert('Erro: falha ao salvar dados no localStorage');
+        alert('Erro: falha ao salvar dados no banco de dados');
       }
     } catch (error) {
       alert('Erro ao importar dados. Verifique o formato do arquivo.')
@@ -1348,11 +1252,8 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
       return updated
     })
     
-    // Limpar do localStorage (usando chaves específicas por departamento)
-    localStorage.removeItem(getProjectionStorageKey('scenarios'))
-    localStorage.removeItem(getProjectionStorageKey('percentages'))
-    localStorage.removeItem(getProjectionStorageKey('data'))
-    localStorage.removeItem(getProjectionStorageKey('active'))
+    // A remoção do Redis será tratada automaticamente pelo useEffect de persistência
+    // quando projectionScenarios.length === 0, ele chama deleteProjectionData
     
     // Voltar ao modo original
     setProjectionMode(false)
@@ -1581,7 +1482,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     return value.toLocaleString('pt-BR')
   }
   
-  // REMOVIDO: Este useEffect estava causando conflito com o carregamento do localStorage
+  // REMOVIDO: Este useEffect estava causando conflito com o carregamento inicial
   // O carregamento correto já acontece no useEffect das linhas 240-275
   // useEffect(() => {
   //   if (dreData.length === 0) {
@@ -1589,7 +1490,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   //   }
   // }, [])
   
-  // Carregar projeções do localStorage quando mudar departamento/ano/marca
+  // Carregar projeções do Redis quando mudar departamento/ano/marca
   useEffect(() => {
     const newContext = `${brand}_${fiscalYear}_${department}`
     
@@ -1597,61 +1498,49 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     isLoadingProjections.current = true
     currentProjectionContext.current = newContext
     
-    console.log(`[Projeções] Carregando para contexto: ${newContext}`)
+    console.log(`[Projeções] Carregando do Redis para contexto: ${newContext}`)
     
-    const scenariosKey = getProjectionStorageKey('scenarios')
-    const percentagesKey = getProjectionStorageKey('percentages')
-    const dataKey = getProjectionStorageKey('data')
-    const activeKey = getProjectionStorageKey('active')
-    
-    const savedScenarios = localStorage.getItem(scenariosKey)
-    const savedPercentages = localStorage.getItem(percentagesKey)
-    const savedProjectedData = localStorage.getItem(dataKey)
-    const savedActiveScenario = localStorage.getItem(activeKey)
-    
-    if (savedScenarios) {
-      try {
-        const scenarios = JSON.parse(savedScenarios)
-        const percentages = savedPercentages ? JSON.parse(savedPercentages) : {}
-        const data = savedProjectedData ? JSON.parse(savedProjectedData) : {}
+    // Carregar projeções do Redis de forma assíncrona
+    loadProjectionData(fiscalYear, department, brand).then((data) => {
+      if (data && data.scenarios && data.scenarios.length > 0) {
+        console.log(`[Projeções] Encontrado ${data.scenarios.length} cenário(s) no Redis para ${department}`)
         
-        console.log(`[Projeções] Encontrado ${scenarios.length} cenário(s) para ${department}`)
+        setProjectionScenarios(data.scenarios)
+        setProjectionPercentages(data.percentages || {})
+        setProjectedData(data.projectedData || {})
         
-        setProjectionScenarios(scenarios)
-        setProjectionPercentages(percentages)
-        setProjectedData(data)
-        
-        if (savedActiveScenario && savedActiveScenario !== '') {
-          setActiveScenario(savedActiveScenario)
+        if (data.activeScenario && data.activeScenario !== '') {
+          setActiveScenario(data.activeScenario)
           setProjectionMode(true)
         } else {
           setActiveScenario(null)
           setProjectionMode(false)
         }
-      } catch (e) {
-        console.error('[Projeções] Erro ao carregar:', e)
+      } else {
+        console.log(`[Projeções] Nenhuma projeção salva no Redis para ${department}`)
         setProjectionScenarios([])
         setProjectionPercentages({})
         setProjectedData({})
         setActiveScenario(null)
         setProjectionMode(false)
       }
-    } else {
-      console.log(`[Projeções] Nenhuma projeção salva para ${department}`)
+      
+      // Permitir salvamento após um pequeno delay
+      setTimeout(() => {
+        isLoadingProjections.current = false
+      }, 100)
+    }).catch((error) => {
+      console.error('[Projeções] Erro ao carregar do Redis:', error)
       setProjectionScenarios([])
       setProjectionPercentages({})
       setProjectedData({})
       setActiveScenario(null)
       setProjectionMode(false)
-    }
-    
-    // Permitir salvamento após um pequeno delay
-    setTimeout(() => {
       isLoadingProjections.current = false
-    }, 100)
-  }, [brand, fiscalYear, department, getProjectionStorageKey])
+    })
+  }, [brand, fiscalYear, department])
   
-  // Persistir projeções no localStorage (apenas quando não está carregando)
+  // Persistir projeções no Redis (apenas quando não está carregando)
   useEffect(() => {
     // Não salvar durante o carregamento inicial
     if (isLoadingProjections.current) {
@@ -1664,25 +1553,22 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
       return
     }
     
-    const scenariosKey = getProjectionStorageKey('scenarios')
-    const percentagesKey = getProjectionStorageKey('percentages')
-    const dataKey = getProjectionStorageKey('data')
-    const activeKey = getProjectionStorageKey('active')
+    // Salvar no Redis
+    const projectionData: ProjectionData = {
+      scenarios: projectionScenarios,
+      percentages: projectionPercentages,
+      projectedData: projectedData,
+      activeScenario: activeScenario
+    }
     
     if (projectionScenarios.length > 0) {
-      console.log(`[Projeções] Salvando ${projectionScenarios.length} cenário(s) para ${department}`)
-      localStorage.setItem(scenariosKey, JSON.stringify(projectionScenarios))
-      localStorage.setItem(percentagesKey, JSON.stringify(projectionPercentages))
-      localStorage.setItem(dataKey, JSON.stringify(projectedData))
-      localStorage.setItem(activeKey, activeScenario || '')
+      console.log(`[Projeções] Salvando ${projectionScenarios.length} cenário(s) no Redis para ${department}`)
+      saveProjectionData(fiscalYear, department, projectionData, brand)
     } else {
-      console.log(`[Projeções] Limpando projeções de ${department}`)
-      localStorage.removeItem(scenariosKey)
-      localStorage.removeItem(percentagesKey)
-      localStorage.removeItem(dataKey)
-      localStorage.removeItem(activeKey)
+      console.log(`[Projeções] Removendo projeções do Redis para ${department}`)
+      deleteProjectionData(fiscalYear, department, brand)
     }
-  }, [projectionScenarios, projectionPercentages, projectedData, activeScenario, brand, fiscalYear, department, getProjectionStorageKey])
+  }, [projectionScenarios, projectionPercentages, projectedData, activeScenario, brand, fiscalYear, department])
   
   // Verificar se os dados estão carregados
   if (dreData.length === 0) {

@@ -106,17 +106,15 @@ export function clearDbCache(): void {
 let dbInitialized = false;
 
 /**
- * Inicializa o cache carregando dados do banco de dados
- * Deve ser chamada na inicialização da aplicação em produção
+ * Inicializa o cache carregando dados do banco de dados Redis
+ * IMPORTANTE: Em produção, TODOS os dados vêm do Redis - NÃO usa localStorage
  */
 export async function initializeFromDatabase(brand?: Brand): Promise<boolean> {
-  if (!isProduction()) {
-    console.log('⚠️ [DEV] Modo desenvolvimento - usando localStorage');
-    return true;
-  }
+  // Em produção, SEMPRE inicializa do banco Redis
+  // Em desenvolvimento, também usamos Redis quando disponível
   
   if (dbInitialized) {
-    console.log('✅ [PROD] Banco de dados já inicializado');
+    console.log('✅ [DB] Banco de dados já inicializado');
     return true;
   }
   
@@ -124,7 +122,7 @@ export async function initializeFromDatabase(brand?: Brand): Promise<boolean> {
   const years: (2024 | 2025 | 2026 | 2027)[] = [2024, 2025, 2026, 2027];
   const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
   
-  console.log(`🚀 [PROD] Inicializando dados do banco para ${currentBrand}...`);
+  console.log(`🚀 [DB] Inicializando dados do Redis para ${currentBrand}...`);
   
   try {
     const promises: Promise<void>[] = [];
@@ -136,7 +134,17 @@ export async function initializeFromDatabase(brand?: Brand): Promise<boolean> {
         promises.push(
           getFromDbWithCache(key).then(data => {
             if (data) {
-              console.log(`✅ [PROD] Carregado: ${key}`);
+              console.log(`✅ [DB] Carregado: ${key}`);
+            }
+          })
+        );
+        
+        // Carrega DRE por departamento
+        const dreKey = `${currentBrand}_dre_${year}_${dept}`;
+        promises.push(
+          getFromDbWithCache(dreKey).then(data => {
+            if (data) {
+              console.log(`✅ [DB] Carregado DRE: ${dreKey}`);
             }
           })
         );
@@ -147,7 +155,7 @@ export async function initializeFromDatabase(brand?: Brand): Promise<boolean> {
       promises.push(
         getFromDbWithCache(sharedKey).then(data => {
           if (data) {
-            console.log(`✅ [PROD] Carregado compartilhado: ${sharedKey}`);
+            console.log(`✅ [DB] Carregado compartilhado: ${sharedKey}`);
           }
         })
       );
@@ -156,10 +164,10 @@ export async function initializeFromDatabase(brand?: Brand): Promise<boolean> {
     await Promise.all(promises);
     
     dbInitialized = true;
-    console.log(`🎉 [PROD] Inicialização concluída! ${dbCache.size} itens no cache.`);
+    console.log(`🎉 [DB] Inicialização concluída! ${dbCache.size} itens no cache.`);
     return true;
   } catch (error) {
-    console.error('❌ [PROD] Erro na inicialização do banco:', error);
+    console.error('❌ [DB] Erro na inicialização do banco:', error);
     return false;
   }
 }
@@ -757,8 +765,8 @@ function calculateConsolidatedData(fiscalYear: 2024 | 2025 | 2026 | 2027, brand?
 
 /**
  * Carrega os dados de métricas de um ano fiscal específico e departamento
- * Em PRODUÇÃO: busca do banco de dados (cache)
- * Em DESENVOLVIMENTO: usa localStorage
+ * IMPORTANTE: Dados vêm EXCLUSIVAMENTE do banco de dados Redis (cache)
+ * NÃO usa localStorage para dados de negócio
  * @param fiscalYear - Ano fiscal (2024-2027)
  * @param department - Departamento
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
@@ -781,24 +789,16 @@ export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, departmen
     
     const key = `${currentBrand}_metrics_${fiscalYear}_${department}`;
     
-    // Em PRODUÇÃO: verifica cache do banco de dados primeiro
-    if (isProduction()) {
-      const cached = dbCache.get(key);
-      if (cached) {
-        console.log(`✅ [PROD] Dados do cache DB: ${key}`);
-        return cached.data;
-      }
-      console.log(`⚠️ [PROD] Cache DB vazio para: ${key} - usando dados padrão`);
+    // Verifica cache do banco de dados (Redis)
+    const cached = dbCache.get(key);
+    if (cached) {
+      console.log(`✅ [DB] Dados do cache: ${key}`);
+      return cached.data;
     }
     
-    // Em DESENVOLVIMENTO ou fallback: usa localStorage
-    const stored = localStorage.getItem(key);
-    
-    // Se houver dados salvos, retorna eles (inclusive dados importados)
-    if (stored) {
-      return JSON.parse(stored);
-    }
-    
+    // Se não houver dados no cache, retorna dados padrão
+    // NÃO usa localStorage - dados devem vir do Redis
+    console.log(`⚠️ [DB] Cache vazio para: ${key} - usando dados padrão`);
     return getDefaultDataForDepartment(department, fiscalYear, currentBrand);
   } catch (error) {
     console.error(`Erro ao carregar dados de métricas de ${fiscalYear} - ${department} - ${currentBrand}:`, error);
@@ -808,8 +808,8 @@ export function loadMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, departmen
 
 /**
  * Carrega os dados de métricas compartilhadas (Dados Adicionais) que são iguais para todos os departamentos
- * Em PRODUÇÃO: busca do banco de dados (cache)
- * Em DESENVOLVIMENTO: usa localStorage
+ * IMPORTANTE: Dados vêm EXCLUSIVAMENTE do banco de dados Redis (cache)
+ * NÃO usa localStorage para dados de negócio
  * @param fiscalYear - Ano fiscal (2024-2027)
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
@@ -819,32 +819,16 @@ export function loadSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, bra
   try {
     const key = `${currentBrand}_metrics_shared_${fiscalYear}`;
     
-    // Em PRODUÇÃO: verifica cache do banco de dados primeiro
-    if (isProduction()) {
-      const cached = dbCache.get(key);
-      if (cached) {
-        console.log(`✅ [PROD] Dados compartilhados do cache DB: ${key}`);
-        return cached.data;
-      }
-      console.log(`⚠️ [PROD] Cache DB vazio para compartilhados: ${key}`);
+    // Verifica cache do banco de dados (Redis)
+    const cached = dbCache.get(key);
+    if (cached) {
+      console.log(`✅ [DB] Dados compartilhados do cache: ${key}`);
+      return cached.data;
     }
     
-    // Em DESENVOLVIMENTO ou fallback: usa localStorage
-    const stored = localStorage.getItem(key);
-    
-    console.log(`🔍 loadSharedMetricsData(${fiscalYear}, ${currentBrand}):`);
-    console.log(`  - Chave: ${key}`);
-    console.log(`  - Encontrou no localStorage: ${stored ? 'SIM' : 'NÃO'}`);
-    
-    // Se houver dados salvos, retorna eles
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      console.log(`  - ✅ Retornando dados compartilhados do localStorage`);
-      return parsed;
-    }
-    
-    // Senão, retorna dados padrão baseados no ano (usa dados de 'usados' como base)
-    console.log(`  - ⚠️ Retornando dados padrão para ${fiscalYear}`);
+    // Se não houver dados no cache, retorna dados padrão
+    // NÃO usa localStorage - dados devem vir do Redis
+    console.log(`⚠️ [DB] Cache vazio para compartilhados: ${key}`);
     return getDefaultDataForDepartment('usados', fiscalYear, currentBrand);
   } catch (error) {
     console.error(`Erro ao carregar dados de métricas compartilhadas de ${fiscalYear} - ${currentBrand}:`, error);
@@ -854,8 +838,8 @@ export function loadSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, bra
 
 /**
  * Salva os dados de métricas de um ano fiscal específico e departamento
- * Em PRODUÇÃO: salva no banco de dados
- * Em DESENVOLVIMENTO: salva no localStorage
+ * IMPORTANTE: Salva EXCLUSIVAMENTE no banco de dados Redis
+ * NÃO salva no localStorage para dados de negócio
  * @param fiscalYear - Ano fiscal (2024-2027)
  * @param data - Dados de métricas
  * @param department - Departamento
@@ -873,22 +857,17 @@ export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: Met
     
     const key = `${currentBrand}_metrics_${fiscalYear}_${department}`;
     
-    // Em PRODUÇÃO: salva SOMENTE no banco de dados
-    if (isProduction()) {
-      console.log(`💾 [PROD] Salvando métricas no DB: ${key}`);
-      saveToDbWithCache(key, data).then(success => {
-        if (success) {
-          console.log(`✅ [PROD] Métricas salvas no DB: ${key}`);
-        } else {
-          console.error(`❌ [PROD] Erro ao salvar métricas no DB: ${key}`);
-        }
-      });
-      // Em produção, não salva no localStorage - só no DB
-      return true;
-    }
+    // Salva EXCLUSIVAMENTE no banco de dados Redis
+    console.log(`💾 [DB] Salvando métricas no Redis: ${key}`);
+    saveToDbWithCache(key, data).then(success => {
+      if (success) {
+        console.log(`✅ [DB] Métricas salvas no Redis: ${key}`);
+      } else {
+        console.error(`❌ [DB] Erro ao salvar métricas no Redis: ${key}`);
+      }
+    });
     
-    // Em DESENVOLVIMENTO: salva no localStorage
-    localStorage.setItem(key, JSON.stringify(data));
+    // NÃO salva no localStorage - dados devem ir apenas para o Redis
     return true;
   } catch (error) {
     console.error(`Erro ao salvar dados de métricas de ${fiscalYear} - ${department} - ${currentBrand}:`, error);
@@ -898,8 +877,8 @@ export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: Met
 
 /**
  * Salva os dados de métricas compartilhadas (Dados Adicionais) que são iguais para todos os departamentos
- * Em PRODUÇÃO: salva no banco de dados
- * Em DESENVOLVIMENTO: salva no localStorage
+ * IMPORTANTE: Salva EXCLUSIVAMENTE no banco de dados Redis
+ * NÃO salva no localStorage para dados de negócio
  * @param fiscalYear - Ano fiscal (2024-2027)
  * @param data - Dados de métricas
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
@@ -910,34 +889,18 @@ export function saveSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, dat
   try {
     const key = `${currentBrand}_metrics_shared_${fiscalYear}`;
     
-    // Em PRODUÇÃO: salva SOMENTE no banco de dados
-    if (isProduction()) {
-      console.log(`💾 [PROD] Salvando compartilhados no DB: ${key}`);
-      saveToDbWithCache(key, data).then(success => {
-        if (success) {
-          console.log(`✅ [PROD] Compartilhados salvos no DB: ${key}`);
-        } else {
-          console.error(`❌ [PROD] Erro ao salvar compartilhados no DB: ${key}`);
-        }
-      });
-      // Em produção, não salva no localStorage - só no DB
-      return true;
-    }
+    // Salva EXCLUSIVAMENTE no banco de dados Redis
+    console.log(`💾 [DB] Salvando compartilhados no Redis: ${key}`);
+    saveToDbWithCache(key, data).then(success => {
+      if (success) {
+        console.log(`✅ [DB] Compartilhados salvos no Redis: ${key}`);
+      } else {
+        console.error(`❌ [DB] Erro ao salvar compartilhados no Redis: ${key}`);
+      }
+    });
     
-    // Em DESENVOLVIMENTO: salva no localStorage
-    localStorage.setItem(key, JSON.stringify(data));
-    
-    console.log(`✅ Dados compartilhados salvos: ${key}`);
-    
-    // Verificar se realmente salvou
-    const verification = localStorage.getItem(key);
-    if (verification) {
-      console.log(`✅ Verificação: dados compartilhados persistiram corretamente`);
-      return true;
-    } else {
-      console.error(`❌ Verificação: falha ao persistir dados compartilhados`);
-      return false;
-    }
+    // NÃO salva no localStorage - dados devem ir apenas para o Redis
+    return true;
   } catch (error) {
     console.error(`Erro ao salvar dados de métricas compartilhadas de ${fiscalYear} - ${currentBrand}:`, error);
     return false;
@@ -946,8 +909,8 @@ export function saveSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, dat
 
 /**
  * Carrega os dados de DRE de um ano fiscal específico e departamento
- * Em PRODUÇÃO: busca do banco de dados (cache)
- * Em DESENVOLVIMENTO: usa localStorage
+ * IMPORTANTE: Dados vêm EXCLUSIVAMENTE do banco de dados Redis (cache)
+ * NÃO usa localStorage para dados de negócio
  * @param fiscalYear - Ano fiscal (2024-2027)
  * @param department - Departamento
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
@@ -1002,38 +965,21 @@ export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: D
     
     const key = `${currentBrand}_dre_${fiscalYear}_${department}`;
     
-    // Em PRODUÇÃO: verifica cache do banco de dados primeiro
-    if (isProduction()) {
-      const cached = dbCache.get(key);
-      if (cached) {
-        console.log(`✅ [PROD] DRE do cache DB: ${key}`);
-        return cached.data;
-      }
-      console.log(`⚠️ [PROD] Cache DB vazio para DRE: ${key}`);
+    // Verifica cache do banco de dados (Redis)
+    const cached = dbCache.get(key);
+    if (cached) {
+      console.log(`✅ [DB] DRE do cache: ${key}`);
+      return cached.data;
     }
     
-    // Em DESENVOLVIMENTO ou fallback: usa localStorage
-    const stored = localStorage.getItem(key);
-    
-    console.log(`🔍 loadDREData(${fiscalYear}, ${department}, ${currentBrand}):`);
-    console.log(`  - Chave: ${key}`);
-    console.log(`  - Encontrou no localStorage: ${stored ? 'SIM' : 'NÃO'}`);
-    
-    // Se houver dados salvos, usa eles (incluindo dados importados do consolidado)
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      console.log(`  - ✅ Retornando ${parsed.length} linhas do localStorage`);
-      console.log(`  - Primeira linha:`, parsed[0]);
-      return parsed;
-    }
-    
-    // Se for consolidado e não houver dados salvos, calcula dinamicamente
+    // Se não houver dados no cache e for consolidado, calcula dinamicamente
     if (department === 'consolidado') {
-      console.log(`  - 📊 Calculando DRE consolidada dinamicamente`);
+      console.log(`📊 [DB] Calculando DRE consolidada dinamicamente`);
       return calculateConsolidatedDRE(fiscalYear, currentBrand);
     }
     
-    console.log(`  - ⚠️ Retornando null (sem dados)`);
+    // NÃO usa localStorage - dados devem vir do Redis
+    console.log(`⚠️ [DB] Cache vazio para DRE: ${key} - retornando null`);
     return null;
   } catch (error) {
     console.error(`❌ Erro ao carregar dados de DRE de ${fiscalYear} - ${department}:`, error);
@@ -1075,6 +1021,8 @@ function calculateConsolidatedDRE(fiscalYear: 2024 | 2025 | 2026 | 2027, brand?:
 
 /**
  * Salva os dados de DRE de um ano fiscal específico e departamento
+ * IMPORTANTE: Salva EXCLUSIVAMENTE no banco de dados Redis
+ * NÃO salva no localStorage para dados de negócio
  * @param fiscalYear - Ano fiscal (2024-2027)
  * @param data - Dados de DRE
  * @param department - Departamento
@@ -1093,22 +1041,17 @@ export function saveDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: DREData
     
     const key = `${currentBrand}_dre_${fiscalYear}_${department}`;
     
-    // Em PRODUÇÃO: salva no banco de dados (assíncrono)
-    if (isProduction()) {
-      console.log(`💾 [PROD] Salvando DRE no DB: ${key}`);
-      saveToDbWithCache(key, data).then(success => {
-        if (success) {
-          console.log(`✅ [PROD] DRE salvo no DB: ${key}`);
-        } else {
-          console.error(`❌ [PROD] Erro ao salvar DRE no DB: ${key}`);
-        }
-      });
-      // Em produção, não salva no localStorage - só no DB
-      return true;
-    }
+    // Salva EXCLUSIVAMENTE no banco de dados Redis
+    console.log(`💾 [DB] Salvando DRE no Redis: ${key}`);
+    saveToDbWithCache(key, data).then(success => {
+      if (success) {
+        console.log(`✅ [DB] DRE salvo no Redis: ${key}`);
+      } else {
+        console.error(`❌ [DB] Erro ao salvar DRE no Redis: ${key}`);
+      }
+    });
     
-    // Em DESENVOLVIMENTO: salva no localStorage
-    localStorage.setItem(key, JSON.stringify(data));
+    // NÃO salva no localStorage - dados devem ir apenas para o Redis
     return true;
   } catch (error) {
     console.error(`Erro ao salvar dados de DRE de ${fiscalYear} - ${department} - ${currentBrand}:`, error);
@@ -1118,6 +1061,7 @@ export function saveDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: DREData
 
 /**
  * Carrega o ano fiscal selecionado
+ * NOTA: Este é um dado de preferência LOCAL do usuário - pode usar localStorage
  */
 export function loadSelectedFiscalYear(): 2024 | 2025 | 2026 | 2027 {
   try {
@@ -1426,44 +1370,30 @@ export async function importAllDataAsync(jsonString: string, brand?: Brand): Pro
     
     console.log(`📥 [IMPORT] Total de itens a importar: ${totalItems}`);
     
-    if (isProduction()) {
-      // Em PRODUÇÃO: salva no banco de dados em lotes
-      console.log(`💾 [IMPORT] Salvando no banco de dados...`);
+    // Salva EXCLUSIVAMENTE no banco de dados Redis
+    console.log(`💾 [IMPORT] Salvando no banco de dados Redis...`);
+    
+    const batchSize = 10;
+    for (let i = 0; i < itemsToSave.length; i += batchSize) {
+      const batch = itemsToSave.slice(i, i + batchSize);
+      const success = await kvBulkSet(batch);
       
-      const batchSize = 10;
-      for (let i = 0; i < itemsToSave.length; i += batchSize) {
-        const batch = itemsToSave.slice(i, i + batchSize);
-        const success = await kvBulkSet(batch);
-        
-        if (success) {
-          batch.forEach(item => {
-            console.log(`✅ [IMPORT] Salvo no DB: ${item.key}`);
-            successCount++;
-            // Atualiza cache local
-            dbCache.set(item.key, { data: item.value, timestamp: Date.now() });
-          });
-        } else {
-          batch.forEach(item => {
-            console.error(`❌ [IMPORT] Erro ao salvar no DB: ${item.key}`);
-            failures.push(item.key);
-          });
-        }
-      }
-    } else {
-      // Em DESENVOLVIMENTO: salva no localStorage
-      console.log(`💾 [IMPORT] Salvando no localStorage...`);
-      
-      itemsToSave.forEach(item => {
-        try {
-          localStorage.setItem(item.key, JSON.stringify(item.value));
-          console.log(`✅ [IMPORT] Salvo no localStorage: ${item.key}`);
+      if (success) {
+        batch.forEach(item => {
+          console.log(`✅ [IMPORT] Salvo no Redis: ${item.key}`);
           successCount++;
-        } catch (error) {
-          console.error(`❌ [IMPORT] Erro ao salvar no localStorage: ${item.key}`, error);
+          // Atualiza cache local (memória)
+          dbCache.set(item.key, { data: item.value, timestamp: Date.now() });
+        });
+      } else {
+        batch.forEach(item => {
+          console.error(`❌ [IMPORT] Erro ao salvar no Redis: ${item.key}`);
           failures.push(item.key);
-        }
-      });
+        });
+      }
     }
+    
+    // NÃO salva no localStorage - dados devem ir apenas para o Redis
     
     // Salvar configurações de seleção (sempre no localStorage - são preferências locais)
     try {
@@ -1480,7 +1410,7 @@ export async function importAllDataAsync(jsonString: string, brand?: Brand): Pro
     // Relatório final
     console.log(`📊 [IMPORT] Relatório:`);
     console.log(`  - Total: ${totalItems}`);
-    console.log(`  - Sucesso: ${successCount}`);
+    console.log(`  - Sucesso no Redis: ${successCount}`);
     console.log(`  - Falhas: ${failures.length}`);
     
     if (failures.length > 0) {
@@ -1495,8 +1425,10 @@ export async function importAllDataAsync(jsonString: string, brand?: Brand): Pro
 }
 
 /**
- * Versão síncrona para retrocompatibilidade (usa localStorage)
- * @deprecated Use importAllDataAsync em produção
+ * Versão síncrona para importação de dados
+ * IMPORTANTE: Salva EXCLUSIVAMENTE no banco de dados Redis e cache local
+ * NÃO salva no localStorage para dados de negócio
+ * @deprecated Prefira usar importAllDataAsync para melhor controle assíncrono
  */
 export function importAllData(jsonString: string, brand?: Brand): boolean {
   const currentBrand = getCurrentBrand(brand);
@@ -1513,8 +1445,9 @@ export function importAllData(jsonString: string, brand?: Brand): boolean {
     let successCount = 0;
     let totalItems = 0;
     const failures: string[] = [];
+    const itemsToSave: Array<{ key: string; value: any }> = [];
     
-    // Importar dados por departamento (existente)
+    // Importar dados por departamento
     Object.entries(backup.data).forEach(([year, depts]: [string, any]) => {
       const fiscalYear = parseInt(year) as 2024 | 2025 | 2026 | 2027;
       
@@ -1526,57 +1459,27 @@ export function importAllData(jsonString: string, brand?: Brand): boolean {
       Object.entries(depts).forEach(([dept, data]: [string, any]) => {
         const department = dept as Department;
         
-        // Para métricas, salvar diretamente no localStorage (incluindo consolidado)
+        // Para métricas, preparar para salvar no Redis
         if (data.metrics) {
           totalItems++;
-          try {
-            const metricsKey = `${currentBrand}_metrics_${fiscalYear}_${department}`;
-            localStorage.setItem(metricsKey, JSON.stringify(data.metrics));
-            
-            // Verificar se realmente salvou
-            const verification = localStorage.getItem(metricsKey);
-            if (verification) {
-              console.log(`✅ Métricas importadas: ${fiscalYear} - ${department}`);
-              successCount++;
-            } else {
-              const errorMsg = `Falha na verificação de métricas: ${fiscalYear} - ${department}`;
-              console.error(`❌ ${errorMsg}`);
-              failures.push(errorMsg);
-            }
-          } catch (error) {
-            const errorMsg = `Erro ao salvar métricas: ${fiscalYear} - ${department} - ${error}`;
-            console.error(`❌ ${errorMsg}`);
-            failures.push(errorMsg);
-          }
+          const metricsKey = `${currentBrand}_metrics_${fiscalYear}_${department}`;
+          itemsToSave.push({ key: metricsKey, value: data.metrics });
+          // Atualiza cache local imediatamente
+          dbCache.set(metricsKey, { data: data.metrics, timestamp: Date.now() });
         }
         
-        // Para DRE, salvar diretamente no localStorage (incluindo consolidado)
+        // Para DRE, preparar para salvar no Redis
         if (data.dre) {
           totalItems++;
-          try {
-            const dreKey = `${currentBrand}_dre_${fiscalYear}_${department}`;
-            localStorage.setItem(dreKey, JSON.stringify(data.dre));
-            
-            // Verificar se realmente salvou
-            const verification = localStorage.getItem(dreKey);
-            if (verification) {
-              console.log(`✅ DRE importada: ${fiscalYear} - ${department}`);
-              successCount++;
-            } else {
-              const errorMsg = `Falha na verificação de DRE: ${fiscalYear} - ${department}`;
-              console.error(`❌ ${errorMsg}`);
-              failures.push(errorMsg);
-            }
-          } catch (error) {
-            const errorMsg = `Erro ao salvar DRE: ${fiscalYear} - ${department} - ${error}`;
-            console.error(`❌ ${errorMsg}`);
-            failures.push(errorMsg);
-          }
+          const dreKey = `${currentBrand}_dre_${fiscalYear}_${department}`;
+          itemsToSave.push({ key: dreKey, value: data.dre });
+          // Atualiza cache local imediatamente
+          dbCache.set(dreKey, { data: data.dre, timestamp: Date.now() });
         }
       });
     });
     
-    // Importar dados compartilhados (novos)
+    // Importar dados compartilhados
     if (backup.sharedData) {
       console.log('📤 Importando dados compartilhados...');
       Object.entries(backup.sharedData).forEach(([year, data]: [string, any]) => {
@@ -1589,26 +1492,30 @@ export function importAllData(jsonString: string, brand?: Brand): boolean {
         
         if (data.metrics) {
           totalItems++;
-          try {
-            const saved = saveSharedMetricsData(fiscalYear, data.metrics, currentBrand);
-            if (saved) {
-              console.log(`✅ Dados compartilhados importados: ${fiscalYear}`);
-              successCount++;
-            } else {
-              const errorMsg = `Falha ao salvar dados compartilhados: ${fiscalYear}`;
-              console.error(`❌ ${errorMsg}`);
-              failures.push(errorMsg);
-            }
-          } catch (error) {
-            const errorMsg = `Erro ao salvar dados compartilhados: ${fiscalYear} - ${error}`;
-            console.error(`❌ ${errorMsg}`);
-            failures.push(errorMsg);
-          }
+          const sharedKey = `${currentBrand}_metrics_shared_${fiscalYear}`;
+          itemsToSave.push({ key: sharedKey, value: data.metrics });
+          // Atualiza cache local imediatamente
+          dbCache.set(sharedKey, { data: data.metrics, timestamp: Date.now() });
         }
       });
     }
     
-    // Salvar configurações de seleção
+    // Salvar EXCLUSIVAMENTE no Redis (assíncrono)
+    console.log(`💾 [IMPORT] Salvando ${itemsToSave.length} itens no Redis...`);
+    kvBulkSet(itemsToSave).then(success => {
+      if (success) {
+        console.log(`✅ [IMPORT] ${itemsToSave.length} itens salvos no Redis com sucesso`);
+      } else {
+        console.error(`❌ [IMPORT] Erro ao salvar itens no Redis`);
+      }
+    }).catch(error => {
+      console.error(`❌ [IMPORT] Erro ao salvar no Redis:`, error);
+    });
+    
+    // NÃO salva no localStorage - dados devem ir apenas para o Redis
+    successCount = itemsToSave.length;
+    
+    // Salvar configurações de seleção (preferências locais - podem usar localStorage)
     try {
       if (backup.selectedYear) {
         saveSelectedFiscalYear(backup.selectedYear);
@@ -1625,23 +1532,10 @@ export function importAllData(jsonString: string, brand?: Brand): boolean {
     // Relatório final
     console.log(`📊 Relatório de importação:`);
     console.log(`  - Total de itens: ${totalItems}`);
-    console.log(`  - Sucessos: ${successCount}`);
-    console.log(`  - Falhas: ${failures.length}`);
+    console.log(`  - Itens preparados para Redis: ${successCount}`);
+    console.log(`  - Cache local atualizado: ✅`);
     
-    if (failures.length > 0) {
-      console.log(`❌ Itens que falharam:`, failures);
-    }
-    
-    const success = successCount > 0 && failures.length === 0;
-    if (success) {
-      console.log('✅ Importação concluída com sucesso total');
-    } else if (successCount > 0) {
-      console.log('⚠️ Importação parcialmente bem-sucedida');
-    } else {
-      console.log('❌ Importação falhou completamente');
-    }
-    
-    return success || successCount > 0; // Considerar sucesso se pelo menos um item foi importado
+    return successCount > 0;
   } catch (error) {
     console.error('❌ Erro crítico ao importar dados:', error);
     return false;
@@ -1650,6 +1544,8 @@ export function importAllData(jsonString: string, brand?: Brand): boolean {
 
 /**
  * Limpa os dados de um ano fiscal específico (força volta aos dados padrão)
+ * IMPORTANTE: Limpa EXCLUSIVAMENTE do Redis e cache local
+ * NÃO gerencia localStorage para dados de negócio
  * @param fiscalYear - Ano fiscal
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
@@ -1658,16 +1554,32 @@ export function clearYearData(fiscalYear: 2024 | 2025 | 2026 | 2027, brand?: Bra
   
   try {
     const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
+    const keysToDelete: string[] = [];
+    
     departments.forEach(dept => {
       const metricsKey = `${currentBrand}_metrics_${fiscalYear}_${dept}`;
       const dreKey = `${currentBrand}_dre_${fiscalYear}_${dept}`;
-      localStorage.removeItem(metricsKey);
-      localStorage.removeItem(dreKey);
+      keysToDelete.push(metricsKey, dreKey);
+      // Limpa cache local
+      dbCache.delete(metricsKey);
+      dbCache.delete(dreKey);
     });
     
     // Também limpa dados compartilhados
     const sharedKey = `${currentBrand}_metrics_shared_${fiscalYear}`;
-    localStorage.removeItem(sharedKey);
+    keysToDelete.push(sharedKey);
+    dbCache.delete(sharedKey);
+    
+    // Limpa do Redis (assíncrono)
+    keysToDelete.forEach(key => {
+      kvDelete(key).then(success => {
+        if (success) {
+          console.log(`✅ Removido do Redis: ${key}`);
+        }
+      }).catch(error => {
+        console.error(`❌ Erro ao remover do Redis: ${key}`, error);
+      });
+    });
     
     console.log(`✅ Dados do ano ${fiscalYear} da marca ${currentBrand} limpos com sucesso`);
   } catch (error) {
@@ -1677,17 +1589,35 @@ export function clearYearData(fiscalYear: 2024 | 2025 | 2026 | 2027, brand?: Bra
 
 /**
  * Limpa todos os dados de uma marca específica
+ * IMPORTANTE: Limpa EXCLUSIVAMENTE do Redis e cache local
+ * NÃO gerencia localStorage para dados de negócio
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
  */
 export function clearAllData(brand?: Brand): void {
   const currentBrand = getCurrentBrand(brand);
   
   try {
-    Object.keys(localStorage).forEach(key => {
+    // Limpa cache local
+    for (const key of dbCache.keys()) {
       if (key.startsWith(`${currentBrand}_`)) {
-        localStorage.removeItem(key);
+        dbCache.delete(key);
       }
+    }
+    
+    // Limpa do Redis (usando padrão)
+    const pattern = `${currentBrand}_*`;
+    kvKeys(pattern).then(keys => {
+      keys.forEach(key => {
+        kvDelete(key).then(success => {
+          if (success) {
+            console.log(`✅ Removido do Redis: ${key}`);
+          }
+        });
+      });
+    }).catch(error => {
+      console.error(`❌ Erro ao listar chaves do Redis: ${pattern}`, error);
     });
+    
     console.log(`✅ Todos os dados da marca ${currentBrand} foram limpos com sucesso`);
   } catch (error) {
     console.error(`Erro ao limpar todos os dados da marca ${currentBrand}:`, error);
@@ -1696,19 +1626,32 @@ export function clearAllData(brand?: Brand): void {
 
 /**
  * Limpa TODOS os dados de TODAS as marcas (cuidado!)
+ * IMPORTANTE: Limpa EXCLUSIVAMENTE do Redis e cache local
  */
 export function clearAllBrandsData(): void {
   try {
     const brands: Brand[] = ['vw', 'audi', 'vw_outros', 'audi_outros'];
+    
+    // Limpa cache local
+    dbCache.clear();
+    
+    // Limpa do Redis para cada marca
     brands.forEach(brand => {
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith(`${brand}_`)) {
-          localStorage.removeItem(key);
-        }
+      const pattern = `${brand}_*`;
+      kvKeys(pattern).then(keys => {
+        keys.forEach(key => {
+          kvDelete(key).then(success => {
+            if (success) {
+              console.log(`✅ Removido do Redis: ${key}`);
+            }
+          });
+        });
+      }).catch(error => {
+        console.error(`❌ Erro ao listar chaves do Redis: ${pattern}`, error);
       });
     });
     
-    // Também limpa configurações
+    // Também limpa configurações de preferência (essas podem ficar no localStorage)
     localStorage.removeItem(STORAGE_KEYS.SELECTED_YEAR);
     localStorage.removeItem(STORAGE_KEYS.SELECTED_DEPARTMENT);
     
@@ -1720,7 +1663,7 @@ export function clearAllBrandsData(): void {
 
 /**
  * Carrega os dados de Fatos Relevantes no Resultado
- * Dados são específicos por marca, departamento e ano fiscal
+ * IMPORTANTE: Dados vêm do Redis (cache)
  * @param fiscalYear - Ano fiscal
  * @param department - Departamento
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
@@ -1735,12 +1678,12 @@ export function loadFatosRelevantes(
   
   try {
     const key = `${currentBrand}_fatos_relevantes_${fiscalYear}_${department}`;
-    const data = localStorage.getItem(key);
     
-    if (data) {
-      const parsedData = JSON.parse(data);
-      console.log(`✅ Fatos Relevantes carregados: ${currentBrand} - ${department} - ${fiscalYear}`);
-      return parsedData;
+    // Verifica cache do banco de dados (Redis)
+    const cached = dbCache.get(key);
+    if (cached) {
+      console.log(`✅ Fatos Relevantes carregados do cache: ${currentBrand} - ${department} - ${fiscalYear}`);
+      return cached.data;
     }
     
     console.log(`ℹ️ Nenhum dado de Fatos Relevantes encontrado para: ${currentBrand} - ${department} - ${fiscalYear}`);
@@ -1753,6 +1696,7 @@ export function loadFatosRelevantes(
 
 /**
  * Salva os dados de Fatos Relevantes no Resultado
+ * IMPORTANTE: Salva EXCLUSIVAMENTE no Redis
  * Dados são específicos por marca, departamento e ano fiscal
  * @param fiscalYear - Ano fiscal
  * @param department - Departamento
@@ -1769,9 +1713,135 @@ export function saveFatosRelevantes(
   
   try {
     const key = `${currentBrand}_fatos_relevantes_${fiscalYear}_${department}`;
-    localStorage.setItem(key, JSON.stringify(data));
-    console.log(`✅ Fatos Relevantes salvos: ${currentBrand} - ${department} - ${fiscalYear}`, data);
+    
+    // Salva EXCLUSIVAMENTE no Redis
+    saveToDbWithCache(key, data).then(success => {
+      if (success) {
+        console.log(`✅ Fatos Relevantes salvos no Redis: ${currentBrand} - ${department} - ${fiscalYear}`);
+      } else {
+        console.error(`❌ Erro ao salvar Fatos Relevantes no Redis: ${key}`);
+      }
+    });
+    
+    // NÃO salva no localStorage
   } catch (error) {
     console.error(`Erro ao salvar Fatos Relevantes (${currentBrand} - ${department} - ${fiscalYear}):`, error);
+  }
+}
+
+// =====================================================
+// PROJEÇÕES - ARMAZENAMENTO NO REDIS
+// =====================================================
+
+/**
+ * Interface para dados de projeção
+ */
+export interface ProjectionData {
+  scenarios: { id: string; name: string }[];
+  percentages: { [scenarioId: string]: { [lineIndex: number]: number[] } };
+  projectedData: { [scenarioId: string]: DREItem[] };
+  activeScenario: string | null;
+}
+
+/**
+ * Gera a chave de armazenamento para projeções
+ */
+function getProjectionKey(brand: Brand, fiscalYear: number, department: Department): string {
+  return `${brand}_projection_${fiscalYear}_${department}`;
+}
+
+/**
+ * Carrega dados de projeção do Redis
+ * @param fiscalYear - Ano fiscal
+ * @param department - Departamento
+ * @param brand - Marca (opcional)
+ */
+export async function loadProjectionData(
+  fiscalYear: 2024 | 2025 | 2026 | 2027,
+  department: Department,
+  brand?: Brand
+): Promise<ProjectionData | null> {
+  const currentBrand = getCurrentBrand(brand);
+  const key = getProjectionKey(currentBrand, fiscalYear, department);
+  
+  try {
+    // Primeiro verifica cache local
+    const cached = dbCache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log(`📊 [Projeções] Carregado do cache: ${key}`);
+      return cached.data as ProjectionData;
+    }
+    
+    // Se não tem cache, busca do Redis
+    const data = await kvGet<ProjectionData>(key);
+    if (data) {
+      dbCache.set(key, { data, timestamp: Date.now() });
+      console.log(`📊 [Projeções] Carregado do Redis: ${key}`);
+      return data;
+    }
+    
+    console.log(`📊 [Projeções] Nenhum dado encontrado para: ${key}`);
+    return null;
+  } catch (error) {
+    console.error(`❌ [Projeções] Erro ao carregar: ${key}`, error);
+    return null;
+  }
+}
+
+/**
+ * Salva dados de projeção no Redis
+ * @param fiscalYear - Ano fiscal
+ * @param department - Departamento
+ * @param data - Dados de projeção
+ * @param brand - Marca (opcional)
+ */
+export async function saveProjectionData(
+  fiscalYear: 2024 | 2025 | 2026 | 2027,
+  department: Department,
+  data: ProjectionData,
+  brand?: Brand
+): Promise<boolean> {
+  const currentBrand = getCurrentBrand(brand);
+  const key = getProjectionKey(currentBrand, fiscalYear, department);
+  
+  try {
+    const success = await kvSet(key, data);
+    if (success) {
+      dbCache.set(key, { data, timestamp: Date.now() });
+      console.log(`✅ [Projeções] Salvo no Redis: ${key}`);
+    } else {
+      console.error(`❌ [Projeções] Falha ao salvar no Redis: ${key}`);
+    }
+    return success;
+  } catch (error) {
+    console.error(`❌ [Projeções] Erro ao salvar: ${key}`, error);
+    return false;
+  }
+}
+
+/**
+ * Remove dados de projeção do Redis
+ * @param fiscalYear - Ano fiscal
+ * @param department - Departamento
+ * @param brand - Marca (opcional)
+ */
+export async function deleteProjectionData(
+  fiscalYear: 2024 | 2025 | 2026 | 2027,
+  department: Department,
+  brand?: Brand
+): Promise<boolean> {
+  const currentBrand = getCurrentBrand(brand);
+  const key = getProjectionKey(currentBrand, fiscalYear, department);
+  
+  try {
+    const success = await kvDelete(key);
+    if (success) {
+      dbCache.delete(key);
+      console.log(`🗑️ [Projeções] Removido do Redis: ${key}`);
+    }
+    return success;
+  } catch (error) {
+    console.error(`❌ [Projeções] Erro ao remover: ${key}`, error);
+    return false;
   }
 }
