@@ -2824,6 +2824,14 @@ function DadosAdicionaisComparison({
       titulo: 'Vendas por Seguradora',
       subtitulo: 'Performance Seguradoras',
       campos: [
+        { label: 'Porto Seguro - Vendas', path: (d: any, m: number) => getValue(d?.seguradoras?.portoSeguro?.vendas, m), isCurrency: true },
+        { label: 'Porto Seguro - Margem %', path: (d: any, m: number) => getValue(d?.seguradoras?.portoSeguro?.margem, m, true), isPercentage: true },
+        { label: 'Azul - Vendas', path: (d: any, m: number) => getValue(d?.seguradoras?.azul?.vendas, m), isCurrency: true },
+        { label: 'Azul - Margem %', path: (d: any, m: number) => getValue(d?.seguradoras?.azul?.margem, m, true), isPercentage: true },
+        { label: 'Allianz - Vendas', path: (d: any, m: number) => getValue(d?.seguradoras?.allianz?.vendas, m), isCurrency: true },
+        { label: 'Allianz - Margem %', path: (d: any, m: number) => getValue(d?.seguradoras?.allianz?.margem, m, true), isPercentage: true },
+        { label: 'Tokio Marine - Vendas', path: (d: any, m: number) => getValue(d?.seguradoras?.tokioMarine?.vendas, m), isCurrency: true },
+        { label: 'Tokio Marine - Margem %', path: (d: any, m: number) => getValue(d?.seguradoras?.tokioMarine?.margem, m, true), isPercentage: true },
         { label: 'Total Vendas', path: (d: any, m: number) => getValue(d?.vendasPecas?.seguradoraTotal?.vendas, m), isCurrency: true },
         { label: 'Total Margem %', path: (d: any, m: number) => getValue(d?.vendasPecas?.seguradoraTotal?.margem, m, true), isPercentage: true },
       ]
