@@ -44,7 +44,7 @@ import { businessMetricsDataAdministracao2027 } from '../data/businessMetricsDat
 
 import { type Brand, getSavedBrand } from './brands';
 import { consolidateMetricsData } from './dataConsolidation';
-import { kvGet, kvSet } from './kvClient';
+import { kvGet, kvSet, kvBulkSet, kvBulkGet, kvKeys, kvDelete } from './kvClient';
 
 // =====================================================
 // CONFIGURAÇÃO DE AMBIENTE
@@ -873,19 +873,21 @@ export function saveMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: Met
     
     const key = `${currentBrand}_metrics_${fiscalYear}_${department}`;
     
-    // Em PRODUÇÃO: salva no banco de dados (assíncrono)
+    // Em PRODUÇÃO: salva SOMENTE no banco de dados
     if (isProduction()) {
-      console.log(`💾 [PROD] Salvando no DB: ${key}`);
+      console.log(`💾 [PROD] Salvando métricas no DB: ${key}`);
       saveToDbWithCache(key, data).then(success => {
         if (success) {
-          console.log(`✅ [PROD] Salvo no DB: ${key}`);
+          console.log(`✅ [PROD] Métricas salvas no DB: ${key}`);
         } else {
-          console.error(`❌ [PROD] Erro ao salvar no DB: ${key}`);
+          console.error(`❌ [PROD] Erro ao salvar métricas no DB: ${key}`);
         }
       });
+      // Em produção, não salva no localStorage - só no DB
+      return true;
     }
     
-    // Também salva no localStorage como backup/cache local
+    // Em DESENVOLVIMENTO: salva no localStorage
     localStorage.setItem(key, JSON.stringify(data));
     return true;
   } catch (error) {
@@ -908,7 +910,7 @@ export function saveSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, dat
   try {
     const key = `${currentBrand}_metrics_shared_${fiscalYear}`;
     
-    // Em PRODUÇÃO: salva no banco de dados (assíncrono)
+    // Em PRODUÇÃO: salva SOMENTE no banco de dados
     if (isProduction()) {
       console.log(`💾 [PROD] Salvando compartilhados no DB: ${key}`);
       saveToDbWithCache(key, data).then(success => {
@@ -918,9 +920,11 @@ export function saveSharedMetricsData(fiscalYear: 2024 | 2025 | 2026 | 2027, dat
           console.error(`❌ [PROD] Erro ao salvar compartilhados no DB: ${key}`);
         }
       });
+      // Em produção, não salva no localStorage - só no DB
+      return true;
     }
     
-    // Também salva no localStorage como backup/cache local
+    // Em DESENVOLVIMENTO: salva no localStorage
     localStorage.setItem(key, JSON.stringify(data));
     
     console.log(`✅ Dados compartilhados salvos: ${key}`);
@@ -1074,6 +1078,22 @@ export function saveDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, data: DREData
     }
     
     const key = `${currentBrand}_dre_${fiscalYear}_${department}`;
+    
+    // Em PRODUÇÃO: salva no banco de dados (assíncrono)
+    if (isProduction()) {
+      console.log(`💾 [PROD] Salvando DRE no DB: ${key}`);
+      saveToDbWithCache(key, data).then(success => {
+        if (success) {
+          console.log(`✅ [PROD] DRE salvo no DB: ${key}`);
+        } else {
+          console.error(`❌ [PROD] Erro ao salvar DRE no DB: ${key}`);
+        }
+      });
+      // Em produção, não salva no localStorage - só no DB
+      return true;
+    }
+    
+    // Em DESENVOLVIMENTO: salva no localStorage
     localStorage.setItem(key, JSON.stringify(data));
     return true;
   } catch (error) {
@@ -1205,7 +1225,86 @@ export async function migrateToDatabase(): Promise<boolean> {
 
 /**
  * Exporta todos os dados para backup
+ * Em PRODUÇÃO: exporta do banco de dados
+ * Em DESENVOLVIMENTO: exporta do localStorage
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
+ */
+export async function exportAllDataAsync(brand?: Brand): Promise<string> {
+  const currentBrand = getCurrentBrand(brand);
+  const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao', 'consolidado'];
+  const years: (2024 | 2025 | 2026 | 2027)[] = [2024, 2025, 2026, 2027];
+  
+  console.log(`📤 [EXPORT] Iniciando exportação para ${currentBrand}...`);
+  console.log(`📤 [EXPORT] Ambiente: ${isProduction() ? 'PRODUÇÃO (DB)' : 'DESENVOLVIMENTO (localStorage)'}`);
+  
+  const data: any = {
+    selectedYear: loadSelectedFiscalYear(),
+    selectedDepartment: loadSelectedDepartment(),
+    exportDate: new Date().toISOString(),
+    brand: currentBrand,
+    source: isProduction() ? 'database' : 'localStorage',
+    data: {},
+    sharedData: {}
+  };
+  
+  if (isProduction()) {
+    // Em PRODUÇÃO: busca do banco de dados
+    console.log(`📤 [EXPORT] Buscando dados do banco de dados...`);
+    
+    for (const year of years) {
+      data.data[year] = {};
+      
+      for (const dept of departments) {
+        const metricsKey = `${currentBrand}_metrics_${year}_${dept}`;
+        const dreKey = `${currentBrand}_dre_${year}_${dept}`;
+        
+        const [metrics, dre] = await Promise.all([
+          getFromDbWithCache<MetricsData>(metricsKey),
+          getFromDbWithCache<DREData>(dreKey)
+        ]);
+        
+        data.data[year][dept] = { metrics, dre };
+        
+        if (metrics || dre) {
+          console.log(`✅ [EXPORT] ${year} - ${dept}: métricas=${!!metrics}, DRE=${!!dre}`);
+        }
+      }
+      
+      // Dados compartilhados
+      const sharedKey = `${currentBrand}_metrics_shared_${year}`;
+      const sharedMetrics = await getFromDbWithCache<MetricsData>(sharedKey);
+      data.sharedData[year] = { metrics: sharedMetrics };
+      
+      if (sharedMetrics) {
+        console.log(`✅ [EXPORT] ${year} - compartilhados: OK`);
+      }
+    }
+  } else {
+    // Em DESENVOLVIMENTO: busca do localStorage
+    years.forEach(year => {
+      data.data[year] = {};
+      departments.forEach(dept => {
+        data.data[year][dept] = {
+          metrics: loadMetricsData(year, dept, currentBrand),
+          dre: loadDREData(year, dept, currentBrand)
+        };
+      });
+    });
+    
+    years.forEach(year => {
+      data.sharedData[year] = {
+        metrics: loadSharedMetricsData(year, currentBrand)
+      };
+    });
+  }
+  
+  console.log(`✅ [EXPORT] Exportação concluída!`);
+  return JSON.stringify(data, null, 2);
+}
+
+/**
+ * Versão síncrona para retrocompatibilidade (usa localStorage)
+ * @deprecated Use exportAllDataAsync em produção
  */
 export function exportAllData(brand?: Brand): string {
   const currentBrand = getCurrentBrand(brand);
@@ -1244,8 +1343,146 @@ export function exportAllData(brand?: Brand): string {
 
 /**
  * Importa todos os dados de um backup
+ * Em PRODUÇÃO: salva no banco de dados
+ * Em DESENVOLVIMENTO: salva no localStorage
  * @param jsonString - JSON string com os dados
  * @param brand - Marca (opcional, usa a marca salva se não fornecida)
+ */
+export async function importAllDataAsync(jsonString: string, brand?: Brand): Promise<boolean> {
+  const currentBrand = getCurrentBrand(brand);
+  
+  try {
+    console.log(`📥 [IMPORT] Iniciando importação para marca: ${currentBrand}...`);
+    console.log(`📥 [IMPORT] Ambiente: ${isProduction() ? 'PRODUÇÃO (DB)' : 'DESENVOLVIMENTO (localStorage)'}`);
+    
+    const backup = JSON.parse(jsonString);
+    
+    if (!backup.data) {
+      console.error('❌ [IMPORT] Formato de backup inválido: propriedade "data" não encontrada');
+      return false;
+    }
+    
+    let successCount = 0;
+    let totalItems = 0;
+    const failures: string[] = [];
+    const itemsToSave: Array<{ key: string; value: any }> = [];
+    
+    // Preparar dados por departamento
+    Object.entries(backup.data).forEach(([year, depts]: [string, any]) => {
+      const fiscalYear = parseInt(year) as 2024 | 2025 | 2026 | 2027;
+      
+      if (![2024, 2025, 2026, 2027].includes(fiscalYear)) {
+        console.warn(`⚠️ [IMPORT] Ano fiscal inválido ignorado: ${year}`);
+        return;
+      }
+      
+      Object.entries(depts).forEach(([dept, data]: [string, any]) => {
+        const department = dept as Department;
+        
+        if (data.metrics) {
+          totalItems++;
+          const metricsKey = `${currentBrand}_metrics_${fiscalYear}_${department}`;
+          itemsToSave.push({ key: metricsKey, value: data.metrics });
+        }
+        
+        if (data.dre) {
+          totalItems++;
+          const dreKey = `${currentBrand}_dre_${fiscalYear}_${department}`;
+          itemsToSave.push({ key: dreKey, value: data.dre });
+        }
+      });
+    });
+    
+    // Preparar dados compartilhados
+    if (backup.sharedData) {
+      Object.entries(backup.sharedData).forEach(([year, data]: [string, any]) => {
+        const fiscalYear = parseInt(year) as 2024 | 2025 | 2026 | 2027;
+        
+        if (![2024, 2025, 2026, 2027].includes(fiscalYear)) {
+          return;
+        }
+        
+        if (data.metrics) {
+          totalItems++;
+          const sharedKey = `${currentBrand}_metrics_shared_${fiscalYear}`;
+          itemsToSave.push({ key: sharedKey, value: data.metrics });
+        }
+      });
+    }
+    
+    console.log(`📥 [IMPORT] Total de itens a importar: ${totalItems}`);
+    
+    if (isProduction()) {
+      // Em PRODUÇÃO: salva no banco de dados em lotes
+      console.log(`💾 [IMPORT] Salvando no banco de dados...`);
+      
+      const batchSize = 10;
+      for (let i = 0; i < itemsToSave.length; i += batchSize) {
+        const batch = itemsToSave.slice(i, i + batchSize);
+        const success = await kvBulkSet(batch);
+        
+        if (success) {
+          batch.forEach(item => {
+            console.log(`✅ [IMPORT] Salvo no DB: ${item.key}`);
+            successCount++;
+            // Atualiza cache local
+            dbCache.set(item.key, { data: item.value, timestamp: Date.now() });
+          });
+        } else {
+          batch.forEach(item => {
+            console.error(`❌ [IMPORT] Erro ao salvar no DB: ${item.key}`);
+            failures.push(item.key);
+          });
+        }
+      }
+    } else {
+      // Em DESENVOLVIMENTO: salva no localStorage
+      console.log(`💾 [IMPORT] Salvando no localStorage...`);
+      
+      itemsToSave.forEach(item => {
+        try {
+          localStorage.setItem(item.key, JSON.stringify(item.value));
+          console.log(`✅ [IMPORT] Salvo no localStorage: ${item.key}`);
+          successCount++;
+        } catch (error) {
+          console.error(`❌ [IMPORT] Erro ao salvar no localStorage: ${item.key}`, error);
+          failures.push(item.key);
+        }
+      });
+    }
+    
+    // Salvar configurações de seleção (sempre no localStorage - são preferências locais)
+    try {
+      if (backup.selectedYear) {
+        saveSelectedFiscalYear(backup.selectedYear);
+      }
+      if (backup.selectedDepartment) {
+        saveSelectedDepartment(backup.selectedDepartment);
+      }
+    } catch (error) {
+      console.warn('⚠️ [IMPORT] Erro ao salvar configurações de seleção:', error);
+    }
+    
+    // Relatório final
+    console.log(`📊 [IMPORT] Relatório:`);
+    console.log(`  - Total: ${totalItems}`);
+    console.log(`  - Sucesso: ${successCount}`);
+    console.log(`  - Falhas: ${failures.length}`);
+    
+    if (failures.length > 0) {
+      console.log(`❌ [IMPORT] Itens que falharam:`, failures);
+    }
+    
+    return successCount > 0;
+  } catch (error) {
+    console.error('❌ [IMPORT] Erro crítico:', error);
+    return false;
+  }
+}
+
+/**
+ * Versão síncrona para retrocompatibilidade (usa localStorage)
+ * @deprecated Use importAllDataAsync em produção
  */
 export function importAllData(jsonString: string, brand?: Brand): boolean {
   const currentBrand = getCurrentBrand(brand);
