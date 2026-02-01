@@ -156,7 +156,8 @@ export async function initializeFromDatabase(brand?: Brand): Promise<boolean> {
     return true;
   }
   const years: (2024 | 2025 | 2026 | 2027)[] = [2024, 2025, 2026, 2027];
-  const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
+  // Inclui 'consolidado' para carregar dados DRE importados para esse departamento
+  const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao', 'consolidado'];
   
   console.log(`🚀 [DB] Inicializando dados do Redis para ${currentBrand}...`);
   
@@ -1628,7 +1629,8 @@ export function clearYearData(fiscalYear: 2024 | 2025 | 2026 | 2027, brand?: Bra
   const currentBrand = getCurrentBrand(brand);
   
   try {
-    const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao'];
+    // Inclui 'consolidado' para limpar dados DRE importados
+    const departments: Department[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria', 'administracao', 'consolidado'];
     const keysToDelete: string[] = [];
     
     departments.forEach(dept => {
