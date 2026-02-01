@@ -2818,6 +2818,30 @@ function DadosAdicionaisComparison({
         { label: 'Funilaria - Margem %', path: (d: any, m: number) => getValue(d?.vendasPecas?.funilaria?.margem, m, true), isPercentage: true },
         { label: 'Acessórios - Vendas', path: (d: any, m: number) => getValue(d?.vendasPecas?.acessorios?.vendas, m), isCurrency: true },
         { label: 'Acessórios - Margem %', path: (d: any, m: number) => getValue(d?.vendasPecas?.acessorios?.margem, m, true), isPercentage: true },
+        { label: 'Total - Vendas', path: (d: any, m: number) => {
+          // Soma de Balcão + Oficina + Funilaria + Acessórios
+          const balcao = getValue(d?.vendasPecas?.balcao?.vendas, m);
+          const oficina = getValue(d?.vendasPecas?.oficina?.vendas, m);
+          const funilaria = getValue(d?.vendasPecas?.funilaria?.vendas, m);
+          const acessorios = getValue(d?.vendasPecas?.acessorios?.vendas, m);
+          return balcao + oficina + funilaria + acessorios;
+        }, isCurrency: true },
+        { label: 'Total - Margem %', path: (d: any, m: number) => {
+          // Margem = Lucro Total / Receita Total
+          const balcaoVendas = getValue(d?.vendasPecas?.balcao?.vendas, m);
+          const oficinaVendas = getValue(d?.vendasPecas?.oficina?.vendas, m);
+          const funilariaVendas = getValue(d?.vendasPecas?.funilaria?.vendas, m);
+          const acessoriosVendas = getValue(d?.vendasPecas?.acessorios?.vendas, m);
+          const totalVendas = balcaoVendas + oficinaVendas + funilariaVendas + acessoriosVendas;
+          
+          const balcaoLucro = getValue(d?.vendasPecas?.balcao?.lucro, m);
+          const oficinaLucro = getValue(d?.vendasPecas?.oficina?.lucro, m);
+          const funilariaLucro = getValue(d?.vendasPecas?.funilaria?.lucro, m);
+          const acessoriosLucro = getValue(d?.vendasPecas?.acessorios?.lucro, m);
+          const totalLucro = balcaoLucro + oficinaLucro + funilariaLucro + acessoriosLucro;
+          
+          return totalVendas > 0 ? (totalLucro / totalVendas) * 100 : 0;
+        }, isPercentage: true },
       ]
     },
     {
