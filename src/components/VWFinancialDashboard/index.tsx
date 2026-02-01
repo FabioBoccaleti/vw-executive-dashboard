@@ -4799,13 +4799,14 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
                       {/* Header com título e variação */}
                       {(() => {
-                        const vendas = [105466, 118535, 87858, 37793, 365647, 194721, 192020, 234193, 245247, 338808, 371809, 366783];
-                        const lucros = [14528, 10793, 10640, 4958, 51530, 26299, 25900, 30071, 33677, 43209, 45834, 37197];
-                        const margens = vendas.map((v, i) => (lucros[i] / v * 100));
+                        // Usar dados dinâmicos de sharedMetricsData em vez de valores hardcoded
+                        const vendas = sharedMetricsData.seguradoras?.tokioMarine?.vendas || Array(12).fill(0);
+                        const lucros = sharedMetricsData.seguradoras?.tokioMarine?.lucro || Array(12).fill(0);
+                        const margens = vendas.map((v, i) => v > 0 ? (lucros[i] / v * 100) : 0);
                         
                         const totalVendas = vendas.reduce((a, b) => a + b, 0);
                         const totalLucro = lucros.reduce((a, b) => a + b, 0);
-                        const margemMedia = (totalLucro / totalVendas * 100);
+                        const margemMedia = totalVendas > 0 ? (totalLucro / totalVendas * 100) : 0;
                         
                         const ultimaVenda = vendas[11];
                         const penultimaVenda = vendas[10];
@@ -4860,13 +4861,14 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
                           <ComposedChart data={metricsData.months.map((month, index) => {
-                            const vendas = [105466, 118535, 87858, 37793, 365647, 194721, 192020, 234193, 245247, 338808, 371809, 366783];
-                            const lucros = [14528, 10793, 10640, 4958, 51530, 26299, 25900, 30071, 33677, 43209, 45834, 37197];
+                            // Usar dados dinâmicos de sharedMetricsData em vez de valores hardcoded
+                            const vendas = sharedMetricsData.seguradoras?.tokioMarine?.vendas || Array(12).fill(0);
+                            const lucros = sharedMetricsData.seguradoras?.tokioMarine?.lucro || Array(12).fill(0);
                             
-                            const vendaAtual = vendas[index];
-                            const vendaAnterior = index > 0 ? vendas[index - 1] : vendaAtual;
-                            const variacaoMesAnt = index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
-                            const margem = (lucros[index] / vendaAtual) * 100;
+                            const vendaAtual = vendas[index] || 0;
+                            const vendaAnterior = index > 0 ? (vendas[index - 1] || 0) : vendaAtual;
+                            const variacaoMesAnt = index > 0 && vendaAnterior > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
+                            const margem = vendaAtual > 0 ? ((lucros[index] || 0) / vendaAtual) * 100 : 0;
                             
                             return {
                               month,
@@ -4983,15 +4985,30 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg w-full overflow-hidden">
                       {/* Header com título e variação */}
                       {(() => {
-                        const vendas = [988075, 812288, 682001, 669198, 1081065, 846304, 590311, 573663, 816041, 1125948, 1035220, 1090539];
-                        const lucros = [33025, 33059, 30884, 32074, 57252, 37751, 19413, 9997, 23681, 8626, 28212, 12352];
+                        // Usar dados dinâmicos de sharedMetricsData - soma de todas as seguradoras
+                        const portoVendas = sharedMetricsData.seguradoras?.portoSeguro?.vendas || Array(12).fill(0);
+                        const portoLucros = sharedMetricsData.seguradoras?.portoSeguro?.lucro || Array(12).fill(0);
+                        const azulVendas = sharedMetricsData.seguradoras?.azul?.vendas || Array(12).fill(0);
+                        const azulLucros = sharedMetricsData.seguradoras?.azul?.lucro || Array(12).fill(0);
+                        const allianzVendas = sharedMetricsData.seguradoras?.allianz?.vendas || Array(12).fill(0);
+                        const allianzLucros = sharedMetricsData.seguradoras?.allianz?.lucro || Array(12).fill(0);
+                        const tokioVendas = sharedMetricsData.seguradoras?.tokioMarine?.vendas || Array(12).fill(0);
+                        const tokioLucros = sharedMetricsData.seguradoras?.tokioMarine?.lucro || Array(12).fill(0);
+                        
+                        // Calcular total consolidado (soma de todas as seguradoras por mês)
+                        const vendas = portoVendas.map((_, i) => 
+                          (portoVendas[i] || 0) + (azulVendas[i] || 0) + (allianzVendas[i] || 0) + (tokioVendas[i] || 0)
+                        );
+                        const lucros = portoLucros.map((_, i) => 
+                          (portoLucros[i] || 0) + (azulLucros[i] || 0) + (allianzLucros[i] || 0) + (tokioLucros[i] || 0)
+                        );
                         
                         const totalVendas = vendas.reduce((a, b) => a + b, 0);
                         const totalLucro = lucros.reduce((a, b) => a + b, 0);
-                        const margemMedia = (totalLucro / totalVendas * 100);
-                        const ultimaVenda = vendas[11];
-                        const penultimaVenda = vendas[10];
-                        const variacaoMes = ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100;
+                        const margemMedia = totalVendas > 0 ? (totalLucro / totalVendas * 100) : 0;
+                        const ultimaVenda = vendas[11] || 0;
+                        const penultimaVenda = vendas[10] || 0;
+                        const variacaoMes = penultimaVenda > 0 ? ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100 : 0;
                         
                         return (
                           <>
@@ -5030,13 +5047,24 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
                           <ComposedChart data={metricsData.months.map((month, index) => {
-                            const vendas = [988075, 812288, 682001, 669198, 1081065, 846304, 590311, 573663, 816041, 1125948, 1035220, 1090539];
-                            const lucros = [33025, 33059, 30884, 32074, 57252, 37751, 19413, 9997, 23681, 8626, 28212, 12352];
+                            // Usar dados dinâmicos de sharedMetricsData - soma de todas as seguradoras
+                            const portoVendas = sharedMetricsData.seguradoras?.portoSeguro?.vendas || Array(12).fill(0);
+                            const portoLucros = sharedMetricsData.seguradoras?.portoSeguro?.lucro || Array(12).fill(0);
+                            const azulVendas = sharedMetricsData.seguradoras?.azul?.vendas || Array(12).fill(0);
+                            const azulLucros = sharedMetricsData.seguradoras?.azul?.lucro || Array(12).fill(0);
+                            const allianzVendas = sharedMetricsData.seguradoras?.allianz?.vendas || Array(12).fill(0);
+                            const allianzLucros = sharedMetricsData.seguradoras?.allianz?.lucro || Array(12).fill(0);
+                            const tokioVendas = sharedMetricsData.seguradoras?.tokioMarine?.vendas || Array(12).fill(0);
+                            const tokioLucros = sharedMetricsData.seguradoras?.tokioMarine?.lucro || Array(12).fill(0);
                             
-                            const vendaAtual = vendas[index];
-                            const vendaAnterior = index > 0 ? vendas[index - 1] : vendaAtual;
-                            const variacaoMesAnt = index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
-                            const margem = (lucros[index] / vendaAtual) * 100;
+                            const vendaAtual = (portoVendas[index] || 0) + (azulVendas[index] || 0) + (allianzVendas[index] || 0) + (tokioVendas[index] || 0);
+                            const lucroAtual = (portoLucros[index] || 0) + (azulLucros[index] || 0) + (allianzLucros[index] || 0) + (tokioLucros[index] || 0);
+                            
+                            const vendaAnterior = index > 0 ? 
+                              (portoVendas[index - 1] || 0) + (azulVendas[index - 1] || 0) + (allianzVendas[index - 1] || 0) + (tokioVendas[index - 1] || 0) 
+                              : vendaAtual;
+                            const variacaoMesAnt = index > 0 && vendaAnterior > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
+                            const margem = vendaAtual > 0 ? (lucroAtual / vendaAtual) * 100 : 0;
                             
                             return {
                               month,
