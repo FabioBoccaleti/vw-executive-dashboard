@@ -136,6 +136,20 @@ export async function initializeFromDatabase(brand?: Brand): Promise<boolean> {
   
   const currentBrand = brand || getSavedBrand();
   
+  // Se a marca for 'consolidado', inicializa VW e Audi (pois consolidado é calculado a partir deles)
+  if (currentBrand === 'consolidado') {
+    console.log(`🔄 [DB] Marca Consolidado selecionada - inicializando VW e Audi...`);
+    const vwInit = await initializeFromDatabase('vw');
+    const audiInit = await initializeFromDatabase('audi');
+    
+    // Marca consolidado como inicializado se ambos VW e Audi foram inicializados
+    if (vwInit && audiInit) {
+      initializedBrands.add('consolidado');
+      console.log(`✅ [DB] Consolidado inicializado com sucesso (VW + Audi)`);
+    }
+    return vwInit && audiInit;
+  }
+  
   // Verifica se já inicializou para esta marca específica
   if (initializedBrands.has(currentBrand)) {
     console.log(`✅ [DB] Banco de dados já inicializado para ${currentBrand}`);
