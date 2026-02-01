@@ -987,6 +987,16 @@ export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: D
   const currentBrand = getCurrentBrand(brand);
   
   try {
+    const key = `${currentBrand}_dre_${fiscalYear}_${department}`;
+    
+    // PRIMEIRO: Verifica cache do banco de dados (Redis)
+    // Isso permite que dados importados para o departamento 'consolidado' sejam recuperados
+    const cached = dbCache.get(key);
+    if (cached) {
+      console.log(`✅ [DB] DRE do cache: ${key}`);
+      return cached.data;
+    }
+    
     // Se a marca for 'consolidado', soma dados de VW + Audi
     if (currentBrand === 'consolidado') {
       const vwDRE = loadDREData(fiscalYear, department, 'vw');
@@ -1031,16 +1041,7 @@ export function loadDREData(fiscalYear: 2024 | 2025 | 2026 | 2027, department: D
       return null;
     }
     
-    const key = `${currentBrand}_dre_${fiscalYear}_${department}`;
-    
-    // Verifica cache do banco de dados (Redis)
-    const cached = dbCache.get(key);
-    if (cached) {
-      console.log(`✅ [DB] DRE do cache: ${key}`);
-      return cached.data;
-    }
-    
-    // Se não houver dados no cache e for consolidado, calcula dinamicamente
+    // Se não houver dados no cache e for departamento consolidado, calcula dinamicamente
     if (department === 'consolidado') {
       console.log(`📊 [DB] Calculando DRE consolidada dinamicamente`);
       return calculateConsolidatedDRE(fiscalYear, currentBrand);
