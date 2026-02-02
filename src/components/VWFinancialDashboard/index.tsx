@@ -10749,7 +10749,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                   <div className="grid grid-cols-3 gap-4 mt-4">
                     <div>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Anual</p>
-                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{activeDreData[0].total.toLocaleString('pt-BR')}</p>
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{Math.round(activeDreData[0].total).toLocaleString('pt-BR')}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
@@ -10757,7 +10757,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Maior Volume</p>
-                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{Math.max(...activeDreData[0].meses).toLocaleString('pt-BR')}</p>
+                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{Math.round(Math.max(...activeDreData[0].meses)).toLocaleString('pt-BR')}</p>
                     </div>
                   </div>
                 )}
