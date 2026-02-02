@@ -12,7 +12,7 @@ import { Building2, Car, ChevronRight, Layers } from 'lucide-react';
 import { PasswordDialog } from '@/components/PasswordDialog';
 
 // Marcas que requerem senha para acesso
-const PROTECTED_BRANDS: Brand[] = ['vw-outros', 'audi-outros'];
+const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros'];
 
 interface BrandSelectorProps {
   onSelectBrand: (brand: Brand) => void;
