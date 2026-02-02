@@ -10648,7 +10648,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
             <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-blue-600 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <CardDescription className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Volume Total</CardDescription>
-                <CardTitle className="text-3xl font-bold text-slate-900 dark:text-white">{totais.volumeTotal.toLocaleString('pt-BR')}</CardTitle>
+                <CardTitle className="text-3xl font-bold text-slate-900 dark:text-white">{Math.round(totais.volumeTotal).toLocaleString('pt-BR')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2">
