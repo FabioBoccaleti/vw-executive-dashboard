@@ -9,6 +9,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BRAND_CONFIGS, AVAILABLE_BRANDS, type Brand } from '@/lib/brands';
 import { Building2, Car, ChevronRight, Layers } from 'lucide-react';
+import { PasswordDialog } from '@/components/PasswordDialog';
+
+// Marcas que requerem senha para acesso
+const PROTECTED_BRANDS: Brand[] = ['vw-outros', 'audi-outros'];
 
 interface BrandSelectorProps {
   onSelectBrand: (brand: Brand) => void;
@@ -18,12 +22,24 @@ interface BrandSelectorProps {
 export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProps) {
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(currentBrand || null);
   const [hoveredBrand, setHoveredBrand] = useState<Brand | null>(null);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
   const handleSelect = (brand: Brand) => {
     setSelectedBrand(brand);
   };
 
   const handleConfirm = () => {
+    if (selectedBrand) {
+      // Verificar se a marca requer senha
+      if (PROTECTED_BRANDS.includes(selectedBrand)) {
+        setShowPasswordDialog(true);
+      } else {
+        onSelectBrand(selectedBrand);
+      }
+    }
+  };
+
+  const handlePasswordSuccess = () => {
     if (selectedBrand) {
       onSelectBrand(selectedBrand);
     }
@@ -150,6 +166,15 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
           Você poderá trocar de marca a qualquer momento pelo menu do dashboard
         </p>
       </div>
+
+      {/* Diálogo de senha para marcas protegidas */}
+      <PasswordDialog
+        open={showPasswordDialog}
+        onOpenChange={setShowPasswordDialog}
+        onSuccess={handlePasswordSuccess}
+        title="Acesso Restrito"
+        description={`O acesso a ${selectedBrand ? BRAND_CONFIGS[selectedBrand].name : ''} requer autorização. Digite a senha para continuar:`}
+      />
     </div>
   );
 }
