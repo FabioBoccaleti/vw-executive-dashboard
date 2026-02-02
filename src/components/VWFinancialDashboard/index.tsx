@@ -27,6 +27,7 @@ import {
   loadSharedMetricsData,
   saveSharedMetricsData,
   loadFatosRelevantes,
+  loadFatosRelevantesAsync,
   saveFatosRelevantes,
   loadProjectionData,
   saveProjectionData,
@@ -382,9 +383,18 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   // Effect para carregar Fatos Relevantes quando mudar departamento, ano ou marca
   useEffect(() => {
     if (!isImporting) {
-      const loadedFatos = loadFatosRelevantes(fiscalYear, department, brand);
-      setFatosRelevantes(loadedFatos);
-      console.log(`✅ Fatos Relevantes carregados: ${brand} - ${department} - ${fiscalYear}`, loadedFatos);
+      // Primeiro tenta carregar do cache (síncrono)
+      const cachedFatos = loadFatosRelevantes(fiscalYear, department, brand);
+      if (cachedFatos.length > 0) {
+        setFatosRelevantes(cachedFatos);
+        console.log(`✅ Fatos Relevantes carregados do cache: ${brand} - ${department} - ${fiscalYear}`, cachedFatos);
+      } else {
+        // Se não estiver no cache, busca do Redis (assíncrono)
+        loadFatosRelevantesAsync(fiscalYear, department, brand).then(loadedFatos => {
+          setFatosRelevantes(loadedFatos);
+          console.log(`✅ Fatos Relevantes carregados do Redis: ${brand} - ${department} - ${fiscalYear}`, loadedFatos);
+        });
+      }
     }
   }, [fiscalYear, department, brand, isImporting]);
   

@@ -207,6 +207,16 @@ export async function initializeFromDatabase(brand?: Brand): Promise<boolean> {
             }
           })
         );
+        
+        // Carrega fatos relevantes por departamento
+        const fatosKey = `${currentBrand}_fatos_relevantes_${year}_${dept}`;
+        promises.push(
+          getFromDbWithCache(fatosKey).then(data => {
+            if (data) {
+              console.log(`✅ [DB] Carregado fatos relevantes: ${fatosKey}`);
+            }
+          })
+        );
       }
     }
     
@@ -1739,7 +1749,7 @@ export function clearAllBrandsData(): void {
 }
 
 /**
- * Carrega os dados de Fatos Relevantes no Resultado
+ * Carrega os dados de Fatos Relevantes no Resultado (versão síncrona - usa cache)
  * IMPORTANTE: Dados vêm do Redis (cache)
  * @param fiscalYear - Ano fiscal
  * @param department - Departamento
@@ -1763,10 +1773,43 @@ export function loadFatosRelevantes(
       return cached.data;
     }
     
-    console.log(`ℹ️ Nenhum dado de Fatos Relevantes encontrado para: ${currentBrand} - ${department} - ${fiscalYear}`);
+    console.log(`ℹ️ Nenhum dado de Fatos Relevantes encontrado no cache para: ${currentBrand} - ${department} - ${fiscalYear}`);
     return [];
   } catch (error) {
     console.error(`Erro ao carregar Fatos Relevantes (${currentBrand} - ${department} - ${fiscalYear}):`, error);
+    return [];
+  }
+}
+
+/**
+ * Carrega os dados de Fatos Relevantes do Redis (versão assíncrona - busca do banco)
+ * Use esta função quando precisar garantir que os dados venham do Redis
+ * @param fiscalYear - Ano fiscal
+ * @param department - Departamento
+ * @param brand - Marca (opcional, usa a marca salva se não fornecida)
+ * @returns Promise com array de fatos relevantes
+ */
+export async function loadFatosRelevantesAsync(
+  fiscalYear: 2024 | 2025 | 2026 | 2027,
+  department: Department,
+  brand?: Brand
+): Promise<FatosRelevantesData> {
+  const currentBrand = getCurrentBrand(brand);
+  
+  try {
+    const key = `${currentBrand}_fatos_relevantes_${fiscalYear}_${department}`;
+    
+    // Busca do Redis usando a função com cache
+    const data = await getFromDbWithCache(key);
+    if (data) {
+      console.log(`✅ Fatos Relevantes carregados do Redis: ${currentBrand} - ${department} - ${fiscalYear}`);
+      return data as FatosRelevantesData;
+    }
+    
+    console.log(`ℹ️ Nenhum dado de Fatos Relevantes encontrado no Redis para: ${currentBrand} - ${department} - ${fiscalYear}`);
+    return [];
+  } catch (error) {
+    console.error(`Erro ao carregar Fatos Relevantes do Redis (${currentBrand} - ${department} - ${fiscalYear}):`, error);
     return [];
   }
 }
