@@ -10730,12 +10730,12 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Total Projetado</p>
-                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{(projectedData[activeScenario!]?.[0]?.total || 0).toLocaleString('pt-BR')}</p>
+                      <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{Math.round(projectedData[activeScenario!]?.[0]?.total || 0).toLocaleString('pt-BR')}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Variação</p>
                       <p className={`text-lg font-bold ${((projectedData[activeScenario!]?.[0]?.total || 0) - dreData[0].total) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {((projectedData[activeScenario!]?.[0]?.total || 0) - dreData[0].total) >= 0 ? '+' : ''}{((projectedData[activeScenario!]?.[0]?.total || 0) - dreData[0].total).toLocaleString('pt-BR')}
+                        {((projectedData[activeScenario!]?.[0]?.total || 0) - dreData[0].total) >= 0 ? '+' : ''}{Math.round((projectedData[activeScenario!]?.[0]?.total || 0) - dreData[0].total).toLocaleString('pt-BR')}
                       </p>
                     </div>
                     <div>
