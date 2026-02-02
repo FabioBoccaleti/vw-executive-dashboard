@@ -12536,15 +12536,15 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               <div className="space-y-1">
                                 <p className="text-sm">
                                   <span className="text-slate-600 dark:text-slate-400">Original: </span>
-                                  <span className="font-bold text-emerald-600">R$ {Number(payload[0]?.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                  <span className="font-bold text-blue-600">R$ {Number(payload[0]?.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
                                 </p>
                                 <p className="text-sm">
                                   <span className="text-slate-600 dark:text-slate-400">Projeção: </span>
-                                  <span className="font-bold text-teal-600">R$ {Number(payload[1]?.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
+                                  <span className="font-bold text-emerald-600">R$ {Number(payload[1]?.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil</span>
                                 </p>
                                 <p className="text-sm">
                                   <span className="text-slate-600 dark:text-slate-400">Variação: </span>
-                                  <span className="font-bold text-cyan-600">
+                                  <span className="font-bold text-purple-600">
                                     R$ {Number(Number(payload[1]?.value || 0) - Number(payload[0]?.value || 0)).toLocaleString('pt-BR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} mil
                                   </span>
                                 </p>
@@ -12560,18 +12560,18 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       content={() => (
                         <div className="flex items-center justify-center gap-4 text-xs mt-2">
                           <div className="flex items-center gap-1">
-                            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#059669' }}></div>
+                            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#3b82f6' }}></div>
                             <span>Original</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#0d9488' }}></div>
+                            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#10b981' }}></div>
                             <span>Projeção</span>
                           </div>
                         </div>
                       )}
                     />
-                    <Bar dataKey="original" fill="#059669" name="Original (mil)" maxBarSize={50} />
-                    <Bar dataKey="projecao" fill="#0d9488" name="Projeção (mil)" maxBarSize={50} />
+                    <Bar dataKey="original" fill="#3b82f6" name="Original (mil)" maxBarSize={50} />
+                    <Bar dataKey="projecao" fill="#10b981" name="Projeção (mil)" maxBarSize={50} />
                   </BarChart>
                   ) : (
                 <BarChart data={(() => {
