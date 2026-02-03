@@ -1184,7 +1184,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   }
 
   // Função para criar novo cenário de projeção
-  const createProjectionScenario = () => {
+  const executeCreateProjection = () => {
     const newScenarioNumber = projectionScenarios.length + 1
     const newScenario = {
       id: `projection-${department}-${Date.now()}`,
@@ -1226,6 +1226,8 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
         setShowProjectionModal(true)
       } else if (passwordAction === 'delete') {
         executeDeleteProjection()
+      } else if (passwordAction === 'create') {
+        executeCreateProjection()
       }
       
       setPasswordAction(null)
@@ -1244,6 +1246,12 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   // Função para solicitar senha antes de deletar
   const handleDeleteClick = () => {
     setPasswordAction('delete')
+    setShowPasswordDialog(true)
+  }
+
+  // Função para solicitar senha antes de criar projeção
+  const handleCreateProjectionClick = () => {
+    setPasswordAction('create')
     setShowPasswordDialog(true)
   }
 
@@ -1625,7 +1633,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
           <DialogHeader>
             <DialogTitle>Senha Necessária</DialogTitle>
             <DialogDescription>
-              Digite a senha para {passwordAction === 'edit' ? 'editar percentuais' : 'deletar a projeção'}
+              Digite a senha para {passwordAction === 'edit' ? 'editar percentuais' : passwordAction === 'delete' ? 'deletar a projeção' : 'criar projeção'}
             </DialogDescription>
           </DialogHeader>
           
@@ -1863,7 +1871,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
           {/* Controles de Projeção e Cenários */}
           <div className="flex flex-wrap items-center gap-3 mt-4">
             <Button
-              onClick={createProjectionScenario}
+              onClick={handleCreateProjectionClick}
               variant="outline"
               size="sm"
               className="gap-2"
