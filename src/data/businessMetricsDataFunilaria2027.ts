@@ -1,6 +1,6 @@
 // Dados de métricas de negócio - Departamento: Funilaria - Ano Fiscal 2027
 export const businessMetricsDataFunilaria2027 = {
-  months: ['Jan/24', 'Fev/24', 'Mar/24', 'Abr/24', 'Mai/24', 'Jun/24', 'Jul/24', 'Ago/24', 'Set/24', 'Out/24', 'Nov/24', 'Dez/24'],
+  months: ['Jan/27', 'Fev/27', 'Mar/27', 'Abr/27', 'Mai/27', 'Jun/27', 'Jul/27', 'Ago/27', 'Set/27', 'Out/27', 'Nov/27', 'Dez/27'],
   
   vendasNovos: {
     vendas: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],

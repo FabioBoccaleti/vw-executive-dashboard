@@ -1,6 +1,6 @@
 // Dados de métricas de negócio - Departamento: Novos - Ano Fiscal 2026
 export const businessMetricsDataNovos2026 = {
-  months: ['Jan/24', 'Fev/24', 'Mar/24', 'Abr/24', 'Mai/24', 'Jun/24', 'Jul/24', 'Ago/24', 'Set/24', 'Out/24', 'Nov/24', 'Dez/24'],
+  months: ['Jan/26', 'Fev/26', 'Mar/26', 'Abr/26', 'Mai/26', 'Jun/26', 'Jul/26', 'Ago/26', 'Set/26', 'Out/26', 'Nov/26', 'Dez/26'],
   
   vendasNovos: {
     vendas: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],

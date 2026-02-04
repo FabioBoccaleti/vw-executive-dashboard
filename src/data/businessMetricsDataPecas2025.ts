@@ -1,6 +1,6 @@
 // Dados de métricas de negócio - Departamento: Peças - Ano Fiscal 2025
 export const businessMetricsDataPecas2025 = {
-  months: ['Jan/24', 'Fev/24', 'Mar/24', 'Abr/24', 'Mai/24', 'Jun/24', 'Jul/24', 'Ago/24', 'Set/24', 'Out/24', 'Nov/24', 'Dez/24'],
+  months: ['Jan/25', 'Fev/25', 'Mar/25', 'Abr/25', 'Mai/25', 'Jun/25', 'Jul/25', 'Ago/25', 'Set/25', 'Out/25', 'Nov/25', 'Dez/25'],
   
   vendasNovos: {
     vendas: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
