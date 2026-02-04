@@ -1609,6 +1609,10 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   // Nomes dos meses para o modal
   const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
   
+  // Meses dinâmicos baseados no ano fiscal selecionado (para gráficos de Dados Adicionais)
+  const yearSuffix = fiscalYear.toString().slice(-2)
+  const dynamicMonths = monthNames.map(m => `${m}/${yearSuffix}`)
+  
   // Índices de linhas editáveis (não calculadas)
   const editableLineIndices = [0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20]
 
@@ -3612,7 +3616,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                         const lucroTotal = sharedMetricsData.vendasPecas?.balcao?.lucro?.reduce((a, b) => a + b, 0) || 0;
                         const margemMedia = (sharedMetricsData.vendasPecas?.balcao?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
 
-                        const chartData = metricsData.months.map((month, index) => {
+                        const chartData = dynamicMonths.map((month, index) => {
                           const receitaAtual = sharedMetricsData.vendasPecas?.balcao?.vendas[index] || 0;
                           const receitaAnterior = index > 0 ? (sharedMetricsData.vendasPecas?.balcao?.vendas[index - 1] || 0) : receitaAtual;
                           const variacao = receitaAnterior !== 0 ? ((receitaAtual - receitaAnterior) / receitaAnterior) * 100 : 0;
@@ -3743,7 +3747,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                         const lucroTotal = sharedMetricsData.vendasPecas?.oficina?.lucro?.reduce((a, b) => a + b, 0) || 0;
                         const margemMedia = (sharedMetricsData.vendasPecas?.oficina?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
 
-                        const chartData = metricsData.months.map((month, index) => {
+                        const chartData = dynamicMonths.map((month, index) => {
                           const receitaAtual = sharedMetricsData.vendasPecas?.oficina?.vendas[index] || 0;
                           const receitaAnterior = index > 0 ? (sharedMetricsData.vendasPecas?.oficina?.vendas[index - 1] || 0) : receitaAtual;
                           const variacao = receitaAnterior !== 0 ? ((receitaAtual - receitaAnterior) / receitaAnterior) * 100 : 0;
@@ -3874,7 +3878,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                         const lucroTotal = sharedMetricsData.vendasPecas?.funilaria?.lucro?.reduce((a, b) => a + b, 0) || 0;
                         const margemMedia = (sharedMetricsData.vendasPecas?.funilaria?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
 
-                        const chartData = metricsData.months.map((month, index) => {
+                        const chartData = dynamicMonths.map((month, index) => {
                           const receitaAtual = sharedMetricsData.vendasPecas?.funilaria?.vendas[index] || 0;
                           const receitaAnterior = index > 0 ? (sharedMetricsData.vendasPecas?.funilaria?.vendas[index - 1] || 0) : receitaAtual;
                           const variacao = receitaAnterior !== 0 ? ((receitaAtual - receitaAnterior) / receitaAnterior) * 100 : 0;
@@ -4005,7 +4009,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                         const lucroTotal = sharedMetricsData.vendasPecas?.acessorios?.lucro?.reduce((a, b) => a + b, 0) || 0;
                         const margemMedia = (sharedMetricsData.vendasPecas?.acessorios?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
 
-                        const chartData = metricsData.months.map((month, index) => {
+                        const chartData = dynamicMonths.map((month, index) => {
                           const receitaAtual = sharedMetricsData.vendasPecas?.acessorios?.vendas[index] || 0;
                           const receitaAnterior = index > 0 ? (sharedMetricsData.vendasPecas?.acessorios?.vendas[index - 1] || 0) : receitaAtual;
                           const variacao = receitaAnterior !== 0 ? ((receitaAtual - receitaAnterior) / receitaAnterior) * 100 : 0;
@@ -4132,7 +4136,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                         </h3>
                         {(() => {
                           // Calcular vendas consolidadas (soma de Balcão + Oficina + Funilaria + Acessórios)
-                          const vendasConsolidadas = metricsData.months.map((_, index) => 
+                          const vendasConsolidadas = dynamicMonths.map((_, index) => 
                             (sharedMetricsData.vendasPecas?.balcao?.vendas[index] || 0) +
                             (sharedMetricsData.vendasPecas?.oficina?.vendas[index] || 0) +
                             (sharedMetricsData.vendasPecas?.funilaria?.vendas[index] || 0) +
@@ -4155,21 +4159,21 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       
                       {(() => {
                         // Calcular totais consolidados
-                        const vendasConsolidadas = metricsData.months.map((_, index) => 
+                        const vendasConsolidadas = dynamicMonths.map((_, index) => 
                           (sharedMetricsData.vendasPecas?.balcao?.vendas[index] || 0) +
                           (sharedMetricsData.vendasPecas?.oficina?.vendas[index] || 0) +
                           (sharedMetricsData.vendasPecas?.funilaria?.vendas[index] || 0) +
                           (sharedMetricsData.vendasPecas?.acessorios?.vendas[index] || 0)
                         );
                         
-                        const lucroConsolidado = metricsData.months.map((_, index) => 
+                        const lucroConsolidado = dynamicMonths.map((_, index) => 
                           (sharedMetricsData.vendasPecas?.balcao?.lucro[index] || 0) +
                           (sharedMetricsData.vendasPecas?.oficina?.lucro[index] || 0) +
                           (sharedMetricsData.vendasPecas?.funilaria?.lucro[index] || 0) +
                           (sharedMetricsData.vendasPecas?.acessorios?.lucro[index] || 0)
                         );
                         
-                        const margemConsolidada = metricsData.months.map((_, index) => 
+                        const margemConsolidada = dynamicMonths.map((_, index) => 
                           vendasConsolidadas[index] !== 0 ? (lucroConsolidado[index] / vendasConsolidadas[index]) * 100 : 0
                         );
                         
@@ -4177,7 +4181,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                         const lucroTotal = lucroConsolidado.reduce((a, b) => a + b, 0);
                         const margemMedia = margemConsolidada.reduce((a, b) => a + b, 0) / 12;
 
-                        const chartData = metricsData.months.map((month, index) => {
+                        const chartData = dynamicMonths.map((month, index) => {
                           const receitaAtual = vendasConsolidadas[index];
                           const receitaAnterior = index > 0 ? vendasConsolidadas[index - 1] : receitaAtual;
                           const variacao = receitaAnterior !== 0 ? ((receitaAtual - receitaAnterior) / receitaAnterior) * 100 : 0;
@@ -4368,7 +4372,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {/* Gráfico */}
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
-                          <ComposedChart data={metricsData.months.map((month, index) => {
+                          <ComposedChart data={dynamicMonths.map((month, index) => {
                             const vendaAtual = sharedMetricsData.seguradoras?.portoSeguro?.vendas[index] || 0;
                             const vendaAnterior = index > 0 ? (sharedMetricsData.seguradoras?.portoSeguro?.vendas[index - 1] || 0) : vendaAtual;
                             const variacaoMesAnt = vendaAnterior !== 0 && index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
@@ -4532,7 +4536,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {/* Gráfico */}
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
-                          <ComposedChart data={metricsData.months.map((month, index) => {
+                          <ComposedChart data={dynamicMonths.map((month, index) => {
                             const vendaAtual = sharedMetricsData.seguradoras?.azul?.vendas[index] || 0;
                             const vendaAnterior = index > 0 ? (sharedMetricsData.seguradoras?.azul?.vendas[index - 1] || 0) : vendaAtual;
                             const variacaoMesAnt = vendaAnterior !== 0 && index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
@@ -4696,7 +4700,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {/* Gráfico */}
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
-                          <ComposedChart data={metricsData.months.map((month, index) => {
+                          <ComposedChart data={dynamicMonths.map((month, index) => {
                             const vendaAtual = sharedMetricsData.seguradoras?.allianz?.vendas[index] || 0;
                             const vendaAnterior = index > 0 ? (sharedMetricsData.seguradoras?.allianz?.vendas[index - 1] || 0) : vendaAtual;
                             const variacaoMesAnt = vendaAnterior !== 0 && index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
@@ -4878,7 +4882,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {/* Gráfico */}
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
-                          <ComposedChart data={metricsData.months.map((month, index) => {
+                          <ComposedChart data={dynamicMonths.map((month, index) => {
                             // Usar dados dinâmicos de sharedMetricsData em vez de valores hardcoded
                             const vendas = sharedMetricsData.seguradoras?.tokioMarine?.vendas || Array(12).fill(0);
                             const lucros = sharedMetricsData.seguradoras?.tokioMarine?.lucro || Array(12).fill(0);
@@ -5064,7 +5068,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {/* Gráfico */}
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
-                          <ComposedChart data={metricsData.months.map((month, index) => {
+                          <ComposedChart data={dynamicMonths.map((month, index) => {
                             // Usar dados dinâmicos de sharedMetricsData - soma de todas as seguradoras
                             const portoVendas = sharedMetricsData.seguradoras?.portoSeguro?.vendas || Array(12).fill(0);
                             const portoLucros = sharedMetricsData.seguradoras?.portoSeguro?.lucro || Array(12).fill(0);
@@ -5273,7 +5277,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {/* Gráfico */}
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
-                          <ComposedChart data={metricsData.months.map((month, index) => {
+                          <ComposedChart data={dynamicMonths.map((month, index) => {
                             const vendas = [295637, 226990, 152428, 231056, 186334, 224765, 274123, 261008, 177273, 146230, 161814, 107544];
                             const lucros = [36424, 24968, 14607, 24554, 16823, 23176, 7967, 1135, 3679, 6500, 5067, 6230];
                             
@@ -5430,7 +5434,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const penultimoJuros = jurosData[10];
                       const variacaoJuros = ((ultimoJuros - penultimoJuros) / penultimoJuros) * 100;
 
-                      const jurosChartData = metricsData.months.map((month, index) => {
+                      const jurosChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = jurosData[index];
                         const valorAnterior = index > 0 ? jurosData[index - 1] : valorAtual;
                         const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -5570,7 +5574,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const penultimaDespesa = despesasData[10];
                       const variacaoDespesas = ((ultimaDespesa - penultimaDespesa) / penultimaDespesa) * 100;
 
-                      const despesasChartData = metricsData.months.map((month, index) => {
+                      const despesasChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = despesasData[index];
                         const valorAnterior = index > 0 ? despesasData[index - 1] : valorAtual;
                         const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -5739,7 +5743,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const penultimoJuros = jurosData[10];
                       const variacaoJuros = ((ultimoJuros - penultimoJuros) / penultimoJuros) * 100;
 
-                      const jurosChartData = metricsData.months.map((month, index) => {
+                      const jurosChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = jurosData[index];
                         const valorAnterior = index > 0 ? jurosData[index - 1] : valorAtual;
                         const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -5879,7 +5883,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const penultimaDespesa = despesasData[10];
                       const variacaoDespesas = ((ultimaDespesa - penultimaDespesa) / penultimaDespesa) * 100;
 
-                      const despesasChartData = metricsData.months.map((month, index) => {
+                      const despesasChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = despesasData[index];
                         const valorAnterior = index > 0 ? despesasData[index - 1] : valorAtual;
                         const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -6046,7 +6050,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaJuros = totalJuros / 12;
                       const ultimoJuros = jurosData[11];
 
-                      const jurosChartData = metricsData.months.map((month, index) => {
+                      const jurosChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = jurosData[index];
                         const valorAnterior = index > 0 ? jurosData[index - 1] : valorAtual;
                         const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -6184,7 +6188,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaDespesas = totalDespesas / 12;
                       const ultimaDespesa = despesasData[11];
 
-                      const despesasChartData = metricsData.months.map((month, index) => {
+                      const despesasChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = despesasData[index];
                         const valorAnterior = index > 0 ? despesasData[index - 1] : valorAtual;
                         const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -6351,7 +6355,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaDespesas = totalDespesas / 12;
                       const ultimaDespesa = despesasData[11];
 
-                      const despesasChartData = metricsData.months.map((month, index) => {
+                      const despesasChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = despesasData[index];
                         const valorAnterior = index > 0 ? despesasData[index - 1] : valorAtual;
                         const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -6518,7 +6522,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaDespesas = totalDespesas / 12;
                       const ultimaDespesa = despesasData[11];
 
-                      const despesasChartData = metricsData.months.map((month, index) => {
+                      const despesasChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = despesasData[index];
                         const valorAnterior = index > 0 ? despesasData[index - 1] : valorAtual;
                         const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -6685,7 +6689,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaJuros = totalJuros / 12;
                       const ultimoJuros = jurosData[11];
 
-                      const jurosChartData = metricsData.months.map((month, index) => {
+                      const jurosChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = jurosData[index];
                         const valorAnterior = index > 0 ? jurosData[index - 1] : valorAtual;
                         const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -6823,7 +6827,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaJuros = totalJuros / 12;
                       const ultimoJuros = jurosData[11];
 
-                      const jurosChartData = metricsData.months.map((month, index) => {
+                      const jurosChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = jurosData[index];
                         const valorAnterior = index > 0 ? jurosData[index - 1] : valorAtual;
                         const variacao = index > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -6961,7 +6965,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaDespesas = totalDespesas / 12;
                       const ultimaDespesa = despesasData[11];
 
-                      const despesasChartData = metricsData.months.map((month, index) => {
+                      const despesasChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = despesasData[index];
                         const valorAnterior = index > 0 ? despesasData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -7128,7 +7132,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaBonus = totalBonus / 12;
                       const ultimoBonus = bonusData[11] || 0;
 
-                      const bonusChartData = metricsData.months.map((month, index) => {
+                      const bonusChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = bonusData[index] || 0;
                         const valorAnterior = index > 0 ? (bonusData[index - 1] || 0) : valorAtual;
                         const variacao = index > 0 && valorAnterior !== 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -7295,7 +7299,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaBonus = totalBonus / 12;
                       const ultimoBonus = bonusData[11];
 
-                      const bonusChartData = metricsData.months.map((month, index) => {
+                      const bonusChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = bonusData[index];
                         const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -7462,7 +7466,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaBonus = totalBonus / 12;
                       const ultimoBonus = bonusData[11];
 
-                      const bonusChartData = metricsData.months.map((month, index) => {
+                      const bonusChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = bonusData[index];
                         const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
                         // Evita divisão por zero e valores infinitos
@@ -7635,7 +7639,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaBonus = totalBonus / 12;
                       const ultimoBonus = bonusData[11];
 
-                      const bonusChartData = metricsData.months.map((month, index) => {
+                      const bonusChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = bonusData[index];
                         const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -7802,7 +7806,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaBonus = totalBonus / 12;
                       const ultimoBonus = bonusData[11];
 
-                      const bonusChartData = metricsData.months.map((month, index) => {
+                      const bonusChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = bonusData[index];
                         const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -7969,7 +7973,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaBonus = totalBonus / 12;
                       const ultimoBonus = bonusData[11];
 
-                      const bonusChartData = metricsData.months.map((month, index) => {
+                      const bonusChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = bonusData[index];
                         const valorAnterior = index > 0 ? bonusData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -8136,7 +8140,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = metricsData.months.map((month, index) => {
+                      const receitaChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -8303,7 +8307,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaCredito = totalCredito / 12;
                       const ultimoCredito = creditoData[11];
 
-                      const creditoChartData = metricsData.months.map((month, index) => {
+                      const creditoChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = creditoData[index];
                         const valorAnterior = index > 0 ? creditoData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -8470,7 +8474,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaCredito = totalCredito / 12;
                       const ultimoCredito = creditoData[11];
 
-                      const creditoChartData = metricsData.months.map((month, index) => {
+                      const creditoChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = creditoData[index];
                         const valorAnterior = index > 0 ? creditoData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -8639,7 +8643,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaCredito = totalCredito / 12;
                       const ultimoCredito = creditoData[11];
 
-                      const creditoChartData = metricsData.months.map((month, index) => {
+                      const creditoChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = creditoData[index];
                         const valorAnterior = index > 0 ? creditoData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -8806,7 +8810,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11] || 0;
 
-                      const receitaChartData = metricsData.months.map((month, index) => {
+                      const receitaChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = receitaData[index] || 0;
                         const valorAnterior = index > 0 ? (receitaData[index - 1] || 0) : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -9307,7 +9311,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaCredito = totalCredito / 12;
                       const ultimoCredito = creditoData[11];
 
-                      const creditoChartData = metricsData.months.map((month, index) => {
+                      const creditoChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = creditoData[index];
                         const valorAnterior = index > 0 ? creditoData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -9474,7 +9478,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       const mediaReceita = totalReceita / 12;
                       const ultimaReceita = receitaData[11];
 
-                      const receitaChartData = metricsData.months.map((month, index) => {
+                      const receitaChartData = dynamicMonths.map((month, index) => {
                         const valorAtual = receitaData[index];
                         const valorAnterior = index > 0 ? receitaData[index - 1] : valorAtual;
                         const variacao = index > 0 && valorAnterior > 0 ? ((valorAtual - valorAnterior) / valorAnterior) * 100 : 0;
@@ -9639,7 +9643,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       ID 1 - % de Trocas em Veículos Novos
                     </h3>
                     <ChartContainer config={{}} className="h-[300px] w-full">
-                      <ComposedChart data={metricsData.months.map((month, index) => ({
+                      <ComposedChart data={dynamicMonths.map((month, index) => ({
                         month,
                         vendas: sharedMetricsData.vendasNovos.vendas[index],
                         trocas: sharedMetricsData.vendasNovos.volumeTrocas[index],
@@ -9721,7 +9725,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       ID 2 - % de Trocas em Veículos Novos VD
                     </h3>
                     <ChartContainer config={{}} className="h-[300px] w-full">
-                      <ComposedChart data={metricsData.months.map((month, index) => ({
+                      <ComposedChart data={dynamicMonths.map((month, index) => ({
                         month,
                         vendas: sharedMetricsData.vendasNovosVD.vendas[index],
                         trocas: sharedMetricsData.vendasNovosVD.volumeTrocas[index],
@@ -9803,7 +9807,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                         ID 3 - % de Trocas em Veículos Usados
                       </h3>
                       <ChartContainer config={{}} className="h-[300px] w-full">
-                        <ComposedChart data={metricsData.months.map((month, index) => ({
+                        <ComposedChart data={dynamicMonths.map((month, index) => ({
                           month,
                           vendas: sharedMetricsData.vendasUsados.vendas[index],
                           trocas: sharedMetricsData.vendasUsados.volumeTrocas[index],
@@ -9919,7 +9923,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     const percentualPago = (pagoAtual / estoqueAtual) * 100;
 
                     // Preparar dados para o gráfico com variação mês anterior
-                    const estoqueChartData = metricsData.months.map((month, index) => {
+                    const estoqueChartData = dynamicMonths.map((month, index) => {
                       const valorAtual = sharedMetricsData.estoqueNovos.valor[index];
                       const valorAnterior = index > 0 ? sharedMetricsData.estoqueNovos.valor[index - 1] : valorAtual;
                       const variacao = ((valorAtual - valorAnterior) / valorAnterior) * 100;
@@ -10087,7 +10091,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     const percentualPago = (pagoAtual / estoqueAtual) * 100;
 
                     // Preparar dados para o gráfico com variação mês anterior
-                    const estoqueChartData = metricsData.months.map((month, index) => {
+                    const estoqueChartData = dynamicMonths.map((month, index) => {
                       const valorAtual = sharedMetricsData.estoqueUsados.valor[index];
                       const valorAnterior = index > 0 ? sharedMetricsData.estoqueUsados.valor[index - 1] : valorAtual;
                       const variacao = ((valorAtual - valorAnterior) / valorAnterior) * 100;
@@ -10255,7 +10259,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     const percentualPago = (pagoAtual / estoqueAtual) * 100;
 
                     // Preparar dados para o gráfico com variação mês anterior
-                    const estoqueChartData = metricsData.months.map((month, index) => {
+                    const estoqueChartData = dynamicMonths.map((month, index) => {
                       const valorAtual = sharedMetricsData.estoquePecas.valor[index];
                       const valorAnterior = index > 0 ? sharedMetricsData.estoquePecas.valor[index - 1] : valorAtual;
                       const variacao = ((valorAtual - valorAnterior) / valorAnterior) * 100;
@@ -10416,7 +10420,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     const mediaPercentual = totalVendas > 0 ? (totalRepasse / totalVendas) * 100 : 0;
 
                     // Preparar dados para o gráfico com cores condicionais
-                    const repasseChartData = metricsData.months.map((month, index) => {
+                    const repasseChartData = dynamicMonths.map((month, index) => {
                       const percentual = (sharedMetricsData.volumeVendas?.percentualRepasse || [])[index] || 0;
                       const limiteVariacao = mediaPercentual * 0.10; // 10% da média
                       let cor = '#0ea5e9'; // Azul - dentro da média
