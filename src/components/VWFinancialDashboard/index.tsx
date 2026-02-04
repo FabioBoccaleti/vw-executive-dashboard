@@ -205,7 +205,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   const [department, setDepartment] = useState<Department>(() => loadSelectedDepartment())
   
   // Estado para controlar categorias de despesas selecionadas
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(['pessoal', 'terceiros', 'ocupacao', 'funcionamento'])
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['pessoal', 'terceiros', 'ocupacao', 'funcionamento', 'vendas'])
   const [viewMode, setViewMode] = useState<'mensal' | 'bimestral' | 'trimestral' | 'semestral'>('mensal')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const metricsFileInputRef = useRef<HTMLInputElement>(null)
