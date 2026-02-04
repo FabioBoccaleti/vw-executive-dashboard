@@ -720,7 +720,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   const [showEstoqueNovos, setShowEstoqueNovos] = useState(false)
   
   // Estado para controlar exibição do card de Insights
-  const [showInsights, setShowInsights] = useState(true)
+  const [showInsights, setShowInsights] = useState(false)
   
   // Estado para controlar exibição do card de Dados Adicionais
   const [showDadosAdicionais, setShowDadosAdicionais] = useState(true)
