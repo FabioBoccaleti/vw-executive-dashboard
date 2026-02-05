@@ -196,6 +196,20 @@ const initialDreData = [
   }
 ]
 
+// Função helper para calcular média considerando apenas meses com dados (não-zero)
+const calculateMonthlyAverage = (values: number[]): number => {
+  if (!values || values.length === 0) return 0
+  const nonZeroValues = values.filter(v => v !== 0)
+  if (nonZeroValues.length === 0) return 0
+  return nonZeroValues.reduce((a, b) => a + b, 0) / nonZeroValues.length
+}
+
+// Função helper para contar meses com dados
+const countMonthsWithData = (values: number[]): number => {
+  if (!values || values.length === 0) return 0
+  return values.filter(v => v !== 0).length
+}
+
 export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashboardProps) {
   // Configuração da marca atual
   const brandConfig = getBrandConfig(brand);
@@ -3614,7 +3628,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {(() => {
                         const receitaTotal = sharedMetricsData.vendasPecas?.balcao?.vendas?.reduce((a, b) => a + b, 0) || 0;
                         const lucroTotal = sharedMetricsData.vendasPecas?.balcao?.lucro?.reduce((a, b) => a + b, 0) || 0;
-                        const margemMedia = (sharedMetricsData.vendasPecas?.balcao?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const margemMedia = calculateMonthlyAverage(sharedMetricsData.vendasPecas?.balcao?.margem || []);
 
                         const chartData = dynamicMonths.map((month, index) => {
                           const receitaAtual = sharedMetricsData.vendasPecas?.balcao?.vendas[index] || 0;
@@ -3745,7 +3759,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {(() => {
                         const receitaTotal = sharedMetricsData.vendasPecas?.oficina?.vendas?.reduce((a, b) => a + b, 0) || 0;
                         const lucroTotal = sharedMetricsData.vendasPecas?.oficina?.lucro?.reduce((a, b) => a + b, 0) || 0;
-                        const margemMedia = (sharedMetricsData.vendasPecas?.oficina?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const margemMedia = calculateMonthlyAverage(sharedMetricsData.vendasPecas?.oficina?.margem || []);
 
                         const chartData = dynamicMonths.map((month, index) => {
                           const receitaAtual = sharedMetricsData.vendasPecas?.oficina?.vendas[index] || 0;
@@ -3876,7 +3890,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {(() => {
                         const receitaTotal = sharedMetricsData.vendasPecas?.funilaria?.vendas?.reduce((a, b) => a + b, 0) || 0;
                         const lucroTotal = sharedMetricsData.vendasPecas?.funilaria?.lucro?.reduce((a, b) => a + b, 0) || 0;
-                        const margemMedia = (sharedMetricsData.vendasPecas?.funilaria?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const margemMedia = calculateMonthlyAverage(sharedMetricsData.vendasPecas?.funilaria?.margem || []);
 
                         const chartData = dynamicMonths.map((month, index) => {
                           const receitaAtual = sharedMetricsData.vendasPecas?.funilaria?.vendas[index] || 0;
@@ -4007,7 +4021,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {(() => {
                         const receitaTotal = sharedMetricsData.vendasPecas?.acessorios?.vendas?.reduce((a, b) => a + b, 0) || 0;
                         const lucroTotal = sharedMetricsData.vendasPecas?.acessorios?.lucro?.reduce((a, b) => a + b, 0) || 0;
-                        const margemMedia = (sharedMetricsData.vendasPecas?.acessorios?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const margemMedia = calculateMonthlyAverage(sharedMetricsData.vendasPecas?.acessorios?.margem || []);
 
                         const chartData = dynamicMonths.map((month, index) => {
                           const receitaAtual = sharedMetricsData.vendasPecas?.acessorios?.vendas[index] || 0;
@@ -4179,7 +4193,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                         
                         const receitaTotal = vendasConsolidadas.reduce((a, b) => a + b, 0);
                         const lucroTotal = lucroConsolidado.reduce((a, b) => a + b, 0);
-                        const margemMedia = margemConsolidada.reduce((a, b) => a + b, 0) / 12;
+                        const margemMedia = calculateMonthlyAverage(margemConsolidada);
 
                         const chartData = dynamicMonths.map((month, index) => {
                           const receitaAtual = vendasConsolidadas[index];
@@ -4331,7 +4345,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {(() => {
                         const totalVendas = sharedMetricsData.seguradoras?.portoSeguro?.vendas?.reduce((a, b) => a + b, 0) || 0;
                         const totalLucro = sharedMetricsData.seguradoras?.portoSeguro?.lucro?.reduce((a, b) => a + b, 0) || 0;
-                        const margemMedia = (sharedMetricsData.seguradoras?.portoSeguro?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const margemMedia = calculateMonthlyAverage(sharedMetricsData.seguradoras?.portoSeguro?.margem || []);
                         const ultimaVenda = sharedMetricsData.seguradoras?.portoSeguro?.vendas[11] || 0;
                         const penultimaVenda = sharedMetricsData.seguradoras?.portoSeguro?.vendas[10] || 0;
                         const variacaoMes = penultimaVenda !== 0 ? ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100 : 0;
@@ -4495,7 +4509,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {(() => {
                         const totalVendas = sharedMetricsData.seguradoras?.azul?.vendas?.reduce((a, b) => a + b, 0) || 0;
                         const totalLucro = sharedMetricsData.seguradoras?.azul?.lucro?.reduce((a, b) => a + b, 0) || 0;
-                        const margemMedia = (sharedMetricsData.seguradoras?.azul?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const margemMedia = calculateMonthlyAverage(sharedMetricsData.seguradoras?.azul?.margem || []);
                         const ultimaVenda = sharedMetricsData.seguradoras?.azul?.vendas[11] || 0;
                         const penultimaVenda = sharedMetricsData.seguradoras?.azul?.vendas[10] || 0;
                         const variacaoMes = penultimaVenda !== 0 ? ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100 : 0;
@@ -4659,7 +4673,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       {(() => {
                         const totalVendas = sharedMetricsData.seguradoras?.allianz?.vendas?.reduce((a, b) => a + b, 0) || 0;
                         const totalLucro = sharedMetricsData.seguradoras?.allianz?.lucro?.reduce((a, b) => a + b, 0) || 0;
-                        const margemMedia = (sharedMetricsData.seguradoras?.allianz?.margem?.reduce((a, b) => a + b, 0) || 0) / 12;
+                        const margemMedia = calculateMonthlyAverage(sharedMetricsData.seguradoras?.allianz?.margem || []);
                         const ultimaVenda = sharedMetricsData.seguradoras?.allianz?.vendas[11] || 0;
                         const penultimaVenda = sharedMetricsData.seguradoras?.allianz?.vendas[10] || 0;
                         const variacaoMes = penultimaVenda !== 0 ? ((ultimaVenda - penultimaVenda) / penultimaVenda) * 100 : 0;
@@ -5429,7 +5443,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const jurosData = sharedMetricsData.juros?.veiculosNovos || [];
                       const totalJuros = jurosData.reduce((a, b) => a + b, 0);
-                      const mediaJuros = totalJuros / 12;
+                      const mediaJuros = calculateMonthlyAverage(jurosData);
                       const ultimoJuros = jurosData[11];
                       const penultimoJuros = jurosData[10];
                       const variacaoJuros = ((ultimoJuros - penultimoJuros) / penultimoJuros) * 100;
@@ -5569,7 +5583,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const despesasData = sharedMetricsData.despesasCartao?.novos || [];
                       const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
-                      const mediaDespesas = totalDespesas / 12;
+                      const mediaDespesas = calculateMonthlyAverage(despesasData);
                       const ultimaDespesa = despesasData[11];
                       const penultimaDespesa = despesasData[10];
                       const variacaoDespesas = ((ultimaDespesa - penultimaDespesa) / penultimaDespesa) * 100;
@@ -5738,7 +5752,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const jurosData = sharedMetricsData.juros?.veiculosUsados || [];
                       const totalJuros = jurosData.reduce((a, b) => a + b, 0);
-                      const mediaJuros = totalJuros / 12;
+                      const mediaJuros = calculateMonthlyAverage(jurosData);
                       const ultimoJuros = jurosData[11];
                       const penultimoJuros = jurosData[10];
                       const variacaoJuros = ((ultimoJuros - penultimoJuros) / penultimoJuros) * 100;
@@ -5878,7 +5892,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const despesasData = sharedMetricsData.despesasCartao?.usados || [];
                       const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
-                      const mediaDespesas = totalDespesas / 12;
+                      const mediaDespesas = calculateMonthlyAverage(despesasData);
                       const ultimaDespesa = despesasData[11];
                       const penultimaDespesa = despesasData[10];
                       const variacaoDespesas = ((ultimaDespesa - penultimaDespesa) / penultimaDespesa) * 100;
@@ -6047,7 +6061,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const jurosData = sharedMetricsData.juros?.pecas || [];
                       const totalJuros = jurosData.reduce((a, b) => a + b, 0);
-                      const mediaJuros = totalJuros / 12;
+                      const mediaJuros = calculateMonthlyAverage(jurosData);
                       const ultimoJuros = jurosData[11];
 
                       const jurosChartData = dynamicMonths.map((month, index) => {
@@ -6185,7 +6199,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const despesasData = sharedMetricsData.despesasCartao?.pecas || [];
                       const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
-                      const mediaDespesas = totalDespesas / 12;
+                      const mediaDespesas = calculateMonthlyAverage(despesasData);
                       const ultimaDespesa = despesasData[11];
 
                       const despesasChartData = dynamicMonths.map((month, index) => {
@@ -6352,7 +6366,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const despesasData = sharedMetricsData.despesasCartao?.oficina || [];
                       const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
-                      const mediaDespesas = totalDespesas / 12;
+                      const mediaDespesas = calculateMonthlyAverage(despesasData);
                       const ultimaDespesa = despesasData[11];
 
                       const despesasChartData = dynamicMonths.map((month, index) => {
@@ -6519,7 +6533,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const despesasData = sharedMetricsData.despesasCartao?.funilaria || [];
                       const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
-                      const mediaDespesas = totalDespesas / 12;
+                      const mediaDespesas = calculateMonthlyAverage(despesasData);
                       const ultimaDespesa = despesasData[11];
 
                       const despesasChartData = dynamicMonths.map((month, index) => {
@@ -6686,7 +6700,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const jurosData = sharedMetricsData.juros?.emprestimosBancarios || [];
                       const totalJuros = jurosData.reduce((a, b) => a + b, 0);
-                      const mediaJuros = totalJuros / 12;
+                      const mediaJuros = calculateMonthlyAverage(jurosData);
                       const ultimoJuros = jurosData[11];
 
                       const jurosChartData = dynamicMonths.map((month, index) => {
@@ -6824,7 +6838,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const jurosData = sharedMetricsData.juros?.contratoMutuo || [];
                       const totalJuros = jurosData.reduce((a, b) => a + b, 0);
-                      const mediaJuros = totalJuros / 12;
+                      const mediaJuros = calculateMonthlyAverage(jurosData);
                       const ultimoJuros = jurosData[11];
 
                       const jurosChartData = dynamicMonths.map((month, index) => {
@@ -6962,7 +6976,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const despesasData = sharedMetricsData.despesasCartao?.administracao || [];
                       const totalDespesas = despesasData.reduce((a, b) => a + b, 0);
-                      const mediaDespesas = totalDespesas / 12;
+                      const mediaDespesas = calculateMonthlyAverage(despesasData);
                       const ultimaDespesa = despesasData[11];
 
                       const despesasChartData = dynamicMonths.map((month, index) => {
@@ -7129,7 +7143,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const bonusData = sharedMetricsData.bonus?.veiculosNovos || [];
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
-                      const mediaBonus = totalBonus / 12;
+                      const mediaBonus = calculateMonthlyAverage(bonusData);
                       const ultimoBonus = bonusData[11] || 0;
 
                       const bonusChartData = dynamicMonths.map((month, index) => {
@@ -7296,7 +7310,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const bonusData = sharedMetricsData.bonus?.veiculosUsados || [];
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
-                      const mediaBonus = totalBonus / 12;
+                      const mediaBonus = calculateMonthlyAverage(bonusData);
                       const ultimoBonus = bonusData[11];
 
                       const bonusChartData = dynamicMonths.map((month, index) => {
@@ -7463,7 +7477,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const bonusData = sharedMetricsData.bonus?.pecas || [];
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
-                      const mediaBonus = totalBonus / 12;
+                      const mediaBonus = calculateMonthlyAverage(bonusData);
                       const ultimoBonus = bonusData[11];
 
                       const bonusChartData = dynamicMonths.map((month, index) => {
@@ -7636,7 +7650,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const bonusData = sharedMetricsData.bonus?.oficina || [];
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
-                      const mediaBonus = totalBonus / 12;
+                      const mediaBonus = calculateMonthlyAverage(bonusData);
                       const ultimoBonus = bonusData[11];
 
                       const bonusChartData = dynamicMonths.map((month, index) => {
@@ -7803,7 +7817,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const bonusData = sharedMetricsData.bonus?.funilaria || [];
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
-                      const mediaBonus = totalBonus / 12;
+                      const mediaBonus = calculateMonthlyAverage(bonusData);
                       const ultimoBonus = bonusData[11];
 
                       const bonusChartData = dynamicMonths.map((month, index) => {
@@ -7970,7 +7984,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const bonusData = sharedMetricsData.bonus?.administracao || [];
                       const totalBonus = bonusData.reduce((a, b) => a + b, 0);
-                      const mediaBonus = totalBonus / 12;
+                      const mediaBonus = calculateMonthlyAverage(bonusData);
                       const ultimoBonus = bonusData[11];
 
                       const bonusChartData = dynamicMonths.map((month, index) => {
@@ -8137,7 +8151,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const receitaData = sharedMetricsData.receitasFinanciamento?.veiculosNovos || [];
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
-                      const mediaReceita = totalReceita / 12;
+                      const mediaReceita = calculateMonthlyAverage(receitaData);
                       const ultimaReceita = receitaData[11];
 
                       const receitaChartData = dynamicMonths.map((month, index) => {
@@ -8304,7 +8318,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const creditoData = sharedMetricsData.creditosICMS?.pecas || [];
                       const totalCredito = creditoData.reduce((a, b) => a + b, 0);
-                      const mediaCredito = totalCredito / 12;
+                      const mediaCredito = calculateMonthlyAverage(creditoData);
                       const ultimoCredito = creditoData[11];
 
                       const creditoChartData = dynamicMonths.map((month, index) => {
@@ -8471,7 +8485,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const creditoData = sharedMetricsData.creditosICMS?.administracao || [];
                       const totalCredito = creditoData.reduce((a, b) => a + b, 0);
-                      const mediaCredito = totalCredito / 12;
+                      const mediaCredito = calculateMonthlyAverage(creditoData);
                       const ultimoCredito = creditoData[11];
 
                       const creditoChartData = dynamicMonths.map((month, index) => {
@@ -8640,7 +8654,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       if (!creditoData) return null;
                       
                       const totalCredito = creditoData.reduce((a, b) => a + b, 0);
-                      const mediaCredito = totalCredito / 12;
+                      const mediaCredito = calculateMonthlyAverage(creditoData);
                       const ultimoCredito = creditoData[11];
 
                       const creditoChartData = dynamicMonths.map((month, index) => {
@@ -8807,7 +8821,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const receitaData = sharedMetricsData.receitaBlindagem || [];
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
-                      const mediaReceita = totalReceita / 12;
+                      const mediaReceita = calculateMonthlyAverage(receitaData);
                       const ultimaReceita = receitaData[11] || 0;
 
                       const receitaChartData = dynamicMonths.map((month, index) => {
@@ -8974,7 +8988,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const receitaData = sharedMetricsData.receitaDespachanteUsados || metricsData.receitaDespachanteUsados;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
-                      const mediaReceita = totalReceita / 12;
+                      const mediaReceita = calculateMonthlyAverage(receitaData);
                       const ultimaReceita = receitaData[11];
 
                       const receitaChartData = (sharedMetricsData.months || metricsData.months).map((month, index) => {
@@ -9141,7 +9155,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const receitaData = sharedMetricsData.receitaDespachanteNovos || metricsData.receitaDespachanteNovos;
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
-                      const mediaReceita = totalReceita / 12;
+                      const mediaReceita = calculateMonthlyAverage(receitaData);
                       const ultimaReceita = receitaData[11];
 
                       const receitaChartData = (sharedMetricsData.months || metricsData.months).map((month, index) => {
@@ -9308,7 +9322,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const creditoData = sharedMetricsData.creditosICMS?.novos || [];
                       const totalCredito = creditoData.reduce((a, b) => a + b, 0);
-                      const mediaCredito = totalCredito / 12;
+                      const mediaCredito = calculateMonthlyAverage(creditoData);
                       const ultimoCredito = creditoData[11];
 
                       const creditoChartData = dynamicMonths.map((month, index) => {
@@ -9475,7 +9489,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     {(() => {
                       const receitaData = sharedMetricsData.receitasFinanciamento?.veiculosUsados || [];
                       const totalReceita = receitaData.reduce((a, b) => a + b, 0);
-                      const mediaReceita = totalReceita / 12;
+                      const mediaReceita = calculateMonthlyAverage(receitaData);
                       const ultimaReceita = receitaData[11];
 
                       const receitaChartData = dynamicMonths.map((month, index) => {
@@ -9916,9 +9930,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     const pagoAtual = sharedMetricsData.estoqueNovos.pagos[11];
                     
                     // Calcular médias anuais
-                    const mediaEstoque = sharedMetricsData.estoqueNovos.valor.reduce((a, b) => a + b, 0) / 12;
-                    const mediaAPagar = sharedMetricsData.estoqueNovos.aPagar.reduce((a, b) => a + b, 0) / 12;
-                    const mediaPago = sharedMetricsData.estoqueNovos.pagos.reduce((a, b) => a + b, 0) / 12;
+                    const mediaEstoque = calculateMonthlyAverage(sharedMetricsData.estoqueNovos?.valor || []);
+                    const mediaAPagar = calculateMonthlyAverage(sharedMetricsData.estoqueNovos?.aPagar || []);
+                    const mediaPago = calculateMonthlyAverage(sharedMetricsData.estoqueNovos?.pagos || []);
                     const percentualAPagar = (aPagarAtual / estoqueAtual) * 100;
                     const percentualPago = (pagoAtual / estoqueAtual) * 100;
 
@@ -10084,9 +10098,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     const pagoAtual = sharedMetricsData.estoqueUsados.pagos[11];
                     
                     // Calcular médias anuais
-                    const mediaEstoque = sharedMetricsData.estoqueUsados.valor.reduce((a, b) => a + b, 0) / 12;
-                    const mediaAPagar = sharedMetricsData.estoqueUsados.aPagar.reduce((a, b) => a + b, 0) / 12;
-                    const mediaPago = sharedMetricsData.estoqueUsados.pagos.reduce((a, b) => a + b, 0) / 12;
+                    const mediaEstoque = calculateMonthlyAverage(sharedMetricsData.estoqueUsados?.valor || []);
+                    const mediaAPagar = calculateMonthlyAverage(sharedMetricsData.estoqueUsados?.aPagar || []);
+                    const mediaPago = calculateMonthlyAverage(sharedMetricsData.estoqueUsados?.pagos || []);
                     const percentualAPagar = (aPagarAtual / estoqueAtual) * 100;
                     const percentualPago = (pagoAtual / estoqueAtual) * 100;
 
@@ -10252,9 +10266,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     const pagoAtual = sharedMetricsData.estoquePecas.pagos[11];
                     
                     // Calcular médias anuais
-                    const mediaEstoque = sharedMetricsData.estoquePecas.valor.reduce((a, b) => a + b, 0) / 12;
-                    const mediaAPagar = sharedMetricsData.estoquePecas.aPagar.reduce((a, b) => a + b, 0) / 12;
-                    const mediaPago = sharedMetricsData.estoquePecas.pagos.reduce((a, b) => a + b, 0) / 12;
+                    const mediaEstoque = calculateMonthlyAverage(sharedMetricsData.estoquePecas?.valor || []);
+                    const mediaAPagar = calculateMonthlyAverage(sharedMetricsData.estoquePecas?.aPagar || []);
+                    const mediaPago = calculateMonthlyAverage(sharedMetricsData.estoquePecas?.pagos || []);
                     const percentualAPagar = (aPagarAtual / estoqueAtual) * 100;
                     const percentualPago = (pagoAtual / estoqueAtual) * 100;
 

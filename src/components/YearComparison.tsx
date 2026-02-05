@@ -91,6 +91,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
     return dre?.find(line => line.descricao === descricao)?.meses || []
   }
 
+  // Função helper para calcular média considerando apenas meses com dados (não-zero)
+  const calculateMonthlyAverage = (values: number[]): number => {
+    if (!values || values.length === 0) return 0
+    const nonZeroValues = values.filter(v => v !== 0)
+    if (nonZeroValues.length === 0) return 0
+    return nonZeroValues.reduce((a, b) => a + b, 0) / nonZeroValues.length
+  }
+
   const getDifferenceColor = (diff: number) => {
     if (diff > 0) return 'text-green-600 dark:text-green-400'
     if (diff < 0) return 'text-red-600 dark:text-red-400'
@@ -650,13 +658,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Média Mensal</p>
                       <p className="text-lg font-bold text-slate-900 dark:text-white">
-                        {Math.round(totals1.volumeTotal / 12).toLocaleString('pt-BR')}
+                        {Math.round(calculateMonthlyAverage(dre1?.[0]?.meses || [])).toLocaleString('pt-BR')}
                       </p>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
                         {year1}
                       </p>
                       <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
-                        {Math.round(totals2.volumeTotal / 12).toLocaleString('pt-BR')}
+                        {Math.round(calculateMonthlyAverage(dre2?.[0]?.meses || [])).toLocaleString('pt-BR')}
                       </p>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
                         {year2}
@@ -835,13 +843,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       <div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Média Mensal</p>
                         <p className="text-lg font-bold text-slate-900 dark:text-white">
-                          {formatCurrency(totals1.receitaLiquida / 12)}
+                          {formatCurrency(calculateMonthlyAverage(getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')))}
                         </p>
                         <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
                           {year1}
                         </p>
                         <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
-                          {formatCurrency(totals2.receitaLiquida / 12)}
+                          {formatCurrency(calculateMonthlyAverage(getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')))}
                         </p>
                         <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
                           {year2}
@@ -2557,11 +2565,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
-                            {formatCurrency(valor1 / 12)}
+                            {formatCurrency(calculateMonthlyAverage((dre1?.[13]?.meses || []).map(Math.abs)))}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
-                            {formatCurrency(valor2 / 12)}
+                            {formatCurrency(calculateMonthlyAverage((dre2?.[13]?.meses || []).map(Math.abs)))}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
                         </>
@@ -3599,7 +3607,12 @@ function DadosAdicionaisComparison({
         return arr[11] || 0 // Dezembro = índice 11
       }
       const sum = arr.reduce((sum, val) => sum + (val || 0), 0)
-      return divideByMonths ? sum / 12 : sum
+      if (divideByMonths) {
+        // Calcula a média apenas dos meses com dados (não-zero)
+        const nonZeroCount = arr.filter(v => v !== 0).length
+        return nonZeroCount > 0 ? sum / nonZeroCount : 0
+      }
+      return sum
     }
   }
 

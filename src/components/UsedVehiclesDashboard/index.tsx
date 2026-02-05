@@ -505,7 +505,7 @@ export function UsedVehiclesDashboard() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Média Mensal:</span>
-                    <span className="font-bold text-lg">{Math.round(data.totals.volume / 11)} veículos</span>
+                    <span className="font-bold text-lg">{Math.round(data.totals.volume / monthlyDataFiltered.length)} veículos</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Maior Mês:</span>
@@ -534,7 +534,7 @@ export function UsedVehiclesDashboard() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Média Mensal:</span>
-                    <span className="font-bold text-lg">{formatCurrency(data.totals.receita / 11)}</span>
+                    <span className="font-bold text-lg">{formatCurrency(data.totals.receita / monthlyDataFiltered.length)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Maior Receita:</span>
