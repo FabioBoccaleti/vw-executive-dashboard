@@ -1812,8 +1812,8 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                 size="sm"
                 className="gap-2 bg-red-600 dark:bg-red-700 border-red-700 dark:border-red-800 hover:bg-red-700 dark:hover:bg-red-800"
               >
-                <Building2 className="w-4 h-4 text-blue-950 dark:text-blue-900" />
-                <span className="text-blue-950 dark:text-blue-900 font-bold">Trocar Marca</span>
+                <Building2 className="w-4 h-4 text-white" />
+                <span className="text-white font-bold text-base">Trocar Marca</span>
               </Button>
               <Button
                 onClick={() => setCurrentView('comparison')}
