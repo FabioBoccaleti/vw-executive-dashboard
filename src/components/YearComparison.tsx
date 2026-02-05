@@ -760,13 +760,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' ? (
+                    {comparisonMode === 'mensal' && (
                       <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    ) : (
-                      <>
-                        <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
-                      </>
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -942,13 +943,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' ? (
+                    {comparisonMode === 'mensal' && (
                       <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    ) : (
-                      <>
-                        <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
-                      </>
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -1131,13 +1133,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' ? (
+                    {comparisonMode === 'mensal' && (
                       <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    ) : (
-                      <>
-                        <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
-                      </>
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -1319,13 +1322,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' ? (
+                    {comparisonMode === 'mensal' && (
                       <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    ) : (
-                      <>
-                        <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
-                      </>
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -1507,13 +1511,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' ? (
+                    {comparisonMode === 'mensal' && (
                       <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    ) : (
-                      <>
-                        <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
-                      </>
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -1695,13 +1700,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' ? (
+                    {comparisonMode === 'mensal' && (
                       <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    ) : (
-                      <>
-                        <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
-                      </>
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -1883,13 +1889,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' ? (
+                    {comparisonMode === 'mensal' && (
                       <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    ) : (
-                      <>
-                        <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
-                      </>
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -2071,13 +2078,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' ? (
+                    {comparisonMode === 'mensal' && (
                       <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    ) : (
-                      <>
-                        <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
-                      </>
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -2259,13 +2267,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' ? (
+                    {comparisonMode === 'mensal' && (
                       <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    ) : (
-                      <>
-                        <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
-                      </>
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -2445,13 +2454,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' ? (
+                    {comparisonMode === 'mensal' && (
                       <Bar dataKey="valor" fill="#64748b" radius={[4, 4, 0, 0]} />
-                    ) : (
-                      <>
-                        <Bar dataKey={String(year1)} fill="#64748b" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey={String(year2)} fill="#94a3b8" radius={[4, 4, 0, 0]} />
-                      </>
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year1)} fill="#64748b" radius={[4, 4, 0, 0]} />
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year2)} fill="#94a3b8" radius={[4, 4, 0, 0]} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -2633,13 +2643,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' ? (
+                    {comparisonMode === 'mensal' && (
                       <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    ) : (
-                      <>
-                        <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
-                      </>
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    )}
+                    {comparisonMode === 'anual' && (
+                      <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
                     )}
                   </BarChart>
                 </ResponsiveContainer>
@@ -2822,13 +2833,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                           formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                         />
                       )}
-                      {comparisonMode === 'mensal' ? (
+                      {comparisonMode === 'mensal' && (
                         <Bar dataKey="valor" fill="#f97316" radius={[4, 4, 0, 0]} />
-                      ) : (
-                        <>
-                          <Bar dataKey={String(year1)} fill="#f97316" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey={String(year2)} fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                        </>
+                      )}
+                      {comparisonMode === 'anual' && (
+                        <Bar dataKey={String(year1)} fill="#f97316" radius={[4, 4, 0, 0]} />
+                      )}
+                      {comparisonMode === 'anual' && (
+                        <Bar dataKey={String(year2)} fill="#f59e0b" radius={[4, 4, 0, 0]} />
                       )}
                     </BarChart>
                   </ResponsiveContainer>
@@ -3012,13 +3024,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                           formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                         />
                       )}
-                      {comparisonMode === 'mensal' ? (
+                      {comparisonMode === 'mensal' && (
                         <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      ) : (
-                        <>
-                          <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
-                        </>
+                      )}
+                      {comparisonMode === 'anual' && (
+                        <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      )}
+                      {comparisonMode === 'anual' && (
+                        <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
                       )}
                     </BarChart>
                   </ResponsiveContainer>
