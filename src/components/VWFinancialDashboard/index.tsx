@@ -10789,7 +10789,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{Math.round(activeDreData[0].total / 12).toLocaleString('pt-BR')}</p>
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{Math.round(calculateMonthlyAverage(activeDreData[0].meses || [])).toLocaleString('pt-BR')}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Maior Volume</p>
@@ -10969,7 +10969,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[1].total / 12)}</p>
+                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(calculateMonthlyAverage(activeDreData[1].meses || []))}</p>
                     </div>
                   </div>
                 )}
@@ -12105,7 +12105,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                 
                 <div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[18].total / 12)}</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(calculateMonthlyAverage(activeDreData[18].meses || []))}</p>
                 </div>
               </div>
             )}
@@ -12328,7 +12328,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                 
                 <div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(activeDreData[19].total / 12)}</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(calculateMonthlyAverage(activeDreData[19].meses || []))}</p>
                 </div>
               </div>
             )}
