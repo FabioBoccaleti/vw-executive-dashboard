@@ -11592,7 +11592,11 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(Math.abs(activeDreData[7].total + activeDreData[8].total + activeDreData[9].total + activeDreData[10].total + activeDreData[11].total) / 12)}</p>
+                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(calculateMonthlyAverage(
+                        (activeDreData[7].meses || []).map((v: number, i: number) => 
+                          Math.abs(v) + Math.abs((activeDreData[8].meses || [])[i] || 0) + Math.abs((activeDreData[9].meses || [])[i] || 0) + Math.abs((activeDreData[10].meses || [])[i] || 0) + Math.abs((activeDreData[11].meses || [])[i] || 0)
+                        )
+                      ))}</p>
                     </div>
                   </div>
                 )}
@@ -11934,7 +11938,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(Math.abs(activeDreData[13].total) / 12)}</p>
+                      <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(calculateMonthlyAverage((activeDreData[13].meses || []).map(Math.abs)))}</p>
                     </div>
                   </div>
                 )}
@@ -12538,7 +12542,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                 
                 <div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mb-1">Média Mensal</p>
-                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency((activeDreData[21]?.total || 0) / 12)}</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-300">{formatCurrency(calculateMonthlyAverage(activeDreData[21]?.meses || []))}</p>
                 </div>
               </div>
             )}
