@@ -31,6 +31,10 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
   // Configuração da marca
   const brandConfig = getBrandConfig(brand)
 
+  // Array de nomes de meses
+  const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+  const monthNamesShort = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
   // Mapeamento de departamento para nome legível
   const departmentNames: Record<Department, string> = {
     'novos': 'Veículos Novos',
@@ -147,20 +151,42 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
     return 0
   }
 
-  // Totalizadores principais
+  // Função auxiliar para obter valor de uma linha DRE baseado no modo de comparação
+  const getDRELineValueByMode = (dre: any[] | null, descricao: string, monthIndex: number) => {
+    const linha = dre?.find(line => line.descricao === descricao)
+    if (!linha?.meses) return 0
+    if (comparisonMode === 'mensal') {
+      return linha.meses[monthIndex] || 0
+    }
+    return linha.meses.reduce((a: number, b: number) => a + b, 0) || 0
+  }
+
+  // Totalizadores principais - consideram modo de comparação
   const totals1 = useMemo(() => {
+    if (comparisonMode === 'mensal') {
+      const volumeTotal = dre1?.[0]?.meses?.[selectedMonth1] || 0
+      const receitaLiquida = getDRELineValueByMode(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
+      const lucro = getDRELineValueByMode(dre1, 'LUCRO LIQUIDO DO EXERCICIO', selectedMonth1)
+      return { volumeNovos: 0, volumeUsados: 0, volumeTotal, receitaLiquida, lucro }
+    }
     const volumeTotal = dre1?.[0]?.meses?.reduce((a: number, b: number) => a + b, 0) || 0
     const receitaLiquida = getDRELineTotal(dre1, 'RECEITA OPERACIONAL LIQUIDA')
     const lucro = getDRELineTotal(dre1, 'LUCRO LIQUIDO DO EXERCICIO')
     return { volumeNovos: 0, volumeUsados: 0, volumeTotal, receitaLiquida, lucro }
-  }, [dre1])
+  }, [dre1, comparisonMode, selectedMonth1])
 
   const totals2 = useMemo(() => {
+    if (comparisonMode === 'mensal') {
+      const volumeTotal = dre2?.[0]?.meses?.[selectedMonth2] || 0
+      const receitaLiquida = getDRELineValueByMode(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
+      const lucro = getDRELineValueByMode(dre2, 'LUCRO LIQUIDO DO EXERCICIO', selectedMonth2)
+      return { volumeNovos: 0, volumeUsados: 0, volumeTotal, receitaLiquida, lucro }
+    }
     const volumeTotal = dre2?.[0]?.meses?.reduce((a: number, b: number) => a + b, 0) || 0
     const receitaLiquida = getDRELineTotal(dre2, 'RECEITA OPERACIONAL LIQUIDA')
     const lucro = getDRELineTotal(dre2, 'LUCRO LIQUIDO DO EXERCICIO')
     return { volumeNovos: 0, volumeUsados: 0, volumeTotal, receitaLiquida, lucro }
-  }, [dre2])
+  }, [dre2, comparisonMode, selectedMonth2])
 
   // Dados para gráfico comparativo
   const chartData = [
@@ -249,43 +275,46 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
           
           {/* Controles de Visualização */}
           <div className="flex flex-wrap items-center gap-3 mt-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Visualizar:</span>
-              <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-                <Button
-                  onClick={() => setViewMode('mensal')}
-                  variant={viewMode === 'mensal' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-7 text-xs"
-                >
-                  Mensal
-                </Button>
-                <Button
-                  onClick={() => setViewMode('bimestral')}
-                  variant={viewMode === 'bimestral' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-7 text-xs"
-                >
-                  Bimestral
-                </Button>
-                <Button
-                  onClick={() => setViewMode('trimestral')}
-                  variant={viewMode === 'trimestral' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-7 text-xs"
-                >
-                  Trimestral
-                </Button>
-                <Button
-                  onClick={() => setViewMode('semestral')}
-                  variant={viewMode === 'semestral' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="h-7 text-xs"
-                >
-                  Semestral
-                </Button>
+            {/* Filtro Visualizar - oculto no modo de comparação mensal */}
+            {comparisonMode === 'anual' && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Visualizar:</span>
+                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+                  <Button
+                    onClick={() => setViewMode('mensal')}
+                    variant={viewMode === 'mensal' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 text-xs"
+                  >
+                    Mensal
+                  </Button>
+                  <Button
+                    onClick={() => setViewMode('bimestral')}
+                    variant={viewMode === 'bimestral' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 text-xs"
+                  >
+                    Bimestral
+                  </Button>
+                  <Button
+                    onClick={() => setViewMode('trimestral')}
+                    variant={viewMode === 'trimestral' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 text-xs"
+                  >
+                    Trimestral
+                  </Button>
+                  <Button
+                    onClick={() => setViewMode('semestral')}
+                    variant={viewMode === 'semestral' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="h-7 text-xs"
+                  >
+                    Semestral
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
             
             {/* Abas de Comparação */}
             <div className="flex items-center gap-2 ml-6">
@@ -330,80 +359,76 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               </Select>
             </div>
 
-            {/* Toggle Anual/Mensal (só para Dados Adicionais) */}
-            {comparisonTab === 'dadosAdicionais' && (
+            {/* Toggle Anual/Mensal - disponível para todas as abas */}
+            <div className="flex items-center gap-2 ml-6">
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Período:</span>
+              <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+                <Button
+                  onClick={() => setComparisonMode('anual')}
+                  variant={comparisonMode === 'anual' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs"
+                >
+                  Comparação Anual
+                </Button>
+                <Button
+                  onClick={() => setComparisonMode('mensal')}
+                  variant={comparisonMode === 'mensal' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs"
+                >
+                  Comparação Mensal
+                </Button>
+              </div>
+            </div>
+
+            {/* Seletores de Mês (só no modo mensal) */}
+            {comparisonMode === 'mensal' && (
               <>
                 <div className="flex items-center gap-2 ml-6">
-                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Período:</span>
-                  <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-                    <Button
-                      onClick={() => setComparisonMode('anual')}
-                      variant={comparisonMode === 'anual' ? 'default' : 'ghost'}
-                      size="sm"
-                      className="h-7 text-xs"
-                    >
-                      Anual
-                    </Button>
-                    <Button
-                      onClick={() => setComparisonMode('mensal')}
-                      variant={comparisonMode === 'mensal' ? 'default' : 'ghost'}
-                      size="sm"
-                      className="h-7 text-xs"
-                    >
-                      Mensal
-                    </Button>
-                  </div>
+                  <span className="text-sm font-medium text-green-700 dark:text-green-400">Mês {year1}:</span>
+                  <Select value={selectedMonth1.toString()} onValueChange={(v) => setSelectedMonth1(parseInt(v))}>
+                    <SelectTrigger className="w-[140px] h-7 text-xs bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Janeiro</SelectItem>
+                      <SelectItem value="1">Fevereiro</SelectItem>
+                      <SelectItem value="2">Março</SelectItem>
+                      <SelectItem value="3">Abril</SelectItem>
+                      <SelectItem value="4">Maio</SelectItem>
+                      <SelectItem value="5">Junho</SelectItem>
+                      <SelectItem value="6">Julho</SelectItem>
+                      <SelectItem value="7">Agosto</SelectItem>
+                      <SelectItem value="8">Setembro</SelectItem>
+                      <SelectItem value="9">Outubro</SelectItem>
+                      <SelectItem value="10">Novembro</SelectItem>
+                      <SelectItem value="11">Dezembro</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-
-                {/* Seletores de Mês (só no modo mensal) */}
-                {comparisonMode === 'mensal' && (
-                  <>
-                    <div className="flex items-center gap-2 ml-6">
-                      <span className="text-sm font-medium text-green-700 dark:text-green-400">Mês {year1}:</span>
-                      <Select value={selectedMonth1.toString()} onValueChange={(v) => setSelectedMonth1(parseInt(v))}>
-                        <SelectTrigger className="w-[140px] h-7 text-xs bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">Janeiro</SelectItem>
-                          <SelectItem value="1">Fevereiro</SelectItem>
-                          <SelectItem value="2">Março</SelectItem>
-                          <SelectItem value="3">Abril</SelectItem>
-                          <SelectItem value="4">Maio</SelectItem>
-                          <SelectItem value="5">Junho</SelectItem>
-                          <SelectItem value="6">Julho</SelectItem>
-                          <SelectItem value="7">Agosto</SelectItem>
-                          <SelectItem value="8">Setembro</SelectItem>
-                          <SelectItem value="9">Outubro</SelectItem>
-                          <SelectItem value="10">Novembro</SelectItem>
-                          <SelectItem value="11">Dezembro</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Mês {year2}:</span>
-                      <Select value={selectedMonth2.toString()} onValueChange={(v) => setSelectedMonth2(parseInt(v))}>
-                        <SelectTrigger className="w-[140px] h-7 text-xs bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">Janeiro</SelectItem>
-                          <SelectItem value="1">Fevereiro</SelectItem>
-                          <SelectItem value="2">Março</SelectItem>
-                          <SelectItem value="3">Abril</SelectItem>
-                          <SelectItem value="4">Maio</SelectItem>
-                          <SelectItem value="5">Junho</SelectItem>
-                          <SelectItem value="6">Julho</SelectItem>
-                          <SelectItem value="7">Agosto</SelectItem>
-                          <SelectItem value="8">Setembro</SelectItem>
-                          <SelectItem value="9">Outubro</SelectItem>
-                          <SelectItem value="10">Novembro</SelectItem>
-                          <SelectItem value="11">Dezembro</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </>
-                )}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Mês {year2}:</span>
+                  <Select value={selectedMonth2.toString()} onValueChange={(v) => setSelectedMonth2(parseInt(v))}>
+                    <SelectTrigger className="w-[140px] h-7 text-xs bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Janeiro</SelectItem>
+                      <SelectItem value="1">Fevereiro</SelectItem>
+                      <SelectItem value="2">Março</SelectItem>
+                      <SelectItem value="3">Abril</SelectItem>
+                      <SelectItem value="4">Maio</SelectItem>
+                      <SelectItem value="5">Junho</SelectItem>
+                      <SelectItem value="6">Julho</SelectItem>
+                      <SelectItem value="7">Agosto</SelectItem>
+                      <SelectItem value="8">Setembro</SelectItem>
+                      <SelectItem value="9">Outubro</SelectItem>
+                      <SelectItem value="10">Novembro</SelectItem>
+                      <SelectItem value="11">Dezembro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </>
             )}
           </div>
@@ -427,11 +452,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{year1}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth1]}/${year1}` : year1}</span>
                     <span className="font-bold text-lg">{totals1.volumeTotal.toLocaleString('pt-BR')}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{year2}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth2]}/${year2}` : year2}</span>
                     <span className="font-bold text-lg">{totals2.volumeTotal.toLocaleString('pt-BR')}</span>
                   </div>
                   <div className={`flex items-center gap-2 pt-2 border-t ${getDifferenceColor(calculateDifference(totals1.volumeTotal, totals2.volumeTotal).absolute)}`}>
@@ -459,11 +484,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{year1}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth1]}/${year1}` : year1}</span>
                     <span className="font-bold text-lg">{formatCurrency(totals1.receitaLiquida)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{year2}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth2]}/${year2}` : year2}</span>
                     <span className="font-bold text-lg">{formatCurrency(totals2.receitaLiquida)}</span>
                   </div>
                   <div className={`flex items-center gap-2 pt-2 border-t ${getDifferenceColor(calculateDifference(totals1.receitaLiquida, totals2.receitaLiquida).absolute)}`}>
@@ -490,11 +515,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{year1}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth1]}/${year1}` : year1}</span>
                     <span className="font-bold text-lg">{formatCurrency(totals1.lucro)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{year2}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth2]}/${year2}` : year2}</span>
                     <span className="font-bold text-lg">{formatCurrency(totals2.lucro)}</span>
                   </div>
                   <div className={`flex items-center gap-2 pt-2 border-t ${getDifferenceColor(calculateDifference(totals1.lucro, totals2.lucro).absolute)}`}>
@@ -521,13 +546,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{year1}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth1]}/${year1}` : year1}</span>
                     <span className="font-bold text-lg">
                       {totals1.receitaLiquida ? ((totals1.lucro / totals1.receitaLiquida) * 100).toFixed(2) : '0.00'}%
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{year2}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth2]}/${year2}` : year2}</span>
                     <span className="font-bold text-lg">
                       {totals2.receitaLiquida ? ((totals2.lucro / totals2.receitaLiquida) * 100).toFixed(2) : '0.00'}%
                     </span>
@@ -563,46 +588,54 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       Volume de Vendas
                     </CardTitle>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                      Unidades comercializadas por período
+                      {comparisonMode === 'mensal' 
+                        ? `Comparação: ${monthNames[selectedMonth1]}/${year1} vs ${monthNames[selectedMonth2]}/${year2}`
+                        : 'Unidades comercializadas por período'}
                     </p>
                   </div>
                   <Badge className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                    {year1} vs {year2}
+                    {comparisonMode === 'mensal' 
+                      ? `${monthNamesShort[selectedMonth1]}/${year1} vs ${monthNamesShort[selectedMonth2]}/${year2}`
+                      : `${year1} vs ${year2}`}
                   </Badge>
                 </div>
 
                 {/* Estatísticas */}
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Anual</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      {comparisonMode === 'mensal' ? 'Volume do Mês' : 'Total Anual'}
+                    </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white">
                       {totals1.volumeTotal.toLocaleString('pt-BR')}
                     </p>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {year1}
+                      {comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth1]}/${year1}` : year1}
                     </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                       {totals2.volumeTotal.toLocaleString('pt-BR')}
                     </p>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {year2}
+                      {comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth2]}/${year2}` : year2}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Média Mensal</p>
-                    <p className="text-lg font-bold text-slate-900 dark:text-white">
-                      {Math.round(totals1.volumeTotal / 12).toLocaleString('pt-BR')}
-                    </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {year1}
-                    </p>
-                    <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
-                      {Math.round(totals2.volumeTotal / 12).toLocaleString('pt-BR')}
-                    </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {year2}
-                    </p>
-                  </div>
+                  {comparisonMode === 'anual' && (
+                    <div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Média Mensal</p>
+                      <p className="text-lg font-bold text-slate-900 dark:text-white">
+                        {Math.round(totals1.volumeTotal / 12).toLocaleString('pt-BR')}
+                      </p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                        {year1}
+                      </p>
+                      <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
+                        {Math.round(totals2.volumeTotal / 12).toLocaleString('pt-BR')}
+                      </p>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                        {year2}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     <div className={`flex items-center gap-1 ${getDifferenceColor(totals1.volumeTotal - totals2.volumeTotal)}`}>
@@ -624,17 +657,31 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={getPeriodLabels().map((label, index) => {
-                      const volumeLine1 = dre1?.[0]
-                      const volumeLine2 = dre2?.[0]
-                      const values1 = aggregateData(volumeLine1?.meses || [])
-                      const values2 = aggregateData(volumeLine2?.meses || [])
-                      return {
-                        name: label,
-                        [year1]: values1[index] || 0,
-                        [year2]: values2[index] || 0
-                      }
-                    })}
+                    data={comparisonMode === 'mensal' 
+                      ? [
+                          {
+                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                            valor: dre1?.[0]?.meses?.[selectedMonth1] || 0,
+                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                          },
+                          {
+                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                            valor: dre2?.[0]?.meses?.[selectedMonth2] || 0,
+                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                          }
+                        ]
+                      : getPeriodLabels().map((label, index) => {
+                          const volumeLine1 = dre1?.[0]
+                          const volumeLine2 = dre2?.[0]
+                          const values1 = aggregateData(volumeLine1?.meses || [])
+                          const values2 = aggregateData(volumeLine2?.meses || [])
+                          return {
+                            name: label,
+                            [year1]: values1[index] || 0,
+                            [year2]: values2[index] || 0
+                          }
+                        })
+                    }
                     barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -643,6 +690,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          if (comparisonMode === 'mensal') {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                <p className="text-sm">
+                                  <span className="font-bold">{formatNumber(Number(payload[0]?.value || 0))} un</span>
+                                </p>
+                              </div>
+                            )
+                          }
                           return (
                             <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                               <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
@@ -670,12 +727,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         return null
                       }}
                     />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                    />
-                    <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                    {comparisonMode === 'anual' && (
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                    )}
+                    {comparisonMode === 'mensal' ? (
+                      <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    ) : (
+                      <>
+                        <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
