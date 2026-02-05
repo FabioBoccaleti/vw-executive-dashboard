@@ -977,20 +977,30 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 {/* Estatísticas */}
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                    </p>
                     {(() => {
-                      const lucroBruto1 = getDRELineTotal(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
-                      const lucroBruto2 = getDRELineTotal(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
+                      const lucroBruto1 = comparisonMode === 'mensal' 
+                        ? getDRELineValues(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth1] || 0
+                        : getDRELineTotal(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
+                      const lucroBruto2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth2] || 0
+                        : getDRELineTotal(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {formatCurrency(lucroBruto1)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(lucroBruto2)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -998,20 +1008,34 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Margem (%)</p>
                     {(() => {
-                      const lucroBruto1 = getDRELineTotal(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
-                      const lucroBruto2 = getDRELineTotal(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
-                      const margem1 = totals1.receitaLiquida > 0 ? (lucroBruto1 / totals1.receitaLiquida) * 100 : 0
-                      const margem2 = totals2.receitaLiquida > 0 ? (lucroBruto2 / totals2.receitaLiquida) * 100 : 0
+                      const lucroBruto1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth1] || 0
+                        : getDRELineTotal(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
+                      const lucroBruto2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth2] || 0
+                        : getDRELineTotal(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
+                      const receita1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                        : totals1.receitaLiquida
+                      const receita2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                        : totals2.receitaLiquida
+                      const margem1 = receita1 > 0 ? (lucroBruto1 / receita1) * 100 : 0
+                      const margem2 = receita2 > 0 ? (lucroBruto2 / receita2) * 100 : 0
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {margem1.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {margem2.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -1019,8 +1043,12 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const lucroBruto1 = getDRELineTotal(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
-                      const lucroBruto2 = getDRELineTotal(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
+                      const lucroBruto1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth1] || 0
+                        : getDRELineTotal(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
+                      const lucroBruto2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth2] || 0
+                        : getDRELineTotal(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
                       const diff = calculateDifference(lucroBruto1, lucroBruto2)
                       return (
                         <div className={`flex items-center gap-1 ${getDifferenceColor(diff.absolute)}`}>
@@ -1167,20 +1195,30 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 {/* Estatísticas */}
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                    </p>
                     {(() => {
-                      const margem1 = dre1?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const margem2 = dre2?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const margem1 = comparisonMode === 'mensal'
+                        ? dre1?.[6]?.meses?.[selectedMonth1] || 0
+                        : dre1?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const margem2 = comparisonMode === 'mensal'
+                        ? dre2?.[6]?.meses?.[selectedMonth2] || 0
+                        : dre2?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {formatCurrency(margem1)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(margem2)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -1188,20 +1226,34 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const margem1 = dre1?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const margem2 = dre2?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const percent1 = totals1.receitaLiquida > 0 ? (margem1 / totals1.receitaLiquida) * 100 : 0
-                      const percent2 = totals2.receitaLiquida > 0 ? (margem2 / totals2.receitaLiquida) * 100 : 0
+                      const margem1 = comparisonMode === 'mensal'
+                        ? dre1?.[6]?.meses?.[selectedMonth1] || 0
+                        : dre1?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const margem2 = comparisonMode === 'mensal'
+                        ? dre2?.[6]?.meses?.[selectedMonth2] || 0
+                        : dre2?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const receita1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                        : totals1.receitaLiquida
+                      const receita2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                        : totals2.receitaLiquida
+                      const percent1 = receita1 > 0 ? (margem1 / receita1) * 100 : 0
+                      const percent2 = receita2 > 0 ? (margem2 / receita2) * 100 : 0
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {percent1.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {percent2.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -1209,8 +1261,12 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const margem1 = dre1?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const margem2 = dre2?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const margem1 = comparisonMode === 'mensal'
+                        ? dre1?.[6]?.meses?.[selectedMonth1] || 0
+                        : dre1?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const margem2 = comparisonMode === 'mensal'
+                        ? dre2?.[6]?.meses?.[selectedMonth2] || 0
+                        : dre2?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
                       const diff = calculateDifference(margem1, margem2)
                       return (
                         <div className={`flex items-center gap-1 ${getDifferenceColor(diff.absolute)}`}>
@@ -1356,20 +1412,30 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 {/* Estatísticas */}
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                    </p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ PESSOAL')?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ PESSOAL')?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {formatCurrency(despesa1)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -1377,20 +1443,34 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const percent1 = totals1.receitaLiquida > 0 ? (despesa1 / totals1.receitaLiquida) * 100 : 0
-                      const percent2 = totals2.receitaLiquida > 0 ? (despesa2 / totals2.receitaLiquida) * 100 : 0
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ PESSOAL')?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ PESSOAL')?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const receita1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                        : totals1.receitaLiquida
+                      const receita2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                        : totals2.receitaLiquida
+                      const percent1 = receita1 > 0 ? (despesa1 / receita1) * 100 : 0
+                      const percent2 = receita2 > 0 ? (despesa2 / receita2) * 100 : 0
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {percent1.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {percent2.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -1398,8 +1478,12 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ PESSOAL')?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ PESSOAL')?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
                         <div className="flex items-center gap-1 text-slate-900 dark:text-white">
@@ -1545,20 +1629,30 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 {/* Estatísticas */}
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                    </p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {formatCurrency(despesa1)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -1566,20 +1660,34 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const percent1 = totals1.receitaLiquida > 0 ? (despesa1 / totals1.receitaLiquida) * 100 : 0
-                      const percent2 = totals2.receitaLiquida > 0 ? (despesa2 / totals2.receitaLiquida) * 100 : 0
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const receita1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                        : totals1.receitaLiquida
+                      const receita2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                        : totals2.receitaLiquida
+                      const percent1 = receita1 > 0 ? (despesa1 / receita1) * 100 : 0
+                      const percent2 = receita2 > 0 ? (despesa2 / receita2) * 100 : 0
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {percent1.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {percent2.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -1587,8 +1695,12 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
                         <div className="flex items-center gap-1 text-slate-900 dark:text-white">
@@ -1734,20 +1846,30 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 {/* Estatísticas */}
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                    </p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(dre1?.[9]?.meses?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(dre2?.[9]?.meses?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {formatCurrency(despesa1)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -1755,20 +1877,34 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const percent1 = totals1.receitaLiquida > 0 ? (despesa1 / totals1.receitaLiquida) * 100 : 0
-                      const percent2 = totals2.receitaLiquida > 0 ? (despesa2 / totals2.receitaLiquida) * 100 : 0
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(dre1?.[9]?.meses?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(dre2?.[9]?.meses?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const receita1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                        : totals1.receitaLiquida
+                      const receita2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                        : totals2.receitaLiquida
+                      const percent1 = receita1 > 0 ? (despesa1 / receita1) * 100 : 0
+                      const percent2 = receita2 > 0 ? (despesa2 / receita2) * 100 : 0
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {percent1.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {percent2.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -1776,8 +1912,12 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(dre1?.[9]?.meses?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(dre2?.[9]?.meses?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
                         <div className="flex items-center gap-1 text-slate-900 dark:text-white">
@@ -1923,20 +2063,30 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 {/* Estatísticas */}
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                    </p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {formatCurrency(despesa1)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -1944,20 +2094,34 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const percent1 = totals1.receitaLiquida > 0 ? (despesa1 / totals1.receitaLiquida) * 100 : 0
-                      const percent2 = totals2.receitaLiquida > 0 ? (despesa2 / totals2.receitaLiquida) * 100 : 0
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const receita1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                        : totals1.receitaLiquida
+                      const receita2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                        : totals2.receitaLiquida
+                      const percent1 = receita1 > 0 ? (despesa1 / receita1) * 100 : 0
+                      const percent2 = receita2 > 0 ? (despesa2 / receita2) * 100 : 0
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {percent1.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {percent2.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -1965,8 +2129,12 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
                         <div className="flex items-center gap-1 text-slate-900 dark:text-white">
@@ -2112,20 +2280,30 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 {/* Estatísticas */}
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                    </p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ VENDAS')?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ VENDAS')?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {formatCurrency(despesa1)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -2133,20 +2311,34 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const percent1 = totals1.receitaLiquida > 0 ? (despesa1 / totals1.receitaLiquida) * 100 : 0
-                      const percent2 = totals2.receitaLiquida > 0 ? (despesa2 / totals2.receitaLiquida) * 100 : 0
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ VENDAS')?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ VENDAS')?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const receita1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                        : totals1.receitaLiquida
+                      const receita2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                        : totals2.receitaLiquida
+                      const percent1 = receita1 > 0 ? (despesa1 / receita1) * 100 : 0
+                      const percent2 = receita2 > 0 ? (despesa2 / receita2) * 100 : 0
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {percent1.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {percent2.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -2154,8 +2346,12 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const despesa1 = Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa1 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ VENDAS')?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const despesa2 = comparisonMode === 'mensal'
+                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ VENDAS')?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
                         <div className="flex items-center gap-1 text-slate-900 dark:text-white">
@@ -2301,29 +2497,63 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 {/* Estatísticas */}
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                    </p>
                     {(() => {
-                      const valor1 = Math.abs(dre1?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const valor2 = Math.abs(dre2?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const valor1 = comparisonMode === 'mensal'
+                        ? Math.abs(dre1?.[13]?.meses?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const valor2 = comparisonMode === 'mensal'
+                        ? Math.abs(dre2?.[13]?.meses?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-600 dark:text-slate-400">
                             {formatCurrency(valor1)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-600 dark:text-slate-400 mt-2">
                             {formatCurrency(valor2)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Média Mensal</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      {comparisonMode === 'mensal' ? '% Receita' : 'Média Mensal'}
+                    </p>
                     {(() => {
-                      const valor1 = Math.abs(dre1?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const valor2 = Math.abs(dre2?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const valor1 = comparisonMode === 'mensal'
+                        ? Math.abs(dre1?.[13]?.meses?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const valor2 = comparisonMode === 'mensal'
+                        ? Math.abs(dre2?.[13]?.meses?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      if (comparisonMode === 'mensal') {
+                        const receita1 = getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                        const receita2 = getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                        const percent1 = receita1 > 0 ? (valor1 / receita1) * 100 : 0
+                        const percent2 = receita2 > 0 ? (valor2 / receita2) * 100 : 0
+                        return (
+                          <>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white">
+                              {percent1.toFixed(2)}%
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{monthNames[selectedMonth1]}/{year1}</p>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
+                              {percent2.toFixed(2)}%
+                            </p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{monthNames[selectedMonth2]}/{year2}</p>
+                          </>
+                        )
+                      }
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
@@ -2341,8 +2571,12 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const valor1 = Math.abs(dre1?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const valor2 = Math.abs(dre2?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const valor1 = comparisonMode === 'mensal'
+                        ? Math.abs(dre1?.[13]?.meses?.[selectedMonth1] || 0)
+                        : Math.abs(dre1?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
+                      const valor2 = comparisonMode === 'mensal'
+                        ? Math.abs(dre2?.[13]?.meses?.[selectedMonth2] || 0)
+                        : Math.abs(dre2?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(valor1, valor2)
                       return (
                         <div className="flex items-center gap-1 text-slate-900 dark:text-white">
@@ -2488,20 +2722,30 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 {/* Estatísticas */}
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                    </p>
                     {(() => {
-                      const lucro1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const lucro2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const lucro1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth1] || 0
+                        : dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const lucro2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth2] || 0
+                        : dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
                       return (
                         <>
                           <p className={`text-lg font-bold ${lucro1 >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                             {formatCurrency(lucro1)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className={`text-lg font-bold mt-2 ${lucro2 >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                             {formatCurrency(lucro2)}
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -2509,20 +2753,34 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Margem (%)</p>
                     {(() => {
-                      const lucro1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const lucro2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const margem1 = totals1.receitaLiquida > 0 ? (lucro1 / totals1.receitaLiquida) * 100 : 0
-                      const margem2 = totals2.receitaLiquida > 0 ? (lucro2 / totals2.receitaLiquida) * 100 : 0
+                      const lucro1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth1] || 0
+                        : dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const lucro2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth2] || 0
+                        : dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const receita1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                        : totals1.receitaLiquida
+                      const receita2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                        : totals2.receitaLiquida
+                      const margem1 = receita1 > 0 ? (lucro1 / receita1) * 100 : 0
+                      const margem2 = receita2 > 0 ? (lucro2 / receita2) * 100 : 0
                       return (
                         <>
                           <p className="text-lg font-bold text-slate-900 dark:text-white">
                             {margem1.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                          </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {margem2.toFixed(2)}%
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                          </p>
                         </>
                       )
                     })()}
@@ -2530,8 +2788,12 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const lucro1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const lucro2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const lucro1 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth1] || 0
+                        : dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
+                      const lucro2 = comparisonMode === 'mensal'
+                        ? getDRELineValues(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth2] || 0
+                        : dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
                       const diff = calculateDifference(lucro1, lucro2)
                       return (
                         <div className={`flex items-center gap-1 ${getDifferenceColor(diff.absolute)}`}>
@@ -2678,20 +2940,35 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   {/* Estatísticas */}
                   <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                     <div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                        {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                      </p>
                       {(() => {
-                        const provisao1 = Math.abs(dre1?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.reduce((a, b) => a + b, 0) || 0)
-                        const provisao2 = Math.abs(dre2?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const getProvisaoValue = (dre: any[] | null, monthIndex?: number) => {
+                          const line = dre?.find(l => l.descricao?.toUpperCase().includes('PROVIS') && l.descricao?.toUpperCase().includes('IRPJ'))
+                          if (monthIndex !== undefined) return Math.abs(line?.meses?.[monthIndex] || 0)
+                          return Math.abs(line?.meses?.reduce((a: number, b: number) => a + b, 0) || 0)
+                        }
+                        const provisao1 = comparisonMode === 'mensal'
+                          ? getProvisaoValue(dre1, selectedMonth1)
+                          : getProvisaoValue(dre1)
+                        const provisao2 = comparisonMode === 'mensal'
+                          ? getProvisaoValue(dre2, selectedMonth2)
+                          : getProvisaoValue(dre2)
                         return (
                           <>
                             <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
                               {formatCurrency(provisao1)}
                             </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            </p>
                             <p className="text-lg font-bold text-orange-600 dark:text-orange-400 mt-2">
                               {formatCurrency(provisao2)}
                             </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            </p>
                           </>
                         )
                       })()}
@@ -2699,20 +2976,39 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                       {(() => {
-                        const provisao1 = Math.abs(dre1?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.reduce((a, b) => a + b, 0) || 0)
-                        const provisao2 = Math.abs(dre2?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.reduce((a, b) => a + b, 0) || 0)
-                        const percent1 = totals1.receitaLiquida > 0 ? (provisao1 / totals1.receitaLiquida) * 100 : 0
-                        const percent2 = totals2.receitaLiquida > 0 ? (provisao2 / totals2.receitaLiquida) * 100 : 0
+                        const getProvisaoValue = (dre: any[] | null, monthIndex?: number) => {
+                          const line = dre?.find(l => l.descricao?.toUpperCase().includes('PROVIS') && l.descricao?.toUpperCase().includes('IRPJ'))
+                          if (monthIndex !== undefined) return Math.abs(line?.meses?.[monthIndex] || 0)
+                          return Math.abs(line?.meses?.reduce((a: number, b: number) => a + b, 0) || 0)
+                        }
+                        const provisao1 = comparisonMode === 'mensal'
+                          ? getProvisaoValue(dre1, selectedMonth1)
+                          : getProvisaoValue(dre1)
+                        const provisao2 = comparisonMode === 'mensal'
+                          ? getProvisaoValue(dre2, selectedMonth2)
+                          : getProvisaoValue(dre2)
+                        const receita1 = comparisonMode === 'mensal'
+                          ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                          : totals1.receitaLiquida
+                        const receita2 = comparisonMode === 'mensal'
+                          ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                          : totals2.receitaLiquida
+                        const percent1 = receita1 > 0 ? (provisao1 / receita1) * 100 : 0
+                        const percent2 = receita2 > 0 ? (provisao2 / receita2) * 100 : 0
                         return (
                           <>
                             <p className="text-lg font-bold text-slate-900 dark:text-white">
                               {percent1.toFixed(2)}%
                             </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            </p>
                             <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                               {percent2.toFixed(2)}%
                             </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            </p>
                           </>
                         )
                       })()}
@@ -2720,8 +3016,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                       {(() => {
-                        const provisao1 = Math.abs(dre1?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.reduce((a, b) => a + b, 0) || 0)
-                        const provisao2 = Math.abs(dre2?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.reduce((a, b) => a + b, 0) || 0)
+                        const getProvisaoValue = (dre: any[] | null, monthIndex?: number) => {
+                          const line = dre?.find(l => l.descricao?.toUpperCase().includes('PROVIS') && l.descricao?.toUpperCase().includes('IRPJ'))
+                          if (monthIndex !== undefined) return Math.abs(line?.meses?.[monthIndex] || 0)
+                          return Math.abs(line?.meses?.reduce((a: number, b: number) => a + b, 0) || 0)
+                        }
+                        const provisao1 = comparisonMode === 'mensal'
+                          ? getProvisaoValue(dre1, selectedMonth1)
+                          : getProvisaoValue(dre1)
+                        const provisao2 = comparisonMode === 'mensal'
+                          ? getProvisaoValue(dre2, selectedMonth2)
+                          : getProvisaoValue(dre2)
                         const diff = calculateDifference(provisao1, provisao2)
                         return (
                           <div className={`flex items-center gap-1 ${getDifferenceColor(diff.absolute)}`}>
@@ -2869,20 +3174,30 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   {/* Estatísticas */}
                   <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                     <div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                        {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                      </p>
                       {(() => {
-                        const lucroLiquido1 = dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                        const lucroLiquido2 = dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido1 = comparisonMode === 'mensal'
+                          ? getDRELineValues(dre1, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth1] || 0
+                          : dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido2 = comparisonMode === 'mensal'
+                          ? getDRELineValues(dre2, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth2] || 0
+                          : dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
                         return (
                           <>
                             <p className={`text-lg font-bold ${lucroLiquido1 >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                               {formatCurrency(lucroLiquido1)}
                             </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            </p>
                             <p className={`text-lg font-bold mt-2 ${lucroLiquido2 >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                               {formatCurrency(lucroLiquido2)}
                             </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            </p>
                           </>
                         )
                       })()}
@@ -2890,20 +3205,34 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Margem Líquida (%)</p>
                       {(() => {
-                        const lucroLiquido1 = dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                        const lucroLiquido2 = dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                        const margem1 = totals1.receitaLiquida > 0 ? (lucroLiquido1 / totals1.receitaLiquida) * 100 : 0
-                        const margem2 = totals2.receitaLiquida > 0 ? (lucroLiquido2 / totals2.receitaLiquida) * 100 : 0
+                        const lucroLiquido1 = comparisonMode === 'mensal'
+                          ? getDRELineValues(dre1, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth1] || 0
+                          : dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido2 = comparisonMode === 'mensal'
+                          ? getDRELineValues(dre2, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth2] || 0
+                          : dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const receita1 = comparisonMode === 'mensal'
+                          ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                          : totals1.receitaLiquida
+                        const receita2 = comparisonMode === 'mensal'
+                          ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                          : totals2.receitaLiquida
+                        const margem1 = receita1 > 0 ? (lucroLiquido1 / receita1) * 100 : 0
+                        const margem2 = receita2 > 0 ? (lucroLiquido2 / receita2) * 100 : 0
                         return (
                           <>
                             <p className="text-lg font-bold text-slate-900 dark:text-white">
                               {margem1.toFixed(2)}%
                             </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year1}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            </p>
                             <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                               {margem2.toFixed(2)}%
                             </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{year2}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            </p>
                           </>
                         )
                       })()}
@@ -2911,8 +3240,12 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                       {(() => {
-                        const lucroLiquido1 = dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                        const lucroLiquido2 = dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido1 = comparisonMode === 'mensal'
+                          ? getDRELineValues(dre1, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth1] || 0
+                          : dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
+                        const lucroLiquido2 = comparisonMode === 'mensal'
+                          ? getDRELineValues(dre2, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth2] || 0
+                          : dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
                         const diff = calculateDifference(lucroLiquido1, lucroLiquido2)
                         return (
                           <div className={`flex items-center gap-1 ${getDifferenceColor(diff.absolute)}`}>
