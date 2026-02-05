@@ -103,6 +103,33 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
     return null
   }
 
+  // Função helper para gerar dados do gráfico considerando o modo de comparação
+  const getChartData = (dreLine: string, dre1Data: any[] | null, dre2Data: any[] | null) => {
+    if (comparisonMode === 'mensal') {
+      return [
+        {
+          name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+          valor: getDRELineValues(dre1Data, dreLine)?.[selectedMonth1] || 0,
+          periodo: `${monthNames[selectedMonth1]}/${year1}`
+        },
+        {
+          name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+          valor: getDRELineValues(dre2Data, dreLine)?.[selectedMonth2] || 0,
+          periodo: `${monthNames[selectedMonth2]}/${year2}`
+        }
+      ]
+    }
+    return getPeriodLabels().map((label, index) => {
+      const values1 = aggregateData(getDRELineValues(dre1Data, dreLine))
+      const values2 = aggregateData(getDRELineValues(dre2Data, dreLine))
+      return {
+        name: label,
+        [year1]: values1[index] || 0,
+        [year2]: values2[index] || 0
+      }
+    })
+  }
+
   // Função para agregar dados por período
   const aggregateData = (values: number[]) => {
     if (!values || values.length === 0) return []
@@ -747,6 +774,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
             </Card>
 
             {/* Receita de Vendas Líquidas */}
+            {/* Receita de Vendas Líquidas */}
             <Card className="bg-white dark:bg-slate-900">
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between">
@@ -755,75 +783,114 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       Receita de Vendas Líquidas
                     </CardTitle>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                      Receita operacional líquida por período
+                      {comparisonMode === 'mensal' 
+                        ? `Comparação: ${monthNames[selectedMonth1]}/${year1} vs ${monthNames[selectedMonth2]}/${year2}`
+                        : 'Receita operacional líquida por período'}
                     </p>
                   </div>
                   <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                    100% Base
+                    {comparisonMode === 'mensal' 
+                      ? `${monthNamesShort[selectedMonth1]}/${year1} vs ${monthNamesShort[selectedMonth2]}/${year2}`
+                      : '100% Base'}
                   </Badge>
                 </div>
 
                 {/* Estatísticas */}
-                <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+                <div className={`grid ${comparisonMode === 'mensal' ? 'grid-cols-2' : 'grid-cols-3'} gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800`}>
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total Acumulado</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      {comparisonMode === 'mensal' ? 'Receita do Mês' : 'Total Acumulado'}
+                    </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white">
                       {formatCurrency(totals1.receitaLiquida)}
                     </p>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {year1}
+                      {comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth1]}/${year1}` : year1}
                     </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                       {formatCurrency(totals2.receitaLiquida)}
                     </p>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {year2}
+                      {comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth2]}/${year2}` : year2}
                     </p>
                   </div>
+                  {comparisonMode === 'anual' && (
+                    <>
+                      <div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Ticket Médio</p>
+                        <p className="text-lg font-bold text-slate-900 dark:text-white">
+                          {formatCurrency(totals1.volumeTotal > 0 ? totals1.receitaLiquida / totals1.volumeTotal : 0)}
+                        </p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                          {year1}
+                        </p>
+                        <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
+                          {formatCurrency(totals2.volumeTotal > 0 ? totals2.receitaLiquida / totals2.volumeTotal : 0)}
+                        </p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                          {year2}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Média Mensal</p>
+                        <p className="text-lg font-bold text-slate-900 dark:text-white">
+                          {formatCurrency(totals1.receitaLiquida / 12)}
+                        </p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                          {year1}
+                        </p>
+                        <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
+                          {formatCurrency(totals2.receitaLiquida / 12)}
+                        </p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                          {year2}
+                        </p>
+                      </div>
+                    </>
+                  )}
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Ticket Médio</p>
-                    <p className="text-lg font-bold text-slate-900 dark:text-white">
-                      {formatCurrency(totals1.volumeTotal > 0 ? totals1.receitaLiquida / totals1.volumeTotal : 0)}
-                    </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {year1}
-                    </p>
-                    <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
-                      {formatCurrency(totals2.volumeTotal > 0 ? totals2.receitaLiquida / totals2.volumeTotal : 0)}
-                    </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {year2}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Média Mensal</p>
-                    <p className="text-lg font-bold text-slate-900 dark:text-white">
-                      {formatCurrency(totals1.receitaLiquida / 12)}
-                    </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {year1}
-                    </p>
-                    <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
-                      {formatCurrency(totals2.receitaLiquida / 12)}
-                    </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {year2}
-                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
+                    <div className={`flex items-center gap-1 ${getDifferenceColor(totals1.receitaLiquida - totals2.receitaLiquida)}`}>
+                      {getDifferenceIcon(totals1.receitaLiquida - totals2.receitaLiquida)}
+                      <div>
+                        <p className="text-lg font-bold">
+                          {calculateDifference(totals1.receitaLiquida, totals2.receitaLiquida).percentage > 0 ? '+' : ''}
+                          {calculateDifference(totals1.receitaLiquida, totals2.receitaLiquida).percentage.toFixed(1)}%
+                        </p>
+                        <p className="text-xs">
+                          {formatCurrency(calculateDifference(totals1.receitaLiquida, totals2.receitaLiquida).absolute)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={getPeriodLabels().map((label, index) => {
-                      const values1 = aggregateData(getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA'))
-                      const values2 = aggregateData(getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA'))
-                      return {
-                        name: label,
-                        [year1]: values1[index] || 0,
-                        [year2]: values2[index] || 0
-                      }
-                    })}
+                    data={comparisonMode === 'mensal' 
+                      ? [
+                          {
+                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                            valor: getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0,
+                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                          },
+                          {
+                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                            valor: getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0,
+                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                          }
+                        ]
+                      : getPeriodLabels().map((label, index) => {
+                          const values1 = aggregateData(getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA'))
+                          const values2 = aggregateData(getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA'))
+                          return {
+                            name: label,
+                            [year1]: values1[index] || 0,
+                            [year2]: values2[index] || 0
+                          }
+                        })
+                    }
                     barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -832,6 +899,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          if (comparisonMode === 'mensal') {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                <p className="text-sm">
+                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                </p>
+                              </div>
+                            )
+                          }
                           return (
                             <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                               <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.name}</p>
@@ -859,12 +936,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         return null
                       }}
                     />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                    />
-                    <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                    {comparisonMode === 'anual' && (
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                    )}
+                    {comparisonMode === 'mensal' ? (
+                      <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    ) : (
+                      <>
+                        <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -955,17 +1040,31 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={getPeriodLabels().map((label, index) => {
-                      const lucroBrutoLine1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
-                      const lucroBrutoLine2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
-                      const values1 = aggregateData(lucroBrutoLine1?.meses || [])
-                      const values2 = aggregateData(lucroBrutoLine2?.meses || [])
-                      return {
-                        name: label,
-                        [year1]: values1[index] || 0,
-                        [year2]: values2[index] || 0
-                      }
-                    })}
+                    data={comparisonMode === 'mensal'
+                      ? [
+                          {
+                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                            valor: getDRELineValues(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth1] || 0,
+                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                          },
+                          {
+                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                            valor: getDRELineValues(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth2] || 0,
+                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                          }
+                        ]
+                      : getPeriodLabels().map((label, index) => {
+                          const lucroBrutoLine1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
+                          const lucroBrutoLine2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
+                          const values1 = aggregateData(lucroBrutoLine1?.meses || [])
+                          const values2 = aggregateData(lucroBrutoLine2?.meses || [])
+                          return {
+                            name: label,
+                            [year1]: values1[index] || 0,
+                            [year2]: values2[index] || 0
+                          }
+                        })
+                    }
                     barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -974,6 +1073,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          if (comparisonMode === 'mensal') {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                <p className="text-sm">
+                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                </p>
+                              </div>
+                            )
+                          }
                           // Calcular receita líquida do período para calcular a margem
                           const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
                           const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
@@ -1016,12 +1125,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         return null
                       }}
                     />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                    />
-                    <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                    {comparisonMode === 'anual' && (
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                    )}
+                    {comparisonMode === 'mensal' ? (
+                      <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    ) : (
+                      <>
+                        <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1112,17 +1229,31 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={getPeriodLabels().map((label, index) => {
-                      const margemLine1 = dre1?.[6]
-                      const margemLine2 = dre2?.[6]
-                      const values1 = aggregateData(margemLine1?.meses || [])
-                      const values2 = aggregateData(margemLine2?.meses || [])
-                      return {
-                        name: label,
-                        [year1]: values1[index] || 0,
-                        [year2]: values2[index] || 0
-                      }
-                    })}
+                    data={comparisonMode === 'mensal'
+                      ? [
+                          {
+                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                            valor: dre1?.[6]?.meses?.[selectedMonth1] || 0,
+                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                          },
+                          {
+                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                            valor: dre2?.[6]?.meses?.[selectedMonth2] || 0,
+                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                          }
+                        ]
+                      : getPeriodLabels().map((label, index) => {
+                          const margemLine1 = dre1?.[6]
+                          const margemLine2 = dre2?.[6]
+                          const values1 = aggregateData(margemLine1?.meses || [])
+                          const values2 = aggregateData(margemLine2?.meses || [])
+                          return {
+                            name: label,
+                            [year1]: values1[index] || 0,
+                            [year2]: values2[index] || 0
+                          }
+                        })
+                    }
                     barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -1131,6 +1262,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          if (comparisonMode === 'mensal') {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                <p className="text-sm">
+                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                </p>
+                              </div>
+                            )
+                          }
                           const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
                           const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
                           const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
@@ -1172,12 +1313,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         return null
                       }}
                     />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                    />
-                    <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                    {comparisonMode === 'anual' && (
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                    )}
+                    {comparisonMode === 'mensal' ? (
+                      <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    ) : (
+                      <>
+                        <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1268,17 +1417,31 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={getPeriodLabels().map((label, index) => {
-                      const despesaLine1 = dre1?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')
-                      const despesaLine2 = dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')
-                      const values1 = aggregateData(despesaLine1?.meses || [])
-                      const values2 = aggregateData(despesaLine2?.meses || [])
-                      return {
-                        name: label,
-                        [year1]: Math.abs(values1[index] || 0),
-                        [year2]: Math.abs(values2[index] || 0)
-                      }
-                    })}
+                    data={comparisonMode === 'mensal'
+                      ? [
+                          {
+                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                            valor: Math.abs(getDRELineValues(dre1, 'DESPESAS C/ PESSOAL')?.[selectedMonth1] || 0),
+                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                          },
+                          {
+                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                            valor: Math.abs(getDRELineValues(dre2, 'DESPESAS C/ PESSOAL')?.[selectedMonth2] || 0),
+                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                          }
+                        ]
+                      : getPeriodLabels().map((label, index) => {
+                          const despesaLine1 = dre1?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')
+                          const despesaLine2 = dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')
+                          const values1 = aggregateData(despesaLine1?.meses || [])
+                          const values2 = aggregateData(despesaLine2?.meses || [])
+                          return {
+                            name: label,
+                            [year1]: Math.abs(values1[index] || 0),
+                            [year2]: Math.abs(values2[index] || 0)
+                          }
+                        })
+                    }
                     barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -1287,6 +1450,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          if (comparisonMode === 'mensal') {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                <p className="text-sm">
+                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                </p>
+                              </div>
+                            )
+                          }
                           const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
                           const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
                           const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
@@ -1328,12 +1501,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         return null
                       }}
                     />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                    />
-                    <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
+                    {comparisonMode === 'anual' && (
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                    )}
+                    {comparisonMode === 'mensal' ? (
+                      <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    ) : (
+                      <>
+                        <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
+                      </>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1424,17 +1605,31 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={getPeriodLabels().map((label, index) => {
-                      const despesaLine1 = dre1?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')
-                      const despesaLine2 = dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')
-                      const values1 = aggregateData(despesaLine1?.meses || [])
-                      const values2 = aggregateData(despesaLine2?.meses || [])
-                      return {
-                        name: label,
-                        [year1]: Math.abs(values1[index] || 0),
-                        [year2]: Math.abs(values2[index] || 0)
-                      }
-                    })}
+                    data={comparisonMode === 'mensal'
+                      ? [
+                          {
+                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                            valor: Math.abs(getDRELineValues(dre1, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth1] || 0),
+                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                          },
+                          {
+                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                            valor: Math.abs(getDRELineValues(dre2, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth2] || 0),
+                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                          }
+                        ]
+                      : getPeriodLabels().map((label, index) => {
+                          const despesaLine1 = dre1?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')
+                          const despesaLine2 = dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')
+                          const values1 = aggregateData(despesaLine1?.meses || [])
+                          const values2 = aggregateData(despesaLine2?.meses || [])
+                          return {
+                            name: label,
+                            [year1]: Math.abs(values1[index] || 0),
+                            [year2]: Math.abs(values2[index] || 0)
+                          }
+                        })
+                    }
                     barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -1443,6 +1638,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          if (comparisonMode === 'mensal') {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                <p className="text-sm">
+                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                </p>
+                              </div>
+                            )
+                          }
                           const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
                           const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
                           const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
@@ -1484,12 +1689,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         return null
                       }}
                     />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                    />
-                    <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
+                    {comparisonMode === 'anual' && (
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                    )}
+                    {comparisonMode === 'mensal' ? (
+                      <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    ) : (
+                      <>
+                        <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
+                      </>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1580,17 +1793,31 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={getPeriodLabels().map((label, index) => {
-                      const despesaLine1 = dre1?.[9]
-                      const despesaLine2 = dre2?.[9]
-                      const values1 = aggregateData(despesaLine1?.meses || [])
-                      const values2 = aggregateData(despesaLine2?.meses || [])
-                      return {
-                        name: label,
-                        [year1]: Math.abs(values1[index] || 0),
-                        [year2]: Math.abs(values2[index] || 0)
-                      }
-                    })}
+                    data={comparisonMode === 'mensal'
+                      ? [
+                          {
+                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                            valor: Math.abs(dre1?.[9]?.meses?.[selectedMonth1] || 0),
+                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                          },
+                          {
+                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                            valor: Math.abs(dre2?.[9]?.meses?.[selectedMonth2] || 0),
+                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                          }
+                        ]
+                      : getPeriodLabels().map((label, index) => {
+                          const despesaLine1 = dre1?.[9]
+                          const despesaLine2 = dre2?.[9]
+                          const values1 = aggregateData(despesaLine1?.meses || [])
+                          const values2 = aggregateData(despesaLine2?.meses || [])
+                          return {
+                            name: label,
+                            [year1]: Math.abs(values1[index] || 0),
+                            [year2]: Math.abs(values2[index] || 0)
+                          }
+                        })
+                    }
                     barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -1599,6 +1826,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          if (comparisonMode === 'mensal') {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                <p className="text-sm">
+                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                </p>
+                              </div>
+                            )
+                          }
                           const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
                           const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
                           const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
@@ -1640,12 +1877,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         return null
                       }}
                     />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                    />
-                    <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
+                    {comparisonMode === 'anual' && (
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                    )}
+                    {comparisonMode === 'mensal' ? (
+                      <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    ) : (
+                      <>
+                        <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
+                      </>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1736,17 +1981,31 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={getPeriodLabels().map((label, index) => {
-                      const despesaLine1 = dre1?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')
-                      const despesaLine2 = dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')
-                      const values1 = aggregateData(despesaLine1?.meses || [])
-                      const values2 = aggregateData(despesaLine2?.meses || [])
-                      return {
-                        name: label,
-                        [year1]: Math.abs(values1[index] || 0),
-                        [year2]: Math.abs(values2[index] || 0)
-                      }
-                    })}
+                    data={comparisonMode === 'mensal'
+                      ? [
+                          {
+                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                            valor: Math.abs(getDRELineValues(dre1, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth1] || 0),
+                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                          },
+                          {
+                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                            valor: Math.abs(getDRELineValues(dre2, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth2] || 0),
+                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                          }
+                        ]
+                      : getPeriodLabels().map((label, index) => {
+                          const despesaLine1 = dre1?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')
+                          const despesaLine2 = dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')
+                          const values1 = aggregateData(despesaLine1?.meses || [])
+                          const values2 = aggregateData(despesaLine2?.meses || [])
+                          return {
+                            name: label,
+                            [year1]: Math.abs(values1[index] || 0),
+                            [year2]: Math.abs(values2[index] || 0)
+                          }
+                        })
+                    }
                     barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -1755,6 +2014,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          if (comparisonMode === 'mensal') {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                <p className="text-sm">
+                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                </p>
+                              </div>
+                            )
+                          }
                           const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
                           const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
                           const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
@@ -1796,12 +2065,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         return null
                       }}
                     />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                    />
-                    <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
+                    {comparisonMode === 'anual' && (
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                    )}
+                    {comparisonMode === 'mensal' ? (
+                      <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    ) : (
+                      <>
+                        <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
+                      </>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -1892,17 +2169,31 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={getPeriodLabels().map((label, index) => {
-                      const despesaLine1 = dre1?.find(line => line.descricao === 'DESPESAS C/ VENDAS')
-                      const despesaLine2 = dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')
-                      const values1 = aggregateData(despesaLine1?.meses || [])
-                      const values2 = aggregateData(despesaLine2?.meses || [])
-                      return {
-                        name: label,
-                        [year1]: Math.abs(values1[index] || 0),
-                        [year2]: Math.abs(values2[index] || 0)
-                      }
-                    })}
+                    data={comparisonMode === 'mensal'
+                      ? [
+                          {
+                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                            valor: Math.abs(getDRELineValues(dre1, 'DESPESAS C/ VENDAS')?.[selectedMonth1] || 0),
+                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                          },
+                          {
+                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                            valor: Math.abs(getDRELineValues(dre2, 'DESPESAS C/ VENDAS')?.[selectedMonth2] || 0),
+                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                          }
+                        ]
+                      : getPeriodLabels().map((label, index) => {
+                          const despesaLine1 = dre1?.find(line => line.descricao === 'DESPESAS C/ VENDAS')
+                          const despesaLine2 = dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')
+                          const values1 = aggregateData(despesaLine1?.meses || [])
+                          const values2 = aggregateData(despesaLine2?.meses || [])
+                          return {
+                            name: label,
+                            [year1]: Math.abs(values1[index] || 0),
+                            [year2]: Math.abs(values2[index] || 0)
+                          }
+                        })
+                    }
                     barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -1911,6 +2202,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          if (comparisonMode === 'mensal') {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                <p className="text-sm">
+                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                </p>
+                              </div>
+                            )
+                          }
                           const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
                           const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
                           const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
@@ -1952,12 +2253,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         return null
                       }}
                     />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                    />
-                    <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
+                    {comparisonMode === 'anual' && (
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                    )}
+                    {comparisonMode === 'mensal' ? (
+                      <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    ) : (
+                      <>
+                        <Bar dataKey={String(year1)} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={String(year2)} fill="#eab308" radius={[4, 4, 0, 0]} />
+                      </>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -2046,17 +2355,31 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={getPeriodLabels().map((label, index) => {
-                      const linha1 = dre1?.[13]
-                      const linha2 = dre2?.[13]
-                      const values1 = aggregateData(linha1?.meses || [])
-                      const values2 = aggregateData(linha2?.meses || [])
-                      return {
-                        name: label,
-                        [year1]: Math.abs(values1[index] || 0),
-                        [year2]: Math.abs(values2[index] || 0)
-                      }
-                    })}
+                    data={comparisonMode === 'mensal'
+                      ? [
+                          {
+                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                            valor: Math.abs(dre1?.[13]?.meses?.[selectedMonth1] || 0),
+                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                          },
+                          {
+                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                            valor: Math.abs(dre2?.[13]?.meses?.[selectedMonth2] || 0),
+                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                          }
+                        ]
+                      : getPeriodLabels().map((label, index) => {
+                          const linha1 = dre1?.[13]
+                          const linha2 = dre2?.[13]
+                          const values1 = aggregateData(linha1?.meses || [])
+                          const values2 = aggregateData(linha2?.meses || [])
+                          return {
+                            name: label,
+                            [year1]: Math.abs(values1[index] || 0),
+                            [year2]: Math.abs(values2[index] || 0)
+                          }
+                        })
+                    }
                     barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -2065,6 +2388,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          if (comparisonMode === 'mensal') {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                <p className="text-sm">
+                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                </p>
+                              </div>
+                            )
+                          }
                           const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
                           const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
                           const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
@@ -2106,12 +2439,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         return null
                       }}
                     />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                    />
-                    <Bar dataKey={String(year1)} fill="#64748b" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                    {comparisonMode === 'anual' && (
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                    )}
+                    {comparisonMode === 'mensal' ? (
+                      <Bar dataKey="valor" fill="#64748b" radius={[4, 4, 0, 0]} />
+                    ) : (
+                      <>
+                        <Bar dataKey={String(year1)} fill="#64748b" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={String(year2)} fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                      </>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -2202,17 +2543,31 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={getPeriodLabels().map((label, index) => {
-                      const lucroLine1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')
-                      const lucroLine2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')
-                      const values1 = aggregateData(lucroLine1?.meses || [])
-                      const values2 = aggregateData(lucroLine2?.meses || [])
-                      return {
-                        name: label,
-                        [year1]: values1[index] || 0,
-                        [year2]: values2[index] || 0
-                      }
-                    })}
+                    data={comparisonMode === 'mensal'
+                      ? [
+                          {
+                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                            valor: getDRELineValues(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth1] || 0,
+                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                          },
+                          {
+                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                            valor: getDRELineValues(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth2] || 0,
+                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                          }
+                        ]
+                      : getPeriodLabels().map((label, index) => {
+                          const lucroLine1 = dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')
+                          const lucroLine2 = dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')
+                          const values1 = aggregateData(lucroLine1?.meses || [])
+                          const values2 = aggregateData(lucroLine2?.meses || [])
+                          return {
+                            name: label,
+                            [year1]: values1[index] || 0,
+                            [year2]: values2[index] || 0
+                          }
+                        })
+                    }
                     barGap={4}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -2221,6 +2576,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
+                          if (comparisonMode === 'mensal') {
+                            return (
+                              <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                <p className="text-sm">
+                                  <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                </p>
+                              </div>
+                            )
+                          }
                           const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
                           const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
                           const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
@@ -2262,12 +2627,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         return null
                       }}
                     />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                    />
-                    <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                    {comparisonMode === 'anual' && (
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                      />
+                    )}
+                    {comparisonMode === 'mensal' ? (
+                      <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    ) : (
+                      <>
+                        <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -2359,17 +2732,31 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <CardContent>
                   <ResponsiveContainer width="100%" height={320}>
                     <BarChart 
-                      data={getPeriodLabels().map((label, index) => {
-                        const provisaoLine1 = dre1?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))
-                        const provisaoLine2 = dre2?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))
-                        const values1 = aggregateData(provisaoLine1?.meses || [])
-                        const values2 = aggregateData(provisaoLine2?.meses || [])
-                        return {
-                          name: label,
-                          [year1]: Math.abs(values1[index] || 0),
-                          [year2]: Math.abs(values2[index] || 0)
-                        }
-                      })}
+                      data={comparisonMode === 'mensal'
+                        ? [
+                            {
+                              name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                              valor: Math.abs((dre1?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.[selectedMonth1]) || 0),
+                              periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            },
+                            {
+                              name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                              valor: Math.abs((dre2?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.[selectedMonth2]) || 0),
+                              periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            }
+                          ]
+                        : getPeriodLabels().map((label, index) => {
+                            const provisaoLine1 = dre1?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))
+                            const provisaoLine2 = dre2?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))
+                            const values1 = aggregateData(provisaoLine1?.meses || [])
+                            const values2 = aggregateData(provisaoLine2?.meses || [])
+                            return {
+                              name: label,
+                              [year1]: Math.abs(values1[index] || 0),
+                              [year2]: Math.abs(values2[index] || 0)
+                            }
+                          })
+                      }
                       barGap={4}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -2378,6 +2765,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       <Tooltip 
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
+                            if (comparisonMode === 'mensal') {
+                              return (
+                                <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                  <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                  <p className="text-sm">
+                                    <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                  </p>
+                                </div>
+                              )
+                            }
                             const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
                             const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
                             const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
@@ -2419,12 +2816,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                           return null
                         }}
                       />
-                      <Legend 
-                        wrapperStyle={{ paddingTop: '20px' }}
-                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                      />
-                      <Bar dataKey={String(year1)} fill="#f97316" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey={String(year2)} fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      {comparisonMode === 'anual' && (
+                        <Legend 
+                          wrapperStyle={{ paddingTop: '20px' }}
+                          formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                        />
+                      )}
+                      {comparisonMode === 'mensal' ? (
+                        <Bar dataKey="valor" fill="#f97316" radius={[4, 4, 0, 0]} />
+                      ) : (
+                        <>
+                          <Bar dataKey={String(year1)} fill="#f97316" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey={String(year2)} fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                        </>
+                      )}
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -2517,17 +2922,31 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <CardContent>
                   <ResponsiveContainer width="100%" height={320}>
                     <BarChart 
-                      data={getPeriodLabels().map((label, index) => {
-                        const lucroLiquidoLine1 = dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')
-                        const lucroLiquidoLine2 = dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')
-                        const values1 = aggregateData(lucroLiquidoLine1?.meses || [])
-                        const values2 = aggregateData(lucroLiquidoLine2?.meses || [])
-                        return {
-                          name: label,
-                          [year1]: values1[index] || 0,
-                          [year2]: values2[index] || 0
-                        }
-                      })}
+                      data={comparisonMode === 'mensal'
+                        ? [
+                            {
+                              name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                              valor: getDRELineValues(dre1, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth1] || 0,
+                              periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            },
+                            {
+                              name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                              valor: getDRELineValues(dre2, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth2] || 0,
+                              periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            }
+                          ]
+                        : getPeriodLabels().map((label, index) => {
+                            const lucroLiquidoLine1 = dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')
+                            const lucroLiquidoLine2 = dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')
+                            const values1 = aggregateData(lucroLiquidoLine1?.meses || [])
+                            const values2 = aggregateData(lucroLiquidoLine2?.meses || [])
+                            return {
+                              name: label,
+                              [year1]: values1[index] || 0,
+                              [year2]: values2[index] || 0
+                            }
+                          })
+                      }
                       barGap={4}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -2536,6 +2955,16 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       <Tooltip 
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
+                            if (comparisonMode === 'mensal') {
+                              return (
+                                <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+                                  <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
+                                  <p className="text-sm">
+                                    <span className="font-bold">{formatCurrency(Number(payload[0]?.value || 0))}</span>
+                                  </p>
+                                </div>
+                              )
+                            }
                             const periodoIndex = getPeriodLabels().indexOf(payload[0].payload.name)
                             const receitaLine1 = dre1?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
                             const receitaLine2 = dre2?.find(line => line.descricao === 'RECEITA OPERACIONAL LIQUIDA')
@@ -2577,12 +3006,20 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                           return null
                         }}
                       />
-                      <Legend 
-                        wrapperStyle={{ paddingTop: '20px' }}
-                        formatter={(value) => <span className="text-sm font-medium">{value}</span>}
-                      />
-                      <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                      {comparisonMode === 'anual' && (
+                        <Legend 
+                          wrapperStyle={{ paddingTop: '20px' }}
+                          formatter={(value) => <span className="text-sm font-medium">{value}</span>}
+                        />
+                      )}
+                      {comparisonMode === 'mensal' ? (
+                        <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      ) : (
+                        <>
+                          <Bar dataKey={String(year1)} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey={String(year2)} fill="#10b981" radius={[4, 4, 0, 0]} />
+                        </>
+                      )}
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
