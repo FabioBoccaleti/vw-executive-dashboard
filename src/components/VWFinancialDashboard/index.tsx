@@ -1830,9 +1830,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                 Comparar Anos
               </Button>
               <Select value={fiscalYear.toString()} onValueChange={handleFiscalYearChange}>
-                <SelectTrigger className="w-[160px] bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                <SelectTrigger className="w-[160px] bg-yellow-400 dark:bg-yellow-500 border-yellow-500 dark:border-yellow-600">
                   <SelectValue>
-                    <span className="text-green-800 dark:text-green-200 font-semibold">
+                    <span className="text-green-700 dark:text-green-800 font-bold">
                       Ano Fiscal {fiscalYear}
                     </span>
                   </SelectValue>
