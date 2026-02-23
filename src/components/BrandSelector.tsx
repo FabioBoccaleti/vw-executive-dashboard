@@ -12,7 +12,7 @@ import { Building2, Car, ChevronRight, Layers, CheckCircle, DollarSign } from 'l
 import { PasswordDialog } from '@/components/PasswordDialog';
 
 // Marcas que requerem senha para acesso
-const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros'];
+const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa'];
 
 interface BrandSelectorProps {
   onSelectBrand: (brand: Brand) => void;
