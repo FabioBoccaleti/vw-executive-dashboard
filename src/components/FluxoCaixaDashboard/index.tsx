@@ -1,10 +1,11 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, FileText, BarChart3, Target, LogOut, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UploadScreen } from "./UploadScreen";
+import { BALANCETE_EXEMPLO } from "./balanceteExemplo";
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
 function parseBalancete(text: string) {
@@ -271,6 +272,19 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [dragOver, setDragOver] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Carrega balancete de exemplo automaticamente ao montar o componente
+  useEffect(() => {
+    try {
+      const parsed = parseBalancete(BALANCETE_EXEMPLO);
+      if (Object.keys(parsed.accounts).length >= 10) {
+        setData(parsed);
+        setActiveTab('overview');
+      }
+    } catch (err) {
+      console.error('Erro ao carregar balancete de exemplo:', err);
+    }
+  }, []);
 
   const processFile = useCallback((file: File | undefined) => {
     if (!file) return;
