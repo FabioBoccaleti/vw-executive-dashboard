@@ -9,6 +9,8 @@ export interface Despesa {
   valor: number;
   status: 'aguardando' | 'aprovado' | 'reprovado' | 'pendente';
   solicitante: string;
+  gerenteAprovador: string;
+  diretorAprovador: string;
   departamento: string;
   marca: string;
   categoria: string;
@@ -36,6 +38,8 @@ export const despesas: Despesa[] = [
     valor: 250.00,
     status: 'pendente',
     solicitante: 'Roberto Martins',
+    gerenteAprovador: 'Gabriela S Mateus',
+    diretorAprovador: 'Gabriela S Mateus',
     departamento: 'Veículos Novos',
     marca: 'Audi',
     categoria: 'Combustível',
@@ -48,6 +52,8 @@ export const despesas: Despesa[] = [
     valor: 1850.00,
     status: 'pendente',
     solicitante: 'Fernando Lima',
+    gerenteAprovador: 'Orlando Chodin',
+    diretorAprovador: 'Orlando Chodin',
     departamento: 'Oficina',
     marca: 'Volkswagen',
     categoria: 'Manutenção/Oficina',
@@ -60,6 +66,8 @@ export const despesas: Despesa[] = [
     valor: 8500.00,
     status: 'pendente',
     solicitante: 'Camila Silvestre',
+    gerenteAprovador: 'Norival Junior',
+    diretorAprovador: 'Gabriela S Mateus',
     departamento: 'Administração',
     marca: 'Audi',
     categoria: 'Marketing',
@@ -72,6 +80,8 @@ export const despesas: Despesa[] = [
     valor: 4500.00,
     status: 'aprovado',
     solicitante: 'Carlos Andrade',
+    gerenteAprovador: 'Sergio Ribeiro',
+    diretorAprovador: 'Orlando Chodin',
     departamento: 'Veículos Novos',
     marca: 'Volkswagen',
     categoria: 'Marketing',
@@ -86,6 +96,8 @@ export const despesas: Despesa[] = [
     valor: 1200.00,
     status: 'aprovado',
     solicitante: 'Marina Costa',
+    gerenteAprovador: 'Thiago Correira',
+    diretorAprovador: 'Gabriela S Mateus',
     departamento: 'Veículos Usados',
     marca: 'Volkswagen',
     categoria: 'Marketing',
@@ -100,6 +112,8 @@ export const despesas: Despesa[] = [
     valor: 3200.00,
     status: 'aprovado',
     solicitante: 'João Santos',
+    gerenteAprovador: 'Fabio Boccaleti',
+    diretorAprovador: 'Orlando Chodin',
     departamento: 'Oficina',
     marca: 'Audi',
     categoria: 'Manutenção/Oficina',
@@ -114,6 +128,8 @@ export const despesas: Despesa[] = [
     valor: 2800.00,
     status: 'reprovado',
     solicitante: 'Patricia Oliveira',
+    gerenteAprovador: 'Andre Simoni',
+    diretorAprovador: 'Gabriela S Mateus',
     departamento: 'Venda Direta / Frotista',
     marca: 'Audi',
     categoria: 'RH',
@@ -129,6 +145,8 @@ export const despesas: Despesa[] = [
     valor: 450.00,
     status: 'aprovado',
     solicitante: 'Lucas Ferreira',
+    gerenteAprovador: 'Daniel Fanti',
+    diretorAprovador: 'Orlando Chodin',
     departamento: 'Administração',
     marca: 'Volkswagen',
     categoria: 'Administrativo',
@@ -143,6 +161,8 @@ export const despesas: Despesa[] = [
     valor: 5200.00,
     status: 'aguardando',
     solicitante: 'Ricardo Mendes',
+    gerenteAprovador: 'Alexandre D Auria',
+    diretorAprovador: 'Gabriela S Mateus',
     departamento: 'Oficina',
     marca: 'Volkswagen',
     categoria: 'Manutenção/Oficina',
@@ -155,6 +175,8 @@ export const despesas: Despesa[] = [
     valor: 15000.00,
     status: 'aprovado',
     solicitante: 'Amanda Silva',
+    gerenteAprovador: 'Gabriela S Mateus',
+    diretorAprovador: 'Orlando Chodin',
     departamento: 'Diretoria',
     marca: 'Audi',
     categoria: 'Marketing',

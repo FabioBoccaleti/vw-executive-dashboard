@@ -41,13 +41,13 @@ export function DashboardHome() {
   };
 
   const handleAprovar = (id: string) => {
-    aprovarDespesa(id, 'Sancho Hara');
+    aprovarDespesa(id, 'Fabio Boccaleti');
     loadData();
     toast.success('Despesa aprovada!');
   };
 
   const handleRejeitar = (id: string) => {
-    rejeitarDespesa(id, 'Sancho Hara');
+    rejeitarDespesa(id, 'Fabio Boccaleti');
     loadData();
     toast.success('Despesa rejeitada');
   };

@@ -86,13 +86,13 @@ export function TodasDespesas() {
   };
 
   const handleAprovar = (id: string) => {
-    aprovarDespesa(id, 'Sancho Hara');
+    aprovarDespesa(id, 'Fabio Boccaleti');
     loadData();
     toast.success('Despesa aprovada com sucesso!');
   };
 
   const handleRejeitar = (id: string) => {
-    rejeitarDespesa(id, 'Sancho Hara', 'Rejeitado pelo sistema');
+    rejeitarDespesa(id, 'Fabio Boccaleti', 'Rejeitado pelo sistema');
     loadData();
     toast.success('Despesa rejeitada');
   };

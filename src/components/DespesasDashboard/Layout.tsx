@@ -61,11 +61,11 @@ export function DespesasLayout({ children, currentPage, onPageChange, onChangeBr
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-semibold">Sancho Hara</p>
+              <p className="text-sm font-semibold">Fabio Boccaleti</p>
               <p className="text-xs text-emerald-100">Gerente Financeiro</p>
             </div>
             <div className="bg-emerald-700 rounded-full w-10 h-10 flex items-center justify-center font-bold">
-              SH
+              FB
             </div>
           </div>
         </div>
