@@ -28,26 +28,49 @@ export function DashboardHome() {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string>('');
   const [selectedImageTitle, setSelectedImageTitle] = useState<string>('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     loadData();
+    
+    // Atualização automática a cada 5 segundos para sincronizar com outros usuários
+    const interval = setInterval(() => {
+      loadData(true);
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, []);
 
-  const loadData = () => {
-    const data = loadDespesas();
-    setDespesas(data);
+  const loadData = async (silent = false) => {
+    if (!silent) setIsRefreshing(true);
+    try {
+      const data = await loadDespesas();
+      setDespesas(data);
+    } finally {
+      if (!silent) setIsRefreshing(false);
+    }
   };
 
-  const handleAprovar = (id: string) => {
-    aprovarDespesa(id, 'Fabio Boccaleti');
-    loadData();
-    toast.success('Despesa aprovada!');
+  const handleAprovar = async (id: string) => {
+    try {
+      await aprovarDespesa(id, 'Fabio Boccaleti');
+      await loadData();
+      toast.success('Despesa aprovada! Sincronizando com outros usuários...');
+    } catch (error) {
+      toast.error('Erro ao aprovar despesa');
+      console.error(error);
+    }
   };
 
-  const handleRejeitar = (id: string) => {
-    rejeitarDespesa(id, 'Fabio Boccaleti');
-    loadData();
-    toast.success('Despesa rejeitada');
+  const handleRejeitar = async (id: string) => {
+    try {
+      await rejeitarDespesa(id, 'Fabio Boccaleti');
+      await loadData();
+      toast.success('Despesa rejeitada! Sincronizando com outros usuários...');
+    } catch (error) {
+      toast.error('Erro ao rejeitar despesa');
+      console.error(error);
+    }
   };
 
   const despesasPendentes = despesas.filter((d) => d.status === 'pendente');

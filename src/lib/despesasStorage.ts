@@ -1,8 +1,10 @@
 /**
  * Sistema de Persistência de Dados - Aprovação de Despesas
+ * Usa Vercel KV para armazenamento compartilhado entre usuários
  */
 
 import { despesas as despesasIniciais, type Despesa } from '@/data/despesasData';
+import { kvGet, kvSet } from './kvClient';
 
 const STORAGE_KEY = 'aprovacao_despesas_data';
 
@@ -12,9 +14,20 @@ export interface DespesasState {
 }
 
 /**
- * Carrega os dados do localStorage ou retorna dados iniciais
+ * Carrega os dados do Vercel KV (ou localStorage como fallback)
  */
-export function loadDespesas(): Despesa[] {
+export async function loadDespesas(): Promise<Despesa[]> {
+  try {
+    // Tenta carregar do Vercel KV primeiro
+    const state = await kvGet<DespesasState>(STORAGE_KEY);
+    if (state && state.despesas) {
+      return state.despesas;
+    }
+  } catch (error) {
+    console.error('Erro ao carregar do KV, usando localStorage:', error);
+  }
+
+  // Fallback para localStorage
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -24,34 +37,44 @@ export function loadDespesas(): Despesa[] {
   } catch (error) {
     console.error('Erro ao carregar despesas:', error);
   }
+  
   return despesasIniciais;
 }
 
 /**
- * Salva os dados no localStorage
+ * Salva os dados no Vercel KV (e localStorage como backup)
  */
-export function saveDespesas(despesas: Despesa[]): void {
+export async function saveDespesas(despesas: Despesa[]): Promise<void> {
+  const state: DespesasState = {
+    despesas,
+    lastUpdate: new Date().toISOString(),
+  };
+
   try {
-    const state: DespesasState = {
-      despesas,
-      lastUpdate: new Date().toISOString(),
-    };
+    // Salva no Vercel KV
+    await kvSet(STORAGE_KEY, state);
+  } catch (error) {
+    console.error('Erro ao salvar no KV:', error);
+  }
+
+  // Salva no localStorage como backup
+  try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (error) {
-    console.error('Erro ao salvar despesas:', error);
+    console.error('Erro ao salvar no localStorage:', error);
   }
 }
 
 /**
  * Adiciona uma nova despesa
  */
-export function addDespesa(novaDespesa: Omit<Despesa, 'id'>): Despesa {
-  const despesas = loadDespesas();
+export async function addDespesa(novaDespesa: Omit<Despesa, 'id'>): Promise<Despesa> {
+  const despesas = await loadDespesas();
   const id = (Math.max(...despesas.map(d => parseInt(d.id)), 0) + 1).toString();
   const despesa: Despesa = { ...novaDespesa, id };
   
   despesas.unshift(despesa);
-  saveDespesas(despesas);
+  await saveDespesas(despesas);
   
   return despesa;
 }
@@ -59,30 +82,30 @@ export function addDespesa(novaDespesa: Omit<Despesa, 'id'>): Despesa {
 /**
  * Atualiza uma despesa existente
  */
-export function updateDespesa(id: string, updates: Partial<Despesa>): void {
-  const despesas = loadDespesas();
+export async function updateDespesa(id: string, updates: Partial<Despesa>): Promise<void> {
+  const despesas = await loadDespesas();
   const index = despesas.findIndex(d => d.id === id);
   
   if (index !== -1) {
     despesas[index] = { ...despesas[index], ...updates };
-    saveDespesas(despesas);
+    await saveDespesas(despesas);
   }
 }
 
 /**
  * Remove uma despesa
  */
-export function deleteDespesa(id: string): void {
-  const despesas = loadDespesas();
+export async function deleteDespesa(id: string): Promise<void> {
+  const despesas = await loadDespesas();
   const filtered = despesas.filter(d => d.id !== id);
-  saveDespesas(filtered);
+  await saveDespesas(filtered);
 }
 
 /**
  * Aprova uma despesa
  */
-export function aprovarDespesa(id: string, aprovador: string): void {
-  updateDespesa(id, {
+export async function aprovarDespesa(id: string, aprovador: string): Promise<void> {
+  await updateDespesa(id, {
     status: 'aprovado',
     dataAprovacao: new Date().toISOString().split('T')[0],
     aprovador,
@@ -92,8 +115,8 @@ export function aprovarDespesa(id: string, aprovador: string): void {
 /**
  * Rejeita uma despesa
  */
-export function rejeitarDespesa(id: string, aprovador: string, observacao?: string): void {
-  updateDespesa(id, {
+export async function rejeitarDespesa(id: string, aprovador: string, observacao?: string): Promise<void> {
+  await updateDespesa(id, {
     status: 'reprovado',
     dataAprovacao: new Date().toISOString().split('T')[0],
     aprovador,
@@ -104,6 +127,6 @@ export function rejeitarDespesa(id: string, aprovador: string, observacao?: stri
 /**
  * Reseta os dados para o estado inicial
  */
-export function resetDespesas(): void {
-  saveDespesas(despesasIniciais);
+export async function resetDespesas(): Promise<void> {
+  await saveDespesas(despesasIniciais);
 }

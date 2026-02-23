@@ -35,7 +35,7 @@ export function DespesasLayout({ children, currentPage, onPageChange, onChangeBr
     { id: 'todas-despesas' as MenuItem, label: 'Todas as Despesas', icon: FileText },
     { id: 'nova-despesa' as MenuItem, label: 'Nova Despesa', icon: Plus },
     { id: 'departamento' as MenuItem, label: 'Por Departamento', icon: Building2 },
-    { id: 'integracao' as MenuItem, label: 'Integração Liv.Branca', icon: BarChart3 },
+    { id: 'integracao' as MenuItem, label: 'Integração Linx Bravos', icon: BarChart3 },
     { id: 'relatorios' as MenuItem, label: 'Relatórios', icon: BarChart3 },
     { id: 'configuracoes' as MenuItem, label: 'Configurações', icon: Settings },
   ];

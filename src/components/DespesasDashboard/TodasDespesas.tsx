@@ -52,14 +52,21 @@ export function TodasDespesas() {
 
   useEffect(() => {
     loadData();
+    
+    // Atualização automática a cada 5 segundos para sincronizar com outros usuários
+    const interval = setInterval(() => {
+      loadData();
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     filterDespesas();
   }, [searchTerm, statusFilter, departamentoFilter, despesas]);
 
-  const loadData = () => {
-    const data = loadDespesas();
+  const loadData = async () => {
+    const data = await loadDespesas();
     setDespesas(data);
   };
 
@@ -89,26 +96,36 @@ export function TodasDespesas() {
     setFilteredDespesas(filtered);
   };
 
-  const handleAprovar = (id: string) => {
-    aprovarDespesa(id, 'Fabio Boccaleti');
-    loadData();
-    toast.success('Despesa aprovada com sucesso!');
+  const handleAprovar = async (id: string) => {
+    try {
+      await aprovarDespesa(id, 'Fabio Boccaleti');
+      await loadData();
+      toast.success('Despesa aprovada! Sincronizando com outros usuários...');
+    } catch (error) {
+      toast.error('Erro ao aprovar despesa');
+      console.error(error);
+    }
   };
 
-  const handleRejeitar = (id: string) => {
-    rejeitarDespesa(id, 'Fabio Boccaleti', 'Rejeitado pelo sistema');
-    loadData();
-    toast.success('Despesa rejeitada');
+  const handleRejeitar = async (id: string) => {
+    try {
+      await rejeitarDespesa(id, 'Fabio Boccaleti', 'Rejeitado pelo sistema');
+      await loadData();
+      toast.success('Despesa rejeitada! Sincronizando com outros usuários...');
+    } catch (error) {
+      toast.error('Erro ao rejeitar despesa');
+      console.error(error);
+    }
   };
 
   const handleDelete = (id: string) => {
     setDeleteId(id);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deleteId) {
-      deleteDespesa(deleteId);
-      loadData();
+      await deleteDespesa(deleteId);
+      await loadData();
       toast.success('Despesa excluída');
       setDeleteId(null);
     }

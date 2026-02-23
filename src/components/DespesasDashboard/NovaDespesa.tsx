@@ -43,7 +43,7 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.identificacaoEmitente || !formData.numeroNotaFiscal || !formData.titulo || !formData.valor || !formData.departamento || 
@@ -55,14 +55,14 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
     setIsSubmitting(true);
 
     try {
-      const novaDespesa = addDespesa({
+      const novaDespesa = await addDespesa({
         ...formData,
         valor: parseFloat(formData.valor),
         data: new Date().toISOString().split('T')[0],
       });
 
-      toast.success('Despesa criada com sucesso!', {
-        description: `${novaDespesa.titulo} - R$ ${novaDespesa.valor.toLocaleString('pt-BR')}`,
+      toast.success('Despesa criada e sincronizada!', {
+        description: `${novaDespesa.titulo} - R$ ${novaDespesa.valor.toLocaleString('pt-BR')} - Outros usuários podem visualizar agora`,
       });
 
       // Limpar formulário
