@@ -17,6 +17,7 @@ import {
   Calendar,
   Building2,
   Tag,
+  X,
 } from 'lucide-react';
 import {
   atividadesRecentes,
@@ -30,6 +31,9 @@ import { toast } from 'sonner';
 
 export function DashboardHome() {
   const [despesas, setDespesas] = useState<Despesa[]>([]);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string>('');
+  const [selectedImageTitle, setSelectedImageTitle] = useState<string>('');
 
   useEffect(() => {
     loadData();
@@ -345,9 +349,24 @@ export function DashboardHome() {
               <Clock className="w-5 h-5" />
               Despesas Pendentes de Aprovação
             </CardTitle>
-            <span className="text-sm text-slate-600 dark:text-slate-400">
-              {despesasPendentes.length} pendente{despesasPendentes.length !== 1 ? 's' : ''}
-            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  console.log('Teste: Abrindo dialog com imagem de teste');
+                  setSelectedImage('data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'300\'%3E%3Crect fill=\'%2334D399\' width=\'400\' height=\'300\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-family=\'Arial\' font-size=\'24\' fill=\'white\'%3EImagem de Teste%3C/text%3E%3C/svg%3E');
+                  setSelectedImageTitle('Teste de Dialog');
+                  setImageDialogOpen(true);
+                }}
+                className="text-xs"
+              >
+                Testar Dialog
+              </Button>
+              <span className="text-sm text-slate-600 dark:text-slate-400">
+                {despesasPendentes.length} pendente{despesasPendentes.length !== 1 ? 's' : ''}
+              </span>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -363,7 +382,14 @@ export function DashboardHome() {
                     <div className="flex-shrink-0 w-32 h-32">
                       {despesa.imagemNotaFiscal.startsWith('data:application/pdf') ? (
                         <div className="relative w-full h-full rounded-lg border-2 border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer hover:border-emerald-500 transition-colors"
-                          onClick={() => window.open(despesa.imagemNotaFiscal, '_blank')}
+                          onClick={() => {
+                            console.log('Clicou na imagem PDF:', despesa.titulo);
+                            console.log('URL da imagem:', despesa.imagemNotaFiscal.substring(0, 50) + '...');
+                            setSelectedImage(despesa.imagemNotaFiscal);
+                            setSelectedImageTitle(despesa.titulo);
+                            setImageDialogOpen(true);
+                            console.log('Dialog aberto:', true);
+                          }}
                           title="Clique para abrir PDF">
                           <iframe
                             src={despesa.imagemNotaFiscal}
@@ -376,8 +402,16 @@ export function DashboardHome() {
                           src={despesa.imagemNotaFiscal}
                           alt="Nota Fiscal"
                           className="w-full h-full object-cover rounded-lg border-2 border-slate-200 dark:border-slate-700 cursor-pointer hover:border-emerald-500 transition-colors"
-                          onClick={() => window.open(despesa.imagemNotaFiscal, '_blank')}
+                          onClick={() => {
+                            console.log('Clicou na imagem:', despesa.titulo);
+                            console.log('URL da imagem:', despesa.imagemNotaFiscal.substring(0, 50) + '...');
+                            setSelectedImage(despesa.imagemNotaFiscal);
+                            setSelectedImageTitle(despesa.titulo);
+                            setImageDialogOpen(true);
+                            console.log('Dialog aberto:', true);
+                          }}
                           title="Clique para ampliar"
+                          onError={(e) => console.error('Erro ao carregar imagem:', e)}
                         />
                       )}
                     </div>
@@ -458,6 +492,73 @@ export function DashboardHome() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog para visualizar imagem */}
+      {imageDialogOpen && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => {
+            console.log('Clicou no overlay - fechando dialog');
+            setImageDialogOpen(false);
+          }}
+        >
+          <div 
+            className="relative bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                {selectedImageTitle || 'Visualizar Imagem'}
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  console.log('Clicou no botão fechar');
+                  setImageDialogOpen(false);
+                }}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Conteúdo */}
+            <div className="p-4 overflow-auto max-h-[calc(90vh-80px)]">
+              {selectedImage ? (
+                selectedImage.startsWith('data:application/pdf') ? (
+                  <iframe
+                    src={selectedImage}
+                    className="w-full h-[70vh] border-0 rounded"
+                    title="Visualização PDF"
+                    onLoad={() => console.log('PDF carregado com sucesso')}
+                    onError={(e) => {
+                      console.error('Erro ao carregar PDF:', e);
+                      alert('Erro ao carregar PDF. Verifique o console.');
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={selectedImage}
+                    alt={selectedImageTitle}
+                    className="w-full h-auto rounded-lg"
+                    onLoad={() => console.log('Imagem carregada com sucesso')}
+                    onError={(e) => {
+                      console.error('Erro ao carregar imagem:', e);
+                      alert('Erro ao carregar imagem. Verifique o console.');
+                    }}
+                  />
+                )
+              ) : (
+                <div className="text-center py-12 text-slate-500">
+                  Nenhuma imagem selecionada
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

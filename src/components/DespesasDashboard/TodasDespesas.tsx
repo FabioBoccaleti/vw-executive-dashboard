@@ -23,6 +23,7 @@ import {
   Clock,
   Trash2,
   Eye,
+  X,
 } from 'lucide-react';
 import { loadDespesas, deleteDespesa, aprovarDespesa, rejeitarDespesa } from '@/lib/despesasStorage';
 import type { Despesa } from '@/data/despesasData';
@@ -45,6 +46,9 @@ export function TodasDespesas() {
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [departamentoFilter, setDepartamentoFilter] = useState<string>('todos');
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string>('');
+  const [selectedImageTitle, setSelectedImageTitle] = useState<string>('');
 
   useEffect(() => {
     loadData();
@@ -278,7 +282,14 @@ export function TodasDespesas() {
                         {despesa.imagemNotaFiscal ? (
                           despesa.imagemNotaFiscal.startsWith('data:application/pdf') ? (
                             <div className="relative w-16 h-16 rounded border-2 border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer hover:border-emerald-500 transition-colors"
-                              onClick={() => window.open(despesa.imagemNotaFiscal, '_blank')}
+                              onClick={() => {
+                                console.log('Clicou no PDF:', despesa.titulo);
+                                console.log('URL:', despesa.imagemNotaFiscal.substring(0, 50) + '...');
+                                setSelectedImage(despesa.imagemNotaFiscal);
+                                setSelectedImageTitle(despesa.titulo);
+                                setImageDialogOpen(true);
+                                console.log('Dialog aberto');
+                              }}
                               title="Clique para abrir PDF">
                               <iframe
                                 src={despesa.imagemNotaFiscal}
@@ -291,8 +302,16 @@ export function TodasDespesas() {
                               src={despesa.imagemNotaFiscal}
                               alt="NF"
                               className="w-16 h-16 object-cover rounded border-2 border-slate-200 dark:border-slate-700 cursor-pointer hover:border-emerald-500 transition-colors"
-                              onClick={() => window.open(despesa.imagemNotaFiscal, '_blank')}
+                              onClick={() => {
+                                console.log('Clicou na imagem:', despesa.titulo);
+                                console.log('URL:', despesa.imagemNotaFiscal.substring(0, 50) + '...');
+                                setSelectedImage(despesa.imagemNotaFiscal);
+                                setSelectedImageTitle(despesa.titulo);
+                                setImageDialogOpen(true);
+                                console.log('Dialog aberto');
+                              }}
                               title="Clique para ampliar"
+                              onError={(e) => console.error('Erro ao carregar miniatura:', e)}
                             />
                           )
                         ) : (
@@ -390,6 +409,73 @@ export function TodasDespesas() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog para visualizar imagem */}
+      {imageDialogOpen && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => {
+            console.log('Clicou no overlay - fechando dialog');
+            setImageDialogOpen(false);
+          }}
+        >
+          <div 
+            className="relative bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                {selectedImageTitle || 'Visualizar Imagem'}
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  console.log('Clicou no botão fechar');
+                  setImageDialogOpen(false);
+                }}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Conteúdo */}
+            <div className="p-4 overflow-auto max-h-[calc(90vh-80px)]">
+              {selectedImage ? (
+                selectedImage.startsWith('data:application/pdf') ? (
+                  <iframe
+                    src={selectedImage}
+                    className="w-full h-[70vh] border-0 rounded"
+                    title="Visualização PDF"
+                    onLoad={() => console.log('PDF carregado com sucesso')}
+                    onError={(e) => {
+                      console.error('Erro ao carregar PDF:', e);
+                      alert('Erro ao carregar PDF. Verifique o console.');
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={selectedImage}
+                    alt={selectedImageTitle}
+                    className="w-full h-auto rounded-lg"
+                    onLoad={() => console.log('Imagem carregada com sucesso')}
+                    onError={(e) => {
+                      console.error('Erro ao carregar imagem:', e);
+                      alert('Erro ao carregar imagem. Verifique o console.');
+                    }}
+                  />
+                )
+              ) : (
+                <div className="text-center py-12 text-slate-500">
+                  Nenhuma imagem selecionada
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
