@@ -19,13 +19,7 @@ import {
   Tag,
   X,
 } from 'lucide-react';
-import {
-  atividadesRecentes,
-  despesasPorMarca,
-  despesasPorCategoria,
-  despesasPorDepartamento,
-  type Despesa,
-} from '@/data/despesasData';
+import { type Despesa } from '@/data/despesasData';
 import { loadDespesas, aprovarDespesa, rejeitarDespesa } from '@/lib/despesasStorage';
 import { toast } from 'sonner';
 
@@ -81,6 +75,55 @@ export function DashboardHome() {
       valor: despesas.reduce((sum, d) => sum + d.valor, 0),
     },
   };
+
+  // Calcular despesas por marca
+  const despesasPorMarcaMap = despesas.reduce((acc, d) => {
+    acc[d.marca] = (acc[d.marca] || 0) + d.valor;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const despesasPorMarca = Object.entries(despesasPorMarcaMap)
+    .map(([marca, valor]) => ({ marca, valor }))
+    .sort((a, b) => b.valor - a.valor);
+
+  // Calcular despesas por categoria
+  const despesasPorCategoriaMap = despesas.reduce((acc, d) => {
+    acc[d.categoria] = (acc[d.categoria] || 0) + d.valor;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const despesasPorCategoria = Object.entries(despesasPorCategoriaMap)
+    .map(([categoria, valor]) => ({ categoria, valor }))
+    .sort((a, b) => b.valor - a.valor);
+
+  // Calcular despesas por departamento
+  const despesasPorDepartamentoMap = despesas.reduce((acc, d) => {
+    acc[d.departamento] = (acc[d.departamento] || 0) + d.valor;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const despesasPorDepartamento = Object.entries(despesasPorDepartamentoMap)
+    .map(([departamento, valor]) => ({ departamento, valor }))
+    .sort((a, b) => b.valor - a.valor);
+
+  // Gerar atividades recentes (últimas 5 despesas aprovadas/reprovadas)
+  const atividadesRecentes = despesas
+    .filter(d => d.status === 'aprovado' || d.status === 'reprovado')
+    .sort((a, b) => {
+      const dataA = new Date(a.dataAprovacao || a.data);
+      const dataB = new Date(b.dataAprovacao || b.data);
+      return dataB.getTime() - dataA.getTime();
+    })
+    .slice(0, 5)
+    .map(d => ({
+      id: d.id,
+      tipo: d.status as 'aprovado' | 'reprovado',
+      titulo: d.status === 'aprovado' ? 'Despesa aprovada' : 'Despesa reprovada',
+      solicitante: d.solicitante,
+      departamento: `${d.departamento} - ${d.categoria}`,
+      valor: d.valor,
+      data: d.dataAprovacao ? new Date(d.dataAprovacao).toLocaleDateString('pt-BR') : new Date(d.data).toLocaleDateString('pt-BR'),
+    }));
 
   return (
     <div className="p-6 space-y-6">
@@ -181,7 +224,10 @@ export function DashboardHome() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {despesasPorMarca.map((item) => {
+              {despesasPorMarca.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">Nenhum dado disponível</p>
+              ) : (
+                despesasPorMarca.map((item) => {
                 const maxValor = Math.max(...despesasPorMarca.map((d) => d.valor));
                 const porcentagem = (item.valor / maxValor) * 100;
                 
@@ -206,7 +252,8 @@ export function DashboardHome() {
                     </div>
                   </div>
                 );
-              })}
+              })
+              )}
             </div>
           </CardContent>
         </Card>
@@ -221,7 +268,10 @@ export function DashboardHome() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {despesasPorCategoria.map((item) => {
+              {despesasPorCategoria.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">Nenhum dado disponível</p>
+              ) : (
+                despesasPorCategoria.map((item) => {
                 const maxValor = Math.max(...despesasPorCategoria.map((d) => d.valor));
                 const porcentagem = (item.valor / maxValor) * 100;
 
@@ -243,7 +293,8 @@ export function DashboardHome() {
                     </div>
                   </div>
                 );
-              })}
+              })
+              )}
             </div>
           </CardContent>
         </Card>
@@ -261,7 +312,10 @@ export function DashboardHome() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {despesasPorDepartamento.map((item) => (
+              {despesasPorDepartamento.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">Nenhum dado disponível</p>
+              ) : (
+                despesasPorDepartamento.map((item) => (
                 <div
                   key={item.departamento}
                   className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700 last:border-0"
@@ -273,7 +327,8 @@ export function DashboardHome() {
                     R$ {item.valor.toLocaleString('pt-BR')}
                   </span>
                 </div>
-              ))}
+              ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -288,7 +343,10 @@ export function DashboardHome() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {atividadesRecentes.map((atividade) => (
+              {atividadesRecentes.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">Nenhuma atividade recente</p>
+              ) : (
+                atividadesRecentes.map((atividade) => (
                 <div key={atividade.id} className="flex gap-3">
                   <div className="flex-shrink-0">
                     {atividade.tipo === 'aprovado' && (
@@ -335,7 +393,8 @@ export function DashboardHome() {
                     </div>
                   </div>
                 </div>
-              ))}
+              ))
+              )}
             </div>
           </CardContent>
         </Card>
