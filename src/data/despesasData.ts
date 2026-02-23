@@ -6,6 +6,7 @@ export interface Despesa {
   id: string;
   identificacaoEmitente: string;
   numeroNotaFiscal: string;
+  imagemNotaFiscal?: string;
   titulo: string;
   descricao: string;
   valor: number;

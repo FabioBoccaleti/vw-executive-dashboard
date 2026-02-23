@@ -28,6 +28,7 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
   const [formData, setFormData] = useState({
     identificacaoEmitente: '',
     numeroNotaFiscal: '',
+    imagemNotaFiscal: '',
     titulo: '',
     descricao: '',
     valor: '',
@@ -68,6 +69,7 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
       setFormData({
         identificacaoEmitente: '',
         numeroNotaFiscal: '',
+        imagemNotaFiscal: '',
         titulo: '',
         descricao: '',
         valor: '',
@@ -93,6 +95,7 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
     setFormData({
       identificacaoEmitente: '',
       numeroNotaFiscal: '',
+      imagemNotaFiscal: '',
       titulo: '',
       descricao: '',
       valor: '',
@@ -152,6 +155,38 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Imagem da Nota Fiscal */}
+              <div className="space-y-2">
+                <Label htmlFor="imagemNotaFiscal">
+                  Imagem da Nota Fiscal
+                </Label>
+                <Input
+                  id="imagemNotaFiscal"
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      // Limite de 5MB
+                      if (file.size > 5 * 1024 * 1024) {
+                        toast.error('Arquivo muito grande. Tamanho máximo: 5MB');
+                        e.target.value = '';
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setFormData({ ...formData, imagemNotaFiscal: reader.result as string });
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  className="cursor-pointer"
+                />
+                {formData.imagemNotaFiscal && (
+                  <p className="text-sm text-emerald-600">✓ Arquivo anexado</p>
+                )}
               </div>
 
               {/* Título */}
