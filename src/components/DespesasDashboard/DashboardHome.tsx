@@ -358,6 +358,31 @@ export function DashboardHome() {
                 className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
               >
                 <div className="flex items-start justify-between gap-4">
+                  {/* Imagem/PDF da Nota Fiscal */}
+                  {despesa.imagemNotaFiscal && (
+                    <div className="flex-shrink-0 w-32 h-32">
+                      {despesa.imagemNotaFiscal.startsWith('data:application/pdf') ? (
+                        <div className="relative w-full h-full rounded-lg border-2 border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer hover:border-emerald-500 transition-colors"
+                          onClick={() => window.open(despesa.imagemNotaFiscal, '_blank')}
+                          title="Clique para abrir PDF">
+                          <iframe
+                            src={despesa.imagemNotaFiscal}
+                            className="w-full h-full pointer-events-none scale-150 origin-top-left"
+                            title="Preview PDF"
+                          />
+                        </div>
+                      ) : (
+                        <img
+                          src={despesa.imagemNotaFiscal}
+                          alt="Nota Fiscal"
+                          className="w-full h-full object-cover rounded-lg border-2 border-slate-200 dark:border-slate-700 cursor-pointer hover:border-emerald-500 transition-colors"
+                          onClick={() => window.open(despesa.imagemNotaFiscal, '_blank')}
+                          title="Clique para ampliar"
+                        />
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="flex-1">
                     <div className="flex items-start gap-3">
                       <div className="bg-amber-100 dark:bg-amber-900/30 p-2 rounded-full flex-shrink-0">

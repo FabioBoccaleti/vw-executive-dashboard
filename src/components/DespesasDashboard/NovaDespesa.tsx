@@ -111,7 +111,7 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
 
   return (
     <div className="p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Plus className="w-8 h-8" />
@@ -122,12 +122,15 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
           </p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Informações da Despesa</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Formulário */}
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Informações da Despesa</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-6">
               {/* Identificação do Emitente e Nº Nota Fiscal */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -157,15 +160,16 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
                 </div>
               </div>
 
-              {/* Imagem da Nota Fiscal */}
+              {/* Imagem/PDF da Nota Fiscal */}
               <div className="space-y-2">
                 <Label htmlFor="imagemNotaFiscal">
-                  Imagem da Nota Fiscal
+                  Nota Fiscal (Foto, Imagem ou PDF)
                 </Label>
                 <Input
                   id="imagemNotaFiscal"
                   type="file"
                   accept="image/*,.pdf"
+                  capture="environment"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
@@ -187,6 +191,9 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
                 {formData.imagemNotaFiscal && (
                   <p className="text-sm text-emerald-600">✓ Arquivo anexado</p>
                 )}
+                <p className="text-xs text-slate-500">
+                  Aceita: JPG, PNG, PDF, HEIC e outros formatos de imagem (máx. 5MB)
+                </p>
               </div>
 
               {/* Título */}
@@ -391,6 +398,55 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
             </form>
           </CardContent>
         </Card>
+          </div>
+
+          {/* Pré-visualização da Imagem/PDF */}
+          <div className="lg:col-span-1">
+            <Card className="sticky top-6">
+              <CardHeader>
+                <CardTitle>Nota Fiscal</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {formData.imagemNotaFiscal ? (
+                  <div className="space-y-3">
+                    <div className="relative rounded-lg overflow-hidden border-2 border-emerald-200 bg-slate-50">
+                      {formData.imagemNotaFiscal.startsWith('data:application/pdf') ? (
+                        <iframe
+                          src={formData.imagemNotaFiscal}
+                          className="w-full h-[500px] border-0"
+                          title="Pré-visualização PDF da Nota Fiscal"
+                        />
+                      ) : (
+                        <img
+                          src={formData.imagemNotaFiscal}
+                          alt="Pré-visualização da Nota Fiscal"
+                          className="w-full h-auto object-contain max-h-[500px]"
+                        />
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFormData({ ...formData, imagemNotaFiscal: '' })}
+                      className="w-full"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Remover Arquivo
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-64 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50">
+                    <p className="text-slate-400 text-center px-4">
+                      Nenhum arquivo anexado<br />
+                      <span className="text-sm">Faça upload de imagem ou PDF</span>
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

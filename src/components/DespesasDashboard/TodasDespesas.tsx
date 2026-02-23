@@ -236,6 +236,9 @@ export function TodasDespesas() {
               <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                    NF
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                     Despesa
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
@@ -261,7 +264,7 @@ export function TodasDespesas() {
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                 {filteredDespesas.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan={8} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                       Nenhuma despesa encontrada
                     </td>
                   </tr>
@@ -271,6 +274,33 @@ export function TodasDespesas() {
                       key={despesa.id}
                       className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                     >
+                      <td className="px-4 py-4">
+                        {despesa.imagemNotaFiscal ? (
+                          despesa.imagemNotaFiscal.startsWith('data:application/pdf') ? (
+                            <div className="relative w-16 h-16 rounded border-2 border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer hover:border-emerald-500 transition-colors"
+                              onClick={() => window.open(despesa.imagemNotaFiscal, '_blank')}
+                              title="Clique para abrir PDF">
+                              <iframe
+                                src={despesa.imagemNotaFiscal}
+                                className="w-full h-full pointer-events-none scale-150 origin-top-left"
+                                title="Preview PDF"
+                              />
+                            </div>
+                          ) : (
+                            <img
+                              src={despesa.imagemNotaFiscal}
+                              alt="NF"
+                              className="w-16 h-16 object-cover rounded border-2 border-slate-200 dark:border-slate-700 cursor-pointer hover:border-emerald-500 transition-colors"
+                              onClick={() => window.open(despesa.imagemNotaFiscal, '_blank')}
+                              title="Clique para ampliar"
+                            />
+                          )
+                        ) : (
+                          <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded border border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center">
+                            <span className="text-xs text-slate-400">Sem NF</span>
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-4">
                         <div>
                           <div className="font-semibold text-slate-900 dark:text-white">
