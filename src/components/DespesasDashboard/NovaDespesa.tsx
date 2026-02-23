@@ -26,6 +26,8 @@ interface NovaDespesaProps {
 
 export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
   const [formData, setFormData] = useState({
+    identificacaoEmitente: '',
+    numeroNotaFiscal: '',
     titulo: '',
     descricao: '',
     valor: '',
@@ -43,7 +45,7 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.titulo || !formData.valor || !formData.departamento || 
+    if (!formData.identificacaoEmitente || !formData.numeroNotaFiscal || !formData.titulo || !formData.valor || !formData.departamento || 
         !formData.marca || !formData.categoria || !formData.gerenteAprovador || !formData.diretorAprovador) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
@@ -64,6 +66,8 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
 
       // Limpar formulário
       setFormData({
+        identificacaoEmitente: '',
+        numeroNotaFiscal: '',
         titulo: '',
         descricao: '',
         valor: '',
@@ -87,6 +91,8 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
 
   const handleReset = () => {
     setFormData({
+      identificacaoEmitente: '',
+      numeroNotaFiscal: '',
       titulo: '',
       descricao: '',
       valor: '',
@@ -119,6 +125,35 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Identificação do Emitente e Nº Nota Fiscal */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="identificacaoEmitente">
+                    Identificação do Emitente <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="identificacaoEmitente"
+                    placeholder="Ex: Razão Social ou Nome do Fornecedor"
+                    value={formData.identificacaoEmitente}
+                    onChange={(e) => setFormData({ ...formData, identificacaoEmitente: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="numeroNotaFiscal">
+                    Nº Nota Fiscal <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="numeroNotaFiscal"
+                    placeholder="Ex: 12345678"
+                    value={formData.numeroNotaFiscal}
+                    onChange={(e) => setFormData({ ...formData, numeroNotaFiscal: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
               {/* Título */}
               <div className="space-y-2">
                 <Label htmlFor="titulo">
@@ -177,7 +212,7 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="gerenteAprovador">
-                    Gerente Aprovador <span className="text-red-500">*</span>
+                    Gerente(a) Aprovador <span className="text-red-500">*</span>
                   </Label>
                   <Select
                     value={formData.gerenteAprovador}
@@ -188,22 +223,24 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
                       <SelectValue placeholder="Selecione o gerente aprovador" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Gabriela S Mateus">Gabriela S Mateus</SelectItem>
-                      <SelectItem value="Orlando Chodin">Orlando Chodin</SelectItem>
-                      <SelectItem value="Norival Junior">Norival Junior</SelectItem>
-                      <SelectItem value="Sergio Ribeiro">Sergio Ribeiro</SelectItem>
-                      <SelectItem value="Thiago Correira">Thiago Correira</SelectItem>
-                      <SelectItem value="Fabio Boccaleti">Fabio Boccaleti</SelectItem>
+                      <SelectItem value="Alexandre D Auria">Alexandre D Auria</SelectItem>
                       <SelectItem value="Andre Simoni">Andre Simoni</SelectItem>
                       <SelectItem value="Daniel Fanti">Daniel Fanti</SelectItem>
-                      <SelectItem value="Alexandre D Auria">Alexandre D Auria</SelectItem>
+                      <SelectItem value="Fabio Boccaleti">Fabio Boccaleti</SelectItem>
+                      <SelectItem value="Gabriela S Mateus">Gabriela S Mateus</SelectItem>
+                      <SelectItem value="Geraldo Palma">Geraldo Palma</SelectItem>
+                      <SelectItem value="Norival Junior">Norival Junior</SelectItem>
+                      <SelectItem value="Orlando Chodin">Orlando Chodin</SelectItem>
+                      <SelectItem value="Roberto Vazquez">Roberto Vazquez</SelectItem>
+                      <SelectItem value="Sergio Ribeiro">Sergio Ribeiro</SelectItem>
+                      <SelectItem value="Thiago Correira">Thiago Correira</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="diretorAprovador">
-                    Diretor Aprovador <span className="text-red-500">*</span>
+                    Diretor(a) Aprovador <span className="text-red-500">*</span>
                   </Label>
                   <Select
                     value={formData.diretorAprovador}

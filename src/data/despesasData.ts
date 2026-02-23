@@ -4,6 +4,8 @@
 
 export interface Despesa {
   id: string;
+  identificacaoEmitente: string;
+  numeroNotaFiscal: string;
   titulo: string;
   descricao: string;
   valor: number;
@@ -33,6 +35,8 @@ export interface AtividadeRecente {
 export const despesas: Despesa[] = [
   {
     id: '1',
+    identificacaoEmitente: 'Posto Shell Center',
+    numeroNotaFiscal: '45672301',
     titulo: 'Test Drive - Combustível A3 Sedan',
     descricao: 'Abastecimento para test drives realizados no mês',
     valor: 250.00,
@@ -47,6 +51,8 @@ export const despesas: Despesa[] = [
   },
   {
     id: '2',
+    identificacaoEmitente: 'Auto Peças Brasil Ltda',
+    numeroNotaFiscal: '78934512',
     titulo: 'Peças de Reposição - Óleo Sintético',
     descricao: 'Compra de óleo sintético para estoque da oficina',
     valor: 1850.00,
@@ -61,6 +67,8 @@ export const despesas: Despesa[] = [
   },
   {
     id: '3',
+    identificacaoEmitente: 'Hotel Sede 982 Eventos',
+    numeroNotaFiscal: '00298345',
     titulo: 'Evento de Lançamento Q5 Sportback',
     descricao: 'Buffet de Luxo - Hotel Sede 982',
     valor: 8500.00,
@@ -75,6 +83,8 @@ export const despesas: Despesa[] = [
   },
   {
     id: '4',
+    identificacaoEmitente: 'AGÊNCIA DIGITAL VORTEX',
+    numeroNotaFiscal: '56129870',
     titulo: 'Campanha Digital Tiguan',
     descricao: 'Anúncios Google Ads e Meta Ads - Janeiro 2025',
     valor: 4500.00,
@@ -91,6 +101,8 @@ export const despesas: Despesa[] = [
   },
   {
     id: '5',
+    identificacaoEmitente: 'Gráfica Rápida Express',
+    numeroNotaFiscal: '33298776',
     titulo: 'Materiais Promocionais',
     descricao: 'Impressão de folders e banners para showroom',
     valor: 1200.00,
@@ -107,6 +119,8 @@ export const despesas: Despesa[] = [
   },
   {
     id: '6',
+    identificacaoEmitente: 'TechAuto Solutions',
+    numeroNotaFiscal: '90234561',
     titulo: 'Ferramentas de Diagnóstico',
     descricao: 'Atualização de software de diagnóstico',
     valor: 3200.00,
@@ -123,6 +137,8 @@ export const despesas: Despesa[] = [
   },
   {
     id: '7',
+    identificacaoEmitente: 'Instituto Capacitar Treinamentos',
+    numeroNotaFiscal: '44567890',
     titulo: 'Treinamento Equipe Vendas',
     descricao: 'Curso de técnicas de vendas consultivas',
     valor: 2800.00,
@@ -140,6 +156,8 @@ export const despesas: Despesa[] = [
   },
   {
     id: '8',
+    identificacaoEmitente: 'Papelaria Office Plus',
+    numeroNotaFiscal: '11223344',
     titulo: 'Material de Escritório',
     descricao: 'Papelaria e material de expediente',
     valor: 450.00,
@@ -156,6 +174,8 @@ export const despesas: Despesa[] = [
   },
   {
     id: '9',
+    identificacaoEmitente: 'Auto Center Manutenção',
+    numeroNotaFiscal: '88765432',
     titulo: 'Manutenção Preventiva Frota',
     descricao: 'Revisão de veículos de demonstração',
     valor: 5200.00,
@@ -170,6 +190,8 @@ export const despesas: Despesa[] = [
   },
   {
     id: '10',
+    identificacaoEmitente: 'Editora Abril S.A.',
+    numeroNotaFiscal: '99887766',
     titulo: 'Anúncio Revista Especializada',
     descricao: 'Página dupla na revista Quatro Rodas',
     valor: 15000.00,
