@@ -40,7 +40,8 @@ interface DepartamentoStats {
 export function PorDepartamento() {
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [marcaFilter, setMarcaFilter] = useState<string>('todas');
-  const [periodoFilter, setPeriodoFilter] = useState<string>('mes-atual');
+  const [anoFilter, setAnoFilter] = useState<string>('2026');
+  const [mesFilter, setMesFilter] = useState<string>('todos');
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,33 +69,30 @@ export function PorDepartamento() {
       filtered = filtered.filter(d => d.marca === marcaFilter);
     }
 
-    // Filtro de período
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-
-    if (periodoFilter === 'mes-atual') {
-      filtered = filtered.filter(d => {
-        const despesaDate = new Date(d.data);
-        return despesaDate.getMonth() === currentMonth && 
-               despesaDate.getFullYear() === currentYear;
-      });
-    } else if (periodoFilter === 'mes-anterior') {
-      const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-      const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-      filtered = filtered.filter(d => {
-        const despesaDate = new Date(d.data);
-        return despesaDate.getMonth() === lastMonth && 
-               despesaDate.getFullYear() === lastMonthYear;
-      });
-    } else if (periodoFilter === 'trimestre') {
-      const threeMonthsAgo = new Date(now);
-      threeMonthsAgo.setMonth(currentMonth - 3);
-      filtered = filtered.filter(d => new Date(d.data) >= threeMonthsAgo);
-    }
+    // Filtro de ano e mês
+    const anoSelecionado = parseInt(anoFilter);
+    
+    filtered = filtered.filter(d => {
+      const despesaDate = new Date(d.data);
+      const despesaAno = despesaDate.getFullYear();
+      
+      // Filtro de ano
+      if (despesaAno !== anoSelecionado) {
+        return false;
+      }
+      
+      // Filtro de mês (se não for "todos")
+      if (mesFilter !== 'todos') {
+        const mesSelecionado = parseInt(mesFilter);
+        const despesaMes = despesaDate.getMonth();
+        return despesaMes === mesSelecionado;
+      }
+      
+      return true;
+    });
 
     return filtered;
-  }, [despesas, marcaFilter, periodoFilter]);
+  }, [despesas, marcaFilter, anoFilter, mesFilter]);
 
   // Calcular estatísticas por departamento
   const departamentoStats = useMemo(() => {
@@ -240,7 +238,7 @@ export function PorDepartamento() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Marca</label>
               <Select value={marcaFilter} onValueChange={setMarcaFilter}>
@@ -259,16 +257,40 @@ export function PorDepartamento() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Período</label>
-              <Select value={periodoFilter} onValueChange={setPeriodoFilter}>
+              <label className="text-sm font-medium">Ano</label>
+              <Select value={anoFilter} onValueChange={setAnoFilter}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="mes-atual">Mês Atual</SelectItem>
-                  <SelectItem value="mes-anterior">Mês Anterior</SelectItem>
-                  <SelectItem value="trimestre">Último Trimestre</SelectItem>
-                  <SelectItem value="todos">Todos os Períodos</SelectItem>
+                  <SelectItem value="2026">2026</SelectItem>
+                  <SelectItem value="2027">2027</SelectItem>
+                  <SelectItem value="2028">2028</SelectItem>
+                  <SelectItem value="2029">2029</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Mês</label>
+              <Select value={mesFilter} onValueChange={setMesFilter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os Meses</SelectItem>
+                  <SelectItem value="0">Janeiro</SelectItem>
+                  <SelectItem value="1">Fevereiro</SelectItem>
+                  <SelectItem value="2">Março</SelectItem>
+                  <SelectItem value="3">Abril</SelectItem>
+                  <SelectItem value="4">Maio</SelectItem>
+                  <SelectItem value="5">Junho</SelectItem>
+                  <SelectItem value="6">Julho</SelectItem>
+                  <SelectItem value="7">Agosto</SelectItem>
+                  <SelectItem value="8">Setembro</SelectItem>
+                  <SelectItem value="9">Outubro</SelectItem>
+                  <SelectItem value="10">Novembro</SelectItem>
+                  <SelectItem value="11">Dezembro</SelectItem>
                 </SelectContent>
               </Select>
             </div>
