@@ -7,6 +7,7 @@ import { DespesasLayout, type MenuItem } from './Layout';
 import { DashboardHome } from './DashboardHome';
 import { TodasDespesas } from './TodasDespesas';
 import { NovaDespesa } from './NovaDespesa';
+import { PorDepartamento } from './PorDepartamento';
 
 interface DespesasDashboardProps {
   onChangeBrand?: () => void;
@@ -24,6 +25,7 @@ export function DespesasDashboard({ onChangeBrand }: DespesasDashboardProps) {
       case 'nova-despesa':
         return <NovaDespesa onSuccess={() => setCurrentPage('todas-despesas')} />;
       case 'departamento':
+        return <PorDepartamento />;
       case 'integracao':
       case 'relatorios':
       case 'configuracoes':
