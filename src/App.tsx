@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Toaster } from '@/components/ui/sonner'
 import { VWFinancialDashboard } from '@/components/VWFinancialDashboard'
+import { DespesasDashboard } from '@/components/DespesasDashboard'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
 import { initializeFromDatabase, isProduction } from '@/lib/dataStorage'
@@ -119,10 +120,14 @@ function App() {
   
   return (
     <div className="min-h-screen bg-background">
-      <VWFinancialDashboard 
-        brand={brand} 
-        onChangeBrand={handleChangeBrand}
-      />
+      {brand === 'aprovacao_despesas' ? (
+        <DespesasDashboard onChangeBrand={handleChangeBrand} />
+      ) : (
+        <VWFinancialDashboard 
+          brand={brand} 
+          onChangeBrand={handleChangeBrand}
+        />
+      )}
       <Toaster />
     </div>
   )

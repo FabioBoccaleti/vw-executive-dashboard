@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BRAND_CONFIGS, AVAILABLE_BRANDS, type Brand } from '@/lib/brands';
-import { Building2, Car, ChevronRight, Layers } from 'lucide-react';
+import { Building2, Car, ChevronRight, Layers, CheckCircle, DollarSign } from 'lucide-react';
 import { PasswordDialog } from '@/components/PasswordDialog';
 
 // Marcas que requerem senha para acesso
@@ -48,6 +48,12 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
   const getBrandIcon = (brand: Brand) => {
     if (brand === 'consolidado') {
       return <Layers className="w-8 h-8" />;
+    }
+    if (brand === 'aprovacao_despesas') {
+      return <CheckCircle className="w-8 h-8" />;
+    }
+    if (brand === 'fluxo_caixa') {
+      return <DollarSign className="w-8 h-8" />;
     }
     if (brand.includes('vw')) {
       return <Car className="w-8 h-8" />;

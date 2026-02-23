@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa';
 
 // Interface de configuração visual da marca
 export interface BrandConfig {
@@ -162,10 +162,60 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-accent': '#ff8097',
     }
   },
+  aprovacao_despesas: {
+    id: 'aprovacao_despesas',
+    name: 'Sistema de Aprovação de Despesas',
+    shortName: 'Aprovação',
+    colors: {
+      primary: '#059669',
+      primaryHover: '#047857',
+      primaryLight: '#d1fae5',
+      secondary: '#10b981',
+      accent: '#34d399',
+      headerBg: 'bg-[#059669]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#059669] hover:bg-[#047857]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-emerald-100 dark:bg-emerald-900/30',
+      badgeText: 'text-emerald-800 dark:text-emerald-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#059669',
+      '--brand-primary-hover': '#047857',
+      '--brand-primary-light': '#d1fae5',
+      '--brand-secondary': '#10b981',
+      '--brand-accent': '#34d399',
+    }
+  },
+  fluxo_caixa: {
+    id: 'fluxo_caixa',
+    name: 'Fluxo de caixa',
+    shortName: 'Fluxo',
+    colors: {
+      primary: '#16a34a',
+      primaryHover: '#15803d',
+      primaryLight: '#dcfce7',
+      secondary: '#22c55e',
+      accent: '#4ade80',
+      headerBg: 'bg-[#16a34a]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#16a34a] hover:bg-[#15803d]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-green-100 dark:bg-green-900/30',
+      badgeText: 'text-green-800 dark:text-green-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#16a34a',
+      '--brand-primary-hover': '#15803d',
+      '--brand-primary-light': '#dcfce7',
+      '--brand-secondary': '#22c55e',
+      '--brand-accent': '#4ade80',
+    }
+  },
 };
 
 // Lista de marcas disponíveis (para iteração) - ordem de exibição
-export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
+export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa'];
 
 // Chave de armazenamento para marca selecionada
 export const SELECTED_BRAND_KEY = 'selected_brand';
