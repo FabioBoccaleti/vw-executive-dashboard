@@ -131,35 +131,6 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Identificação do Emitente e Nº Nota Fiscal */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="identificacaoEmitente">
-                    Identificação do Emitente <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="identificacaoEmitente"
-                    placeholder="Ex: Razão Social ou Nome do Fornecedor"
-                    value={formData.identificacaoEmitente}
-                    onChange={(e) => setFormData({ ...formData, identificacaoEmitente: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="numeroNotaFiscal">
-                    Nº Nota Fiscal <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="numeroNotaFiscal"
-                    placeholder="Ex: 12345678"
-                    value={formData.numeroNotaFiscal}
-                    onChange={(e) => setFormData({ ...formData, numeroNotaFiscal: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
               {/* Imagem/PDF da Nota Fiscal */}
               <div className="space-y-2">
                 <Label htmlFor="imagemNotaFiscal">
@@ -194,6 +165,35 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
                 <p className="text-xs text-slate-500">
                   Aceita: JPG, PNG, PDF, HEIC e outros formatos de imagem (máx. 5MB)
                 </p>
+              </div>
+
+              {/* Identificação do Emitente e Nº Nota Fiscal */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="identificacaoEmitente">
+                    Identificação do Emitente <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="identificacaoEmitente"
+                    placeholder="Ex: Razão Social ou Nome do Fornecedor"
+                    value={formData.identificacaoEmitente}
+                    onChange={(e) => setFormData({ ...formData, identificacaoEmitente: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="numeroNotaFiscal">
+                    Nº Nota Fiscal <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="numeroNotaFiscal"
+                    placeholder="Ex: 12345678"
+                    value={formData.numeroNotaFiscal}
+                    onChange={(e) => setFormData({ ...formData, numeroNotaFiscal: e.target.value })}
+                    required
+                  />
+                </div>
               </div>
 
               {/* Título */}
