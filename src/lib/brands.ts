@@ -164,8 +164,9 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
   },
   aprovacao_despesas: {
     id: 'aprovacao_despesas',
-    name: 'Sistema de Aprovação de Despesas',
-    shortName: 'Aprovação',
+    name: 'Sistema de Gerenciamento e Aprovação de Despesas',
+    shortName: 'Gerenciamento',
+    fullName: 'Sistema de Gerenciamento e Aprovação de Despesas',
     colors: {
       primary: '#059669',
       primaryHover: '#047857',

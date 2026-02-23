@@ -1,5 +1,5 @@
 /**
- * Sistema de Persistência de Dados - Aprovação de Despesas
+ * Sistema de Persistência de Dados - Sistema de Gerenciamento e Aprovação de Despesas
  * Usa Vercel KV para armazenamento compartilhado entre usuários
  */
 

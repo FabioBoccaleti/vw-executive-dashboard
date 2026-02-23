@@ -1,5 +1,5 @@
 /**
- * Dashboard de Sistema de Aprovação de Despesas
+ * Dashboard de Sistema de Gerenciamento e Aprovação de Despesas
  */
 
 import { useState, useEffect } from 'react';

@@ -1,5 +1,5 @@
 /**
- * Layout com Sidebar - Sistema de Aprovação de Despesas
+ * Layout com Sidebar - Sistema de Gerenciamento e Aprovação de Despesas
  */
 
 import { ReactNode } from 'react';

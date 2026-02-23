@@ -1,5 +1,5 @@
 /**
- * Dados do Sistema de Aprovação de Despesas
+ * Dados do Sistema de Gerenciamento e Aprovação de Despesas
  */
 
 export interface Despesa {
