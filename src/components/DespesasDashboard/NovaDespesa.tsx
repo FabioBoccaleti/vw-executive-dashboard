@@ -122,9 +122,9 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Formulário */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <Card>
               <CardHeader>
                 <CardTitle>Informações da Despesa</CardTitle>
@@ -402,41 +402,42 @@ export function NovaDespesa({ onSuccess }: NovaDespesaProps) {
 
           {/* Pré-visualização da Imagem/PDF */}
           <div className="lg:col-span-1">
-            <Card className="sticky top-6">
-              <CardHeader>
-                <CardTitle>Nota Fiscal</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {formData.imagemNotaFiscal ? (
-                  <div className="space-y-3">
-                    <div className="relative rounded-lg overflow-hidden border-2 border-emerald-200 bg-slate-50">
-                      {formData.imagemNotaFiscal.startsWith('data:application/pdf') ? (
-                        <iframe
-                          src={formData.imagemNotaFiscal}
-                          className="w-full h-[500px] border-0"
-                          title="Pré-visualização PDF da Nota Fiscal"
-                        />
-                      ) : (
-                        <img
-                          src={formData.imagemNotaFiscal}
-                          alt="Pré-visualização da Nota Fiscal"
-                          className="w-full h-auto object-contain max-h-[500px]"
-                        />
-                      )}
-                    </div>
+            <Card className="sticky top-6 flex flex-col h-[900px]">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between">
+                  <span>Nota Fiscal</span>
+                  {formData.imagemNotaFiscal && (
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
                       onClick={() => setFormData({ ...formData, imagemNotaFiscal: '' })}
-                      className="w-full"
                     >
-                      <X className="w-4 h-4 mr-2" />
-                      Remover Arquivo
+                      <X className="w-4 h-4 mr-1" />
+                      Remover
                     </Button>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 pt-0 pb-6">
+                {formData.imagemNotaFiscal ? (
+                  <div className="relative rounded-lg overflow-hidden border-2 border-emerald-200 bg-slate-50 h-full">
+                    {formData.imagemNotaFiscal.startsWith('data:application/pdf') ? (
+                      <iframe
+                        src={formData.imagemNotaFiscal}
+                        className="w-full h-full border-0"
+                        title="Pré-visualização PDF da Nota Fiscal"
+                      />
+                    ) : (
+                      <img
+                        src={formData.imagemNotaFiscal}
+                        alt="Pré-visualização da Nota Fiscal"
+                        className="w-full h-full object-contain"
+                      />
+                    )}
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-64 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50">
+                  <div className="flex items-center justify-center h-full border-2 border-dashed border-slate-300 rounded-lg bg-slate-50">
                     <p className="text-slate-400 text-center px-4">
                       Nenhum arquivo anexado<br />
                       <span className="text-sm">Faça upload de imagem ou PDF</span>
