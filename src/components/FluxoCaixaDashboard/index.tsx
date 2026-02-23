@@ -1,6 +1,10 @@
 import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, FileText, BarChart3, Target, LogOut, Menu } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { UploadScreen } from "./UploadScreen";
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
 function parseBalancete(text: string) {
@@ -158,28 +162,39 @@ const fmtVar = (ant: number, atu: number) => {
 };
 
 // ─── COMPONENTS ──────────────────────────────────────────────────────────────
-const KPI = ({ label, value, sub, color = '#06d6a0', icon }: any) => (
-  <div style={{
-    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 16, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 6,
-    borderLeft: `3px solid ${color}`, backdropFilter: 'blur(8px)'
-  }}>
-    <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 2, color: 'rgba(255,255,255,0.45)', fontFamily: 'DM Sans, sans-serif' }}>
-      {icon && <span style={{ marginRight: 6 }}>{icon}</span>}{label}
-    </div>
-    <div style={{ fontSize: 26, fontWeight: 700, color: '#fff', fontFamily: 'Syne, sans-serif', letterSpacing: -0.5 }}>{value}</div>
-    {sub && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'DM Sans, sans-serif' }}>{sub}</div>}
-  </div>
-);
+const KPI = ({ label, value, sub, color = 'emerald', icon }: any) => {
+  const colorClasses: any = {
+    emerald: 'border-l-emerald-500 bg-emerald-50 dark:bg-emerald-950/30',
+    blue: 'border-l-blue-500 bg-blue-50 dark:bg-blue-950/30',
+    amber: 'border-l-amber-500 bg-amber-50 dark:bg-amber-950/30',
+    red: 'border-l-red-500 bg-red-50 dark:bg-red-950/30',
+    violet: 'border-l-violet-500 bg-violet-50 dark:bg-violet-950/30'
+  };
+  
+  return (
+    <Card className={cn('border-l-4', colorClasses[color] || colorClasses.emerald)}>
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {icon && <span>{icon}</span>}
+          {label}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold text-foreground mb-1">{value}</div>
+        {sub && <div className="text-sm text-muted-foreground">{sub}</div>}
+      </CardContent>
+    </Card>
+  );
+};
 
 const TableRow2 = ({ label, ant, atu, highlight, indent = 0 }: any) => {
   const { diff, pct } = fmtVar(ant, atu);
   return (
-    <tr style={{ background: highlight ? 'rgba(255,255,255,0.03)' : 'transparent' }}>
-      <td style={{ padding: '9px 12px', paddingLeft: 12 + indent * 16, fontSize: 13, color: highlight ? '#fff' : 'rgba(255,255,255,0.75)', fontWeight: highlight ? 700 : 400, fontFamily: 'DM Sans, sans-serif' }}>{label}</td>
-      <td style={{ padding: '9px 12px', textAlign: 'right', fontSize: 13, fontFamily: 'DM Mono, monospace', color: 'rgba(255,255,255,0.7)' }}>{fmtBRL(ant)}</td>
-      <td style={{ padding: '9px 12px', textAlign: 'right', fontSize: 13, fontFamily: 'DM Mono, monospace', color: '#fff', fontWeight: highlight ? 700 : 400 }}>{fmtBRL(atu)}</td>
-      <td style={{ padding: '9px 12px', textAlign: 'right', fontSize: 12, fontFamily: 'DM Mono, monospace', color: diff >= 0 ? '#06d6a0' : '#ef476f' }}>
+    <tr className={cn(highlight && 'bg-muted/50')}>
+      <td className={cn('py-2 px-3 text-sm', highlight ? 'font-bold text-foreground' : 'text-muted-foreground')} style={{ paddingLeft: 12 + indent * 16 }}>{label}</td>
+      <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(ant)}</td>
+      <td className={cn('py-2 px-3 text-right text-sm font-mono', highlight ? 'font-bold text-foreground' : 'text-foreground')}>{fmtBRL(atu)}</td>
+      <td className={cn('py-2 px-3 text-right text-xs font-mono', diff >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
         {pct !== null ? `${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%` : '—'}
       </td>
     </tr>
@@ -188,15 +203,16 @@ const TableRow2 = ({ label, ant, atu, highlight, indent = 0 }: any) => {
 
 const DFCRow = ({ label, value, indent = 0, highlight, total }: any) => {
   const isPos = value >= 0;
-  const color = total ? '#fff' : isPos ? '#06d6a0' : '#ef476f';
   return (
-    <tr style={{ background: highlight ? 'rgba(6,214,160,0.06)' : total ? 'rgba(255,255,255,0.06)' : 'transparent' }}>
-      <td style={{ padding: '10px 12px', paddingLeft: 12 + indent * 20, fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: total ? '#fff' : 'rgba(255,255,255,0.8)', fontWeight: total || highlight ? 700 : 400 }}>{label}</td>
-      <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: total || highlight ? 700 : 400, color }}>
+    <tr className={cn(highlight && 'bg-emerald-50 dark:bg-emerald-950/20', total && 'bg-muted/50')}>
+      <td className={cn('py-2.5 px-3 text-sm', total || highlight ? 'font-bold text-foreground' : 'text-muted-foreground')} style={{ paddingLeft: 12 + indent * 20 }}>{label}</td>
+      <td className={cn('py-2.5 px-3 text-right font-mono text-sm', total || highlight ? 'font-bold' : '')}>
         {total ? '' : (value >= 0 ? '' : '(')}
-        {total ? '' : fmtBRL(Math.abs(value))}
+        <span className={cn(total ? (isPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400') : 'text-foreground')}>
+          {total ? '' : fmtBRL(Math.abs(value))}
+          {total && fmtBRL(value)}
+        </span>
         {total ? '' : (value < 0 ? ')' : '')}
-        {total && <span style={{ color: isPos ? '#06d6a0' : '#ef476f', fontSize: 16 }}>{fmtBRL(value)}</span>}
       </td>
     </tr>
   );
@@ -204,31 +220,42 @@ const DFCRow = ({ label, value, indent = 0, highlight, total }: any) => {
 
 const BarGauge = ({ label, value, max, color }: any) => {
   const pct = Math.min(100, (Math.abs(value) / max) * 100);
+  const colorClasses: any = {
+    emerald: 'bg-emerald-500',
+    blue: 'bg-blue-500',
+    amber: 'bg-amber-500',
+    red: 'bg-red-500',
+    violet: 'bg-violet-500'
+  };
+  
   return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontFamily: 'DM Sans, sans-serif' }}>{label}</span>
-        <span style={{ fontSize: 12, fontFamily: 'DM Mono, monospace', color: '#fff' }}>{fmtBRL(value, true)}</span>
+    <div className="mb-3">
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className="text-xs font-mono font-semibold text-foreground">{fmtBRL(value, true)}</span>
       </div>
-      <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 99, transition: 'width 1s cubic-bezier(.4,0,.2,1)' }} />
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
+        <div className={cn('h-full rounded-full transition-all duration-1000', colorClasses[color] || 'bg-emerald-500')} style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
 };
 
 const SectionTitle = ({ children, icon }: any) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, marginTop: 8 }}>
-    {icon && <span style={{ fontSize: 20 }}>{icon}</span>}
-    <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: -0.3, margin: 0 }}>{children}</h2>
-    <div style={{ flex: 1, height: 1, background: 'linear-gradient(to right, rgba(255,255,255,0.15), transparent)', marginLeft: 8 }} />
+  <div className="flex items-center gap-3 mb-5 mt-2">
+    {icon && <span className="text-xl">{icon}</span>}
+    <h2 className="text-lg font-bold text-foreground">{children}</h2>
+    <div className="flex-1 h-px bg-gradient-to-r from-border to-transparent ml-2" />
   </div>
 );
 
-const Badge = ({ label, status }: any) => {
-  const colors: any = { ok: ['#06d6a0', 'rgba(6,214,160,0.12)'], warn: ['#ffd166', 'rgba(255,209,102,0.12)'], bad: ['#ef476f', 'rgba(239,71,111,0.12)'] };
-  const [fg, bg] = colors[status] || colors.ok;
-  return <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: bg, color: fg, fontFamily: 'DM Mono, monospace' }}>{label}</span>;
+const StatusBadge = ({ label, status }: any) => {
+  const variants: any = {
+    ok: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
+    warn: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400',
+    bad: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400'
+  };
+  return <Badge className={cn('text-xs font-bold', variants[status] || variants.ok)}>{label}</Badge>;
 };
 
 // ─── MAIN COMPONENT ─────────────────────────────────────────────────────────────────
@@ -242,6 +269,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [dragOver, setDragOver] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const processFile = useCallback((file: File | undefined) => {
@@ -274,157 +302,138 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const onDragLeave = () => setDragOver(false);
 
   const TABS = [
-    { id: 'overview', label: 'Visão Geral', icon: '📊' },
-    { id: 'ativo', label: 'Ativo', icon: '📦' },
-    { id: 'passivo', label: 'Passivo + PL', icon: '🏦' },
-    { id: 'resultado', label: 'Resultado', icon: '📈' },
-    { id: 'caixa', label: 'Fluxo de Caixa', icon: '💰' },
-    { id: 'indicadores', label: 'Indicadores', icon: '🎯' },
+    { id: 'overview', label: 'Visão Geral', icon: <BarChart3 className="w-4 h-4" /> },
+    { id: 'ativo', label: 'Ativo', icon: <Package className="w-4 h-4" /> },
+    { id: 'passivo', label: 'Passivo + PL', icon: <Building2 className="w-4 h-4" /> },
+    { id: 'resultado', label: 'Resultado', icon: <TrendingUp className="w-4 h-4" /> },
+    { id: 'caixa', label: 'Fluxo de Caixa', icon: <DollarSign className="w-4 h-4" /> },
+    { id: 'indicadores', label: 'Indicadores', icon: <Target className="w-4 h-4" /> },
   ];
 
-  const styles = {
-    app: {
-      minHeight: '100vh', background: '#0a0e1a',
-      backgroundImage: 'radial-gradient(ellipse at 20% 50%, rgba(6,214,160,0.06) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(99,102,241,0.08) 0%, transparent 60%)',
-      fontFamily: 'DM Sans, sans-serif', color: '#fff',
-    },
-    header: {
-      padding: '20px 32px', borderBottom: '1px solid rgba(255,255,255,0.06)',
-      background: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(20px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    },
-    content: { maxWidth: 1200, margin: '0 auto', padding: '32px 24px' },
-    upload: {
-      border: `2px dashed ${dragOver ? '#06d6a0' : 'rgba(255,255,255,0.15)'}`,
-      borderRadius: 24, padding: '64px 40px', textAlign: 'center' as const,
-      background: dragOver ? 'rgba(6,214,160,0.05)' : 'rgba(255,255,255,0.02)',
-      cursor: 'pointer', transition: 'all 0.2s ease',
-    },
-    tabs: { display: 'flex', gap: 4, marginBottom: 32, overflowX: 'auto' as const, paddingBottom: 4 },
-    tab: (active: boolean) => ({
-      padding: '10px 20px', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap' as const,
-      fontSize: 13, fontWeight: 600, fontFamily: 'DM Sans, sans-serif', border: 'none',
-      background: active ? 'rgba(6,214,160,0.15)' : 'rgba(255,255,255,0.05)',
-      color: active ? '#06d6a0' : 'rgba(255,255,255,0.55)',
-      transition: 'all 0.15s ease',
-    }),
-    table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 },
-    card: { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, padding: 24, marginBottom: 24 },
-  };
-
   return (
-    <div style={styles.app}>
-      {/* Fonts */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600;700&family=DM+Mono&display=swap');
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 99px; }
-        thead tr { background: rgba(255,255,255,0.05); }
-        thead th { padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.4); font-family: 'DM Sans', sans-serif; font-weight: 600; }
-        thead th:not(:first-child) { text-align: right; }
-        tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); }
-        tbody tr:hover { background: rgba(255,255,255,0.02) !important; }
-        .dfc-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); }
-        .dfc-table tbody tr:hover { background: rgba(255,255,255,0.02) !important; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-        @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-        .fade-in { animation: fadeIn 0.4s ease forwards; }
-        .upload-btn { background: rgba(6,214,160,0.15); border: 1px solid rgba(6,214,160,0.3); color: #06d6a0; padding: 12px 28px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.2s; }
-        .upload-btn:hover { background: rgba(6,214,160,0.25); }
-      `}</style>
-
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header */}
-      <header style={styles.header}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #06d6a0, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📒</div>
-          <div>
-            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 18, fontWeight: 800, letterSpacing: -0.5 }}>BalanceteAI</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: 1 }}>ANÁLISE FINANCEIRA INTELIGENTE</div>
+      <div className="bg-[#16a34a] text-white shadow-lg fixed top-0 left-0 right-0 z-30">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-4">
+            {data && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden text-white hover:bg-green-700"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+              >
+                {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </Button>
+            )}
+            <div>
+              <h1 className="text-xl font-bold">BalanceteAI - Análise Financeira</h1>
+              <p className="text-sm text-green-100">Fluxo de Caixa & Indicadores</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {data && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white hover:bg-green-700 hidden sm:flex"
+                onClick={() => { setData(null); setActiveTab('overview'); }}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Novo Arquivo
+              </Button>
+            )}
+            {onChangeBrand && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white hover:bg-green-700"
+                onClick={onChangeBrand}
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">Voltar ao Menu</span>
+              </Button>
+            )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          {data && (
-            <button className="upload-btn" onClick={() => { setData(null); setActiveTab('overview'); }}>
-              ↑ Novo Arquivo
-            </button>
-          )}
-          {onChangeBrand && (
-            <button className="upload-btn" onClick={onChangeBrand}>
-              ← Voltar ao Menu
-            </button>
-          )}
-        </div>
-      </header>
+      </div>
 
-      {/* Main */}
-      <main style={styles.content}>
-        {!data ? (
-          /* ── UPLOAD SCREEN ── */
-          <div style={{ maxWidth: 600, margin: '80px auto' }}>
-            <div style={{ textAlign: 'center', marginBottom: 40 }}>
-              <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 40, fontWeight: 800, letterSpacing: -1.5, lineHeight: 1.1, marginBottom: 16 }}>
-                Análise de Balancete<br />
-                <span style={{ background: 'linear-gradient(90deg, #06d6a0, #4f46e5)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>em segundos</span>
-              </h1>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15, lineHeight: 1.7 }}>
-                Importe seu arquivo de balancete (.txt) e obtenha análise completa do ativo, passivo, resultado e geração de caixa automaticamente.
-              </p>
+      {/* Sidebar - apenas quando tem dados */}
+      {data && (
+        <>
+          <aside
+            className={cn(
+              'fixed left-0 top-[60px] bottom-0 w-64 bg-slate-800 text-white z-20 transition-transform duration-300',
+              sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+            )}
+          >
+            <nav className="p-4 space-y-1">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setSidebarOpen(false);
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-left',
+                    activeTab === tab.id
+                      ? 'bg-green-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                  )}
+                >
+                  {tab.icon}
+                  <span className="text-sm font-medium">{tab.label}</span>
+                </button>
+              ))}
+            </nav>
+
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700">
+              <button
+                onClick={() => { setData(null); setActiveTab('overview'); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+              >
+                <Upload className="w-5 h-5" />
+                <span className="text-sm font-medium">Novo Arquivo</span>
+              </button>
             </div>
+          </aside>
 
+          {/* Overlay para mobile */}
+          {sidebarOpen && (
             <div
-              style={styles.upload}
+              className="fixed inset-0 bg-black/50 z-10 lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+        </>
+      )}
+
+      {/* Main Content */}
+      <main className={cn('pt-[60px] min-h-screen', data && 'lg:ml-64')}>
+        <div className="p-6 max-w-7xl mx-auto">
+          {!data ? (
+            <UploadScreen
+              dragOver={dragOver}
+              loading={loading}
+              error={error}
+              fileRef={fileRef}
               onDrop={onDrop}
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
-              onClick={() => fileRef.current?.click()}
-            >
-              <input ref={fileRef} type="file" accept=".txt,.csv" style={{ display: 'none' }}
-                onChange={e => processFile(e.target.files?.[0])} />
-              <div style={{ fontSize: 48, marginBottom: 20 }}>📂</div>
-              <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 700, marginBottom: 8 }}>
-                {dragOver ? 'Solte o arquivo aqui' : 'Arraste seu Balancete'}
-              </div>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 24 }}>
-                Formato suportado: arquivo .txt com campos separados por ponto-e-vírgula (;)<br />
-                Colunas: Nível; Conta; Descrição; Saldo Anterior; Déb; Créd; Saldo Atual
-              </p>
-              <button className="upload-btn">Selecionar Arquivo</button>
-              {loading && <p style={{ marginTop: 20, color: '#06d6a0', animation: 'pulse 1s infinite' }}>Processando...</p>}
-              {error && <p style={{ marginTop: 20, color: '#ef476f', fontSize: 13 }}>⚠️ {error}</p>}
+              processFile={processFile}
+            />
+          ) : (
+            <div className="animate-in fade-in duration-500">
+              {activeTab === 'overview' && <OverviewTab data={data} fmtBRL={fmtBRL} KPI={KPI} BarGauge={BarGauge} SectionTitle={SectionTitle} />}
+              {activeTab === 'ativo' && <AtivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} />}
+              {activeTab === 'passivo' && <PassivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} />}
+              {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
+              {activeTab === 'caixa' && <CaixaTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} />}
+              {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} />}
             </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 24 }}>
-              {['Ativo e Passivo', 'DRE do Período', 'Fluxo de Caixa'].map((f, i) => (
-                <div key={i} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 16, textAlign: 'center' }}>
-                  <div style={{ fontSize: 24, marginBottom: 8 }}>{['📊', '📈', '💰'][i]}</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'DM Sans, sans-serif' }}>{f}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          /* ── DASHBOARD ── */
-          <div className="fade-in">
-            {/* Tabs */}
-            <div style={styles.tabs}>
-              {TABS.map(t => (
-                <button key={t.id} style={styles.tab(activeTab === t.id)} onClick={() => setActiveTab(t.id)}>
-                  {t.icon} {t.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Tabs Content */}
-            {activeTab === 'overview' && <OverviewTab data={data} fmtBRL={fmtBRL} styles={styles} KPI={KPI} BarGauge={BarGauge} SectionTitle={SectionTitle} />}
-            {activeTab === 'ativo' && <AtivoTab data={data} styles={styles} SectionTitle={SectionTitle} TableRow2={TableRow2} />}
-            {activeTab === 'passivo' && <PassivoTab data={data} styles={styles} SectionTitle={SectionTitle} TableRow2={TableRow2} />}
-            {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} styles={styles} SectionTitle={SectionTitle} />}
-            {activeTab === 'caixa' && <CaixaTab data={data} fmtBRL={fmtBRL} styles={styles} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} />}
-            {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} styles={styles} SectionTitle={SectionTitle} Badge={Badge} />}
-          </div>
-        )}
+          )}
+        </div>
       </main>
     </div>
   );
@@ -432,7 +441,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
 
 // ─── TABS ─────────────────────────────────────────────────────────────────────
 
-function OverviewTab({ data, fmtBRL, styles, KPI, BarGauge, SectionTitle }: any) {
+function OverviewTab({ data, fmtBRL, KPI, BarGauge, SectionTitle }: any) {
   const d = data;
   const varAtivo = d.ativo.total.atu - d.ativo.total.ant;
   const varCaixa = d.disponib.atu - d.disponib.ant;
@@ -441,70 +450,77 @@ function OverviewTab({ data, fmtBRL, styles, KPI, BarGauge, SectionTitle }: any)
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 32 }}>
-        <KPI label="Total do Ativo" value={fmtBRL(d.ativo.total.atu, true)} sub={`Ant: ${fmtBRL(d.ativo.total.ant, true)} | Var: ${fmtBRL(varAtivo, true)}`} color="#06d6a0" icon="📊" />
-        <KPI label="Disponibilidades" value={fmtBRL(d.disponib.atu, true)} sub={`Variação: ${varCaixa >= 0 ? '+' : ''}${fmtBRL(varCaixa, true)}`} color={varCaixa >= 0 ? "#06d6a0" : "#ef476f"} icon="💵" />
-        <KPI label="Estoques" value={fmtBRL(d.estoques.atu, true)} sub={`Variação: ${fmtBRL(varEstoque, true)}`} color={varEstoque <= 0 ? "#ffd166" : "#ef476f"} icon="🚗" />
-        <KPI label="Pass. Circulante" value={fmtBRL(d.passivo.circ.atu, true)} sub={`Variação: ${fmtBRL(varPass, true)}`} color={varPass <= 0 ? "#06d6a0" : "#ef476f"} icon="🏦" />
-        <KPI label="Patrimônio Líquido" value={fmtBRL(d.PL.atu, true)} sub="Sem variação no período" color="#4f46e5" icon="💼" />
-        <KPI label="Fluxo de Caixa Total" value={fmtBRL(d.dfc.fluxoTotal, true)} sub={`Var. real: ${fmtBRL(d.dfc.varCaixaReal, true)}`} color={d.dfc.fluxoTotal >= 0 ? "#06d6a0" : "#ef476f"} icon="💰" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <KPI label="Total do Ativo" value={fmtBRL(d.ativo.total.atu, true)} sub={`Ant: ${fmtBRL(d.ativo.total.ant, true)} | Var: ${fmtBRL(varAtivo, true)}`} color="emerald" icon="📊" />
+        <KPI label="Disponibilidades" value={fmtBRL(d.disponib.atu, true)} sub={`Variação: ${varCaixa >= 0 ? '+' : ''}${fmtBRL(varCaixa, true)}`} color={varCaixa >= 0 ? "emerald" : "red"} icon="💵" />
+        <KPI label="Estoques" value={fmtBRL(d.estoques.atu, true)} sub={`Variação: ${fmtBRL(varEstoque, true)}`} color={varEstoque <= 0 ? "amber" : "red"} icon="🚗" />
+        <KPI label="Pass. Circulante" value={fmtBRL(d.passivo.circ.atu, true)} sub={`Variação: ${fmtBRL(varPass, true)}`} color={varPass <= 0 ? "emerald" : "red"} icon="🏦" />
+        <KPI label="Patrimônio Líquido" value={fmtBRL(d.PL.atu, true)} sub="Sem variação no período" color="violet" icon="💼" />
+        <KPI label="Fluxo de Caixa Total" value={fmtBRL(d.dfc.fluxoTotal, true)} sub={`Var. real: ${fmtBRL(d.dfc.varCaixaReal, true)}`} color={d.dfc.fluxoTotal >= 0 ? "emerald" : "red"} icon="💰" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
-        <div style={styles.card}>
-          <SectionTitle icon="📦">Composição do Ativo</SectionTitle>
-          <BarGauge label="Ativo Circulante" value={d.ativo.circ.atu} max={d.ativo.total.atu} color="#06d6a0" />
-          <BarGauge label="  ↳ Estoques" value={d.estoques.atu} max={d.ativo.total.atu} color="#4f46e5" />
-          <BarGauge label="  ↳ Créditos" value={d.creditos.atu} max={d.ativo.total.atu} color="#ffd166" />
-          <BarGauge label="  ↳ Disponibilidades" value={d.disponib.atu} max={d.ativo.total.atu} color="#06d6a0" />
-          <BarGauge label="Ativo Não Circulante" value={d.ativo.naoCirc.atu} max={d.ativo.total.atu} color="#ef476f" />
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+        <Card>
+          <CardContent className="pt-6">
+            <SectionTitle icon="📦">Composição do Ativo</SectionTitle>
+            <BarGauge label="Ativo Circulante" value={d.ativo.circ.atu} max={d.ativo.total.atu} color="emerald" />
+            <BarGauge label="  ↳ Estoques" value={d.estoques.atu} max={d.ativo.total.atu} color="violet" />
+            <BarGauge label="  ↳ Créditos" value={d.creditos.atu} max={d.ativo.total.atu} color="amber" />
+            <BarGauge label="  ↳ Disponibilidades" value={d.disponib.atu} max={d.ativo.total.atu} color="emerald" />
+            <BarGauge label="Ativo Não Circulante" value={d.ativo.naoCirc.atu} max={d.ativo.total.atu} color="red" />
+          </CardContent>
+        </Card>
 
-        <div style={styles.card}>
-          <SectionTitle icon="🏦">Composição do Passivo</SectionTitle>
-          <BarGauge label="Pass. Circulante" value={d.passivo.circ.atu} max={d.ativo.total.atu} color="#ef476f" />
-          <BarGauge label="  ↳ Empréstimos CP" value={d.emprestCP.atu} max={d.ativo.total.atu} color="#c0392b" />
-          <BarGauge label="  ↳ Fornecedores" value={d.fornecTotal.atu} max={d.ativo.total.atu} color="#e74c3c" />
-          <BarGauge label="Pass. Não Circulante" value={d.passivo.naoCirc.atu} max={d.ativo.total.atu} color="#ffd166" />
-          <BarGauge label="Patrimônio Líquido" value={d.PL.atu} max={d.ativo.total.atu} color="#06d6a0" />
-        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <SectionTitle icon="🏦">Composição do Passivo</SectionTitle>
+            <BarGauge label="Pass. Circulante" value={d.passivo.circ.atu} max={d.ativo.total.atu} color="red" />
+            <BarGauge label="  ↳ Empréstimos CP" value={d.emprestCP.atu} max={d.ativo.total.atu} color="red" />
+            <BarGauge label="  ↳ Fornecedores" value={d.fornecTotal.atu} max={d.ativo.total.atu} color="red" />
+            <BarGauge label="Pass. Não Circulante" value={d.passivo.naoCirc.atu} max={d.ativo.total.atu} color="amber" />
+            <BarGauge label="Patrimônio Líquido" value={d.PL.atu} max={d.ativo.total.atu} color="emerald" />
+          </CardContent>
+        </Card>
       </div>
 
-      <div style={styles.card}>
-        <SectionTitle icon="⚠️">Pontos de Atenção</SectionTitle>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-          {[
-            { tipo: 'bad', icon: '🔴', msg: `Liquidez imediata muito baixa: ${(d.indicadores.liqImediata * 100).toFixed(1)}% do PC coberto por disponibilidades` },
-            { tipo: data.indicadores.liqCorrente >= 1 ? 'ok' : 'bad', icon: data.indicadores.liqCorrente >= 1 ? '🟢' : '🔴', msg: `Liquidez corrente: ${d.indicadores.liqCorrente.toFixed(2)}x ${d.indicadores.liqCorrente >= 1 ? '(adequado)' : '(abaixo de 1,0 — atenção)'}` },
-            { tipo: 'bad', icon: '🔴', msg: `Alta alavancagem: endividamento total de ${(d.indicadores.endivTotal * 100).toFixed(0)}% sobre o ativo` },
-            { tipo: d.estoques.atu < d.estoques.ant ? 'ok' : 'warn', icon: d.estoques.atu < d.estoques.ant ? '🟢' : '🟡', msg: `Estoques ${d.estoques.atu < d.estoques.ant ? 'reduziram — bom giro comercial no período' : 'aumentaram no período'}` },
-            { tipo: 'ok', icon: '🟢', msg: `Fluxo de caixa operacional: ${fmtBRL(d.dfc.fluxoOper, true)} — desgiro de estoques e créditos` },
-            { tipo: d.emprestCP.atu < d.emprestCP.ant ? 'ok' : 'warn', icon: d.emprestCP.atu < d.emprestCP.ant ? '🟢' : '🟡', msg: `Empréstimos CP ${d.emprestCP.atu < d.emprestCP.ant ? 'reduziram — amortização no período' : 'aumentaram no período'}` },
-          ].map((a, i) => (
-            <div key={i} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: 14, fontSize: 13, color: 'rgba(255,255,255,0.75)', fontFamily: 'DM Sans, sans-serif', lineHeight: 1.5, display: 'flex', gap: 10 }}>
-              <span>{a.icon}</span><span>{a.msg}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      <Card>
+        <CardContent className="pt-6">
+          <SectionTitle icon="⚠️">Pontos de Atenção</SectionTitle>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {[
+              { tipo: 'bad', icon: '🔴', msg: `Liquidez imediata muito baixa: ${(d.indicadores.liqImediata * 100).toFixed(1)}% do PC coberto por disponibilidades` },
+              { tipo: data.indicadores.liqCorrente >= 1 ? 'ok' : 'bad', icon: data.indicadores.liqCorrente >= 1 ? '🟢' : '🔴', msg: `Liquidez corrente: ${d.indicadores.liqCorrente.toFixed(2)}x ${d.indicadores.liqCorrente >= 1 ? '(adequado)' : '(abaixo de 1,0 — atenção)'}` },
+              { tipo: 'bad', icon: '🔴', msg: `Alta alavancagem: endividamento total de ${(d.indicadores.endivTotal * 100).toFixed(0)}% sobre o ativo` },
+              { tipo: d.estoques.atu < d.estoques.ant ? 'ok' : 'warn', icon: d.estoques.atu < d.estoques.ant ? '🟢' : '🟡', msg: `Estoques ${d.estoques.atu < d.estoques.ant ? 'reduziram — bom giro comercial no período' : 'aumentaram no período'}` },
+              { tipo: 'ok', icon: '🟢', msg: `Fluxo de caixa operacional: ${fmtBRL(d.dfc.fluxoOper, true)} — desgiro de estoques e créditos` },
+              { tipo: d.emprestCP.atu < d.emprestCP.ant ? 'ok' : 'warn', icon: d.emprestCP.atu < d.emprestCP.ant ? '🟢' : '🟡', msg: `Empréstimos CP ${d.emprestCP.atu < d.emprestCP.ant ? 'reduziram — amortização no período' : 'aumentaram no período'}` },
+            ].map((a, i) => (
+              <div key={i} className="bg-muted/30 rounded-lg p-3.5 text-sm text-muted-foreground leading-relaxed flex gap-2.5">
+                <span>{a.icon}</span><span>{a.msg}</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function AtivoTab({ data, styles, SectionTitle, TableRow2 }: any) {
+function AtivoTab({ data, SectionTitle, TableRow2 }: any) {
   const d = data;
   return (
     <div>
-      <div style={styles.card}>
-        <SectionTitle icon="📦">Detalhamento do Ativo</SectionTitle>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr>
-              <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)' }}>Conta</th>
-              <th style={{ padding: '10px 12px', textAlign: 'right', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)' }}>Saldo Anterior</th>
-              <th style={{ padding: '10px 12px', textAlign: 'right', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)' }}>Saldo Atual</th>
-              <th style={{ padding: '10px 12px', textAlign: 'right', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)' }}>Var %</th>
-            </tr></thead>
+      <Card>
+        <CardContent className="pt-6">
+          <SectionTitle icon="📦">Detalhamento do Ativo</SectionTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead className="bg-muted/50"><tr>
+                <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
+              </tr></thead>
             <tbody>
               <TableRow2 label="ATIVO CIRCULANTE" ant={d.ativo.circ.ant} atu={d.ativo.circ.atu} highlight />
               <TableRow2 label="Disponibilidades" ant={d.disponib.ant} atu={d.disponib.atu} indent={1} />
@@ -527,25 +543,27 @@ function AtivoTab({ data, styles, SectionTitle, TableRow2 }: any) {
             </tbody>
           </table>
         </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function PassivoTab({ data, styles, SectionTitle, TableRow2 }: any) {
+function PassivoTab({ data, SectionTitle, TableRow2 }: any) {
   const d = data;
   return (
     <div>
-      <div style={styles.card}>
-        <SectionTitle icon="🏦">Detalhamento do Passivo e PL</SectionTitle>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr>
-              <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)' }}>Conta</th>
-              <th style={{ padding: '10px 12px', textAlign: 'right', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)' }}>Saldo Anterior</th>
-              <th style={{ padding: '10px 12px', textAlign: 'right', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)' }}>Saldo Atual</th>
-              <th style={{ padding: '10px 12px', textAlign: 'right', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)' }}>Var %</th>
-            </tr></thead>
+      <Card>
+        <CardContent className="pt-6">
+          <SectionTitle icon="🏦">Detalhamento do Passivo e PL</SectionTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead className="bg-muted/50"><tr>
+                <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
+              </tr></thead>
             <tbody>
               <TableRow2 label="PASSIVO CIRCULANTE" ant={d.passivo.circ.ant} atu={d.passivo.circ.atu} highlight />
               <TableRow2 label="Empréstimos e Floor Plan (CP)" ant={d.emprestCP.ant} atu={d.emprestCP.atu} indent={1} />
@@ -561,12 +579,13 @@ function PassivoTab({ data, styles, SectionTitle, TableRow2 }: any) {
             </tbody>
           </table>
         </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function ResultadoTab({ data, fmtBRL, styles, SectionTitle }: any) {
+function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
   const d = data;
   const recBruta = d.receitas.bruta.atu;
   const impostosV = d.receitas.impostosVendas.per;
@@ -591,76 +610,87 @@ function ResultadoTab({ data, fmtBRL, styles, SectionTitle }: any) {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
-        <div style={{ ...styles.card, margin: 0 }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 2, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>Receita Bruta do Período</div>
-          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 24, fontWeight: 800, color: '#06d6a0' }}>{fmtBRL(recBruta, true)}</div>
-        </div>
-        <div style={{ ...styles.card, margin: 0 }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 2, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>Receita Líquida</div>
-          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 24, fontWeight: 800, color: recLiq >= 0 ? '#06d6a0' : '#ef476f' }}>{fmtBRL(recLiq, true)}</div>
-        </div>
-        <div style={{ ...styles.card, margin: 0 }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 2, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>Lucro/Prej. Bruto</div>
-          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 24, fontWeight: 800, color: lucBruto >= 0 ? '#06d6a0' : '#ef476f' }}>{fmtBRL(lucBruto, true)}</div>
-        </div>
-        <div style={{ ...styles.card, margin: 0 }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 2, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>Devoluções</div>
-          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 24, fontWeight: 800, color: '#ef476f' }}>{fmtBRL(devolucoes, true)}</div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Receita Bruta do Período</div>
+            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{fmtBRL(recBruta, true)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Receita Líquida</div>
+            <div className={cn('text-2xl font-bold', recLiq >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(recLiq, true)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Lucro/Prej. Bruto</div>
+            <div className={cn('text-2xl font-bold', lucBruto >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(lucBruto, true)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Devoluções</div>
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{fmtBRL(devolucoes, true)}</div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div style={styles.card}>
-        <SectionTitle icon="📈">DRE do Período (Parcial)</SectionTitle>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <tbody>
-            {rows.map((r, i) => {
-              const isPos = r.value >= 0;
-              const isHeader = r.type === 'header';
-              const isSubtotal = r.type === 'subtotal';
-              const barPct = Math.min(100, (Math.abs(r.value) / (recBruta || 1)) * 100);
-              return (
-                <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: isHeader ? 'rgba(6,214,160,0.06)' : isSubtotal ? 'rgba(255,255,255,0.04)' : 'transparent' }}>
-                  <td style={{ padding: '12px 16px', fontSize: 13, fontFamily: 'DM Sans, sans-serif', color: isHeader || isSubtotal ? '#fff' : 'rgba(255,255,255,0.7)', fontWeight: isHeader || isSubtotal ? 700 : 400, width: '40%' }}>{r.label}</td>
-                  <td style={{ padding: '12px 16px', width: '35%' }}>
-                    <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${barPct}%`, background: isPos ? '#06d6a0' : '#ef476f', borderRadius: 99 }} />
-                    </div>
-                  </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: isHeader || isSubtotal ? 700 : 400, color: isPos ? (isHeader || isSubtotal ? '#06d6a0' : 'rgba(255,255,255,0.8)') : '#ef476f', width: '25%' }}>
-                    {r.value >= 0 ? fmtBRL(r.value) : `(${fmtBRL(Math.abs(r.value))})`}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        <p style={{ marginTop: 16, fontSize: 12, color: 'rgba(255,255,255,0.35)', fontFamily: 'DM Sans, sans-serif', lineHeight: 1.6 }}>
-          * DRE parcial calculada com base nas variações do balancete (débitos/créditos do período). Para encerramento definitivo, consultar as demonstrações completas.
-        </p>
-      </div>
+      <Card>
+        <CardContent className="pt-6">
+          <SectionTitle icon="📈">DRE do Período (Parcial)</SectionTitle>
+          <table className="w-full border-collapse">
+            <tbody>
+              {rows.map((r, i) => {
+                const isPos = r.value >= 0;
+                const isHeader = r.type === 'header';
+                const isSubtotal = r.type === 'subtotal';
+                const barPct = Math.min(100, (Math.abs(r.value) / (recBruta || 1)) * 100);
+                return (
+                  <tr key={i} className={cn('border-b border-border', isHeader && 'bg-emerald-50/50 dark:bg-emerald-950/20', isSubtotal && 'bg-muted/30')}>
+                    <td className={cn('py-3 px-4 text-sm w-2/5', isHeader || isSubtotal ? 'font-bold text-foreground' : 'text-muted-foreground')}>{r.label}</td>
+                    <td className="py-3 px-4 w-1/3">
+                      <div className="h-1 bg-muted rounded-full overflow-hidden">
+                        <div className={cn('h-full rounded-full', isPos ? 'bg-emerald-500' : 'bg-red-500')} style={{ width: `${barPct}%` }} />
+                      </div>
+                    </td>
+                    <td className={cn('py-3 px-4 text-right text-sm font-mono w-1/4', isHeader || isSubtotal ? 'font-bold' : '', isPos ? (isHeader || isSubtotal ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground/80') : 'text-red-600 dark:text-red-400')}>
+                      {r.value >= 0 ? fmtBRL(r.value) : `(${fmtBRL(Math.abs(r.value))})`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="mt-4 text-xs text-muted-foreground/70 leading-relaxed">
+            * DRE parcial calculada com base nas variações do balancete (débitos/créditos do período). Para encerramento definitivo, consultar as demonstrações completas.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function CaixaTab({ data, fmtBRL, styles, SectionTitle, DFCRow, KPI }: any) {
+function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
   const d = data.dfc;
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
-        <KPI label="Fluxo Operacional" value={fmtBRL(d.fluxoOper, true)} sub="Principal fonte de caixa" color={d.fluxoOper >= 0 ? '#06d6a0' : '#ef476f'} icon="⚙️" />
-        <KPI label="Fluxo de Investimento" value={fmtBRL(d.fluxoInvest, true)} sub="Imobilizado (depreciação/vendas)" color={d.fluxoInvest >= 0 ? '#06d6a0' : '#ffd166'} icon="🏗️" />
-        <KPI label="Fluxo de Financiamento" value={fmtBRL(d.fluxoFinanc, true)} sub="Passivo não circulante" color={d.fluxoFinanc >= 0 ? '#ffd166' : '#ef476f'} icon="🏛️" />
-        <KPI label="Var. Total de Caixa" value={fmtBRL(d.fluxoTotal, true)} sub={`Var. real no balanço: ${fmtBRL(d.varCaixaReal, true)}`} color={d.fluxoTotal >= 0 ? '#06d6a0' : '#ef476f'} icon="💰" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <KPI label="Fluxo Operacional" value={fmtBRL(d.fluxoOper, true)} sub="Principal fonte de caixa" color={d.fluxoOper >= 0 ? 'emerald' : 'red'} icon="⚙️" />
+        <KPI label="Fluxo de Investimento" value={fmtBRL(d.fluxoInvest, true)} sub="Imobilizado (depreciação/vendas)" color={d.fluxoInvest >= 0 ? 'emerald' : 'amber'} icon="🏗️" />
+        <KPI label="Fluxo de Financiamento" value={fmtBRL(d.fluxoFinanc, true)} sub="Passivo não circulante" color={d.fluxoFinanc >= 0 ? 'amber' : 'red'} icon="🏛️" />
+        <KPI label="Var. Total de Caixa" value={fmtBRL(d.fluxoTotal, true)} sub={`Var. real no balanço: ${fmtBRL(d.varCaixaReal, true)}`} color={d.fluxoTotal >= 0 ? 'emerald' : 'red'} icon="💰" />
       </div>
 
-      <div style={styles.card}>
+      <Card>
+        <CardContent className="pt-6">
         <SectionTitle icon="💰">Demonstração do Fluxo de Caixa — Método Indireto</SectionTitle>
-        <table className="dfc-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <table className="dfc-table w-full border-collapse">
           <thead>
-            <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
-              <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)' }}>Descrição</th>
-              <th style={{ padding: '10px 12px', textAlign: 'right', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, color: 'rgba(255,255,255,0.4)' }}>Valor (R$)</th>
+            <tr className="bg-muted/50">
+              <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Descrição</th>
+              <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Valor (R$)</th>
             </tr>
           </thead>
           <tbody>
@@ -683,33 +713,34 @@ function CaixaTab({ data, fmtBRL, styles, SectionTitle, DFCRow, KPI }: any) {
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={d.fluxoFinanc} total highlight />
           </tbody>
           <tfoot>
-            <tr style={{ background: 'rgba(6,214,160,0.08)', borderTop: '2px solid rgba(6,214,160,0.3)' }}>
-              <td style={{ padding: '14px 12px', fontFamily: 'Syne, sans-serif', fontSize: 14, fontWeight: 800, color: '#fff' }}>VARIAÇÃO TOTAL DE CAIXA NO PERÍODO</td>
-              <td style={{ padding: '14px 12px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 16, fontWeight: 700, color: d.fluxoTotal >= 0 ? '#06d6a0' : '#ef476f' }}>{fmtBRL(d.fluxoTotal)}</td>
+            <tr className="bg-emerald-50/50 dark:bg-emerald-950/20 border-t-2 border-emerald-500/30">
+              <td className="py-3.5 px-3 text-sm font-bold text-foreground">VARIAÇÃO TOTAL DE CAIXA NO PERÍODO</td>
+              <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold', d.fluxoTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(d.fluxoTotal)}</td>
             </tr>
-            <tr style={{ background: 'rgba(255,255,255,0.04)' }}>
-              <td style={{ padding: '10px 12px', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Saldo de Caixa — Período Anterior</td>
-              <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>{fmtBRL(data.disponib.ant)}</td>
+            <tr className="bg-muted/30">
+              <td className="py-2.5 px-3 text-sm text-muted-foreground">Saldo de Caixa — Período Anterior</td>
+              <td className="py-2.5 px-3 text-right font-mono text-sm text-muted-foreground">{fmtBRL(data.disponib.ant)}</td>
             </tr>
-            <tr style={{ background: 'rgba(255,255,255,0.04)' }}>
-              <td style={{ padding: '10px 12px', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Saldo de Caixa — Período Atual</td>
-              <td style={{ padding: '10px 12px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 13, color: '#fff', fontWeight: 600 }}>{fmtBRL(data.disponib.atu)}</td>
+            <tr className="bg-muted/30">
+              <td className="py-2.5 px-3 text-sm text-muted-foreground">Saldo de Caixa — Período Atual</td>
+              <td className="py-2.5 px-3 text-right font-mono text-sm font-semibold text-foreground">{fmtBRL(data.disponib.atu)}</td>
             </tr>
-            <tr style={{ background: 'rgba(79,70,229,0.1)', borderTop: '1px solid rgba(79,70,229,0.3)' }}>
-              <td style={{ padding: '12px 12px', fontFamily: 'DM Sans, sans-serif', fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Variação Real de Caixa (conferência com balanço)</td>
-              <td style={{ padding: '12px 12px', textAlign: 'right', fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 700, color: d.varCaixaReal >= 0 ? '#06d6a0' : '#ef476f' }}>{fmtBRL(d.varCaixaReal)}</td>
+            <tr className="bg-violet-50/50 dark:bg-violet-950/20 border-t border-violet-500/30">
+              <td className="py-3 px-3 text-sm font-semibold text-foreground/80">Variação Real de Caixa (conferência com balanço)</td>
+              <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold', d.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(d.varCaixaReal)}</td>
             </tr>
           </tfoot>
         </table>
-        <p style={{ marginTop: 16, fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.6, fontFamily: 'DM Sans, sans-serif' }}>
+        <p className="mt-4 text-xs text-muted-foreground/70 leading-relaxed">
           * DFC elaborada pelo método indireto com base nas variações patrimoniais do balancete. Ajustes de resultado (lucro/prejuízo do período) não foram incluídos por falta de encerramento contábil no arquivo. A variação real de caixa é calculada diretamente das disponibilidades do balanço.
         </p>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function IndicadoresTab({ data, fmtBRL, styles, SectionTitle, Badge }: any) {
+function IndicadoresTab({ data, fmtBRL, SectionTitle, Badge }: any) {
   const ind = data.indicadores;
   const lqcStatus = ind.liqCorrente >= 1.5 ? 'ok' : ind.liqCorrente >= 1 ? 'warn' : 'bad';
   const lqiStatus = ind.liqImediata >= 0.2 ? 'ok' : ind.liqImediata >= 0.1 ? 'warn' : 'bad';
@@ -727,22 +758,24 @@ function IndicadoresTab({ data, fmtBRL, styles, SectionTitle, Badge }: any) {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 24 }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {indicadores.map((ind2, i) => (
-          <div key={i} style={{ ...styles.card, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontFamily: 'DM Sans, sans-serif', marginBottom: 2 }}>{ind2.formula}</div>
-                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 15, fontWeight: 700, color: '#fff' }}>{ind2.label}</div>
+          <Card key={i}>
+            <CardContent className="pt-6 flex flex-col gap-2.5">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="text-xs text-muted-foreground mb-0.5">{ind2.formula}</div>
+                  <div className="text-base font-bold text-foreground">{ind2.label}</div>
+                </div>
+                <Badge label={ind2.status === 'ok' ? '✓ Ok' : ind2.status === 'warn' ? '⚡ Atenção' : '✗ Crítico'} status={ind2.status} />
               </div>
-              <Badge label={ind2.status === 'ok' ? '✓ Ok' : ind2.status === 'warn' ? '⚡ Atenção' : '✗ Crítico'} status={ind2.status} />
-            </div>
-            <div style={{ fontFamily: 'DM Mono, monospace', fontSize: 32, fontWeight: 700, color: ind2.status === 'ok' ? '#06d6a0' : ind2.status === 'warn' ? '#ffd166' : '#ef476f' }}>
-              {ind2.value}
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontFamily: 'DM Sans, sans-serif', lineHeight: 1.5 }}>{ind2.desc}</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontFamily: 'DM Mono, monospace' }}>Referência: {ind2.ref}</div>
-          </div>
+              <div className={cn('font-mono text-3xl font-bold', ind2.status === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : ind2.status === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')}>
+                {ind2.value}
+              </div>
+              <div className="text-xs text-muted-foreground/70 leading-relaxed">{ind2.desc}</div>
+              <div className="text-xs font-mono text-muted-foreground/60">Referência: {ind2.ref}</div>
+            </CardContent>
+          </Card>
         ))}
       </div>
     </div>
