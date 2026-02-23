@@ -6,6 +6,7 @@ import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, Fi
 import { cn } from "@/lib/utils";
 import { UploadScreen } from "./UploadScreen";
 import { BALANCETE_EXEMPLO } from "./balanceteExemplo";
+import { loadFluxoCaixaData, saveFluxoCaixaData } from "./fluxoCaixaStorage";
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
 function parseBalancete(text: string) {
@@ -267,23 +268,54 @@ interface FluxoCaixaDashboardProps {
 export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps) {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [dragOver, setDragOver] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Carrega balancete de exemplo automaticamente ao montar o componente
+  // Carrega dados do Redis ou usa exemplo como fallback
   useEffect(() => {
-    try {
-      const parsed = parseBalancete(BALANCETE_EXEMPLO);
-      if (Object.keys(parsed.accounts).length >= 10) {
-        setData(parsed);
-        setActiveTab('overview');
+    async function loadInitialData() {
+      try {
+        setLoading(true);
+        
+        // Tenta carregar do Redis primeiro
+        const savedData = await loadFluxoCaixaData();
+        
+        if (savedData && Object.keys(savedData.accounts || {}).length >= 10) {
+          console.log('✅ Dados carregados do Redis');
+          setData(savedData);
+          setActiveTab('overview');
+        } else {
+          // Se não houver dados salvos, usa dados de exemplo
+          console.log('📄 Usando dados de exemplo');
+          const parsed = parseBalancete(BALANCETE_EXEMPLO);
+          if (Object.keys(parsed.accounts).length >= 10) {
+            setData(parsed);
+            setActiveTab('overview');
+            // Salva os dados de exemplo no Redis para próxima vez
+            await saveFluxoCaixaData(parsed);
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao carregar dados:', err);
+        // Fallback para dados de exemplo em caso de erro
+        try {
+          const parsed = parseBalancete(BALANCETE_EXEMPLO);
+          if (Object.keys(parsed.accounts).length >= 10) {
+            setData(parsed);
+            setActiveTab('overview');
+          }
+        } catch (parseErr) {
+          console.error('Erro ao carregar balancete de exemplo:', parseErr);
+        }
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Erro ao carregar balancete de exemplo:', err);
     }
+    
+    loadInitialData();
   }, []);
 
   const processFile = useCallback((file: File | undefined) => {
@@ -291,11 +323,20 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     setLoading(true);
     setError(null);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const text = e.target?.result as string;
         const parsed = parseBalancete(text);
         if (Object.keys(parsed.accounts).length < 10) throw new Error('Arquivo não reconhecido como balancete válido.');
+        
+        // Salva os dados processados no Redis
+        const saved = await saveFluxoCaixaData(parsed);
+        if (saved) {
+          console.log('✅ Dados salvos no Redis com sucesso');
+        } else {
+          console.warn('⚠️ Não foi possível salvar no Redis, mas os dados estão em memória');
+        }
+        
         setData(parsed);
         setActiveTab('overview');
       } catch (err: any) {
