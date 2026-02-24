@@ -46,14 +46,22 @@ function parseBalancete(text: string) {
   const estVeicNovos = { ant: absAnt('1.1.2.01'), atu: absAtu('1.1.2.01') };
   const estVeicUsados = { ant: absAnt('1.1.2.02'), atu: absAtu('1.1.2.02') };
   const estPecas = { ant: absAnt('1.1.2.03'), atu: absAtu('1.1.2.03') };
-  const est11702 = { ant: absAnt('1.1.7.02'), atu: absAtu('1.1.7.02') }; // Estoque adicional (1.1.7.02)
+  // Estoques Audi (grupo 1.1.7) — atividade separada da VW
+  const estAudi        = { ant: absAnt('1.1.7.02'), atu: absAtu('1.1.7.02') };
+  const outrasAtivAudi = { ant: absAnt('1.1.7'),    atu: absAtu('1.1.7') };
   const creditos = { ant: absAnt('1.1.3'), atu: absAtu('1.1.3') };
   const contasCorr = { ant: absAnt('1.1.4'), atu: absAtu('1.1.4') };
   const valDiversos = { ant: absAnt('1.1.5'), atu: absAtu('1.1.5') };
+  // Despesas antecipadas / exercício seguinte (1.1.6)
+  const despAntec     = { ant: absAnt('1.1.6'),    atu: absAtu('1.1.6') };
+  const despAntecEnc  = { ant: absAnt('1.1.6.01'), atu: absAtu('1.1.6.01') };
+  const despAntecGast = { ant: absAnt('1.1.6.02'), atu: absAtu('1.1.6.02') };
   const ativoNaoCirc = { ant: absAnt('1.5'), atu: absAtu('1.5') };
-  const realizLP = { ant: absAnt('1.5.1'), atu: absAtu('1.5.1') };
-  const investimentos = { ant: absAnt('1.5.3'), atu: absAtu('1.5.3') };
-  const imobiliz = { ant: absAnt('1.5.5'), atu: absAtu('1.5.5') };
+  const realizLP     = { ant: absAnt('1.5.1'),       atu: absAtu('1.5.1') };
+  const realizLPCred = { ant: absAnt('1.5.1.01.52'), atu: absAtu('1.5.1.01.52') }; // créditos com ligadas LP
+  const investimentos = { ant: absAnt('1.5.3'),       atu: absAtu('1.5.3') };
+  const imobiliz      = { ant: absAnt('1.5.5'),       atu: absAtu('1.5.5') };
+  const intangivel    = { ant: absAnt('1.5.7'),       atu: absAtu('1.5.7') };
 
   // PASSIVO CIRCULANTE
   const passCirc = { ant: absAnt('2.1'), atu: absAtu('2.1') };
@@ -66,7 +74,12 @@ function parseBalancete(text: string) {
   const fornecTotal = { ant: fornecVW.ant + fornecAudi.ant, atu: fornecVW.atu + fornecAudi.atu };
 
   // PASSIVO NÃO CIRCULANTE
-  const passNaoCirc = { ant: absAnt('2.2'), atu: absAtu('2.2') };
+  const passNaoCirc  = { ant: absAnt('2.2'),       atu: absAtu('2.2') };
+  const emprestLP    = { ant: absAnt('2.2.1.07'), atu: absAtu('2.2.1.07') }; // Empréstimos bancários LP
+  const pessoasLig   = { ant: absAnt('2.2.1.01'), atu: absAtu('2.2.1.01') }; // Sócios / pessoas ligadas
+  const debitosLig   = { ant: absAnt('2.2.1.02'), atu: absAtu('2.2.1.02') }; // Débitos com ligadas
+  const arrendLP     = { ant: absAnt('2.2.1.15'), atu: absAtu('2.2.1.15') }; // Arrendamentos LP (HPFS)
+  const outrosPassLP = { ant: absAnt('2.2.3'),    atu: absAtu('2.2.3') };    // Outros passivos LP
 
   // PATRIMÔNIO LÍQUIDO
   const PL = { ant: absAnt('2.3'), atu: absAtu('2.3') };
@@ -90,44 +103,60 @@ function parseBalancete(text: string) {
   const provisaoIR = { saldo: absAtu('6') };
 
   // GERAÇÃO DE CAIXA (método indireto)
-  const dEstoque = estoques.atu - estoques.ant;
-  const dEst11702 = est11702.atu - est11702.ant; // Variação estoque 1.1.7.02
-  const dCred = creditos.atu - creditos.ant;
-  const dContasCorr = contasCorr.atu - contasCorr.ant;
-  const dValDiv = valDiversos.atu - valDiversos.ant;
-  const dFornec = fornecTotal.atu - fornecTotal.ant;
-  const dObrigTrib = obrigTrib.atu - obrigTrib.ant;
-  const dObrigTrab = obrigTrab.atu - obrigTrab.ant;
-  const dContasPag = contasPagar.atu - contasPagar.ant;
+  // Estoque total = VW (1.1.2) + Audi (1.1.7.02)
+  const estoqueTotalAnt = estoques.ant + estAudi.ant;
+  const estoqueTotalAtu = estoques.atu + estAudi.atu;
+  // ── Variações de capital de giro operacional ────────────────────────────────────────────
+  const dEstoque    = estoqueTotalAtu - estoqueTotalAnt; // VW (1.1.2) + Audi (1.1.7.02)
+  const dCred       = creditos.atu   - creditos.ant;
+  const dFornec     = fornecTotal.atu - fornecTotal.ant;
+  const dObrigTrib  = obrigTrib.atu  - obrigTrib.ant;
+  const dObrigTrab  = obrigTrab.atu  - obrigTrab.ant;
+  const dContasPag  = contasPagar.atu - contasPagar.ant;
+  const dContasCorr = contasCorr.atu  - contasCorr.ant;
+  const dDespAntec  = despAntec.atu   - despAntec.ant; // aumento = uso de caixa
+  const dValDiv     = valDiversos.atu - valDiversos.ant;
 
-  // Ajustes operacionais
-  const ajusteEstoque = -dEstoque;
-  const ajusteEst11702 = -dEst11702; // Ajuste estoque 1.1.7.02
-  const ajusteCred = -dCred;
+  // Ajustes operacionais (redução de ativo = fonte; redução de passivo = uso)
+  const ajusteEstoque    = -dEstoque;
+  const ajusteCred       = -dCred;
   const ajusteContasCorr = -dContasCorr;
-  const ajusteValDiv = -dValDiv;
-  const ajusteFornec = dFornec;
-  const ajusteTrib = dObrigTrib;
-  const ajusteTrab = dObrigTrab;
-  const ajusteContasPag = dContasPag;
+  const ajusteDespAntec  = -dDespAntec;
+  const ajusteValDiv     = -dValDiv;
+  const ajusteFornec     = dFornec;
+  const ajusteTrib       = dObrigTrib;
+  const ajusteTrab       = dObrigTrab;
+  const ajusteContasPag  = dContasPag;
 
   const fluxoOper =
     deprec_per +
-    ajusteEstoque + ajusteEst11702 + ajusteCred +
+    ajusteEstoque + ajusteCred +
+    ajusteDespAntec +
     ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag;
 
-  const fluxoInvest = -(imobiliz.atu - imobiliz.ant);
+  // ── Atividades de Investimento ────────────────────────────────────────────
+  const dIntangivel   = intangivel.atu   - intangivel.ant;
+  const dRealizLPCred = realizLPCred.atu - realizLPCred.ant;
+  const fluxoInvest = -(imobiliz.atu - imobiliz.ant)
+                    - dIntangivel
+                    - dRealizLPCred;
 
-  // ATIVIDADES DE FINANCIAMENTO (CP + LP)
-  const dEmprestCP = emprestCP.atu - emprestCP.ant;
-  const dPassNaoCircLP = passNaoCirc.atu - passNaoCirc.ant;
-  const dDividaTotal = dEmprestCP + dPassNaoCircLP;
-  const captacao = Math.max(0, dDividaTotal);
-  const amortizacao = Math.min(0, dDividaTotal); // valor negativo quando há pagamento
-  const endividamento = emprestCP.atu + passNaoCirc.atu; // saldo total de dívidas
+  // ── Atividades de Financiamento ─────────────────────────────────────────────
+  const dEmprestCP  = emprestCP.atu  - emprestCP.ant;
+  const dEmprestLP  = emprestLP.atu  - emprestLP.ant;
+  const dPessoasLig = pessoasLig.atu - pessoasLig.ant;
+  const dDebitosLig = debitosLig.atu - debitosLig.ant;
+  const dArrendLP   = arrendLP.atu   - arrendLP.ant;
+  // NOTA: 2.2.2 (Receitas Diferidas) excluída do financiamento — contém ICMS ST Diferido (não-caixa)
 
-  const fluxoFinanc = dDividaTotal; // agora inclui CP + LP
-  const fluxoTotal = fluxoOper + fluxoInvest + fluxoFinanc;
+  const fluxoFinanc =
+    dEmprestCP  +
+    dEmprestLP  +
+    dPessoasLig +
+    dDebitosLig +
+    dArrendLP;
+
+  const fluxoTotal   = fluxoOper + fluxoInvest + fluxoFinanc;
   const varCaixaReal = disponib.atu - disponib.ant;
 
   // INDICADORES
@@ -141,9 +170,9 @@ function parseBalancete(text: string) {
     accounts,
     ativo: { total: ativoTotal, circ: ativoCirc, naoCirc: ativoNaoCirc },
     disponib, caixaGeral, bancos, aplicLiq, holdBack,
-    estoques, estVeicNovos, estVeicUsados, estPecas, est11702,
-    creditos, contasCorr, valDiversos,
-    realizLP, investimentos, imobiliz,
+    estoques, estVeicNovos, estVeicUsados, estPecas, estAudi, outrasAtivAudi,
+    creditos, contasCorr, valDiversos, despAntec, despAntecEnc, despAntecGast,
+    realizLP, realizLPCred, investimentos, imobiliz, intangivel,
     passivo: { circ: passCirc, naoCirc: passNaoCirc },
     emprestCP, obrigTrab, obrigTrib, contasPagar, fornecTotal, fornecVW, fornecAudi,
     PL, capitalSocial,
@@ -152,10 +181,16 @@ function parseBalancete(text: string) {
     provisaoIR,
     dfc: {
       deprec: deprec_per,
-      ajusteEstoque, ajusteEst11702, ajusteCred, ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
+      ajusteEstoque, ajusteCred, ajusteDespAntec, ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
       fluxoOper, fluxoInvest, fluxoFinanc, fluxoTotal, varCaixaReal,
-      dEstoque, dEst11702, dCred, dFornec, dObrigTrib, dObrigTrab, dContasPag,
-      dEmprestCP, dPassNaoCircLP, captacao, amortizacao, endividamento
+      dEstoque, dCred, dDespAntec, dFornec, dObrigTrib, dObrigTrab, dContasPag,
+      dEmprestCP, dEmprestLP, dPessoasLig, dDebitosLig, dArrendLP,
+      dIntangivel, dRealizLPCred,
+      emprestCPAnt: emprestCP.ant, emprestCPAtu: emprestCP.atu,
+      emprestLPAnt: emprestLP.ant, emprestLPAtu: emprestLP.atu,
+      pessoasLigAnt: pessoasLig.ant, pessoasLigAtu: pessoasLig.atu,
+      debitosLigAnt: debitosLig.ant, debitosLigAtu: debitosLig.atu,
+      arrendLPAnt: arrendLP.ant, arrendLPAtu: arrendLP.atu,
     },
     indicadores: { liqCorrente, liqImediata, endivTotal, partCapTerceiros, margemBruta }
   };
@@ -518,7 +553,8 @@ function OverviewTab({ data, fmtBRL, KPI, BarGauge, SectionTitle }: any) {
           <CardContent className="pt-6">
             <SectionTitle icon="📦">Composição do Ativo</SectionTitle>
             <BarGauge label="Ativo Circulante" value={d.ativo.circ.atu} max={d.ativo.total.atu} color="emerald" />
-            <BarGauge label="  ↳ Estoques" value={d.estoques.atu} max={d.ativo.total.atu} color="violet" />
+            <BarGauge label="  ↳ Estoques VW (1.1.2)" value={d.estoques.atu} max={d.ativo.total.atu} color="violet" />
+            <BarGauge label="  ↳ Estoques Audi (1.1.7.02)" value={d.estAudi.atu} max={d.ativo.total.atu} color="violet" />
             <BarGauge label="  ↳ Créditos" value={d.creditos.atu} max={d.ativo.total.atu} color="amber" />
             <BarGauge label="  ↳ Disponibilidades" value={d.disponib.atu} max={d.ativo.total.atu} color="emerald" />
             <BarGauge label="Ativo Não Circulante" value={d.ativo.naoCirc.atu} max={d.ativo.total.atu} color="red" />
@@ -582,17 +618,22 @@ function AtivoTab({ data, SectionTitle, TableRow2 }: any) {
               <TableRow2 label="Bancos Conta Movimento" ant={d.bancos.ant} atu={d.bancos.atu} indent={2} />
               <TableRow2 label="Aplicações de Liquidez Imediata" ant={d.aplicLiq.ant} atu={d.aplicLiq.atu} indent={2} />
               <TableRow2 label="Hold Back" ant={d.holdBack.ant} atu={d.holdBack.atu} indent={2} />
-              <TableRow2 label="Estoques" ant={d.estoques.ant} atu={d.estoques.atu} highlight indent={1} />
+              <TableRow2 label="Estoques VW (1.1.2)" ant={d.estoques.ant} atu={d.estoques.atu} highlight indent={1} />
               <TableRow2 label="Veículos Novos" ant={d.estVeicNovos.ant} atu={d.estVeicNovos.atu} indent={2} />
               <TableRow2 label="Veículos Usados" ant={d.estVeicUsados.ant} atu={d.estVeicUsados.atu} indent={2} />
               <TableRow2 label="Peças" ant={d.estPecas.ant} atu={d.estPecas.atu} indent={2} />
+              <TableRow2 label="Estoques Audi (1.1.7.02)" ant={d.estAudi.ant} atu={d.estAudi.atu} highlight indent={1} />
               <TableRow2 label="Créditos de Vendas" ant={d.creditos.ant} atu={d.creditos.atu} highlight indent={1} />
               <TableRow2 label="Contas Correntes" ant={d.contasCorr.ant} atu={d.contasCorr.atu} indent={1} />
               <TableRow2 label="Valores Diversos" ant={d.valDiversos.ant} atu={d.valDiversos.atu} indent={1} />
+              <TableRow2 label="Despesas Antecipadas (1.1.6)" ant={d.despAntec.ant} atu={d.despAntec.atu} highlight indent={1} />
+              <TableRow2 label="  ↳ Encargos Financeiros" ant={d.despAntecEnc.ant} atu={d.despAntecEnc.atu} indent={2} />
+              <TableRow2 label="  ↳ Gastos Operacionais" ant={d.despAntecGast.ant} atu={d.despAntecGast.atu} indent={2} />
               <TableRow2 label="ATIVO NÃO CIRCULANTE" ant={d.ativo.naoCirc.ant} atu={d.ativo.naoCirc.atu} highlight />
               <TableRow2 label="Realizável a Longo Prazo" ant={d.realizLP.ant} atu={d.realizLP.atu} indent={1} />
               <TableRow2 label="Investimentos" ant={d.investimentos.ant} atu={d.investimentos.atu} indent={1} />
               <TableRow2 label="Imobilizado" ant={d.imobiliz.ant} atu={d.imobiliz.atu} indent={1} />
+              <TableRow2 label="Intangível (1.5.7)" ant={d.intangivel.ant} atu={d.intangivel.atu} indent={1} />
               <TableRow2 label="TOTAL DO ATIVO" ant={d.ativo.total.ant} atu={d.ativo.total.atu} highlight />
             </tbody>
           </table>
@@ -732,15 +773,9 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
     <div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPI label="Fluxo Operacional" value={fmtBRL(d.fluxoOper, true)} sub="Principal fonte de caixa" color={d.fluxoOper >= 0 ? 'emerald' : 'red'} icon="⚙️" />
-        <KPI label="Fluxo de Investimento" value={fmtBRL(d.fluxoInvest, true)} sub="Imobilizado (depreciação/vendas)" color={d.fluxoInvest >= 0 ? 'emerald' : 'amber'} icon="🏗️" />
-        <KPI label="Fluxo de Financiamento" value={fmtBRL(d.fluxoFinanc, true)} sub="CP + LP (empr. e financ.)" color={d.fluxoFinanc >= 0 ? 'amber' : 'red'} icon="🏛️" />
+        <KPI label="Fluxo de Investimento" value={fmtBRL(d.fluxoInvest, true)} sub="Imobilizado + Intangível + Créditos LP" color={d.fluxoInvest >= 0 ? 'emerald' : 'amber'} icon="🏗️" />
+        <KPI label="Fluxo de Financiamento" value={fmtBRL(d.fluxoFinanc, true)} sub={`Floor Plan ${d.dEmprestCP >= 0 ? '+' : ''}${fmtBRL(d.dEmprestCP, true)} | Arrend. ${d.dArrendLP >= 0 ? '+' : ''}${fmtBRL(d.dArrendLP, true)}`} color={d.fluxoFinanc >= 0 ? 'amber' : 'red'} icon="🏛️" />
         <KPI label="Var. Total de Caixa" value={fmtBRL(d.fluxoTotal, true)} sub={`Var. real no balanço: ${fmtBRL(d.varCaixaReal, true)}`} color={d.fluxoTotal >= 0 ? 'emerald' : 'red'} icon="💰" />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <KPI label="Endividamento Total" value={fmtBRL(d.endividamento, true)} sub="Saldo atual: Emprést. CP + Passivo LP" color="amber" icon="🏦" />
-        <KPI label="Captação do Período" value={d.captacao > 0 ? fmtBRL(d.captacao, true) : '—'} sub={d.captacao > 0 ? 'Aumento líquido de dívida no período' : 'Sem captação no período'} color={d.captacao > 0 ? 'blue' : 'violet'} icon="📈" />
-        <KPI label="Amortização do Período" value={d.amortizacao < 0 ? fmtBRL(Math.abs(d.amortizacao), true) : '—'} sub={d.amortizacao < 0 ? 'Redução líquida de dívida no período' : 'Sem amortização no período'} color={d.amortizacao < 0 ? 'emerald' : 'violet'} icon="📉" />
       </div>
 
       <Card>
@@ -756,11 +791,11 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
           <tbody>
             <DFCRow label="ATIVIDADES OPERACIONAIS" value={0} highlight />
             <DFCRow label="(+) Depreciações e Amortizações (não caixa)" value={d.deprec} indent={1} />
-            <DFCRow label={`${d.ajusteEstoque >= 0 ? '(+)' : '(–)'} Variação de Estoques (1.1.2) ${d.dEstoque < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'}`} value={d.ajusteEstoque} indent={1} />
-            {(d.ajusteEst11702 !== 0 || d.dEst11702 !== 0) && (
-              <DFCRow label={`${d.ajusteEst11702 >= 0 ? '(+)' : '(–)'} Variação de Estoques Adicionais (1.1.7.02) ${d.dEst11702 < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'}`} value={d.ajusteEst11702} indent={1} />
-            )}
+            <DFCRow label={`${d.ajusteEstoque >= 0 ? '(+)' : '(–)'} Variação de Estoques VW + Audi ${d.dEstoque < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'} (1.1.2 + 1.1.7.02)`} value={d.ajusteEstoque} indent={1} />
+            <DFCRow label={`    ↳ Estoques VW (1.1.2): ${fmtBRL(data.estoques.ant, true)} → ${fmtBRL(data.estoques.atu, true)}`} value={-(data.estoques.atu - data.estoques.ant)} indent={2} />
+            <DFCRow label={`    ↳ Estoques Audi (1.1.7.02): ${fmtBRL(data.estAudi.ant, true)} → ${fmtBRL(data.estAudi.atu, true)}`} value={-(data.estAudi.atu - data.estAudi.ant)} indent={2} />
             <DFCRow label={`${d.ajusteCred >= 0 ? '(+)' : '(–)'} Variação de Créditos ${d.dCred < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'}`} value={d.ajusteCred} indent={1} />
+            <DFCRow label={`${d.ajusteDespAntec >= 0 ? '(+)' : '(–)'} Variação de Despesas Antecipadas (1.1.6) ${d.dDespAntec > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteDespAntec} indent={1} />
             <DFCRow label={`${d.ajusteFornec >= 0 ? '(+)' : '(–)'} Variação de Fornecedores ${d.dFornec < 0 ? '— redução (uso de caixa)' : '— aumento (fonte)'}`} value={d.ajusteFornec} indent={1} />
             <DFCRow label={`${d.ajusteTrib >= 0 ? '(+)' : '(–)'} Variação de Obrigações Tributárias`} value={d.ajusteTrib} indent={1} />
             <DFCRow label={`${d.ajusteTrab >= 0 ? '(+)' : '(–)'} Variação de Obrigações Trabalhistas`} value={d.ajusteTrab} indent={1} />
@@ -768,20 +803,27 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={d.fluxoOper} total highlight />
 
             <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} highlight />
-            <DFCRow label="Variação Líquida do Imobilizado (depreciação / venda de ativos)" value={d.fluxoInvest} indent={1} />
+            <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado 1.5.5 (inclui depreciação acumulada)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} indent={1} />
+            <DFCRow label={`${-d.dIntangivel >= 0 ? '(+)' : '(–)'} Variação Líquida do Intangível 1.5.7 (inclui amortização acumulada)`} value={-d.dIntangivel} indent={1} />
+            <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(–)'} Variação Créditos c/ Ligadas LP 1.5.1.01.52`} value={-d.dRealizLPCred} indent={1} />
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO" value={d.fluxoInvest} total highlight />
 
             <DFCRow label="ATIVIDADES DE FINANCIAMENTO" value={0} highlight />
-            <DFCRow label={`${d.dEmprestCP >= 0 ? '(+) Captação' : '(–) Amortização'} — Empréstimos / Financiamentos CP (2.1.1)`} value={d.dEmprestCP} indent={1} />
-            <DFCRow label={`${d.dPassNaoCircLP >= 0 ? '(+) Captação' : '(–) Amortização'} — Passivo Não Circulante LP (2.2)`} value={d.dPassNaoCircLP} indent={1} />
-            <tr className="bg-amber-50/60 dark:bg-amber-950/20 border-t border-amber-200/40 dark:border-amber-700/20">
-              <td className="py-2 px-3 text-xs text-amber-700 dark:text-amber-300 italic" style={{ paddingLeft: 32 }}>
-                🏦 Endividamento total atual (saldo CP + LP — informativo)
-              </td>
-              <td className="py-2 px-3 text-right font-mono text-xs text-amber-700 dark:text-amber-300 font-semibold italic">
-                {fmtBRL(d.endividamento)}
-              </td>
-            </tr>
+            {(d.emprestCPAnt > 0 || d.emprestCPAtu > 0) && (
+              <DFCRow label={`${d.dEmprestCP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos CP / Floor Plan  (${fmtBRL(d.emprestCPAnt, true)} → ${fmtBRL(d.emprestCPAtu, true)})`} value={d.dEmprestCP} indent={1} />
+            )}
+            {(d.emprestLPAnt > 0 || d.emprestLPAtu > 0) && (
+              <DFCRow label={`${d.dEmprestLP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos Bancários LP  (${fmtBRL(d.emprestLPAnt, true)} → ${fmtBRL(d.emprestLPAtu, true)})`} value={d.dEmprestLP} indent={1} />
+            )}
+            {(d.pessoasLigAnt > 0 || d.pessoasLigAtu > 0) && (
+              <DFCRow label={`${d.dPessoasLig >= 0 ? '(+) Aporte' : '(–) Retirada'} Sócios / Pessoas Ligadas  (${fmtBRL(d.pessoasLigAnt, true)} → ${fmtBRL(d.pessoasLigAtu, true)})`} value={d.dPessoasLig} indent={1} />
+            )}
+            {(d.debitosLigAnt > 0 || d.debitosLigAtu > 0) && (
+              <DFCRow label={`${d.dDebitosLig >= 0 ? '(+) Captação' : '(–) Liquidação'} Débitos com Ligadas LP  (${fmtBRL(d.debitosLigAnt, true)} → ${fmtBRL(d.debitosLigAtu, true)})`} value={d.dDebitosLig} indent={1} />
+            )}
+            {(d.arrendLPAnt > 0 || d.arrendLPAtu > 0) && (
+              <DFCRow label={`${d.dArrendLP >= 0 ? '(+) Novos Arrendamentos LP' : '(–) Amortização Arrendamentos LP'}  (${fmtBRL(d.arrendLPAnt, true)} → ${fmtBRL(d.arrendLPAtu, true)})`} value={d.dArrendLP} indent={1} />
+            )}
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={d.fluxoFinanc} total highlight />
           </tbody>
           <tfoot>
@@ -804,7 +846,7 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
           </tfoot>
         </table>
         <p className="mt-4 text-xs text-muted-foreground/70 leading-relaxed">
-          * DFC elaborada pelo método indireto com base nas variações patrimoniais do balancete. Ajustes de resultado (lucro/prejuízo do período) não foram incluídos por falta de encerramento contábil no arquivo. A variação real de caixa é calculada diretamente das disponibilidades do balanço.
+          * DFC pelo método indireto. Correções aplicadas: (1) Intangível 1.5.7 incluído no investimento; (2) Realizável LP limitado aos créditos com ligadas 1.5.1.01.52; (3) Receitas Diferidas 2.2.2 excluída do financiamento — contém ICMS ST Diferido (não-caixa); (4) Arrendamentos LP mapeados em 2.2.1.15; (5) Estoque Audi (1.1.7.02) consolidado no ajuste operacional de estoques.
         </p>
         </CardContent>
       </Card>

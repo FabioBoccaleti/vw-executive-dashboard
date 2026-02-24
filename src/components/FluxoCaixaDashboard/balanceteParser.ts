@@ -19,14 +19,22 @@ export function analyzeAccounts(accounts: Record<string, any>) {
   const estVeicNovos = { ant: absAnt('1.1.2.01'), atu: absAtu('1.1.2.01') };
   const estVeicUsados = { ant: absAnt('1.1.2.02'), atu: absAtu('1.1.2.02') };
   const estPecas = { ant: absAnt('1.1.2.03'), atu: absAtu('1.1.2.03') };
-  const est11702 = { ant: absAnt('1.1.7.02'), atu: absAtu('1.1.7.02') }; // Estoque adicional (1.1.7.02)
+  // Estoques Audi (grupo 1.1.7) — atividade separada da VW
+  const estAudi        = { ant: absAnt('1.1.7.02'), atu: absAtu('1.1.7.02') };
+  const outrasAtivAudi = { ant: absAnt('1.1.7'),    atu: absAtu('1.1.7') };
   const creditos = { ant: absAnt('1.1.3'), atu: absAtu('1.1.3') };
   const contasCorr = { ant: absAnt('1.1.4'), atu: absAtu('1.1.4') };
   const valDiversos = { ant: absAnt('1.1.5'), atu: absAtu('1.1.5') };
+  // Despesas antecipadas / exercício seguinte (1.1.6)
+  const despAntec     = { ant: absAnt('1.1.6'),    atu: absAtu('1.1.6') };
+  const despAntecEnc  = { ant: absAnt('1.1.6.01'), atu: absAtu('1.1.6.01') };
+  const despAntecGast = { ant: absAnt('1.1.6.02'), atu: absAtu('1.1.6.02') };
   const ativoNaoCirc = { ant: absAnt('1.5'), atu: absAtu('1.5') };
-  const realizLP = { ant: absAnt('1.5.1'), atu: absAtu('1.5.1') };
-  const investimentos = { ant: absAnt('1.5.3'), atu: absAtu('1.5.3') };
-  const imobiliz = { ant: absAnt('1.5.5'), atu: absAtu('1.5.5') };
+  const realizLP     = { ant: absAnt('1.5.1'),       atu: absAtu('1.5.1') };
+  const realizLPCred = { ant: absAnt('1.5.1.01.52'), atu: absAtu('1.5.1.01.52') }; // créditos com ligadas LP
+  const investimentos = { ant: absAnt('1.5.3'),       atu: absAtu('1.5.3') };
+  const imobiliz      = { ant: absAnt('1.5.5'),       atu: absAtu('1.5.5') };
+  const intangivel    = { ant: absAnt('1.5.7'),       atu: absAtu('1.5.7') };
 
   // PASSIVO CIRCULANTE
   const passCirc = { ant: absAnt('2.1'), atu: absAtu('2.1') };
@@ -39,7 +47,12 @@ export function analyzeAccounts(accounts: Record<string, any>) {
   const fornecTotal = { ant: fornecVW.ant + fornecAudi.ant, atu: fornecVW.atu + fornecAudi.atu };
 
   // PASSIVO NÃO CIRCULANTE
-  const passNaoCirc = { ant: absAnt('2.2'), atu: absAtu('2.2') };
+  const passNaoCirc  = { ant: absAnt('2.2'),       atu: absAtu('2.2') };
+  const emprestLP    = { ant: absAnt('2.2.1.07'), atu: absAtu('2.2.1.07') }; // Empréstimos bancários LP
+  const pessoasLig   = { ant: absAnt('2.2.1.01'), atu: absAtu('2.2.1.01') }; // Sócios / pessoas ligadas
+  const debitosLig   = { ant: absAnt('2.2.1.02'), atu: absAtu('2.2.1.02') }; // Débitos com ligadas
+  const arrendLP     = { ant: absAnt('2.2.1.15'), atu: absAtu('2.2.1.15') }; // Arrendamentos LP (HPFS)
+  const outrosPassLP = { ant: absAnt('2.2.3'),    atu: absAtu('2.2.3') };    // Outros passivos LP
 
   // PATRIMÔNIO LÍQUIDO
   const PL = { ant: absAnt('2.3'), atu: absAtu('2.3') };
@@ -63,44 +76,61 @@ export function analyzeAccounts(accounts: Record<string, any>) {
   const provisaoIR = { saldo: absAtu('6') };
 
   // GERAÇÃO DE CAIXA (método indireto)
-  const dEstoque = estoques.atu - estoques.ant;
-  const dEst11702 = est11702.atu - est11702.ant; // Variação estoque 1.1.7.02
-  const dCred = creditos.atu - creditos.ant;
-  const dContasCorr = contasCorr.atu - contasCorr.ant;
-  const dValDiv = valDiversos.atu - valDiversos.ant;
-  const dFornec = fornecTotal.atu - fornecTotal.ant;
-  const dObrigTrib = obrigTrib.atu - obrigTrib.ant;
-  const dObrigTrab = obrigTrab.atu - obrigTrab.ant;
-  const dContasPag = contasPagar.atu - contasPagar.ant;
+  // Estoque total = VW (1.1.2) + Audi (1.1.7.02)
+  const estoqueTotalAnt = estoques.ant + estAudi.ant;
+  const estoqueTotalAtu = estoques.atu + estAudi.atu;
+  // ── Variações de capital de giro operacional ────────────────────────────────────────────
+  const dEstoque    = estoqueTotalAtu - estoqueTotalAnt; // VW (1.1.2) + Audi (1.1.7.02)
+  const dCred       = creditos.atu   - creditos.ant;
+  const dFornec     = fornecTotal.atu - fornecTotal.ant;
+  const dObrigTrib  = obrigTrib.atu  - obrigTrib.ant;
+  const dObrigTrab  = obrigTrab.atu  - obrigTrab.ant;
+  const dContasPag  = contasPagar.atu - contasPagar.ant;
+  const dContasCorr = contasCorr.atu  - contasCorr.ant;
+  const dDespAntec  = despAntec.atu   - despAntec.ant; // aumento = uso de caixa
+  const dValDiv     = valDiversos.atu - valDiversos.ant;
 
-  // Ajustes operacionais
-  const ajusteEstoque = -dEstoque;
-  const ajusteEst11702 = -dEst11702; // Ajuste estoque 1.1.7.02
-  const ajusteCred = -dCred;
+  // Ajustes operacionais (redução de ativo = fonte; redução de passivo = uso)
+  const ajusteEstoque    = -dEstoque;
+  const ajusteCred       = -dCred;
   const ajusteContasCorr = -dContasCorr;
-  const ajusteValDiv = -dValDiv;
-  const ajusteFornec = dFornec;
-  const ajusteTrib = dObrigTrib;
-  const ajusteTrab = dObrigTrab;
-  const ajusteContasPag = dContasPag;
+  const ajusteDespAntec  = -dDespAntec;
+  const ajusteValDiv     = -dValDiv;
+  const ajusteFornec     = dFornec;
+  const ajusteTrib       = dObrigTrib;
+  const ajusteTrab       = dObrigTrab;
+  const ajusteContasPag  = dContasPag;
 
   const fluxoOper =
     deprec_per +
-    ajusteEstoque + ajusteEst11702 + ajusteCred +
+    ajusteEstoque + ajusteCred +
+    ajusteDespAntec +
     ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag;
 
-  const fluxoInvest = -(imobiliz.atu - imobiliz.ant);
+  // ── Atividades de Investimento ────────────────────────────────────────────
+  const dIntangivel   = intangivel.atu   - intangivel.ant;
+  const dRealizLPCred = realizLPCred.atu - realizLPCred.ant;
+  const fluxoInvest = -(imobiliz.atu - imobiliz.ant)
+                    - dIntangivel
+                    - dRealizLPCred;
 
-  // ATIVIDADES DE FINANCIAMENTO (CP + LP)
-  const dEmprestCP = emprestCP.atu - emprestCP.ant;
-  const dPassNaoCircLP = passNaoCirc.atu - passNaoCirc.ant;
-  const dDividaTotal = dEmprestCP + dPassNaoCircLP;
-  const captacao = Math.max(0, dDividaTotal);
-  const amortizacao = Math.min(0, dDividaTotal); // valor negativo quando há pagamento
-  const endividamento = emprestCP.atu + passNaoCirc.atu; // saldo total de dívidas
+  // ── Atividades de Financiamento ─────────────────────────────────────────────
+  const dEmprestCP  = emprestCP.atu  - emprestCP.ant;
+  const dEmprestLP  = emprestLP.atu  - emprestLP.ant;
+  const dPessoasLig = pessoasLig.atu - pessoasLig.ant;
+  const dDebitosLig = debitosLig.atu - debitosLig.ant;
+  const dArrendLP   = arrendLP.atu   - arrendLP.ant;
+  const dOutrosPassLP = outrosPassLP.atu - outrosPassLP.ant; // eslint-disable-line @typescript-eslint/no-unused-vars
+  // NOTA: 2.2.2 (Receitas Diferidas) excluída do financiamento — contém ICMS ST Diferido (não-caixa)
 
-  const fluxoFinanc = dDividaTotal; // agora inclui CP + LP
-  const fluxoTotal = fluxoOper + fluxoInvest + fluxoFinanc;
+  const fluxoFinanc =
+    dEmprestCP  +
+    dEmprestLP  +
+    dPessoasLig +
+    dDebitosLig +
+    dArrendLP;
+
+  const fluxoTotal   = fluxoOper + fluxoInvest + fluxoFinanc;
   const varCaixaReal = disponib.atu - disponib.ant;
 
   // INDICADORES
@@ -114,9 +144,9 @@ export function analyzeAccounts(accounts: Record<string, any>) {
     accounts,
     ativo: { total: ativoTotal, circ: ativoCirc, naoCirc: ativoNaoCirc },
     disponib, caixaGeral, bancos, aplicLiq, holdBack,
-    estoques, estVeicNovos, estVeicUsados, estPecas, est11702,
-    creditos, contasCorr, valDiversos,
-    realizLP, investimentos, imobiliz,
+    estoques, estVeicNovos, estVeicUsados, estPecas, estAudi, outrasAtivAudi,
+    creditos, contasCorr, valDiversos, despAntec, despAntecEnc, despAntecGast,
+    realizLP, realizLPCred, investimentos, imobiliz, intangivel,
     passivo: { circ: passCirc, naoCirc: passNaoCirc },
     emprestCP, obrigTrab, obrigTrib, contasPagar, fornecTotal, fornecVW, fornecAudi,
     PL, capitalSocial,
@@ -125,10 +155,16 @@ export function analyzeAccounts(accounts: Record<string, any>) {
     provisaoIR,
     dfc: {
       deprec: deprec_per,
-      ajusteEstoque, ajusteEst11702, ajusteCred, ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
+      ajusteEstoque, ajusteCred, ajusteDespAntec, ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
       fluxoOper, fluxoInvest, fluxoFinanc, fluxoTotal, varCaixaReal,
-      dEstoque, dEst11702, dCred, dFornec, dObrigTrib, dObrigTrab, dContasPag,
-      dEmprestCP, dPassNaoCircLP, captacao, amortizacao, endividamento
+      dEstoque, dCred, dDespAntec, dFornec, dObrigTrib, dObrigTrab, dContasPag,
+      dEmprestCP, dEmprestLP, dPessoasLig, dDebitosLig, dArrendLP,
+      dIntangivel, dRealizLPCred,
+      emprestCPAnt: emprestCP.ant, emprestCPAtu: emprestCP.atu,
+      emprestLPAnt: emprestLP.ant, emprestLPAtu: emprestLP.atu,
+      pessoasLigAnt: pessoasLig.ant, pessoasLigAtu: pessoasLig.atu,
+      debitosLigAnt: debitosLig.ant, debitosLigAtu: debitosLig.atu,
+      arrendLPAnt: arrendLP.ant, arrendLPAtu: arrendLP.atu,
     },
     indicadores: { liqCorrente, liqImediata, endivTotal, partCapTerceiros, margemBruta }
   };
