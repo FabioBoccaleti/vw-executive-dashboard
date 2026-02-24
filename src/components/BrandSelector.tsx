@@ -93,11 +93,11 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
         </div>
 
         {/* ── 3 categorias em linha ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8 items-stretch">
 
           {/* Demonstrativo de Resultados */}
           <Card
-            className={`transition-all duration-300 ${
+            className={`transition-all duration-300 h-full ${
               demonstrativoExpanded || isDemonstrativoSelected
                 ? 'ring-2 ring-offset-2 shadow-lg'
                 : 'hover:shadow-md cursor-pointer'
@@ -194,8 +194,7 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
             return (
               <Card
                 key={brand}
-                className={`cursor-pointer transition-all duration-300 ${
-                  isSelected ? 'ring-2 ring-offset-2 scale-[1.02] shadow-xl' : 'hover:shadow-md'
+                className={`cursor-pointer transition-all duration-300 h-full ${
                 }`}
                 style={{
                   borderColor: isSelected ? config.colors.primary : undefined,
