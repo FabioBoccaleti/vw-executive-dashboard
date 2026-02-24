@@ -6,6 +6,7 @@ import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, Ba
 import { cn } from "@/lib/utils";
 import { BALANCETE_EXEMPLO } from "./balanceteExemplo";
 import { loadFluxoCaixaData, saveFluxoCaixaData } from "./fluxoCaixaStorage";
+import { ComparativosTab } from "./ComparativosTab";
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
 function parseBalancete(text: string) {
@@ -347,12 +348,13 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   }, []);
 
   const TABS = [
-    { id: 'overview', label: 'Visão Geral', icon: <BarChart3 className="w-4 h-4" /> },
-    { id: 'ativo', label: 'Ativo', icon: <Package className="w-4 h-4" /> },
-    { id: 'passivo', label: 'Passivo + PL', icon: <Building2 className="w-4 h-4" /> },
-    { id: 'resultado', label: 'Resultado', icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'caixa', label: 'Fluxo de Caixa', icon: <DollarSign className="w-4 h-4" /> },
-    { id: 'indicadores', label: 'Indicadores', icon: <Target className="w-4 h-4" /> },
+    { id: 'overview', label: 'Visão Geral', icon: <BarChart3 className="w-4 h-4" />, requiresData: true },
+    { id: 'ativo', label: 'Ativo', icon: <Package className="w-4 h-4" />, requiresData: true },
+    { id: 'passivo', label: 'Passivo + PL', icon: <Building2 className="w-4 h-4" />, requiresData: true },
+    { id: 'resultado', label: 'Resultado', icon: <TrendingUp className="w-4 h-4" />, requiresData: true },
+    { id: 'caixa', label: 'Fluxo de Caixa', icon: <DollarSign className="w-4 h-4" />, requiresData: true },
+    { id: 'indicadores', label: 'Indicadores', icon: <Target className="w-4 h-4" />, requiresData: true },
+    { id: 'comparativos', label: 'Comparativos', icon: <BarChart3 className="w-4 h-4" />, requiresData: false },
   ];
 
   return (
@@ -361,16 +363,14 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
       <div className="bg-[#16a34a] text-white shadow-lg fixed top-0 left-0 right-0 z-30">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-4">
-            {data && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="lg:hidden text-white hover:bg-green-700"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-              >
-                {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden text-white hover:bg-green-700"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+            >
+              {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </Button>
             <div>
               <h1 className="text-xl font-bold">Análise Financeira Sorana</h1>
               <p className="text-sm text-green-100">Fluxo de Caixa & Indicadores</p>
@@ -390,8 +390,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
       />
 
       {/* Sidebar */}
-      {data && (
-        <>
+      <>
           <aside
             className={cn(
               'fixed left-0 top-[60px] bottom-0 w-64 bg-slate-800 text-white z-20 transition-transform duration-300',
@@ -399,7 +398,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             )}
           >
             <nav className="p-4 space-y-1">
-              {TABS.map((tab) => (
+              {TABS.filter(tab => !tab.requiresData || data).map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => {
@@ -447,12 +446,15 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             />
           )}
         </>
-      )}
 
       {/* Main Content */}
-      <main className={cn('pt-[60px] min-h-screen', data && 'lg:ml-64')}>
+      <main className={cn('pt-[60px] min-h-screen', 'lg:ml-64')}>
         <div className="p-6 max-w-7xl mx-auto">
-          {loading && !data ? (
+          {activeTab === 'comparativos' ? (
+            <div className="animate-in fade-in duration-500">
+              <ComparativosTab />
+            </div>
+          ) : loading && !data ? (
             <div className="flex flex-col items-center justify-center py-32 gap-4 text-slate-500">
               <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm">Carregando dados...</p>
