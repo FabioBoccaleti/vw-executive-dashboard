@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BALANCETE_EXEMPLO } from "./balanceteExemplo";
-import { loadFluxoCaixaData, saveFluxoCaixaData } from "./fluxoCaixaStorage";
+import { loadFluxoCaixaData, saveFluxoCaixaData, clearFluxoCaixaData } from "./fluxoCaixaStorage";
 import { ComparativosTab } from "./ComparativosTab";
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
@@ -330,12 +330,22 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         // Tenta carregar do Redis primeiro
         const savedData = await loadFluxoCaixaData();
         
-        if (savedData && Object.keys(savedData.accounts || {}).length >= 10) {
+        // Valida schema atual: campos adicionados no refactor de fev/2026
+        const hasNewSchema = savedData &&
+          savedData.estAudi !== undefined &&
+          savedData.despAntec !== undefined &&
+          savedData.intangivel !== undefined;
+
+        if (savedData && Object.keys(savedData.accounts || {}).length >= 10 && hasNewSchema) {
           console.log('✅ Dados carregados do Redis');
           setData(savedData);
           setActiveTab('overview');
         } else {
-          // Se não houver dados salvos, usa dados de exemplo
+          // Se não houver dados salvos ou schema desatualizado, limpa e usa exemplo
+          if (savedData && !hasNewSchema) {
+            console.warn('⚠️ Schema desatualizado detectado — limpando dados antigos do Redis');
+            await clearFluxoCaixaData();
+          }
           console.log('📄 Usando dados de exemplo');
           const parsed = parseBalancete(BALANCETE_EXEMPLO);
           if (Object.keys(parsed.accounts).length >= 10) {
