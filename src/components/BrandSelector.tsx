@@ -195,6 +195,7 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
               <Card
                 key={brand}
                 className={`cursor-pointer transition-all duration-300 h-full ${
+                  isSelected ? 'ring-2 ring-offset-2 scale-[1.02] shadow-xl' : 'hover:shadow-md'
                 }`}
                 style={{
                   borderColor: isSelected ? config.colors.primary : undefined,
