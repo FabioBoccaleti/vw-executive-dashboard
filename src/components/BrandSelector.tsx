@@ -93,22 +93,26 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
         </div>
 
         {/* ── 3 categorias em linha ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8 items-start">
 
           {/* Demonstrativo de Resultados */}
           <Card
-            className={`cursor-pointer transition-all duration-300 ${
+            className={`transition-all duration-300 ${
               demonstrativoExpanded || isDemonstrativoSelected
                 ? 'ring-2 ring-offset-2 shadow-lg'
-                : 'hover:shadow-md'
+                : 'hover:shadow-md cursor-pointer'
             }`}
             style={{
               ['--tw-ring-color' as any]: '#4f46e5',
               borderColor: demonstrativoExpanded || isDemonstrativoSelected ? '#4f46e5' : undefined,
             }}
-            onClick={handleToggleDemonstrativo}
           >
-            <CardContent className="p-5 flex flex-col items-center justify-center min-h-[140px] gap-3 text-center">
+            {/* Cabeçalho clicável */}
+            <CardContent
+              className="p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer"
+              style={{ minHeight: demonstrativoExpanded ? undefined : '140px' }}
+              onClick={handleToggleDemonstrativo}
+            >
               <div
                 className="p-3 rounded-full transition-colors duration-300"
                 style={{
@@ -128,6 +132,58 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
                 className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${demonstrativoExpanded ? 'rotate-180' : ''}`}
               />
             </CardContent>
+
+            {/* Sub-marcas dentro do card */}
+            {demonstrativoExpanded && (
+              <div className="px-3 pb-4 grid grid-cols-2 sm:grid-cols-3 gap-2 animate-in fade-in slide-in-from-top-2 duration-300 border-t border-slate-100 pt-3">
+                {DEMONSTRATIVO_BRANDS.map((brand) => {
+                  const config = BRAND_CONFIGS[brand];
+                  const isSelected = selectedBrand === brand;
+                  const isHovered = hoveredBrand === brand;
+                  return (
+                    <Card
+                      key={brand}
+                      className={`cursor-pointer transition-all duration-200 ${
+                        isSelected ? 'ring-2 ring-offset-1 shadow-md' : 'hover:shadow-md'
+                      }`}
+                      style={{
+                        borderColor: isSelected ? config.colors.primary : undefined,
+                        ['--tw-ring-color' as any]: config.colors.primary,
+                      }}
+                      onClick={() => handleSelectBrand(brand)}
+                      onMouseEnter={() => setHoveredBrand(brand)}
+                      onMouseLeave={() => setHoveredBrand(null)}
+                    >
+                      <CardContent className="p-2 flex flex-col items-center justify-center gap-1 text-center min-h-[90px]">
+                        <div
+                          className="p-2 rounded-full transition-colors duration-200"
+                          style={{
+                            backgroundColor: isSelected || isHovered ? config.colors.primaryLight : '#f1f5f9',
+                            color: config.colors.primary,
+                          }}
+                        >
+                          {getBrandIcon(brand, 'w-5 h-5')}
+                        </div>
+                        <h3
+                          className="text-xs font-bold"
+                          style={{ color: isSelected || isHovered ? config.colors.primary : '#334155' }}
+                        >
+                          {config.name}
+                        </h3>
+                        {isSelected && (
+                          <div
+                            className="px-1.5 py-0.5 rounded-full text-xs font-semibold text-white"
+                            style={{ backgroundColor: config.colors.primary }}
+                          >
+                            Selecionado
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </Card>
 
           {/* Categorias diretas */}
@@ -178,58 +234,6 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
             );
           })}
         </div>
-
-        {/* Sub-marcas do Demonstrativo — expande abaixo dos 3 cards */}
-        {demonstrativoExpanded && (
-          <div className="mb-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
-            {DEMONSTRATIVO_BRANDS.map((brand) => {
-              const config = BRAND_CONFIGS[brand];
-              const isSelected = selectedBrand === brand;
-              const isHovered = hoveredBrand === brand;
-              return (
-                <Card
-                  key={brand}
-                  className={`cursor-pointer transition-all duration-200 ${
-                    isSelected ? 'ring-2 ring-offset-1 scale-105 shadow-md' : 'hover:shadow-md'
-                  }`}
-                  style={{
-                    borderColor: isSelected ? config.colors.primary : undefined,
-                    ['--tw-ring-color' as any]: config.colors.primary,
-                  }}
-                  onClick={() => handleSelectBrand(brand)}
-                  onMouseEnter={() => setHoveredBrand(brand)}
-                  onMouseLeave={() => setHoveredBrand(null)}
-                >
-                  <CardContent className="p-3 flex flex-col items-center justify-center min-h-[110px] gap-2 text-center">
-                    <div
-                      className="p-2 rounded-full transition-colors duration-200"
-                      style={{
-                        backgroundColor: isSelected || isHovered ? config.colors.primaryLight : '#f1f5f9',
-                        color: config.colors.primary,
-                      }}
-                    >
-                      {getBrandIcon(brand, 'w-6 h-6')}
-                    </div>
-                    <h3
-                      className="text-sm font-bold"
-                      style={{ color: isSelected || isHovered ? config.colors.primary : '#334155' }}
-                    >
-                      {config.name}
-                    </h3>
-                    {isSelected && (
-                      <div
-                        className="px-2 py-0.5 rounded-full text-xs font-semibold text-white"
-                        style={{ backgroundColor: config.colors.primary }}
-                      >
-                        Selecionado
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
 
         {/* Confirm Button */}
         <div className="flex justify-center">
