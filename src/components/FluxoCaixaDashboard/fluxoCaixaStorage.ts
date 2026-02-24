@@ -1,39 +1,13 @@
 // Serviço para persistência dos dados do Fluxo de Caixa no Redis (Vercel KV)
+// Usa kvClient.ts para consistência com o restante do sistema.
 
-const KV_API_BASE = '/api/kv';
+import { kvGet, kvSet, kvDelete } from '@/lib/kvClient';
+
 const FLUXO_CAIXA_KEY = 'fluxo_caixa_data';
 
 export interface FluxoCaixaData {
   accounts: Record<string, any>;
-  ativo: any;
-  disponib: any;
-  caixaGeral: any;
-  bancos: any;
-  aplicLiq: any;
-  holdBack: any;
-  estoques: any;
-  estVeicNovos: any;
-  estVeicUsados: any;
-  estPecas: any;
-  creditos: any;
-  contasCorr: any;
-  valDiversos: any;
-  realizLP: any;
-  investimentos: any;
-  imobiliz: any;
-  passivo: any;
-  emprestCP: any;
-  obrigTrab: any;
-  obrigTrib: any;
-  contasPagar: any;
-  fornecVW: any;
-  fornecAudi: any;
-  PL: any;
-  capitalSocial: any;
-  receitas: any;
-  custos: any;
-  dfc: any;
-  indicadores: any;
+  [key: string]: any;
   timestamp?: number;
 }
 
@@ -42,31 +16,7 @@ export interface FluxoCaixaData {
  */
 export async function saveFluxoCaixaData(data: FluxoCaixaData): Promise<boolean> {
   try {
-    // Adiciona timestamp
-    const dataWithTimestamp = {
-      ...data,
-      timestamp: Date.now()
-    };
-
-    const response = await fetch(`${KV_API_BASE}/set`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        key: FLUXO_CAIXA_KEY,
-        value: dataWithTimestamp,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('Erro ao salvar dados no Redis:', await response.text());
-      return false;
-    }
-
-    const result = await response.json();
-    console.log('Dados do Fluxo de Caixa salvos no Redis:', result);
-    return result.success === true;
+    return await kvSet(FLUXO_CAIXA_KEY, { ...data, timestamp: Date.now() });
   } catch (error) {
     console.error('Erro ao salvar dados do Fluxo de Caixa:', error);
     return false;
@@ -78,22 +28,7 @@ export async function saveFluxoCaixaData(data: FluxoCaixaData): Promise<boolean>
  */
 export async function loadFluxoCaixaData(): Promise<FluxoCaixaData | null> {
   try {
-    const response = await fetch(`${KV_API_BASE}/get?key=${FLUXO_CAIXA_KEY}`);
-
-    if (!response.ok) {
-      console.error('Erro ao carregar dados do Redis:', await response.text());
-      return null;
-    }
-
-    const result = await response.json();
-    
-    if (!result.value) {
-      console.log('Nenhum dado encontrado no Redis para Fluxo de Caixa');
-      return null;
-    }
-
-    console.log('Dados do Fluxo de Caixa carregados do Redis');
-    return result.value as FluxoCaixaData;
+    return await kvGet<FluxoCaixaData>(FLUXO_CAIXA_KEY);
   } catch (error) {
     console.error('Erro ao carregar dados do Fluxo de Caixa:', error);
     return null;
@@ -105,19 +40,10 @@ export async function loadFluxoCaixaData(): Promise<FluxoCaixaData | null> {
  */
 export async function clearFluxoCaixaData(): Promise<boolean> {
   try {
-    const response = await fetch(`${KV_API_BASE}/delete?key=${FLUXO_CAIXA_KEY}`, {
-      method: 'DELETE',
-    });
-
-    if (!response.ok) {
-      console.error('Erro ao limpar dados do Redis:', await response.text());
-      return false;
-    }
-
-    console.log('Dados do Fluxo de Caixa removidos do Redis');
-    return true;
+    return await kvDelete(FLUXO_CAIXA_KEY);
   } catch (error) {
     console.error('Erro ao limpar dados do Fluxo de Caixa:', error);
     return false;
   }
 }
+
