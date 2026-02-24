@@ -242,7 +242,7 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
             }`}
             style={{ backgroundColor: confirmColor, color: 'white' }}
           >
-            Acessar Dashboard
+            Acessar
             <ChevronRight className="ml-2 w-5 h-5" />
           </Button>
         </div>
