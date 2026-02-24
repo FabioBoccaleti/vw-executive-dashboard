@@ -376,28 +376,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               <p className="text-sm text-green-100">Fluxo de Caixa & Indicadores</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white hover:bg-green-700 hidden sm:flex"
-              onClick={() => fileRef.current?.click()}
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Novo Arquivo
-            </Button>
-            {onChangeBrand && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-white hover:bg-green-700"
-                onClick={onChangeBrand}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">Voltar ao Menu</span>
-              </Button>
-            )}
-          </div>
+          <div className="flex items-center gap-3" />
         </div>
       </div>
 
@@ -440,7 +419,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               ))}
             </nav>
 
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700">
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700 space-y-1">
               <button
                 onClick={() => fileRef.current?.click()}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
@@ -448,6 +427,15 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
                 <Upload className="w-5 h-5" />
                 <span className="text-sm font-medium">Novo Arquivo</span>
               </button>
+              {onChangeBrand && (
+                <button
+                  onClick={onChangeBrand}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span className="text-sm font-medium">Voltar ao Menu</span>
+                </button>
+              )}
             </div>
           </aside>
 
