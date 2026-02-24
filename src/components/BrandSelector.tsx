@@ -135,7 +135,7 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
 
             {/* Sub-marcas dentro do card */}
             {demonstrativoExpanded && (
-              <div className="px-3 pb-4 grid grid-cols-2 sm:grid-cols-3 gap-2 animate-in fade-in slide-in-from-top-2 duration-300 border-t border-slate-100 pt-3">
+              <div className="px-3 pb-4 grid grid-cols-5 gap-2 animate-in fade-in slide-in-from-top-2 duration-300 border-t border-slate-100 pt-3">
                 {DEMONSTRATIVO_BRANDS.map((brand) => {
                   const config = BRAND_CONFIGS[brand];
                   const isSelected = selectedBrand === brand;
