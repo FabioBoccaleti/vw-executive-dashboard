@@ -1,42 +1,47 @@
 // Serviço para persistência dos dados do Fluxo de Caixa no Redis (Vercel KV)
-// Usa kvClient.ts para consistência com o restante do sistema.
+// Persiste o TEXTO BRUTO do balancete — o parse é sempre refeito no carregamento,
+// garantindo imunidade a mudanças de schema e tamanho mínimo no Redis.
 
 import { kvGet, kvSet, kvDelete } from '@/lib/kvClient';
 
-const FLUXO_CAIXA_KEY = 'fluxo_caixa_data';
+const FLUXO_CAIXA_KEY = 'fluxo_caixa_raw_v2';
 
-export interface FluxoCaixaData {
-  accounts: Record<string, any>;
-  [key: string]: any;
+export interface FluxoCaixaRaw {
+  rawText: string;
+  fileName?: string;
   timestamp?: number;
 }
 
 /**
- * Salva os dados do Fluxo de Caixa no Redis
+ * Salva o texto bruto do balancete no Redis.
+ * @param rawText  Conteúdo original do arquivo .txt
+ * @param fileName Nome do arquivo (opcional, para exibição)
  */
-export async function saveFluxoCaixaData(data: FluxoCaixaData): Promise<boolean> {
+export async function saveFluxoCaixaData(rawText: string, fileName?: string): Promise<boolean> {
   try {
-    return await kvSet(FLUXO_CAIXA_KEY, { ...data, timestamp: Date.now() });
+    const payload: FluxoCaixaRaw = { rawText, fileName, timestamp: Date.now() };
+    return await kvSet(FLUXO_CAIXA_KEY, payload);
   } catch (error) {
-    console.error('Erro ao salvar dados do Fluxo de Caixa:', error);
+    console.error('Erro ao salvar balancete no Redis:', error);
     return false;
   }
 }
 
 /**
- * Carrega os dados do Fluxo de Caixa do Redis
+ * Carrega o texto bruto do balancete do Redis.
+ * Retorna null se não houver dados ou se ocorrer erro.
  */
-export async function loadFluxoCaixaData(): Promise<FluxoCaixaData | null> {
+export async function loadFluxoCaixaRaw(): Promise<FluxoCaixaRaw | null> {
   try {
-    return await kvGet<FluxoCaixaData>(FLUXO_CAIXA_KEY);
+    return await kvGet<FluxoCaixaRaw>(FLUXO_CAIXA_KEY);
   } catch (error) {
-    console.error('Erro ao carregar dados do Fluxo de Caixa:', error);
+    console.error('Erro ao carregar balancete do Redis:', error);
     return null;
   }
 }
 
 /**
- * Limpa os dados do Fluxo de Caixa do Redis
+ * Limpa os dados do Fluxo de Caixa do Redis.
  */
 export async function clearFluxoCaixaData(): Promise<boolean> {
   try {
@@ -46,4 +51,7 @@ export async function clearFluxoCaixaData(): Promise<boolean> {
     return false;
   }
 }
+
+// Alias mantido para compatibilidade de imports existentes
+export { loadFluxoCaixaRaw as loadFluxoCaixaData };
 

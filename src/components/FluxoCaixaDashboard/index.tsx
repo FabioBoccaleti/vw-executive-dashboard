@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BALANCETE_EXEMPLO } from "./balanceteExemplo";
-import { loadFluxoCaixaData, saveFluxoCaixaData, clearFluxoCaixaData } from "./fluxoCaixaStorage";
+import { loadFluxoCaixaRaw, saveFluxoCaixaData } from "./fluxoCaixaStorage";
 import { ComparativosTab } from "./ComparativosTab";
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
@@ -322,42 +322,36 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Carrega dados do Redis ou usa exemplo como fallback
+  const [savedFileName, setSavedFileName] = useState<string | undefined>(undefined);
+
   useEffect(() => {
     async function loadInitialData() {
       try {
         setLoading(true);
-        
-        // Tenta carregar do Redis primeiro
-        const savedData = await loadFluxoCaixaData();
-        
-        // Valida schema atual: campos adicionados no refactor de fev/2026
-        const hasNewSchema = savedData &&
-          savedData.estAudi !== undefined &&
-          savedData.despAntec !== undefined &&
-          savedData.intangivel !== undefined;
 
-        if (savedData && Object.keys(savedData.accounts || {}).length >= 10 && hasNewSchema) {
-          console.log('✅ Dados carregados do Redis');
-          setData(savedData);
-          setActiveTab('overview');
-        } else {
-          // Se não houver dados salvos ou schema desatualizado, limpa e usa exemplo
-          if (savedData && !hasNewSchema) {
-            console.warn('⚠️ Schema desatualizado detectado — limpando dados antigos do Redis');
-            await clearFluxoCaixaData();
-          }
-          console.log('📄 Usando dados de exemplo');
-          const parsed = parseBalancete(BALANCETE_EXEMPLO);
+        // Carrega o texto bruto do Redis (chave fluxo_caixa_raw_v2)
+        const raw = await loadFluxoCaixaRaw();
+
+        if (raw?.rawText) {
+          console.log('✅ Balancete carregado do Redis — re-parseando...');
+          const parsed = parseBalancete(raw.rawText);
           if (Object.keys(parsed.accounts).length >= 10) {
             setData(parsed);
+            setSavedFileName(raw.fileName);
             setActiveTab('overview');
-            // Salva os dados de exemplo no Redis para próxima vez
-            await saveFluxoCaixaData(parsed);
+            return; // sucesso — sai sem usar o exemplo
           }
+        }
+
+        // Nenhum dado no Redis: usa exemplos locais
+        console.log('📄 Nenhum balancete no Redis — usando dados de exemplo');
+        const parsed = parseBalancete(BALANCETE_EXEMPLO);
+        if (Object.keys(parsed.accounts).length >= 10) {
+          setData(parsed);
+          setActiveTab('overview');
         }
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
-        // Fallback para dados de exemplo em caso de erro
         try {
           const parsed = parseBalancete(BALANCETE_EXEMPLO);
           if (Object.keys(parsed.accounts).length >= 10) {
@@ -371,7 +365,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         setLoading(false);
       }
     }
-    
+
     loadInitialData();
   }, []);
 
@@ -386,15 +380,16 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         const text = e.target?.result as string;
         const parsed = parseBalancete(text);
         if (Object.keys(parsed.accounts).length < 10) throw new Error('Arquivo não reconhecido como balancete válido.');
-        
-        // Salva os dados processados no Redis
-        const saved = await saveFluxoCaixaData(parsed);
+
+        // Persiste o TEXTO BRUTO no Redis — re-parse automático em futuras sessões
+        const saved = await saveFluxoCaixaData(text, file.name);
         if (saved) {
-          console.log('✅ Dados salvos no Redis com sucesso');
+          console.log('✅ Balancete salvo no Redis com sucesso:', file.name);
         } else {
           console.warn('⚠️ Não foi possível salvar no Redis, mas os dados estão em memória');
         }
-        
+
+        setSavedFileName(file.name);
         setData(parsed);
         setActiveTab('overview');
       } catch (err: any) {
@@ -431,7 +426,9 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             </Button>
             <div>
               <h1 className="text-xl font-bold">Análise Financeira Sorana</h1>
-              <p className="text-sm text-green-100">Fluxo de Caixa & Indicadores</p>
+              <p className="text-sm text-green-100">
+                {savedFileName ? `📂 ${savedFileName}` : 'Fluxo de Caixa & Indicadores'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3" />
