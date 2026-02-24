@@ -93,7 +93,7 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
         </div>
 
         {/* ── 3 categorias em linha ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8 items-stretch">
+        <div className="grid grid-cols-1 gap-3 mb-8">
 
           {/* Demonstrativo de Resultados */}
           <Card
