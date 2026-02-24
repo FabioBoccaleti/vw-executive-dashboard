@@ -2,9 +2,8 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, FileText, BarChart3, Target, LogOut, Menu } from "lucide-react";
+import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { UploadScreen } from "./UploadScreen";
 import { BALANCETE_EXEMPLO } from "./balanceteExemplo";
 import { loadFluxoCaixaData, saveFluxoCaixaData } from "./fluxoCaixaStorage";
 
@@ -270,7 +269,6 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
-  const [dragOver, setDragOver] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -322,6 +320,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     if (!file) return;
     setLoading(true);
     setError(null);
+    if (fileRef.current) fileRef.current.value = '';
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
@@ -346,15 +345,6 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     };
     reader.readAsText(file, 'latin1');
   }, []);
-
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    processFile(e.dataTransfer.files[0]);
-  }, [processFile]);
-
-  const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setDragOver(true); };
-  const onDragLeave = () => setDragOver(false);
 
   const TABS = [
     { id: 'overview', label: 'Visão Geral', icon: <BarChart3 className="w-4 h-4" /> },
@@ -387,17 +377,15 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {data && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-white hover:bg-green-700 hidden sm:flex"
-                onClick={() => { setData(null); setActiveTab('overview'); }}
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Novo Arquivo
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-green-700 hidden sm:flex"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Novo Arquivo
+            </Button>
             {onChangeBrand && (
               <Button
                 variant="ghost"
@@ -413,7 +401,16 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         </div>
       </div>
 
-      {/* Sidebar - apenas quando tem dados */}
+      {/* Input file oculto — acionado pelo botão "Novo Arquivo" */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".txt,.csv"
+        className="hidden"
+        onChange={e => processFile(e.target.files?.[0])}
+      />
+
+      {/* Sidebar */}
       {data && (
         <>
           <aside
@@ -445,7 +442,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
 
             <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700">
               <button
-                onClick={() => { setData(null); setActiveTab('overview'); }}
+                onClick={() => fileRef.current?.click()}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
               >
                 <Upload className="w-5 h-5" />
@@ -467,19 +464,18 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
       {/* Main Content */}
       <main className={cn('pt-[60px] min-h-screen', data && 'lg:ml-64')}>
         <div className="p-6 max-w-7xl mx-auto">
-          {!data ? (
-            <UploadScreen
-              dragOver={dragOver}
-              loading={loading}
-              error={error}
-              fileRef={fileRef}
-              onDrop={onDrop}
-              onDragOver={onDragOver}
-              onDragLeave={onDragLeave}
-              processFile={processFile}
-            />
+          {loading && !data ? (
+            <div className="flex flex-col items-center justify-center py-32 gap-4 text-slate-500">
+              <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm">Carregando dados...</p>
+            </div>
           ) : (
             <div className="animate-in fade-in duration-500">
+              {error && (
+                <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                  {error}
+                </div>
+              )}
               {activeTab === 'overview' && <OverviewTab data={data} fmtBRL={fmtBRL} KPI={KPI} BarGauge={BarGauge} SectionTitle={SectionTitle} />}
               {activeTab === 'ativo' && <AtivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} />}
               {activeTab === 'passivo' && <PassivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} />}
