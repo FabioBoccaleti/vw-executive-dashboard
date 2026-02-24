@@ -372,7 +372,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               </Button>
             )}
             <div>
-              <h1 className="text-xl font-bold">BalanceteAI - Análise Financeira</h1>
+              <h1 className="text-xl font-bold">Análise Financeira Sorana</h1>
               <p className="text-sm text-green-100">Fluxo de Caixa & Indicadores</p>
             </div>
           </div>
