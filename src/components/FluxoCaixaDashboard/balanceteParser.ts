@@ -19,6 +19,7 @@ export function analyzeAccounts(accounts: Record<string, any>) {
   const estVeicNovos = { ant: absAnt('1.1.2.01'), atu: absAtu('1.1.2.01') };
   const estVeicUsados = { ant: absAnt('1.1.2.02'), atu: absAtu('1.1.2.02') };
   const estPecas = { ant: absAnt('1.1.2.03'), atu: absAtu('1.1.2.03') };
+  const est11702 = { ant: absAnt('1.1.7.02'), atu: absAtu('1.1.7.02') }; // Estoque adicional (1.1.7.02)
   const creditos = { ant: absAnt('1.1.3'), atu: absAtu('1.1.3') };
   const contasCorr = { ant: absAnt('1.1.4'), atu: absAtu('1.1.4') };
   const valDiversos = { ant: absAnt('1.1.5'), atu: absAtu('1.1.5') };
@@ -63,6 +64,7 @@ export function analyzeAccounts(accounts: Record<string, any>) {
 
   // GERAÇÃO DE CAIXA (método indireto)
   const dEstoque = estoques.atu - estoques.ant;
+  const dEst11702 = est11702.atu - est11702.ant; // Variação estoque 1.1.7.02
   const dCred = creditos.atu - creditos.ant;
   const dContasCorr = contasCorr.atu - contasCorr.ant;
   const dValDiv = valDiversos.atu - valDiversos.ant;
@@ -73,6 +75,7 @@ export function analyzeAccounts(accounts: Record<string, any>) {
 
   // Ajustes operacionais
   const ajusteEstoque = -dEstoque;
+  const ajusteEst11702 = -dEst11702; // Ajuste estoque 1.1.7.02
   const ajusteCred = -dCred;
   const ajusteContasCorr = -dContasCorr;
   const ajusteValDiv = -dValDiv;
@@ -83,7 +86,7 @@ export function analyzeAccounts(accounts: Record<string, any>) {
 
   const fluxoOper =
     deprec_per +
-    ajusteEstoque + ajusteCred +
+    ajusteEstoque + ajusteEst11702 + ajusteCred +
     ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag;
 
   const fluxoInvest = -(imobiliz.atu - imobiliz.ant);
@@ -111,7 +114,7 @@ export function analyzeAccounts(accounts: Record<string, any>) {
     accounts,
     ativo: { total: ativoTotal, circ: ativoCirc, naoCirc: ativoNaoCirc },
     disponib, caixaGeral, bancos, aplicLiq, holdBack,
-    estoques, estVeicNovos, estVeicUsados, estPecas,
+    estoques, estVeicNovos, estVeicUsados, estPecas, est11702,
     creditos, contasCorr, valDiversos,
     realizLP, investimentos, imobiliz,
     passivo: { circ: passCirc, naoCirc: passNaoCirc },
@@ -122,9 +125,9 @@ export function analyzeAccounts(accounts: Record<string, any>) {
     provisaoIR,
     dfc: {
       deprec: deprec_per,
-      ajusteEstoque, ajusteCred, ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
+      ajusteEstoque, ajusteEst11702, ajusteCred, ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
       fluxoOper, fluxoInvest, fluxoFinanc, fluxoTotal, varCaixaReal,
-      dEstoque, dCred, dFornec, dObrigTrib, dObrigTrab, dContasPag,
+      dEstoque, dEst11702, dCred, dFornec, dObrigTrib, dObrigTrab, dContasPag,
       dEmprestCP, dPassNaoCircLP, captacao, amortizacao, endividamento
     },
     indicadores: { liqCorrente, liqImediata, endivTotal, partCapTerceiros, margemBruta }

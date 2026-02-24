@@ -46,6 +46,7 @@ function parseBalancete(text: string) {
   const estVeicNovos = { ant: absAnt('1.1.2.01'), atu: absAtu('1.1.2.01') };
   const estVeicUsados = { ant: absAnt('1.1.2.02'), atu: absAtu('1.1.2.02') };
   const estPecas = { ant: absAnt('1.1.2.03'), atu: absAtu('1.1.2.03') };
+  const est11702 = { ant: absAnt('1.1.7.02'), atu: absAtu('1.1.7.02') }; // Estoque adicional (1.1.7.02)
   const creditos = { ant: absAnt('1.1.3'), atu: absAtu('1.1.3') };
   const contasCorr = { ant: absAnt('1.1.4'), atu: absAtu('1.1.4') };
   const valDiversos = { ant: absAnt('1.1.5'), atu: absAtu('1.1.5') };
@@ -90,6 +91,7 @@ function parseBalancete(text: string) {
 
   // GERAÇÃO DE CAIXA (método indireto)
   const dEstoque = estoques.atu - estoques.ant;
+  const dEst11702 = est11702.atu - est11702.ant; // Variação estoque 1.1.7.02
   const dCred = creditos.atu - creditos.ant;
   const dContasCorr = contasCorr.atu - contasCorr.ant;
   const dValDiv = valDiversos.atu - valDiversos.ant;
@@ -100,6 +102,7 @@ function parseBalancete(text: string) {
 
   // Ajustes operacionais
   const ajusteEstoque = -dEstoque;
+  const ajusteEst11702 = -dEst11702; // Ajuste estoque 1.1.7.02
   const ajusteCred = -dCred;
   const ajusteContasCorr = -dContasCorr;
   const ajusteValDiv = -dValDiv;
@@ -110,7 +113,7 @@ function parseBalancete(text: string) {
 
   const fluxoOper =
     deprec_per +
-    ajusteEstoque + ajusteCred +
+    ajusteEstoque + ajusteEst11702 + ajusteCred +
     ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag;
 
   const fluxoInvest = -(imobiliz.atu - imobiliz.ant);
@@ -138,7 +141,7 @@ function parseBalancete(text: string) {
     accounts,
     ativo: { total: ativoTotal, circ: ativoCirc, naoCirc: ativoNaoCirc },
     disponib, caixaGeral, bancos, aplicLiq, holdBack,
-    estoques, estVeicNovos, estVeicUsados, estPecas,
+    estoques, estVeicNovos, estVeicUsados, estPecas, est11702,
     creditos, contasCorr, valDiversos,
     realizLP, investimentos, imobiliz,
     passivo: { circ: passCirc, naoCirc: passNaoCirc },
@@ -149,9 +152,9 @@ function parseBalancete(text: string) {
     provisaoIR,
     dfc: {
       deprec: deprec_per,
-      ajusteEstoque, ajusteCred, ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
+      ajusteEstoque, ajusteEst11702, ajusteCred, ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
       fluxoOper, fluxoInvest, fluxoFinanc, fluxoTotal, varCaixaReal,
-      dEstoque, dCred, dFornec, dObrigTrib, dObrigTrab, dContasPag,
+      dEstoque, dEst11702, dCred, dFornec, dObrigTrib, dObrigTrab, dContasPag,
       dEmprestCP, dPassNaoCircLP, captacao, amortizacao, endividamento
     },
     indicadores: { liqCorrente, liqImediata, endivTotal, partCapTerceiros, margemBruta }
@@ -753,7 +756,10 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
           <tbody>
             <DFCRow label="ATIVIDADES OPERACIONAIS" value={0} highlight />
             <DFCRow label="(+) Depreciações e Amortizações (não caixa)" value={d.deprec} indent={1} />
-            <DFCRow label={`${d.ajusteEstoque >= 0 ? '(+)' : '(–)'} Variação de Estoques ${d.dEstoque < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'}`} value={d.ajusteEstoque} indent={1} />
+            <DFCRow label={`${d.ajusteEstoque >= 0 ? '(+)' : '(–)'} Variação de Estoques (1.1.2) ${d.dEstoque < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'}`} value={d.ajusteEstoque} indent={1} />
+            {(d.ajusteEst11702 !== 0 || d.dEst11702 !== 0) && (
+              <DFCRow label={`${d.ajusteEst11702 >= 0 ? '(+)' : '(–)'} Variação de Estoques Adicionais (1.1.7.02) ${d.dEst11702 < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'}`} value={d.ajusteEst11702} indent={1} />
+            )}
             <DFCRow label={`${d.ajusteCred >= 0 ? '(+)' : '(–)'} Variação de Créditos ${d.dCred < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'}`} value={d.ajusteCred} indent={1} />
             <DFCRow label={`${d.ajusteFornec >= 0 ? '(+)' : '(–)'} Variação de Fornecedores ${d.dFornec < 0 ? '— redução (uso de caixa)' : '— aumento (fonte)'}`} value={d.ajusteFornec} indent={1} />
             <DFCRow label={`${d.ajusteTrib >= 0 ? '(+)' : '(–)'} Variação de Obrigações Tributárias`} value={d.ajusteTrib} indent={1} />
