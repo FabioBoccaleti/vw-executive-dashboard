@@ -1,27 +1,8 @@
 // ─── PARSER DE BALANCETE ─────────────────────────────────────────────────────
 // Extraído de index.tsx para ser reutilizado em ComparativosTab e outros componentes
 
-export function parseBalancete(text: string) {
-  const lines = text.split('\n').filter(l => l.trim());
-  const accounts: Record<string, any> = {};
-
-  for (const line of lines) {
-    const parts = line.split(';');
-    if (parts.length < 7) continue;
-    const [nivel, conta, desc, saldoAnt, valDeb, valCred, saldoAtual] = parts;
-    if (nivel === 'T') continue;
-    const parse = (v: string) => parseFloat((v || '0').replace(',', '.')) || 0;
-    accounts[conta?.trim()] = {
-      nivel: nivel?.trim(),
-      conta: conta?.trim(),
-      desc: desc?.trim(),
-      saldoAnt: parse(saldoAnt),
-      valDeb: parse(valDeb),
-      valCred: parse(valCred),
-      saldoAtual: parse(saldoAtual),
-    };
-  }
-
+/** Analisa um dicionário de contas já extraído e retorna o objeto estruturado */
+export function analyzeAccounts(accounts: Record<string, any>) {
   const get = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0, desc: '' };
   const absAnt = (id: string) => Math.abs(get(id).saldoAnt);
   const absAtu = (id: string) => Math.abs(get(id).saldoAtual);
@@ -106,7 +87,16 @@ export function parseBalancete(text: string) {
     ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag;
 
   const fluxoInvest = -(imobiliz.atu - imobiliz.ant);
-  const fluxoFinanc = passNaoCirc.atu - passNaoCirc.ant;
+
+  // ATIVIDADES DE FINANCIAMENTO (CP + LP)
+  const dEmprestCP = emprestCP.atu - emprestCP.ant;
+  const dPassNaoCircLP = passNaoCirc.atu - passNaoCirc.ant;
+  const dDividaTotal = dEmprestCP + dPassNaoCircLP;
+  const captacao = Math.max(0, dDividaTotal);
+  const amortizacao = Math.min(0, dDividaTotal); // valor negativo quando há pagamento
+  const endividamento = emprestCP.atu + passNaoCirc.atu; // saldo total de dívidas
+
+  const fluxoFinanc = dDividaTotal; // agora inclui CP + LP
   const fluxoTotal = fluxoOper + fluxoInvest + fluxoFinanc;
   const varCaixaReal = disponib.atu - disponib.ant;
 
@@ -134,10 +124,40 @@ export function parseBalancete(text: string) {
       deprec: deprec_per,
       ajusteEstoque, ajusteCred, ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
       fluxoOper, fluxoInvest, fluxoFinanc, fluxoTotal, varCaixaReal,
-      dEstoque, dCred, dFornec, dObrigTrib, dObrigTrab, dContasPag
+      dEstoque, dCred, dFornec, dObrigTrib, dObrigTrab, dContasPag,
+      dEmprestCP, dPassNaoCircLP, captacao, amortizacao, endividamento
     },
     indicadores: { liqCorrente, liqImediata, endivTotal, partCapTerceiros, margemBruta }
   };
 }
 
-export type ParsedBalancete = ReturnType<typeof parseBalancete>;
+/** Extrai o mapa de contas de um texto de balancete semicolonado */
+export function extractAccounts(text: string): Record<string, any> {
+  const lines = text.split('\n').filter(l => l.trim());
+  const accounts: Record<string, any> = {};
+  for (const line of lines) {
+    const parts = line.split(';');
+    if (parts.length < 7) continue;
+    const [nivel, conta, desc, saldoAnt, valDeb, valCred, saldoAtual] = parts;
+    if (nivel === 'T') continue;
+    const parse = (v: string) => parseFloat((v || '0').replace(',', '.')) || 0;
+    accounts[conta?.trim()] = {
+      nivel: nivel?.trim(),
+      conta: conta?.trim(),
+      desc: desc?.trim(),
+      saldoAnt: parse(saldoAnt),
+      valDeb: parse(valDeb),
+      valCred: parse(valCred),
+      saldoAtual: parse(saldoAtual),
+    };
+  }
+  return accounts;
+}
+
+/** Parser completo: extrai contas do texto e retorna análise estruturada */
+export function parseBalancete(text: string) {
+  const accounts = extractAccounts(text);
+  return analyzeAccounts(accounts);
+}
+
+export type ParsedBalancete = ReturnType<typeof analyzeAccounts>;

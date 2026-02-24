@@ -114,7 +114,16 @@ function parseBalancete(text: string) {
     ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag;
 
   const fluxoInvest = -(imobiliz.atu - imobiliz.ant);
-  const fluxoFinanc = passNaoCirc.atu - passNaoCirc.ant;
+
+  // ATIVIDADES DE FINANCIAMENTO (CP + LP)
+  const dEmprestCP = emprestCP.atu - emprestCP.ant;
+  const dPassNaoCircLP = passNaoCirc.atu - passNaoCirc.ant;
+  const dDividaTotal = dEmprestCP + dPassNaoCircLP;
+  const captacao = Math.max(0, dDividaTotal);
+  const amortizacao = Math.min(0, dDividaTotal); // valor negativo quando há pagamento
+  const endividamento = emprestCP.atu + passNaoCirc.atu; // saldo total de dívidas
+
+  const fluxoFinanc = dDividaTotal; // agora inclui CP + LP
   const fluxoTotal = fluxoOper + fluxoInvest + fluxoFinanc;
   const varCaixaReal = disponib.atu - disponib.ant;
 
@@ -142,7 +151,8 @@ function parseBalancete(text: string) {
       deprec: deprec_per,
       ajusteEstoque, ajusteCred, ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
       fluxoOper, fluxoInvest, fluxoFinanc, fluxoTotal, varCaixaReal,
-      dEstoque, dCred, dFornec, dObrigTrib, dObrigTrab, dContasPag
+      dEstoque, dCred, dFornec, dObrigTrib, dObrigTrab, dContasPag,
+      dEmprestCP, dPassNaoCircLP, captacao, amortizacao, endividamento
     },
     indicadores: { liqCorrente, liqImediata, endivTotal, partCapTerceiros, margemBruta }
   };
@@ -720,8 +730,14 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPI label="Fluxo Operacional" value={fmtBRL(d.fluxoOper, true)} sub="Principal fonte de caixa" color={d.fluxoOper >= 0 ? 'emerald' : 'red'} icon="⚙️" />
         <KPI label="Fluxo de Investimento" value={fmtBRL(d.fluxoInvest, true)} sub="Imobilizado (depreciação/vendas)" color={d.fluxoInvest >= 0 ? 'emerald' : 'amber'} icon="🏗️" />
-        <KPI label="Fluxo de Financiamento" value={fmtBRL(d.fluxoFinanc, true)} sub="Passivo não circulante" color={d.fluxoFinanc >= 0 ? 'amber' : 'red'} icon="🏛️" />
+        <KPI label="Fluxo de Financiamento" value={fmtBRL(d.fluxoFinanc, true)} sub="CP + LP (empr. e financ.)" color={d.fluxoFinanc >= 0 ? 'amber' : 'red'} icon="🏛️" />
         <KPI label="Var. Total de Caixa" value={fmtBRL(d.fluxoTotal, true)} sub={`Var. real no balanço: ${fmtBRL(d.varCaixaReal, true)}`} color={d.fluxoTotal >= 0 ? 'emerald' : 'red'} icon="💰" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <KPI label="Endividamento Total" value={fmtBRL(d.endividamento, true)} sub="Saldo atual: Emprést. CP + Passivo LP" color="amber" icon="🏦" />
+        <KPI label="Captação do Período" value={d.captacao > 0 ? fmtBRL(d.captacao, true) : '—'} sub={d.captacao > 0 ? 'Aumento líquido de dívida no período' : 'Sem captação no período'} color={d.captacao > 0 ? 'blue' : 'violet'} icon="📈" />
+        <KPI label="Amortização do Período" value={d.amortizacao < 0 ? fmtBRL(Math.abs(d.amortizacao), true) : '—'} sub={d.amortizacao < 0 ? 'Redução líquida de dívida no período' : 'Sem amortização no período'} color={d.amortizacao < 0 ? 'emerald' : 'violet'} icon="📉" />
       </div>
 
       <Card>
@@ -750,7 +766,16 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO" value={d.fluxoInvest} total highlight />
 
             <DFCRow label="ATIVIDADES DE FINANCIAMENTO" value={0} highlight />
-            <DFCRow label="Variação do Passivo Não Circulante (captações / amortizações LP)" value={d.fluxoFinanc} indent={1} />
+            <DFCRow label={`${d.dEmprestCP >= 0 ? '(+) Captação' : '(–) Amortização'} — Empréstimos / Financiamentos CP (2.1.1)`} value={d.dEmprestCP} indent={1} />
+            <DFCRow label={`${d.dPassNaoCircLP >= 0 ? '(+) Captação' : '(–) Amortização'} — Passivo Não Circulante LP (2.2)`} value={d.dPassNaoCircLP} indent={1} />
+            <tr className="bg-amber-50/60 dark:bg-amber-950/20 border-t border-amber-200/40 dark:border-amber-700/20">
+              <td className="py-2 px-3 text-xs text-amber-700 dark:text-amber-300 italic" style={{ paddingLeft: 32 }}>
+                🏦 Endividamento total atual (saldo CP + LP — informativo)
+              </td>
+              <td className="py-2 px-3 text-right font-mono text-xs text-amber-700 dark:text-amber-300 font-semibold italic">
+                {fmtBRL(d.endividamento)}
+              </td>
+            </tr>
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={d.fluxoFinanc} total highlight />
           </tbody>
           <tfoot>
