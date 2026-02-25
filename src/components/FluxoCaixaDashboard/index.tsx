@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu } from "lucide-react";
+import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BALANCETE_EXEMPLO } from "./balanceteExemplo";
 import { loadFluxoCaixaRaw, saveFluxoCaixaData } from "./fluxoCaixaStorage";
@@ -319,6 +319,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [redisWarning, setRedisWarning] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Carrega dados do Redis ou usa exemplo como fallback
@@ -385,8 +386,10 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         const saved = await saveFluxoCaixaData(text, file.name);
         if (saved) {
           console.log('✅ Balancete salvo no Redis com sucesso:', file.name);
+          setRedisWarning(null);
         } else {
           console.warn('⚠️ Não foi possível salvar no Redis, mas os dados estão em memória');
+          setRedisWarning('Os dados foram carregados na sessão, mas não foi possível salvar no banco de dados (Redis). Ao recarregar a página os dados serão perdidos. Verifique se as variáveis KV_REST_API_URL e KV_REST_API_TOKEN estão configuradas na Vercel.');
         }
 
         setSavedFileName(file.name);
@@ -407,6 +410,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     { id: 'resultado', label: 'Resultado', icon: <TrendingUp className="w-4 h-4" />, requiresData: true },
     { id: 'caixa', label: 'Fluxo de Caixa', icon: <DollarSign className="w-4 h-4" />, requiresData: true },
     { id: 'indicadores', label: 'Indicadores', icon: <Target className="w-4 h-4" />, requiresData: true },
+    { id: 'diagnostico', label: 'Diagnóstico', icon: <Activity className="w-4 h-4" />, requiresData: true },
     { id: 'comparativos', label: 'Comparativos', icon: <BarChart3 className="w-4 h-4" />, requiresData: false },
   ];
 
@@ -521,12 +525,19 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
                   {error}
                 </div>
               )}
+              {redisWarning && (
+                <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-sm flex items-start justify-between gap-3">
+                  <span>⚠️ <strong>Dados não persistidos:</strong> {redisWarning}</span>
+                  <button onClick={() => setRedisWarning(null)} className="shrink-0 text-amber-600 hover:text-amber-900 font-bold text-lg leading-none">×</button>
+                </div>
+              )}
               {activeTab === 'overview' && <OverviewTab data={data} fmtBRL={fmtBRL} KPI={KPI} BarGauge={BarGauge} SectionTitle={SectionTitle} />}
               {activeTab === 'ativo' && <AtivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} />}
               {activeTab === 'passivo' && <PassivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} />}
               {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
               {activeTab === 'caixa' && <CaixaTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} />}
               {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} />}
+              {activeTab === 'diagnostico' && <DiagnosticoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
             </div>
           )}
         </div>
@@ -857,6 +868,251 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
         </p>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ─── DIAGNÓSTICO DE GERAÇÃO DE CAIXA ────────────────────────────────────────
+function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
+  const d = data.dfc;
+
+  // Utilitário: percentual absoluto de `part` em relação a `whole`
+  const pctOf = (part: number, whole: number) =>
+    whole !== 0 ? Math.round((Math.abs(part) / Math.abs(whole)) * 100) : 0;
+
+  // ── Flags de sustentabilidade ──────────────────────────────────────────────
+  const queimouEstoque  = d.ajusteEstoque > 0;                      // estoque caiu → entrou caixa
+  const estoquePct      = d.fluxoOper > 0 ? pctOf(d.ajusteEstoque, d.fluxoOper) : 0;
+  const queimouSignif   = queimouEstoque && estoquePct >= 30;        // ≥ 30% do oper vem de estoque
+
+  const atrasouFornec   = d.ajusteFornec > 0;                       // fornecedores subiram → postergação
+  const fornecPct       = d.fluxoOper > 0 ? pctOf(d.ajusteFornec, d.fluxoOper) : 0;
+  const atrasouSignif   = atrasouFornec && fornecPct >= 30;
+
+  const deprecPct       = d.fluxoOper > 0 ? pctOf(d.deprec, d.fluxoOper) : 0;
+  const credPct         = d.fluxoOper > 0 ? pctOf(d.ajusteCred, d.fluxoOper) : 0;
+
+  const operPositivo    = d.fluxoOper > 0;
+  const operSustentavel = operPositivo && !queimouSignif && !atrasouSignif;
+  const gerarCaixa      = d.fluxoTotal >= 0;
+
+  // ── Semáforo ───────────────────────────────────────────────────────────────
+  type SemStatus = 'green' | 'yellow' | 'red';
+  let status: SemStatus;
+  let titulo: string;
+  let descricao: string;
+
+  if (operSustentavel) {
+    status    = 'green';
+    titulo    = 'Saúde do Fluxo: FORTE';
+    descricao = 'A empresa gera caixa de forma sustentável a partir de suas operações principais, sem dependência de ajustes de capital de giro não recorrentes.';
+  } else if (operPositivo) {
+    status    = 'yellow';
+    titulo    = 'Saúde do Fluxo: ATENÇÃO';
+    descricao = 'O fluxo operacional é positivo, mas parte relevante vem de ajustes pontuais (queima de estoque ou atraso a fornecedores). Isso pode não se repetir no próximo período.';
+  } else if (!operPositivo && gerarCaixa) {
+    status    = 'yellow';
+    titulo    = 'Saúde do Fluxo: ATENÇÃO';
+    descricao = 'A operação consumiu caixa, mas o saldo final é positivo graças a financiamento ou desinvestimentos. Não é sustentável no longo prazo.';
+  } else {
+    status    = 'red';
+    titulo    = 'Saúde do Fluxo: CRÍTICO';
+    descricao = 'A empresa está consumindo caixa. A operação não gera recursos suficientes para se autofinanciar e o saldo do período é negativo.';
+  }
+
+  const semColors = {
+    green:  { bg: 'bg-emerald-50 dark:bg-emerald-950/30', border: 'border-emerald-400', text: 'text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500', icon: '🟢' },
+    yellow: { bg: 'bg-amber-50 dark:bg-amber-950/30',     border: 'border-amber-400',   text: 'text-amber-700 dark:text-amber-400',   dot: 'bg-amber-400',   icon: '🟡' },
+    red:    { bg: 'bg-red-50 dark:bg-red-950/30',          border: 'border-red-400',     text: 'text-red-700 dark:text-red-400',       dot: 'bg-red-500',     icon: '🔴' },
+  };
+  const sc = semColors[status];
+
+  // ── Atividades ─────────────────────────────────────────────────────────────
+  const atividades = [
+    { label: 'Operacional',    value: d.fluxoOper,   icon: '⚙️', desc: 'Resultado das atividades-fim da empresa (vendas, custos e capital de giro)' },
+    { label: 'Investimento',   value: d.fluxoInvest, icon: '🏗️', desc: 'Compra/venda de imobilizado, intangível e créditos de longo prazo' },
+    { label: 'Financiamento',  value: d.fluxoFinanc, icon: '🏛️', desc: 'Empréstimos, arrendamentos, aportes e retiradas de sócios' },
+  ];
+
+  // ── Checklist ──────────────────────────────────────────────────────────────
+  const checks = [
+    {
+      ok: gerarCaixa,
+      label: 'Empresa gerou caixa no período',
+      detail: `Variação total: ${d.fluxoTotal >= 0 ? '+' : ''}${fmtBRL(d.fluxoTotal)}`,
+    },
+    {
+      ok: operPositivo,
+      label: 'Atividade operacional gera caixa',
+      detail: `Fluxo operacional: ${d.fluxoOper >= 0 ? '+' : ''}${fmtBRL(d.fluxoOper)}`,
+    },
+    {
+      ok: !queimouSignif,
+      warn: queimouEstoque && !queimouSignif,
+      label: 'Caixa operacional sem dependência excessiva de queima de estoque',
+      detail: queimouEstoque
+        ? `Redução de estoque contribuiu ${estoquePct}% do caixa operacional${queimouSignif ? ' — acima de 30%, sinal de atenção' : ' — patamar aceitável'}`
+        : 'Estoques estáveis ou em crescimento',
+    },
+    {
+      ok: !atrasouSignif,
+      warn: atrasouFornec && !atrasouSignif,
+      label: 'Sem dependência excessiva de postergação de fornecedores',
+      detail: atrasouFornec
+        ? `Aumento de fornecedores contribuiu ${fornecPct}% do caixa operacional${atrasouSignif ? ' — acima de 30%, atenção ao prazo' : ' — patamar controlado'}`
+        : 'Fornecedores estáveis ou reduzidos',
+    },
+    {
+      ok: operPositivo,
+      label: 'Operação é a principal fonte de caixa (não depende de dívida)',
+      detail: operPositivo
+        ? 'Fluxo operacional positivo — empresa se autofinancia'
+        : 'Financiamento ou venda de ativos sustentando o caixa',
+    },
+    {
+      ok: d.varCaixaReal >= 0,
+      label: 'Saldo de caixa aumentou (conferência com o balanço)',
+      detail: `Variação real: ${d.varCaixaReal >= 0 ? '+' : ''}${fmtBRL(d.varCaixaReal)}`,
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+
+      {/* ── 1. Semáforo principal ─────────────────────────────── */}
+      <Card className={cn('border-2', sc.border, sc.bg)}>
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-5">
+            {/* Semáforo visual */}
+            <div className="flex flex-col items-center gap-2 shrink-0 pt-1">
+              {(['green', 'yellow', 'red'] as SemStatus[]).map((s) => (
+                <div key={s} className={cn('w-9 h-9 rounded-full border-2 border-white/30 shadow-inner transition-all', status === s ? semColors[s].dot + ' shadow-md scale-110' : 'bg-gray-200 dark:bg-gray-700 opacity-30')} />
+              ))}
+            </div>
+
+            {/* Conteúdo principal */}
+            <div className="flex-1">
+              <div className={cn('text-xl font-bold mb-2', sc.text)}>{sc.icon} {titulo}</div>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">{descricao}</p>
+              <div className={cn('text-3xl font-bold font-mono', d.fluxoTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
+                {d.fluxoTotal >= 0 ? '✅' : '❌'} {d.fluxoTotal >= 0 ? '+' : ''}{fmtBRL(d.fluxoTotal)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                {d.fluxoTotal >= 0 ? 'A empresa GEROU caixa no período analisado.' : 'A empresa CONSUMIU caixa no período analisado.'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── 2. De onde veio o caixa? ──────────────────────────── */}
+      <div>
+        <SectionTitle icon="🔍">De qual atividade veio o caixa?</SectionTitle>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {atividades.map((a) => {
+            const isPos = a.value >= 0;
+            const isMain = Math.abs(a.value) === Math.max(...atividades.filter(x => x.value >= 0).map(x => x.value)) && isPos;
+            return (
+              <Card key={a.label} className={cn('border-l-4', isPos ? 'border-l-emerald-500' : 'border-l-red-400')}>
+                <CardContent className="pt-5">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{a.icon}</span>
+                      <span className="font-bold text-foreground text-sm">{a.label}</span>
+                    </div>
+                    <span className={cn('text-xs font-bold px-2 py-0.5 rounded-full', isPos ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400')}>
+                      {isPos ? '✅ Fonte' : '❌ Uso'}
+                    </span>
+                  </div>
+                  <div className={cn('text-2xl font-bold font-mono mb-1', isPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}>
+                    {isPos ? '+' : ''}{fmtBRL(a.value)}
+                  </div>
+                  {isMain && <span className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded-full font-semibold">★ Maior fonte</span>}
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-2">{a.desc}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── 3. Análise de sustentabilidade ────────────────────── */}
+      <div>
+        <SectionTitle icon="🔬">É sustentável? Análise do Caixa Operacional</SectionTitle>
+        <Card>
+          <CardContent className="pt-6">
+            {d.fluxoOper !== 0 && (
+              <div className="mb-5">
+                <div className="text-sm font-semibold text-foreground mb-4">
+                  Composição do Fluxo Operacional&nbsp;
+                  <span className={cn('font-mono', d.fluxoOper >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500')}>{d.fluxoOper >= 0 ? '+' : ''}{fmtBRL(d.fluxoOper)}</span>
+                </div>
+                {[
+                  { label: 'Depreciação / Amortização (não-caixa)', value: d.deprec, pctVal: deprecPct, color: 'bg-blue-400', neutral: true, warn: false, note: 'Ajuste contábil — sempre positivo, mas não representa entrada real de dinheiro.' },
+                  { label: 'Variação de Estoques', value: d.ajusteEstoque, pctVal: estoquePct, color: queimouSignif ? 'bg-amber-400' : 'bg-emerald-400', neutral: false, warn: queimouSignif, note: queimouEstoque ? `Redução de estoque (fonte de caixa). ${queimouSignif ? `Representa ${estoquePct}% do caixa oper. — sinal de queima de estoque.` : `${estoquePct}% do caixa oper. — patamar aceitável.`}` : 'Aumento de estoque (uso de caixa — empresa está investindo em produto).' },
+                  { label: 'Variação de Fornecedores', value: d.ajusteFornec, pctVal: fornecPct, color: atrasouSignif ? 'bg-amber-400' : 'bg-emerald-400', neutral: false, warn: atrasouSignif, note: atrasouFornec ? `Aumento de fornecedores (postergação de pagamentos). ${atrasouSignif ? `${fornecPct}% do caixa oper. — atenção ao prazo prometido.` : `${fornecPct}% do caixa oper. — controlado.`}` : 'Redução de fornecedores (pagamentos realizados no período).' },
+                  { label: 'Créditos a Receber', value: d.ajusteCred, pctVal: credPct, color: d.ajusteCred >= 0 ? 'bg-emerald-400' : 'bg-red-400', neutral: false, warn: false, note: d.ajusteCred >= 0 ? 'Redução de créditos (recebimentos efetuados — bom sinal).' : 'Aumento de créditos (mais a receber, mas o caixa ainda não entrou).' },
+                ].filter(i => Math.abs(i.value) > 0).map((item, idx) => (
+                  <div key={idx} className="mb-4">
+                    <div className="flex justify-between items-center mb-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-muted-foreground">{item.label}</span>
+                        {item.warn      && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded dark:bg-amber-950 dark:text-amber-400">⚠️ Pontual</span>}
+                        {item.neutral   && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded dark:bg-blue-950 dark:text-blue-400">ℹ️ Não-caixa</span>}
+                        {!item.warn && !item.neutral && item.value > 0 && <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded dark:bg-emerald-950 dark:text-emerald-400">✓ OK</span>}
+                      </div>
+                      <span className="text-xs font-mono font-semibold text-foreground shrink-0">{item.value >= 0 ? '+' : ''}{fmtBRL(item.value, true)}</span>
+                    </div>
+                    <div className="relative h-2 bg-muted rounded-full overflow-hidden mb-1">
+                      <div className={cn('h-full rounded-full transition-all duration-700', item.color)} style={{ width: `${Math.min(100, item.pctVal)}%` }} />
+                    </div>
+                    <p className="text-xs text-muted-foreground/70 leading-snug">{item.note}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Veredito de sustentabilidade */}
+            <div className={cn('p-4 rounded-xl border', operSustentavel ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800' : !operPositivo ? 'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800' : 'bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800')}>
+              <div className="font-bold text-sm mb-1">
+                {operSustentavel ? '✅ Caixa operacional SUSTENTÁVEL' : !operPositivo ? '❌ Caixa operacional DEFICITÁRIO' : '⚠️ Caixa operacional PARCIALMENTE SUSTENTÁVEL'}
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {operSustentavel
+                  ? 'O fluxo operacional é positivo e não depende de itens pontuais como queima de estoque ou postergação de pagamentos a fornecedores.'
+                  : !operPositivo
+                  ? 'A atividade-fim não está gerando caixa suficiente. Isso pode indicar margens comprimidas ou capital de giro cronicamente negativo.'
+                  : 'O fluxo operacional é positivo, mas existem componentes pontuais que podem não se repetir. Monitore a evolução do estoque e dos prazos com fornecedores.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── 4. Checklist de sinais ─────────────────────────────── */}
+      <div>
+        <SectionTitle icon="📋">Checklist de Saúde do Fluxo de Caixa</SectionTitle>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-3">
+              {checks.map((item, idx) => {
+                const icon = item.ok ? '✅' : (item as any).warn ? '⚠️' : '❌';
+                const rowBg = item.ok ? 'bg-emerald-50 dark:bg-emerald-950/20' : (item as any).warn ? 'bg-amber-50 dark:bg-amber-950/20' : 'bg-red-50 dark:bg-red-950/20';
+                return (
+                  <div key={idx} className={cn('flex items-start gap-3 p-3 rounded-lg', rowBg)}>
+                    <span className="text-xl mt-0.5 shrink-0">{icon}</span>
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">{item.label}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{item.detail}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
     </div>
   );
 }
