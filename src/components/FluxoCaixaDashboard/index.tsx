@@ -19,7 +19,8 @@ function parseBalancete(text: string) {
     if (parts.length < 7) continue;
     const [nivel, conta, desc, saldoAnt, valDeb, valCred, saldoAtual] = parts;
     if (nivel === 'T') continue;
-    const parse = (v: string) => parseFloat((v || '0').replace(',', '.')) || 0;
+    const parse = (v: string) =>
+      parseFloat((v || '0').trim().replace(/\./g, '').replace(',', '.')) || 0;
     accounts[conta?.trim()] = {
       nivel: nivel?.trim(),
       conta: conta?.trim(),
@@ -762,9 +763,8 @@ function PassivoTab({ data, SectionTitle, TableRow2 }: any) {
               {d.arrendLP.ant !== 0 || d.arrendLP.atu !== 0 ? <TableRow2 label="Arrendamentos LP" ant={d.arrendLP.ant} atu={d.arrendLP.atu} indent={1} /> : null}
               {d.outrosPassLP.ant !== 0 || d.outrosPassLP.atu !== 0 ? <TableRow2 label="Outros Passivos LP" ant={d.outrosPassLP.ant} atu={d.outrosPassLP.atu} indent={1} /> : null}
               <TableRow2 label="PATRIMÔNIO LÍQUIDO" ant={d.PL.ant} atu={d.PL.atu} highlight />
-              {sa('2.3').filter(a => !a.conta.startsWith('2.3.3.')).map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={1} />)}
-              {(d.resultAcum.ant !== 0 || d.resultAcum.atu !== 0) && <TableRow2 label="Resultados Acumulados" ant={d.resultAcum.ant} atu={d.resultAcum.atu} indent={1} />}
-              {sa('2.3.3').map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={2} />)}
+              {sa('2.3').filter(a => a.conta !== '2.3.3' && !a.conta.startsWith('2.3.3.')).map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={1} />)}
+              {(() => { const subs233 = sa('2.3.3'); const hasHeader = d.resultAcum.ant !== 0 || d.resultAcum.atu !== 0 || subs233.length > 0; const antTotal = d.resultAcum.ant || subs233.reduce((s, a) => s + a.ant, 0); const atuTotal = d.resultAcum.atu || subs233.reduce((s, a) => s + a.atu, 0); return hasHeader ? <><TableRow2 label="Resultados Acumulados" ant={antTotal} atu={atuTotal} indent={1} />{subs233.map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={2} />)}</> : null; })()}
               <TableRow2 label="TOTAL PASSIVO + PL" ant={d.ativo.total.ant} atu={d.ativo.total.atu} highlight />
             </tbody>
           </table>
