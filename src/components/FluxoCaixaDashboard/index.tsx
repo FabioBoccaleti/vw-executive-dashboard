@@ -56,6 +56,20 @@ function parseBalancete(text: string) {
   const creditos = { ant: absAnt('1.1.3'), atu: absAtu('1.1.3') };
   const contasCorr = { ant: absAnt('1.1.4'), atu: absAtu('1.1.4') };
   const valDiversos = { ant: absAnt('1.1.5'), atu: absAtu('1.1.5') };
+  // Sub-contas de Créditos de Vendas (1.1.3)
+  const cred_3_01_01 = { ant: absAnt('1.1.3.01.01'), atu: absAtu('1.1.3.01.01'), desc: get('1.1.3.01.01').desc };
+  const cred_3_01_02 = { ant: absAnt('1.1.3.01.02'), atu: absAtu('1.1.3.01.02'), desc: get('1.1.3.01.02').desc };
+  const cred_3_01_03 = { ant: absAnt('1.1.3.01.03'), atu: absAtu('1.1.3.01.03'), desc: get('1.1.3.01.03').desc };
+  const cred_3_01_04 = { ant: absAnt('1.1.3.01.04'), atu: absAtu('1.1.3.01.04'), desc: get('1.1.3.01.04').desc };
+  const cred_3_01_06 = { ant: absAnt('1.1.3.01.06'), atu: absAtu('1.1.3.01.06'), desc: get('1.1.3.01.06').desc };
+  const cred_3_01_10 = { ant: absAnt('1.1.3.01.10'), atu: absAtu('1.1.3.01.10'), desc: get('1.1.3.01.10').desc };
+  // Sub-contas de Contas Correntes (1.1.4)
+  const contCorr_4_01_01 = { ant: absAnt('1.1.4.01.01'), atu: absAtu('1.1.4.01.01'), desc: get('1.1.4.01.01').desc };
+  const contCorr_4_02_01 = { ant: absAnt('1.1.4.02.01'), atu: absAtu('1.1.4.02.01'), desc: get('1.1.4.02.01').desc };
+  const contCorr_4_03_01 = { ant: absAnt('1.1.4.03.01'), atu: absAtu('1.1.4.03.01'), desc: get('1.1.4.03.01').desc };
+  // Sub-contas de Valores Diversos (1.1.5)
+  const valDiv_5_01_01 = { ant: absAnt('1.1.5.01.01'), atu: absAtu('1.1.5.01.01'), desc: get('1.1.5.01.01').desc };
+  const valDiv_5_03_01 = { ant: absAnt('1.1.5.03.01'), atu: absAtu('1.1.5.03.01'), desc: get('1.1.5.03.01').desc };
   // Despesas antecipadas / exercício seguinte (1.1.6)
   const despAntec     = { ant: absAnt('1.1.6'),    atu: absAtu('1.1.6') };
   const despAntecEnc  = { ant: absAnt('1.1.6.01'), atu: absAtu('1.1.6.01') };
@@ -175,7 +189,11 @@ function parseBalancete(text: string) {
     ativo: { total: ativoTotal, circ: ativoCirc, naoCirc: ativoNaoCirc },
     disponib, caixaGeral, bancos, aplicLiq, holdBack,
     estoques, estVeicNovos, estVeicUsados, estPecas, estAudi, estAudiVeicNovos, estAudiVeicUsados, estAudiPecas, outrasAtivAudi,
-    creditos, contasCorr, valDiversos, despAntec, despAntecEnc, despAntecGast,
+    creditos, contasCorr, valDiversos,
+    cred_3_01_01, cred_3_01_02, cred_3_01_03, cred_3_01_04, cred_3_01_06, cred_3_01_10,
+    contCorr_4_01_01, contCorr_4_02_01, contCorr_4_03_01,
+    valDiv_5_01_01, valDiv_5_03_01,
+    despAntec, despAntecEnc, despAntecGast,
     realizLP, realizLPCred, investimentos, imobiliz, intangivel,
     passivo: { circ: passCirc, naoCirc: passNaoCirc },
     emprestCP, obrigTrab, obrigTrib, contasPagar, fornecTotal, fornecVW, fornecAudi,
@@ -672,8 +690,19 @@ function AtivoTab({ data, SectionTitle, TableRow2 }: any) {
               <TableRow2 label="Veículos Usados" ant={d.estAudiVeicUsados?.ant ?? 0} atu={d.estAudiVeicUsados?.atu ?? 0} indent={2} />
               <TableRow2 label="Peças" ant={d.estAudiPecas?.ant ?? 0} atu={d.estAudiPecas?.atu ?? 0} indent={2} />
               <TableRow2 label="Créditos de Vendas" ant={d.creditos.ant} atu={d.creditos.atu} highlight indent={1} />
-              <TableRow2 label="Contas Correntes" ant={d.contasCorr.ant} atu={d.contasCorr.atu} indent={1} />
-              <TableRow2 label="Valores Diversos" ant={d.valDiversos.ant} atu={d.valDiversos.atu} indent={1} />
+              {(d.cred_3_01_01.desc || d.cred_3_01_01.ant !== 0 || d.cred_3_01_01.atu !== 0) && <TableRow2 label={d.cred_3_01_01.desc || '1.1.3.01.01'} ant={d.cred_3_01_01.ant} atu={d.cred_3_01_01.atu} indent={2} />}
+              {(d.cred_3_01_02.desc || d.cred_3_01_02.ant !== 0 || d.cred_3_01_02.atu !== 0) && <TableRow2 label={d.cred_3_01_02.desc || '1.1.3.01.02'} ant={d.cred_3_01_02.ant} atu={d.cred_3_01_02.atu} indent={2} />}
+              {(d.cred_3_01_03.desc || d.cred_3_01_03.ant !== 0 || d.cred_3_01_03.atu !== 0) && <TableRow2 label={d.cred_3_01_03.desc || '1.1.3.01.03'} ant={d.cred_3_01_03.ant} atu={d.cred_3_01_03.atu} indent={2} />}
+              {(d.cred_3_01_04.desc || d.cred_3_01_04.ant !== 0 || d.cred_3_01_04.atu !== 0) && <TableRow2 label={d.cred_3_01_04.desc || '1.1.3.01.04'} ant={d.cred_3_01_04.ant} atu={d.cred_3_01_04.atu} indent={2} />}
+              {(d.cred_3_01_06.desc || d.cred_3_01_06.ant !== 0 || d.cred_3_01_06.atu !== 0) && <TableRow2 label={d.cred_3_01_06.desc || '1.1.3.01.06'} ant={d.cred_3_01_06.ant} atu={d.cred_3_01_06.atu} indent={2} />}
+              {(d.cred_3_01_10.desc || d.cred_3_01_10.ant !== 0 || d.cred_3_01_10.atu !== 0) && <TableRow2 label={d.cred_3_01_10.desc || '1.1.3.01.10'} ant={d.cred_3_01_10.ant} atu={d.cred_3_01_10.atu} indent={2} />}
+              <TableRow2 label="Contas Correntes" ant={d.contasCorr.ant} atu={d.contasCorr.atu} highlight indent={1} />
+              {(d.contCorr_4_01_01.desc || d.contCorr_4_01_01.ant !== 0 || d.contCorr_4_01_01.atu !== 0) && <TableRow2 label={d.contCorr_4_01_01.desc || '1.1.4.01.01'} ant={d.contCorr_4_01_01.ant} atu={d.contCorr_4_01_01.atu} indent={2} />}
+              {(d.contCorr_4_02_01.desc || d.contCorr_4_02_01.ant !== 0 || d.contCorr_4_02_01.atu !== 0) && <TableRow2 label={d.contCorr_4_02_01.desc || '1.1.4.02.01'} ant={d.contCorr_4_02_01.ant} atu={d.contCorr_4_02_01.atu} indent={2} />}
+              {(d.contCorr_4_03_01.desc || d.contCorr_4_03_01.ant !== 0 || d.contCorr_4_03_01.atu !== 0) && <TableRow2 label={d.contCorr_4_03_01.desc || '1.1.4.03.01'} ant={d.contCorr_4_03_01.ant} atu={d.contCorr_4_03_01.atu} indent={2} />}
+              <TableRow2 label="Valores Diversos" ant={d.valDiversos.ant} atu={d.valDiversos.atu} highlight indent={1} />
+              {(d.valDiv_5_01_01.desc || d.valDiv_5_01_01.ant !== 0 || d.valDiv_5_01_01.atu !== 0) && <TableRow2 label={d.valDiv_5_01_01.desc || '1.1.5.01.01'} ant={d.valDiv_5_01_01.ant} atu={d.valDiv_5_01_01.atu} indent={2} />}
+              {(d.valDiv_5_03_01.desc || d.valDiv_5_03_01.ant !== 0 || d.valDiv_5_03_01.atu !== 0) && <TableRow2 label={d.valDiv_5_03_01.desc || '1.1.5.03.01'} ant={d.valDiv_5_03_01.ant} atu={d.valDiv_5_03_01.atu} indent={2} />}
               <TableRow2 label="Despesas Antecipadas (1.1.6)" ant={d.despAntec.ant} atu={d.despAntec.atu} highlight indent={1} />
               <TableRow2 label="  ↳ Encargos Financeiros" ant={d.despAntecEnc.ant} atu={d.despAntecEnc.atu} indent={2} />
               <TableRow2 label="  ↳ Gastos Operacionais" ant={d.despAntecGast.ant} atu={d.despAntecGast.atu} indent={2} />
