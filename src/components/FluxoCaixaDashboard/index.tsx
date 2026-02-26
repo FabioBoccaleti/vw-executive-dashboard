@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BALANCETE_EXEMPLO } from "./balanceteExemplo";
@@ -215,7 +216,7 @@ const fmtVar = (ant: number, atu: number) => {
 };
 
 // ─── COMPONENTS ──────────────────────────────────────────────────────────────
-const KPI = ({ label, value, sub, color = 'emerald', icon }: any) => {
+const KPI = ({ label, value, sub, color = 'emerald', icon, tooltip }: any) => {
   const colorClasses: any = {
     emerald: 'border-l-emerald-500 bg-emerald-50 dark:bg-emerald-950/30',
     blue: 'border-l-blue-500 bg-blue-50 dark:bg-blue-950/30',
@@ -230,6 +231,16 @@ const KPI = ({ label, value, sub, color = 'emerald', icon }: any) => {
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {icon && <span>{icon}</span>}
           {label}
+          {tooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="ml-auto cursor-help text-muted-foreground/60 hover:text-muted-foreground transition-colors">ℹ️</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs whitespace-pre-line text-xs leading-relaxed p-3">
+                {tooltip}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -555,7 +566,9 @@ function OverviewTab({ data, fmtBRL, KPI, BarGauge, SectionTitle }: any) {
   const d = data;
   const varAtivo = d.ativo.total.atu - d.ativo.total.ant;
   const varCaixa = d.disponib.atu - d.disponib.ant;
-  const varEstoque = d.estoques.atu - d.estoques.ant;
+  const estoqueTotalAtu = d.estoques.atu + (d.estAudi?.atu ?? 0);
+  const estoqueTotalAnt = d.estoques.ant + (d.estAudi?.ant ?? 0);
+  const varEstoque = estoqueTotalAtu - estoqueTotalAnt;
   const varPass = d.passivo.circ.atu - d.passivo.circ.ant;
 
   return (
@@ -563,10 +576,21 @@ function OverviewTab({ data, fmtBRL, KPI, BarGauge, SectionTitle }: any) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <KPI label="Total do Ativo" value={fmtBRL(d.ativo.total.atu, true)} sub={`Ant: ${fmtBRL(d.ativo.total.ant, true)} | Var: ${fmtBRL(varAtivo, true)}`} color="emerald" icon="📊" />
         <KPI label="Disponibilidades" value={fmtBRL(d.disponib.atu, true)} sub={`Variação: ${varCaixa >= 0 ? '+' : ''}${fmtBRL(varCaixa, true)}`} color={varCaixa >= 0 ? "emerald" : "red"} icon="💵" />
-        <KPI label="Estoques" value={fmtBRL(d.estoques.atu, true)} sub={`Variação: ${fmtBRL(varEstoque, true)}`} color={varEstoque <= 0 ? "amber" : "red"} icon="🚗" />
+        <KPI label="Estoques" value={fmtBRL(estoqueTotalAtu, true)} sub={`Variação: ${fmtBRL(varEstoque, true)}`} color={varEstoque <= 0 ? "amber" : "red"} icon="🚗" />
         <KPI label="Pass. Circulante" value={fmtBRL(d.passivo.circ.atu, true)} sub={`Variação: ${fmtBRL(varPass, true)}`} color={varPass <= 0 ? "emerald" : "red"} icon="🏦" />
         <KPI label="Patrimônio Líquido" value={fmtBRL(d.PL.atu, true)} sub="Sem variação no período" color="violet" icon="💼" />
-        <KPI label="Fluxo de Caixa Total" value={fmtBRL(d.dfc.fluxoTotal, true)} sub={`Var. real: ${fmtBRL(d.dfc.varCaixaReal, true)}`} color={d.dfc.fluxoTotal >= 0 ? "emerald" : "red"} icon="💰" />
+        <KPI
+          label="Fluxo de Caixa Total"
+          value={fmtBRL(d.dfc.fluxoTotal, true)}
+          sub={`Var. real: ${fmtBRL(d.dfc.varCaixaReal, true)}`}
+          color={d.dfc.fluxoTotal >= 0 ? "emerald" : "red"}
+          icon="💰"
+          tooltip={`Fluxo Operacional:  ${d.dfc.fluxoOper >= 0 ? '+' : '–'} ${fmtBRL(Math.abs(d.dfc.fluxoOper))}
+Fluxo de Investimento:  ${d.dfc.fluxoInvest >= 0 ? '+' : '–'} ${fmtBRL(Math.abs(d.dfc.fluxoInvest))}
+Fluxo de Financiamento:  ${d.dfc.fluxoFinanc >= 0 ? '+' : '–'} ${fmtBRL(Math.abs(d.dfc.fluxoFinanc))}
+────────────────────────────
+Total:  ${d.dfc.fluxoTotal >= 0 ? '+' : '–'} ${fmtBRL(Math.abs(d.dfc.fluxoTotal))}`}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
