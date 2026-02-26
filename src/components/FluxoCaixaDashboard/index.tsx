@@ -689,7 +689,7 @@ function AtivoTab({ data, SectionTitle, TableRow2 }: any) {
               <TableRow2 label="Veículos Novos" ant={d.estAudiVeicNovos?.ant ?? 0} atu={d.estAudiVeicNovos?.atu ?? 0} indent={2} />
               <TableRow2 label="Veículos Usados" ant={d.estAudiVeicUsados?.ant ?? 0} atu={d.estAudiVeicUsados?.atu ?? 0} indent={2} />
               <TableRow2 label="Peças" ant={d.estAudiPecas?.ant ?? 0} atu={d.estAudiPecas?.atu ?? 0} indent={2} />
-              <TableRow2 label="Créditos de Vendas" ant={d.creditos.ant} atu={d.creditos.atu} highlight indent={1} />
+              <TableRow2 label="Créditos" ant={d.creditos.ant} atu={d.creditos.atu} highlight indent={1} />
               {(d.cred_3_01_01.desc || d.cred_3_01_01.ant !== 0 || d.cred_3_01_01.atu !== 0) && <TableRow2 label={d.cred_3_01_01.desc || '1.1.3.01.01'} ant={d.cred_3_01_01.ant} atu={d.cred_3_01_01.atu} indent={2} />}
               {(d.cred_3_01_02.desc || d.cred_3_01_02.ant !== 0 || d.cred_3_01_02.atu !== 0) && <TableRow2 label={d.cred_3_01_02.desc || '1.1.3.01.02'} ant={d.cred_3_01_02.ant} atu={d.cred_3_01_02.atu} indent={2} />}
               {(d.cred_3_01_03.desc || d.cred_3_01_03.ant !== 0 || d.cred_3_01_03.atu !== 0) && <TableRow2 label={d.cred_3_01_03.desc || '1.1.3.01.03'} ant={d.cred_3_01_03.ant} atu={d.cred_3_01_03.atu} indent={2} />}
