@@ -197,6 +197,7 @@ function parseBalancete(text: string) {
     realizLP, realizLPCred, investimentos, imobiliz, intangivel,
     passivo: { circ: passCirc, naoCirc: passNaoCirc },
     emprestCP, obrigTrab, obrigTrib, contasPagar, fornecTotal, fornecVW, fornecAudi,
+    emprestLP, pessoasLig, debitosLig, arrendLP, outrosPassLP,
     PL, capitalSocial,
     receitas: { bruta: recBruta, liq: recLiq, impostosVendas, devolucoes, rendOper, rendFinanc },
     custos: { CMV, despPessoal_per, despFinanc_per, deprec_per },
@@ -268,6 +269,9 @@ const KPI = ({ label, value, sub, color = 'emerald', icon, tooltip }: any) => {
     </Card>
   );
 };
+
+const toTitleCase = (str: string) =>
+  str.toLowerCase().replace(/(?:^|\s)\S/g, (c) => c.toUpperCase());
 
 const TableRow2 = ({ label, ant, atu, highlight, indent = 0 }: any) => {
   const { diff, pct } = fmtVar(ant, atu);
@@ -681,29 +685,29 @@ function AtivoTab({ data, SectionTitle, TableRow2 }: any) {
               <TableRow2 label="Bancos Conta Movimento" ant={d.bancos.ant} atu={d.bancos.atu} indent={2} />
               <TableRow2 label="Aplicações de Liquidez Imediata" ant={d.aplicLiq.ant} atu={d.aplicLiq.atu} indent={2} />
               <TableRow2 label="Hold Back" ant={d.holdBack.ant} atu={d.holdBack.atu} indent={2} />
-              <TableRow2 label="Estoques VW (1.1.2)" ant={d.estoques.ant} atu={d.estoques.atu} highlight indent={1} />
+              <TableRow2 label="Estoques VW" ant={d.estoques.ant} atu={d.estoques.atu} indent={1} />
               <TableRow2 label="Veículos Novos" ant={d.estVeicNovos.ant} atu={d.estVeicNovos.atu} indent={2} />
               <TableRow2 label="Veículos Usados" ant={d.estVeicUsados.ant} atu={d.estVeicUsados.atu} indent={2} />
               <TableRow2 label="Peças" ant={d.estPecas.ant} atu={d.estPecas.atu} indent={2} />
-              <TableRow2 label="Estoques Audi (1.1.7.02)" ant={d.estAudi.ant} atu={d.estAudi.atu} highlight indent={1} />
+              <TableRow2 label="Estoques Audi" ant={d.estAudi.ant} atu={d.estAudi.atu} indent={1} />
               <TableRow2 label="Veículos Novos" ant={d.estAudiVeicNovos?.ant ?? 0} atu={d.estAudiVeicNovos?.atu ?? 0} indent={2} />
               <TableRow2 label="Veículos Usados" ant={d.estAudiVeicUsados?.ant ?? 0} atu={d.estAudiVeicUsados?.atu ?? 0} indent={2} />
               <TableRow2 label="Peças" ant={d.estAudiPecas?.ant ?? 0} atu={d.estAudiPecas?.atu ?? 0} indent={2} />
-              <TableRow2 label="Créditos" ant={d.creditos.ant} atu={d.creditos.atu} highlight indent={1} />
-              {(d.cred_3_01_01.desc || d.cred_3_01_01.ant !== 0 || d.cred_3_01_01.atu !== 0) && <TableRow2 label={d.cred_3_01_01.desc || '1.1.3.01.01'} ant={d.cred_3_01_01.ant} atu={d.cred_3_01_01.atu} indent={2} />}
-              {(d.cred_3_01_02.desc || d.cred_3_01_02.ant !== 0 || d.cred_3_01_02.atu !== 0) && <TableRow2 label={d.cred_3_01_02.desc || '1.1.3.01.02'} ant={d.cred_3_01_02.ant} atu={d.cred_3_01_02.atu} indent={2} />}
-              {(d.cred_3_01_03.desc || d.cred_3_01_03.ant !== 0 || d.cred_3_01_03.atu !== 0) && <TableRow2 label={d.cred_3_01_03.desc || '1.1.3.01.03'} ant={d.cred_3_01_03.ant} atu={d.cred_3_01_03.atu} indent={2} />}
-              {(d.cred_3_01_04.desc || d.cred_3_01_04.ant !== 0 || d.cred_3_01_04.atu !== 0) && <TableRow2 label={d.cred_3_01_04.desc || '1.1.3.01.04'} ant={d.cred_3_01_04.ant} atu={d.cred_3_01_04.atu} indent={2} />}
-              {(d.cred_3_01_06.desc || d.cred_3_01_06.ant !== 0 || d.cred_3_01_06.atu !== 0) && <TableRow2 label={d.cred_3_01_06.desc || '1.1.3.01.06'} ant={d.cred_3_01_06.ant} atu={d.cred_3_01_06.atu} indent={2} />}
-              {(d.cred_3_01_10.desc || d.cred_3_01_10.ant !== 0 || d.cred_3_01_10.atu !== 0) && <TableRow2 label={d.cred_3_01_10.desc || '1.1.3.01.10'} ant={d.cred_3_01_10.ant} atu={d.cred_3_01_10.atu} indent={2} />}
-              <TableRow2 label="Contas Correntes" ant={d.contasCorr.ant} atu={d.contasCorr.atu} highlight indent={1} />
-              {(d.contCorr_4_01_01.desc || d.contCorr_4_01_01.ant !== 0 || d.contCorr_4_01_01.atu !== 0) && <TableRow2 label={d.contCorr_4_01_01.desc || '1.1.4.01.01'} ant={d.contCorr_4_01_01.ant} atu={d.contCorr_4_01_01.atu} indent={2} />}
-              {(d.contCorr_4_02_01.desc || d.contCorr_4_02_01.ant !== 0 || d.contCorr_4_02_01.atu !== 0) && <TableRow2 label={d.contCorr_4_02_01.desc || '1.1.4.02.01'} ant={d.contCorr_4_02_01.ant} atu={d.contCorr_4_02_01.atu} indent={2} />}
-              {(d.contCorr_4_03_01.desc || d.contCorr_4_03_01.ant !== 0 || d.contCorr_4_03_01.atu !== 0) && <TableRow2 label={d.contCorr_4_03_01.desc || '1.1.4.03.01'} ant={d.contCorr_4_03_01.ant} atu={d.contCorr_4_03_01.atu} indent={2} />}
-              <TableRow2 label="Valores Diversos" ant={d.valDiversos.ant} atu={d.valDiversos.atu} highlight indent={1} />
-              {(d.valDiv_5_01_01.desc || d.valDiv_5_01_01.ant !== 0 || d.valDiv_5_01_01.atu !== 0) && <TableRow2 label={d.valDiv_5_01_01.desc || '1.1.5.01.01'} ant={d.valDiv_5_01_01.ant} atu={d.valDiv_5_01_01.atu} indent={2} />}
-              {(d.valDiv_5_03_01.desc || d.valDiv_5_03_01.ant !== 0 || d.valDiv_5_03_01.atu !== 0) && <TableRow2 label={d.valDiv_5_03_01.desc || '1.1.5.03.01'} ant={d.valDiv_5_03_01.ant} atu={d.valDiv_5_03_01.atu} indent={2} />}
-              <TableRow2 label="Despesas Antecipadas (1.1.6)" ant={d.despAntec.ant} atu={d.despAntec.atu} highlight indent={1} />
+              <TableRow2 label="Créditos" ant={d.creditos.ant} atu={d.creditos.atu} indent={1} />
+              {(d.cred_3_01_01.desc || d.cred_3_01_01.ant !== 0 || d.cred_3_01_01.atu !== 0) && <TableRow2 label={toTitleCase(d.cred_3_01_01.desc || '1.1.3.01.01')} ant={d.cred_3_01_01.ant} atu={d.cred_3_01_01.atu} indent={2} />}
+              {(d.cred_3_01_02.desc || d.cred_3_01_02.ant !== 0 || d.cred_3_01_02.atu !== 0) && <TableRow2 label={toTitleCase(d.cred_3_01_02.desc || '1.1.3.01.02')} ant={d.cred_3_01_02.ant} atu={d.cred_3_01_02.atu} indent={2} />}
+              {(d.cred_3_01_03.desc || d.cred_3_01_03.ant !== 0 || d.cred_3_01_03.atu !== 0) && <TableRow2 label={toTitleCase(d.cred_3_01_03.desc || '1.1.3.01.03')} ant={d.cred_3_01_03.ant} atu={d.cred_3_01_03.atu} indent={2} />}
+              {(d.cred_3_01_04.desc || d.cred_3_01_04.ant !== 0 || d.cred_3_01_04.atu !== 0) && <TableRow2 label={toTitleCase(d.cred_3_01_04.desc || '1.1.3.01.04')} ant={d.cred_3_01_04.ant} atu={d.cred_3_01_04.atu} indent={2} />}
+              {(d.cred_3_01_06.desc || d.cred_3_01_06.ant !== 0 || d.cred_3_01_06.atu !== 0) && <TableRow2 label={toTitleCase(d.cred_3_01_06.desc || '1.1.3.01.06')} ant={d.cred_3_01_06.ant} atu={d.cred_3_01_06.atu} indent={2} />}
+              {(d.cred_3_01_10.desc || d.cred_3_01_10.ant !== 0 || d.cred_3_01_10.atu !== 0) && <TableRow2 label={toTitleCase(d.cred_3_01_10.desc || '1.1.3.01.10')} ant={d.cred_3_01_10.ant} atu={d.cred_3_01_10.atu} indent={2} />}
+              <TableRow2 label="Contas Correntes" ant={d.contasCorr.ant} atu={d.contasCorr.atu} indent={1} />
+              {(d.contCorr_4_01_01.desc || d.contCorr_4_01_01.ant !== 0 || d.contCorr_4_01_01.atu !== 0) && <TableRow2 label={toTitleCase(d.contCorr_4_01_01.desc || '1.1.4.01.01')} ant={d.contCorr_4_01_01.ant} atu={d.contCorr_4_01_01.atu} indent={2} />}
+              {(d.contCorr_4_02_01.desc || d.contCorr_4_02_01.ant !== 0 || d.contCorr_4_02_01.atu !== 0) && <TableRow2 label={toTitleCase(d.contCorr_4_02_01.desc || '1.1.4.02.01')} ant={d.contCorr_4_02_01.ant} atu={d.contCorr_4_02_01.atu} indent={2} />}
+              {(d.contCorr_4_03_01.desc || d.contCorr_4_03_01.ant !== 0 || d.contCorr_4_03_01.atu !== 0) && <TableRow2 label={toTitleCase(d.contCorr_4_03_01.desc || '1.1.4.03.01')} ant={d.contCorr_4_03_01.ant} atu={d.contCorr_4_03_01.atu} indent={2} />}
+              <TableRow2 label="Valores Diversos" ant={d.valDiversos.ant} atu={d.valDiversos.atu} indent={1} />
+              {(d.valDiv_5_01_01.desc || d.valDiv_5_01_01.ant !== 0 || d.valDiv_5_01_01.atu !== 0) && <TableRow2 label={toTitleCase(d.valDiv_5_01_01.desc || '1.1.5.01.01')} ant={d.valDiv_5_01_01.ant} atu={d.valDiv_5_01_01.atu} indent={2} />}
+              {(d.valDiv_5_03_01.desc || d.valDiv_5_03_01.ant !== 0 || d.valDiv_5_03_01.atu !== 0) && <TableRow2 label={toTitleCase(d.valDiv_5_03_01.desc || '1.1.5.03.01')} ant={d.valDiv_5_03_01.ant} atu={d.valDiv_5_03_01.atu} indent={2} />}
+              <TableRow2 label="Despesas Antecipadas" ant={d.despAntec.ant} atu={d.despAntec.atu} indent={1} />
               <TableRow2 label="  ↳ Encargos Financeiros" ant={d.despAntecEnc.ant} atu={d.despAntecEnc.atu} indent={2} />
               <TableRow2 label="  ↳ Gastos Operacionais" ant={d.despAntecGast.ant} atu={d.despAntecGast.atu} indent={2} />
               <TableRow2 label="ATIVO NÃO CIRCULANTE" ant={d.ativo.naoCirc.ant} atu={d.ativo.naoCirc.atu} highlight />
@@ -723,6 +727,18 @@ function AtivoTab({ data, SectionTitle, TableRow2 }: any) {
 
 function PassivoTab({ data, SectionTitle, TableRow2 }: any) {
   const d = data;
+  const accounts = d.accounts as Record<string, any>;
+
+  // Retorna sub-contas folha (sem filhos) de um prefixo, com valores não-zero
+  const subAccs = (prefix: string) => {
+    const allKeys = Object.keys(accounts).filter(k => k.startsWith(prefix + '.'));
+    const leaves = allKeys.filter(k => !allKeys.some(other => other !== k && other.startsWith(k + '.')));
+    return leaves
+      .filter(k => accounts[k].saldoAnt !== 0 || accounts[k].saldoAtual !== 0)
+      .sort()
+      .map(k => ({ conta: k, desc: accounts[k].desc, ant: Math.abs(accounts[k].saldoAnt), atu: Math.abs(accounts[k].saldoAtual) }));
+  };
+
   return (
     <div>
       <Card>
@@ -738,15 +754,26 @@ function PassivoTab({ data, SectionTitle, TableRow2 }: any) {
               </tr></thead>
             <tbody>
               <TableRow2 label="PASSIVO CIRCULANTE" ant={d.passivo.circ.ant} atu={d.passivo.circ.atu} highlight />
-              <TableRow2 label="Empréstimos e Floor Plan (CP)" ant={d.emprestCP.ant} atu={d.emprestCP.atu} indent={1} />
-              <TableRow2 label=" Trabalhistas" ant={d.obrigTrab.ant} atu={d.obrigTrab.atu} indent={1} />
+              <TableRow2 label="Empréstimos e Floor Plan" ant={d.emprestCP.ant} atu={d.emprestCP.atu} indent={1} />
+              {subAccs('2.1.1').map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={2} />)}
+              <TableRow2 label="Obrigações Trabalhistas" ant={d.obrigTrab.ant} atu={d.obrigTrab.atu} indent={1} />
+              {subAccs('2.1.2.01').map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={2} />)}
               <TableRow2 label="Obrigações Tributárias" ant={d.obrigTrib.ant} atu={d.obrigTrib.atu} indent={1} />
+              {subAccs('2.1.2.02').map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={2} />)}
               <TableRow2 label="Contas a Pagar" ant={d.contasPagar.ant} atu={d.contasPagar.atu} indent={1} />
+              {subAccs('2.1.2.03').map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={2} />)}
               <TableRow2 label="Fornecedores VW" ant={d.fornecVW.ant} atu={d.fornecVW.atu} indent={1} />
+              {subAccs('2.1.3').map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={2} />)}
               <TableRow2 label="Fornecedores Audi" ant={d.fornecAudi.ant} atu={d.fornecAudi.atu} indent={1} />
+              {subAccs('2.1.4').map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={2} />)}
               <TableRow2 label="PASSIVO NÃO CIRCULANTE" ant={d.passivo.naoCirc.ant} atu={d.passivo.naoCirc.atu} highlight />
+              {d.emprestLP.ant !== 0 || d.emprestLP.atu !== 0 ? <TableRow2 label="Empréstimos Bancários LP" ant={d.emprestLP.ant} atu={d.emprestLP.atu} indent={1} /> : null}
+              {d.pessoasLig.ant !== 0 || d.pessoasLig.atu !== 0 ? <TableRow2 label="Sócios / Pessoas Ligadas" ant={d.pessoasLig.ant} atu={d.pessoasLig.atu} indent={1} /> : null}
+              {d.debitosLig.ant !== 0 || d.debitosLig.atu !== 0 ? <TableRow2 label="Débitos com Ligadas" ant={d.debitosLig.ant} atu={d.debitosLig.atu} indent={1} /> : null}
+              {d.arrendLP.ant !== 0 || d.arrendLP.atu !== 0 ? <TableRow2 label="Arrendamentos LP" ant={d.arrendLP.ant} atu={d.arrendLP.atu} indent={1} /> : null}
+              {d.outrosPassLP.ant !== 0 || d.outrosPassLP.atu !== 0 ? <TableRow2 label="Outros Passivos LP" ant={d.outrosPassLP.ant} atu={d.outrosPassLP.atu} indent={1} /> : null}
               <TableRow2 label="PATRIMÔNIO LÍQUIDO" ant={d.PL.ant} atu={d.PL.atu} highlight />
-              <TableRow2 label="Capital Social" ant={d.capitalSocial.ant} atu={d.capitalSocial.atu} indent={1} />
+              {subAccs('2.3').map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={1} />)}
               <TableRow2 label="TOTAL PASSIVO + PL" ant={d.ativo.total.ant} atu={d.ativo.total.atu} highlight />
             </tbody>
           </table>
