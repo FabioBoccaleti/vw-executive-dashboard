@@ -641,6 +641,9 @@ function AtivoTab({ data, SectionTitle, TableRow2 }: any) {
               <TableRow2 label="Veículos Usados" ant={d.estVeicUsados.ant} atu={d.estVeicUsados.atu} indent={2} />
               <TableRow2 label="Peças" ant={d.estPecas.ant} atu={d.estPecas.atu} indent={2} />
               <TableRow2 label="Estoques Audi (1.1.7.02)" ant={d.estAudi.ant} atu={d.estAudi.atu} highlight indent={1} />
+              <TableRow2 label="Veículos Novos" ant={d.estAudiVeicNovos.ant} atu={d.estAudiVeicNovos.atu} indent={2} />
+              <TableRow2 label="Veículos Usados" ant={d.estAudiVeicUsados.ant} atu={d.estAudiVeicUsados.atu} indent={2} />
+              <TableRow2 label="Peças" ant={d.estAudiPecas.ant} atu={d.estAudiPecas.atu} indent={2} />
               <TableRow2 label="Créditos de Vendas" ant={d.creditos.ant} atu={d.creditos.atu} highlight indent={1} />
               <TableRow2 label="Contas Correntes" ant={d.contasCorr.ant} atu={d.contasCorr.atu} indent={1} />
               <TableRow2 label="Valores Diversos" ant={d.valDiversos.ant} atu={d.valDiversos.atu} indent={1} />

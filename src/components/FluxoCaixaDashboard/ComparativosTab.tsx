@@ -1,12 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { CheckCircle2, Upload, Trash2, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { parseBalancete } from "./balanceteParser";
 import {
   saveComparativo,
   loadComparativosIndex,
   deleteComparativo,
 } from "./comparativosStorage";
+
+/** Lê um File como texto em latin-1 (encoding padrão dos balancetes do sistema) */
+function readFileAsLatin1(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+    reader.readAsText(file, 'latin1');
+  });
+}
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -78,9 +87,9 @@ export function ComparativosTab() {
       setCellError(null);
 
       try {
-        const text = await file.text();
-        const parsed = parseBalancete(text);
-        await saveComparativo(year, month, parsed.accounts);
+        // Lê em latin-1 — mesmo encoding do balancete principal para preservar caracteres acentuados
+        const text = await readFileAsLatin1(file);
+        await saveComparativo(year, month, text);
         setLoaded((prev) => ({ ...prev, [key]: true }));
       } catch (err: any) {
         setCellError({ key, msg: err?.message ?? 'Erro ao importar arquivo' });

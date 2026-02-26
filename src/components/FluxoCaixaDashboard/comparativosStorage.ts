@@ -1,7 +1,10 @@
 // Persistência Redis para os balancetes do menu Comparativos
 // Cada período (ano+mês) é salvo em uma chave individual.
+// Persiste o TEXTO BRUTO (mesma estratégia do balancete principal),
+// garantindo imunidade a mudanças de schema e parse sempre atualizado.
 
 import { kvGet, kvSet, kvDelete, kvKeys } from '@/lib/kvClient';
+import { extractAccounts } from './balanceteParser';
 
 const KEY_PREFIX = 'fluxo_caixa_comparativo_';
 
@@ -12,14 +15,42 @@ function makeKey(year: number, month: number): string {
 export interface ComparativoEntry {
   year: number;
   month: number;
-  accounts: Record<string, any>;
+  /**
+   * Texto bruto do balancete (latin-1, separado por ';') — re-parsed em cada uso.
+   * Presente em entradas salvas após a migração para armazenamento de texto bruto.
+   */
+  rawText?: string;
+  /**
+   * @deprecated Contas pré-parsadas salvas antes da migração.
+   * Mantido somente para retrocompatibilidade com entradas antigas no Redis.
+   */
+  accounts?: Record<string, any>;
   timestamp?: number;
 }
 
-/** Salva um balancete de um período específico */
-export async function saveComparativo(year: number, month: number, data: Record<string, any>): Promise<boolean> {
+/**
+ * Resolve o mapa de contas de um ComparativoEntry,
+ * suportando tanto entradas novas (rawText) quanto antigas (accounts).
+ */
+export function resolveComparativoAccounts(
+  entry: ComparativoEntry
+): Record<string, any> | null {
+  if (entry.rawText) {
+    return extractAccounts(entry.rawText);
+  }
+  if (entry.accounts) {
+    return entry.accounts;
+  }
+  return null;
+}
+
+/**
+ * Salva o texto bruto de um balancete de um período específico.
+ * @param rawText Conteúdo original do arquivo lido em latin-1
+ */
+export async function saveComparativo(year: number, month: number, rawText: string): Promise<boolean> {
   try {
-    const entry: ComparativoEntry = { year, month, accounts: data, timestamp: Date.now() };
+    const entry: ComparativoEntry = { year, month, rawText, timestamp: Date.now() };
     return await kvSet(makeKey(year, month), entry);
   } catch (err) {
     console.error('Erro ao salvar comparativo:', err);
