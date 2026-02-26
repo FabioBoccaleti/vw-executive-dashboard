@@ -47,8 +47,11 @@ function parseBalancete(text: string) {
   const estVeicUsados = { ant: absAnt('1.1.2.02'), atu: absAtu('1.1.2.02') };
   const estPecas = { ant: absAnt('1.1.2.03'), atu: absAtu('1.1.2.03') };
   // Estoques Audi (grupo 1.1.7) — atividade separada da VW
-  const estAudi        = { ant: absAnt('1.1.7.02'), atu: absAtu('1.1.7.02') };
-  const outrasAtivAudi = { ant: absAnt('1.1.7'),    atu: absAtu('1.1.7') };
+  const estAudi          = { ant: absAnt('1.1.7.02'),    atu: absAtu('1.1.7.02') };
+  const estAudiVeicNovos = { ant: absAnt('1.1.7.02.01'), atu: absAtu('1.1.7.02.01') };
+  const estAudiVeicUsados = { ant: absAnt('1.1.7.02.02'), atu: absAtu('1.1.7.02.02') };
+  const estAudiPecas     = { ant: absAnt('1.1.7.02.03'), atu: absAtu('1.1.7.02.03') };
+  const outrasAtivAudi   = { ant: absAnt('1.1.7'),       atu: absAtu('1.1.7') };
   const creditos = { ant: absAnt('1.1.3'), atu: absAtu('1.1.3') };
   const contasCorr = { ant: absAnt('1.1.4'), atu: absAtu('1.1.4') };
   const valDiversos = { ant: absAnt('1.1.5'), atu: absAtu('1.1.5') };
@@ -170,7 +173,7 @@ function parseBalancete(text: string) {
     accounts,
     ativo: { total: ativoTotal, circ: ativoCirc, naoCirc: ativoNaoCirc },
     disponib, caixaGeral, bancos, aplicLiq, holdBack,
-    estoques, estVeicNovos, estVeicUsados, estPecas, estAudi, outrasAtivAudi,
+    estoques, estVeicNovos, estVeicUsados, estPecas, estAudi, estAudiVeicNovos, estAudiVeicUsados, estAudiPecas, outrasAtivAudi,
     creditos, contasCorr, valDiversos, despAntec, despAntecEnc, despAntecGast,
     realizLP, realizLPCred, investimentos, imobiliz, intangivel,
     passivo: { circ: passCirc, naoCirc: passNaoCirc },
