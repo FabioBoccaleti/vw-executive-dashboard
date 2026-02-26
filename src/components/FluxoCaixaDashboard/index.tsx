@@ -285,6 +285,16 @@ function subAccs(accounts: Record<string, any>, prefix: string) {
     .map(k => ({ conta: k, desc: accounts[k].desc, ant: Math.abs(accounts[k].saldoAnt), atu: Math.abs(accounts[k].saldoAtual) }));
 }
 
+// Retorna contas a exatamente `extraSegments` níveis abaixo do prefixo
+function subAccsAtDepth(accounts: Record<string, any>, prefix: string, extraSegments: number) {
+  const targetDots = (prefix.match(/\./g) || []).length + extraSegments;
+  return Object.keys(accounts)
+    .filter(k => k.startsWith(prefix + '.') && (k.match(/\./g) || []).length === targetDots)
+    .filter(k => accounts[k].saldoAnt !== 0 || accounts[k].saldoAtual !== 0)
+    .sort()
+    .map(k => ({ conta: k, desc: accounts[k].desc, ant: Math.abs(accounts[k].saldoAnt), atu: Math.abs(accounts[k].saldoAtual) }));
+}
+
 const TableRow2 = ({ label, ant, atu, highlight, indent = 0 }: any) => {
   const { diff, pct } = fmtVar(ant, atu);
   return (
@@ -764,7 +774,7 @@ function PassivoTab({ data, SectionTitle, TableRow2 }: any) {
               {d.outrosPassLP.ant !== 0 || d.outrosPassLP.atu !== 0 ? <TableRow2 label="Outros Passivos LP" ant={d.outrosPassLP.ant} atu={d.outrosPassLP.atu} indent={1} /> : null}
               <TableRow2 label="PATRIMÔNIO LÍQUIDO" ant={d.PL.ant} atu={d.PL.atu} highlight />
               {sa('2.3').filter(a => a.conta !== '2.3.3' && !a.conta.startsWith('2.3.3.')).map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={1} />)}
-              {(() => { const subs233 = sa('2.3.3'); const hasHeader = d.resultAcum.ant !== 0 || d.resultAcum.atu !== 0 || subs233.length > 0; const antTotal = d.resultAcum.ant || subs233.reduce((s, a) => s + a.ant, 0); const atuTotal = d.resultAcum.atu || subs233.reduce((s, a) => s + a.atu, 0); return hasHeader ? <><TableRow2 label="Resultados Acumulados" ant={antTotal} atu={atuTotal} indent={1} />{subs233.map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={2} />)}</> : null; })()}
+              {(() => { const subs233 = subAccsAtDepth(accounts, '2.3.3', 2); const hasHeader = d.resultAcum.ant !== 0 || d.resultAcum.atu !== 0 || subs233.length > 0; const antTotal = d.resultAcum.ant || subs233.reduce((s, a) => s + a.ant, 0); const atuTotal = d.resultAcum.atu || subs233.reduce((s, a) => s + a.atu, 0); return hasHeader ? <><TableRow2 label="Resultados Acumulados" ant={antTotal} atu={atuTotal} indent={1} />{subs233.map((a) => <TableRow2 key={a.conta} label={toTitleCase(a.desc || a.conta)} ant={a.ant} atu={a.atu} indent={2} />)}</> : null; })()}
               <TableRow2 label="TOTAL PASSIVO + PL" ant={d.ativo.total.ant} atu={d.ativo.total.atu} highlight />
             </tbody>
           </table>
@@ -777,25 +787,48 @@ function PassivoTab({ data, SectionTitle, TableRow2 }: any) {
 
 function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
   const d = data;
-  const recBruta = d.receitas.bruta.atu;
+  const accounts = d.accounts as Record<string, any>;
+
+  const recBruta  = d.receitas.bruta.atu;
   const impostosV = d.receitas.impostosVendas.per;
   const devolucoes = d.receitas.devolucoes.per;
-  const recLiq = d.receitas.liq.per;
-  const CMV = d.custos.CMV.per;
-  const lucBruto = recLiq - CMV;
-  const despFinanc = d.custos.despFinanc_per;
-  const deprec = d.custos.deprec_per;
+  const recLiq    = d.receitas.liq.per;
+  const CMV       = d.custos.CMV.per;
+  const lucBruto  = recLiq - CMV;
 
-  const rows = [
-    { label: 'RECEITA BRUTA DE VENDAS', value: recBruta, type: 'header' },
-    { label: '  (–) Impostos sobre Vendas', value: -impostosV, type: 'sub' },
-    { label: '  (–) Devoluções de Vendas', value: -devolucoes, type: 'sub' },
-    { label: 'RECEITA LÍQUIDA', value: recLiq, type: 'subtotal' },
-    { label: '  (–) Custo das Mercadorias Vendidas', value: -CMV, type: 'sub' },
-    { label: 'LUCRO (PREJUÍZO) BRUTO', value: lucBruto, type: 'subtotal' },
-    { label: '  (–) Despesas Financeiras', value: -despFinanc, type: 'sub' },
-    { label: '  (–) Depreciações/Amortizações', value: -deprec, type: 'sub' },
-    { label: '  (+) Rendas Operacionais', value: d.receitas.rendOper.per, type: 'sub' },
+  // Despesas operacionais — folhas dinâmicas da conta 5 pelo período (valDeb)
+  const allKeys5 = Object.keys(accounts).filter(k => k.startsWith('5.'));
+  const despLeaves = allKeys5
+    .filter(k => !allKeys5.some(other => other !== k && other.startsWith(k + '.')))
+    .filter(k => (accounts[k].valDeb || 0) > 0)
+    .sort()
+    .map(k => ({ conta: k, desc: (accounts[k].desc as string) || k, valDeb: (accounts[k].valDeb || 0) as number }));
+  const despTotal = despLeaves.reduce((s, x) => s + x.valDeb, 0);
+
+  const rendOper   = d.receitas.rendOper.per;
+  const rendFinanc = d.receitas.rendFinanc.per;
+  const lucAnteIR  = lucBruto - despTotal + rendOper + rendFinanc;
+  const provisaoIR = d.provisaoIR.saldo;
+  const resLiq     = lucAnteIR - provisaoIR;
+
+  const rows: Array<{ label: string; value: number; type: string }> = [
+    { label: 'RECEITA BRUTA DE VENDAS',                value: recBruta,   type: 'header'   },
+    { label: '  (–) Impostos sobre Vendas',            value: -impostosV, type: 'sub'      },
+    { label: '  (–) Devoluções de Vendas',             value: -devolucoes, type: 'sub'     },
+    { label: 'RECEITA LÍQUIDA',                        value: recLiq,     type: 'subtotal' },
+    { label: '  (–) Custo das Mercadorias Vendidas (CMV)', value: -CMV,   type: 'sub'      },
+    { label: 'LUCRO (PREJUÍZO) BRUTO',                 value: lucBruto,   type: 'subtotal' },
+    { label: 'DESPESAS OPERACIONAIS',                  value: -despTotal, type: 'group'    },
+    ...despLeaves.map(s => ({
+      label: `    (–) ${toTitleCase(s.desc)}`,
+      value: -s.valDeb,
+      type: 'sub',
+    })),
+    { label: '  (+) Rendas Operacionais',              value: rendOper,   type: 'sub'      },
+    { label: '  (+) Rendas Financeiras',               value: rendFinanc, type: 'sub'      },
+    { label: 'RESULTADO ANTES DO IR/CSLL',             value: lucAnteIR,  type: 'subtotal' },
+    ...(provisaoIR > 0 ? [{ label: '  (–) Provisão IR + CSLL', value: -provisaoIR, type: 'sub' }] : []),
+    { label: 'RESULTADO LÍQUIDO DO EXERCÍCIO',         value: resLiq,     type: 'total'    },
   ];
 
   return (
@@ -821,31 +854,48 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Devoluções</div>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{fmtBRL(devolucoes, true)}</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Resultado Líquido</div>
+            <div className={cn('text-2xl font-bold', resLiq >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(resLiq, true)}</div>
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardContent className="pt-6">
-          <SectionTitle icon="📈">DRE do Período (Parcial)</SectionTitle>
+          <SectionTitle icon="📈">DRE — Demonstração do Resultado do Exercício</SectionTitle>
           <table className="w-full border-collapse">
             <tbody>
               {rows.map((r, i) => {
-                const isPos = r.value >= 0;
-                const isHeader = r.type === 'header';
+                const isPos      = r.value >= 0;
+                const isHeader   = r.type === 'header';
                 const isSubtotal = r.type === 'subtotal';
+                const isTotal    = r.type === 'total';
+                const isGroup    = r.type === 'group';
                 const barPct = Math.min(100, (Math.abs(r.value) / (recBruta || 1)) * 100);
                 return (
-                  <tr key={i} className={cn('border-b border-border', isHeader && 'bg-emerald-50/50 dark:bg-emerald-950/20', isSubtotal && 'bg-muted/30')}>
-                    <td className={cn('py-3 px-4 text-sm w-2/5', isHeader || isSubtotal ? 'font-bold text-foreground' : 'text-muted-foreground')}>{r.label}</td>
+                  <tr key={i} className={cn(
+                    'border-b border-border',
+                    isHeader   && 'bg-emerald-50/50 dark:bg-emerald-950/20',
+                    isSubtotal && 'bg-muted/30',
+                    isTotal    && 'bg-primary/10',
+                    isGroup    && 'bg-amber-50/40 dark:bg-amber-950/20',
+                  )}>
+                    <td className={cn(
+                      'py-3 px-4 text-sm w-2/5',
+                      (isHeader || isSubtotal || isTotal || isGroup) ? 'font-bold text-foreground' : 'text-muted-foreground',
+                    )}>{r.label}</td>
                     <td className="py-3 px-4 w-1/3">
                       <div className="h-1 bg-muted rounded-full overflow-hidden">
                         <div className={cn('h-full rounded-full', isPos ? 'bg-emerald-500' : 'bg-red-500')} style={{ width: `${barPct}%` }} />
                       </div>
                     </td>
-                    <td className={cn('py-3 px-4 text-right text-sm font-mono w-1/4', isHeader || isSubtotal ? 'font-bold' : '', isPos ? (isHeader || isSubtotal ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground/80') : 'text-red-600 dark:text-red-400')}>
+                    <td className={cn(
+                      'py-3 px-4 text-right text-sm font-mono w-1/4',
+                      (isHeader || isSubtotal || isTotal || isGroup) ? 'font-bold' : '',
+                      isPos
+                        ? ((isHeader || isSubtotal || isTotal) ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground/80')
+                        : 'text-red-600 dark:text-red-400',
+                    )}>
                       {r.value >= 0 ? fmtBRL(r.value) : `(${fmtBRL(Math.abs(r.value))})`}
                     </td>
                   </tr>
@@ -854,7 +904,7 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
             </tbody>
           </table>
           <p className="mt-4 text-xs text-muted-foreground/70 leading-relaxed">
-            * DRE parcial calculada com base nas variações do balancete (débitos/créditos do período). Para encerramento definitivo, consultar as demonstrações completas.
+            * DRE calculada com base nas variações do balancete (débitos/créditos do período). Para encerramento definitivo, consultar as demonstrações completas.
           </p>
         </CardContent>
       </Card>
