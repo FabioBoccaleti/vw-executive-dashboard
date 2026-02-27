@@ -67,6 +67,7 @@ export function analyzeAccounts(accounts: Record<string, any>) {
   const devolucoes = { per: get('3.3').valDeb };
   const rendOper = { ant: absAnt('3.4'), per: get('3.4').valCred };
   const rendFinanc = { ant: absAnt('3.5'), per: get('3.5').valCred };
+  const rendNaoOper = { ant: absAnt('3.6'), per: get('3.6').valCred };
   const recLiq = { per: recBruta.atu - impostosVendas.per - devolucoes.per };
 
   // CUSTOS E DESPESAS
@@ -153,7 +154,7 @@ export function analyzeAccounts(accounts: Record<string, any>) {
     passivo: { circ: passCirc, naoCirc: passNaoCirc },
     emprestCP, obrigTrab, obrigTrib, contasPagar, fornecTotal, fornecVW, fornecAudi,
     PL, capitalSocial,
-    receitas: { bruta: recBruta, liq: recLiq, impostosVendas, devolucoes, rendOper, rendFinanc },
+    receitas: { bruta: recBruta, liq: recLiq, impostosVendas, devolucoes, rendOper, rendFinanc, rendNaoOper },
     custos: { CMV, despPessoal_per, despFinanc_per, deprec_per },
     provisaoIR,
     dfc: {

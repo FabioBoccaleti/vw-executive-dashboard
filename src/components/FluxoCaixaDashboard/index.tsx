@@ -796,20 +796,23 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
   const CMV       = d.custos.CMV.per;
   const lucBruto  = recLiq - CMV;
 
-  // Despesas operacionais — sub-grupos da conta 5 (nível mais raso com valDeb != 0 no período)
-  const allKeys5withVal = Object.keys(accounts).filter(k => k.startsWith('5.') && Math.abs(accounts[k].valDeb || 0) > 0);
+  // Despesas operacionais — sub-grupos da conta 5 (nível mais raso com movimento líquido != 0)
+  // Movimento líquido = valDeb - valCred (equivalente a saldoAtual - saldoAnt), correto para DRE
+  const netDep = (k: string) => (accounts[k]?.valDeb || 0) - (accounts[k]?.valCred || 0);
+  const allKeys5withVal = Object.keys(accounts).filter(k => k.startsWith('5.') && Math.abs(netDep(k)) > 0);
   const minDepth5 = allKeys5withVal.length > 0
     ? Math.min(...allKeys5withVal.map(k => (k.match(/\./g) || []).length))
     : 1;
   const despLeaves = Object.keys(accounts)
-    .filter(k => k.startsWith('5.') && (k.match(/\./g) || []).length === minDepth5 && Math.abs(accounts[k].valDeb || 0) > 0)
+    .filter(k => k.startsWith('5.') && (k.match(/\./g) || []).length === minDepth5 && Math.abs(netDep(k)) > 0)
     .sort()
-    .map(k => ({ conta: k, desc: (accounts[k].desc as string) || k, valor: Math.abs(accounts[k].valDeb || 0) as number }));
+    .map(k => ({ conta: k, desc: (accounts[k].desc as string) || k, valor: Math.abs(netDep(k)) as number }));
   const despTotal = despLeaves.reduce((s, x) => s + x.valor, 0);
 
-  const rendOper   = d.receitas.rendOper.per;
-  const rendFinanc = d.receitas.rendFinanc.per;
-  const lucAnteIR  = lucBruto - despTotal + rendOper + rendFinanc;
+  const rendOper    = d.receitas.rendOper.per;
+  const rendFinanc  = d.receitas.rendFinanc.per;
+  const rendNaoOper = d.receitas.rendNaoOper.per;
+  const lucAnteIR   = lucBruto - despTotal + rendOper + rendFinanc + rendNaoOper;
   const provisaoIR = d.provisaoIR.saldo;
   const resLiq     = lucAnteIR - provisaoIR;
 
@@ -827,7 +830,8 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
       value: -s.valor,
       type: 'sub',
     })),
-    { label: '  (+) Rendas Financeiras',               value: rendFinanc, type: 'sub'      },
+    { label: '  (+) Rendas Financeiras',               value: rendFinanc,  type: 'sub'      },
+    ...(rendNaoOper !== 0 ? [{ label: '  (+) Rendas Não Operacionais', value: rendNaoOper, type: 'sub' }] : []),
     { label: 'RESULTADO ANTES DO IR/CSLL',             value: lucAnteIR,  type: 'subtotal' },
     ...(provisaoIR > 0 ? [{ label: '  (–) Provisão IR + CSLL', value: -provisaoIR, type: 'sub' }] : []),
     { label: 'RESULTADO LÍQUIDO DO EXERCÍCIO',         value: resLiq,     type: 'total'    },
@@ -895,7 +899,7 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
                       'py-3 px-4 text-right text-sm font-mono w-1/4',
                       (isHeader || isSubtotal || isTotal || isGroup) ? 'font-bold' : '',
                       isPos
-                        ? ((isHeader || isSubtotal || isTotal) ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground/80')
+                        ? ((isHeader || isSubtotal || isTotal || isGroup) ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground/80')
                         : 'text-red-600 dark:text-red-400',
                     )}>
                       {r.value >= 0 ? fmtBRL(r.value) : `(${fmtBRL(Math.abs(r.value))})`}
