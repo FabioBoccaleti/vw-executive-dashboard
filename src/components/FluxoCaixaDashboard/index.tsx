@@ -176,6 +176,12 @@ function parseBalancete(text: string) {
   const dPessoasLig = pessoasLig.atu - pessoasLig.ant;
   const dDebitosLig = debitosLig.atu - debitosLig.ant;
   const dArrendLP   = arrendLP.atu   - arrendLP.ant;
+  const dOutrosPassLP = outrosPassLP.atu - outrosPassLP.ant; // 2.2.3
+  // Resíduo de 2.2.1 — sub-contas não mapeadas individualmente (ex: 2.2.1.03, 2.2.1.05 etc.)
+  const grupo2_2_1 = { ant: absAnt('2.2.1'), atu: absAtu('2.2.1') };
+  const outros2_2_1Ant = grupo2_2_1.ant - emprestLP.ant - pessoasLig.ant - debitosLig.ant - arrendLP.ant;
+  const outros2_2_1Atu = grupo2_2_1.atu - emprestLP.atu - pessoasLig.atu - debitosLig.atu - arrendLP.atu;
+  const dOutros2_2_1   = outros2_2_1Atu - outros2_2_1Ant;
   // NOTA: 2.2.2 (Receitas Diferidas) excluída do financiamento — contém ICMS ST Diferido (não-caixa)
 
   const fluxoFinanc =
@@ -183,7 +189,9 @@ function parseBalancete(text: string) {
     dEmprestLP  +
     dPessoasLig +
     dDebitosLig +
-    dArrendLP;
+    dArrendLP   +
+    dOutrosPassLP +
+    dOutros2_2_1;
 
   const fluxoTotal   = fluxoOper + fluxoInvest + fluxoFinanc;
   const varCaixaReal = disponib.atu - disponib.ant;
@@ -222,6 +230,8 @@ function parseBalancete(text: string) {
       dEstoque, dCred, dContasCorr, dValDiv, dDespAntec, dFornec, dObrigTrib, dObrigTrab, dContasPag,
       dEmprestCP, dEmprestLP, dPessoasLig, dDebitosLig, dArrendLP,
       dIntangivel, dRealizLPCred, dInvestimentos,
+      dOutrosPassLP, dOutros2_2_1, outros2_2_1Ant, outros2_2_1Atu,
+      despOper5Net,
       emprestCPAnt: emprestCP.ant, emprestCPAtu: emprestCP.atu,
       emprestLPAnt: emprestLP.ant, emprestLPAtu: emprestLP.atu,
       pessoasLigAnt: pessoasLig.ant, pessoasLigAtu: pessoasLig.atu,
@@ -479,6 +489,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     { id: 'passivo', label: 'Passivo + PL', icon: <Building2 className="w-4 h-4" />, requiresData: true },
     { id: 'resultado', label: 'Resultado', icon: <TrendingUp className="w-4 h-4" />, requiresData: true },
     { id: 'caixa', label: 'Fluxo de Caixa', icon: <DollarSign className="w-4 h-4" />, requiresData: true },
+    { id: 'caixaDireto', label: 'FC Direto', icon: <DollarSign className="w-4 h-4" />, requiresData: true },
     { id: 'indicadores', label: 'Indicadores', icon: <Target className="w-4 h-4" />, requiresData: true },
     { id: 'diagnostico', label: 'Diagnóstico', icon: <Activity className="w-4 h-4" />, requiresData: true },
     { id: 'comparativos', label: 'Comparativos', icon: <BarChart3 className="w-4 h-4" />, requiresData: false },
@@ -606,6 +617,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'passivo' && <PassivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} />}
               {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
               {activeTab === 'caixa' && <CaixaTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} />}
+              {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} />}
               {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} />}
               {activeTab === 'diagnostico' && <DiagnosticoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
             </div>
@@ -991,6 +1003,12 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
             {(d.arrendLPAnt > 0 || d.arrendLPAtu > 0) && (
               <DFCRow label={`${d.dArrendLP >= 0 ? '(+) Novos Arrendamentos LP' : '(–) Amortização Arrendamentos LP'}  (${fmtBRL(d.arrendLPAnt, true)} → ${fmtBRL(d.arrendLPAtu, true)})`} value={d.dArrendLP} indent={1} />
             )}
+            {(d.dOutrosPassLP !== 0) && (
+              <DFCRow label={`${d.dOutrosPassLP >= 0 ? '(+) Captação' : '(–) Liquidação'} Outros Passivos LP (2.2.3)`} value={d.dOutrosPassLP} indent={1} />
+            )}
+            {(Math.abs(d.dOutros2_2_1) > 0.01) && (
+              <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos L.P. não mapeados (2.2.1 — demais) (${fmtBRL(d.outros2_2_1Ant, true)} → ${fmtBRL(d.outros2_2_1Atu, true)})`} value={d.dOutros2_2_1} indent={1} />
+            )}
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={d.fluxoFinanc} total highlight />
           </tbody>
           <tfoot>
@@ -1015,6 +1033,160 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
         <p className="mt-4 text-xs text-muted-foreground/70 leading-relaxed">
           * DFC pelo método indireto. Correções aplicadas: (1) Intangível 1.5.7 incluído no investimento; (2) Realizável LP limitado aos créditos com ligadas 1.5.1.01.52; (3) Receitas Diferidas 2.2.2 excluída do financiamento — contém ICMS ST Diferido (não-caixa); (4) Arrendamentos LP mapeados em 2.2.1.15; (5) Estoque Audi (1.1.7.02) consolidado no ajuste operacional de estoques.
         </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── FLUXO DE CAIXA DIRETO ──────────────────────────────────────────────────
+function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
+  const d = data.dfc;
+  const rec = data.receitas;
+
+  // ── Atividades Operacionais — Método Direto (NBC TG 03) ───────────────────
+  // (+) Recebimentos de clientes
+  //     = Receita Bruta − Devoluções − Δ Créditos de Vendas − Δ Contas Correntes
+  const recebClientes = rec.bruta.atu - rec.devolucoes.per - d.dCred - d.dContasCorr;
+
+  // (−) Pagamentos a fornecedores
+  //     = −(CMV + Δ Estoques − Δ Fornecedores)
+  const pagFornec = -(data.custos.CMV.per + d.dEstoque - d.dFornec);
+
+  // (−) Pagamentos de impostos sobre vendas
+  //     = −(Impostos sobre Vendas − Δ Obrigações Tributárias)
+  const pagImpostos = -(rec.impostosVendas.per - d.dObrigTrib);
+
+  // (−) Pagamentos de despesas operacionais (conta 5, excl. depreciação)
+  //     ajustados pelas variações de accrual:
+  //     + Δ Contas a Pagar   (aumento = pagou menos = reduz saída)
+  //     + Δ Obrig Trabalhistas (aumento = deve mais salários = reduz saída)
+  //     − Δ Despesas Antecipadas (aumento = pagou antecipado = aumenta saída)
+  //     − Δ Valores Diversos (aumento de ativo = mais caixa usado)
+  const despOperCaixa = -(
+    (d.despOper5Net - d.deprec)
+    - d.dContasPag
+    - d.dObrigTrab
+    + d.dDespAntec
+    + d.dValDiv
+  );
+
+  // (−) IR + CSLL pago
+  const pagIR = -(data.provisaoIR.saldo);
+
+  // (+) Rendas recebidas (operacionais + financeiras + não-operacionais)
+  const rendasRecebidas = rec.rendOper.per + rec.rendFinanc.per + (rec.rendNaoOper?.per ?? 0);
+
+  const fluxoOperDireto = recebClientes + pagFornec + pagImpostos + despOperCaixa + pagIR + rendasRecebidas;
+  const diff = Math.abs(fluxoOperDireto - d.fluxoOper);
+
+  return (
+    <div>
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <KPI label="Caixa Operacional (Direto)" value={fmtBRL(fluxoOperDireto, true)} color={fluxoOperDireto >= 0 ? 'emerald' : 'red'} icon="🏭" />
+        <KPI label="Caixa de Investimento" value={fmtBRL(d.fluxoInvest, true)} color={d.fluxoInvest >= 0 ? 'emerald' : 'amber'} icon="🏗️" />
+        <KPI label="Caixa de Financiamento" value={fmtBRL(d.fluxoFinanc, true)} color={d.fluxoFinanc >= 0 ? 'blue' : 'amber'} icon="🏦" />
+        <KPI label="Variação Total de Caixa" value={fmtBRL(d.fluxoTotal, true)} color={d.fluxoTotal >= 0 ? 'emerald' : 'red'} icon="💰" />
+      </div>
+
+      {diff > 1 && (
+        <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-sm">
+          ⚠️ Diferença de {fmtBRL(diff)} entre método direto e indireto — verifique contas não mapeadas.
+        </div>
+      )}
+      {diff <= 1 && (
+        <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">
+          ✅ Validação cruzada: método direto e indireto convergem ({fmtBRL(diff)} de diferença).
+        </div>
+      )}
+
+      <Card>
+        <CardContent className="pt-6">
+          <SectionTitle icon="💵">DFC — Método Direto (NBC TG 03)</SectionTitle>
+          <table className="dfc-table w-full border-collapse">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Descrição</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Valor (R$)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* ── Operacional ── */}
+              <DFCRow label="ATIVIDADES OPERACIONAIS" value={0} highlight />
+              <DFCRow label="(+) Recebimentos de Clientes" value={recebClientes} indent={1} />
+              <DFCRow label={`    ↳ Receita Bruta: ${fmtBRL(rec.bruta.atu, true)}`} value={rec.bruta.atu} indent={2} />
+              {rec.devolucoes.per !== 0 && <DFCRow label={`    ↳ (–) Devoluções devolvidas a clientes`} value={-rec.devolucoes.per} indent={2} />}
+              {d.dCred !== 0 && <DFCRow label={`    ↳ ${d.dCred > 0 ? '(–)' : '(+)'} Variação Créditos de Vendas (1.1.3)`} value={-d.dCred} indent={2} />}
+              {d.dContasCorr !== 0 && <DFCRow label={`    ↳ ${d.dContasCorr > 0 ? '(–)' : '(+)'} Variação Contas Correntes (1.1.4)`} value={-d.dContasCorr} indent={2} />}
+
+              <DFCRow label="(–) Pagamentos a Fornecedores" value={pagFornec} indent={1} />
+              <DFCRow label={`    ↳ CMV do período: ${fmtBRL(data.custos.CMV.per, true)}`} value={-data.custos.CMV.per} indent={2} />
+              {d.dEstoque !== 0 && <DFCRow label={`    ↳ ${d.dEstoque > 0 ? '(–)' : '(+)'} Variação Estoques (1.1.2 + 1.1.7.02)`} value={-d.dEstoque} indent={2} />}
+              {d.dFornec !== 0 && <DFCRow label={`    ↳ ${d.dFornec > 0 ? '(+)' : '(–)'} Variação Fornecedores (2.1.3 + 2.1.4)`} value={d.dFornec} indent={2} />}
+
+              <DFCRow label="(–) Pagamentos de Despesas Operacionais" value={despOperCaixa} indent={1} />
+              <DFCRow label={`    ↳ Despesas operacionais do período (conta 5, líquido): ${fmtBRL(d.despOper5Net, true)}`} value={-d.despOper5Net} indent={2} />
+              <DFCRow label={`    ↳ (+) Depreciação/Amortização (não-caixa): ${fmtBRL(d.deprec, true)}`} value={d.deprec} indent={2} />
+              {d.dContasPag !== 0 && <DFCRow label={`    ↳ ${d.dContasPag > 0 ? '(+)' : '(–)'} Variação Contas a Pagar (2.1.2.03)`} value={d.dContasPag} indent={2} />}
+              {d.dObrigTrab !== 0 && <DFCRow label={`    ↳ ${d.dObrigTrab > 0 ? '(+)' : '(–)'} Variação Obrig. Trabalhistas (2.1.2.01)`} value={d.dObrigTrab} indent={2} />}
+              {d.dDespAntec !== 0 && <DFCRow label={`    ↳ ${d.dDespAntec > 0 ? '(–)' : '(+)'} Variação Despesas Antecipadas (1.1.6)`} value={-d.dDespAntec} indent={2} />}
+              {d.dValDiv !== 0 && <DFCRow label={`    ↳ ${d.dValDiv > 0 ? '(–)' : '(+)'} Variação Valores Diversos (1.1.5)`} value={-d.dValDiv} indent={2} />}
+
+              <DFCRow label="(–) Pagamentos de Impostos sobre Vendas" value={pagImpostos} indent={1} />
+              <DFCRow label={`    ↳ Impostos sobre Vendas do período: ${fmtBRL(rec.impostosVendas.per, true)}`} value={-rec.impostosVendas.per} indent={2} />
+              {d.dObrigTrib !== 0 && <DFCRow label={`    ↳ ${d.dObrigTrib > 0 ? '(+)' : '(–)'} Variação Obrig. Tributárias (2.1.2.02)`} value={d.dObrigTrib} indent={2} />}
+
+              {pagIR !== 0 && <DFCRow label="(–) IR + CSLL pago (conta 6)" value={pagIR} indent={1} />}
+
+              {rendasRecebidas !== 0 && <DFCRow label="(+) Rendas Recebidas (Oper. + Financ. + Não Oper.)" value={rendasRecebidas} indent={1} />}
+              {rec.rendOper.per !== 0 && <DFCRow label={`    ↳ Rendas Operacionais (3.4): ${fmtBRL(rec.rendOper.per, true)}`} value={rec.rendOper.per} indent={2} />}
+              {rec.rendFinanc.per !== 0 && <DFCRow label={`    ↳ Rendas Financeiras (3.5): ${fmtBRL(rec.rendFinanc.per, true)}`} value={rec.rendFinanc.per} indent={2} />}
+              {(rec.rendNaoOper?.per ?? 0) !== 0 && <DFCRow label={`    ↳ Rendas Não Operacionais (3.6): ${fmtBRL(rec.rendNaoOper.per, true)}`} value={rec.rendNaoOper.per} indent={2} />}
+
+              <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={fluxoOperDireto} total highlight />
+
+              {/* ── Investimento (idêntico ao indireto) ── */}
+              <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} highlight />
+              <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado (1.5.5)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} indent={1} />
+              <DFCRow label={`${-d.dIntangivel >= 0 ? '(+)' : '(–)'} Variação Líquida do Intangível (1.5.7)`} value={-d.dIntangivel} indent={1} />
+              {(d.dInvestimentos !== 0) && <DFCRow label={`${-d.dInvestimentos >= 0 ? '(+)' : '(–)'} Variação de Investimentos (1.5.3) ${fmtBRL(d.investimentosAnt, true)} → ${fmtBRL(d.investimentosAtu, true)}`} value={-d.dInvestimentos} indent={1} />}
+              <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(–)'} Variação Créditos c/ Ligadas LP (1.5.1.01.52)`} value={-d.dRealizLPCred} indent={1} />
+              <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO" value={d.fluxoInvest} total highlight />
+
+              {/* ── Financiamento (idêntico ao indireto) ── */}
+              <DFCRow label="ATIVIDADES DE FINANCIAMENTO" value={0} highlight />
+              {(d.emprestCPAnt > 0 || d.emprestCPAtu > 0) && <DFCRow label={`${d.dEmprestCP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos CP / Floor Plan (${fmtBRL(d.emprestCPAnt, true)} → ${fmtBRL(d.emprestCPAtu, true)})`} value={d.dEmprestCP} indent={1} />}
+              {(d.emprestLPAnt > 0 || d.emprestLPAtu > 0) && <DFCRow label={`${d.dEmprestLP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos Bancários LP (${fmtBRL(d.emprestLPAnt, true)} → ${fmtBRL(d.emprestLPAtu, true)})`} value={d.dEmprestLP} indent={1} />}
+              {(d.pessoasLigAnt > 0 || d.pessoasLigAtu > 0) && <DFCRow label={`${d.dPessoasLig >= 0 ? '(+) Aporte' : '(–) Retirada'} Sócios / Pessoas Ligadas (${fmtBRL(d.pessoasLigAnt, true)} → ${fmtBRL(d.pessoasLigAtu, true)})`} value={d.dPessoasLig} indent={1} />}
+              {(d.debitosLigAnt > 0 || d.debitosLigAtu > 0) && <DFCRow label={`${d.dDebitosLig >= 0 ? '(+) Captação' : '(–) Liquidação'} Débitos com Ligadas LP (${fmtBRL(d.debitosLigAnt, true)} → ${fmtBRL(d.debitosLigAtu, true)})`} value={d.dDebitosLig} indent={1} />}
+              {(d.arrendLPAnt > 0 || d.arrendLPAtu > 0) && <DFCRow label={`${d.dArrendLP >= 0 ? '(+) Novos Arrendamentos LP' : '(–) Amortização Arrendamentos LP'} (${fmtBRL(d.arrendLPAnt, true)} → ${fmtBRL(d.arrendLPAtu, true)})`} value={d.dArrendLP} indent={1} />}
+              {(d.dOutrosPassLP !== 0) && <DFCRow label={`${d.dOutrosPassLP >= 0 ? '(+) Captação' : '(–) Liquidação'} Outros Passivos LP (2.2.3)`} value={d.dOutrosPassLP} indent={1} />}
+              {(Math.abs(d.dOutros2_2_1) > 0.01) && <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos LP não mapeados (2.2.1 — demais)`} value={d.dOutros2_2_1} indent={1} />}
+              <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={d.fluxoFinanc} total highlight />
+            </tbody>
+            <tfoot>
+              <tr className="bg-emerald-50/50 dark:bg-emerald-950/20 border-t-2 border-emerald-500/30">
+                <td className="py-3.5 px-3 text-sm font-bold text-foreground">VARIAÇÃO TOTAL DE CAIXA NO PERÍODO</td>
+                <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold', d.fluxoTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(d.fluxoTotal)}</td>
+              </tr>
+              <tr className="bg-muted/30">
+                <td className="py-2.5 px-3 text-sm text-muted-foreground">Saldo de Caixa — Período Anterior</td>
+                <td className="py-2.5 px-3 text-right font-mono text-sm text-muted-foreground">{fmtBRL(data.disponib.ant)}</td>
+              </tr>
+              <tr className="bg-muted/30">
+                <td className="py-2.5 px-3 text-sm text-muted-foreground">Saldo de Caixa — Período Atual</td>
+                <td className="py-2.5 px-3 text-right font-mono text-sm font-semibold text-foreground">{fmtBRL(data.disponib.atu)}</td>
+              </tr>
+              <tr className="bg-violet-50/50 dark:bg-violet-950/20 border-t border-violet-500/30">
+                <td className="py-3 px-3 text-sm font-semibold text-foreground/80">Variação Real de Caixa (conferência com balanço)</td>
+                <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold', d.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(d.varCaixaReal)}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <p className="mt-4 text-xs text-muted-foreground/70 leading-relaxed">
+            * DFC pelo método direto. Recebimentos e pagamentos calculados a partir das variações do balancete (accrual → caixa). Atividades de Investimento e Financiamento idênticas ao método indireto. O total operacional deve convergir com o método indireto — divergências indicam contas não mapeadas.
+          </p>
         </CardContent>
       </Card>
     </div>
