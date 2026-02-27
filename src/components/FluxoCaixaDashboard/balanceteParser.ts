@@ -76,7 +76,7 @@ export function analyzeAccounts(accounts: Record<string, any>) {
   const deprec_per = get('5.5.2.07.20').valDeb;
 
   // PROVISÃO IR + CSLL
-  const provisaoIR = { saldo: absAtu('6') };
+  const provisaoIR = { saldo: get('6').valDeb };
 
   // GERAÇÃO DE CAIXA (método indireto)
   // Estoque total = VW (1.1.2) + Audi (1.1.7.02)

@@ -796,15 +796,15 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
   const CMV       = d.custos.CMV.per;
   const lucBruto  = recLiq - CMV;
 
-  // Despesas operacionais — sub-grupos da conta 5 (nível mais raso com saldoAtual != 0)
-  const allKeys5withVal = Object.keys(accounts).filter(k => k.startsWith('5.') && Math.abs(accounts[k].saldoAtual || 0) > 0);
+  // Despesas operacionais — sub-grupos da conta 5 (nível mais raso com valDeb != 0 no período)
+  const allKeys5withVal = Object.keys(accounts).filter(k => k.startsWith('5.') && Math.abs(accounts[k].valDeb || 0) > 0);
   const minDepth5 = allKeys5withVal.length > 0
     ? Math.min(...allKeys5withVal.map(k => (k.match(/\./g) || []).length))
     : 1;
   const despLeaves = Object.keys(accounts)
-    .filter(k => k.startsWith('5.') && (k.match(/\./g) || []).length === minDepth5 && Math.abs(accounts[k].saldoAtual || 0) > 0)
+    .filter(k => k.startsWith('5.') && (k.match(/\./g) || []).length === minDepth5 && Math.abs(accounts[k].valDeb || 0) > 0)
     .sort()
-    .map(k => ({ conta: k, desc: (accounts[k].desc as string) || k, valor: Math.abs(accounts[k].saldoAtual || 0) as number }));
+    .map(k => ({ conta: k, desc: (accounts[k].desc as string) || k, valor: Math.abs(accounts[k].valDeb || 0) as number }));
   const despTotal = despLeaves.reduce((s, x) => s + x.valor, 0);
 
   const rendOper   = d.receitas.rendOper.per;
@@ -820,7 +820,7 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
     { label: 'RECEITA LÍQUIDA',                        value: recLiq,     type: 'subtotal' },
     { label: '  (–) Custo das Mercadorias Vendidas (CMV)', value: -CMV,   type: 'sub'      },
     { label: 'LUCRO (PREJUÍZO) BRUTO',                 value: lucBruto,   type: 'subtotal' },
-    { label: '(+) RENDAS OPERACIONAIS',               value: rendOper,   type: 'group'    },
+    { label: 'RENDAS OPERACIONAIS',                    value: rendOper,   type: 'group'    },
     { label: 'DESPESAS OPERACIONAIS',                  value: -despTotal, type: 'group'    },
     ...despLeaves.map(s => ({
       label: `    (–) ${toTitleCase(s.desc)}`,
