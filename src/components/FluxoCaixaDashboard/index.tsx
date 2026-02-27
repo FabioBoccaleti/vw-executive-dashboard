@@ -111,6 +111,7 @@ function parseBalancete(text: string) {
   const devolucoes = { per: absAtu('3.3') };
   const rendOper = { ant: absAnt('3.4'), per: absAtu('3.4') };
   const rendFinanc = { ant: absAnt('3.5'), per: absAtu('3.5') };
+  const rendNaoOper = { ant: absAnt('3.6'), per: absAtu('3.6') };
   const recLiq = { per: recBruta.atu - impostosVendas.per - devolucoes.per };
 
   // CUSTOS E DESPESAS
@@ -148,18 +149,26 @@ function parseBalancete(text: string) {
   const ajusteTrab       = dObrigTrab;
   const ajusteContasPag  = dContasPag;
 
+  // Resultado Líquido do período (ponto de partida obrigatório — NBC TG 03 / IAS 7)
+  const despOper5Net = (get('5').valDeb || 0) - (get('5').valCred || 0);
+  const resLiq_dfc   = recLiq.per - CMV.per - despOper5Net
+                     + rendOper.per + rendFinanc.per + rendNaoOper.per - provisaoIR.saldo;
+
   const fluxoOper =
+    resLiq_dfc +
     deprec_per +
-    ajusteEstoque + ajusteCred +
+    ajusteEstoque + ajusteCred + ajusteContasCorr + ajusteValDiv +
     ajusteDespAntec +
     ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag;
 
   // ── Atividades de Investimento ────────────────────────────────────────────
   const dIntangivel   = intangivel.atu   - intangivel.ant;
   const dRealizLPCred = realizLPCred.atu - realizLPCred.ant;
+  const dInvestimentos = investimentos.atu - investimentos.ant;
   const fluxoInvest = -(imobiliz.atu - imobiliz.ant)
                     - dIntangivel
-                    - dRealizLPCred;
+                    - dRealizLPCred
+                    - dInvestimentos;
 
   // ── Atividades de Financiamento ─────────────────────────────────────────────
   const dEmprestCP  = emprestCP.atu  - emprestCP.ant;
@@ -201,21 +210,24 @@ function parseBalancete(text: string) {
     emprestCP, obrigTrab, obrigTrib, contasPagar, fornecTotal, fornecVW, fornecAudi,
     emprestLP, pessoasLig, debitosLig, arrendLP, outrosPassLP,
     PL, capitalSocial, resultAcum,
-    receitas: { bruta: recBruta, liq: recLiq, impostosVendas, devolucoes, rendOper, rendFinanc },
+    receitas: { bruta: recBruta, liq: recLiq, impostosVendas, devolucoes, rendOper, rendFinanc, rendNaoOper },
     custos: { CMV, despPessoal_per, despFinanc_per, deprec_per },
     provisaoIR,
     dfc: {
+      resLiq: resLiq_dfc,
       deprec: deprec_per,
-      ajusteEstoque, ajusteCred, ajusteDespAntec, ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
+      ajusteEstoque, ajusteCred, ajusteContasCorr, ajusteValDiv, ajusteDespAntec,
+      ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
       fluxoOper, fluxoInvest, fluxoFinanc, fluxoTotal, varCaixaReal,
-      dEstoque, dCred, dDespAntec, dFornec, dObrigTrib, dObrigTrab, dContasPag,
+      dEstoque, dCred, dContasCorr, dValDiv, dDespAntec, dFornec, dObrigTrib, dObrigTrab, dContasPag,
       dEmprestCP, dEmprestLP, dPessoasLig, dDebitosLig, dArrendLP,
-      dIntangivel, dRealizLPCred,
+      dIntangivel, dRealizLPCred, dInvestimentos,
       emprestCPAnt: emprestCP.ant, emprestCPAtu: emprestCP.atu,
       emprestLPAnt: emprestLP.ant, emprestLPAtu: emprestLP.atu,
       pessoasLigAnt: pessoasLig.ant, pessoasLigAtu: pessoasLig.atu,
       debitosLigAnt: debitosLig.ant, debitosLigAtu: debitosLig.atu,
       arrendLPAnt: arrendLP.ant, arrendLPAtu: arrendLP.atu,
+      investimentosAnt: investimentos.ant, investimentosAtu: investimentos.atu,
     },
     indicadores: { liqCorrente, liqImediata, endivTotal, partCapTerceiros, margemBruta }
   };
@@ -811,7 +823,7 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
 
   const rendOper    = d.receitas.rendOper.per;
   const rendFinanc  = d.receitas.rendFinanc.per;
-  const rendNaoOper = d.receitas.rendNaoOper.per;
+  const rendNaoOper = d.receitas.rendNaoOper?.per ?? 0;
   const lucAnteIR   = lucBruto - despTotal + rendOper + rendFinanc + rendNaoOper;
   const provisaoIR = d.provisaoIR.saldo;
   const resLiq     = lucAnteIR - provisaoIR;
@@ -824,6 +836,7 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
     { label: '  (–) Custo das Mercadorias Vendidas (CMV)', value: -CMV,   type: 'sub'      },
     { label: 'LUCRO (PREJUÍZO) BRUTO',                 value: lucBruto,   type: 'subtotal' },
     { label: 'RENDAS OPERACIONAIS',                    value: rendOper,   type: 'group'    },
+    ...(rendNaoOper !== 0 ? [{ label: 'RENDAS NÃO OPERACIONAIS', value: rendNaoOper, type: 'group' }] : []),
     { label: 'DESPESAS OPERACIONAIS',                  value: -despTotal, type: 'group'    },
     ...despLeaves.map(s => ({
       label: `    (–) ${toTitleCase(s.desc)}`,
@@ -831,7 +844,6 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
       type: 'sub',
     })),
     { label: '  (+) Rendas Financeiras',               value: rendFinanc,  type: 'sub'      },
-    ...(rendNaoOper !== 0 ? [{ label: '  (+) Rendas Não Operacionais', value: rendNaoOper, type: 'sub' }] : []),
     { label: 'RESULTADO ANTES DO IR/CSLL',             value: lucAnteIR,  type: 'subtotal' },
     ...(provisaoIR > 0 ? [{ label: '  (–) Provisão IR + CSLL', value: -provisaoIR, type: 'sub' }] : []),
     { label: 'RESULTADO LÍQUIDO DO EXERCÍCIO',         value: resLiq,     type: 'total'    },
@@ -941,22 +953,26 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
           </thead>
           <tbody>
             <DFCRow label="ATIVIDADES OPERACIONAIS" value={0} highlight />
+            <DFCRow label={`${d.resLiq >= 0 ? '(+)' : '(–)'} Resultado Líquido do Exercício (base NBC TG 03)`} value={d.resLiq} indent={1} />
             <DFCRow label="(+) Depreciações e Amortizações (não caixa)" value={d.deprec} indent={1} />
             <DFCRow label={`${d.ajusteEstoque >= 0 ? '(+)' : '(–)'} Variação de Estoques VW + Audi ${d.dEstoque < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'} (1.1.2 + 1.1.7.02)`} value={d.ajusteEstoque} indent={1} />
             <DFCRow label={`    ↳ Estoques VW (1.1.2): ${fmtBRL(data.estoques.ant, true)} → ${fmtBRL(data.estoques.atu, true)}`} value={-(data.estoques.atu - data.estoques.ant)} indent={2} />
             <DFCRow label={`    ↳ Estoques Audi (1.1.7.02): ${fmtBRL(data.estAudi.ant, true)} → ${fmtBRL(data.estAudi.atu, true)}`} value={-(data.estAudi.atu - data.estAudi.ant)} indent={2} />
-            <DFCRow label={`${d.ajusteCred >= 0 ? '(+)' : '(–)'} Variação de Créditos ${d.dCred < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'}`} value={d.ajusteCred} indent={1} />
+            <DFCRow label={`${d.ajusteCred >= 0 ? '(+)' : '(–)'} Variação de Créditos de Vendas (1.1.3) ${d.dCred < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'}`} value={d.ajusteCred} indent={1} />
+            {(d.dContasCorr !== 0) && <DFCRow label={`${d.ajusteContasCorr >= 0 ? '(+)' : '(–)'} Variação de Contas Correntes (1.1.4) ${d.dContasCorr > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteContasCorr} indent={1} />}
+            {(d.dValDiv !== 0) && <DFCRow label={`${d.ajusteValDiv >= 0 ? '(+)' : '(–)'} Variação de Valores Diversos (1.1.5) ${d.dValDiv > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteValDiv} indent={1} />}
             <DFCRow label={`${d.ajusteDespAntec >= 0 ? '(+)' : '(–)'} Variação de Despesas Antecipadas (1.1.6) ${d.dDespAntec > 0 ? '— aumento (uso de caixa)' : '— redução (fonte de caixa)'}`} value={d.ajusteDespAntec} indent={1} />
-            <DFCRow label={`${d.ajusteFornec >= 0 ? '(+)' : '(–)'} Variação de Fornecedores ${d.dFornec < 0 ? '— redução (uso de caixa)' : '— aumento (fonte)'}`} value={d.ajusteFornec} indent={1} />
-            <DFCRow label={`${d.ajusteTrib >= 0 ? '(+)' : '(–)'} Variação de Obrigações Tributárias`} value={d.ajusteTrib} indent={1} />
-            <DFCRow label={`${d.ajusteTrab >= 0 ? '(+)' : '(–)'} Variação de Obrigações Trabalhistas`} value={d.ajusteTrab} indent={1} />
-            <DFCRow label={`${d.ajusteContasPag >= 0 ? '(+)' : '(–)'} Variação de Contas a Pagar`} value={d.ajusteContasPag} indent={1} />
+            <DFCRow label={`${d.ajusteFornec >= 0 ? '(+)' : '(–)'} Variação de Fornecedores (2.1.3 + 2.1.4) ${d.dFornec < 0 ? '— redução (uso de caixa)' : '— aumento (fonte)'}`} value={d.ajusteFornec} indent={1} />
+            <DFCRow label={`${d.ajusteTrib >= 0 ? '(+)' : '(–)'} Variação de Obrigações Tributárias (2.1.2.02)`} value={d.ajusteTrib} indent={1} />
+            <DFCRow label={`${d.ajusteTrab >= 0 ? '(+)' : '(–)'} Variação de Obrigações Trabalhistas (2.1.2.01)`} value={d.ajusteTrab} indent={1} />
+            <DFCRow label={`${d.ajusteContasPag >= 0 ? '(+)' : '(–)'} Variação de Contas a Pagar (2.1.2.03)`} value={d.ajusteContasPag} indent={1} />
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={d.fluxoOper} total highlight />
 
             <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} highlight />
-            <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado 1.5.5 (inclui depreciação acumulada)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} indent={1} />
-            <DFCRow label={`${-d.dIntangivel >= 0 ? '(+)' : '(–)'} Variação Líquida do Intangível 1.5.7 (inclui amortização acumulada)`} value={-d.dIntangivel} indent={1} />
-            <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(–)'} Variação Créditos c/ Ligadas LP 1.5.1.01.52`} value={-d.dRealizLPCred} indent={1} />
+            <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado (1.5.5)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} indent={1} />
+            <DFCRow label={`${-d.dIntangivel >= 0 ? '(+)' : '(–)'} Variação Líquida do Intangível (1.5.7)`} value={-d.dIntangivel} indent={1} />
+            {(d.dInvestimentos !== 0) && <DFCRow label={`${-d.dInvestimentos >= 0 ? '(+)' : '(–)'} Variação de Investimentos (1.5.3) ${fmtBRL(d.investimentosAnt, true)} → ${fmtBRL(d.investimentosAtu, true)}`} value={-d.dInvestimentos} indent={1} />}
+            <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(–)'} Variação Créditos c/ Ligadas LP (1.5.1.01.52)`} value={-d.dRealizLPCred} indent={1} />
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO" value={d.fluxoInvest} total highlight />
 
             <DFCRow label="ATIVIDADES DE FINANCIAMENTO" value={0} highlight />
