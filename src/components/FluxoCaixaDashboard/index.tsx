@@ -106,15 +106,15 @@ function parseBalancete(text: string) {
   const resultAcum = { ant: absAnt('2.3.3'), atu: absAtu('2.3.3') };
 
   // RECEITAS (conta 3 — valores negativos no balancete)
-  const recBruta = { ant: absAnt('3.1'), atu: get('3.1').valCred };
-  const impostosVendas = { per: get('3.2').valDeb };
-  const devolucoes = { per: get('3.3').valDeb };
-  const rendOper = { ant: absAnt('3.4'), per: get('3.4').valCred };
-  const rendFinanc = { ant: absAnt('3.5'), per: get('3.5').valCred };
+  const recBruta = { ant: absAnt('3.1'), atu: absAtu('3.1') };
+  const impostosVendas = { per: absAtu('3.2') };
+  const devolucoes = { per: absAtu('3.3') };
+  const rendOper = { ant: absAnt('3.4'), per: absAtu('3.4') };
+  const rendFinanc = { ant: absAnt('3.5'), per: absAtu('3.5') };
   const recLiq = { per: recBruta.atu - impostosVendas.per - devolucoes.per };
 
   // CUSTOS E DESPESAS
-  const CMV = { per: get('4').valDeb };
+  const CMV = { per: absAtu('4') };
   const despPessoal_per = get('2.1.2.01.01').valCred;
   const despFinanc_per = get('5.5.7').valDeb;
   const deprec_per = get('5.5.2.07.20').valDeb;
@@ -796,14 +796,16 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
   const CMV       = d.custos.CMV.per;
   const lucBruto  = recLiq - CMV;
 
-  // Despesas operacionais — folhas dinâmicas da conta 5 pelo período (valDeb)
-  const allKeys5 = Object.keys(accounts).filter(k => k.startsWith('5.'));
-  const despLeaves = allKeys5
-    .filter(k => !allKeys5.some(other => other !== k && other.startsWith(k + '.')))
-    .filter(k => (accounts[k].valDeb || 0) > 0)
+  // Despesas operacionais — sub-grupos da conta 5 (nível mais raso com saldoAtual != 0)
+  const allKeys5withVal = Object.keys(accounts).filter(k => k.startsWith('5.') && Math.abs(accounts[k].saldoAtual || 0) > 0);
+  const minDepth5 = allKeys5withVal.length > 0
+    ? Math.min(...allKeys5withVal.map(k => (k.match(/\./g) || []).length))
+    : 1;
+  const despLeaves = Object.keys(accounts)
+    .filter(k => k.startsWith('5.') && (k.match(/\./g) || []).length === minDepth5 && Math.abs(accounts[k].saldoAtual || 0) > 0)
     .sort()
-    .map(k => ({ conta: k, desc: (accounts[k].desc as string) || k, valDeb: (accounts[k].valDeb || 0) as number }));
-  const despTotal = despLeaves.reduce((s, x) => s + x.valDeb, 0);
+    .map(k => ({ conta: k, desc: (accounts[k].desc as string) || k, valor: Math.abs(accounts[k].saldoAtual || 0) as number }));
+  const despTotal = despLeaves.reduce((s, x) => s + x.valor, 0);
 
   const rendOper   = d.receitas.rendOper.per;
   const rendFinanc = d.receitas.rendFinanc.per;
@@ -818,13 +820,13 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
     { label: 'RECEITA LÍQUIDA',                        value: recLiq,     type: 'subtotal' },
     { label: '  (–) Custo das Mercadorias Vendidas (CMV)', value: -CMV,   type: 'sub'      },
     { label: 'LUCRO (PREJUÍZO) BRUTO',                 value: lucBruto,   type: 'subtotal' },
+    { label: '(+) RENDAS OPERACIONAIS',               value: rendOper,   type: 'group'    },
     { label: 'DESPESAS OPERACIONAIS',                  value: -despTotal, type: 'group'    },
     ...despLeaves.map(s => ({
       label: `    (–) ${toTitleCase(s.desc)}`,
-      value: -s.valDeb,
+      value: -s.valor,
       type: 'sub',
     })),
-    { label: '  (+) Rendas Operacionais',              value: rendOper,   type: 'sub'      },
     { label: '  (+) Rendas Financeiras',               value: rendFinanc, type: 'sub'      },
     { label: 'RESULTADO ANTES DO IR/CSLL',             value: lucAnteIR,  type: 'subtotal' },
     ...(provisaoIR > 0 ? [{ label: '  (–) Provisão IR + CSLL', value: -provisaoIR, type: 'sub' }] : []),
