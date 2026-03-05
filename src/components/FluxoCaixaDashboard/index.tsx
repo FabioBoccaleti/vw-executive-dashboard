@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity } from "lucide-react";
+import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BALANCETE_EXEMPLO } from "./balanceteExemplo";
 import { loadFluxoCaixaRaw, saveFluxoCaixaData } from "./fluxoCaixaStorage";
@@ -402,45 +402,69 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [redisWarning, setRedisWarning] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Preferência de ano — lida do localStorage para sobreviver a recarregamentos
+  const [selectedYear, setSelectedYearState] = useState<2025 | 2026>(() => {
+    try {
+      const stored = localStorage.getItem('fluxo_caixa_selected_year');
+      return (stored === '2026' ? 2026 : 2025) as 2025 | 2026;
+    } catch {
+      return 2025;
+    }
+  });
+  const setSelectedYear = (year: 2025 | 2026) => {
+    try { localStorage.setItem('fluxo_caixa_selected_year', String(year)); } catch {}
+    setSelectedYearState(year);
+  };
+
   // Carrega dados do Redis ou usa exemplo como fallback
-  const [savedFileName, setSavedFileName] = useState<string | undefined>(undefined);
+  const [savedFileNames, setSavedFileNames] = useState<Record<number, string | undefined>>({ 2025: undefined, 2026: undefined });
+  const savedFileName = savedFileNames[selectedYear];
 
   useEffect(() => {
     async function loadInitialData() {
       try {
         setLoading(true);
+        setData(null);
 
-        // Carrega o texto bruto do Redis (chave fluxo_caixa_raw_v2)
-        const raw = await loadFluxoCaixaRaw();
+        // Carrega o texto bruto do Redis pela chave do ano selecionado
+        const raw = await loadFluxoCaixaRaw(selectedYear);
 
         if (raw?.rawText) {
-          console.log('✅ Balancete carregado do Redis — re-parseando...');
+          console.log(`✅ Balancete ${selectedYear} carregado do Redis — re-parseando...`);
           const parsed = parseBalancete(raw.rawText);
           if (Object.keys(parsed.accounts).length >= 10) {
             setData(parsed);
-            setSavedFileName(raw.fileName);
+            setSavedFileNames(prev => ({ ...prev, [selectedYear]: raw.fileName }));
             setActiveTab('overview');
             return; // sucesso — sai sem usar o exemplo
           }
         }
 
-        // Nenhum dado no Redis: usa exemplos locais
-        console.log('📄 Nenhum balancete no Redis — usando dados de exemplo');
-        const parsed = parseBalancete(BALANCETE_EXEMPLO);
-        if (Object.keys(parsed.accounts).length >= 10) {
-          setData(parsed);
-          setActiveTab('overview');
-        }
-      } catch (err) {
-        console.error('Erro ao carregar dados:', err);
-        try {
+        // Para 2025: usa o exemplo local como fallback
+        if (selectedYear === 2025) {
+          console.log('📄 Nenhum balancete 2025 no Redis — usando dados de exemplo');
           const parsed = parseBalancete(BALANCETE_EXEMPLO);
           if (Object.keys(parsed.accounts).length >= 10) {
             setData(parsed);
             setActiveTab('overview');
           }
-        } catch (parseErr) {
-          console.error('Erro ao carregar balancete de exemplo:', parseErr);
+        } else {
+          // Para 2026: sem dados ainda
+          console.log(`📄 Nenhum balancete ${selectedYear} no Redis`);
+          setData(null);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar dados:', err);
+        if (selectedYear === 2025) {
+          try {
+            const parsed = parseBalancete(BALANCETE_EXEMPLO);
+            if (Object.keys(parsed.accounts).length >= 10) {
+              setData(parsed);
+              setActiveTab('overview');
+            }
+          } catch (parseErr) {
+            console.error('Erro ao carregar balancete de exemplo:', parseErr);
+          }
         }
       } finally {
         setLoading(false);
@@ -448,7 +472,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     }
 
     loadInitialData();
-  }, []);
+  }, [selectedYear]);
 
   const processFile = useCallback((file: File | undefined) => {
     if (!file) return;
@@ -462,17 +486,17 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         const parsed = parseBalancete(text);
         if (Object.keys(parsed.accounts).length < 10) throw new Error('Arquivo não reconhecido como balancete válido.');
 
-        // Persiste o TEXTO BRUTO no Redis — re-parse automático em futuras sessões
-        const saved = await saveFluxoCaixaData(text, file.name);
+        // Persiste o TEXTO BRUTO no Redis — usa chave do ano selecionado
+        const saved = await saveFluxoCaixaData(text, file.name, selectedYear);
         if (saved) {
-          console.log('✅ Balancete salvo no Redis com sucesso:', file.name);
+          console.log(`✅ Balancete ${selectedYear} salvo no Redis com sucesso:`, file.name);
           setRedisWarning(null);
         } else {
           console.warn('⚠️ Não foi possível salvar no Redis, mas os dados estão em memória');
           setRedisWarning('Os dados foram carregados na sessão, mas não foi possível salvar no banco de dados (Redis). Ao recarregar a página os dados serão perdidos. Verifique se as variáveis KV_REST_API_URL e KV_REST_API_TOKEN estão configuradas na Vercel.');
         }
 
-        setSavedFileName(file.name);
+        setSavedFileNames(prev => ({ ...prev, [selectedYear]: file.name }));
         setData(parsed);
         setActiveTab('overview');
       } catch (err: any) {
@@ -481,7 +505,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
       setLoading(false);
     };
     reader.readAsText(file, 'latin1');
-  }, []);
+  }, [selectedYear]);
 
   const TABS = [
     { id: 'overview', label: 'Visão Geral', icon: <BarChart3 className="w-4 h-4" />, requiresData: true },
@@ -490,6 +514,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     { id: 'resultado', label: 'Resultado', icon: <TrendingUp className="w-4 h-4" />, requiresData: true },
     { id: 'caixa', label: 'Fluxo de Caixa', icon: <DollarSign className="w-4 h-4" />, requiresData: true },
     { id: 'caixaDireto', label: 'FC Direto', icon: <DollarSign className="w-4 h-4" />, requiresData: true },
+    { id: 'endividamento', label: 'Endividamento', icon: <Landmark className="w-4 h-4" />, requiresData: true },
     { id: 'indicadores', label: 'Indicadores', icon: <Target className="w-4 h-4" />, requiresData: true },
     { id: 'diagnostico', label: 'Diagnóstico', icon: <Activity className="w-4 h-4" />, requiresData: true },
     { id: 'comparativos', label: 'Comparativos', icon: <BarChart3 className="w-4 h-4" />, requiresData: false },
@@ -512,11 +537,28 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             <div>
               <h1 className="text-xl font-bold">Análise Financeira Sorana</h1>
               <p className="text-sm text-green-100">
-                {savedFileName ? `📂 ${savedFileName}` : 'Fluxo de Caixa & Indicadores'}
+                {savedFileName ? `📂 ${savedFileName}` : `Fluxo de Caixa ${selectedYear}`}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3" />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center bg-green-700 rounded-lg p-1 gap-1">
+              {([2025, 2026] as const).map(year => (
+                <button
+                  key={year}
+                  onClick={() => setSelectedYear(year as 2025 | 2026)}
+                  className={cn(
+                    'px-3 py-1 rounded-md text-sm font-bold transition-colors',
+                    selectedYear === year
+                      ? 'bg-white text-green-700 shadow'
+                      : 'text-green-100 hover:bg-green-600'
+                  )}
+                >
+                  {year}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -599,6 +641,21 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm">Carregando dados...</p>
             </div>
+          ) : !data ? (
+            <div className="flex flex-col items-center justify-center py-32 gap-6 text-slate-500">
+              <div className="text-6xl">📂</div>
+              <div className="text-center">
+                <p className="text-xl font-semibold text-slate-700 mb-2">Nenhum dado para {selectedYear}</p>
+                <p className="text-sm text-slate-500 mb-6">Importe o balancete referente ao exercício de {selectedYear} para visualizar as informações.</p>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center gap-2 mx-auto"
+                >
+                  <Upload className="w-4 h-4" />
+                  Importar Balancete {selectedYear}
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="animate-in fade-in duration-500">
               {error && (
@@ -618,6 +675,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
               {activeTab === 'caixa' && <CaixaTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} />}
               {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} />}
+              {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} />}
               {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} />}
               {activeTab === 'diagnostico' && <DiagnosticoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
             </div>
@@ -629,6 +687,208 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
 }
 
 // ─── TABS ─────────────────────────────────────────────────────────────────────
+
+function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2 }: any) {
+  const d = data;
+  const accounts = d.accounts as Record<string, any>;
+  const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
+
+  // CP: grupo 2.1.1.02.03 (empréstimos bancários curto prazo — bancos financiadores)
+  const cpTotal = { ant: Math.abs(getAcc('2.1.1.02.03').saldoAnt), atu: Math.abs(getAcc('2.1.1.02.03').saldoAtual) };
+  const cpSubs = subAccs(accounts, '2.1.1.02.03');
+
+  // LP: grupo 2.2.1.07 (empréstimos bancários longo prazo)
+  const lpTotal = { ant: d.emprestLP.ant, atu: d.emprestLP.atu };
+  const lpSubs = subAccs(accounts, '2.2.1.07');
+
+  const totalAnt = cpTotal.ant + lpTotal.ant;
+  const totalAtu = cpTotal.atu + lpTotal.atu;
+  const varTotal = totalAtu - totalAnt;
+  const varTotalPct = totalAnt !== 0 ? ((varTotal / totalAnt) * 100) : null;
+
+  return (
+    <div className="space-y-6">
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <KPI
+          label="Empréstimos Curto Prazo"
+          value={fmtBRL(cpTotal.atu, true)}
+          sub={`Ant: ${fmtBRL(cpTotal.ant, true)} | Var: ${fmtBRL(cpTotal.atu - cpTotal.ant, true)}`}
+          color={cpTotal.atu > cpTotal.ant ? 'red' : 'emerald'}
+          icon="📅"
+        />
+        <KPI
+          label="Empréstimos Longo Prazo"
+          value={fmtBRL(lpTotal.atu, true)}
+          sub={`Ant: ${fmtBRL(lpTotal.ant, true)} | Var: ${fmtBRL(lpTotal.atu - lpTotal.ant, true)}`}
+          color={lpTotal.atu > lpTotal.ant ? 'red' : 'emerald'}
+          icon="📆"
+        />
+        <KPI
+          label="Endividamento Bancário Total"
+          value={fmtBRL(totalAtu, true)}
+          sub={`Ant: ${fmtBRL(totalAnt, true)} | Var: ${varTotalPct !== null ? (varTotal >= 0 ? '+' : '') + varTotalPct.toFixed(1) + '%' : '—'}`}
+          color={totalAtu > totalAnt ? 'red' : 'emerald'}
+          icon="🏦"
+        />
+      </div>
+
+      {/* Tabela CP */}
+      <Card>
+        <CardContent className="pt-6">
+          <SectionTitle icon="📅">Empréstimos Bancários — Curto Prazo (2.1.1.02.03)</SectionTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cpSubs.length === 0 ? (
+                  <tr><td colSpan={5} className="py-6 text-center text-sm text-muted-foreground">Nenhuma sub-conta encontrada em 2.1.1.02.03</td></tr>
+                ) : (
+                  cpSubs.map(a => {
+                    const varR = a.atu - a.ant;
+                    const varP = a.ant !== 0 ? (varR / a.ant) * 100 : null;
+                    return (
+                      <tr key={a.conta} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="py-2 px-3">
+                          <span className="text-xs font-mono text-muted-foreground mr-2">{a.conta}</span>
+                          <span className="text-sm text-foreground">{a.desc ? toTitleCase(a.desc) : a.conta}</span>
+                        </td>
+                        <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
+                        <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
+                        <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                          {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                        </td>
+                        <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                          {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+                <tr className="bg-muted/50 font-bold">
+                  <td className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL CURTO PRAZO</td>
+                  <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(cpTotal.ant)}</td>
+                  <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(cpTotal.atu)}</td>
+                  <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${cpTotal.atu - cpTotal.ant > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    {cpTotal.atu - cpTotal.ant >= 0 ? '+' : ''}{fmtBRL(cpTotal.atu - cpTotal.ant)}
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
+                    {cpTotal.ant !== 0 ? `${((cpTotal.atu - cpTotal.ant) / cpTotal.ant * 100) >= 0 ? '+' : ''}${((cpTotal.atu - cpTotal.ant) / cpTotal.ant * 100).toFixed(1)}%` : '—'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tabela LP */}
+      <Card>
+        <CardContent className="pt-6">
+          <SectionTitle icon="📆">Empréstimos Bancários — Longo Prazo (2.2.1.07)</SectionTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lpSubs.length === 0 ? (
+                  <tr><td colSpan={5} className="py-6 text-center text-sm text-muted-foreground">Nenhuma sub-conta encontrada em 2.2.1.07</td></tr>
+                ) : (
+                  lpSubs.map(a => {
+                    const varR = a.atu - a.ant;
+                    const varP = a.ant !== 0 ? (varR / a.ant) * 100 : null;
+                    return (
+                      <tr key={a.conta} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="py-2 px-3">
+                          <span className="text-xs font-mono text-muted-foreground mr-2">{a.conta}</span>
+                          <span className="text-sm text-foreground">{a.desc ? toTitleCase(a.desc) : a.conta}</span>
+                        </td>
+                        <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
+                        <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
+                        <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                          {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                        </td>
+                        <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                          {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+                <tr className="bg-muted/50 font-bold">
+                  <td className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL LONGO PRAZO</td>
+                  <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(lpTotal.ant)}</td>
+                  <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(lpTotal.atu)}</td>
+                  <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${lpTotal.atu - lpTotal.ant > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    {lpTotal.atu - lpTotal.ant >= 0 ? '+' : ''}{fmtBRL(lpTotal.atu - lpTotal.ant)}
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
+                    {lpTotal.ant !== 0 ? `${((lpTotal.atu - lpTotal.ant) / lpTotal.ant * 100) >= 0 ? '+' : ''}${((lpTotal.atu - lpTotal.ant) / lpTotal.ant * 100).toFixed(1)}%` : '—'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Consolidado */}
+      <Card className="border-2 border-border">
+        <CardContent className="pt-6">
+          <SectionTitle icon="🏦">Consolidado do Endividamento Bancário</SectionTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Classificação</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[{ label: 'Curto Prazo (2.1.1.02.03)', ant: cpTotal.ant, atu: cpTotal.atu }, { label: 'Longo Prazo (2.2.1.07)', ant: lpTotal.ant, atu: lpTotal.atu }, { label: 'TOTAL GERAL', ant: totalAnt, atu: totalAtu }].map((row, i) => {
+                  const isTotal = i === 2;
+                  const varR = row.atu - row.ant;
+                  const varP = row.ant !== 0 ? (varR / row.ant) * 100 : null;
+                  return (
+                    <tr key={row.label} className={isTotal ? 'bg-muted/70 font-bold' : 'border-b border-border/50'}>
+                      <td className={`py-2.5 px-3 text-sm ${isTotal ? 'font-bold text-foreground' : 'text-muted-foreground'}`}>{row.label}</td>
+                      <td className={`py-2.5 px-3 text-right text-sm font-mono ${isTotal ? 'font-bold text-muted-foreground' : 'text-muted-foreground'}`}>{fmtBRL(row.ant)}</td>
+                      <td className={`py-2.5 px-3 text-right text-sm font-mono ${isTotal ? 'font-bold text-foreground' : 'text-foreground'}`}>{fmtBRL(row.atu)}</td>
+                      <td className={`py-2.5 px-3 text-right text-sm font-mono ${isTotal ? 'font-bold ' : ''}${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                        {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                      </td>
+                      <td className={`py-2.5 px-3 text-right text-xs font-mono ${isTotal ? 'font-bold ' : ''}${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                        {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 function OverviewTab({ data, fmtBRL, KPI, BarGauge, SectionTitle }: any) {
   const d = data;

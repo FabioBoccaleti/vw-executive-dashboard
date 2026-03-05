@@ -4,7 +4,16 @@
 
 import { kvGet, kvSet, kvDelete } from '@/lib/kvClient';
 
-const FLUXO_CAIXA_KEY = 'fluxo_caixa_raw_v2';
+const FLUXO_CAIXA_KEYS: Record<number, string> = {
+  2025: 'fluxo_caixa_raw_v2',
+  2026: 'fluxo_caixa_2026_raw_v1',
+};
+
+const FLUXO_CAIXA_KEY = FLUXO_CAIXA_KEYS[2025];
+
+function getKey(year: number): string {
+  return FLUXO_CAIXA_KEYS[year] ?? `fluxo_caixa_${year}_raw_v1`;
+}
 
 export interface FluxoCaixaRaw {
   rawText: string;
@@ -16,11 +25,12 @@ export interface FluxoCaixaRaw {
  * Salva o texto bruto do balancete no Redis.
  * @param rawText  Conteúdo original do arquivo .txt
  * @param fileName Nome do arquivo (opcional, para exibição)
+ * @param year     Ano do balancete (default: 2025)
  */
-export async function saveFluxoCaixaData(rawText: string, fileName?: string): Promise<boolean> {
+export async function saveFluxoCaixaData(rawText: string, fileName?: string, year = 2025): Promise<boolean> {
   try {
     const payload: FluxoCaixaRaw = { rawText, fileName, timestamp: Date.now() };
-    return await kvSet(FLUXO_CAIXA_KEY, payload);
+    return await kvSet(getKey(year), payload);
   } catch (error) {
     console.error('Erro ao salvar balancete no Redis:', error);
     return false;
@@ -30,10 +40,11 @@ export async function saveFluxoCaixaData(rawText: string, fileName?: string): Pr
 /**
  * Carrega o texto bruto do balancete do Redis.
  * Retorna null se não houver dados ou se ocorrer erro.
+ * @param year Ano do balancete (default: 2025)
  */
-export async function loadFluxoCaixaRaw(): Promise<FluxoCaixaRaw | null> {
+export async function loadFluxoCaixaRaw(year = 2025): Promise<FluxoCaixaRaw | null> {
   try {
-    return await kvGet<FluxoCaixaRaw>(FLUXO_CAIXA_KEY);
+    return await kvGet<FluxoCaixaRaw>(getKey(year));
   } catch (error) {
     console.error('Erro ao carregar balancete do Redis:', error);
     return null;
@@ -42,10 +53,11 @@ export async function loadFluxoCaixaRaw(): Promise<FluxoCaixaRaw | null> {
 
 /**
  * Limpa os dados do Fluxo de Caixa do Redis.
+ * @param year Ano do balancete (default: 2025)
  */
-export async function clearFluxoCaixaData(): Promise<boolean> {
+export async function clearFluxoCaixaData(year = 2025): Promise<boolean> {
   try {
-    return await kvDelete(FLUXO_CAIXA_KEY);
+    return await kvDelete(getKey(year));
   } catch (error) {
     console.error('Erro ao limpar dados do Fluxo de Caixa:', error);
     return false;
