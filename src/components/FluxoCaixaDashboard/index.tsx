@@ -512,7 +512,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     { id: 'ativo', label: 'Ativo', icon: <Package className="w-4 h-4" />, requiresData: true },
     { id: 'passivo', label: 'Passivo + PL', icon: <Building2 className="w-4 h-4" />, requiresData: true },
     { id: 'resultado', label: 'Resultado', icon: <TrendingUp className="w-4 h-4" />, requiresData: true },
-    { id: 'caixa', label: 'Fluxo de Caixa', icon: <DollarSign className="w-4 h-4" />, requiresData: true },
+    { id: 'caixa', label: 'FC Indireto', icon: <DollarSign className="w-4 h-4" />, requiresData: true },
     { id: 'caixaDireto', label: 'FC Direto', icon: <DollarSign className="w-4 h-4" />, requiresData: true },
     { id: 'endividamento', label: 'Endividamento', icon: <Landmark className="w-4 h-4" />, requiresData: true },
     { id: 'indicadores', label: 'Indicadores', icon: <Target className="w-4 h-4" />, requiresData: true },
