@@ -666,10 +666,13 @@ Total:  ${d.dfc.fluxoTotal >= 0 ? '+' : '–'} ${fmtBRL(Math.abs(d.dfc.fluxoTota
           <CardContent className="pt-6">
             <SectionTitle icon="📦">Composição do Ativo</SectionTitle>
             <BarGauge label="Ativo Circulante" value={d.ativo.circ.atu} max={d.ativo.total.atu} color="emerald" />
-            <BarGauge label="  ↳ Estoques VW (1.1.2)" value={d.estoques.atu} max={d.ativo.total.atu} color="violet" />
-            <BarGauge label="  ↳ Estoques Audi (1.1.7.02)" value={d.estAudi.atu} max={d.ativo.total.atu} color="violet" />
-            <BarGauge label="  ↳ Créditos" value={d.creditos.atu} max={d.ativo.total.atu} color="amber" />
             <BarGauge label="  ↳ Disponibilidades" value={d.disponib.atu} max={d.ativo.total.atu} color="emerald" />
+            <BarGauge label="  ↳ Estoque VW" value={d.estoques.atu} max={d.ativo.total.atu} color="violet" />
+            <BarGauge label="  ↳ Estoque Audi" value={d.estAudi.atu} max={d.ativo.total.atu} color="violet" />
+            <BarGauge label="  ↳ Créditos" value={d.creditos.atu} max={d.ativo.total.atu} color="amber" />
+            <BarGauge label="  ↳ Contas Correntes" value={d.contasCorr.atu} max={d.ativo.total.atu} color="blue" />
+            <BarGauge label="  ↳ Valores Diversos" value={d.valDiversos.atu} max={d.ativo.total.atu} color="orange" />
+            <BarGauge label="  ↳ Despesas Antecipadas" value={d.despAntec.atu} max={d.ativo.total.atu} color="pink" />
             <BarGauge label="Ativo Não Circulante" value={d.ativo.naoCirc.atu} max={d.ativo.total.atu} color="red" />
           </CardContent>
         </Card>
@@ -678,8 +681,11 @@ Total:  ${d.dfc.fluxoTotal >= 0 ? '+' : '–'} ${fmtBRL(Math.abs(d.dfc.fluxoTota
           <CardContent className="pt-6">
             <SectionTitle icon="🏦">Composição do Passivo</SectionTitle>
             <BarGauge label="Pass. Circulante" value={d.passivo.circ.atu} max={d.ativo.total.atu} color="red" />
-            <BarGauge label="  ↳ Empréstimos CP" value={d.emprestCP.atu} max={d.ativo.total.atu} color="red" />
-            <BarGauge label="  ↳ Fornecedores" value={d.fornecTotal.atu} max={d.ativo.total.atu} color="red" />
+            <BarGauge label="  ↳ Empréstimos e Fornecedores" value={d.emprestCP.atu + d.fornecVW.atu} max={d.ativo.total.atu} color="red" />
+            <BarGauge label="  ↳ Obrigações Trabalhistas" value={d.obrigTrab.atu} max={d.ativo.total.atu} color="orange" />
+            <BarGauge label="  ↳ Obrigações Tributárias" value={d.obrigTrib.atu} max={d.ativo.total.atu} color="amber" />
+            <BarGauge label="  ↳ Contas a Pagar" value={d.contasPagar.atu} max={d.ativo.total.atu} color="red" />
+            <BarGauge label="  ↳ Fornecedores Audi" value={d.fornecAudi.atu} max={d.ativo.total.atu} color="violet" />
             <BarGauge label="Pass. Não Circulante" value={d.passivo.naoCirc.atu} max={d.ativo.total.atu} color="amber" />
             <BarGauge label="Patrimônio Líquido" value={d.PL.atu} max={d.ativo.total.atu} color="emerald" />
           </CardContent>
