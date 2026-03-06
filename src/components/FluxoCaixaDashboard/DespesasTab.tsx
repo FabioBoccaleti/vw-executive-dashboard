@@ -31,16 +31,17 @@ interface DespesasTabProps {
   fmtBRL: (v: number, abs?: boolean) => string;
   SectionTitle: React.ComponentType<{ icon?: string; children: React.ReactNode }>;
   KPI: React.ComponentType<any>;
+  showTabela: boolean;
+  setShowTabela: (v: (prev: boolean) => boolean) => void;
 }
 
-export function DespesasTab({ data, fmtBRL, SectionTitle, KPI }: DespesasTabProps) {
+export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setShowTabela }: DespesasTabProps) {
   const accounts = data.accounts as Record<string, any>;
   const rows = grupo5Leaves(accounts);
 
   const [tipos, setTipos] = useState<Record<string, string>>({});
   const [loadingTipos, setLoadingTipos] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showTabela, setShowTabela] = useState(false);
   // Ref para debounce do save
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -73,11 +74,11 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI }: DespesasTabProp
 
   return (
     <div className="space-y-4">
-      {/* Botão toggle no topo */}
+      {/* Botão toggle no topo da área branca */}
       <div>
         <button
           onClick={() => setShowTabela((v) => !v)}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md border border-border bg-muted/40 hover:bg-muted/70 transition-colors text-foreground shadow-sm"
+          className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-md border border-border bg-muted/40 hover:bg-muted/70 transition-colors text-foreground shadow-sm"
         >
           <span>{showTabela ? '▲' : '▼'}</span>
           Tabela de Despesas
