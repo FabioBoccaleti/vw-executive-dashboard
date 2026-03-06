@@ -40,6 +40,7 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI }: DespesasTabProp
   const [tipos, setTipos] = useState<Record<string, string>>({});
   const [loadingTipos, setLoadingTipos] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showTabela, setShowTabela] = useState(false);
   // Ref para debounce do save
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,7 +72,20 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI }: DespesasTabProp
   const totalCred = rows.reduce((sum, r) => sum + r.valCred, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Botão toggle no topo */}
+      <div>
+        <button
+          onClick={() => setShowTabela((v) => !v)}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md border border-border bg-muted/40 hover:bg-muted/70 transition-colors text-foreground shadow-sm"
+        >
+          <span>{showTabela ? '▲' : '▼'}</span>
+          Tabela de Despesas
+        </button>
+      </div>
+
+      {showTabela && (
+      <div className="space-y-6">
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KPI
@@ -105,6 +119,7 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI }: DespesasTabProp
               <span className="text-xs text-muted-foreground animate-pulse">Salvando...</span>
             )}
           </div>
+
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead className="bg-muted/50">
@@ -205,6 +220,8 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI }: DespesasTabProp
           </div>
         </CardContent>
       </Card>
+      </div>
+      )}
     </div>
   );
 }
