@@ -20,7 +20,7 @@ const GRUPOS_CONFIG = [
     badgeBg: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
     totalColor: 'text-blue-700 dark:text-blue-300',
     rowHover: 'hover:bg-blue-50/50 dark:hover:bg-blue-950/10',
-    keywords: /sal[aá]rio|inss|fgts|f[eé]ria|13[°º ]|d[eé]cimo.ter|benefi[cç]|assist.*m[eé]d|m[eé]d.*assist|indeniz|trabalhist|encargo|rescis|vale.transp|vale.aliment|pr[eo]labore|aviso.pr[eé]v|folha|pr[eê]mio|hora.*extra|extra.*hora|funcion[aá]rio|uniform|vestuário|comiss[aã]o/i,
+    keywords: /sal[aá]rio|inss|fgts|f[eé]ria|13[°º ]|d[eé]cimo.ter|benefi[cç]|assist.*m[eé]d|m[eé]d.*assist|indeniz|trabalhist|encargo|rescis|vale.transp|vale.aliment|pr[eo]labore|aviso.pr[eé]v|folha|pr[eê]mio|hora.*extra|extra.*hora|funcion[aá]rio|uniform|vestuário|comiss[aã]o|seguro.de.vida|vida.*seguro|forma[cç][aã]o.profis|treinamento|capacita[cç]/i,
   },
   {
     id: 'imoveis',
@@ -46,7 +46,7 @@ const GRUPOS_CONFIG = [
     badgeBg: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
     totalColor: 'text-violet-700 dark:text-violet-300',
     rowHover: 'hover:bg-violet-50/50 dark:hover:bg-violet-950/10',
-    keywords: /pessoa.jur[ií]d|jur[ií]d.*pessoa|frete|honor[aá]rio|consultori|portaria|vigil[aâ]nci|limpeza|conserva[cç][aã]o|m[aã]o.de.obra|servi[cç].*terceiro|terceiro.*servi[cç]|outros servi/i,
+    keywords: /pessoa.jur[ií]d|jur[ií]d.*pessoa|frete|honor[aá]rio|consultori|portaria|vigil[aâ]nci|limpeza|conserva[cç][aã]o|m[aã]o.de.obra|servi[cç].*terceiro|terceiro.*servi[cç]|outros servi|processamento.de.dado|lavagem|est[eé]tica.*ve[ií]c|ve[ií]c.*est[eé]tica|advogado|mercado.livre|guincho|isen[cç][aã]o.*vd|vd.*isen[cç][aã]o|instala[cç].*acess[oó]|acess[oó].*instala[cç]|cont[aá]bil|emplacamento|auditoria/i,
   },
   {
     id: 'financeiras',
@@ -59,7 +59,7 @@ const GRUPOS_CONFIG = [
     badgeBg: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300',
     totalColor: 'text-rose-700 dark:text-rose-300',
     rowHover: 'hover:bg-rose-50/50 dark:hover:bg-rose-950/10',
-    keywords: /juros|iof|tarifa.banc|spread|encargo.financ|multa.financ|emprestimo|financiamento|refis|cdi|taxa.adm|juro.mora|juro.prot|juro.desc|desconto.*financ|financ.*desconto|cart[aã]o.cr[eé]d|taxa.*cart[aã]o|cart[aã]o.*taxa/i,
+    keywords: /juros|iof|tarifa.banc|spread|encargo.financ|multa.financ|emprestimo|financiamento|refis|cdi|taxa.adm|juro.mora|juro.prot|juro.desc|desconto.*financ|financ.*desconto|cart[aã]o.cr[eé]d|taxa.*cart[aã]o|cart[aã]o.*taxa|despesa.*banc[aá]|banc[aá].*despesa/i,
   },
   {
     id: 'outras',
