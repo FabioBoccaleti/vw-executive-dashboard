@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins } from "lucide-react";
+import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { loadFluxoCaixaRaw, saveFluxoCaixaData } from "./fluxoCaixaStorage";
 import { ComparativosTab } from "./ComparativosTab";
@@ -518,6 +518,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     { id: 'resultado', label: 'Resultado', icon: <TrendingUp className="w-4 h-4" />, requiresData: true },
     { id: 'caixa', label: 'FC Indireto', icon: <DollarSign className="w-4 h-4" />, requiresData: true },
     { id: 'caixaDireto', label: 'FC Direto', icon: <DollarSign className="w-4 h-4" />, requiresData: true },
+    { id: 'posicaoEstoques', label: 'Posição de Estoques', icon: <Layers className="w-4 h-4" />, requiresData: true },
     { id: 'valoresReceber', label: 'Valores a Receber', icon: <HandCoins className="w-4 h-4" />, requiresData: true },
     { id: 'endividamento', label: 'Endividamento', icon: <Landmark className="w-4 h-4" />, requiresData: true },
     { id: 'mutuoSocios', label: 'Mútuo Sócios', icon: <Users className="w-4 h-4" />, requiresData: true },
@@ -687,6 +688,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
               {activeTab === 'caixa' && <CaixaTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} />}
               {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} />}
+              {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
               {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
               {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} />}
               {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
@@ -702,6 +704,164 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
 }
 
 // ─── TABS ─────────────────────────────────────────────────────────────────────
+
+function PosicaoEstoquesTab({ data, fmtBRL, SectionTitle, KPI }: any) {
+  const accounts = data.accounts as Record<string, any>;
+  const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
+
+  const vwContas = [
+    { id: '1.1.2.01.01.001' },
+    { id: '1.1.2.02.01.001' },
+    { id: '1.1.2.03.01.001' },
+  ].map(c => {
+    const acc = getAcc(c.id);
+    return { conta: c.id, desc: acc.desc || c.id, ant: Math.abs(acc.saldoAnt), atu: Math.abs(acc.saldoAtual) };
+  });
+
+  const audiContas = [
+    { id: '1.1.7.02.01.001' },
+    { id: '1.1.7.02.02.001' },
+    { id: '1.1.7.02.03.001' },
+  ].map(c => {
+    const acc = getAcc(c.id);
+    return { conta: c.id, desc: acc.desc || c.id, ant: Math.abs(acc.saldoAnt), atu: Math.abs(acc.saldoAtual) };
+  });
+
+  const vwAnt = vwContas.reduce((s, c) => s + c.ant, 0);
+  const vwAtu = vwContas.reduce((s, c) => s + c.atu, 0);
+  const audiAnt = audiContas.reduce((s, c) => s + c.ant, 0);
+  const audiAtu = audiContas.reduce((s, c) => s + c.atu, 0);
+  const totalAnt = vwAnt + audiAnt;
+  const totalAtu = vwAtu + audiAtu;
+  const varTotal = totalAtu - totalAnt;
+  const varTotalPct = totalAnt !== 0 ? (varTotal / totalAnt) * 100 : null;
+
+  const renderTabela = (contas: typeof vwContas, totalAntLocal: number, totalAtuLocal: number, titulo: string, icon: string) => (
+    <Card>
+      <CardContent className="pt-6">
+        <SectionTitle icon={icon}>{titulo}</SectionTitle>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contas.map(a => {
+                const varR = a.atu - a.ant;
+                const varP = a.ant !== 0 ? (varR / a.ant) * 100 : null;
+                return (
+                  <tr key={a.conta} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                    <td className="py-2 px-3">
+                      <span className="text-xs font-mono text-muted-foreground mr-2">{a.conta}</span>
+                      <span className="text-sm text-foreground">{a.desc ? toTitleCase(a.desc) : a.conta}</span>
+                    </td>
+                    <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
+                    <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
+                    <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-emerald-600 dark:text-emerald-400' : varR < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                      {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                    </td>
+                    <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-emerald-600 dark:text-emerald-400' : varR < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                      {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr className="bg-muted/50 font-bold">
+                <td className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL</td>
+                <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(totalAntLocal)}</td>
+                <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(totalAtuLocal)}</td>
+                <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${totalAtuLocal - totalAntLocal > 0 ? 'text-emerald-600 dark:text-emerald-400' : totalAtuLocal - totalAntLocal < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                  {totalAtuLocal - totalAntLocal >= 0 ? '+' : ''}{fmtBRL(totalAtuLocal - totalAntLocal)}
+                </td>
+                <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
+                  {totalAntLocal !== 0 ? `${((totalAtuLocal - totalAntLocal) / totalAntLocal * 100) >= 0 ? '+' : ''}${((totalAtuLocal - totalAntLocal) / totalAntLocal * 100).toFixed(1)}%` : '—'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <KPI
+          label="Estoque Sorana VW"
+          value={fmtBRL(vwAtu, true)}
+          sub={`Ant: ${fmtBRL(vwAnt, true)} | Var: ${fmtBRL(vwAtu - vwAnt, true)}`}
+          color={vwAtu >= vwAnt ? 'emerald' : 'red'}
+          icon="🚗"
+        />
+        <KPI
+          label="Estoque Sorana Audi"
+          value={fmtBRL(audiAtu, true)}
+          sub={`Ant: ${fmtBRL(audiAnt, true)} | Var: ${fmtBRL(audiAtu - audiAnt, true)}`}
+          color={audiAtu >= audiAnt ? 'emerald' : 'red'}
+          icon="🏎️"
+        />
+        <KPI
+          label="Total Consolidado"
+          value={fmtBRL(totalAtu, true)}
+          sub={`Ant: ${fmtBRL(totalAnt, true)} | Var: ${varTotalPct !== null ? (varTotal >= 0 ? '+' : '') + varTotalPct.toFixed(1) + '%' : '—'}`}
+          color={totalAtu >= totalAnt ? 'emerald' : 'red'}
+          icon="📦"
+        />
+      </div>
+
+      {renderTabela(vwContas, vwAnt, vwAtu, 'Estoque Sorana VW', '🚗')}
+      {renderTabela(audiContas, audiAnt, audiAtu, 'Estoque Sorana Audi', '🏎️')}
+
+      {/* Consolidado */}
+      <Card className="border-2 border-border">
+        <CardContent className="pt-6">
+          <SectionTitle icon="📦">Consolidado por Marca</SectionTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Marca</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[{ label: '🚗 Sorana VW', ant: vwAnt, atu: vwAtu }, { label: '🏎️ Sorana Audi', ant: audiAnt, atu: audiAtu }, { label: '📦 TOTAL GERAL', ant: totalAnt, atu: totalAtu }].map((row, i) => {
+                  const isTotal = i === 2;
+                  const varR = row.atu - row.ant;
+                  const varP = row.ant !== 0 ? (varR / row.ant) * 100 : null;
+                  return (
+                    <tr key={row.label} className={isTotal ? 'bg-muted/70 font-bold' : 'border-b border-border/50 hover:bg-muted/30'}>
+                      <td className={`py-2.5 px-3 text-sm ${isTotal ? 'font-bold text-foreground' : 'text-muted-foreground'}`}>{row.label}</td>
+                      <td className={`py-2.5 px-3 text-right text-sm font-mono ${isTotal ? 'font-bold text-muted-foreground' : 'text-muted-foreground'}`}>{fmtBRL(row.ant)}</td>
+                      <td className={`py-2.5 px-3 text-right text-sm font-mono ${isTotal ? 'font-bold text-foreground' : 'text-foreground'}`}>{fmtBRL(row.atu)}</td>
+                      <td className={`py-2.5 px-3 text-right text-sm font-mono ${isTotal ? 'font-bold ' : ''}${varR > 0 ? 'text-emerald-600 dark:text-emerald-400' : varR < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                        {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                      </td>
+                      <td className={`py-2.5 px-3 text-right text-xs font-mono ${isTotal ? 'font-bold ' : ''}${varR > 0 ? 'text-emerald-600 dark:text-emerald-400' : varR < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                        {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI }: any) {
   const accounts = data.accounts as Record<string, any>;
