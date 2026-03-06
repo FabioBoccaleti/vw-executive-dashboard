@@ -72,6 +72,8 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
   const totalDeb = rows.reduce((sum, r) => sum + r.valDeb, 0);
   const totalCred = rows.reduce((sum, r) => sum + r.valCred, 0);
 
+  const visibleRows = rows.filter((r) => r.valor !== 0);
+
   return (
     <div className="space-y-4">
       {/* Botão toggle no topo da área branca */}
@@ -146,14 +148,14 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
                 </tr>
               </thead>
               <tbody>
-                {rows.length === 0 ? (
+                {visibleRows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                       Nenhuma conta do grupo 5 encontrada no balancete
                     </td>
                   </tr>
                 ) : (
-                  rows.map((r) => (
+                  visibleRows.map((r) => (
                     <tr
                       key={r.conta}
                       className="border-b border-border/50 hover:bg-muted/30 transition-colors"
