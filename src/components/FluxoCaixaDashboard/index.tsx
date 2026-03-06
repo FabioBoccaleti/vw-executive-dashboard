@@ -402,12 +402,14 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const fileRef = useRef<HTMLInputElement>(null);
 
   const MONTHS = [
+    { n: 0, label: 'Anual' },
     { n: 1, label: 'Jan' }, { n: 2, label: 'Fev' }, { n: 3, label: 'Mar' },
     { n: 4, label: 'Abr' }, { n: 5, label: 'Mai' }, { n: 6, label: 'Jun' },
     { n: 7, label: 'Jul' }, { n: 8, label: 'Ago' }, { n: 9, label: 'Set' },
     { n: 10, label: 'Out' }, { n: 11, label: 'Nov' }, { n: 12, label: 'Dez' },
   ];
   const MONTH_NAMES: Record<number, string> = {
+    0: 'Anual',
     1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho',
     7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro',
   };
@@ -425,7 +427,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     try {
       const stored = localStorage.getItem('fluxo_caixa_selected_month');
       const n = stored ? parseInt(stored, 10) : NaN;
-      return n >= 1 && n <= 12 ? n : 12;
+      return n >= 0 && n <= 12 ? n : 12;
     } catch {
       return 12;
     }
@@ -972,8 +974,19 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2 }: any) {
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
 
   // CP: grupo 2.1.1.02.03 (empréstimos bancários curto prazo — bancos financiadores)
-  const cpTotal = { ant: Math.abs(getAcc('2.1.1.02.03').saldoAnt), atu: Math.abs(getAcc('2.1.1.02.03').saldoAtual) };
+  const cpBase = { ant: Math.abs(getAcc('2.1.1.02.03').saldoAnt), atu: Math.abs(getAcc('2.1.1.02.03').saldoAtual) };
   const cpSubs = subAccs(accounts, '2.1.1.02.03');
+
+  // Contas adicionais CP com offset de ativo (resultado mínimo = 0)
+  const netAcc1 = {
+    ant: Math.max(0, Math.abs(getAcc('2.1.1.02.01.001').saldoAnt) - Math.abs(getAcc('1.1.2.01.01.001').saldoAnt)),
+    atu: Math.max(0, Math.abs(getAcc('2.1.1.02.01.001').saldoAtual) - Math.abs(getAcc('1.1.2.01.01.001').saldoAtual)),
+  };
+  const netAcc2 = {
+    ant: Math.max(0, Math.abs(getAcc('2.1.4.01.01.007').saldoAnt) - Math.abs(getAcc('1.1.7.02.01.001').saldoAnt)),
+    atu: Math.max(0, Math.abs(getAcc('2.1.4.01.01.007').saldoAtual) - Math.abs(getAcc('1.1.7.02.01.001').saldoAtual)),
+  };
+  const cpTotal = { ant: cpBase.ant + netAcc1.ant + netAcc2.ant, atu: cpBase.atu + netAcc1.atu + netAcc2.atu };
 
   // LP: grupo 2.2.1.07 (empréstimos bancários longo prazo)
   const lpTotal = { ant: d.emprestLP.ant, atu: d.emprestLP.atu };
@@ -1051,6 +1064,48 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2 }: any) {
                     );
                   })
                 )}
+                {/* 2.1.1.02.01.001 líq. 1.1.2.01.01.001 */}
+                {(() => {
+                  const varR = netAcc1.atu - netAcc1.ant;
+                  const varP = netAcc1.ant !== 0 ? (varR / netAcc1.ant) * 100 : null;
+                  return (
+                    <tr className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-3">
+                        <span className="text-xs font-mono text-muted-foreground mr-2">2.1.1.02.01.001</span>
+                        <span className="text-xs text-muted-foreground">(líq. 1.1.2.01.01.001)</span>
+                      </td>
+                      <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(netAcc1.ant)}</td>
+                      <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(netAcc1.atu)}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                        {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                      </td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                        {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })()}
+                {/* 2.1.4.01.01.007 líq. 1.1.7.02.01.001 */}
+                {(() => {
+                  const varR = netAcc2.atu - netAcc2.ant;
+                  const varP = netAcc2.ant !== 0 ? (varR / netAcc2.ant) * 100 : null;
+                  return (
+                    <tr className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-3">
+                        <span className="text-xs font-mono text-muted-foreground mr-2">2.1.4.01.01.007</span>
+                        <span className="text-xs text-muted-foreground">(líq. 1.1.7.02.01.001)</span>
+                      </td>
+                      <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(netAcc2.ant)}</td>
+                      <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(netAcc2.atu)}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                        {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                      </td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                        {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })()}
                 <tr className="bg-muted/50 font-bold">
                   <td className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL CURTO PRAZO</td>
                   <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(cpTotal.ant)}</td>
