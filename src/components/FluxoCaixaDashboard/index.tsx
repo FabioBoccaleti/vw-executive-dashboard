@@ -7,6 +7,7 @@ import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, Ba
 import { cn } from "@/lib/utils";
 import { loadFluxoCaixaRaw, saveFluxoCaixaData } from "./fluxoCaixaStorage";
 import { ComparativosTab } from "./ComparativosTab";
+import { DespesasTab } from "./DespesasTab";
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
 function parseBalancete(text: string) {
@@ -523,6 +524,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     { id: 'posicaoEstoques', label: 'Posição de Estoques', icon: <Layers className="w-4 h-4" />, requiresData: true },
     { id: 'valoresReceber', label: 'Valores a Receber', icon: <HandCoins className="w-4 h-4" />, requiresData: true },
     { id: 'endividamento', label: 'Endividamento', icon: <Landmark className="w-4 h-4" />, requiresData: true },
+    { id: 'despesas', label: 'Despesas', icon: <Receipt className="w-4 h-4" />, requiresData: true },
     { id: 'mutuoSocios', label: 'Mútuo Sócios', icon: <Users className="w-4 h-4" />, requiresData: true },
     { id: 'parcelamentoRefis', label: 'Parcelamento Refis', icon: <Receipt className="w-4 h-4" />, requiresData: true },
     { id: 'indicadores', label: 'Indicadores', icon: <Target className="w-4 h-4" />, requiresData: true },
@@ -693,6 +695,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
               {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
               {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} />}
+              {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
               {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
               {activeTab === 'parcelamentoRefis' && <ParcelamentoRefisTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
               {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} />}
@@ -1072,7 +1075,7 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2 }: any) {
                     <tr className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                       <td className="py-2 px-3">
                         <span className="text-xs font-mono text-muted-foreground mr-2">2.1.1.02.01.001</span>
-                        <span className="text-xs text-muted-foreground">(líq. 1.1.2.01.01.001)</span>
+                        <span className="text-sm text-foreground">Banco Volks Floor Plan Novos VW</span>
                       </td>
                       <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(netAcc1.ant)}</td>
                       <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(netAcc1.atu)}</td>
@@ -1093,7 +1096,7 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2 }: any) {
                     <tr className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                       <td className="py-2 px-3">
                         <span className="text-xs font-mono text-muted-foreground mr-2">2.1.4.01.01.007</span>
-                        <span className="text-xs text-muted-foreground">(líq. 1.1.7.02.01.001)</span>
+                        <span className="text-sm text-foreground">Banco Volks Floor Plan Novos Audi</span>
                       </td>
                       <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(netAcc2.ant)}</td>
                       <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(netAcc2.atu)}</td>
