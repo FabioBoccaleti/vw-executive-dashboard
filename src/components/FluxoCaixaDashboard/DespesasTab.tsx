@@ -157,7 +157,11 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI }: DespesasTabProp
                             value={tipos[r.conta] ?? ''}
                             onChange={(e) => handleTipoChange(r.conta, e.target.value)}
                             placeholder="Informe o tipo"
-                            className="w-full min-w-[160px] px-2 py-1 text-sm rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                            className={`w-full min-w-[160px] px-2 py-1 text-sm rounded-md border focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground ${
+                              r.valor !== 0 && !(tipos[r.conta]?.trim())
+                                ? 'bg-yellow-200 dark:bg-yellow-600/50 border-yellow-400 dark:border-yellow-500'
+                                : 'bg-background border-border'
+                            }`}
                           />
                         )}
                       </td>
