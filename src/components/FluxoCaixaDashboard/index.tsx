@@ -528,7 +528,6 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header */}
       <div className="bg-[#16a34a] text-white shadow-lg fixed top-0 left-0 right-0 z-30">
-        {/* Linha principal */}
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-4">
             <Button
@@ -546,42 +545,29 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Seletor de ano */}
-            <div className="flex items-center bg-green-700 rounded-lg p-1 gap-1">
-              {([2025, 2026] as const).map(year => (
-                <button
-                  key={year}
-                  onClick={() => setSelectedYear(year as 2025 | 2026)}
-                  className={cn(
-                    'px-3 py-1 rounded-md text-sm font-bold transition-colors',
-                    selectedYear === year
-                      ? 'bg-white text-green-700 shadow'
-                      : 'text-green-100 hover:bg-green-600'
-                  )}
-                >
-                  {year}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-        {/* Linha de seleção de mês */}
-        <div className="px-4 pb-2 flex items-center gap-1 overflow-x-auto hide-scrollbar">
-          {MONTHS.map(({ n, label }) => (
-            <button
-              key={n}
-              onClick={() => setSelectedMonth(n)}
-              className={cn(
-                'px-2.5 py-1 rounded-md text-xs font-semibold transition-colors whitespace-nowrap',
-                selectedMonth === n
-                  ? 'bg-white text-green-700 shadow'
-                  : 'text-green-100 hover:bg-green-600'
-              )}
+            <select
+              value={selectedYear}
+              onChange={e => setSelectedYear(Number(e.target.value) as 2025 | 2026)}
+              className="appearance-none bg-white text-green-700 font-bold text-sm rounded-lg px-3 py-1.5 pr-8 border border-green-200 shadow-sm cursor-pointer focus:outline-none"
+              style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2316a34a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
             >
-              {label}
-            </button>
-          ))}
+              <option value={2025}>2025</option>
+              <option value={2026}>2026</option>
+            </select>
+            {/* Seletor de mês */}
+            <select
+              value={selectedMonth}
+              onChange={e => setSelectedMonth(Number(e.target.value))}
+              className="appearance-none bg-white text-green-700 font-bold text-sm rounded-lg px-3 py-1.5 pr-8 border border-green-200 shadow-sm cursor-pointer focus:outline-none"
+              style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2316a34a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+            >
+              {MONTHS.map(({ n, label }) => (
+                <option key={n} value={n}>{label}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -598,7 +584,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
       <>
           <aside
             className={cn(
-              'fixed left-0 top-[92px] bottom-0 w-64 bg-slate-800 text-white z-20 transition-transform duration-300',
+              'fixed left-0 top-[60px] bottom-0 w-64 bg-slate-800 text-white z-20 transition-transform duration-300',
               sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
             )}
           >
@@ -653,7 +639,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         </>
 
       {/* Main Content */}
-      <main className={cn('pt-[92px] min-h-screen', 'lg:ml-64')}>
+      <main className={cn('pt-[60px] min-h-screen', 'lg:ml-64')}>
         <div className="p-6 max-w-7xl mx-auto">
           {activeTab === 'comparativos' ? (
             <div className="animate-in fade-in duration-500">
