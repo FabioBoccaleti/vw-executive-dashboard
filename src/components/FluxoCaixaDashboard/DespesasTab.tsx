@@ -74,6 +74,15 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
 
   const visibleRows = rows.filter((r) => r.valor !== 0);
 
+  // Resumo agrupado por Tipo de Despesa (ignora linhas sem tipo)
+  const resumoMap = visibleRows.reduce<Record<string, number>>((acc, r) => {
+    const tipo = tipos[r.conta]?.trim();
+    if (!tipo) return acc;
+    acc[tipo] = (acc[tipo] ?? 0) + r.valor;
+    return acc;
+  }, {});
+  const resumoRows = Object.entries(resumoMap).sort((a, b) => b[1] - a[1]);
+
   return (
     <div className="space-y-4">
       {/* Botão toggle no topo da área branca */}
@@ -113,6 +122,53 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
           icon="📥"
         />
       </div>
+
+      {/* Resumo por Tipo de Despesa */}
+      {resumoRows.length > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="mb-4">
+              <SectionTitle icon="📊">Resumo por Tipo de Despesa</SectionTitle>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                      Tipo de Despesa
+                    </th>
+                    <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">
+                      Valor (Déb − Créd)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resumoRows.map(([tipo, valor]) => (
+                    <tr key={tipo} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-3 text-sm text-foreground">{tipo}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono font-semibold ${
+                        valor > 0
+                          ? 'text-red-600 dark:text-red-400'
+                          : valor < 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-muted-foreground'
+                      }`}>
+                        {fmtBRL(valor)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-muted/50">
+                    <td className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL</td>
+                    <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-red-600 dark:text-red-400">
+                      {fmtBRL(resumoRows.reduce((s, [, v]) => s + v, 0))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="pt-6">
