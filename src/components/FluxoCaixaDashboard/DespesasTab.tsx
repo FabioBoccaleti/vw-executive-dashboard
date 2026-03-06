@@ -20,7 +20,7 @@ const GRUPOS_CONFIG = [
     badgeBg: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
     totalColor: 'text-blue-700 dark:text-blue-300',
     rowHover: 'hover:bg-blue-50/50 dark:hover:bg-blue-950/10',
-    keywords: /sal[aá]rio|inss|fgts|f[eé]ria|13[°º ]|d[eé]cimo.ter|benefi[cç]|assist.*m[eé]d|m[eé]d.*assist|indeniz|trabalhist|encargo|rescis|vale.transp|vale.aliment|pr[eo]labore|aviso.pr[eé]v|folha|pr[eê]mio|hora.*extra|extra.*hora|funcion[aá]rio|uniform|vestuário|comiss[aã]o|seguro.de.vida|vida.*seguro|forma[cç][aã]o.profis|treinamento|capacita[cç]/i,
+    keywords: /sal[aá]rio|inss|fgts|f[eé]ria|13[°º ]|d[eé]cimo.ter|benefi[cç]|assist.*m[eé]d|m[eé]d.*assist|indeniz|trabalhist|encargo|rescis|vale.transp|vale.aliment|pr[oó][-\s]?labore|aviso.pr[eé]v|folha|pr[eê]mio|hora.*extra|extra.*hora|funcion[aá]rio|uniform|vestu[aá]rio|comiss[aã][oe]|seguro.de.vida|vida.*seguro|forma[cç][aã]o.profis|treinamento|capacita[cç]/i,
   },
   {
     id: 'imoveis',
