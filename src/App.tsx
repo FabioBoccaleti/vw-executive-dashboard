@@ -5,7 +5,7 @@ import { DespesasDashboard } from '@/components/DespesasDashboard'
 import { FluxoCaixaDashboard } from '@/components/FluxoCaixaDashboard'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
-import { initializeFromDatabase, isProduction } from '@/lib/dataStorage'
+import { initializeFromDatabase, isProduction, saveSelectedFiscalYear } from '@/lib/dataStorage'
 
 function App() {
   const [brand, setBrand] = useState<Brand | null>(null)
@@ -44,10 +44,17 @@ function App() {
     }
   }, [])
   
+  const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros']
+
   const handleBrandSelect = async (selectedBrand: Brand) => {
     saveBrand(selectedBrand)
     setBrand(selectedBrand)
     applyBrandTheme(selectedBrand)
+
+    // Força ano fiscal 2026 ao entrar no Demonstrativo de Resultados
+    if (DEMONSTRATIVO_BRANDS.includes(selectedBrand)) {
+      saveSelectedFiscalYear(2026)
+    }
     
     // Inicializa o banco de dados para a nova marca (se em produção)
     if (isProduction()) {
