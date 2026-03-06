@@ -1,18 +1,18 @@
 // Serviço para persistência dos dados do Fluxo de Caixa no Redis (Vercel KV)
 // Persiste o TEXTO BRUTO do balancete — o parse é sempre refeito no carregamento,
 // garantindo imunidade a mudanças de schema e tamanho mínimo no Redis.
+//
+// Chaveamento: uma chave por mês/ano → fluxo_caixa_YYYY_MM
+// Chave legada do dez/25 (migração automática): fluxo_caixa_raw_v2
 
 import { kvGet, kvSet, kvDelete } from '@/lib/kvClient';
 
-const FLUXO_CAIXA_KEYS: Record<number, string> = {
-  2025: 'fluxo_caixa_raw_v2',
-  2026: 'fluxo_caixa_2026_raw_v1',
-};
+// Chave legada usada antes da separação por mês
+const LEGACY_KEY_2025 = 'fluxo_caixa_raw_v2';
 
-const FLUXO_CAIXA_KEY = FLUXO_CAIXA_KEYS[2025];
-
-function getKey(year: number): string {
-  return FLUXO_CAIXA_KEYS[year] ?? `fluxo_caixa_${year}_raw_v1`;
+function getKey(year: number, month: number): string {
+  const mm = String(month).padStart(2, '0');
+  return `fluxo_caixa_${year}_${mm}`;
 }
 
 export interface FluxoCaixaRaw {
@@ -22,15 +22,12 @@ export interface FluxoCaixaRaw {
 }
 
 /**
- * Salva o texto bruto do balancete no Redis.
- * @param rawText  Conteúdo original do arquivo .txt
- * @param fileName Nome do arquivo (opcional, para exibição)
- * @param year     Ano do balancete (default: 2025)
+ * Salva o texto bruto do balancete no Redis para o mês/ano selecionado.
  */
-export async function saveFluxoCaixaData(rawText: string, fileName?: string, year = 2025): Promise<boolean> {
+export async function saveFluxoCaixaData(rawText: string, fileName?: string, year = 2025, month = 12): Promise<boolean> {
   try {
     const payload: FluxoCaixaRaw = { rawText, fileName, timestamp: Date.now() };
-    return await kvSet(getKey(year), payload);
+    return await kvSet(getKey(year, month), payload);
   } catch (error) {
     console.error('Erro ao salvar balancete no Redis:', error);
     return false;
@@ -38,13 +35,26 @@ export async function saveFluxoCaixaData(rawText: string, fileName?: string, yea
 }
 
 /**
- * Carrega o texto bruto do balancete do Redis.
- * Retorna null se não houver dados ou se ocorrer erro.
- * @param year Ano do balancete (default: 2025)
+ * Carrega o texto bruto do balancete do Redis para o mês/ano selecionado.
+ * Para dez/2025 faz fallback na chave legada para migração automática.
  */
-export async function loadFluxoCaixaRaw(year = 2025): Promise<FluxoCaixaRaw | null> {
+export async function loadFluxoCaixaRaw(year = 2025, month = 12): Promise<FluxoCaixaRaw | null> {
   try {
-    return await kvGet<FluxoCaixaRaw>(getKey(year));
+    const data = await kvGet<FluxoCaixaRaw>(getKey(year, month));
+    if (data) return data;
+
+    // Migração automática: dez/2025 pode estar na chave legada
+    if (year === 2025 && month === 12) {
+      const legacy = await kvGet<FluxoCaixaRaw>(LEGACY_KEY_2025);
+      if (legacy) {
+        console.log('🔄 Migrando balancete dez/2025 da chave legada...');
+        // Salva na nova chave para não precisar migrar de novo
+        await kvSet(getKey(2025, 12), legacy);
+        return legacy;
+      }
+    }
+
+    return null;
   } catch (error) {
     console.error('Erro ao carregar balancete do Redis:', error);
     return null;
@@ -52,12 +62,11 @@ export async function loadFluxoCaixaRaw(year = 2025): Promise<FluxoCaixaRaw | nu
 }
 
 /**
- * Limpa os dados do Fluxo de Caixa do Redis.
- * @param year Ano do balancete (default: 2025)
+ * Limpa os dados do Fluxo de Caixa do Redis para o mês/ano selecionado.
  */
-export async function clearFluxoCaixaData(year = 2025): Promise<boolean> {
+export async function clearFluxoCaixaData(year = 2025, month = 12): Promise<boolean> {
   try {
-    return await kvDelete(getKey(year));
+    return await kvDelete(getKey(year, month));
   } catch (error) {
     console.error('Erro ao limpar dados do Fluxo de Caixa:', error);
     return false;

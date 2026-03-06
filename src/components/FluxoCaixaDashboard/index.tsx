@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BALANCETE_EXEMPLO } from "./balanceteExemplo";
 import { loadFluxoCaixaRaw, saveFluxoCaixaData } from "./fluxoCaixaStorage";
 import { ComparativosTab } from "./ComparativosTab";
 
@@ -402,7 +401,18 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [redisWarning, setRedisWarning] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Preferência de ano — lida do localStorage para sobreviver a recarregamentos
+  const MONTHS = [
+    { n: 1, label: 'Jan' }, { n: 2, label: 'Fev' }, { n: 3, label: 'Mar' },
+    { n: 4, label: 'Abr' }, { n: 5, label: 'Mai' }, { n: 6, label: 'Jun' },
+    { n: 7, label: 'Jul' }, { n: 8, label: 'Ago' }, { n: 9, label: 'Set' },
+    { n: 10, label: 'Out' }, { n: 11, label: 'Nov' }, { n: 12, label: 'Dez' },
+  ];
+  const MONTH_NAMES: Record<number, string> = {
+    1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho',
+    7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro',
+  };
+
+  // Ano e mês selecionados — lidos do localStorage para sobreviver a recarregamentos
   const [selectedYear, setSelectedYearState] = useState<2025 | 2026>(() => {
     try {
       const stored = localStorage.getItem('fluxo_caixa_selected_year');
@@ -411,14 +421,29 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
       return 2025;
     }
   });
+  const [selectedMonth, setSelectedMonthState] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem('fluxo_caixa_selected_month');
+      const n = stored ? parseInt(stored, 10) : NaN;
+      return n >= 1 && n <= 12 ? n : 12;
+    } catch {
+      return 12;
+    }
+  });
+
   const setSelectedYear = (year: 2025 | 2026) => {
     try { localStorage.setItem('fluxo_caixa_selected_year', String(year)); } catch {}
     setSelectedYearState(year);
   };
+  const setSelectedMonth = (month: number) => {
+    try { localStorage.setItem('fluxo_caixa_selected_month', String(month)); } catch {}
+    setSelectedMonthState(month);
+  };
 
-  // Carrega dados do Redis ou usa exemplo como fallback
-  const [savedFileNames, setSavedFileNames] = useState<Record<number, string | undefined>>({ 2025: undefined, 2026: undefined });
-  const savedFileName = savedFileNames[selectedYear];
+  // Nome do arquivo salvo por chave (ano+mês)
+  const [savedFileNames, setSavedFileNames] = useState<Record<string, string | undefined>>({});
+  const savedFileKey = `${selectedYear}_${selectedMonth}`;
+  const savedFileName = savedFileNames[savedFileKey];
 
   useEffect(() => {
     async function loadInitialData() {
@@ -426,53 +451,33 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         setLoading(true);
         setData(null);
 
-        // Carrega o texto bruto do Redis pela chave do ano selecionado
-        const raw = await loadFluxoCaixaRaw(selectedYear);
+        const raw = await loadFluxoCaixaRaw(selectedYear, selectedMonth);
 
         if (raw?.rawText) {
-          console.log(`✅ Balancete ${selectedYear} carregado do Redis — re-parseando...`);
+          console.log(`✅ Balancete ${MONTH_NAMES[selectedMonth]}/${selectedYear} carregado do Redis — re-parseando...`);
           const parsed = parseBalancete(raw.rawText);
           if (Object.keys(parsed.accounts).length >= 10) {
             setData(parsed);
-            setSavedFileNames(prev => ({ ...prev, [selectedYear]: raw.fileName }));
+            setSavedFileNames(prev => ({ ...prev, [savedFileKey]: raw.fileName }));
             setActiveTab('overview');
-            return; // sucesso — sai sem usar o exemplo
+            return;
           }
         }
 
-        // Para 2025: usa o exemplo local como fallback
-        if (selectedYear === 2025) {
-          console.log('📄 Nenhum balancete 2025 no Redis — usando dados de exemplo');
-          const parsed = parseBalancete(BALANCETE_EXEMPLO);
-          if (Object.keys(parsed.accounts).length >= 10) {
-            setData(parsed);
-            setActiveTab('overview');
-          }
-        } else {
-          // Para 2026: sem dados ainda
-          console.log(`📄 Nenhum balancete ${selectedYear} no Redis`);
-          setData(null);
-        }
+        // Sem dados para o mês selecionado
+        console.log(`📄 Nenhum balancete ${MONTH_NAMES[selectedMonth]}/${selectedYear} no Redis`);
+        setData(null);
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
-        if (selectedYear === 2025) {
-          try {
-            const parsed = parseBalancete(BALANCETE_EXEMPLO);
-            if (Object.keys(parsed.accounts).length >= 10) {
-              setData(parsed);
-              setActiveTab('overview');
-            }
-          } catch (parseErr) {
-            console.error('Erro ao carregar balancete de exemplo:', parseErr);
-          }
-        }
+        setData(null);
       } finally {
         setLoading(false);
       }
     }
 
     loadInitialData();
-  }, [selectedYear]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear, selectedMonth]);
 
   const processFile = useCallback((file: File | undefined) => {
     if (!file) return;
@@ -486,17 +491,16 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         const parsed = parseBalancete(text);
         if (Object.keys(parsed.accounts).length < 10) throw new Error('Arquivo não reconhecido como balancete válido.');
 
-        // Persiste o TEXTO BRUTO no Redis — usa chave do ano selecionado
-        const saved = await saveFluxoCaixaData(text, file.name, selectedYear);
+        const saved = await saveFluxoCaixaData(text, file.name, selectedYear, selectedMonth);
         if (saved) {
-          console.log(`✅ Balancete ${selectedYear} salvo no Redis com sucesso:`, file.name);
+          console.log(`✅ Balancete ${MONTH_NAMES[selectedMonth]}/${selectedYear} salvo no Redis com sucesso:`, file.name);
           setRedisWarning(null);
         } else {
           console.warn('⚠️ Não foi possível salvar no Redis, mas os dados estão em memória');
           setRedisWarning('Os dados foram carregados na sessão, mas não foi possível salvar no banco de dados (Redis). Ao recarregar a página os dados serão perdidos. Verifique se as variáveis KV_REST_API_URL e KV_REST_API_TOKEN estão configuradas na Vercel.');
         }
 
-        setSavedFileNames(prev => ({ ...prev, [selectedYear]: file.name }));
+        setSavedFileNames(prev => ({ ...prev, [savedFileKey]: file.name }));
         setData(parsed);
         setActiveTab('overview');
       } catch (err: any) {
@@ -505,7 +509,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
       setLoading(false);
     };
     reader.readAsText(file, 'latin1');
-  }, [selectedYear]);
+  }, [selectedYear, selectedMonth, savedFileKey]);
 
   const TABS = [
     { id: 'overview', label: 'Visão Geral', icon: <BarChart3 className="w-4 h-4" />, requiresData: true },
@@ -524,6 +528,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header */}
       <div className="bg-[#16a34a] text-white shadow-lg fixed top-0 left-0 right-0 z-30">
+        {/* Linha principal */}
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-4">
             <Button
@@ -537,11 +542,12 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             <div>
               <h1 className="text-xl font-bold">Análise Financeira Sorana</h1>
               <p className="text-sm text-green-100">
-                {savedFileName ? `📂 ${savedFileName}` : `Fluxo de Caixa ${selectedYear}`}
+                {savedFileName ? `📂 ${savedFileName}` : `Fluxo de Caixa — ${MONTH_NAMES[selectedMonth]}/${selectedYear}`}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Seletor de ano */}
             <div className="flex items-center bg-green-700 rounded-lg p-1 gap-1">
               {([2025, 2026] as const).map(year => (
                 <button
@@ -560,6 +566,23 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             </div>
           </div>
         </div>
+        {/* Linha de seleção de mês */}
+        <div className="px-4 pb-2 flex items-center gap-1 overflow-x-auto hide-scrollbar">
+          {MONTHS.map(({ n, label }) => (
+            <button
+              key={n}
+              onClick={() => setSelectedMonth(n)}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-xs font-semibold transition-colors whitespace-nowrap',
+                selectedMonth === n
+                  ? 'bg-white text-green-700 shadow'
+                  : 'text-green-100 hover:bg-green-600'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Input file oculto — acionado pelo botão "Novo Arquivo" */}
@@ -575,7 +598,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
       <>
           <aside
             className={cn(
-              'fixed left-0 top-[60px] bottom-0 w-64 bg-slate-800 text-white z-20 transition-transform duration-300',
+              'fixed left-0 top-[92px] bottom-0 w-64 bg-slate-800 text-white z-20 transition-transform duration-300',
               sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
             )}
           >
@@ -630,7 +653,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         </>
 
       {/* Main Content */}
-      <main className={cn('pt-[60px] min-h-screen', 'lg:ml-64')}>
+      <main className={cn('pt-[92px] min-h-screen', 'lg:ml-64')}>
         <div className="p-6 max-w-7xl mx-auto">
           {activeTab === 'comparativos' ? (
             <div className="animate-in fade-in duration-500">
@@ -645,14 +668,14 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             <div className="flex flex-col items-center justify-center py-32 gap-6 text-slate-500">
               <div className="text-6xl">📂</div>
               <div className="text-center">
-                <p className="text-xl font-semibold text-slate-700 mb-2">Nenhum dado para {selectedYear}</p>
-                <p className="text-sm text-slate-500 mb-6">Importe o balancete referente ao exercício de {selectedYear} para visualizar as informações.</p>
+                <p className="text-xl font-semibold text-slate-700 mb-2">Nenhum dado para {MONTH_NAMES[selectedMonth]}/{selectedYear}</p>
+                <p className="text-sm text-slate-500 mb-6">Importe o balancete referente a {MONTH_NAMES[selectedMonth]}/{selectedYear} para visualizar as informações.</p>
                 <button
                   onClick={() => fileRef.current?.click()}
                   className="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center gap-2 mx-auto"
                 >
                   <Upload className="w-4 h-4" />
-                  Importar Balancete {selectedYear}
+                  Importar Balancete {MONTH_NAMES[selectedMonth]}/{selectedYear}
                 </button>
               </div>
             </div>
