@@ -6,6 +6,85 @@ function toTitleCase(str: string) {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// ─── Grupos de Despesas ───────────────────────────────────────────────────────
+
+const GRUPOS_CONFIG = [
+  {
+    id: 'pessoal',
+    label: 'Despesas c/ Pessoal',
+    descricao: 'Salários · Encargos · Benefícios · Indenizações',
+    icon: '👥',
+    borderClass: 'border-t-4 border-t-blue-500',
+    headerBg: 'bg-blue-50 dark:bg-blue-950/20',
+    headerText: 'text-blue-700 dark:text-blue-300',
+    badgeBg: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+    totalColor: 'text-blue-700 dark:text-blue-300',
+    rowHover: 'hover:bg-blue-50/50 dark:hover:bg-blue-950/10',
+    keywords: /sal[aá]rio|inss|fgts|f[eé]ria|13[°º ]|d[eé]cimo.ter|benefi[cç]|assist.*m[eé]d|m[eé]d.*assist|indeniz|trabalhist|encargo|rescis|vale.transp|vale.aliment|pr[eo]labore|aviso.pr[eé]v|folha|pr[eê]mio|hora.*extra|extra.*hora|funcion[aá]rio|uniform|vestuário|comiss[aã]o/i,
+  },
+  {
+    id: 'imoveis',
+    label: 'Imóveis e Veículos Frota',
+    descricao: 'Aluguéis · Água/Luz · Seguros · Combustíveis',
+    icon: '🏢',
+    borderClass: 'border-t-4 border-t-amber-500',
+    headerBg: 'bg-amber-50 dark:bg-amber-950/20',
+    headerText: 'text-amber-700 dark:text-amber-300',
+    badgeBg: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+    totalColor: 'text-amber-700 dark:text-amber-300',
+    rowHover: 'hover:bg-amber-50/50 dark:hover:bg-amber-950/10',
+    keywords: /alugu[eé][il]|loca[cç].*im[oó]vel|[aá]gua|energia.el[eé]|energia.luz|tarifa.luz|ilumina|seguro|combust[ií]vel|frota|iptu|condom[ií]nio|reparo.*ve[ií]c|ve[ií]c.*reparo|manuten[cç].*pred|deprecia[cç]|amortiza[cç]|conserva[cç].*im[oó]vel|conserva[cç].*m[aá]q|im[oó]vel.*conserva[cç]|m[aá]q.*conserva[cç]|estacionamento|telefone|celular|alugu[eé][il].*equip|equip.*alugu[eé][il]|aquisi[cç][aã]o.*n[aã]o.imob|n[aã]o.imob/i,
+  },
+  {
+    id: 'terceiros',
+    label: 'Serviços de Terceiros',
+    descricao: 'Fretes · Comissões · PJ · Terceirizados',
+    icon: '🤝',
+    borderClass: 'border-t-4 border-t-violet-500',
+    headerBg: 'bg-violet-50 dark:bg-violet-950/20',
+    headerText: 'text-violet-700 dark:text-violet-300',
+    badgeBg: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
+    totalColor: 'text-violet-700 dark:text-violet-300',
+    rowHover: 'hover:bg-violet-50/50 dark:hover:bg-violet-950/10',
+    keywords: /pessoa.jur[ií]d|jur[ií]d.*pessoa|frete|honor[aá]rio|consultori|portaria|vigil[aâ]nci|limpeza|conserva[cç][aã]o|m[aã]o.de.obra|servi[cç].*terceiro|terceiro.*servi[cç]|outros servi/i,
+  },
+  {
+    id: 'financeiras',
+    label: 'Despesas Financeiras',
+    descricao: 'Juros · IOF · Tarifas Bancárias · Empréstimos',
+    icon: '🏦',
+    borderClass: 'border-t-4 border-t-rose-500',
+    headerBg: 'bg-rose-50 dark:bg-rose-950/20',
+    headerText: 'text-rose-700 dark:text-rose-300',
+    badgeBg: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300',
+    totalColor: 'text-rose-700 dark:text-rose-300',
+    rowHover: 'hover:bg-rose-50/50 dark:hover:bg-rose-950/10',
+    keywords: /juros|iof|tarifa.banc|spread|encargo.financ|multa.financ|emprestimo|financiamento|refis|cdi|taxa.adm|juro.mora|juro.prot|juro.desc|desconto.*financ|financ.*desconto|cart[aã]o.cr[eé]d|taxa.*cart[aã]o|cart[aã]o.*taxa/i,
+  },
+  {
+    id: 'outras',
+    label: 'Outras Despesas',
+    descricao: 'Impostos · Publicidade · Depreciações · Outras',
+    icon: '📋',
+    borderClass: 'border-t-4 border-t-slate-400',
+    headerBg: 'bg-slate-50 dark:bg-slate-800/20',
+    headerText: 'text-slate-700 dark:text-slate-300',
+    badgeBg: 'bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400',
+    totalColor: 'text-slate-700 dark:text-slate-300',
+    rowHover: 'hover:bg-slate-50/50 dark:hover:bg-slate-800/10',
+    keywords: null as null | RegExp,
+  },
+] as const;
+
+function classificarTipo(tipo: string): number {
+  for (let i = 0; i < GRUPOS_CONFIG.length - 1; i++) {
+    if (GRUPOS_CONFIG[i].keywords!.test(tipo)) return i;
+  }
+  return GRUPOS_CONFIG.length - 1;
+}
+
+// ─── Fim Grupos ───────────────────────────────────────────────────────────────
+
 /** Retorna as contas folha do grupo 5 (sem filhos) com valDeb e valCred */
 function grupo5Leaves(accounts: Record<string, any>) {
   const allKeys = Object.keys(accounts).filter((k) => k.startsWith('5.'));
@@ -83,8 +162,143 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
   }, {});
   const resumoRows = Object.entries(resumoMap).sort((a, b) => b[1] - a[1]);
 
+  // Agrupar resumoRows nos 4 grupos
+  const totalGeral = resumoRows.reduce((s, [, v]) => s + v, 0);
+  const gruposData = GRUPOS_CONFIG.map((g, idx) => {
+    const itens = resumoRows
+      .filter(([tipo]) => classificarTipo(tipo) === idx)
+      .sort((a, b) => b[1] - a[1]);
+    const total = itens.reduce((s, [, v]) => s + v, 0);
+    const pct = totalGeral !== 0 ? (total / totalGeral) * 100 : 0;
+    return { ...g, itens, total, pct };
+  });
+
   return (
     <div className="space-y-4">
+
+      {/* ── Cards de Resumo por Grupo (sempre visíveis) ── */}
+      {resumoRows.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-base font-semibold text-foreground">Resumo por Grupo de Despesa</span>
+            <span className="text-xs text-muted-foreground">— competência do período</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {gruposData.map((grupo, idx) => (
+              <Card key={grupo.id} className={`overflow-hidden shadow-sm ${grupo.borderClass}${gruposData.length % 2 !== 0 && idx === gruposData.length - 1 ? ' md:col-span-2' : ''}`}>
+                {/* Cabeçalho do card */}
+                <div className={`px-4 py-3 ${grupo.headerBg} flex items-start justify-between`}>
+                  <div>
+                    <div className={`flex items-center gap-2 font-semibold text-sm ${grupo.headerText}`}>
+                      <span className="text-base">{grupo.icon}</span>
+                      {grupo.label}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{grupo.descricao}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`text-sm font-bold font-mono ${grupo.totalColor}`}>
+                      {fmtBRL(grupo.total)}
+                    </div>
+                    <div className={`text-xs font-semibold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${grupo.badgeBg}`}>
+                      {grupo.pct.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabela de itens */}
+                <CardContent className="p-0">
+                  {grupo.itens.length === 0 ? (
+                    <div className="py-4 px-4 text-xs text-muted-foreground italic">
+                      Nenhuma despesa classificada neste grupo
+                    </div>
+                  ) : (
+                    <table className="w-full">
+                      <tbody>
+                        {grupo.itens.map(([tipo, valor], i) => {
+                          const pctItem = grupo.total !== 0 ? (valor / grupo.total) * 100 : 0;
+                          return (
+                            <tr
+                              key={tipo}
+                              className={`${grupo.rowHover} transition-colors ${i < grupo.itens.length - 1 ? 'border-b border-border/40' : ''}`}
+                            >
+                              <td className="py-2 pl-4 pr-2 text-sm text-foreground w-full">
+                                {tipo}
+                              </td>
+                              <td className="py-2 px-2 text-right text-xs text-muted-foreground whitespace-nowrap">
+                                {pctItem.toFixed(1)}%
+                              </td>
+                              <td className="py-2 pl-2 pr-4 text-right text-sm font-mono font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
+                                {fmtBRL(valor)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className={`border-t border-border/50 ${grupo.headerBg}`}>
+                          <td className={`py-2 pl-4 text-xs font-bold uppercase tracking-wide ${grupo.headerText}`}>
+                            Total
+                          </td>
+                          <td></td>
+                          <td className={`py-2 pr-4 text-right text-sm font-mono font-bold ${grupo.totalColor} whitespace-nowrap`}>
+                            {fmtBRL(grupo.total)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Barra de composição total */}
+          <Card className="shadow-sm">
+            <CardContent className="py-3 px-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Composição do Total de Despesas</span>
+                <span className="text-sm font-bold font-mono text-red-600 dark:text-red-400">{fmtBRL(totalGeral)}</span>
+              </div>
+              <div className="flex h-3 rounded-full overflow-hidden gap-px">
+                {gruposData.filter(g => g.pct > 0).map((g) => {
+                  const barColors: Record<string, string> = {
+                    pessoal: 'bg-blue-500',
+                    imoveis: 'bg-amber-500',
+                    terceiros: 'bg-violet-500',
+                    outras: 'bg-slate-400',
+                  };
+                  return (
+                    <div
+                      key={g.id}
+                      title={`${g.label}: ${g.pct.toFixed(1)}%`}
+                      className={`${barColors[g.id]} transition-all`}
+                      style={{ width: `${g.pct}%` }}
+                    />
+                  );
+                })}
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                {gruposData.filter(g => g.pct > 0).map((g) => {
+                  const dotColors: Record<string, string> = {
+                    pessoal: 'bg-blue-500',
+                    imoveis: 'bg-amber-500',
+                    terceiros: 'bg-violet-500',
+                    outras: 'bg-slate-400',
+                  };
+                  return (
+                    <div key={g.id} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className={`w-2.5 h-2.5 rounded-full inline-block ${dotColors[g.id]}`} />
+                      {g.label}
+                      <span className="font-semibold text-foreground">{g.pct.toFixed(1)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Botão toggle no topo da área branca */}
       <div>
         <button
