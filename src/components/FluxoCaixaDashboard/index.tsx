@@ -401,6 +401,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [redisWarning, setRedisWarning] = useState<string | null>(null);
   const [showTabelaDespesas, setShowTabelaDespesas] = useState(false);
+  const [despesasView, setDespesasView] = useState<'normal' | 'comparativo'>('normal');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const MONTHS = [
@@ -555,6 +556,20 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Botão Comparativo — visível apenas na aba Despesas */}
+            {activeTab === 'despesas' && (
+              <button
+                onClick={() => setDespesasView(v => v === 'comparativo' ? 'normal' : 'comparativo')}
+                className={cn(
+                  'px-3 py-1.5 text-sm font-semibold rounded-lg border transition-colors',
+                  despesasView === 'comparativo'
+                    ? 'bg-white text-green-700 border-white'
+                    : 'bg-green-700 text-white border-green-500 hover:bg-green-600'
+                )}
+              >
+                📊 Comparativo
+              </button>
+            )}
             {/* Seletor de ano */}
             <select
               value={selectedYear}
@@ -696,7 +711,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
               {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
               {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} />}
-              {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} />}
+              {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} despesasView={despesasView} />}
               {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
               {activeTab === 'parcelamentoRefis' && <ParcelamentoRefisTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
               {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} />}

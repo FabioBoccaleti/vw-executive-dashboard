@@ -139,9 +139,10 @@ interface DespesasTabProps {
   KPI: React.ComponentType<any>;
   showTabela: boolean;
   setShowTabela: (v: (prev: boolean) => boolean) => void;
+  despesasView?: 'normal' | 'comparativo';
 }
 
-export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setShowTabela }: DespesasTabProps) {
+export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setShowTabela, despesasView = 'normal' }: DespesasTabProps) {
   const accounts = data.accounts as Record<string, any>;
   const rows = grupo5Leaves(accounts);
 
@@ -199,6 +200,14 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
     const pct = totalGeral !== 0 ? (total / totalGeral) * 100 : 0;
     return { ...g, itens, total, pct };
   });
+
+  if (despesasView === 'comparativo') {
+    return (
+      <div className="space-y-4">
+        <ComparativoDespesas fmtBRL={fmtBRL} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
