@@ -546,9 +546,6 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
       </div>
       )}
 
-      {/* ── Card Comparativo de Despesas ── */}
-      <ComparativoDespesas fmtBRL={fmtBRL} />
-
     </div>
   );
 }
