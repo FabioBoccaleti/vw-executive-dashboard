@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { loadFluxoCaixaRaw } from './fluxoCaixaStorage';
 import { loadDespesasTipos } from './despesasStorage';
 import { GRUPOS_CONFIG, classificarTipo } from './DespesasTab';
+import { GraficosDespesas, type GrupoResult } from './GraficosDespesas';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -175,6 +176,7 @@ export function ComparativoDespesas({ fmtBRL }: ComparativoDespesasProps) {
   const [hasResult, setHasResult] = useState(false);
   const [labelA, setLabelA] = useState('');
   const [labelB, setLabelB] = useState('');
+  const [showGraficos, setShowGraficos] = useState(false);
 
   function changePeriodoTipo(tipo: PeriodoTipo) {
     setPeriodoTipo(tipo);
@@ -198,6 +200,7 @@ export function ComparativoDespesas({ fmtBRL }: ComparativoDespesasProps) {
       setDataB(rawB);
       setLabelA(getPeriodLabel(periodoTipo, periodoA.year, periodoA.index));
       setLabelB(getPeriodLabel(periodoTipo, periodoB.year, periodoB.index));
+      setShowGraficos(false);
 
       if (!rawA && !rawB) {
         setError('Nenhum balancete encontrado para os períodos selecionados. Verifique se os arquivos foram importados.');
@@ -254,6 +257,33 @@ export function ComparativoDespesas({ fmtBRL }: ComparativoDespesasProps) {
   }
 
   const gruposParaExibir = [grupo1Id, grupo2Id].filter(Boolean);
+
+  // Monta estrutura de GrupoResult para passar aos gráficos
+  function buildAllGrupos(): GrupoResult[] {
+    return gruposParaExibir
+      .map((grupoId) => {
+        const result = buildGrupoTable(grupoId);
+        if (!result) return null;
+        return { grupoId, rows: result.rows };
+      })
+      .filter(Boolean) as GrupoResult[];
+  }
+
+  if (showGraficos) {
+    return (
+      <GraficosDespesas
+        initialGrupos={buildAllGrupos()}
+        initialLabelA={labelA}
+        initialLabelB={labelB}
+        initialPeriodoTipo={periodoTipo}
+        initialPeriodoA={periodoA}
+        initialPeriodoB={periodoB}
+        initialTipos={tipos}
+        fmtBRL={fmtBRL}
+        onVoltar={() => setShowGraficos(false)}
+      />
+    );
+  }
 
   return (
     <Card className="shadow-sm border border-indigo-200 dark:border-indigo-800">
@@ -353,7 +383,7 @@ export function ComparativoDespesas({ fmtBRL }: ComparativoDespesasProps) {
         </div>
 
         {/* ── Grupos de Despesas ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="flex flex-col gap-4">
           {/* Grupo 1 (obrigatório) */}
           <div className="space-y-2">
             <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -393,7 +423,7 @@ export function ComparativoDespesas({ fmtBRL }: ComparativoDespesasProps) {
         </div>
 
         {/* ── Botão Comparar ── */}
-        <div>
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleComparar}
             disabled={loading}
@@ -413,6 +443,15 @@ export function ComparativoDespesas({ fmtBRL }: ComparativoDespesasProps) {
               '🔍 Comparar'
             )}
           </button>
+
+          {hasResult && !loading && (
+            <button
+              onClick={() => setShowGraficos(true)}
+              className="px-5 py-2 rounded-lg text-sm font-semibold transition-colors bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2"
+            >
+              📈 Gráficos
+            </button>
+          )}
         </div>
 
         {/* ── Erro ── */}

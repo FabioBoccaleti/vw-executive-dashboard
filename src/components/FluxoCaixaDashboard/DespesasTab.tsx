@@ -140,9 +140,10 @@ interface DespesasTabProps {
   showTabela: boolean;
   setShowTabela: (v: (prev: boolean) => boolean) => void;
   despesasView?: 'normal' | 'comparativo';
+  setDespesasView?: (v: 'normal' | 'comparativo') => void;
 }
 
-export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setShowTabela, despesasView = 'normal' }: DespesasTabProps) {
+export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setShowTabela, despesasView = 'normal', setDespesasView }: DespesasTabProps) {
   const accounts = data.accounts as Record<string, any>;
   const rows = grupo5Leaves(accounts);
 
@@ -204,6 +205,14 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
   if (despesasView === 'comparativo') {
     return (
       <div className="space-y-4">
+        {setDespesasView && (
+          <button
+            onClick={() => setDespesasView('normal')}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg border border-border bg-muted/40 hover:bg-muted/70 transition-colors text-foreground shadow-sm"
+          >
+            ← Voltar para Despesas
+          </button>
+        )}
         <ComparativoDespesas fmtBRL={fmtBRL} />
       </div>
     );
