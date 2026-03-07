@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { loadDespesasTipos, saveDespesasTipos } from './despesasStorage';
+import { ComparativoDespesas } from './ComparativoDespesas';
 
 function toTitleCase(str: string) {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -8,7 +9,7 @@ function toTitleCase(str: string) {
 
 // ─── Grupos de Despesas ───────────────────────────────────────────────────────
 
-const GRUPOS_CONFIG = [
+export const GRUPOS_CONFIG = [
   {
     id: 'pessoal',
     label: 'Despesas c/ Pessoal',
@@ -24,7 +25,7 @@ const GRUPOS_CONFIG = [
   },
   {
     id: 'veiculosEstoque',
-    label: 'Despesas c/ Veículos Estoque',
+    label: 'Despesas c/ Veículos (Estoque e Vendas)',
     descricao: 'Reparos · Garantias · Preparação · Combustível',
     icon: '🚗',
     borderClass: 'border-t-4 border-t-cyan-500',
@@ -33,7 +34,7 @@ const GRUPOS_CONFIG = [
     badgeBg: 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300',
     totalColor: 'text-cyan-700 dark:text-cyan-300',
     rowHover: 'hover:bg-cyan-50/50 dark:hover:bg-cyan-950/10',
-    keywords: /reparo.*ve[ií]c|ve[ií]c.*reparo|imposto.*taxa|taxa.*imposto|cortesia|garantia|combust[ií]vel|prepara[cç].*ve[ií]c|ve[ií]c.*prepara[cç]|despesas?\s*divers/i,
+    keywords: /reparo.*ve[ií]c|ve[ií]c.*reparo|imposto.*taxa|taxa.*imposto|cortesia|garantia|combust[ií]ve[il]|prepara[cç].*ve[ií]c|ve[ií]c.*prepara[cç]|despesas?\s*divers|lavagem|est[eé]tica.*ve[ií]c|ve[ií]c.*est[eé]tica|guincho|estacionamento/i,
   },
   {
     id: 'imoveis',
@@ -72,7 +73,7 @@ const GRUPOS_CONFIG = [
     badgeBg: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300',
     totalColor: 'text-rose-700 dark:text-rose-300',
     rowHover: 'hover:bg-rose-50/50 dark:hover:bg-rose-950/10',
-    keywords: /juros|iof|tarifa.banc|spread|encargo.financ|multa.financ|emprestimo|financiamento|refis|cdi|taxa.adm|juro.mora|juro.prot|juro.desc|desconto.*financ|financ.*desconto|cart[aã]o.cr[eé]d|taxa.*cart[aã]o|cart[aã]o.*taxa|despesa.*banc[aá]|banc[aá].*despesa/i,
+    keywords: /juros|iof|tarifa.banc|spread|encargo.financ|multa.financ|emprestimo|financiamento|refis|cdi|taxa.adm|juro.mora|juro.prot|juro.desc|desconto.*financ|financ.*desconto|cart[aã]o.cr[eé]d|taxa.*cart[aã]o|cart[aã]o.*taxa|despesa.*banc[aá]|banc[aá].*despesa|desconto.*concedido|concedido.*desconto/i,
   },
   {
     id: 'marketing',
@@ -102,7 +103,7 @@ const GRUPOS_CONFIG = [
   },
 ] as const;
 
-function classificarTipo(tipo: string): number {
+export function classificarTipo(tipo: string): number {
   for (let i = 0; i < GRUPOS_CONFIG.length - 1; i++) {
     if (GRUPOS_CONFIG[i].keywords!.test(tipo)) return i;
   }
@@ -219,7 +220,6 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
                       <span className="text-base">{grupo.icon}</span>
                       {grupo.label}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{grupo.descricao}</div>
                   </div>
                   <div className="text-right">
                     <div className={`text-sm font-bold font-mono ${grupo.totalColor}`}>
@@ -289,8 +289,11 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
                 {gruposData.filter(g => g.pct > 0).map((g) => {
                   const barColors: Record<string, string> = {
                     pessoal: 'bg-blue-500',
+                    veiculosEstoque: 'bg-cyan-500',
                     imoveis: 'bg-amber-500',
                     terceiros: 'bg-violet-500',
+                    financeiras: 'bg-rose-500',
+                    marketing: 'bg-pink-500',
                     outras: 'bg-slate-400',
                   };
                   return (
@@ -307,8 +310,11 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
                 {gruposData.filter(g => g.pct > 0).map((g) => {
                   const dotColors: Record<string, string> = {
                     pessoal: 'bg-blue-500',
+                    veiculosEstoque: 'bg-cyan-500',
                     imoveis: 'bg-amber-500',
                     terceiros: 'bg-violet-500',
+                    financeiras: 'bg-rose-500',
+                    marketing: 'bg-pink-500',
                     outras: 'bg-slate-400',
                   };
                   return (
@@ -521,6 +527,10 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
       </Card>
       </div>
       )}
+
+      {/* ── Card Comparativo de Despesas ── */}
+      <ComparativoDespesas fmtBRL={fmtBRL} />
+
     </div>
   );
 }
