@@ -445,6 +445,22 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     setSelectedMonthState(month);
   };
 
+  // ── Labels dinâmicos das colunas de período ──────────────────────────────
+  const MONTH_SHORT_MAP: Record<number, string> = {
+    1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 5: 'Mai', 6: 'Jun',
+    7: 'Jul', 8: 'Ago', 9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez',
+  };
+  // "Saldo Atual" vira o período selecionado: "2025" (anual) ou "Dez/25" (mensal)
+  const colAtual = selectedMonth === 0
+    ? String(selectedYear)
+    : `${MONTH_SHORT_MAP[selectedMonth]}/${String(selectedYear).slice(2)}`;
+  // "Saldo Anterior" vira o período imediatamente anterior
+  const colAnterior = selectedMonth === 0
+    ? String(selectedYear - 1)
+    : selectedMonth === 1
+      ? `Dez/${String(selectedYear - 1).slice(2)}`
+      : `${MONTH_SHORT_MAP[selectedMonth - 1]}/${String(selectedYear).slice(2)}`;
+
   // Nome do arquivo salvo por chave (ano+mês)
   const [savedFileNames, setSavedFileNames] = useState<Record<string, string | undefined>>({});
   const savedFileKey = `${selectedYear}_${selectedMonth}`;
@@ -766,8 +782,8 @@ function PosicaoEstoquesTab({ data, fmtBRL, SectionTitle, KPI }: any) {
             <thead className="bg-muted/50">
               <tr>
                 <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
-                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
-                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                 <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
                 <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
               </tr>
@@ -850,8 +866,8 @@ function PosicaoEstoquesTab({ data, fmtBRL, SectionTitle, KPI }: any) {
               <thead className="bg-muted/50">
                 <tr>
                   <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Marca</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
                 </tr>
@@ -940,8 +956,8 @@ function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI }: any) {
               <thead className="bg-muted/50">
                 <tr>
                   <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
                 </tr>
@@ -1052,8 +1068,8 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2 }: any) {
               <thead className="bg-muted/50">
                 <tr>
                   <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
                 </tr>
@@ -1151,8 +1167,8 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2 }: any) {
               <thead className="bg-muted/50">
                 <tr>
                   <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
                 </tr>
@@ -1208,8 +1224,8 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2 }: any) {
               <thead className="bg-muted/50">
                 <tr>
                   <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Classificação</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
                 </tr>
@@ -1257,14 +1273,14 @@ function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI }: any) {
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KPI
-          label="Saldo Anterior"
+          label={colAnterior}
           value={fmtBRL(totalAnt, true)}
           sub="Saldo do período anterior"
           color="blue"
           icon="👥"
         />
         <KPI
-          label="Saldo Atual"
+          label={colAtual}
           value={fmtBRL(totalAtu, true)}
           sub="Saldo do período atual"
           color={totalAtu > totalAnt ? 'red' : 'emerald'}
@@ -1288,8 +1304,8 @@ function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI }: any) {
               <thead className="bg-muted/50">
                 <tr>
                   <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
                 </tr>
@@ -1402,8 +1418,8 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI }: any) {
                 <tr>
                   <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Classificação</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
                 </tr>
@@ -1549,8 +1565,8 @@ function AtivoTab({ data, SectionTitle, TableRow2 }: any) {
             <table className="w-full border-collapse">
               <thead className="bg-muted/50"><tr>
                 <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta</th>
-                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
-                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                 <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
               </tr></thead>
             <tbody>
@@ -1598,8 +1614,8 @@ function PassivoTab({ data, SectionTitle, TableRow2 }: any) {
             <table className="w-full border-collapse">
               <thead className="bg-muted/50"><tr>
                 <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta</th>
-                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Anterior</th>
-                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+                <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                 <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
               </tr></thead>
             <tbody>
