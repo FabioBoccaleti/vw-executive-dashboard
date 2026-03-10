@@ -24,7 +24,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
   const [viewMode, setViewMode] = useState<'mensal' | 'bimestral' | 'trimestral' | 'semestral'>('mensal')
   const [comparisonTab, setComparisonTab] = useState<'dre' | 'dadosAdicionais'>('dre')
   const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState<Department | 'consolidado'>(department)
-  const [comparisonMode, setComparisonMode] = useState<'anual' | 'mensal'>('anual')
+  const [comparisonMode, setComparisonMode] = useState<'anual' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral'>('anual')
   const [selectedMonth1, setSelectedMonth1] = useState<number>(0) // 0-11 (Jan-Dez)
   const [selectedMonth2, setSelectedMonth2] = useState<number>(0)
 
@@ -99,6 +99,91 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
     return nonZeroValues.reduce((a, b) => a + b, 0) / nonZeroValues.length
   }
 
+  // === HELPERS DE PERÍODO ===
+
+  // Retorna os índices dos meses que compõem um período
+  const getMonthsForPeriod = (periodIndex: number): number[] => {
+    if (comparisonMode === 'mensal') return [periodIndex]
+    if (comparisonMode === 'bimestral') {
+      const start = periodIndex * 2
+      return [start, start + 1].filter(m => m < 12)
+    }
+    if (comparisonMode === 'trimestral') {
+      const start = periodIndex * 3
+      return [start, start + 1, start + 2].filter(m => m < 12)
+    }
+    if (comparisonMode === 'semestral') {
+      const start = periodIndex * 6
+      return Array.from({ length: 6 }, (_, i) => start + i).filter(m => m < 12)
+    }
+    return [periodIndex]
+  }
+
+  // Soma os valores de um array de meses para um período específico
+  const sumForPeriod = (meses: number[] | undefined, periodIndex: number): number => {
+    if (!meses) return 0
+    const months = getMonthsForPeriod(periodIndex)
+    return months.reduce((sum, m) => sum + (meses[m] || 0), 0)
+  }
+
+  // Obtém valor de uma linha DRE para um período específico (soma dos meses)
+  const getDREPeriodValue = (dre: any[] | null, descricao: string, periodIndex: number): number => {
+    const linha = dre?.find(line => line.descricao === descricao)
+    return sumForPeriod(linha?.meses, periodIndex)
+  }
+
+  // Número de períodos disponíveis no modo atual
+  const getPeriodCount = (): number => {
+    if (comparisonMode === 'bimestral') return 6
+    if (comparisonMode === 'trimestral') return 4
+    if (comparisonMode === 'semestral') return 2
+    return 12
+  }
+
+  // Opções de período para o seletor
+  const getPeriodOptions = (): { value: string; label: string }[] => {
+    if (comparisonMode === 'mensal') return monthNames.map((n, i) => ({ value: i.toString(), label: n }))
+    if (comparisonMode === 'bimestral') return [
+      { value: '0', label: '1º Bimestre (Jan-Fev)' },
+      { value: '1', label: '2º Bimestre (Mar-Abr)' },
+      { value: '2', label: '3º Bimestre (Mai-Jun)' },
+      { value: '3', label: '4º Bimestre (Jul-Ago)' },
+      { value: '4', label: '5º Bimestre (Set-Out)' },
+      { value: '5', label: '6º Bimestre (Nov-Dez)' },
+    ]
+    if (comparisonMode === 'trimestral') return [
+      { value: '0', label: '1º Trimestre (Jan-Mar)' },
+      { value: '1', label: '2º Trimestre (Abr-Jun)' },
+      { value: '2', label: '3º Trimestre (Jul-Set)' },
+      { value: '3', label: '4º Trimestre (Out-Dez)' },
+    ]
+    if (comparisonMode === 'semestral') return [
+      { value: '0', label: '1º Semestre (Jan-Jun)' },
+      { value: '1', label: '2º Semestre (Jul-Dez)' },
+    ]
+    return monthNames.map((n, i) => ({ value: i.toString(), label: n }))
+  }
+
+  // Label de exibição para um período selecionado
+  const getPeriodLabel = (periodIndex: number, year: number, short = false): string => {
+    if (comparisonMode === 'mensal') {
+      return short ? `${monthNamesShort[periodIndex]}/${year}` : `${monthNames[periodIndex]}/${year}`
+    }
+    if (comparisonMode === 'bimestral') return `${periodIndex + 1}º Bim/${year}`
+    if (comparisonMode === 'trimestral') return `${periodIndex + 1}º Trim/${year}`
+    if (comparisonMode === 'semestral') return `${periodIndex + 1}º Sem/${year}`
+    return String(year)
+  }
+
+  // Label do tipo de período para a UI
+  const getPeriodTypeName = (): string => {
+    if (comparisonMode === 'mensal') return 'Mês'
+    if (comparisonMode === 'bimestral') return 'Bimestre'
+    if (comparisonMode === 'trimestral') return 'Trimestre'
+    if (comparisonMode === 'semestral') return 'Semestre'
+    return ''
+  }
+
   const getDifferenceColor = (diff: number) => {
     if (diff > 0) return 'text-green-600 dark:text-green-400'
     if (diff < 0) return 'text-red-600 dark:text-red-400'
@@ -113,17 +198,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
 
   // Função helper para gerar dados do gráfico considerando o modo de comparação
   const getChartData = (dreLine: string, dre1Data: any[] | null, dre2Data: any[] | null) => {
-    if (comparisonMode === 'mensal') {
+    if (comparisonMode !== 'anual') {
       return [
         {
-          name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+          name: getPeriodLabel(selectedMonth1, year1, true),
           valor: getDRELineValues(dre1Data, dreLine)?.[selectedMonth1] || 0,
-          periodo: `${monthNames[selectedMonth1]}/${year1}`
+          periodo: getPeriodLabel(selectedMonth1, year1)
         },
         {
-          name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+          name: getPeriodLabel(selectedMonth2, year2, true),
           valor: getDRELineValues(dre2Data, dreLine)?.[selectedMonth2] || 0,
-          periodo: `${monthNames[selectedMonth2]}/${year2}`
+          periodo: getPeriodLabel(selectedMonth2, year2)
         }
       ]
     }
@@ -187,19 +272,19 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
   }
 
   // Função auxiliar para obter valor de uma linha DRE baseado no modo de comparação
-  const getDRELineValueByMode = (dre: any[] | null, descricao: string, monthIndex: number) => {
+  const getDRELineValueByMode = (dre: any[] | null, descricao: string, periodIndex: number) => {
     const linha = dre?.find(line => line.descricao === descricao)
     if (!linha?.meses) return 0
-    if (comparisonMode === 'mensal') {
-      return linha.meses[monthIndex] || 0
+    if (comparisonMode !== 'anual') {
+      return sumForPeriod(linha.meses, periodIndex)
     }
     return linha.meses.reduce((a: number, b: number) => a + b, 0) || 0
   }
 
   // Totalizadores principais - consideram modo de comparação
   const totals1 = useMemo(() => {
-    if (comparisonMode === 'mensal') {
-      const volumeTotal = dre1?.[0]?.meses?.[selectedMonth1] || 0
+    if (comparisonMode !== 'anual') {
+      const volumeTotal = sumForPeriod(dre1?.[0]?.meses, selectedMonth1)
       const receitaLiquida = getDRELineValueByMode(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
       const lucro = getDRELineValueByMode(dre1, 'LUCRO LIQUIDO DO EXERCICIO', selectedMonth1)
       return { volumeNovos: 0, volumeUsados: 0, volumeTotal, receitaLiquida, lucro }
@@ -211,8 +296,8 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
   }, [dre1, comparisonMode, selectedMonth1])
 
   const totals2 = useMemo(() => {
-    if (comparisonMode === 'mensal') {
-      const volumeTotal = dre2?.[0]?.meses?.[selectedMonth2] || 0
+    if (comparisonMode !== 'anual') {
+      const volumeTotal = sumForPeriod(dre2?.[0]?.meses, selectedMonth2)
       const receitaLiquida = getDRELineValueByMode(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
       const lucro = getDRELineValueByMode(dre2, 'LUCRO LIQUIDO DO EXERCICIO', selectedMonth2)
       return { volumeNovos: 0, volumeUsados: 0, volumeTotal, receitaLiquida, lucro }
@@ -394,7 +479,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               </Select>
             </div>
 
-            {/* Toggle Anual/Mensal - disponível para todas as abas */}
+            {/* Toggle Anual/Período - disponível para todas as abas */}
             <div className="flex items-center gap-2 ml-6">
               <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Período:</span>
               <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
@@ -407,60 +492,66 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   Comparação Anual
                 </Button>
                 <Button
-                  onClick={() => setComparisonMode('mensal')}
+                  onClick={() => { setComparisonMode('mensal'); setSelectedMonth1(0); setSelectedMonth2(0) }}
                   variant={comparisonMode === 'mensal' ? 'default' : 'ghost'}
                   size="sm"
                   className="h-7 text-xs"
                 >
-                  Comparação Mensal
+                  Mensal
+                </Button>
+                <Button
+                  onClick={() => { setComparisonMode('bimestral'); setSelectedMonth1(0); setSelectedMonth2(0) }}
+                  variant={comparisonMode === 'bimestral' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs"
+                >
+                  Bimestral
+                </Button>
+                <Button
+                  onClick={() => { setComparisonMode('trimestral'); setSelectedMonth1(0); setSelectedMonth2(0) }}
+                  variant={comparisonMode === 'trimestral' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs"
+                >
+                  Trimestral
+                </Button>
+                <Button
+                  onClick={() => { setComparisonMode('semestral'); setSelectedMonth1(0); setSelectedMonth2(0) }}
+                  variant={comparisonMode === 'semestral' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs"
+                >
+                  Semestral
                 </Button>
               </div>
             </div>
 
-            {/* Seletores de Mês (só no modo mensal) */}
-            {comparisonMode === 'mensal' && (
+            {/* Seletores de Período (só nos modos não-anuais) */}
+            {comparisonMode !== 'anual' && (
               <>
                 <div className="flex items-center gap-2 ml-6">
-                  <span className="text-sm font-medium text-green-700 dark:text-green-400">Mês {year1}:</span>
+                  <span className="text-sm font-medium text-green-700 dark:text-green-400">{getPeriodTypeName()} {year1}:</span>
                   <Select value={selectedMonth1.toString()} onValueChange={(v) => setSelectedMonth1(parseInt(v))}>
-                    <SelectTrigger className="w-[140px] h-7 text-xs bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                    <SelectTrigger className="w-[220px] h-7 text-xs bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">Janeiro</SelectItem>
-                      <SelectItem value="1">Fevereiro</SelectItem>
-                      <SelectItem value="2">Março</SelectItem>
-                      <SelectItem value="3">Abril</SelectItem>
-                      <SelectItem value="4">Maio</SelectItem>
-                      <SelectItem value="5">Junho</SelectItem>
-                      <SelectItem value="6">Julho</SelectItem>
-                      <SelectItem value="7">Agosto</SelectItem>
-                      <SelectItem value="8">Setembro</SelectItem>
-                      <SelectItem value="9">Outubro</SelectItem>
-                      <SelectItem value="10">Novembro</SelectItem>
-                      <SelectItem value="11">Dezembro</SelectItem>
+                      {getPeriodOptions().map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Mês {year2}:</span>
+                  <span className="text-sm font-medium text-blue-700 dark:text-blue-400">{getPeriodTypeName()} {year2}:</span>
                   <Select value={selectedMonth2.toString()} onValueChange={(v) => setSelectedMonth2(parseInt(v))}>
-                    <SelectTrigger className="w-[140px] h-7 text-xs bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                    <SelectTrigger className="w-[220px] h-7 text-xs bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">Janeiro</SelectItem>
-                      <SelectItem value="1">Fevereiro</SelectItem>
-                      <SelectItem value="2">Março</SelectItem>
-                      <SelectItem value="3">Abril</SelectItem>
-                      <SelectItem value="4">Maio</SelectItem>
-                      <SelectItem value="5">Junho</SelectItem>
-                      <SelectItem value="6">Julho</SelectItem>
-                      <SelectItem value="7">Agosto</SelectItem>
-                      <SelectItem value="8">Setembro</SelectItem>
-                      <SelectItem value="9">Outubro</SelectItem>
-                      <SelectItem value="10">Novembro</SelectItem>
-                      <SelectItem value="11">Dezembro</SelectItem>
+                      {getPeriodOptions().map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -487,11 +578,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth1]}/${year1}` : year1}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1, true) : year1}</span>
                     <span className="font-bold text-lg">{totals1.volumeTotal.toLocaleString('pt-BR')}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth2]}/${year2}` : year2}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2, true) : year2}</span>
                     <span className="font-bold text-lg">{totals2.volumeTotal.toLocaleString('pt-BR')}</span>
                   </div>
                   <div className={`flex items-center gap-2 pt-2 border-t ${getDifferenceColor(calculateDifference(totals1.volumeTotal, totals2.volumeTotal).absolute)}`}>
@@ -519,11 +610,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth1]}/${year1}` : year1}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1, true) : year1}</span>
                     <span className="font-bold text-lg">{formatCurrency(totals1.receitaLiquida)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth2]}/${year2}` : year2}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2, true) : year2}</span>
                     <span className="font-bold text-lg">{formatCurrency(totals2.receitaLiquida)}</span>
                   </div>
                   <div className={`flex items-center gap-2 pt-2 border-t ${getDifferenceColor(calculateDifference(totals1.receitaLiquida, totals2.receitaLiquida).absolute)}`}>
@@ -550,11 +641,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth1]}/${year1}` : year1}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1, true) : year1}</span>
                     <span className="font-bold text-lg">{formatCurrency(totals1.lucro)}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth2]}/${year2}` : year2}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2, true) : year2}</span>
                     <span className="font-bold text-lg">{formatCurrency(totals2.lucro)}</span>
                   </div>
                   <div className={`flex items-center gap-2 pt-2 border-t ${getDifferenceColor(calculateDifference(totals1.lucro, totals2.lucro).absolute)}`}>
@@ -581,13 +672,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth1]}/${year1}` : year1}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1, true) : year1}</span>
                     <span className="font-bold text-lg">
                       {totals1.receitaLiquida ? ((totals1.lucro / totals1.receitaLiquida) * 100).toFixed(2) : '0.00'}%
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth2]}/${year2}` : year2}</span>
+                    <span className="text-xs text-slate-500">{comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2, true) : year2}</span>
                     <span className="font-bold text-lg">
                       {totals2.receitaLiquida ? ((totals2.lucro / totals2.receitaLiquida) * 100).toFixed(2) : '0.00'}%
                     </span>
@@ -623,14 +714,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       Volume de Vendas
                     </CardTitle>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                      {comparisonMode === 'mensal' 
-                        ? `Comparação: ${monthNames[selectedMonth1]}/${year1} vs ${monthNames[selectedMonth2]}/${year2}`
+                      {comparisonMode !== 'anual' 
+                        ? `Comparação: ${getPeriodLabel(selectedMonth1, year1)} vs ${getPeriodLabel(selectedMonth2, year2)}`
                         : 'Unidades comercializadas por período'}
                     </p>
                   </div>
                   <Badge className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                    {comparisonMode === 'mensal' 
-                      ? `${monthNamesShort[selectedMonth1]}/${year1} vs ${monthNamesShort[selectedMonth2]}/${year2}`
+                    {comparisonMode !== 'anual' 
+                      ? `${getPeriodLabel(selectedMonth1, year1, true)} vs ${getPeriodLabel(selectedMonth2, year2, true)}`
                       : `${year1} vs ${year2}`}
                   </Badge>
                 </div>
@@ -639,19 +730,19 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                      {comparisonMode === 'mensal' ? 'Volume do Mês' : 'Total Anual'}
+                      {comparisonMode !== 'anual' ? 'Volume do Período' : 'Total Anual'}
                     </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white">
                       {totals1.volumeTotal.toLocaleString('pt-BR')}
                     </p>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth1]}/${year1}` : year1}
+                      {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1, true) : year1}
                     </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                       {totals2.volumeTotal.toLocaleString('pt-BR')}
                     </p>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth2]}/${year2}` : year2}
+                      {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2, true) : year2}
                     </p>
                   </div>
                   {comparisonMode === 'anual' && (
@@ -692,17 +783,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={comparisonMode === 'mensal' 
+                    data={comparisonMode !== 'anual' 
                       ? [
                           {
-                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
-                            valor: dre1?.[0]?.meses?.[selectedMonth1] || 0,
-                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            name: getPeriodLabel(selectedMonth1, year1, true),
+                            valor: sumForPeriod(dre1?.[0]?.meses, selectedMonth1),
+                            periodo: getPeriodLabel(selectedMonth1, year1)
                           },
                           {
-                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
-                            valor: dre2?.[0]?.meses?.[selectedMonth2] || 0,
-                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            name: getPeriodLabel(selectedMonth2, year2, true),
+                            valor: sumForPeriod(dre2?.[0]?.meses, selectedMonth2),
+                            periodo: getPeriodLabel(selectedMonth2, year2)
                           }
                         ]
                       : getPeriodLabels().map((label, index) => {
@@ -725,7 +816,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
-                          if (comparisonMode === 'mensal') {
+                          if (comparisonMode !== 'anual') {
                             return (
                               <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                 <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -768,7 +859,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' && (
+                    {comparisonMode !== 'anual' && (
                       <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                     )}
                     {comparisonMode === 'anual' && (
@@ -792,35 +883,35 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       Receita de Vendas Líquidas
                     </CardTitle>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                      {comparisonMode === 'mensal' 
-                        ? `Comparação: ${monthNames[selectedMonth1]}/${year1} vs ${monthNames[selectedMonth2]}/${year2}`
+                      {comparisonMode !== 'anual' 
+                        ? `Comparação: ${getPeriodLabel(selectedMonth1, year1)} vs ${getPeriodLabel(selectedMonth2, year2)}`
                         : 'Receita operacional líquida por período'}
                     </p>
                   </div>
                   <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                    {comparisonMode === 'mensal' 
-                      ? `${monthNamesShort[selectedMonth1]}/${year1} vs ${monthNamesShort[selectedMonth2]}/${year2}`
+                    {comparisonMode !== 'anual' 
+                      ? `${getPeriodLabel(selectedMonth1, year1, true)} vs ${getPeriodLabel(selectedMonth2, year2, true)}`
                       : '100% Base'}
                   </Badge>
                 </div>
 
                 {/* Estatísticas */}
-                <div className={`grid ${comparisonMode === 'mensal' ? 'grid-cols-2' : 'grid-cols-3'} gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800`}>
+                <div className={`grid ${comparisonMode !== 'anual' ? 'grid-cols-2' : 'grid-cols-3'} gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800`}>
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                      {comparisonMode === 'mensal' ? 'Receita do Mês' : 'Total Acumulado'}
+                      {comparisonMode !== 'anual' ? 'Receita do Período' : 'Total Acumulado'}
                     </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white">
                       {formatCurrency(totals1.receitaLiquida)}
                     </p>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth1]}/${year1}` : year1}
+                      {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1, true) : year1}
                     </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                       {formatCurrency(totals2.receitaLiquida)}
                     </p>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                      {comparisonMode === 'mensal' ? `${monthNamesShort[selectedMonth2]}/${year2}` : year2}
+                      {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2, true) : year2}
                     </p>
                   </div>
                   {comparisonMode === 'anual' && (
@@ -877,17 +968,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={comparisonMode === 'mensal' 
+                    data={comparisonMode !== 'anual' 
                       ? [
                           {
-                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
-                            valor: getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0,
-                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            name: getPeriodLabel(selectedMonth1, year1, true),
+                            valor: getDREPeriodValue(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1),
+                            periodo: getPeriodLabel(selectedMonth1, year1)
                           },
                           {
-                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
-                            valor: getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0,
-                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            name: getPeriodLabel(selectedMonth2, year2, true),
+                            valor: getDREPeriodValue(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2),
+                            periodo: getPeriodLabel(selectedMonth2, year2)
                           }
                         ]
                       : getPeriodLabels().map((label, index) => {
@@ -908,7 +999,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
-                          if (comparisonMode === 'mensal') {
+                          if (comparisonMode !== 'anual') {
                             return (
                               <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                 <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -951,7 +1042,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' && (
+                    {comparisonMode !== 'anual' && (
                       <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                     )}
                     {comparisonMode === 'anual' && (
@@ -986,14 +1077,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                      {comparisonMode !== 'anual' ? 'Valor do Período' : 'Total Acumulado'}
                     </p>
                     {(() => {
-                      const lucroBruto1 = comparisonMode === 'mensal' 
-                        ? getDRELineValues(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth1] || 0
+                      const lucroBruto1 = comparisonMode !== 'anual' 
+                        ? getDREPeriodValue(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO', selectedMonth1)
                         : getDRELineTotal(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
-                      const lucroBruto2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth2] || 0
+                      const lucroBruto2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO', selectedMonth2)
                         : getDRELineTotal(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
                       return (
                         <>
@@ -1001,13 +1092,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {formatCurrency(lucroBruto1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(lucroBruto2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -1016,17 +1107,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Margem (%)</p>
                     {(() => {
-                      const lucroBruto1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth1] || 0
+                      const lucroBruto1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO', selectedMonth1)
                         : getDRELineTotal(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
-                      const lucroBruto2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth2] || 0
+                      const lucroBruto2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO', selectedMonth2)
                         : getDRELineTotal(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
-                      const receita1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                      const receita1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
                         : totals1.receitaLiquida
-                      const receita2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                      const receita2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
                         : totals2.receitaLiquida
                       const margem1 = receita1 > 0 ? (lucroBruto1 / receita1) * 100 : 0
                       const margem2 = receita2 > 0 ? (lucroBruto2 / receita2) * 100 : 0
@@ -1036,13 +1127,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {margem1.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {margem2.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -1051,11 +1142,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const lucroBruto1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth1] || 0
+                      const lucroBruto1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO', selectedMonth1)
                         : getDRELineTotal(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
-                      const lucroBruto2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth2] || 0
+                      const lucroBruto2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO', selectedMonth2)
                         : getDRELineTotal(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')
                       const diff = calculateDifference(lucroBruto1, lucroBruto2)
                       return (
@@ -1078,17 +1169,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={comparisonMode === 'mensal'
+                    data={comparisonMode !== 'anual'
                       ? [
                           {
-                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
-                            valor: getDRELineValues(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth1] || 0,
-                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            name: getPeriodLabel(selectedMonth1, year1, true),
+                            valor: getDREPeriodValue(dre1, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO', selectedMonth1),
+                            periodo: getPeriodLabel(selectedMonth1, year1)
                           },
                           {
-                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
-                            valor: getDRELineValues(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO')?.[selectedMonth2] || 0,
-                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            name: getPeriodLabel(selectedMonth2, year2, true),
+                            valor: getDREPeriodValue(dre2, 'LUCRO (PREJUIZO) OPERACIONAL BRUTO', selectedMonth2),
+                            periodo: getPeriodLabel(selectedMonth2, year2)
                           }
                         ]
                       : getPeriodLabels().map((label, index) => {
@@ -1111,7 +1202,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
-                          if (comparisonMode === 'mensal') {
+                          if (comparisonMode !== 'anual') {
                             return (
                               <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                 <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -1169,7 +1260,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' && (
+                    {comparisonMode !== 'anual' && (
                       <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                     )}
                     {comparisonMode === 'anual' && (
@@ -1204,14 +1295,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                      {comparisonMode !== 'anual' ? 'Valor do Período' : 'Total Acumulado'}
                     </p>
                     {(() => {
-                      const margem1 = comparisonMode === 'mensal'
-                        ? dre1?.[6]?.meses?.[selectedMonth1] || 0
+                      const margem1 = comparisonMode !== 'anual'
+                        ? sumForPeriod(dre1?.[6]?.meses, selectedMonth1)
                         : dre1?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const margem2 = comparisonMode === 'mensal'
-                        ? dre2?.[6]?.meses?.[selectedMonth2] || 0
+                      const margem2 = comparisonMode !== 'anual'
+                        ? sumForPeriod(dre2?.[6]?.meses, selectedMonth2)
                         : dre2?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
                       return (
                         <>
@@ -1219,13 +1310,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {formatCurrency(margem1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(margem2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -1234,17 +1325,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const margem1 = comparisonMode === 'mensal'
-                        ? dre1?.[6]?.meses?.[selectedMonth1] || 0
+                      const margem1 = comparisonMode !== 'anual'
+                        ? sumForPeriod(dre1?.[6]?.meses, selectedMonth1)
                         : dre1?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const margem2 = comparisonMode === 'mensal'
-                        ? dre2?.[6]?.meses?.[selectedMonth2] || 0
+                      const margem2 = comparisonMode !== 'anual'
+                        ? sumForPeriod(dre2?.[6]?.meses, selectedMonth2)
                         : dre2?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const receita1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                      const receita1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
                         : totals1.receitaLiquida
-                      const receita2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                      const receita2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
                         : totals2.receitaLiquida
                       const percent1 = receita1 > 0 ? (margem1 / receita1) * 100 : 0
                       const percent2 = receita2 > 0 ? (margem2 / receita2) * 100 : 0
@@ -1254,13 +1345,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {percent1.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {percent2.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -1269,11 +1360,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const margem1 = comparisonMode === 'mensal'
-                        ? dre1?.[6]?.meses?.[selectedMonth1] || 0
+                      const margem1 = comparisonMode !== 'anual'
+                        ? sumForPeriod(dre1?.[6]?.meses, selectedMonth1)
                         : dre1?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const margem2 = comparisonMode === 'mensal'
-                        ? dre2?.[6]?.meses?.[selectedMonth2] || 0
+                      const margem2 = comparisonMode !== 'anual'
+                        ? sumForPeriod(dre2?.[6]?.meses, selectedMonth2)
                         : dre2?.[6]?.meses?.reduce((a, b) => a + b, 0) || 0
                       const diff = calculateDifference(margem1, margem2)
                       return (
@@ -1296,17 +1387,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={comparisonMode === 'mensal'
+                    data={comparisonMode !== 'anual'
                       ? [
                           {
-                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
-                            valor: dre1?.[6]?.meses?.[selectedMonth1] || 0,
-                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            name: getPeriodLabel(selectedMonth1, year1, true),
+                            valor: sumForPeriod(dre1?.[6]?.meses, selectedMonth1),
+                            periodo: getPeriodLabel(selectedMonth1, year1)
                           },
                           {
-                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
-                            valor: dre2?.[6]?.meses?.[selectedMonth2] || 0,
-                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            name: getPeriodLabel(selectedMonth2, year2, true),
+                            valor: sumForPeriod(dre2?.[6]?.meses, selectedMonth2),
+                            periodo: getPeriodLabel(selectedMonth2, year2)
                           }
                         ]
                       : getPeriodLabels().map((label, index) => {
@@ -1329,7 +1420,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
-                          if (comparisonMode === 'mensal') {
+                          if (comparisonMode !== 'anual') {
                             return (
                               <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                 <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -1386,7 +1477,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' && (
+                    {comparisonMode !== 'anual' && (
                       <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                     )}
                     {comparisonMode === 'anual' && (
@@ -1421,14 +1512,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                      {comparisonMode !== 'anual' ? 'Valor do Período' : 'Total Acumulado'}
                     </p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ PESSOAL')?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ PESSOAL', selectedMonth1))
                         : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ PESSOAL')?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ PESSOAL', selectedMonth2))
                         : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
@@ -1436,13 +1527,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {formatCurrency(despesa1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -1451,17 +1542,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ PESSOAL')?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ PESSOAL', selectedMonth1))
                         : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ PESSOAL')?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ PESSOAL', selectedMonth2))
                         : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const receita1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                      const receita1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
                         : totals1.receitaLiquida
-                      const receita2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                      const receita2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
                         : totals2.receitaLiquida
                       const percent1 = receita1 > 0 ? (despesa1 / receita1) * 100 : 0
                       const percent2 = receita2 > 0 ? (despesa2 / receita2) * 100 : 0
@@ -1471,13 +1562,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {percent1.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {percent2.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -1486,11 +1577,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ PESSOAL')?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ PESSOAL', selectedMonth1))
                         : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ PESSOAL')?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ PESSOAL', selectedMonth2))
                         : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ PESSOAL')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
@@ -1513,17 +1604,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={comparisonMode === 'mensal'
+                    data={comparisonMode !== 'anual'
                       ? [
                           {
-                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
-                            valor: Math.abs(getDRELineValues(dre1, 'DESPESAS C/ PESSOAL')?.[selectedMonth1] || 0),
-                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            name: getPeriodLabel(selectedMonth1, year1, true),
+                            valor: Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ PESSOAL', selectedMonth1)),
+                            periodo: getPeriodLabel(selectedMonth1, year1)
                           },
                           {
-                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
-                            valor: Math.abs(getDRELineValues(dre2, 'DESPESAS C/ PESSOAL')?.[selectedMonth2] || 0),
-                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            name: getPeriodLabel(selectedMonth2, year2, true),
+                            valor: Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ PESSOAL', selectedMonth2)),
+                            periodo: getPeriodLabel(selectedMonth2, year2)
                           }
                         ]
                       : getPeriodLabels().map((label, index) => {
@@ -1546,7 +1637,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
-                          if (comparisonMode === 'mensal') {
+                          if (comparisonMode !== 'anual') {
                             return (
                               <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                 <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -1603,7 +1694,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' && (
+                    {comparisonMode !== 'anual' && (
                       <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
                     )}
                     {comparisonMode === 'anual' && (
@@ -1638,14 +1729,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                      {comparisonMode !== 'anual' ? 'Valor do Período' : 'Total Acumulado'}
                     </p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ SERV. DE TERCEIROS', selectedMonth1))
                         : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ SERV. DE TERCEIROS', selectedMonth2))
                         : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
@@ -1653,13 +1744,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {formatCurrency(despesa1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -1668,17 +1759,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ SERV. DE TERCEIROS', selectedMonth1))
                         : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ SERV. DE TERCEIROS', selectedMonth2))
                         : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const receita1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                      const receita1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
                         : totals1.receitaLiquida
-                      const receita2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                      const receita2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
                         : totals2.receitaLiquida
                       const percent1 = receita1 > 0 ? (despesa1 / receita1) * 100 : 0
                       const percent2 = receita2 > 0 ? (despesa2 / receita2) * 100 : 0
@@ -1688,13 +1779,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {percent1.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {percent2.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -1703,11 +1794,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ SERV. DE TERCEIROS', selectedMonth1))
                         : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ SERV. DE TERCEIROS', selectedMonth2))
                         : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ SERV. DE TERCEIROS')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
@@ -1730,17 +1821,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={comparisonMode === 'mensal'
+                    data={comparisonMode !== 'anual'
                       ? [
                           {
-                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
-                            valor: Math.abs(getDRELineValues(dre1, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth1] || 0),
-                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            name: getPeriodLabel(selectedMonth1, year1, true),
+                            valor: Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ SERV. DE TERCEIROS', selectedMonth1)),
+                            periodo: getPeriodLabel(selectedMonth1, year1)
                           },
                           {
-                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
-                            valor: Math.abs(getDRELineValues(dre2, 'DESPESAS C/ SERV. DE TERCEIROS')?.[selectedMonth2] || 0),
-                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            name: getPeriodLabel(selectedMonth2, year2, true),
+                            valor: Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ SERV. DE TERCEIROS', selectedMonth2)),
+                            periodo: getPeriodLabel(selectedMonth2, year2)
                           }
                         ]
                       : getPeriodLabels().map((label, index) => {
@@ -1763,7 +1854,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
-                          if (comparisonMode === 'mensal') {
+                          if (comparisonMode !== 'anual') {
                             return (
                               <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                 <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -1820,7 +1911,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' && (
+                    {comparisonMode !== 'anual' && (
                       <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
                     )}
                     {comparisonMode === 'anual' && (
@@ -1855,14 +1946,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                      {comparisonMode !== 'anual' ? 'Valor do Período' : 'Total Acumulado'}
                     </p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(dre1?.[9]?.meses?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(sumForPeriod(dre1?.[9]?.meses, selectedMonth1))
                         : Math.abs(dre1?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(dre2?.[9]?.meses?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(sumForPeriod(dre2?.[9]?.meses, selectedMonth2))
                         : Math.abs(dre2?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
@@ -1870,13 +1961,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {formatCurrency(despesa1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -1885,17 +1976,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(dre1?.[9]?.meses?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(sumForPeriod(dre1?.[9]?.meses, selectedMonth1))
                         : Math.abs(dre1?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(dre2?.[9]?.meses?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(sumForPeriod(dre2?.[9]?.meses, selectedMonth2))
                         : Math.abs(dre2?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const receita1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                      const receita1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
                         : totals1.receitaLiquida
-                      const receita2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                      const receita2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
                         : totals2.receitaLiquida
                       const percent1 = receita1 > 0 ? (despesa1 / receita1) * 100 : 0
                       const percent2 = receita2 > 0 ? (despesa2 / receita2) * 100 : 0
@@ -1905,13 +1996,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {percent1.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {percent2.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -1920,11 +2011,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(dre1?.[9]?.meses?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(sumForPeriod(dre1?.[9]?.meses, selectedMonth1))
                         : Math.abs(dre1?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(dre2?.[9]?.meses?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(sumForPeriod(dre2?.[9]?.meses, selectedMonth2))
                         : Math.abs(dre2?.[9]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
@@ -1947,17 +2038,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={comparisonMode === 'mensal'
+                    data={comparisonMode !== 'anual'
                       ? [
                           {
-                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
-                            valor: Math.abs(dre1?.[9]?.meses?.[selectedMonth1] || 0),
-                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            name: getPeriodLabel(selectedMonth1, year1, true),
+                            valor: Math.abs(sumForPeriod(dre1?.[9]?.meses, selectedMonth1)),
+                            periodo: getPeriodLabel(selectedMonth1, year1)
                           },
                           {
-                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
-                            valor: Math.abs(dre2?.[9]?.meses?.[selectedMonth2] || 0),
-                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            name: getPeriodLabel(selectedMonth2, year2, true),
+                            valor: Math.abs(sumForPeriod(dre2?.[9]?.meses, selectedMonth2)),
+                            periodo: getPeriodLabel(selectedMonth2, year2)
                           }
                         ]
                       : getPeriodLabels().map((label, index) => {
@@ -1980,7 +2071,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
-                          if (comparisonMode === 'mensal') {
+                          if (comparisonMode !== 'anual') {
                             return (
                               <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                 <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -2037,7 +2128,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' && (
+                    {comparisonMode !== 'anual' && (
                       <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
                     )}
                     {comparisonMode === 'anual' && (
@@ -2072,14 +2163,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                      {comparisonMode !== 'anual' ? 'Valor do Período' : 'Total Acumulado'}
                     </p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ FUNCIONAMENTO', selectedMonth1))
                         : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ FUNCIONAMENTO', selectedMonth2))
                         : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
@@ -2087,13 +2178,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {formatCurrency(despesa1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -2102,17 +2193,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ FUNCIONAMENTO', selectedMonth1))
                         : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ FUNCIONAMENTO', selectedMonth2))
                         : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const receita1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                      const receita1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
                         : totals1.receitaLiquida
-                      const receita2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                      const receita2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
                         : totals2.receitaLiquida
                       const percent1 = receita1 > 0 ? (despesa1 / receita1) * 100 : 0
                       const percent2 = receita2 > 0 ? (despesa2 / receita2) * 100 : 0
@@ -2122,13 +2213,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {percent1.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {percent2.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -2137,11 +2228,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ FUNCIONAMENTO', selectedMonth1))
                         : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ FUNCIONAMENTO', selectedMonth2))
                         : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ FUNCIONAMENTO')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
@@ -2164,17 +2255,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={comparisonMode === 'mensal'
+                    data={comparisonMode !== 'anual'
                       ? [
                           {
-                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
-                            valor: Math.abs(getDRELineValues(dre1, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth1] || 0),
-                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            name: getPeriodLabel(selectedMonth1, year1, true),
+                            valor: Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ FUNCIONAMENTO', selectedMonth1)),
+                            periodo: getPeriodLabel(selectedMonth1, year1)
                           },
                           {
-                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
-                            valor: Math.abs(getDRELineValues(dre2, 'DESPESAS C/ FUNCIONAMENTO')?.[selectedMonth2] || 0),
-                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            name: getPeriodLabel(selectedMonth2, year2, true),
+                            valor: Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ FUNCIONAMENTO', selectedMonth2)),
+                            periodo: getPeriodLabel(selectedMonth2, year2)
                           }
                         ]
                       : getPeriodLabels().map((label, index) => {
@@ -2197,7 +2288,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
-                          if (comparisonMode === 'mensal') {
+                          if (comparisonMode !== 'anual') {
                             return (
                               <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                 <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -2254,7 +2345,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' && (
+                    {comparisonMode !== 'anual' && (
                       <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
                     )}
                     {comparisonMode === 'anual' && (
@@ -2289,14 +2380,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                      {comparisonMode !== 'anual' ? 'Valor do Período' : 'Total Acumulado'}
                     </p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ VENDAS')?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ VENDAS', selectedMonth1))
                         : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ VENDAS')?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ VENDAS', selectedMonth2))
                         : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
@@ -2304,13 +2395,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {formatCurrency(despesa1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {formatCurrency(despesa2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -2319,17 +2410,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">% Receita</p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ VENDAS')?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ VENDAS', selectedMonth1))
                         : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ VENDAS')?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ VENDAS', selectedMonth2))
                         : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const receita1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                      const receita1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
                         : totals1.receitaLiquida
-                      const receita2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                      const receita2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
                         : totals2.receitaLiquida
                       const percent1 = receita1 > 0 ? (despesa1 / receita1) * 100 : 0
                       const percent2 = receita2 > 0 ? (despesa2 / receita2) * 100 : 0
@@ -2339,13 +2430,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {percent1.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {percent2.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -2354,11 +2445,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const despesa1 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre1, 'DESPESAS C/ VENDAS')?.[selectedMonth1] || 0)
+                      const despesa1 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ VENDAS', selectedMonth1))
                         : Math.abs(dre1?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const despesa2 = comparisonMode === 'mensal'
-                        ? Math.abs(getDRELineValues(dre2, 'DESPESAS C/ VENDAS')?.[selectedMonth2] || 0)
+                      const despesa2 = comparisonMode !== 'anual'
+                        ? Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ VENDAS', selectedMonth2))
                         : Math.abs(dre2?.find(line => line.descricao === 'DESPESAS C/ VENDAS')?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(despesa1, despesa2)
                       return (
@@ -2381,17 +2472,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={comparisonMode === 'mensal'
+                    data={comparisonMode !== 'anual'
                       ? [
                           {
-                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
-                            valor: Math.abs(getDRELineValues(dre1, 'DESPESAS C/ VENDAS')?.[selectedMonth1] || 0),
-                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            name: getPeriodLabel(selectedMonth1, year1, true),
+                            valor: Math.abs(getDREPeriodValue(dre1, 'DESPESAS C/ VENDAS', selectedMonth1)),
+                            periodo: getPeriodLabel(selectedMonth1, year1)
                           },
                           {
-                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
-                            valor: Math.abs(getDRELineValues(dre2, 'DESPESAS C/ VENDAS')?.[selectedMonth2] || 0),
-                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            name: getPeriodLabel(selectedMonth2, year2, true),
+                            valor: Math.abs(getDREPeriodValue(dre2, 'DESPESAS C/ VENDAS', selectedMonth2)),
+                            periodo: getPeriodLabel(selectedMonth2, year2)
                           }
                         ]
                       : getPeriodLabels().map((label, index) => {
@@ -2414,7 +2505,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
-                          if (comparisonMode === 'mensal') {
+                          if (comparisonMode !== 'anual') {
                             return (
                               <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                 <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -2471,7 +2562,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' && (
+                    {comparisonMode !== 'anual' && (
                       <Bar dataKey="valor" fill="#ef4444" radius={[4, 4, 0, 0]} />
                     )}
                     {comparisonMode === 'anual' && (
@@ -2506,14 +2597,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                      {comparisonMode !== 'anual' ? 'Valor do Período' : 'Total Acumulado'}
                     </p>
                     {(() => {
-                      const valor1 = comparisonMode === 'mensal'
-                        ? Math.abs(dre1?.[13]?.meses?.[selectedMonth1] || 0)
+                      const valor1 = comparisonMode !== 'anual'
+                        ? Math.abs(sumForPeriod(dre1?.[13]?.meses, selectedMonth1))
                         : Math.abs(dre1?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const valor2 = comparisonMode === 'mensal'
-                        ? Math.abs(dre2?.[13]?.meses?.[selectedMonth2] || 0)
+                      const valor2 = comparisonMode !== 'anual'
+                        ? Math.abs(sumForPeriod(dre2?.[13]?.meses, selectedMonth2))
                         : Math.abs(dre2?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       return (
                         <>
@@ -2521,13 +2612,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {formatCurrency(valor1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-600 dark:text-slate-400 mt-2">
                             {formatCurrency(valor2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -2535,18 +2626,18 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   </div>
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                      {comparisonMode === 'mensal' ? '% Receita' : 'Média Mensal'}
+                      {comparisonMode !== 'anual' ? '% Receita' : 'Média Mensal'}
                     </p>
                     {(() => {
-                      const valor1 = comparisonMode === 'mensal'
-                        ? Math.abs(dre1?.[13]?.meses?.[selectedMonth1] || 0)
+                      const valor1 = comparisonMode !== 'anual'
+                        ? Math.abs(sumForPeriod(dre1?.[13]?.meses, selectedMonth1))
                         : Math.abs(dre1?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const valor2 = comparisonMode === 'mensal'
-                        ? Math.abs(dre2?.[13]?.meses?.[selectedMonth2] || 0)
+                      const valor2 = comparisonMode !== 'anual'
+                        ? Math.abs(sumForPeriod(dre2?.[13]?.meses, selectedMonth2))
                         : Math.abs(dre2?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      if (comparisonMode === 'mensal') {
-                        const receita1 = getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
-                        const receita2 = getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                      if (comparisonMode !== 'anual') {
+                        const receita1 = getDREPeriodValue(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
+                        const receita2 = getDREPeriodValue(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
                         const percent1 = receita1 > 0 ? (valor1 / receita1) * 100 : 0
                         const percent2 = receita2 > 0 ? (valor2 / receita2) * 100 : 0
                         return (
@@ -2554,11 +2645,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             <p className="text-lg font-bold text-slate-900 dark:text-white">
                               {percent1.toFixed(2)}%
                             </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{monthNames[selectedMonth1]}/{year1}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{getPeriodLabel(selectedMonth1, year1)}</p>
                             <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                               {percent2.toFixed(2)}%
                             </p>
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{monthNames[selectedMonth2]}/{year2}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{getPeriodLabel(selectedMonth2, year2)}</p>
                           </>
                         )
                       }
@@ -2579,11 +2670,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const valor1 = comparisonMode === 'mensal'
-                        ? Math.abs(dre1?.[13]?.meses?.[selectedMonth1] || 0)
+                      const valor1 = comparisonMode !== 'anual'
+                        ? Math.abs(sumForPeriod(dre1?.[13]?.meses, selectedMonth1))
                         : Math.abs(dre1?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
-                      const valor2 = comparisonMode === 'mensal'
-                        ? Math.abs(dre2?.[13]?.meses?.[selectedMonth2] || 0)
+                      const valor2 = comparisonMode !== 'anual'
+                        ? Math.abs(sumForPeriod(dre2?.[13]?.meses, selectedMonth2))
                         : Math.abs(dre2?.[13]?.meses?.reduce((a, b) => a + b, 0) || 0)
                       const diff = calculateDifference(valor1, valor2)
                       return (
@@ -2606,17 +2697,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={comparisonMode === 'mensal'
+                    data={comparisonMode !== 'anual'
                       ? [
                           {
-                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
-                            valor: Math.abs(dre1?.[13]?.meses?.[selectedMonth1] || 0),
-                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            name: getPeriodLabel(selectedMonth1, year1, true),
+                            valor: Math.abs(sumForPeriod(dre1?.[13]?.meses, selectedMonth1)),
+                            periodo: getPeriodLabel(selectedMonth1, year1)
                           },
                           {
-                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
-                            valor: Math.abs(dre2?.[13]?.meses?.[selectedMonth2] || 0),
-                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            name: getPeriodLabel(selectedMonth2, year2, true),
+                            valor: Math.abs(sumForPeriod(dre2?.[13]?.meses, selectedMonth2)),
+                            periodo: getPeriodLabel(selectedMonth2, year2)
                           }
                         ]
                       : getPeriodLabels().map((label, index) => {
@@ -2639,7 +2730,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
-                          if (comparisonMode === 'mensal') {
+                          if (comparisonMode !== 'anual') {
                             return (
                               <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                 <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -2696,7 +2787,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' && (
+                    {comparisonMode !== 'anual' && (
                       <Bar dataKey="valor" fill="#64748b" radius={[4, 4, 0, 0]} />
                     )}
                     {comparisonMode === 'anual' && (
@@ -2731,14 +2822,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                      {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                      {comparisonMode !== 'anual' ? 'Valor do Período' : 'Total Acumulado'}
                     </p>
                     {(() => {
-                      const lucro1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth1] || 0
+                      const lucro1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS', selectedMonth1)
                         : dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const lucro2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth2] || 0
+                      const lucro2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS', selectedMonth2)
                         : dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
                       return (
                         <>
@@ -2746,13 +2837,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {formatCurrency(lucro1)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className={`text-lg font-bold mt-2 ${lucro2 >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                             {formatCurrency(lucro2)}
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -2761,17 +2852,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Margem (%)</p>
                     {(() => {
-                      const lucro1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth1] || 0
+                      const lucro1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS', selectedMonth1)
                         : dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const lucro2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth2] || 0
+                      const lucro2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS', selectedMonth2)
                         : dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const receita1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                      const receita1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
                         : totals1.receitaLiquida
-                      const receita2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                      const receita2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
                         : totals2.receitaLiquida
                       const margem1 = receita1 > 0 ? (lucro1 / receita1) * 100 : 0
                       const margem2 = receita2 > 0 ? (lucro2 / receita2) * 100 : 0
@@ -2781,13 +2872,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                             {margem1.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                           </p>
                           <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                             {margem2.toFixed(2)}%
                           </p>
                           <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                            {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                            {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                           </p>
                         </>
                       )
@@ -2796,11 +2887,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                     {(() => {
-                      const lucro1 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth1] || 0
+                      const lucro1 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS', selectedMonth1)
                         : dre1?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
-                      const lucro2 = comparisonMode === 'mensal'
-                        ? getDRELineValues(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth2] || 0
+                      const lucro2 = comparisonMode !== 'anual'
+                        ? getDREPeriodValue(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS', selectedMonth2)
                         : dre2?.find(line => line.descricao === 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.meses?.reduce((a, b) => a + b, 0) || 0
                       const diff = calculateDifference(lucro1, lucro2)
                       return (
@@ -2823,17 +2914,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
               <CardContent>
                 <ResponsiveContainer width="100%" height={320}>
                   <BarChart 
-                    data={comparisonMode === 'mensal'
+                    data={comparisonMode !== 'anual'
                       ? [
                           {
-                            name: `${monthNamesShort[selectedMonth1]}/${year1}`,
-                            valor: getDRELineValues(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth1] || 0,
-                            periodo: `${monthNames[selectedMonth1]}/${year1}`
+                            name: getPeriodLabel(selectedMonth1, year1, true),
+                            valor: getDREPeriodValue(dre1, 'LUCRO (PREJUIZO) ANTES IMPOSTOS', selectedMonth1),
+                            periodo: getPeriodLabel(selectedMonth1, year1)
                           },
                           {
-                            name: `${monthNamesShort[selectedMonth2]}/${year2}`,
-                            valor: getDRELineValues(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS')?.[selectedMonth2] || 0,
-                            periodo: `${monthNames[selectedMonth2]}/${year2}`
+                            name: getPeriodLabel(selectedMonth2, year2, true),
+                            valor: getDREPeriodValue(dre2, 'LUCRO (PREJUIZO) ANTES IMPOSTOS', selectedMonth2),
+                            periodo: getPeriodLabel(selectedMonth2, year2)
                           }
                         ]
                       : getPeriodLabels().map((label, index) => {
@@ -2856,7 +2947,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <Tooltip 
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
-                          if (comparisonMode === 'mensal') {
+                          if (comparisonMode !== 'anual') {
                             return (
                               <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                 <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -2913,7 +3004,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                         formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                       />
                     )}
-                    {comparisonMode === 'mensal' && (
+                    {comparisonMode !== 'anual' && (
                       <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                     )}
                     {comparisonMode === 'anual' && (
@@ -2949,7 +3040,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                        {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                        {comparisonMode !== 'anual' ? 'Valor do Período' : 'Total Acumulado'}
                       </p>
                       {(() => {
                         const getProvisaoValue = (dre: any[] | null, monthIndex?: number) => {
@@ -2957,10 +3048,10 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                           if (monthIndex !== undefined) return Math.abs(line?.meses?.[monthIndex] || 0)
                           return Math.abs(line?.meses?.reduce((a: number, b: number) => a + b, 0) || 0)
                         }
-                        const provisao1 = comparisonMode === 'mensal'
+                        const provisao1 = comparisonMode !== 'anual'
                           ? getProvisaoValue(dre1, selectedMonth1)
                           : getProvisaoValue(dre1)
-                        const provisao2 = comparisonMode === 'mensal'
+                        const provisao2 = comparisonMode !== 'anual'
                           ? getProvisaoValue(dre2, selectedMonth2)
                           : getProvisaoValue(dre2)
                         return (
@@ -2969,13 +3060,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                               {formatCurrency(provisao1)}
                             </p>
                             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                              {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                             </p>
                             <p className="text-lg font-bold text-orange-600 dark:text-orange-400 mt-2">
                               {formatCurrency(provisao2)}
                             </p>
                             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                              {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                             </p>
                           </>
                         )
@@ -2989,17 +3080,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                           if (monthIndex !== undefined) return Math.abs(line?.meses?.[monthIndex] || 0)
                           return Math.abs(line?.meses?.reduce((a: number, b: number) => a + b, 0) || 0)
                         }
-                        const provisao1 = comparisonMode === 'mensal'
+                        const provisao1 = comparisonMode !== 'anual'
                           ? getProvisaoValue(dre1, selectedMonth1)
                           : getProvisaoValue(dre1)
-                        const provisao2 = comparisonMode === 'mensal'
+                        const provisao2 = comparisonMode !== 'anual'
                           ? getProvisaoValue(dre2, selectedMonth2)
                           : getProvisaoValue(dre2)
-                        const receita1 = comparisonMode === 'mensal'
-                          ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                        const receita1 = comparisonMode !== 'anual'
+                          ? getDREPeriodValue(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
                           : totals1.receitaLiquida
-                        const receita2 = comparisonMode === 'mensal'
-                          ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                        const receita2 = comparisonMode !== 'anual'
+                          ? getDREPeriodValue(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
                           : totals2.receitaLiquida
                         const percent1 = receita1 > 0 ? (provisao1 / receita1) * 100 : 0
                         const percent2 = receita2 > 0 ? (provisao2 / receita2) * 100 : 0
@@ -3009,13 +3100,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                               {percent1.toFixed(2)}%
                             </p>
                             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                              {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                             </p>
                             <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                               {percent2.toFixed(2)}%
                             </p>
                             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                              {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                             </p>
                           </>
                         )
@@ -3029,10 +3120,10 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                           if (monthIndex !== undefined) return Math.abs(line?.meses?.[monthIndex] || 0)
                           return Math.abs(line?.meses?.reduce((a: number, b: number) => a + b, 0) || 0)
                         }
-                        const provisao1 = comparisonMode === 'mensal'
+                        const provisao1 = comparisonMode !== 'anual'
                           ? getProvisaoValue(dre1, selectedMonth1)
                           : getProvisaoValue(dre1)
-                        const provisao2 = comparisonMode === 'mensal'
+                        const provisao2 = comparisonMode !== 'anual'
                           ? getProvisaoValue(dre2, selectedMonth2)
                           : getProvisaoValue(dre2)
                         const diff = calculateDifference(provisao1, provisao2)
@@ -3056,17 +3147,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <CardContent>
                   <ResponsiveContainer width="100%" height={320}>
                     <BarChart 
-                      data={comparisonMode === 'mensal'
+                      data={comparisonMode !== 'anual'
                         ? [
                             {
-                              name: `${monthNamesShort[selectedMonth1]}/${year1}`,
+                              name: getPeriodLabel(selectedMonth1, year1, true),
                               valor: Math.abs((dre1?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.[selectedMonth1]) || 0),
-                              periodo: `${monthNames[selectedMonth1]}/${year1}`
+                              periodo: getPeriodLabel(selectedMonth1, year1)
                             },
                             {
-                              name: `${monthNamesShort[selectedMonth2]}/${year2}`,
+                              name: getPeriodLabel(selectedMonth2, year2, true),
                               valor: Math.abs((dre2?.find(line => line.descricao?.toUpperCase().includes('PROVIS') && line.descricao?.toUpperCase().includes('IRPJ'))?.meses?.[selectedMonth2]) || 0),
-                              periodo: `${monthNames[selectedMonth2]}/${year2}`
+                              periodo: getPeriodLabel(selectedMonth2, year2)
                             }
                           ]
                         : getPeriodLabels().map((label, index) => {
@@ -3089,7 +3180,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       <Tooltip 
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
-                            if (comparisonMode === 'mensal') {
+                            if (comparisonMode !== 'anual') {
                               return (
                                 <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                   <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -3146,7 +3237,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                           formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                         />
                       )}
-                      {comparisonMode === 'mensal' && (
+                      {comparisonMode !== 'anual' && (
                         <Bar dataKey="valor" fill="#f97316" radius={[4, 4, 0, 0]} />
                       )}
                       {comparisonMode === 'anual' && (
@@ -3183,14 +3274,14 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                   <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                        {comparisonMode === 'mensal' ? 'Valor do Mês' : 'Total Acumulado'}
+                        {comparisonMode !== 'anual' ? 'Valor do Período' : 'Total Acumulado'}
                       </p>
                       {(() => {
-                        const lucroLiquido1 = comparisonMode === 'mensal'
-                          ? getDRELineValues(dre1, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth1] || 0
+                        const lucroLiquido1 = comparisonMode !== 'anual'
+                          ? getDREPeriodValue(dre1, 'LUCRO LIQUIDO DO EXERCICIO', selectedMonth1)
                           : dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                        const lucroLiquido2 = comparisonMode === 'mensal'
-                          ? getDRELineValues(dre2, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth2] || 0
+                        const lucroLiquido2 = comparisonMode !== 'anual'
+                          ? getDREPeriodValue(dre2, 'LUCRO LIQUIDO DO EXERCICIO', selectedMonth2)
                           : dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
                         return (
                           <>
@@ -3198,13 +3289,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                               {formatCurrency(lucroLiquido1)}
                             </p>
                             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                              {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                             </p>
                             <p className={`text-lg font-bold mt-2 ${lucroLiquido2 >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                               {formatCurrency(lucroLiquido2)}
                             </p>
                             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                              {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                             </p>
                           </>
                         )
@@ -3213,17 +3304,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Margem Líquida (%)</p>
                       {(() => {
-                        const lucroLiquido1 = comparisonMode === 'mensal'
-                          ? getDRELineValues(dre1, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth1] || 0
+                        const lucroLiquido1 = comparisonMode !== 'anual'
+                          ? getDREPeriodValue(dre1, 'LUCRO LIQUIDO DO EXERCICIO', selectedMonth1)
                           : dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                        const lucroLiquido2 = comparisonMode === 'mensal'
-                          ? getDRELineValues(dre2, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth2] || 0
+                        const lucroLiquido2 = comparisonMode !== 'anual'
+                          ? getDREPeriodValue(dre2, 'LUCRO LIQUIDO DO EXERCICIO', selectedMonth2)
                           : dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                        const receita1 = comparisonMode === 'mensal'
-                          ? getDRELineValues(dre1, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth1] || 0
+                        const receita1 = comparisonMode !== 'anual'
+                          ? getDREPeriodValue(dre1, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth1)
                           : totals1.receitaLiquida
-                        const receita2 = comparisonMode === 'mensal'
-                          ? getDRELineValues(dre2, 'RECEITA OPERACIONAL LIQUIDA')?.[selectedMonth2] || 0
+                        const receita2 = comparisonMode !== 'anual'
+                          ? getDREPeriodValue(dre2, 'RECEITA OPERACIONAL LIQUIDA', selectedMonth2)
                           : totals2.receitaLiquida
                         const margem1 = receita1 > 0 ? (lucroLiquido1 / receita1) * 100 : 0
                         const margem2 = receita2 > 0 ? (lucroLiquido2 / receita2) * 100 : 0
@@ -3233,13 +3324,13 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                               {margem1.toFixed(2)}%
                             </p>
                             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                              {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth1, year1) : year1}
                             </p>
                             <p className="text-lg font-bold text-slate-900 dark:text-white mt-2">
                               {margem2.toFixed(2)}%
                             </p>
                             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                              {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                              {comparisonMode !== 'anual' ? getPeriodLabel(selectedMonth2, year2) : year2}
                             </p>
                           </>
                         )
@@ -3248,11 +3339,11 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Variação</p>
                       {(() => {
-                        const lucroLiquido1 = comparisonMode === 'mensal'
-                          ? getDRELineValues(dre1, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth1] || 0
+                        const lucroLiquido1 = comparisonMode !== 'anual'
+                          ? getDREPeriodValue(dre1, 'LUCRO LIQUIDO DO EXERCICIO', selectedMonth1)
                           : dre1?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
-                        const lucroLiquido2 = comparisonMode === 'mensal'
-                          ? getDRELineValues(dre2, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth2] || 0
+                        const lucroLiquido2 = comparisonMode !== 'anual'
+                          ? getDREPeriodValue(dre2, 'LUCRO LIQUIDO DO EXERCICIO', selectedMonth2)
                           : dre2?.find(line => line.descricao === 'LUCRO LIQUIDO DO EXERCICIO')?.meses?.reduce((a, b) => a + b, 0) || 0
                         const diff = calculateDifference(lucroLiquido1, lucroLiquido2)
                         return (
@@ -3275,17 +3366,17 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                 <CardContent>
                   <ResponsiveContainer width="100%" height={320}>
                     <BarChart 
-                      data={comparisonMode === 'mensal'
+                      data={comparisonMode !== 'anual'
                         ? [
                             {
-                              name: `${monthNamesShort[selectedMonth1]}/${year1}`,
-                              valor: getDRELineValues(dre1, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth1] || 0,
-                              periodo: `${monthNames[selectedMonth1]}/${year1}`
+                              name: getPeriodLabel(selectedMonth1, year1, true),
+                              valor: getDREPeriodValue(dre1, 'LUCRO LIQUIDO DO EXERCICIO', selectedMonth1),
+                              periodo: getPeriodLabel(selectedMonth1, year1)
                             },
                             {
-                              name: `${monthNamesShort[selectedMonth2]}/${year2}`,
-                              valor: getDRELineValues(dre2, 'LUCRO LIQUIDO DO EXERCICIO')?.[selectedMonth2] || 0,
-                              periodo: `${monthNames[selectedMonth2]}/${year2}`
+                              name: getPeriodLabel(selectedMonth2, year2, true),
+                              valor: getDREPeriodValue(dre2, 'LUCRO LIQUIDO DO EXERCICIO', selectedMonth2),
+                              periodo: getPeriodLabel(selectedMonth2, year2)
                             }
                           ]
                         : getPeriodLabels().map((label, index) => {
@@ -3308,7 +3399,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                       <Tooltip 
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
-                            if (comparisonMode === 'mensal') {
+                            if (comparisonMode !== 'anual') {
                               return (
                                 <div className="bg-white dark:bg-slate-800 p-3 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                                   <p className="font-semibold text-slate-900 dark:text-white mb-2">{payload[0].payload.periodo}</p>
@@ -3365,7 +3456,7 @@ export function YearComparison({ onBack, initialYear1 = 2025, initialYear2 = 202
                           formatter={(value) => <span className="text-sm font-medium">{value}</span>}
                         />
                       )}
-                      {comparisonMode === 'mensal' && (
+                      {comparisonMode !== 'anual' && (
                         <Bar dataKey="valor" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                       )}
                       {comparisonMode === 'anual' && (
@@ -3545,7 +3636,7 @@ interface DadosAdicionaisComparisonProps {
   brand: Brand
   department: Department | 'consolidado'
   viewMode: 'mensal' | 'bimestral' | 'trimestral' | 'semestral'
-  comparisonMode: 'anual' | 'mensal'
+  comparisonMode: 'anual' | 'mensal' | 'bimestral' | 'trimestral' | 'semestral'
   selectedMonth1: number
   selectedMonth2: number
   formatCurrency: (value: number) => string
@@ -3580,35 +3671,56 @@ function DadosAdicionaisComparison({
   // Array de nomes de meses
   const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
-  // Função auxiliar para somar arrays ou pegar valor específico do mês
-  const sumArray = (arr?: number[]) => {
-    if (!arr) return 0
-    if (comparisonMode === 'mensal') {
-      // No modo mensal, não soma - retorna apenas o valor do mês selecionado
-      return 0
+  // Helper local: índices dos meses para um período
+  const getMonthsForPeriodLocal = (periodIndex: number): number[] => {
+    if (comparisonMode === 'mensal') return [periodIndex]
+    if (comparisonMode === 'bimestral') {
+      const start = periodIndex * 2
+      return [start, start + 1].filter(m => m < 12)
     }
-    return arr.reduce((sum, val) => sum + (val || 0), 0)
+    if (comparisonMode === 'trimestral') {
+      const start = periodIndex * 3
+      return [start, start + 1, start + 2].filter(m => m < 12)
+    }
+    if (comparisonMode === 'semestral') {
+      const start = periodIndex * 6
+      return Array.from({ length: 6 }, (_, i) => start + i).filter(m => m < 12)
+    }
+    return [periodIndex]
   }
 
-  // Função para obter valor do mês específico
-  const getMonthValue = (arr?: number[], monthIndex?: number) => {
-    if (!arr || !Array.isArray(arr) || monthIndex === undefined) return 0
-    return arr[monthIndex] || 0
+  // Helper local: label de exibição do período
+  const getPeriodLabelLocal = (periodIndex: number, year: number): string => {
+    if (comparisonMode === 'mensal') return `${monthNames[periodIndex]}/${year}`
+    if (comparisonMode === 'bimestral') return `${periodIndex + 1}º Bim/${year}`
+    if (comparisonMode === 'trimestral') return `${periodIndex + 1}º Trim/${year}`
+    if (comparisonMode === 'semestral') return `${periodIndex + 1}º Sem/${year}`
+    return String(year)
   }
 
   // Função auxiliar para obter valor baseado no modo de comparação
-  const getValue = (arr?: number[], monthIndex?: number, divideByMonths: boolean = false, useDecemberOnly: boolean = false) => {
+  const getValue = (arr?: number[], periodIndex?: number, divideByMonths: boolean = false, useDecemberOnly: boolean = false) => {
     if (!arr || !Array.isArray(arr)) return 0
-    if (comparisonMode === 'mensal') {
-      return getMonthValue(arr, monthIndex)
+    if (comparisonMode !== 'anual') {
+      if (periodIndex === undefined) return 0
+      const months = getMonthsForPeriodLocal(periodIndex)
+      if (useDecemberOnly) {
+        // Usa o último mês do período (ex: mar no 1º trim, jun no 2º trim)
+        return arr[months[months.length - 1]] || 0
+      }
+      const sum = months.reduce((s, m) => s + (arr[m] || 0), 0)
+      if (divideByMonths) {
+        const nonZeroCount = months.filter(m => arr[m] !== 0).length
+        return nonZeroCount > 0 ? sum / nonZeroCount : 0
+      }
+      return sum
     } else {
-      // Para estoques, usar apenas dezembro no modo anual
+      // Modo anual
       if (useDecemberOnly) {
         return arr[11] || 0 // Dezembro = índice 11
       }
       const sum = arr.reduce((sum, val) => sum + (val || 0), 0)
       if (divideByMonths) {
-        // Calcula a média apenas dos meses com dados (não-zero)
         const nonZeroCount = arr.filter(v => v !== 0).length
         return nonZeroCount > 0 ? sum / nonZeroCount : 0
       }
@@ -3983,9 +4095,9 @@ function DadosAdicionaisComparison({
                   <div className="text-lg font-bold">{secao.titulo}</div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     {secao.subtitulo}
-                    {comparisonMode === 'mensal' && (
+                    {comparisonMode !== 'anual' && (
                       <span className="ml-2 font-semibold">
-                        ({monthNames[selectedMonth1]}/{year1} vs {monthNames[selectedMonth2]}/{year2})
+                        ({getPeriodLabelLocal(selectedMonth1, year1)} vs {getPeriodLabelLocal(selectedMonth2, year2)})
                       </span>
                     )}
                   </div>
@@ -3999,10 +4111,10 @@ function DadosAdicionaisComparison({
                     <tr className="border-b-2 border-slate-200 dark:border-slate-700">
                       <th className="text-left py-3 px-2 font-semibold text-slate-700 dark:text-slate-300">Métrica</th>
                       <th className="text-right py-3 px-2 font-semibold text-green-700 dark:text-green-400">
-                        {comparisonMode === 'mensal' ? `${monthNames[selectedMonth1]}/${year1}` : year1}
+                        {comparisonMode !== 'anual' ? getPeriodLabelLocal(selectedMonth1, year1) : year1}
                       </th>
                       <th className="text-right py-3 px-2 font-semibold text-blue-700 dark:text-blue-400">
-                        {comparisonMode === 'mensal' ? `${monthNames[selectedMonth2]}/${year2}` : year2}
+                        {comparisonMode !== 'anual' ? getPeriodLabelLocal(selectedMonth2, year2) : year2}
                       </th>
                       <th className="text-right py-3 px-2 font-semibold text-slate-700 dark:text-slate-300">Diferença</th>
                       <th className="text-right py-3 px-2 font-semibold text-slate-700 dark:text-slate-300">Variação %</th>

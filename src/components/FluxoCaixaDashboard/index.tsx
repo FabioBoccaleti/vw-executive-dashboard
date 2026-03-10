@@ -719,17 +719,17 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
                 </div>
               )}
               {activeTab === 'overview' && <OverviewTab data={data} fmtBRL={fmtBRL} KPI={KPI} BarGauge={BarGauge} SectionTitle={SectionTitle} />}
-              {activeTab === 'ativo' && <AtivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} />}
-              {activeTab === 'passivo' && <PassivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} />}
-              {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
-              {activeTab === 'caixa' && <CaixaTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} />}
-              {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} />}
-              {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
-              {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
-              {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} />}
+              {activeTab === 'ativo' && <AtivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'passivo' && <PassivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'caixa' && <CaixaTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} despesasView={despesasView} setDespesasView={setDespesasView} />}
-              {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
-              {activeTab === 'parcelamentoRefis' && <ParcelamentoRefisTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} />}
+              {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'parcelamentoRefis' && <ParcelamentoRefisTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} />}
               {activeTab === 'diagnostico' && <DiagnosticoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
             </div>
@@ -742,7 +742,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
 
 // ─── TABS ─────────────────────────────────────────────────────────────────────
 
-function PosicaoEstoquesTab({ data, fmtBRL, SectionTitle, KPI }: any) {
+function PosicaoEstoquesTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }: any) {
   const accounts = data.accounts as Record<string, any>;
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
 
@@ -900,7 +900,7 @@ function PosicaoEstoquesTab({ data, fmtBRL, SectionTitle, KPI }: any) {
   );
 }
 
-function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI }: any) {
+function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }: any) {
   const accounts = data.accounts as Record<string, any>;
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
 
@@ -1003,7 +1003,7 @@ function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI }: any) {
   );
 }
 
-function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2 }: any) {
+function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnterior, colAtual }: any) {
   const d = data;
   const accounts = d.accounts as Record<string, any>;
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
@@ -1258,7 +1258,7 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2 }: any) {
   );
 }
 
-function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI }: any) {
+function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }: any) {
   const accounts = data.accounts as Record<string, any>;
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
 
@@ -1355,7 +1355,7 @@ function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI }: any) {
   );
 }
 
-function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI }: any) {
+function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }: any) {
   const accounts = data.accounts as Record<string, any>;
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
 
@@ -1551,7 +1551,7 @@ Total:  ${d.dfc.fluxoTotal >= 0 ? '+' : '–'} ${fmtBRL(Math.abs(d.dfc.fluxoTota
   );
 }
 
-function AtivoTab({ data, SectionTitle, TableRow2 }: any) {
+function AtivoTab({ data, SectionTitle, TableRow2, colAnterior, colAtual }: any) {
   const d = data;
   const accounts = d.accounts as Record<string, any>;
   const sa = (prefix: string) => subAccs(accounts, prefix);
@@ -1600,7 +1600,7 @@ function AtivoTab({ data, SectionTitle, TableRow2 }: any) {
   );
 }
 
-function PassivoTab({ data, SectionTitle, TableRow2 }: any) {
+function PassivoTab({ data, SectionTitle, TableRow2, colAnterior, colAtual }: any) {
   const d = data;
   const accounts = d.accounts as Record<string, any>;
   const sa = (prefix: string) => subAccs(accounts, prefix);
@@ -1651,7 +1651,7 @@ function PassivoTab({ data, SectionTitle, TableRow2 }: any) {
   );
 }
 
-function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
+function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual }: any) {
   const d = data;
   const accounts = d.accounts as Record<string, any>;
 
@@ -1784,7 +1784,7 @@ function ResultadoTab({ data, fmtBRL, SectionTitle }: any) {
   );
 }
 
-function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
+function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtual }: any) {
   const d = data.dfc;
   return (
     <div>
@@ -1882,7 +1882,7 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
 }
 
 // ─── FLUXO DE CAIXA DIRETO ──────────────────────────────────────────────────
-function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI }: any) {
+function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtual }: any) {
   const d = data.dfc;
   const rec = data.receitas;
 
