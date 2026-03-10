@@ -541,6 +541,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     { id: 'caixaDireto', label: 'FC Direto', icon: <DollarSign className="w-4 h-4" />, requiresData: true },
     { id: 'posicaoEstoques', label: 'Posição de Estoques', icon: <Layers className="w-4 h-4" />, requiresData: true },
     { id: 'valoresReceber', label: 'Valores a Receber', icon: <HandCoins className="w-4 h-4" />, requiresData: true },
+    { id: 'receitas', label: 'Receitas', icon: <TrendingUp className="w-4 h-4" />, requiresData: true },
     { id: 'endividamento', label: 'Endividamento', icon: <Landmark className="w-4 h-4" />, requiresData: true },
     { id: 'mutuoSocios', label: 'Mútuo Sócios', icon: <Users className="w-4 h-4" />, requiresData: true },
     { id: 'parcelamentoRefis', label: 'Parcelamento Refis', icon: <Receipt className="w-4 h-4" />, requiresData: true },
@@ -726,6 +727,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'receitas' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} despesasView={despesasView} setDespesasView={setDespesasView} />}
               {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
@@ -988,6 +990,174 @@ function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAt
                   <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(totalAnt)}</td>
                   <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(totalAtu)}</td>
                   <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${varTotal > 0 ? 'text-emerald-600 dark:text-emerald-400' : varTotal < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                    {varTotal >= 0 ? '+' : ''}{fmtBRL(varTotal)}
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
+                    {varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }: any) {
+  const accounts = data.accounts as Record<string, any>;
+  const absVal = (val: number) => Math.abs(val);
+  const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
+
+  // Contas com dedução → linha única com valor líquido (bruta − dedução)
+  const PAIRED: Array<{ conta: string; desc: string; ant: number; atu: number }> = [
+    { gross: '3.1.1.01.01.001', ded: '3.3.1.01.01.001' },
+    { gross: '3.1.1.01.01.002', ded: '3.3.1.01.01.005' },
+    { gross: '3.1.1.03.01.001', ded: '3.3.1.01.01.002' },
+    { gross: '3.1.1.03.01.002', ded: '3.3.1.01.01.006' },
+    { gross: '3.1.2.01.01.001', ded: '3.3.1.01.01.003' },
+    { gross: '3.1.2.01.01.002', ded: '3.3.1.01.01.007' },
+  ].map((p: any) => {
+    const g = getAcc(p.gross);
+    const d = getAcc(p.ded);
+    return {
+      conta: p.gross,
+      desc: g.desc || p.gross,
+      ant: absVal(g.saldoAnt) - absVal(d.saldoAnt),
+      atu: absVal(g.saldoAtual) - absVal(d.saldoAtual),
+    };
+  });
+
+  // Contas simples (sem dedução)
+  const SIMPLES: Array<{ conta: string; desc: string; ant: number; atu: number }> = [
+    '3.1.3.01.01.001',
+    '3.1.3.01.01.002',
+    '3.1.3.01.01.003',
+    '3.1.3.01.01.004',
+    '3.1.3.01.01.005',
+    '3.1.3.01.01.006',
+    '3.4.1.02.02.002',
+    '3.4.1.02.02.003',
+    '3.4.1.02.02.005',
+    '3.4.1.02.02.006',
+    '3.4.1.02.02.007',
+    '3.4.1.04.01.001',
+    '3.4.1.04.03.001',
+    '3.4.1.05.01.001',
+    '3.4.1.08.01.001',
+    '3.4.1.09.01.001',
+    '3.4.2.01.01.001',
+    '3.4.2.03.01.001',
+    '3.4.2.05.01.001',
+    '3.4.2.06.01.001',
+    '3.4.2.99.01.001',
+    '3.4.3.01.02.002',
+    '3.4.3.01.02.003',
+    '3.4.3.01.02.025',
+    '3.4.3.02.01.001',
+    '3.4.3.04.01.001',
+    '3.5.1.01.01.001',
+    '3.5.2.01.01.001',
+    '3.5.3.01.01.001',
+    '3.6.1.02.01.001',
+    '3.6.1.02.01.002',
+  ].map(id => {
+    const acc = getAcc(id);
+    return {
+      conta: id,
+      desc: acc.desc || id,
+      ant: absVal(acc.saldoAnt),
+      atu: absVal(acc.saldoAtual),
+    };
+  });
+
+  const CONTAS = [...PAIRED, ...SIMPLES];
+  const totalAnt = CONTAS.reduce((s, c) => s + c.ant, 0);
+  const totalAtu = CONTAS.reduce((s, c) => s + c.atu, 0);
+  const varTotal = totalAtu - totalAnt;
+  const varTotalPct = totalAnt !== 0 ? (varTotal / totalAnt) * 100 : null;
+
+  return (
+    <div className="space-y-6">
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <KPI
+          label="Total Anterior"
+          value={fmtBRL(totalAnt, true)}
+          sub="Saldo do período anterior"
+          color="blue"
+          icon="📋"
+        />
+        <KPI
+          label="Total Atual"
+          value={fmtBRL(totalAtu, true)}
+          sub="Saldo do período atual"
+          color={totalAtu > totalAnt ? 'emerald' : 'red'}
+          icon="💰"
+        />
+        <KPI
+          label="Variação"
+          value={fmtBRL(varTotal, true)}
+          sub={varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
+          color={varTotal >= 0 ? 'emerald' : 'red'}
+          icon="📈"
+        />
+      </div>
+
+      {/* Tabela */}
+      <Card>
+        <CardContent className="pt-6">
+          <SectionTitle icon="💵">Receitas — Detalhamento</SectionTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {CONTAS.map(a => {
+                  const varR = a.atu - a.ant;
+                  const varP = a.ant !== 0 ? (varR / a.ant) * 100 : null;
+                  return (
+                    <tr key={a.conta} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-3">
+                        <span className="text-xs font-mono text-muted-foreground mr-2">{a.conta}</span>
+                        <span className="text-sm text-foreground">{a.desc ? toTitleCase(a.desc) : a.conta}</span>
+                      </td>
+                      <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
+                      <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${
+                        varR > 0 ? 'text-emerald-600 dark:text-emerald-400'
+                        : varR < 0 ? 'text-red-600 dark:text-red-400'
+                        : 'text-muted-foreground'
+                      }`}>
+                        {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                      </td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${
+                        varR > 0 ? 'text-emerald-600 dark:text-emerald-400'
+                        : varR < 0 ? 'text-red-600 dark:text-red-400'
+                        : 'text-muted-foreground'
+                      }`}>
+                        {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="bg-muted/50 font-bold">
+                  <td className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL</td>
+                  <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(totalAnt)}</td>
+                  <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(totalAtu)}</td>
+                  <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${
+                    varTotal > 0 ? 'text-emerald-600 dark:text-emerald-400'
+                    : varTotal < 0 ? 'text-red-600 dark:text-red-400'
+                    : 'text-muted-foreground'
+                  }`}>
                     {varTotal >= 0 ? '+' : ''}{fmtBRL(varTotal)}
                   </td>
                   <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
