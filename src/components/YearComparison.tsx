@@ -3698,6 +3698,21 @@ function DadosAdicionaisComparison({
     return String(year)
   }
 
+  // Retorna o nome do mês de fechamento de um período (usado nos subtítulos de estoque)
+  const getClosingMonthName = (periodIndex: number): string => {
+    const months = getMonthsForPeriodLocal(periodIndex)
+    return monthNames[months[months.length - 1]] ?? 'Dezembro'
+  }
+
+  // Subtítulo dinâmico para seções de estoque
+  const estoqueSubtitulo = (periodIndex1: number, periodIndex2: number): string => {
+    if (comparisonMode === 'anual') return 'Posição de Estoque (Dezembro)'
+    const m1 = getClosingMonthName(periodIndex1)
+    const m2 = getClosingMonthName(periodIndex2)
+    if (m1 === m2) return `Posição de Estoque (${m1})`
+    return `Posição de Estoque (${m1} / ${m2})`
+  }
+
   // Função auxiliar para obter valor baseado no modo de comparação
   const getValue = (arr?: number[], periodIndex?: number, divideByMonths: boolean = false, useDecemberOnly: boolean = false) => {
     if (!arr || !Array.isArray(arr)) return 0
@@ -3752,7 +3767,7 @@ function DadosAdicionaisComparison({
     },
     {
       titulo: 'Estoque de Novos',
-      subtitulo: 'Evolução do Estoque (Dezembro)',
+      subtitulo: estoqueSubtitulo(selectedMonth1, selectedMonth2),
       campos: [
         { label: 'Quantidade', path: (d: any, m: number) => getValue(d?.estoqueNovos?.quantidade, m, false, true), isInteger: true },
         { label: 'Valor Total', path: (d: any, m: number) => getValue(d?.estoqueNovos?.valor, m, false, true), isCurrency: true },
@@ -3762,7 +3777,7 @@ function DadosAdicionaisComparison({
     },
     {
       titulo: 'Estoque de Usados',
-      subtitulo: 'Evolução do Estoque (Dezembro)',
+      subtitulo: estoqueSubtitulo(selectedMonth1, selectedMonth2),
       campos: [
         { label: 'Quantidade', path: (d: any, m: number) => getValue(d?.estoqueUsados?.quantidade, m, false, true), isInteger: true },
         { label: 'Valor Total', path: (d: any, m: number) => getValue(d?.estoqueUsados?.valor, m, false, true), isCurrency: true },
@@ -3772,7 +3787,7 @@ function DadosAdicionaisComparison({
     },
     {
       titulo: 'Estoque de Peças',
-      subtitulo: 'Evolução do Estoque (Dezembro)',
+      subtitulo: estoqueSubtitulo(selectedMonth1, selectedMonth2),
       campos: [
         { label: 'Valor Total', path: (d: any, m: number) => getValue(d?.estoquePecas?.valor, m, false, true), isCurrency: true },
         { label: 'A Pagar', path: (d: any, m: number) => getValue(d?.estoquePecas?.aPagar, m, false, true), isCurrency: true },
