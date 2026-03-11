@@ -414,6 +414,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [despesasView, setDespesasView] = useState<'normal' | 'comparativo'>('normal');
   const [receitasView, setReceitasView] = useState<'normal' | 'comparativo'>('normal');
   const [janAccounts, setJanAccounts] = useState<Record<string, any> | null>(null);
+  const [prevMonthAccounts, setPrevMonthAccounts] = useState<Record<string, any> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const MONTHS = [
@@ -497,6 +498,21 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
           }
         } else {
           setJanAccounts(null);
+        }
+
+        // Carregar balancete do mês anterior para cálculo de receitas
+        if (selectedMonth !== 0) {
+          const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
+          const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
+          const prevRaw = await loadFluxoCaixaRaw(prevYear, prevMonth);
+          if (prevRaw?.rawText) {
+            const prevParsed = parseBalancete(prevRaw.rawText);
+            setPrevMonthAccounts(Object.keys(prevParsed.accounts).length >= 10 ? prevParsed.accounts : null);
+          } else {
+            setPrevMonthAccounts(null);
+          }
+        } else {
+          setPrevMonthAccounts(null);
         }
 
         if (raw?.rawText) {
@@ -768,7 +784,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
-              {activeTab === 'receitas' && receitasView === 'normal' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'receitas' && receitasView === 'normal' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} prevMonthAccounts={prevMonthAccounts} />}
               {activeTab === 'receitas' && receitasView === 'comparativo' && (
                 <div className="space-y-4">
                   <button
@@ -1057,17 +1073,23 @@ function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAt
   );
 }
 
-function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }: any) {
+function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, prevMonthAccounts }: any) {
   const accounts = data.accounts as Record<string, any>;
-  const absVal = (val: number) => Math.abs(val);
-  const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
+  const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0 };
+  const getPrev = (id: string) => (prevMonthAccounts || {})[id] || { valDeb: 0, valCred: 0 };
+
+  // Movimentação do mês atual: crédito − débito (contas de receita têm natureza credora)
+  const mov = (id: string) => { const a = getAcc(id); return a.valCred - a.valDeb; };
+  // Movimentação do mês anterior (zero se balancete não disponível)
+  const movPrev = (id: string) => { if (!prevMonthAccounts) return 0; const a = getPrev(id); return a.valCred - a.valDeb; };
 
   const makeSimples = (ids: string[]) => ids.map(id => {
     const acc = getAcc(id);
-    return { conta: id, desc: acc.desc || id, ant: absVal(acc.saldoAnt), atu: absVal(acc.saldoAtual) };
+    return { conta: id, desc: acc.desc || id, ant: movPrev(id), atu: mov(id) };
   });
 
   // Contas com dedução → linha única com valor líquido (bruta − dedução)
+  // Contas de dedução (3.3.x) têm natureza devedora: deduction = valDeb - valCred
   const PAIRED: Array<{ conta: string; desc: string; ant: number; atu: number }> = [
     { gross: '3.1.1.01.01.001', ded: '3.3.1.01.01.001' },
     { gross: '3.1.1.01.01.002', ded: '3.3.1.01.01.005' },
@@ -1078,11 +1100,13 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }:
   ].map((p: any) => {
     const g = getAcc(p.gross);
     const d = getAcc(p.ded);
+    const gP = getPrev(p.gross);
+    const dP = getPrev(p.ded);
     return {
       conta: p.gross,
       desc: g.desc || p.gross,
-      ant: absVal(g.saldoAnt) - absVal(d.saldoAnt),
-      atu: absVal(g.saldoAtual) - absVal(d.saldoAtual),
+      ant: prevMonthAccounts ? (gP.valCred - gP.valDeb) - (dP.valDeb - dP.valCred) : 0,
+      atu: (g.valCred - g.valDeb) - (d.valDeb - d.valCred),
     };
   });
 
