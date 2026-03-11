@@ -343,7 +343,7 @@ const DFCRow = ({ label, value, value2, hasAcum, indent = 0, highlight, total }:
       {total ? '' : (v >= 0 ? '' : '(')}
       <span className={cn(total ? (pos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400') : 'text-foreground')}>
         {total ? '' : fmtBRL(Math.abs(v))}
-        {total && fmtBRL(v)}
+        {total && `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmtBRL(v)}`}
       </span>
       {total ? '' : (v < 0 ? ')' : '')}
     </td>
@@ -2304,21 +2304,21 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
                 {hasAcum ? (
                   <div className="space-y-2">
                     <div>
-                      <div className="text-[10px] uppercase tracking-wider text-blue-500/80 dark:text-blue-400/70 mb-0.5">{headerMes}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{headerMes}</div>
                       <div className={cn('text-lg font-bold', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-                        {fmtBRL(kpi.mes, true)}
+                        {kpi.mes > 0 ? '+' : kpi.mes < 0 ? '−' : ''}{fmtBRL(kpi.mes, true)}
                       </div>
                     </div>
                     <div className="border-t border-border/50 pt-2">
-                      <div className="text-[10px] uppercase tracking-wider text-emerald-600/70 dark:text-emerald-400/60 mb-0.5">{headerAcu}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{headerAcu}</div>
                       <div className={cn('text-xl font-bold', (kpi.acu ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-                        {fmtBRL(kpi.acu ?? 0, true)}
+                        {(kpi.acu ?? 0) > 0 ? '+' : (kpi.acu ?? 0) < 0 ? '−' : ''}{fmtBRL(kpi.acu ?? 0, true)}
                       </div>
                     </div>
                   </div>
                 ) : (
                   <>
-                    <div className={cn('text-2xl font-bold mb-1', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(kpi.mes, true)}</div>
+                    <div className={cn('text-2xl font-bold mb-1', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{kpi.mes > 0 ? '+' : kpi.mes < 0 ? '−' : ''}{fmtBRL(kpi.mes, true)}</div>
                     <div className="text-sm text-muted-foreground">{kpi.sub}</div>
                   </>
                 )}
@@ -2396,8 +2396,8 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
           <tfoot>
             <tr className="bg-emerald-50/50 dark:bg-emerald-950/20 border-t-2 border-emerald-500/30">
               <td className="py-3.5 px-3 text-sm font-bold text-foreground">VARIAÇÃO TOTAL DE CAIXA NO PERÍODO</td>
-              <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold', d.fluxoTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(d.fluxoTotal)}</td>
-              {hasAcum && <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold border-l border-border/30', (dAcum.fluxoTotal ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(dAcum.fluxoTotal)}</td>}
+              <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold', d.fluxoTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(d.fluxoTotal > 0 ? '+' : d.fluxoTotal < 0 ? '−' : '') + fmtBRL(d.fluxoTotal)}</td>
+              {hasAcum && <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold border-l border-border/30', (dAcum.fluxoTotal ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{((dAcum.fluxoTotal ?? 0) > 0 ? '+' : (dAcum.fluxoTotal ?? 0) < 0 ? '−' : '') + fmtBRL(dAcum.fluxoTotal)}</td>}
             </tr>
             <tr className="bg-muted/30">
               <td className="py-2.5 px-3 text-sm text-muted-foreground">Saldo de Caixa — Período Anterior</td>
@@ -2411,8 +2411,8 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
             </tr>
             <tr className="bg-violet-50/50 dark:bg-violet-950/20 border-t border-violet-500/30">
               <td className="py-3 px-3 text-sm font-semibold text-foreground/80">Variação Real de Caixa (conferência com balanço)</td>
-              <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold', d.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(d.varCaixaReal)}</td>
-              {hasAcum && <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold border-l border-border/30', dAcum.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(dAcum.varCaixaReal)}</td>}
+              <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold', d.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(d.varCaixaReal > 0 ? '+' : d.varCaixaReal < 0 ? '−' : '') + fmtBRL(d.varCaixaReal)}</td>
+              {hasAcum && <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold border-l border-border/30', dAcum.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(dAcum.varCaixaReal > 0 ? '+' : dAcum.varCaixaReal < 0 ? '−' : '') + fmtBRL(dAcum.varCaixaReal)}</td>}
             </tr>
           </tfoot>
         </table>
@@ -2592,16 +2592,16 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
                 {hasAcum ? (
                   <div className="space-y-2">
                     <div>
-                      <div className="text-[10px] uppercase tracking-wider text-blue-500/80 dark:text-blue-400/70 mb-0.5">{headerMes}</div>
-                      <div className={cn('text-lg font-bold', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(kpi.mes, true)}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{headerMes}</div>
+                      <div className={cn('text-lg font-bold', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{kpi.mes > 0 ? '+' : kpi.mes < 0 ? '−' : ''}{fmtBRL(kpi.mes, true)}</div>
                     </div>
                     <div className="border-t border-border/50 pt-2">
-                      <div className="text-[10px] uppercase tracking-wider text-emerald-600/70 dark:text-emerald-400/60 mb-0.5">{headerAcu}</div>
-                      <div className={cn('text-xl font-bold', (kpi.acu ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(kpi.acu ?? 0, true)}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{headerAcu}</div>
+                      <div className={cn('text-xl font-bold', (kpi.acu ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(kpi.acu ?? 0) > 0 ? '+' : (kpi.acu ?? 0) < 0 ? '−' : ''}{fmtBRL(kpi.acu ?? 0, true)}</div>
                     </div>
                   </div>
                 ) : (
-                  <div className={cn('text-2xl font-bold', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(kpi.mes, true)}</div>
+                  <div className={cn('text-2xl font-bold', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{kpi.mes > 0 ? '+' : kpi.mes < 0 ? '−' : ''}{fmtBRL(kpi.mes, true)}</div>
                 )}
               </CardContent>
             </Card>
@@ -2694,8 +2694,8 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
             <tfoot>
               <tr className="bg-emerald-50/50 dark:bg-emerald-950/20 border-t-2 border-emerald-500/30">
                 <td className="py-3.5 px-3 text-sm font-bold text-foreground">VARIAÇÃO TOTAL DE CAIXA NO PERÍODO</td>
-                <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold', d.fluxoTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(d.fluxoTotal)}</td>
-                {hasAcum && <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold border-l border-border/30', (acum.fluxoTotal ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(acum.fluxoTotal)}</td>}
+                <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold', d.fluxoTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(d.fluxoTotal > 0 ? '+' : d.fluxoTotal < 0 ? '−' : '') + fmtBRL(d.fluxoTotal)}</td>
+                {hasAcum && <td className={cn('py-3.5 px-3 text-right font-mono text-base font-bold border-l border-border/30', (acum.fluxoTotal ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{((acum.fluxoTotal ?? 0) > 0 ? '+' : (acum.fluxoTotal ?? 0) < 0 ? '−' : '') + fmtBRL(acum.fluxoTotal)}</td>}
               </tr>
               <tr className="bg-muted/30">
                 <td className="py-2.5 px-3 text-sm text-muted-foreground">Saldo de Caixa — Período Anterior</td>
@@ -2709,8 +2709,8 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
               </tr>
               <tr className="bg-violet-50/50 dark:bg-violet-950/20 border-t border-violet-500/30">
                 <td className="py-3 px-3 text-sm font-semibold text-foreground/80">Variação Real de Caixa (conferência com balanço)</td>
-                <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold', d.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(d.varCaixaReal)}</td>
-                {hasAcum && <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold border-l border-border/30', acum.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{fmtBRL(acum.varCaixaReal)}</td>}
+                <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold', d.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(d.varCaixaReal > 0 ? '+' : d.varCaixaReal < 0 ? '−' : '') + fmtBRL(d.varCaixaReal)}</td>
+                {hasAcum && <td className={cn('py-3 px-3 text-right font-mono text-sm font-bold border-l border-border/30', acum.varCaixaReal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{(acum.varCaixaReal > 0 ? '+' : acum.varCaixaReal < 0 ? '−' : '') + fmtBRL(acum.varCaixaReal)}</td>}
               </tr>
             </tfoot>
           </table>
