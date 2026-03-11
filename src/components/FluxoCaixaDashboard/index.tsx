@@ -1192,10 +1192,12 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
   const varTotal = totalAtu - totalAnt;
   const varTotalPct = totalAnt !== 0 ? (varTotal / totalAnt) * 100 : null;
 
+  const [showYtd, setShowYtd] = useState(false);
+
   return (
     <div className="space-y-6">
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KPI
           label={`Total ${colAnterior}`}
           value={fmtBRL(totalAnt, true)}
@@ -1217,19 +1219,26 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
           color={varTotal >= 0 ? 'emerald' : 'red'}
           icon="📈"
         />
-        <KPI
-          label={`Acum. ${ytdLabel}`}
-          value={fmtBRL(totalYtd, true)}
-          sub="Receita acumulada no ano"
-          color="amber"
-          icon="📊"
-        />
       </div>
 
       {/* Tabela */}
       <Card>
         <CardContent className="pt-6">
-          <SectionTitle icon="💵">Receitas — Detalhamento</SectionTitle>
+          <div className="flex items-center justify-between mb-4">
+            <SectionTitle icon="💵">Receitas — Detalhamento</SectionTitle>
+            <button
+              onClick={() => setShowYtd(v => !v)}
+              className={cn(
+                'flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm',
+                showYtd
+                  ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700'
+                  : 'bg-muted/40 text-muted-foreground border-border hover:bg-muted/70'
+              )}
+            >
+              <span>📊</span>
+              {showYtd ? `Ocultar Acumulado` : `Mostrar Acumulado ${ytdLabel}`}
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead className="bg-muted/50">
@@ -1239,9 +1248,11 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
-                  <th className="py-2.5 pl-8 pr-3 text-right text-xs uppercase tracking-wider text-amber-600 dark:text-amber-400 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20">
-                    Acum. {ytdLabel}
-                  </th>
+                  {showYtd && (
+                    <th className="py-2.5 pl-8 pr-3 text-right text-xs uppercase tracking-wider text-amber-600 dark:text-amber-400 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20">
+                      Acum. {ytdLabel}
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -1258,7 +1269,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                         <td colSpan={5} className="py-2 px-3 text-xs font-bold uppercase tracking-wider text-foreground">
                           {group.label}
                         </td>
-                        <td className="py-2 pl-8 pr-3 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/10" />
+                        {showYtd && <td className="py-2 pl-8 pr-3 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/10" />}
                       </tr>
                       {/* Linhas do grupo */}
                       {group.contas.map(a => {
@@ -1286,9 +1297,11 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                             }`}>
                               {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
                             </td>
-                            <td className="py-2 pl-8 pr-3 text-right text-sm font-mono font-semibold text-amber-700 dark:text-amber-400 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/10">
-                              {fmtBRL(a.ytd)}
-                            </td>
+                            {showYtd && (
+                              <td className="py-2 pl-8 pr-3 text-right text-sm font-mono font-semibold text-amber-700 dark:text-amber-400 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/10">
+                                {fmtBRL(a.ytd)}
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
@@ -1311,9 +1324,11 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                         }`}>
                           {gVarPct !== null ? `${gVarPct >= 0 ? '+' : ''}${gVarPct.toFixed(1)}%` : '—'}
                         </td>
-                        <td className="py-2 pl-8 pr-3 text-right text-sm font-mono font-bold text-amber-700 dark:text-amber-400 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20">
-                          {fmtBRL(gYtd)}
-                        </td>
+                        {showYtd && (
+                          <td className="py-2 pl-8 pr-3 text-right text-sm font-mono font-bold text-amber-700 dark:text-amber-400 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20">
+                            {fmtBRL(gYtd)}
+                          </td>
+                        )}
                       </tr>
                     </Fragment>
                   );
@@ -1333,9 +1348,11 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                   <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
                     {varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
                   </td>
-                  <td className="py-2.5 pl-8 pr-3 text-right text-sm font-mono font-bold text-amber-700 dark:text-amber-400 border-l-2 border-amber-300 dark:border-amber-700 bg-amber-100/60 dark:bg-amber-950/30">
-                    {fmtBRL(totalYtd)}
-                  </td>
+                  {showYtd && (
+                    <td className="py-2.5 pl-8 pr-3 text-right text-sm font-mono font-bold text-amber-700 dark:text-amber-400 border-l-2 border-amber-300 dark:border-amber-700 bg-amber-100/60 dark:bg-amber-950/30">
+                      {fmtBRL(totalYtd)}
+                    </td>
+                  )}
                 </tr>
               </tbody>
             </table>
