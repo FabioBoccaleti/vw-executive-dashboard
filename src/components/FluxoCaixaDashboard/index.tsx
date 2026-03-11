@@ -784,7 +784,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
-              {activeTab === 'receitas' && receitasView === 'normal' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} prevMonthAccounts={prevMonthAccounts} />}
+              {activeTab === 'receitas' && receitasView === 'normal' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} prevMonthAccounts={prevMonthAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'receitas' && receitasView === 'comparativo' && (
                 <div className="space-y-4">
                   <button
@@ -1073,7 +1073,7 @@ function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAt
   );
 }
 
-function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, prevMonthAccounts }: any) {
+function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, prevMonthAccounts, selectedMonth, selectedYear }: any) {
   const accounts = data.accounts as Record<string, any>;
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0 };
   const getPrev = (id: string) => (prevMonthAccounts || {})[id] || { valDeb: 0, valCred: 0 };
@@ -1082,15 +1082,26 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
   const mov = (id: string) => { const a = getAcc(id); return a.valCred - a.valDeb; };
   // Movimentação do mês anterior (zero se balancete não disponível)
   const movPrev = (id: string) => { if (!prevMonthAccounts) return 0; const a = getPrev(id); return a.valCred - a.valDeb; };
+  // YTD acumulado: saldoAtual já é cumulativo Jan→mês atual
+  const ytdVal = (id: string) => Math.abs(getAcc(id).saldoAtual);
+
+  // Label do acumulado ex: "Jan–Jul/25"
+  const MSHORT = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const yr2 = String(selectedYear).slice(2);
+  const ytdLabel = selectedMonth === 0
+    ? String(selectedYear)
+    : selectedMonth === 1
+      ? `Jan/${yr2}`
+      : `Jan–${MSHORT[selectedMonth]}/${yr2}`;
 
   const makeSimples = (ids: string[]) => ids.map(id => {
     const acc = getAcc(id);
-    return { conta: id, desc: acc.desc || id, ant: movPrev(id), atu: mov(id) };
+    return { conta: id, desc: acc.desc || id, ant: movPrev(id), atu: mov(id), ytd: ytdVal(id) };
   });
 
   // Contas com dedução → linha única com valor líquido (bruta − dedução)
   // Contas de dedução (3.3.x) têm natureza devedora: deduction = valDeb - valCred
-  const PAIRED: Array<{ conta: string; desc: string; ant: number; atu: number }> = [
+  const PAIRED: Array<{ conta: string; desc: string; ant: number; atu: number; ytd: number }> = [
     { gross: '3.1.1.01.01.001', ded: '3.3.1.01.01.001' },
     { gross: '3.1.1.01.01.002', ded: '3.3.1.01.01.005' },
     { gross: '3.1.1.03.01.001', ded: '3.3.1.01.01.002' },
@@ -1107,6 +1118,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
       desc: g.desc || p.gross,
       ant: prevMonthAccounts ? (gP.valCred - gP.valDeb) - (dP.valDeb - dP.valCred) : 0,
       atu: (g.valCred - g.valDeb) - (d.valDeb - d.valCred),
+      ytd: Math.abs(g.saldoAtual) - Math.abs(d.saldoAtual),
     };
   });
 
@@ -1176,13 +1188,14 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
   const CONTAS = GROUPS.flatMap(g => g.contas);
   const totalAnt = CONTAS.reduce((s, c) => s + c.ant, 0);
   const totalAtu = CONTAS.reduce((s, c) => s + c.atu, 0);
+  const totalYtd = CONTAS.reduce((s, c) => s + c.ytd, 0);
   const varTotal = totalAtu - totalAnt;
   const varTotalPct = totalAnt !== 0 ? (varTotal / totalAnt) * 100 : null;
 
   return (
     <div className="space-y-6">
       {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPI
           label={`Total ${colAnterior}`}
           value={fmtBRL(totalAnt, true)}
@@ -1204,6 +1217,13 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
           color={varTotal >= 0 ? 'emerald' : 'red'}
           icon="📈"
         />
+        <KPI
+          label={`Acum. ${ytdLabel}`}
+          value={fmtBRL(totalYtd, true)}
+          sub="Receita acumulada no ano"
+          color="amber"
+          icon="📊"
+        />
       </div>
 
       {/* Tabela */}
@@ -1219,12 +1239,16 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
+                  <th className="py-2.5 pl-8 pr-3 text-right text-xs uppercase tracking-wider text-amber-600 dark:text-amber-400 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20">
+                    Acum. {ytdLabel}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {GROUPS.map(group => {
                   const gAnt = group.contas.reduce((s, c) => s + c.ant, 0);
                   const gAtu = group.contas.reduce((s, c) => s + c.atu, 0);
+                  const gYtd = group.contas.reduce((s, c) => s + c.ytd, 0);
                   const gVar = gAtu - gAnt;
                   const gVarPct = gAnt !== 0 ? (gVar / gAnt) * 100 : null;
                   return (
@@ -1234,6 +1258,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                         <td colSpan={5} className="py-2 px-3 text-xs font-bold uppercase tracking-wider text-foreground">
                           {group.label}
                         </td>
+                        <td className="py-2 pl-8 pr-3 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/10" />
                       </tr>
                       {/* Linhas do grupo */}
                       {group.contas.map(a => {
@@ -1261,6 +1286,9 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                             }`}>
                               {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
                             </td>
+                            <td className="py-2 pl-8 pr-3 text-right text-sm font-mono font-semibold text-amber-700 dark:text-amber-400 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/10">
+                              {fmtBRL(a.ytd)}
+                            </td>
                           </tr>
                         );
                       })}
@@ -1283,6 +1311,9 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                         }`}>
                           {gVarPct !== null ? `${gVarPct >= 0 ? '+' : ''}${gVarPct.toFixed(1)}%` : '—'}
                         </td>
+                        <td className="py-2 pl-8 pr-3 text-right text-sm font-mono font-bold text-amber-700 dark:text-amber-400 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20">
+                          {fmtBRL(gYtd)}
+                        </td>
                       </tr>
                     </Fragment>
                   );
@@ -1301,6 +1332,9 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                   </td>
                   <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
                     {varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
+                  </td>
+                  <td className="py-2.5 pl-8 pr-3 text-right text-sm font-mono font-bold text-amber-700 dark:text-amber-400 border-l-2 border-amber-300 dark:border-amber-700 bg-amber-100/60 dark:bg-amber-950/30">
+                    {fmtBRL(totalYtd)}
                   </td>
                 </tr>
               </tbody>
