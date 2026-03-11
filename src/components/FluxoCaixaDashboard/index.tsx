@@ -769,7 +769,17 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'receitas' && receitasView === 'normal' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
-              {activeTab === 'receitas' && receitasView === 'comparativo' && <ComparativoReceitas fmtBRL={fmtBRL} />}
+              {activeTab === 'receitas' && receitasView === 'comparativo' && (
+                <div className="space-y-4">
+                  <button
+                    onClick={() => setReceitasView('normal')}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg border border-border bg-muted/40 hover:bg-muted/70 transition-colors text-foreground shadow-sm"
+                  >
+                    ← Voltar para Receitas
+                  </button>
+                  <ComparativoReceitas fmtBRL={fmtBRL} />
+                </div>
+              )}
               {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} despesasView={despesasView} setDespesasView={setDespesasView} />}
               {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
