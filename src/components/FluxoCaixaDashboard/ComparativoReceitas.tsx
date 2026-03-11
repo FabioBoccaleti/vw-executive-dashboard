@@ -166,8 +166,8 @@ export const GRUPOS_RECEITA_CONFIG: GrupoReceitaConfig[] = [
 
 // ─── Helper de parse do balancete para receitas (grupo 3) ─────────────────────
 
-function parseReceitas(rawText: string): Record<string, { saldoAnt: number; saldoAtual: number }> {
-  const result: Record<string, { saldoAnt: number; saldoAtual: number }> = {};
+function parseReceitas(rawText: string): Record<string, { valDeb: number; valCred: number }> {
+  const result: Record<string, { valDeb: number; valCred: number }> = {};
   const parse = (v: string) =>
     parseFloat((v ?? '0').trim().replace(/\./g, '').replace(',', '.')) || 0;
   for (const line of rawText.split('\n')) {
@@ -179,8 +179,8 @@ function parseReceitas(rawText: string): Record<string, { saldoAnt: number; sald
     // Inclui contas 3.x e também contas de dedução 3.3.x
     if (!conta.startsWith('3.')) continue;
     result[conta] = {
-      saldoAnt: parse(parts[3]),
-      saldoAtual: parse(parts[6]),
+      valDeb: parse(parts[4]),
+      valCred: parse(parts[5]),
     };
   }
   return result;
@@ -212,7 +212,8 @@ export async function loadReceitaPeriodData(
   sel: PeriodoSel
 ): Promise<Record<string, number> | null> {
   const months = getMonths(tipo, sel.index);
-  const aggregated: Record<string, { saldoAtual: number }> = {};
+  // Agrega valDeb e valCred de cada mês (movimentação mensal, não saldo acumulado)
+  const aggregated: Record<string, { valDeb: number; valCred: number }> = {};
   let hasAny = false;
 
   for (const month of months) {
@@ -221,20 +222,27 @@ export async function loadReceitaPeriodData(
     hasAny = true;
     const accounts = parseReceitas(raw.rawText);
     for (const [conta, vals] of Object.entries(accounts)) {
-      if (!aggregated[conta]) aggregated[conta] = { saldoAtual: 0 };
-      aggregated[conta].saldoAtual += vals.saldoAtual;
+      if (!aggregated[conta]) aggregated[conta] = { valDeb: 0, valCred: 0 };
+      aggregated[conta].valDeb += vals.valDeb;
+      aggregated[conta].valCred += vals.valCred;
     }
   }
 
   if (!hasAny) return null;
 
-  // Monta o resultado por conta de receita (aplica dedução onde necessário)
+  // Monta o resultado por conta de receita aplicando a fórmula de movimentação:
+  // receita líquida = (bruta.valCred − bruta.valDeb) − (deducao.valDeb − deducao.valCred)
   const result: Record<string, number> = {};
   for (const grupo of GRUPOS_RECEITA_CONFIG) {
     for (const contaRef of grupo.contas) {
-      const gross = Math.abs(aggregated[contaRef.conta]?.saldoAtual ?? 0);
-      const ded = contaRef.deducao ? Math.abs(aggregated[contaRef.deducao]?.saldoAtual ?? 0) : 0;
-      const valor = gross - ded;
+      const g = aggregated[contaRef.conta] ?? { valDeb: 0, valCred: 0 };
+      const grossMov = g.valCred - g.valDeb;
+      let valor = grossMov;
+      if (contaRef.deducao) {
+        const d = aggregated[contaRef.deducao] ?? { valDeb: 0, valCred: 0 };
+        const dedMov = d.valDeb - d.valCred;
+        valor = grossMov - dedMov;
+      }
       if (valor !== 0) result[contaRef.conta] = valor;
     }
   }
