@@ -1184,16 +1184,16 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KPI
-          label="Total Anterior"
+          label={`Total ${colAnterior}`}
           value={fmtBRL(totalAnt, true)}
-          sub="Saldo do período anterior"
+          sub={`Receita total de ${colAnterior}`}
           color="blue"
           icon="📋"
         />
         <KPI
-          label="Total Atual"
+          label={`Total ${colAtual}`}
           value={fmtBRL(totalAtu, true)}
-          sub="Saldo do período atual"
+          sub={`Receita total de ${colAtual}`}
           color={totalAtu > totalAnt ? 'emerald' : 'red'}
           icon="💰"
         />
