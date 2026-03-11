@@ -1010,6 +1010,11 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }:
   const absVal = (val: number) => Math.abs(val);
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
 
+  const makeSimples = (ids: string[]) => ids.map(id => {
+    const acc = getAcc(id);
+    return { conta: id, desc: acc.desc || id, ant: absVal(acc.saldoAnt), atu: absVal(acc.saldoAtual) };
+  });
+
   // Contas com dedução → linha única com valor líquido (bruta − dedução)
   const PAIRED: Array<{ conta: string; desc: string; ant: number; atu: number }> = [
     { gross: '3.1.1.01.01.001', ded: '3.3.1.01.01.001' },
@@ -1029,50 +1034,69 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }:
     };
   });
 
-  // Contas simples (sem dedução)
-  const SIMPLES: Array<{ conta: string; desc: string; ant: number; atu: number }> = [
-    '3.1.3.01.01.001',
-    '3.1.3.01.01.002',
-    '3.1.3.01.01.003',
-    '3.1.3.01.01.004',
-    '3.1.3.01.01.005',
-    '3.1.3.01.01.006',
-    '3.4.1.02.02.002',
-    '3.4.1.02.02.003',
-    '3.4.1.02.02.005',
-    '3.4.1.02.02.006',
-    '3.4.1.02.02.007',
-    '3.4.1.04.01.001',
-    '3.4.1.04.03.001',
-    '3.4.1.05.01.001',
-    '3.4.1.08.01.001',
-    '3.4.1.09.01.001',
-    '3.4.2.01.01.001',
-    '3.4.2.03.01.001',
-    '3.4.2.05.01.001',
-    '3.4.2.06.01.001',
-    '3.4.2.99.01.001',
-    '3.4.3.01.02.002',
-    '3.4.3.01.02.003',
-    '3.4.3.01.02.025',
-    '3.4.3.02.01.001',
-    '3.4.3.04.01.001',
-    '3.5.1.01.01.001',
-    '3.5.2.01.01.001',
-    '3.5.3.01.01.001',
-    '3.6.1.02.01.001',
-    '3.6.1.02.01.002',
-  ].map(id => {
-    const acc = getAcc(id);
-    return {
-      conta: id,
-      desc: acc.desc || id,
-      ant: absVal(acc.saldoAnt),
-      atu: absVal(acc.saldoAtual),
-    };
-  });
+  const GROUPS: Array<{ label: string; contas: Array<{ conta: string; desc: string; ant: number; atu: number }> }> = [
+    {
+      label: '1 — Receita de Vendas',
+      contas: [
+        ...PAIRED,
+        ...makeSimples([
+          '3.1.3.01.01.001',
+          '3.1.3.01.01.002',
+          '3.1.3.01.01.003',
+          '3.1.3.01.01.004',
+          '3.1.3.01.01.005',
+          '3.1.3.01.01.006',
+        ]),
+      ],
+    },
+    {
+      label: '2 — Bonificações',
+      contas: makeSimples([
+        '3.4.1.02.02.002',
+        '3.4.1.08.01.001',
+        '3.4.1.09.01.001',
+        '3.4.1.02.02.003',
+        '3.4.1.02.02.007',
+        '3.4.1.02.02.005',
+      ]),
+    },
+    {
+      label: '3 — Comissões',
+      contas: makeSimples([
+        '3.4.1.05.01.001',
+        '3.4.1.02.02.006',
+        '3.4.1.04.01.001',
+        '3.4.1.04.03.001',
+        '3.4.2.01.01.001',
+        '3.4.2.03.01.001',
+        '3.4.2.05.01.001',
+        '3.4.2.06.01.001',
+        '3.4.2.99.01.001',
+      ]),
+    },
+    {
+      label: '4 — Recuperação de Impostos',
+      contas: makeSimples([
+        '3.4.3.01.02.002',
+        '3.4.3.01.02.003',
+        '3.4.3.01.02.025',
+      ]),
+    },
+    {
+      label: '5 — Outras Receitas',
+      contas: makeSimples([
+        '3.4.3.02.01.001',
+        '3.4.3.04.01.001',
+        '3.5.1.01.01.001',
+        '3.5.2.01.01.001',
+        '3.5.3.01.01.001',
+        '3.6.1.02.01.001',
+        '3.6.1.02.01.002',
+      ]),
+    },
+  ];
 
-  const CONTAS = [...PAIRED, ...SIMPLES];
+  const CONTAS = GROUPS.flatMap(g => g.contas);
   const totalAnt = CONTAS.reduce((s, c) => s + c.ant, 0);
   const totalAtu = CONTAS.reduce((s, c) => s + c.atu, 0);
   const varTotal = totalAtu - totalAnt;
@@ -1121,35 +1145,73 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }:
                 </tr>
               </thead>
               <tbody>
-                {CONTAS.map(a => {
-                  const varR = a.atu - a.ant;
-                  const varP = a.ant !== 0 ? (varR / a.ant) * 100 : null;
+                {GROUPS.map(group => {
+                  const gAnt = group.contas.reduce((s, c) => s + c.ant, 0);
+                  const gAtu = group.contas.reduce((s, c) => s + c.atu, 0);
+                  const gVar = gAtu - gAnt;
+                  const gVarPct = gAnt !== 0 ? (gVar / gAnt) * 100 : null;
                   return (
-                    <tr key={a.conta} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                      <td className="py-2 px-3">
-                        <span className="text-xs font-mono text-muted-foreground mr-2">{a.conta}</span>
-                        <span className="text-sm text-foreground">{a.desc ? toTitleCase(a.desc) : a.conta}</span>
-                      </td>
-                      <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
-                      <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
-                      <td className={`py-2 px-3 text-right text-sm font-mono ${
-                        varR > 0 ? 'text-emerald-600 dark:text-emerald-400'
-                        : varR < 0 ? 'text-red-600 dark:text-red-400'
-                        : 'text-muted-foreground'
-                      }`}>
-                        {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
-                      </td>
-                      <td className={`py-2 px-3 text-right text-xs font-mono ${
-                        varR > 0 ? 'text-emerald-600 dark:text-emerald-400'
-                        : varR < 0 ? 'text-red-600 dark:text-red-400'
-                        : 'text-muted-foreground'
-                      }`}>
-                        {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
-                      </td>
-                    </tr>
+                    <React.Fragment key={group.label}>
+                      {/* Cabeçalho do grupo */}
+                      <tr className="bg-muted/40 border-t-2 border-border">
+                        <td colSpan={5} className="py-2 px-3 text-xs font-bold uppercase tracking-wider text-foreground">
+                          {group.label}
+                        </td>
+                      </tr>
+                      {/* Linhas do grupo */}
+                      {group.contas.map(a => {
+                        const varR = a.atu - a.ant;
+                        const varP = a.ant !== 0 ? (varR / a.ant) * 100 : null;
+                        return (
+                          <tr key={a.conta} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                            <td className="py-2 px-3 pl-6">
+                              <span className="text-xs font-mono text-muted-foreground mr-2">{a.conta}</span>
+                              <span className="text-sm text-foreground">{a.desc ? toTitleCase(a.desc) : a.conta}</span>
+                            </td>
+                            <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
+                            <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
+                            <td className={`py-2 px-3 text-right text-sm font-mono ${
+                              varR > 0 ? 'text-emerald-600 dark:text-emerald-400'
+                              : varR < 0 ? 'text-red-600 dark:text-red-400'
+                              : 'text-muted-foreground'
+                            }`}>
+                              {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                            </td>
+                            <td className={`py-2 px-3 text-right text-xs font-mono ${
+                              varR > 0 ? 'text-emerald-600 dark:text-emerald-400'
+                              : varR < 0 ? 'text-red-600 dark:text-red-400'
+                              : 'text-muted-foreground'
+                            }`}>
+                              {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {/* Subtotal do grupo */}
+                      <tr className="bg-muted/20 border-t border-border">
+                        <td className="py-2 px-3 pl-6 text-sm font-semibold text-foreground">Subtotal — {group.label}</td>
+                        <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-muted-foreground">{fmtBRL(gAnt)}</td>
+                        <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(gAtu)}</td>
+                        <td className={`py-2 px-3 text-right text-sm font-mono font-semibold ${
+                          gVar > 0 ? 'text-emerald-600 dark:text-emerald-400'
+                          : gVar < 0 ? 'text-red-600 dark:text-red-400'
+                          : 'text-muted-foreground'
+                        }`}>
+                          {gVar >= 0 ? '+' : ''}{fmtBRL(gVar)}
+                        </td>
+                        <td className={`py-2 px-3 text-right text-xs font-mono font-semibold ${
+                          gVar > 0 ? 'text-emerald-600 dark:text-emerald-400'
+                          : gVar < 0 ? 'text-red-600 dark:text-red-400'
+                          : 'text-muted-foreground'
+                        }`}>
+                          {gVarPct !== null ? `${gVarPct >= 0 ? '+' : ''}${gVarPct.toFixed(1)}%` : '—'}
+                        </td>
+                      </tr>
+                    </React.Fragment>
                   );
                 })}
-                <tr className="bg-muted/50 font-bold">
+                {/* Total geral */}
+                <tr className="bg-muted/50 font-bold border-t-2 border-border">
                   <td className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL</td>
                   <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(totalAnt)}</td>
                   <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(totalAtu)}</td>
