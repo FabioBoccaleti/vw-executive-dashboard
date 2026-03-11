@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, Fragment } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { loadFluxoCaixaRaw, saveFluxoCaixaData } from "./fluxoCaixaStorage";
 import { ComparativosTab } from "./ComparativosTab";
 import { DespesasTab } from "./DespesasTab";
+import { ComparativoReceitas } from "./ComparativoReceitas";
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
 function parseBalancete(text: string) {
@@ -402,6 +403,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [redisWarning, setRedisWarning] = useState<string | null>(null);
   const [showTabelaDespesas, setShowTabelaDespesas] = useState(false);
   const [despesasView, setDespesasView] = useState<'normal' | 'comparativo'>('normal');
+  const [receitasView, setReceitasView] = useState<'normal' | 'comparativo'>('normal');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const MONTHS = [
@@ -573,13 +575,26 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Botão Comparativo — visível apenas na aba Despesas */}
+            {/* Botão Comparativo — visível nas abas Despesas e Receitas */}
             {activeTab === 'despesas' && (
               <button
                 onClick={() => setDespesasView(v => v === 'comparativo' ? 'normal' : 'comparativo')}
                 className={cn(
                   'px-3 py-1.5 text-sm font-semibold rounded-lg border transition-colors',
                   despesasView === 'comparativo'
+                    ? 'bg-white text-green-700 border-white'
+                    : 'bg-green-700 text-white border-green-500 hover:bg-green-600'
+                )}
+              >
+                📊 Comparativo
+              </button>
+            )}
+            {activeTab === 'receitas' && (
+              <button
+                onClick={() => setReceitasView(v => v === 'comparativo' ? 'normal' : 'comparativo')}
+                className={cn(
+                  'px-3 py-1.5 text-sm font-semibold rounded-lg border transition-colors',
+                  receitasView === 'comparativo'
                     ? 'bg-white text-green-700 border-white'
                     : 'bg-green-700 text-white border-green-500 hover:bg-green-600'
                 )}
@@ -727,7 +742,8 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
-              {activeTab === 'receitas' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'receitas' && receitasView === 'normal' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'receitas' && receitasView === 'comparativo' && <ComparativoReceitas fmtBRL={fmtBRL} />}
               {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} despesasView={despesasView} setDespesasView={setDespesasView} />}
               {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
@@ -1151,7 +1167,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }:
                   const gVar = gAtu - gAnt;
                   const gVarPct = gAnt !== 0 ? (gVar / gAnt) * 100 : null;
                   return (
-                    <React.Fragment key={group.label}>
+                    <Fragment key={group.label}>
                       {/* Cabeçalho do grupo */}
                       <tr className="bg-muted/40 border-t-2 border-border">
                         <td colSpan={5} className="py-2 px-3 text-xs font-bold uppercase tracking-wider text-foreground">
@@ -1207,7 +1223,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }:
                           {gVarPct !== null ? `${gVarPct >= 0 ? '+' : ''}${gVarPct.toFixed(1)}%` : '—'}
                         </td>
                       </tr>
-                    </React.Fragment>
+                    </Fragment>
                   );
                 })}
                 {/* Total geral */}
