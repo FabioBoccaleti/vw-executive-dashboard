@@ -798,7 +798,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               )}
               {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} />}
               {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} despesasView={despesasView} setDespesasView={setDespesasView} />}
-              {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'parcelamentoRefis' && <ParcelamentoRefisTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} />}
               {activeTab === 'diagnostico' && <DiagnosticoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
@@ -1618,9 +1618,27 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
   );
 }
 
-function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual }: any) {
+function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, janAccounts, selectedMonth, selectedYear }: any) {
   const accounts = data.accounts as Record<string, any>;
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
+
+  // Saldo anterior de Janeiro (igual ao padrão do Parcelamento Refis)
+  const getJanAnt = (id: string): number => {
+    if (selectedMonth > 1 && janAccounts) {
+      const janAcc = janAccounts[id] || { saldoAnt: 0 };
+      return Math.abs(janAcc.saldoAnt);
+    }
+    return Math.abs(getAcc(id).saldoAnt);
+  };
+
+  // Label do período de amortização
+  const MSHORT = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const yr2 = String(selectedYear).slice(2);
+  const amortLabel = selectedMonth === 0
+    ? `Anual ${selectedYear}`
+    : selectedMonth === 1
+      ? `Jan/${yr2}`
+      : `Jan–${MSHORT[selectedMonth]}/${yr2}`;
 
   // Grupo exato 2.2.1.01.01 — Mútuo Sócios
   const groupAcc = getAcc('2.2.1.01.01');
@@ -1711,6 +1729,50 @@ function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Tabela de Amortização ── */}
+      {(() => {
+        const saldoInicioAno = getJanAnt('2.2.1.01.01');
+        const saldoAtual     = Math.abs(getAcc('2.2.1.01.01').saldoAtual);
+        const amort          = saldoInicioAno - saldoAtual;
+        const amortPct       = saldoInicioAno !== 0 ? (amort / saldoInicioAno) * 100 : null;
+        return (
+          <Card className="border-t-4 border-t-emerald-500">
+            <CardContent className="pt-6">
+              <SectionTitle icon="💳">Amortização no Período — {amortLabel} (Pagamento da Dívida)</SectionTitle>
+              <p className="text-xs text-muted-foreground mb-4">
+                Valor quitado desde o início do ano: <span className="font-semibold">Saldo início do ano − Saldo atual ({colAtual})</span>
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Descrição</th>
+                      <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Início do Ano</th>
+                      <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Saldo Atual ({colAtual})</th>
+                      <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Amortizado no Período</th>
+                      <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">% Quitado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="bg-emerald-50/60 dark:bg-emerald-950/20 border-t-2 border-emerald-200 dark:border-emerald-800 font-bold">
+                      <td className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL MÚTUO SÓCIOS</td>
+                      <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(saldoInicioAno)}</td>
+                      <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(saldoAtual)}</td>
+                      <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${amort > 0 ? 'text-emerald-600 dark:text-emerald-400' : amort < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                        {amort > 0 ? '−' : amort < 0 ? '+' : ''}{fmtBRL(Math.abs(amort))}
+                      </td>
+                      <td className={`py-2.5 px-3 text-right text-xs font-mono font-bold ${amort > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                        {amortPct !== null ? `${amortPct.toFixed(1)}%` : '—'}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }
