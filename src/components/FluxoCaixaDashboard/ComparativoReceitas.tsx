@@ -120,6 +120,7 @@ export const GRUPOS_RECEITA_CONFIG: GrupoReceitaConfig[] = [
       { conta: '3.4.1.04.03.001', desc: 'Comissões e Intermediações Diversas' },
       { conta: '3.4.2.01.01.001', desc: 'Comissões s/ Vendas de Consórcios' },
       { conta: '3.4.2.03.01.001', desc: 'Comissões s/ Financiamentos' },
+      { conta: '3.4.2.04.01.001', desc: 'Comissões s/ Seguros' },
       { conta: '3.4.2.05.01.001', desc: 'Comissões s/ Serviços de Despachantes' },
       { conta: '3.4.2.06.01.001', desc: 'Comissões s/ Interm. Venda Blindagem' },
       { conta: '3.4.2.99.01.001', desc: 'Comissões s/ Venda de Vistoria' },
