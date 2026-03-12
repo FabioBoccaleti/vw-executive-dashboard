@@ -158,6 +158,8 @@ function parseBalancete(text: string) {
                      - absMov('4') - despOper5Net
                      + absMov('3.4') + absMov('3.5') + absMov('3.6') - absMov('6');
 
+  const dRealizLPCred = realizLPCred.atu - realizLPCred.ant;
+
   const fluxoOper =
     resLiq_dfc +
     deprec_per +
@@ -168,7 +170,6 @@ function parseBalancete(text: string) {
 
   // ── Atividades de Investimento ────────────────────────────────────────────
   const dIntangivel   = intangivel.atu   - intangivel.ant;
-  const dRealizLPCred = realizLPCred.atu - realizLPCred.ant;
   const dInvestimentos = investimentos.atu - investimentos.ant;
   const fluxoInvest = -(imobiliz.atu - imobiliz.ant)
                     - dIntangivel
@@ -741,7 +742,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         <div className="p-6 max-w-7xl mx-auto">
           {activeTab === 'comparativos' ? (
             <div className="animate-in fade-in duration-500">
-              <ComparativosTab />
+              <ComparativosTab selectedYear={selectedYear} selectedMonth={selectedMonth} />
             </div>
           ) : loading && !data ? (
             <div className="flex flex-col items-center justify-center py-32 gap-4 text-slate-500">
@@ -2638,17 +2639,17 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
                            + absAtu_acum('3.4') + absAtu_acum('3.5') + absAtu_acum('3.6') - absAtu_acum('6');
     const deprec_acum = Math.abs(cur['5.5.2.07.20']?.saldoAtual || 0);
 
-    const fluxoOper_acum = resLiq_dfc_acum + deprec_acum
-      + ajusteEstoque_acum + ajusteCred_acum + ajusteContasCorr_acum + ajusteValDiv_acum
-      + ajusteDespAntec_acum + ajusteFornec_acum + ajusteTrib_acum + ajusteTrab_acum + ajusteContasPag_acum
-      - dRealizLPCred_acum;
-
     // Investimento
     const dImobiliz_acum     = getAtu('1.5.5')          - getJanAnt('1.5.5');
     const dIntangivel_acum   = getAtu('1.5.7')          - getJanAnt('1.5.7');
     const dRealizLPCred_acum = getAtu('1.5.1.01.52')    - getJanAnt('1.5.1.01.52');
     const dInvestimentos_acum = getAtu('1.5.3')         - getJanAnt('1.5.3');
     const fluxoInvest_acum = -dImobiliz_acum - dIntangivel_acum - dInvestimentos_acum;
+
+    const fluxoOper_acum = resLiq_dfc_acum + deprec_acum
+      + ajusteEstoque_acum + ajusteCred_acum + ajusteContasCorr_acum + ajusteValDiv_acum
+      + ajusteDespAntec_acum + ajusteFornec_acum + ajusteTrib_acum + ajusteTrab_acum + ajusteContasPag_acum
+      - dRealizLPCred_acum;
 
     // Financiamento
     const emprestCP_ant   = getJanAnt('2.1.1');    const emprestCP_atu   = getAtu('2.1.1');

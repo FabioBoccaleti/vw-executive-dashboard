@@ -594,16 +594,18 @@ function PeriodSelector({
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-export function ComparativosTab() {
+export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?: number; selectedMonth?: number }) {
+  const defaultYear = selectedYear ?? new Date().getFullYear();
+  const defaultMonth = selectedMonth !== undefined ? selectedMonth : 0;
   const [availableKeys, setAvailableKeys] = useState<Record<string, boolean>>({});
   const [indexLoading,  setIndexLoading]  = useState(true);
   const [indexError,    setIndexError]    = useState<string | null>(null);
 
   const [selectedPeriods, setSelectedPeriods] = useState<Period[]>([
-    { year: 2022, month: 0 },
-    { year: 2023, month: 0 },
-    { year: 2024, month: 0 },
-    { year: 2025, month: 0 },
+    { year: defaultYear, month: defaultMonth },
+    { year: defaultYear, month: defaultMonth },
+    { year: defaultYear, month: defaultMonth },
+    { year: defaultYear, month: defaultMonth },
   ]);
   const [activePeriodCount, setActivePeriodCount] = useState(4);
   const [loadedPeriods,    setLoadedPeriods]    = useState<LoadedPeriod[]>([]);
