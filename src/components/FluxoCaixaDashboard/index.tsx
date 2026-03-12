@@ -163,7 +163,8 @@ function parseBalancete(text: string) {
     deprec_per +
     ajusteEstoque + ajusteCred + ajusteContasCorr + ajusteValDiv +
     ajusteDespAntec +
-    ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag;
+    ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag
+    - dRealizLPCred;
 
   // ── Atividades de Investimento ────────────────────────────────────────────
   const dIntangivel   = intangivel.atu   - intangivel.ant;
@@ -171,7 +172,6 @@ function parseBalancete(text: string) {
   const dInvestimentos = investimentos.atu - investimentos.ant;
   const fluxoInvest = -(imobiliz.atu - imobiliz.ant)
                     - dIntangivel
-                    - dRealizLPCred
                     - dInvestimentos;
 
   // ── Atividades de Financiamento ─────────────────────────────────────────────
@@ -2640,14 +2640,15 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
 
     const fluxoOper_acum = resLiq_dfc_acum + deprec_acum
       + ajusteEstoque_acum + ajusteCred_acum + ajusteContasCorr_acum + ajusteValDiv_acum
-      + ajusteDespAntec_acum + ajusteFornec_acum + ajusteTrib_acum + ajusteTrab_acum + ajusteContasPag_acum;
+      + ajusteDespAntec_acum + ajusteFornec_acum + ajusteTrib_acum + ajusteTrab_acum + ajusteContasPag_acum
+      - dRealizLPCred_acum;
 
     // Investimento
     const dImobiliz_acum     = getAtu('1.5.5')          - getJanAnt('1.5.5');
     const dIntangivel_acum   = getAtu('1.5.7')          - getJanAnt('1.5.7');
     const dRealizLPCred_acum = getAtu('1.5.1.01.52')    - getJanAnt('1.5.1.01.52');
     const dInvestimentos_acum = getAtu('1.5.3')         - getJanAnt('1.5.3');
-    const fluxoInvest_acum = -dImobiliz_acum - dIntangivel_acum - dRealizLPCred_acum - dInvestimentos_acum;
+    const fluxoInvest_acum = -dImobiliz_acum - dIntangivel_acum - dInvestimentos_acum;
 
     // Financiamento
     const emprestCP_ant   = getJanAnt('2.1.1');    const emprestCP_atu   = getAtu('2.1.1');
@@ -2792,13 +2793,13 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
             <DFCRow label={`${d.ajusteTrib >= 0 ? '(+)' : '(–)'} Variação de Obrigações Tributárias (2.1.2.02)`} value={d.ajusteTrib} value2={dAcum?.ajusteTrib} hasAcum={hasAcum} indent={1} />
             <DFCRow label={`${d.ajusteTrab >= 0 ? '(+)' : '(–)'} Variação de Obrigações Trabalhistas (2.1.2.01)`} value={d.ajusteTrab} value2={dAcum?.ajusteTrab} hasAcum={hasAcum} indent={1} />
             <DFCRow label={`${d.ajusteContasPag >= 0 ? '(+)' : '(–)'} Variação de Contas a Pagar (2.1.2.03)`} value={d.ajusteContasPag} value2={dAcum?.ajusteContasPag} hasAcum={hasAcum} indent={1} />
+            <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(–)'} Variação Créditos c/ Ligadas LP (1.5.1.01.52)`} value={-d.dRealizLPCred} value2={dAcum ? -dAcum.dRealizLPCred : undefined} hasAcum={hasAcum} indent={1} />
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={d.fluxoOper} value2={dAcum?.fluxoOper} hasAcum={hasAcum} total highlight />
 
             <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
             <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado (1.5.5)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} value2={dAcum ? -(dAcum.imobiliz.atu - dAcum.imobiliz.ant) : undefined} hasAcum={hasAcum} indent={1} />
             <DFCRow label={`${-d.dIntangivel >= 0 ? '(+)' : '(–)'} Variação Líquida do Intangível (1.5.7)`} value={-d.dIntangivel} value2={dAcum ? -dAcum.dIntangivel : undefined} hasAcum={hasAcum} indent={1} />
             {(d.dInvestimentos !== 0 || (dAcum && dAcum.dInvestimentos !== 0)) && <DFCRow label={`${-d.dInvestimentos >= 0 ? '(+)' : '(–)'} Variação de Investimentos (1.5.3) ${fmtBRL(d.investimentosAnt, true)} → ${fmtBRL(d.investimentosAtu, true)}`} value={-d.dInvestimentos} value2={dAcum ? -dAcum.dInvestimentos : undefined} hasAcum={hasAcum} indent={1} />}
-            <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(–)'} Variação Créditos c/ Ligadas LP (1.5.1.01.52)`} value={-d.dRealizLPCred} value2={dAcum ? -dAcum.dRealizLPCred : undefined} hasAcum={hasAcum} indent={1} />
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO" value={d.fluxoInvest} value2={dAcum?.fluxoInvest} hasAcum={hasAcum} total highlight />
 
             <DFCRow label="ATIVIDADES DE FINANCIAMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
@@ -3101,6 +3102,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
               {(rendOperMes !== 0 || (acum && acum.rendOper !== 0)) && <DFCRow label={`    ↳ Rendas Operacionais (3.4): ${fmtBRL(rendOperMes, true)}`} value={rendOperMes} value2={acum?.rendOper} hasAcum={hasAcum} indent={2} />}
               {(rendFinancMes !== 0 || (acum && acum.rendFinanc !== 0)) && <DFCRow label={`    ↳ Rendas Financeiras (3.5): ${fmtBRL(rendFinancMes, true)}`} value={rendFinancMes} value2={acum?.rendFinanc} hasAcum={hasAcum} indent={2} />}
               {(rendNaoOperMes !== 0 || (acum && acum.rendNaoOper !== 0)) && <DFCRow label={`    ↳ Rendas Não Operacionais (3.6): ${fmtBRL(rendNaoOperMes, true)}`} value={rendNaoOperMes} value2={acum?.rendNaoOper} hasAcum={hasAcum} indent={2} />}
+              <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(\u2013)'} Variação Créditos c/ Ligadas LP (1.5.1.01.52)`} value={-d.dRealizLPCred} value2={acum ? -acum.dRealizLPCred : undefined} hasAcum={hasAcum} indent={1} />
 
               <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={fluxoOperDireto} value2={acum?.fluxoOperDireto} hasAcum={hasAcum} total highlight />
 
@@ -3109,7 +3111,6 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
               <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado (1.5.5)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} value2={acum ? -(acum.imobiliz.atu - acum.imobiliz.ant) : undefined} hasAcum={hasAcum} indent={1} />
               <DFCRow label={`${-d.dIntangivel >= 0 ? '(+)' : '(–)'} Variação Líquida do Intangível (1.5.7)`} value={-d.dIntangivel} value2={acum ? -acum.dIntangivel : undefined} hasAcum={hasAcum} indent={1} />
               {(d.dInvestimentos !== 0 || (acum && acum.dInvest !== 0)) && <DFCRow label={`${-d.dInvestimentos >= 0 ? '(+)' : '(–)'} Variação de Investimentos (1.5.3) ${fmtBRL(d.investimentosAnt, true)} → ${fmtBRL(d.investimentosAtu, true)}`} value={-d.dInvestimentos} value2={acum ? -acum.dInvest : undefined} hasAcum={hasAcum} indent={1} />}
-              <DFCRow label={`${-d.dRealizLPCred >= 0 ? '(+)' : '(–)'} Variação Créditos c/ Ligadas LP (1.5.1.01.52)`} value={-d.dRealizLPCred} value2={acum ? -acum.dRealizLPCred : undefined} hasAcum={hasAcum} indent={1} />
               <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO" value={d.fluxoInvest} value2={acum?.fluxoInvest} hasAcum={hasAcum} total highlight />
 
               {/* ── Financiamento ── */}
