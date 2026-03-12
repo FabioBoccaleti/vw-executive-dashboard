@@ -2193,7 +2193,11 @@ function OverviewTab({ data, fmtBRL, KPI, BarGauge, SectionTitle }: any) {
         <KPI label="Patrimônio Líquido" value={fmtBRL(d.PL.atu, true)} sub="Sem variação no período" color="violet" icon="💼" />
         <KPI
           label="Fluxo de Caixa Total"
-          value={fmtBRL(d.dfc.fluxoTotal, true)}
+          value={
+            <span className={d.dfc.fluxoTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
+              {d.dfc.fluxoTotal >= 0 ? '+' : '−'}{fmtBRL(Math.abs(d.dfc.fluxoTotal), true)}
+            </span>
+          }
           sub={`Var. real: ${fmtBRL(d.dfc.varCaixaReal, true)}`}
           color={d.dfc.fluxoTotal >= 0 ? "emerald" : "red"}
           icon="💰"
