@@ -797,7 +797,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
                 </div>
               )}
               {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
-              {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} despesasView={despesasView} setDespesasView={setDespesasView} />}
+              {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} despesasView={despesasView} setDespesasView={setDespesasView} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'parcelamentoRefis' && <ParcelamentoRefisTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} />}
@@ -1435,6 +1435,26 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
   const lpTotCA = rollCA(lpCA);
   const grandCA = rollCA([...cpCA, ...lpCA]);
   const [showCaptAmort, setShowCaptAmort] = useState(false);
+  const resultadoRowCA = (tot: { captMes: number; amortMes: number; captYTD: number; amortYTD: number; captAnual: number; amortAnual: number }, label: string, bold: boolean) => {
+    const netMes = tot.captMes - tot.amortMes;
+    const netYTD = tot.captYTD - tot.amortYTD;
+    const netAnual = tot.captAnual - tot.amortAnual;
+    const clr = (n: number) => n > 0 ? 'text-red-600 dark:text-red-400' : n < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground/50';
+    const fmt = (n: number) => n === 0 ? '—' : (n > 0 ? '+ ' : '− ') + fmtBRL(Math.abs(n));
+    return (
+      <tr className="border-b border-dashed border-border/50 bg-muted/10">
+        <td className={cn('py-1.5 px-3 text-xs italic', bold ? 'font-bold' : 'font-medium', 'text-foreground/70')}>{label}</td>
+        <td className="py-1.5 px-3 text-right text-muted-foreground/40 text-xs">—</td>
+        {isMo ? <>
+          <td colSpan={2} className={cn('py-1.5 px-3 text-right text-sm font-mono italic border-l border-border/40', bold && 'font-bold', clr(netMes))}>{fmt(netMes)}</td>
+          {CA_hasYTD && <td colSpan={2} className={cn('py-1.5 px-3 text-right text-sm font-mono italic border-l border-border/40', bold && 'font-bold', clr(netYTD))}>{fmt(netYTD)}</td>}
+        </> : <>
+          <td colSpan={2} className={cn('py-1.5 px-3 text-right text-sm font-mono italic border-l border-border/40', bold && 'font-bold', clr(netAnual))}>{fmt(netAnual)}</td>
+        </>}
+      </tr>
+    );
+  };
+
   const movColsCA = (r: { captMes: number; amortMes: number; captYTD: number; amortYTD: number; captAnual: number; amortAnual: number }, bold: boolean) => {
     if (isMo) {
       return <>
@@ -1746,6 +1766,7 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                   <td className="py-2.5 px-3 text-right font-mono font-bold text-foreground">{fmtBRL(cpTotCA.saldoAtu)}</td>
                   {movColsCA(cpTotCA, true)}
                 </tr>
+                {resultadoRowCA(cpTotCA, 'Resultado Curto Prazo', false)}
                 {lpCA.length > 0 && <>
                   <tr className="bg-muted/20">
                     <td colSpan={CA_nCols} className="py-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Longo Prazo</td>
@@ -1764,12 +1785,14 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-foreground">{fmtBRL(lpTotCA.saldoAtu)}</td>
                     {movColsCA(lpTotCA, true)}
                   </tr>
+                  {resultadoRowCA(lpTotCA, 'Resultado Longo Prazo', false)}
                 </>}
                 <tr className="bg-primary/10">
                   <td className="py-3 px-3 font-bold text-foreground">TOTAL GERAL</td>
                   <td className="py-3 px-3 text-right font-mono font-bold text-foreground">{fmtBRL(grandCA.saldoAtu)}</td>
                   {movColsCA(grandCA, true)}
                 </tr>
+                {resultadoRowCA(grandCA, 'RESULTADO GERAL', true)}
               </tbody>
             </table>
           </div>
