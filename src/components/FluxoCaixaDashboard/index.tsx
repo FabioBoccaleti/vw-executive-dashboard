@@ -2901,7 +2901,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
   );
   const pagIR           = -provisaoIRMes;
   const rendasRecebidas = rendOperMes + rendFinancMes + rendNaoOperMes;
-  const fluxoOperDireto = recebClientes + pagFornec + pagImpostos + despOperCaixa + pagIR + rendasRecebidas;
+  const fluxoOperDireto = recebClientes + pagFornec + pagImpostos + despOperCaixa + pagIR + rendasRecebidas - d.dRealizLPCred;
   const diff = Math.abs(fluxoOperDireto - d.fluxoOper);
 
   // ── Acumulado YTD: usando saldoAtual (resultado) e variação Jan→mês (patrimonial) ──
@@ -2944,14 +2944,14 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
     );
     const pagIR_a           = -provisaoIR_a;
     const rendasRecebidas_a = rendOper_a + rendFinanc_a + rendNaoOper_a;
-    const fluxoOperDireto_a = recebClientes_a + pagFornec_a + pagImpostos_a + despOperCaixa_a + pagIR_a + rendasRecebidas_a;
+    const fluxoOperDireto_a = recebClientes_a + pagFornec_a + pagImpostos_a + despOperCaixa_a + pagIR_a + rendasRecebidas_a - dRealizLPCred_a;
 
     // Investimento e financiamento: reusa dAcum calculado da mesma forma
     const dImobiliz_a     = getAtu('1.5.5')       - getJanAnt('1.5.5');
     const dIntangivel_a   = getAtu('1.5.7')        - getJanAnt('1.5.7');
     const dRealizLPCred_a = getAtu('1.5.1.01.52') - getJanAnt('1.5.1.01.52');
     const dInvest_a       = getAtu('1.5.3')        - getJanAnt('1.5.3');
-    const fluxoInvest_a   = -dImobiliz_a - dIntangivel_a - dRealizLPCred_a - dInvest_a;
+    const fluxoInvest_a   = -dImobiliz_a - dIntangivel_a - dInvest_a;
 
     const empCP_ant = getJanAnt('2.1.1');     const empCP_atu = getAtu('2.1.1');
     const empLP_ant = getJanAnt('2.2.1.07'); const empLP_atu = getAtu('2.2.1.07');
