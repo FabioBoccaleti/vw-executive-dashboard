@@ -2304,13 +2304,13 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
               {isMonthly ? (
                 <div className="space-y-2">
                   <div>
-                    <div className="text-[10px] uppercase tracking-wider text-blue-500/80 dark:text-blue-400/70 mb-0.5">{headerMes}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{headerMes}</div>
                     <div className={cn('text-lg font-bold', kpi.mes >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
                       {fmtBRL(kpi.mes, true)}
                     </div>
                   </div>
                   <div className="border-t border-border/50 pt-2">
-                    <div className="text-[10px] uppercase tracking-wider text-emerald-600/70 dark:text-emerald-400/60 mb-0.5">{headerAcu}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{headerAcu}</div>
                     <div className={cn('text-xl font-bold', kpi.acu >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
                       {fmtBRL(kpi.acu, true)}
                     </div>
