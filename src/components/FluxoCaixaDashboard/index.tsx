@@ -1766,7 +1766,7 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                   <td className="py-2.5 px-3 text-right font-mono font-bold text-foreground">{fmtBRL(cpTotCA.saldoAtu)}</td>
                   {movColsCA(cpTotCA, true)}
                 </tr>
-                {resultadoRowCA(cpTotCA, 'Resultado Curto Prazo', false)}
+                {resultadoRowCA(cpTotCA, 'Resultado da Amortização ou Captação Curto Prazo', false)}
                 {lpCA.length > 0 && <>
                   <tr className="bg-muted/20">
                     <td colSpan={CA_nCols} className="py-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Longo Prazo</td>
@@ -1785,14 +1785,14 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-foreground">{fmtBRL(lpTotCA.saldoAtu)}</td>
                     {movColsCA(lpTotCA, true)}
                   </tr>
-                  {resultadoRowCA(lpTotCA, 'Resultado Longo Prazo', false)}
+                  {resultadoRowCA(lpTotCA, 'Resultado da Amortização ou Captação Longo Prazo', false)}
                 </>}
                 <tr className="bg-primary/10">
                   <td className="py-3 px-3 font-bold text-foreground">TOTAL GERAL</td>
                   <td className="py-3 px-3 text-right font-mono font-bold text-foreground">{fmtBRL(grandCA.saldoAtu)}</td>
                   {movColsCA(grandCA, true)}
                 </tr>
-                {resultadoRowCA(grandCA, 'RESULTADO GERAL', true)}
+                {resultadoRowCA(grandCA, 'Resultado da Amortização ou Captação Geral', true)}
               </tbody>
             </table>
           </div>
