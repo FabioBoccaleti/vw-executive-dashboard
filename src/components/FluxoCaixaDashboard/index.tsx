@@ -796,7 +796,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
                   <ComparativoReceitas fmtBRL={fmtBRL} />
                 </div>
               )}
-              {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} despesasView={despesasView} setDespesasView={setDespesasView} />}
               {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'parcelamentoRefis' && <ParcelamentoRefisTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
@@ -1363,7 +1363,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
   );
 }
 
-function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnterior, colAtual }: any) {
+function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnterior, colAtual, janAccounts, selectedMonth, selectedYear }: any) {
   const d = data;
   const accounts = d.accounts as Record<string, any>;
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
@@ -1391,6 +1391,53 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
   const totalAtu = cpTotal.atu + lpTotal.atu;
   const varTotal = totalAtu - totalAnt;
   const varTotalPct = totalAnt !== 0 ? ((varTotal / totalAnt) * 100) : null;
+
+  // ── Captação / Amortização ────────────────────────────────────────────
+  const isMo = selectedMonth > 0;
+  const CA_MS: Record<number, string> = {1:'Jan',2:'Fev',3:'Mar',4:'Abr',5:'Mai',6:'Jun',7:'Jul',8:'Ago',9:'Set',10:'Out',11:'Nov',12:'Dez'};
+  const CA_yr2 = String(selectedYear || new Date().getFullYear()).slice(2);
+  const CA_ytdLbl = (isMo && selectedMonth > 1) ? `Jan – ${CA_MS[selectedMonth]}/${CA_yr2}` : colAtual;
+  const CA_hasYTD = isMo && selectedMonth > 1 && !!janAccounts;
+  const CA_nCols = isMo ? (CA_hasYTD ? 6 : 4) : 4;
+  const jg = (id: string) => ((janAccounts as Record<string, any>) || {})[id] || { saldoAnt: 0, valDeb: 0, valCred: 0 };
+  const jst = (id: string) => janAccounts ? Math.abs(jg(id).saldoAnt) : 0;
+  const enrichCA = (conta: string, label: string, saldoAtu: number, deltaMes: number, janStart: number) => ({
+    conta, label, saldoAtu, deltaMes,
+    deltaYTD: saldoAtu - janStart,
+    captAnual: Math.abs((accounts[conta] || {}).valCred || 0),
+    amortAnual: Math.abs((accounts[conta] || {}).valDeb || 0),
+  });
+  const janSt1CA = janAccounts ? Math.max(0, Math.abs(jg('2.1.1.02.01.001').saldoAnt) - Math.abs(jg('1.1.2.01.01.001').saldoAnt)) : 0;
+  const janSt2CA = janAccounts ? Math.max(0, Math.abs(jg('2.1.4.01.01.007').saldoAnt) - Math.abs(jg('1.1.7.02.01.001').saldoAnt)) : 0;
+  const cpCA = [
+    ...cpSubs.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu, s.atu - s.ant, jst(s.conta))),
+    enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW',   netAcc1.atu, netAcc1.atu - netAcc1.ant, janSt1CA),
+    enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu, netAcc2.atu - netAcc2.ant, janSt2CA),
+  ];
+  const lpCA = lpSubs.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu, s.atu - s.ant, jst(s.conta)));
+  const rollCA = (rows: { saldoAtu: number; deltaMes: number; deltaYTD: number; captAnual: number; amortAnual: number }[]) =>
+    rows.reduce((a, r) => ({ saldoAtu: a.saldoAtu+r.saldoAtu, deltaMes: a.deltaMes+r.deltaMes, deltaYTD: a.deltaYTD+r.deltaYTD, captAnual: a.captAnual+r.captAnual, amortAnual: a.amortAnual+r.amortAnual }), { saldoAtu: 0, deltaMes: 0, deltaYTD: 0, captAnual: 0, amortAnual: 0 });
+  const cpTotCA = rollCA(cpCA);
+  const lpTotCA = rollCA(lpCA);
+  const grandCA = { saldoAtu: totalAtu, deltaMes: cpTotCA.deltaMes+lpTotCA.deltaMes, deltaYTD: cpTotCA.deltaYTD+lpTotCA.deltaYTD, captAnual: cpTotCA.captAnual+lpTotCA.captAnual, amortAnual: cpTotCA.amortAnual+lpTotCA.amortAnual };
+  const movColsCA = (r: { deltaMes: number; deltaYTD: number; captAnual: number; amortAnual: number }, bold: boolean) => {
+    if (isMo) {
+      const cM = Math.max(0, r.deltaMes); const aM = Math.max(0, -r.deltaMes);
+      const cY = Math.max(0, r.deltaYTD); const aY = Math.max(0, -r.deltaYTD);
+      return <>
+        <td className={cn('py-2.5 px-3 text-right text-sm font-mono border-l border-border/40', cM > 0 ? cn('text-red-600 dark:text-red-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{cM > 0 ? fmtBRL(cM) : '—'}</td>
+        <td className={cn('py-2.5 px-3 text-right text-sm font-mono', aM > 0 ? cn('text-emerald-600 dark:text-emerald-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{aM > 0 ? fmtBRL(aM) : '—'}</td>
+        {CA_hasYTD && <>
+          <td className={cn('py-2.5 px-3 text-right text-sm font-mono border-l border-border/40', cY > 0 ? cn('text-red-600 dark:text-red-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{cY > 0 ? fmtBRL(cY) : '—'}</td>
+          <td className={cn('py-2.5 px-3 text-right text-sm font-mono', aY > 0 ? cn('text-emerald-600 dark:text-emerald-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{aY > 0 ? fmtBRL(aY) : '—'}</td>
+        </>}
+      </>;
+    }
+    return <>
+      <td className={cn('py-2.5 px-3 text-right text-sm font-mono border-l border-border/40', r.captAnual > 0 ? cn('text-red-600 dark:text-red-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{r.captAnual > 0 ? fmtBRL(r.captAnual) : '—'}</td>
+      <td className={cn('py-2.5 px-3 text-right text-sm font-mono', r.amortAnual > 0 ? cn('text-emerald-600 dark:text-emerald-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{r.amortAnual > 0 ? fmtBRL(r.amortAnual) : '—'}</td>
+    </>;
+  };
 
   return (
     <div className="space-y-6">
@@ -1609,6 +1656,92 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Captação e Amortização Bancária */}
+      <Card>
+        <CardContent className="pt-6">
+          <SectionTitle icon="⚡">Captação e Amortização Bancária</SectionTitle>
+          <p className="text-xs text-muted-foreground mb-4">
+            {isMo
+              ? 'Variação líquida de saldo: Captação = aumento do endividamento no período (vermelho) · Amortização = redução da dívida (verde).'
+              : 'Movimentos brutos do período via balancete: Captação = total de créditos · Amortização = total de débitos (pagamentos realizados).'}
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead className="bg-muted/50">
+                {isMo ? (
+                  <>
+                    <tr className="border-b border-border/40">
+                      <th rowSpan={2} className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground align-bottom">Endividamento</th>
+                      <th rowSpan={2} className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground align-bottom w-[13%]">Saldo Atual</th>
+                      <th colSpan={2} className="py-2 px-3 text-center text-xs font-bold uppercase tracking-wider text-foreground border-l border-border/40">{colAtual}</th>
+                      {CA_hasYTD && <th colSpan={2} className="py-2 px-3 text-center text-xs font-bold uppercase tracking-wider text-foreground border-l border-border/40">{CA_ytdLbl}</th>}
+                    </tr>
+                    <tr className="border-b-2 border-border">
+                      <th className="py-2 px-3 text-right text-xs uppercase tracking-wider text-red-500 dark:text-red-400 border-l border-border/40">Captação</th>
+                      <th className="py-2 px-3 text-right text-xs uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Amortização</th>
+                      {CA_hasYTD && <>
+                        <th className="py-2 px-3 text-right text-xs uppercase tracking-wider text-red-500 dark:text-red-400 border-l border-border/40">Captação</th>
+                        <th className="py-2 px-3 text-right text-xs uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Amortização</th>
+                      </>}
+                    </tr>
+                  </>
+                ) : (
+                  <tr className="border-b-2 border-border">
+                    <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Endividamento</th>
+                    <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground w-[15%]">Saldo Atual</th>
+                    <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-red-500 dark:text-red-400 border-l border-border/40 w-[20%]">Captação</th>
+                    <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-emerald-600 dark:text-emerald-400 w-[20%]">Amortização</th>
+                  </tr>
+                )}
+              </thead>
+              <tbody>
+                <tr className="bg-muted/20">
+                  <td colSpan={CA_nCols} className="py-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Curto Prazo</td>
+                </tr>
+                {cpCA.map(r => (
+                  <tr key={r.conta} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
+                    <td className="py-2.5 px-3 text-foreground">
+                      <span className="text-xs font-mono text-muted-foreground mr-2">{r.conta}</span>{r.label}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-semibold text-foreground">{fmtBRL(r.saldoAtu)}</td>
+                    {movColsCA(r, false)}
+                  </tr>
+                ))}
+                <tr className="bg-muted/50 border-b-2 border-border">
+                  <td className="py-2.5 px-3 font-bold text-foreground">Total Curto Prazo</td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-foreground">{fmtBRL(cpTotCA.saldoAtu)}</td>
+                  {movColsCA(cpTotCA, true)}
+                </tr>
+                {lpCA.length > 0 && <>
+                  <tr className="bg-muted/20">
+                    <td colSpan={CA_nCols} className="py-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Longo Prazo</td>
+                  </tr>
+                  {lpCA.map(r => (
+                    <tr key={r.conta} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
+                      <td className="py-2.5 px-3 text-foreground">
+                        <span className="text-xs font-mono text-muted-foreground mr-2">{r.conta}</span>{r.label}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-foreground">{fmtBRL(r.saldoAtu)}</td>
+                      {movColsCA(r, false)}
+                    </tr>
+                  ))}
+                  <tr className="bg-muted/50 border-b-2 border-border">
+                    <td className="py-2.5 px-3 font-bold text-foreground">Total Longo Prazo</td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-foreground">{fmtBRL(lpTotCA.saldoAtu)}</td>
+                    {movColsCA(lpTotCA, true)}
+                  </tr>
+                </>}
+                <tr className="bg-primary/10">
+                  <td className="py-3 px-3 font-bold text-foreground">TOTAL GERAL</td>
+                  <td className="py-3 px-3 text-right font-mono font-bold text-foreground">{fmtBRL(grandCA.saldoAtu)}</td>
+                  {movColsCA(grandCA, true)}
+                </tr>
               </tbody>
             </table>
           </div>
