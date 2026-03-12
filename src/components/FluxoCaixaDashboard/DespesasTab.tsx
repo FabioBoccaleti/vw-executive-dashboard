@@ -128,6 +128,7 @@ function grupo5Leaves(accounts: Record<string, any>) {
         valDeb: acc.valDeb as number,
         valCred: acc.valCred as number,
         valor: (acc.valDeb as number) - (acc.valCred as number),
+        ytd: acc.saldoAtual as number,
       };
     });
 }
@@ -141,15 +142,18 @@ interface DespesasTabProps {
   setShowTabela: (v: (prev: boolean) => boolean) => void;
   despesasView?: 'normal' | 'comparativo';
   setDespesasView?: (v: 'normal' | 'comparativo') => void;
+  selectedMonth?: number;
+  selectedYear?: number;
 }
 
-export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setShowTabela, despesasView = 'normal', setDespesasView }: DespesasTabProps) {
+export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setShowTabela, despesasView = 'normal', setDespesasView, selectedMonth = 0, selectedYear = new Date().getFullYear() }: DespesasTabProps) {
   const accounts = data.accounts as Record<string, any>;
   const rows = grupo5Leaves(accounts);
 
   const [tipos, setTipos] = useState<Record<string, string>>({});
   const [loadingTipos, setLoadingTipos] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showYTD, setShowYTD] = useState(false);
   // Ref para debounce do save
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -191,6 +195,14 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
   }, {});
   const resumoRows = Object.entries(resumoMap).sort((a, b) => b[1] - a[1]);
 
+  // YTD acumulado por tipo (saldoAtual = cumulative from year start)
+  const resumoMapYTD = visibleRows.reduce<Record<string, number>>((acc, r) => {
+    const tipo = tipos[r.conta]?.trim();
+    if (!tipo) return acc;
+    acc[tipo] = (acc[tipo] ?? 0) + r.ytd;
+    return acc;
+  }, {});
+
   // Agrupar resumoRows nos 4 grupos
   const totalGeral = resumoRows.reduce((s, [, v]) => s + v, 0);
   const gruposData = GRUPOS_CONFIG.map((g, idx) => {
@@ -198,9 +210,16 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
       .filter(([tipo]) => classificarTipo(tipo) === idx)
       .sort((a, b) => b[1] - a[1]);
     const total = itens.reduce((s, [, v]) => s + v, 0);
+    const totalYTD = itens.reduce((s, [tipo]) => s + (resumoMapYTD[tipo] ?? 0), 0);
     const pct = totalGeral !== 0 ? (total / totalGeral) * 100 : 0;
-    return { ...g, itens, total, pct };
+    return { ...g, itens, total, totalYTD, pct };
   });
+
+  // Labels para acumulado anual
+  const YTD_MS: Record<number, string> = { 1:'Jan',2:'Fev',3:'Mar',4:'Abr',5:'Mai',6:'Jun',7:'Jul',8:'Ago',9:'Set',10:'Out',11:'Nov',12:'Dez' };
+  const yr2 = String(selectedYear).slice(2);
+  const canShowYTD = selectedMonth > 1;
+  const ytdLabel = canShowYTD ? `Jan – ${YTD_MS[selectedMonth]}/${yr2}` : '';
 
   if (despesasView === 'comparativo') {
     return (
@@ -224,9 +243,24 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
       {/* ── Cards de Resumo por Grupo (sempre visíveis) ── */}
       {resumoRows.length > 0 && (
         <div className="space-y-3">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-base font-semibold text-foreground">Resumo por Grupo de Despesa</span>
-            <span className="text-xs text-muted-foreground">— competência do período</span>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <span className="text-base font-semibold text-foreground">Resumo por Grupo de Despesa</span>
+              <span className="text-xs text-muted-foreground">— competência do período</span>
+            </div>
+            {canShowYTD && (
+              <button
+                onClick={() => setShowYTD(v => !v)}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm ${
+                  showYTD
+                    ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700'
+                    : 'bg-muted/40 text-muted-foreground border-border hover:bg-muted/70'
+                }`}
+              >
+                <span>📊</span>
+                {showYTD ? 'Ocultar Acumulado' : `Mostrar Acumulado ${ytdLabel}`}
+              </button>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {gruposData.map((grupo, idx) => (
@@ -240,12 +274,28 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className={`text-sm font-bold font-mono ${grupo.totalColor}`}>
-                      {fmtBRL(grupo.total)}
-                    </div>
-                    <div className={`text-xs font-semibold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${grupo.badgeBg}`}>
-                      {grupo.pct.toFixed(1)}%
-                    </div>
+                    {(showYTD && canShowYTD) ? (
+                      <div className="flex gap-4 items-start">
+                        <div>
+                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Mês</div>
+                          <div className={`text-sm font-bold font-mono ${grupo.totalColor}`}>{fmtBRL(grupo.total)}</div>
+                          <div className={`text-xs font-semibold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${grupo.badgeBg}`}>{grupo.pct.toFixed(1)}%</div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">{ytdLabel}</div>
+                          <div className={`text-sm font-bold font-mono ${grupo.totalColor}`}>{fmtBRL(grupo.totalYTD)}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className={`text-sm font-bold font-mono ${grupo.totalColor}`}>
+                          {fmtBRL(grupo.total)}
+                        </div>
+                        <div className={`text-xs font-semibold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${grupo.badgeBg}`}>
+                          {grupo.pct.toFixed(1)}%
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -260,6 +310,7 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
                       <tbody>
                         {grupo.itens.map(([tipo, valor], i) => {
                           const pctItem = grupo.total !== 0 ? (valor / grupo.total) * 100 : 0;
+                          const ytdVal = resumoMapYTD[tipo] ?? 0;
                           return (
                             <tr
                               key={tipo}
@@ -274,6 +325,11 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
                               <td className="py-2 pl-2 pr-4 text-right text-sm font-mono font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
                                 {fmtBRL(valor)}
                               </td>
+                              {(showYTD && canShowYTD) && (
+                                <td className="py-2 pl-2 pr-4 text-right text-sm font-mono font-semibold text-red-600/70 dark:text-red-400/70 whitespace-nowrap border-l border-border/30">
+                                  {fmtBRL(ytdVal)}
+                                </td>
+                              )}
                             </tr>
                           );
                         })}
@@ -287,6 +343,11 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
                           <td className={`py-2 pr-4 text-right text-sm font-mono font-bold ${grupo.totalColor} whitespace-nowrap`}>
                             {fmtBRL(grupo.total)}
                           </td>
+                          {(showYTD && canShowYTD) && (
+                            <td className={`py-2 pr-4 text-right text-sm font-mono font-bold ${grupo.totalColor} whitespace-nowrap border-l border-border/30`}>
+                              {fmtBRL(grupo.totalYTD)}
+                            </td>
+                          )}
                         </tr>
                       </tfoot>
                     </table>
