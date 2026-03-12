@@ -1094,9 +1094,15 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
       ? `Jan/${yr2}`
       : `Jan–${MSHORT[selectedMonth]}/${yr2}`;
 
+  const SUFFIX_MAP: Record<string, string> = {
+    '3.1.1.01.01.001': ' - VW',
+    '3.1.1.03.01.001': ' - VW',
+    '3.1.3.01.01.001': ' - VW',
+  };
+
   const makeSimples = (ids: string[]) => ids.map(id => {
     const acc = getAcc(id);
-    return { conta: id, desc: acc.desc || id, ant: movPrev(id), atu: mov(id), ytd: ytdVal(id) };
+    return { conta: id, desc: (acc.desc || id) + (SUFFIX_MAP[id] ?? ''), ant: movPrev(id), atu: mov(id), ytd: ytdVal(id) };
   });
 
   // Contas com dedução → linha única com valor líquido (bruta − dedução)
@@ -1115,7 +1121,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
     const dP = getPrev(p.ded);
     return {
       conta: p.gross,
-      desc: g.desc || p.gross,
+      desc: (g.desc || p.gross) + (SUFFIX_MAP[p.gross] ?? ''),
       ant: prevMonthAccounts ? (gP.valCred - gP.valDeb) - (dP.valDeb - dP.valCred) : 0,
       atu: (g.valCred - g.valDeb) - (d.valDeb - d.valCred),
       ytd: Math.abs(g.saldoAtual) - Math.abs(d.saldoAtual),
