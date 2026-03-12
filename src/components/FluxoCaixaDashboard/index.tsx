@@ -1434,6 +1434,7 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
   const cpTotCA = rollCA(cpCA);
   const lpTotCA = rollCA(lpCA);
   const grandCA = rollCA([...cpCA, ...lpCA]);
+  const [showCaptAmort, setShowCaptAmort] = useState(true);
   const movColsCA = (r: { captMes: number; amortMes: number; captYTD: number; amortYTD: number; captAnual: number; amortAnual: number }, bold: boolean) => {
     if (isMo) {
       return <>
@@ -1677,7 +1678,22 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
       {/* Captação e Amortização Bancária */}
       <Card>
         <CardContent className="pt-6">
-          <SectionTitle icon="⚡">Captação e Amortização Bancária</SectionTitle>
+          <div className="flex items-center justify-between mb-4">
+            <SectionTitle icon="⚡">Captação e Amortização Bancária</SectionTitle>
+            <button
+              onClick={() => setShowCaptAmort(v => !v)}
+              className={cn(
+                'flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm',
+                !showCaptAmort
+                  ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700'
+                  : 'bg-muted/40 text-muted-foreground border-border hover:bg-muted/70'
+              )}
+            >
+              <span>⚡</span>
+              {showCaptAmort ? 'Ocultar Tabela' : 'Mostrar Tabela'}
+            </button>
+          </div>
+          {showCaptAmort && <>
           <p className="text-xs text-muted-foreground mb-4">
             {isMo
               ? 'Variação líquida de saldo: Captação = aumento do endividamento no período (vermelho) · Amortização = redução da dívida (verde).'
@@ -1757,6 +1773,7 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
               </tbody>
             </table>
           </div>
+          </>}
         </CardContent>
       </Card>
     </div>
