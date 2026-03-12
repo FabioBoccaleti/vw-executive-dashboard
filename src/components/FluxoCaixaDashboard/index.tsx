@@ -1405,13 +1405,13 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
   const CA_yr2 = String(selectedYear || new Date().getFullYear()).slice(2);
   const CA_ytdLbl = (isMo && selectedMonth > 1) ? `Jan – ${CA_MS[selectedMonth]}/${CA_yr2}` : colAtual;
   const CA_hasYTD = isMo && selectedMonth > 1 && !!janAccounts;
-  const CA_nCols = isMo ? (CA_hasYTD ? 6 : 4) : 4;
+  const CA_nCols = isMo ? (CA_hasYTD ? 5 : 3) : 3;
   const jg = (id: string) => ((janAccounts as Record<string, any>) || {})[id] || { saldoAnt: 0, valDeb: 0, valCred: 0 };
   const jst = (id: string) => janAccounts ? Math.abs(jg(id).saldoAnt) : 0;
   const enrichCA = (conta: string, label: string, saldoAtu: number, deltaMes: number, janStart: number) => {
     const deltaYTD = saldoAtu - janStart;
     return {
-      conta, label, saldoAtu,
+      conta, label,
       captMes:   Math.max(0,  deltaMes),
       amortMes:  Math.max(0, -deltaMes),
       captYTD:   Math.max(0,  deltaYTD),
@@ -1428,16 +1428,15 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
     enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu, netAcc2.atu - netAcc2.ant, janSt2CA),
   ];
   const lpCA = lpSubs.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu, s.atu - s.ant, jst(s.conta)));
-  const rollCA = (rows: { saldoAtu: number; captMes: number; amortMes: number; captYTD: number; amortYTD: number; captAnual: number; amortAnual: number }[]) =>
+  const rollCA = (rows: { captMes: number; amortMes: number; captYTD: number; amortYTD: number; captAnual: number; amortAnual: number }[]) =>
     rows.reduce((a, r) => ({
-      saldoAtu:   a.saldoAtu   + r.saldoAtu,
       captMes:    a.captMes    + r.captMes,
       amortMes:   a.amortMes   + r.amortMes,
       captYTD:    a.captYTD    + r.captYTD,
       amortYTD:   a.amortYTD   + r.amortYTD,
       captAnual:  a.captAnual  + r.captAnual,
       amortAnual: a.amortAnual + r.amortAnual,
-    }), { saldoAtu: 0, captMes: 0, amortMes: 0, captYTD: 0, amortYTD: 0, captAnual: 0, amortAnual: 0 });
+    }), { captMes: 0, amortMes: 0, captYTD: 0, amortYTD: 0, captAnual: 0, amortAnual: 0 });
   const cpTotCA = rollCA(cpCA);
   const lpTotCA = rollCA(lpCA);
   const grandCA = rollCA([...cpCA, ...lpCA]);
@@ -1451,7 +1450,6 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
     return (
       <tr className="border-b border-dashed border-border/50 bg-muted/10">
         <td className={cn('py-1.5 px-3 text-xs italic', bold ? 'font-bold' : 'font-medium', 'text-foreground/70')}>{label}</td>
-        <td className="py-1.5 px-3 text-right text-muted-foreground/40 text-xs">—</td>
         {isMo ? <>
           <td colSpan={2} className={cn('py-1.5 px-3 text-right text-sm font-mono italic border-l border-border/40', bold && 'font-bold', clr(netMes))}>{fmt(netMes)}</td>
           {CA_hasYTD && <td colSpan={2} className={cn('py-1.5 px-3 text-right text-sm font-mono italic border-l border-border/40', bold && 'font-bold', clr(netYTD))}>{fmt(netYTD)}</td>}
@@ -1733,7 +1731,6 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                   <>
                     <tr className="border-b border-border/40">
                       <th rowSpan={2} className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground align-bottom">Endividamento</th>
-                      <th rowSpan={2} className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground align-bottom w-[13%]">Saldo Atual</th>
                       <th colSpan={2} className="py-2 px-3 text-center text-xs font-bold uppercase tracking-wider text-foreground border-l border-border/40">{colAtual}</th>
                       {CA_hasYTD && <th colSpan={2} className="py-2 px-3 text-center text-xs font-bold uppercase tracking-wider text-foreground border-l border-border/40">{CA_ytdLbl}</th>}
                     </tr>
@@ -1749,7 +1746,6 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                 ) : (
                   <tr className="border-b-2 border-border">
                     <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Endividamento</th>
-                    <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground w-[15%]">Saldo Atual</th>
                     <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-red-500 dark:text-red-400 border-l border-border/40 w-[20%]">Captação</th>
                     <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-emerald-600 dark:text-emerald-400 w-[20%]">Amortização</th>
                   </tr>
@@ -1764,13 +1760,11 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                     <td className="py-2.5 px-3 text-foreground">
                       <span className="text-xs font-mono text-muted-foreground mr-2">{r.conta}</span>{r.label}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-semibold text-foreground">{fmtBRL(r.saldoAtu)}</td>
                     {movColsCA(r, false)}
                   </tr>
                 ))}
                 <tr className="bg-muted/50 border-b-2 border-border">
                   <td className="py-2.5 px-3 font-bold text-foreground">Total Curto Prazo</td>
-                  <td className="py-2.5 px-3 text-right font-mono font-bold text-foreground">{fmtBRL(cpTotCA.saldoAtu)}</td>
                   {movColsCA(cpTotCA, true)}
                 </tr>
                 {resultadoRowCA(cpTotCA, 'Resultado da Amortização ou Captação Curto Prazo', false)}
@@ -1783,20 +1777,17 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                       <td className="py-2.5 px-3 text-foreground">
                         <span className="text-xs font-mono text-muted-foreground mr-2">{r.conta}</span>{r.label}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-foreground">{fmtBRL(r.saldoAtu)}</td>
                       {movColsCA(r, false)}
                     </tr>
                   ))}
                   <tr className="bg-muted/50 border-b-2 border-border">
                     <td className="py-2.5 px-3 font-bold text-foreground">Total Longo Prazo</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-foreground">{fmtBRL(lpTotCA.saldoAtu)}</td>
                     {movColsCA(lpTotCA, true)}
                   </tr>
                   {resultadoRowCA(lpTotCA, 'Resultado da Amortização ou Captação Longo Prazo', false)}
                 </>}
                 <tr className="bg-primary/10">
                   <td className="py-3 px-3 font-bold text-foreground">TOTAL GERAL</td>
-                  <td className="py-3 px-3 text-right font-mono font-bold text-foreground">{fmtBRL(grandCA.saldoAtu)}</td>
                   {movColsCA(grandCA, true)}
                 </tr>
                 {resultadoRowCA(grandCA, 'Resultado da Amortização ou Captação Geral', true)}
@@ -2944,7 +2935,6 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
     );
     const pagIR_a           = -provisaoIR_a;
     const rendasRecebidas_a = rendOper_a + rendFinanc_a + rendNaoOper_a;
-    const fluxoOperDireto_a = recebClientes_a + pagFornec_a + pagImpostos_a + despOperCaixa_a + pagIR_a + rendasRecebidas_a - dRealizLPCred_a;
 
     // Investimento e financiamento: reusa dAcum calculado da mesma forma
     const dImobiliz_a     = getAtu('1.5.5')       - getJanAnt('1.5.5');
@@ -2952,6 +2942,8 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
     const dRealizLPCred_a = getAtu('1.5.1.01.52') - getJanAnt('1.5.1.01.52');
     const dInvest_a       = getAtu('1.5.3')        - getJanAnt('1.5.3');
     const fluxoInvest_a   = -dImobiliz_a - dIntangivel_a - dInvest_a;
+
+    const fluxoOperDireto_a = recebClientes_a + pagFornec_a + pagImpostos_a + despOperCaixa_a + pagIR_a + rendasRecebidas_a - dRealizLPCred_a;
 
     const empCP_ant = getJanAnt('2.1.1');     const empCP_atu = getAtu('2.1.1');
     const empLP_ant = getJanAnt('2.2.1.07'); const empLP_atu = getAtu('2.2.1.07');
