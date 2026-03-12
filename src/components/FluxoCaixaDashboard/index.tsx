@@ -1434,7 +1434,7 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
   const cpTotCA = rollCA(cpCA);
   const lpTotCA = rollCA(lpCA);
   const grandCA = rollCA([...cpCA, ...lpCA]);
-  const [showCaptAmort, setShowCaptAmort] = useState(true);
+  const [showCaptAmort, setShowCaptAmort] = useState(false);
   const movColsCA = (r: { captMes: number; amortMes: number; captYTD: number; amortYTD: number; captAnual: number; amortAnual: number }, bold: boolean) => {
     if (isMo) {
       return <>
