@@ -1401,12 +1401,18 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
   const CA_nCols = isMo ? (CA_hasYTD ? 6 : 4) : 4;
   const jg = (id: string) => ((janAccounts as Record<string, any>) || {})[id] || { saldoAnt: 0, valDeb: 0, valCred: 0 };
   const jst = (id: string) => janAccounts ? Math.abs(jg(id).saldoAnt) : 0;
-  const enrichCA = (conta: string, label: string, saldoAtu: number, deltaMes: number, janStart: number) => ({
-    conta, label, saldoAtu, deltaMes,
-    deltaYTD: saldoAtu - janStart,
-    captAnual: Math.abs((accounts[conta] || {}).valCred || 0),
-    amortAnual: Math.abs((accounts[conta] || {}).valDeb || 0),
-  });
+  const enrichCA = (conta: string, label: string, saldoAtu: number, deltaMes: number, janStart: number) => {
+    const deltaYTD = saldoAtu - janStart;
+    return {
+      conta, label, saldoAtu,
+      captMes:   Math.max(0,  deltaMes),
+      amortMes:  Math.max(0, -deltaMes),
+      captYTD:   Math.max(0,  deltaYTD),
+      amortYTD:  Math.max(0, -deltaYTD),
+      captAnual: Math.abs((accounts[conta] || {}).valCred || 0),
+      amortAnual: Math.abs((accounts[conta] || {}).valDeb || 0),
+    };
+  };
   const janSt1CA = janAccounts ? Math.max(0, Math.abs(jg('2.1.1.02.01.001').saldoAnt) - Math.abs(jg('1.1.2.01.01.001').saldoAnt)) : 0;
   const janSt2CA = janAccounts ? Math.max(0, Math.abs(jg('2.1.4.01.01.007').saldoAnt) - Math.abs(jg('1.1.7.02.01.001').saldoAnt)) : 0;
   const cpCA = [
@@ -1415,21 +1421,27 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
     enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu, netAcc2.atu - netAcc2.ant, janSt2CA),
   ];
   const lpCA = lpSubs.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu, s.atu - s.ant, jst(s.conta)));
-  const rollCA = (rows: { saldoAtu: number; deltaMes: number; deltaYTD: number; captAnual: number; amortAnual: number }[]) =>
-    rows.reduce((a, r) => ({ saldoAtu: a.saldoAtu+r.saldoAtu, deltaMes: a.deltaMes+r.deltaMes, deltaYTD: a.deltaYTD+r.deltaYTD, captAnual: a.captAnual+r.captAnual, amortAnual: a.amortAnual+r.amortAnual }), { saldoAtu: 0, deltaMes: 0, deltaYTD: 0, captAnual: 0, amortAnual: 0 });
+  const rollCA = (rows: { saldoAtu: number; captMes: number; amortMes: number; captYTD: number; amortYTD: number; captAnual: number; amortAnual: number }[]) =>
+    rows.reduce((a, r) => ({
+      saldoAtu:   a.saldoAtu   + r.saldoAtu,
+      captMes:    a.captMes    + r.captMes,
+      amortMes:   a.amortMes   + r.amortMes,
+      captYTD:    a.captYTD    + r.captYTD,
+      amortYTD:   a.amortYTD   + r.amortYTD,
+      captAnual:  a.captAnual  + r.captAnual,
+      amortAnual: a.amortAnual + r.amortAnual,
+    }), { saldoAtu: 0, captMes: 0, amortMes: 0, captYTD: 0, amortYTD: 0, captAnual: 0, amortAnual: 0 });
   const cpTotCA = rollCA(cpCA);
   const lpTotCA = rollCA(lpCA);
-  const grandCA = { saldoAtu: totalAtu, deltaMes: cpTotCA.deltaMes+lpTotCA.deltaMes, deltaYTD: cpTotCA.deltaYTD+lpTotCA.deltaYTD, captAnual: cpTotCA.captAnual+lpTotCA.captAnual, amortAnual: cpTotCA.amortAnual+lpTotCA.amortAnual };
-  const movColsCA = (r: { deltaMes: number; deltaYTD: number; captAnual: number; amortAnual: number }, bold: boolean) => {
+  const grandCA = rollCA([...cpCA, ...lpCA]);
+  const movColsCA = (r: { captMes: number; amortMes: number; captYTD: number; amortYTD: number; captAnual: number; amortAnual: number }, bold: boolean) => {
     if (isMo) {
-      const cM = Math.max(0, r.deltaMes); const aM = Math.max(0, -r.deltaMes);
-      const cY = Math.max(0, r.deltaYTD); const aY = Math.max(0, -r.deltaYTD);
       return <>
-        <td className={cn('py-2.5 px-3 text-right text-sm font-mono border-l border-border/40', cM > 0 ? cn('text-red-600 dark:text-red-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{cM > 0 ? fmtBRL(cM) : '—'}</td>
-        <td className={cn('py-2.5 px-3 text-right text-sm font-mono', aM > 0 ? cn('text-emerald-600 dark:text-emerald-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{aM > 0 ? fmtBRL(aM) : '—'}</td>
+        <td className={cn('py-2.5 px-3 text-right text-sm font-mono border-l border-border/40', r.captMes > 0 ? cn('text-red-600 dark:text-red-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{r.captMes > 0 ? fmtBRL(r.captMes) : '—'}</td>
+        <td className={cn('py-2.5 px-3 text-right text-sm font-mono', r.amortMes > 0 ? cn('text-emerald-600 dark:text-emerald-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{r.amortMes > 0 ? fmtBRL(r.amortMes) : '—'}</td>
         {CA_hasYTD && <>
-          <td className={cn('py-2.5 px-3 text-right text-sm font-mono border-l border-border/40', cY > 0 ? cn('text-red-600 dark:text-red-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{cY > 0 ? fmtBRL(cY) : '—'}</td>
-          <td className={cn('py-2.5 px-3 text-right text-sm font-mono', aY > 0 ? cn('text-emerald-600 dark:text-emerald-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{aY > 0 ? fmtBRL(aY) : '—'}</td>
+          <td className={cn('py-2.5 px-3 text-right text-sm font-mono border-l border-border/40', r.captYTD > 0 ? cn('text-red-600 dark:text-red-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{r.captYTD > 0 ? fmtBRL(r.captYTD) : '—'}</td>
+          <td className={cn('py-2.5 px-3 text-right text-sm font-mono', r.amortYTD > 0 ? cn('text-emerald-600 dark:text-emerald-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{r.amortYTD > 0 ? fmtBRL(r.amortYTD) : '—'}</td>
         </>}
       </>;
     }
