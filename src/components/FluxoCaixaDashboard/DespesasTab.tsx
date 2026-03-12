@@ -274,28 +274,12 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
                     </div>
                   </div>
                   <div className="text-right">
-                    {(showYTD && canShowYTD) ? (
-                      <div className="flex gap-4 items-start">
-                        <div>
-                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">Mês</div>
-                          <div className={`text-sm font-bold font-mono ${grupo.totalColor}`}>{fmtBRL(grupo.total)}</div>
-                          <div className={`text-xs font-semibold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${grupo.badgeBg}`}>{grupo.pct.toFixed(1)}%</div>
-                        </div>
-                        <div>
-                          <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">{ytdLabel}</div>
-                          <div className={`text-sm font-bold font-mono ${grupo.totalColor}`}>{fmtBRL(grupo.totalYTD)}</div>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className={`text-sm font-bold font-mono ${grupo.totalColor}`}>
-                          {fmtBRL(grupo.total)}
-                        </div>
-                        <div className={`text-xs font-semibold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${grupo.badgeBg}`}>
-                          {grupo.pct.toFixed(1)}%
-                        </div>
-                      </>
-                    )}
+                    <div className={`text-sm font-bold font-mono ${grupo.totalColor}`}>
+                      {fmtBRL(grupo.total)}
+                    </div>
+                    <div className={`text-xs font-semibold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${grupo.badgeBg}`}>
+                      {grupo.pct.toFixed(1)}%
+                    </div>
                   </div>
                 </div>
 
@@ -310,7 +294,6 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
                       <tbody>
                         {grupo.itens.map(([tipo, valor], i) => {
                           const pctItem = grupo.total !== 0 ? (valor / grupo.total) * 100 : 0;
-                          const ytdVal = resumoMapYTD[tipo] ?? 0;
                           return (
                             <tr
                               key={tipo}
@@ -325,11 +308,6 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
                               <td className="py-2 pl-2 pr-4 text-right text-sm font-mono font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
                                 {fmtBRL(valor)}
                               </td>
-                              {(showYTD && canShowYTD) && (
-                                <td className="py-2 pl-2 pr-4 text-right text-sm font-mono font-semibold text-red-600/70 dark:text-red-400/70 whitespace-nowrap border-l border-border/30">
-                                  {fmtBRL(ytdVal)}
-                                </td>
-                              )}
                             </tr>
                           );
                         })}
@@ -343,11 +321,6 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
                           <td className={`py-2 pr-4 text-right text-sm font-mono font-bold ${grupo.totalColor} whitespace-nowrap`}>
                             {fmtBRL(grupo.total)}
                           </td>
-                          {(showYTD && canShowYTD) && (
-                            <td className={`py-2 pr-4 text-right text-sm font-mono font-bold ${grupo.totalColor} whitespace-nowrap border-l border-border/30`}>
-                              {fmtBRL(grupo.totalYTD)}
-                            </td>
-                          )}
                         </tr>
                       </tfoot>
                     </table>
@@ -409,6 +382,100 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
           </Card>
         </div>
       )}
+
+      {/* ── Acumulado YTD (seção duplicada abaixo) ── */}
+      {(showYTD && canShowYTD && resumoRows.length > 0) && (() => {
+        const totalGeralYTD = gruposData.reduce((s, g) => s + g.totalYTD, 0);
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-base font-semibold text-foreground">Resumo por Grupo de Despesa</span>
+              <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded-full">— acumulado {ytdLabel}</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {gruposData.map((grupo, idx) => {
+                const ytdItens = gruposData[idx].itens
+                  .map(([tipo]) => [tipo, resumoMapYTD[tipo] ?? 0] as [string, number])
+                  .filter(([, v]) => v !== 0)
+                  .sort((a, b) => b[1] - a[1]);
+                const ytdTotal = gruposData[idx].totalYTD;
+                const ytdPct = totalGeralYTD !== 0 ? (ytdTotal / totalGeralYTD) * 100 : 0;
+                if (ytdTotal === 0) return null;
+                return (
+                  <Card key={grupo.id} className={`overflow-hidden shadow-sm ${grupo.borderClass}${gruposData.filter(g => g.totalYTD !== 0).length % 2 !== 0 && idx === gruposData.length - 1 ? ' md:col-span-2' : ''}`}>
+                    <div className={`px-4 py-3 ${grupo.headerBg} flex items-start justify-between`}>
+                      <div className={`flex items-center gap-2 font-semibold text-sm ${grupo.headerText}`}>
+                        <span className="text-base">{grupo.icon}</span>
+                        {grupo.label}
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-sm font-bold font-mono ${grupo.totalColor}`}>{fmtBRL(ytdTotal)}</div>
+                        <div className={`text-xs font-semibold mt-0.5 px-1.5 py-0.5 rounded-full inline-block ${grupo.badgeBg}`}>{ytdPct.toFixed(1)}%</div>
+                      </div>
+                    </div>
+                    <CardContent className="p-0">
+                      {ytdItens.length === 0 ? (
+                        <div className="py-4 px-4 text-xs text-muted-foreground italic">Nenhuma despesa classificada neste grupo</div>
+                      ) : (
+                        <table className="w-full">
+                          <tbody>
+                            {ytdItens.map(([tipo, valor], i) => {
+                              const pctItem = ytdTotal !== 0 ? (valor / ytdTotal) * 100 : 0;
+                              return (
+                                <tr key={tipo} className={`${grupo.rowHover} transition-colors ${i < ytdItens.length - 1 ? 'border-b border-border/40' : ''}`}>
+                                  <td className="py-2 pl-4 pr-2 text-sm text-foreground w-full">{tipo}</td>
+                                  <td className="py-2 px-2 text-right text-xs text-muted-foreground whitespace-nowrap">{pctItem.toFixed(1)}%</td>
+                                  <td className="py-2 pl-2 pr-4 text-right text-sm font-mono font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">{fmtBRL(valor)}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className={`border-t border-border/50 ${grupo.headerBg}`}>
+                              <td className={`py-2 pl-4 text-xs font-bold uppercase tracking-wide ${grupo.headerText}`}>Total</td>
+                              <td></td>
+                              <td className={`py-2 pr-4 text-right text-sm font-mono font-bold ${grupo.totalColor} whitespace-nowrap`}>{fmtBRL(ytdTotal)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+            {/* Barra de composição acumulado */}
+            <Card className="shadow-sm">
+              <CardContent className="py-3 px-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Composição do Total Acumulado</span>
+                  <span className="text-sm font-bold font-mono text-red-600 dark:text-red-400">{fmtBRL(totalGeralYTD)}</span>
+                </div>
+                <div className="flex h-3 rounded-full overflow-hidden gap-px">
+                  {gruposData.filter(g => g.totalYTD > 0).map((g) => {
+                    const barColors: Record<string, string> = { pessoal:'bg-blue-500', veiculosEstoque:'bg-cyan-500', imoveis:'bg-amber-500', terceiros:'bg-violet-500', financeiras:'bg-rose-500', marketing:'bg-pink-500', outras:'bg-slate-400' };
+                    const pct = totalGeralYTD !== 0 ? (g.totalYTD / totalGeralYTD) * 100 : 0;
+                    return <div key={g.id} title={`${g.label}: ${pct.toFixed(1)}%`} className={`${barColors[g.id]} transition-all`} style={{ width: `${pct}%` }} />;
+                  })}
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                  {gruposData.filter(g => g.totalYTD > 0).map((g) => {
+                    const dotColors: Record<string, string> = { pessoal:'bg-blue-500', veiculosEstoque:'bg-cyan-500', imoveis:'bg-amber-500', terceiros:'bg-violet-500', financeiras:'bg-rose-500', marketing:'bg-pink-500', outras:'bg-slate-400' };
+                    const pct = totalGeralYTD !== 0 ? (g.totalYTD / totalGeralYTD) * 100 : 0;
+                    return (
+                      <div key={g.id} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className={`w-2.5 h-2.5 rounded-full inline-block ${dotColors[g.id]}`} />
+                        {g.label}
+                        <span className="font-semibold text-foreground">{pct.toFixed(1)}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* Botão toggle no topo da área branca */}
       <div>
