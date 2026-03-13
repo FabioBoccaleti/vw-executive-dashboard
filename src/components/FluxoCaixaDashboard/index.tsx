@@ -442,10 +442,12 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   };
 
   // Ano e mês selecionados — lidos do localStorage para sobreviver a recarregamentos
-  const [selectedYear, setSelectedYearState] = useState<2025 | 2026>(() => {
+  const AVAILABLE_YEARS = [2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028];
+  const [selectedYear, setSelectedYearState] = useState<number>(() => {
     try {
       const stored = localStorage.getItem('fluxo_caixa_selected_year');
-      return (stored === '2026' ? 2026 : 2025) as 2025 | 2026;
+      const n = stored ? parseInt(stored, 10) : NaN;
+      return AVAILABLE_YEARS.includes(n) ? n : 2025;
     } catch {
       return 2025;
     }
@@ -460,7 +462,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     }
   });
 
-  const setSelectedYear = (year: 2025 | 2026) => {
+  const setSelectedYear = (year: number) => {
     try { localStorage.setItem('fluxo_caixa_selected_year', String(year)); } catch {}
     setSelectedYearState(year);
   };
@@ -658,12 +660,13 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             {/* Seletor de ano */}
             <select
               value={selectedYear}
-              onChange={e => setSelectedYear(Number(e.target.value) as 2025 | 2026)}
+              onChange={e => setSelectedYear(Number(e.target.value))}
               className="appearance-none bg-white text-green-700 font-bold text-sm rounded-lg px-3 py-1.5 pr-8 border border-green-200 shadow-sm cursor-pointer focus:outline-none"
               style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2316a34a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
             >
-              <option value={2025}>2025</option>
-              <option value={2026}>2026</option>
+              {AVAILABLE_YEARS.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
             </select>
             {/* Seletor de mês */}
             <select
