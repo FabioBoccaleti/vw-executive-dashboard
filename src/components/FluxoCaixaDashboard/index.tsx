@@ -9,6 +9,7 @@ import { loadFluxoCaixaRaw, saveFluxoCaixaData } from "./fluxoCaixaStorage";
 import { ComparativosTab } from "./ComparativosTab";
 import { DespesasTab } from "./DespesasTab";
 import { ComparativoReceitas } from "./ComparativoReceitas";
+import { ProjecaoCaixaChart } from "./ProjecaoCaixaChart";
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
 function parseBalancete(text: string) {
@@ -2888,6 +2889,8 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
         </p>
         </CardContent>
       </Card>
+
+      <ProjecaoCaixaChart currentYear={selectedYear} currentMonth={selectedMonth} />
     </div>
   );
 }
