@@ -82,6 +82,7 @@ export const GRUPOS_RECEITA_CONFIG: GrupoReceitaConfig[] = [
       { conta: '3.1.3.01.01.004', desc: 'Vendas Internas Audi' },
       { conta: '3.1.3.01.01.005', desc: 'Venda Garantia - VW' },
       { conta: '3.1.3.01.01.006', desc: 'Venda Garantia - Audi' },
+      { conta: '3.6.1.01.02.001', desc: 'Venda de Veículos de Uso Firma' },
     ],
   },
   {

@@ -1141,6 +1141,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
           '3.1.3.01.01.004',
           '3.1.3.01.01.005',
           '3.1.3.01.01.006',
+          '3.6.1.01.02.001',
         ]),
       ],
     },
