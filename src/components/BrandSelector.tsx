@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { BRAND_CONFIGS, type Brand } from '@/lib/brands';
 import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, Settings, LogOut } from 'lucide-react';
 import { PasswordDialog } from '@/components/PasswordDialog';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Sub-marcas do Demonstrativo de Resultados
 const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
@@ -32,6 +33,21 @@ interface BrandSelectorProps {
 }
 
 export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLogout }: BrandSelectorProps) {
+  const { canAccessModule, canAccessBrand } = useAuth();
+
+  // Filtra marcas do demonstrativo conforme permissões
+  const allowedDemonstrativobrands = DEMONSTRATIVO_BRANDS.filter(b =>
+    canAccessModule('demonstrativo') && canAccessBrand(b as any)
+  );
+  const showDemonstrativo = canAccessModule('demonstrativo');
+  const showDespesas = canAccessModule('despesas');
+  const showFluxoCaixa = canAccessModule('fluxo_caixa');
+  const allowedDirectBrands = DIRECT_BRANDS.filter(b => {
+    if (b === 'aprovacao_despesas') return showDespesas;
+    if (b === 'fluxo_caixa') return showFluxoCaixa;
+    return false;
+  });
+
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(currentBrand || null);
   const [hoveredBrand, setHoveredBrand] = useState<Brand | null>(null);
   const [demonstrativoExpanded, setDemonstrativoExpanded] = useState<boolean>(
@@ -113,7 +129,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
         <div className="grid grid-cols-1 gap-3 mb-8">
 
           {/* Demonstrativo de Resultados */}
-          <Card
+          {showDemonstrativo && (
             className={`transition-all duration-300 h-full ${
               demonstrativoExpanded || isDemonstrativoSelected
                 ? 'ring-2 ring-offset-2 shadow-lg'
@@ -153,7 +169,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
             {/* Sub-marcas dentro do card */}
             {demonstrativoExpanded && (
               <div className="px-3 pb-4 grid grid-cols-5 gap-2 animate-in fade-in slide-in-from-top-2 duration-300 border-t border-slate-100 pt-3">
-                {DEMONSTRATIVO_BRANDS.map((brand) => {
+                {allowedDemonstrativobrands.map((brand) => {
                   const config = BRAND_CONFIGS[brand];
                   const isSelected = selectedBrand === brand;
                   const isHovered = hoveredBrand === brand;
@@ -202,9 +218,10 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
               </div>
             )}
           </Card>
+          )}
 
           {/* Categorias diretas */}
-          {DIRECT_BRANDS.map((brand) => {
+          {allowedDirectBrands.map((brand) => {
             const config = BRAND_CONFIGS[brand];
             const isSelected = selectedBrand === brand;
             const isHovered = hoveredBrand === brand;
