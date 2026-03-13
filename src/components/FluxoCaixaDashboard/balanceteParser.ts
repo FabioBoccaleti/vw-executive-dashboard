@@ -42,6 +42,9 @@ export function analyzeAccounts(accounts: Record<string, any>) {
   // PASSIVO CIRCULANTE
   const passCirc = { ant: absAnt('2.1'), atu: absAtu('2.1') };
   const emprestCP = { ant: absAnt('2.1.1'), atu: absAtu('2.1.1') };
+  // 2.1.1 dividido: 01 = Fornecedores (operacional) · 02 = Financiamentos CP (financiamento)
+  const emprestCP_01 = { ant: absAnt('2.1.1.01'), atu: absAtu('2.1.1.01') }; // Fornecedores → operacional
+  const emprestCP_02 = { ant: absAnt('2.1.1.02'), atu: absAtu('2.1.1.02') }; // Financiamentos CP → financiamento
   const obrigTrab = { ant: absAnt('2.1.2.01'), atu: absAtu('2.1.2.01') };
   const obrigTrib = { ant: absAnt('2.1.2.02'), atu: absAtu('2.1.2.02') };
   const contasPagar = { ant: absAnt('2.1.2.03'), atu: absAtu('2.1.2.03') };
@@ -109,7 +112,8 @@ export function analyzeAccounts(accounts: Record<string, any>) {
     deprec_per +
     ajusteEstoque + ajusteCred +
     ajusteDespAntec +
-    ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag;
+    ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag
+    + dEmprestCP_01; // Fornecedores 2.1.1.01 → operacional
 
   // ── Atividades de Investimento ────────────────────────────────────────────
   const dIntangivel   = intangivel.atu   - intangivel.ant;
@@ -119,7 +123,9 @@ export function analyzeAccounts(accounts: Record<string, any>) {
                     - dRealizLPCred;
 
   // ── Atividades de Financiamento ─────────────────────────────────────────────
-  const dEmprestCP  = emprestCP.atu  - emprestCP.ant;
+  const dEmprestCP  = emprestCP.atu  - emprestCP.ant; // total 2.1.1 (referência)
+  const dEmprestCP_01 = emprestCP_01.atu - emprestCP_01.ant; // Fornecedores → operacional
+  const dEmprestCP_02 = emprestCP_02.atu - emprestCP_02.ant; // Financiamentos CP → financiamento
   const dEmprestLP  = emprestLP.atu  - emprestLP.ant;
   const dPessoasLig = pessoasLig.atu - pessoasLig.ant;
   const dDebitosLig = debitosLig.atu - debitosLig.ant;
@@ -128,7 +134,7 @@ export function analyzeAccounts(accounts: Record<string, any>) {
   // NOTA: 2.2.2 (Receitas Diferidas) excluída do financiamento — contém ICMS ST Diferido (não-caixa)
 
   const fluxoFinanc =
-    dEmprestCP  +
+    dEmprestCP_02 +
     dEmprestLP  +
     dPessoasLig +
     dDebitosLig +
@@ -162,9 +168,11 @@ export function analyzeAccounts(accounts: Record<string, any>) {
       ajusteEstoque, ajusteCred, ajusteDespAntec, ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
       fluxoOper, fluxoInvest, fluxoFinanc, fluxoTotal, varCaixaReal,
       dEstoque, dCred, dDespAntec, dFornec, dObrigTrib, dObrigTrab, dContasPag,
-      dEmprestCP, dEmprestLP, dPessoasLig, dDebitosLig, dArrendLP,
+      dEmprestCP, dEmprestCP_01, dEmprestCP_02, dEmprestLP, dPessoasLig, dDebitosLig, dArrendLP,
       dIntangivel, dRealizLPCred,
       emprestCPAnt: emprestCP.ant, emprestCPAtu: emprestCP.atu,
+      emprestCP_01Ant: emprestCP_01.ant, emprestCP_01Atu: emprestCP_01.atu,
+      emprestCP_02Ant: emprestCP_02.ant, emprestCP_02Atu: emprestCP_02.atu,
       emprestLPAnt: emprestLP.ant, emprestLPAtu: emprestLP.atu,
       pessoasLigAnt: pessoasLig.ant, pessoasLigAtu: pessoasLig.atu,
       debitosLigAnt: debitosLig.ant, debitosLigAtu: debitosLig.atu,
