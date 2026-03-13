@@ -163,7 +163,12 @@ function extractMetrics(rawText: string): ComparativoMetrics {
   const rendOper      = get('3.4').valCred;
   const rendFinanc    = get('3.5').valCred;
   const rendNaoOper   = get('3.6').valCred;
-  const despOper5Net  = (get('5').valDeb || 0) - (get('5').valCred || 0);
+  // Despesas grupo 5 — soma das contas-folha usando valDeb−valCred (mesmo método
+  // do ResultadoTab "Mês"). A conta-pai '5' pode não existir no balancete ou
+  // conter valor diferente da soma das sub-contas, causando despesas subestimadas.
+  const allKeys5_dre = Object.keys(acc).filter(k => k.startsWith('5.'));
+  const leaves5_dre  = allKeys5_dre.filter(k => !allKeys5_dre.some(o => o !== k && o.startsWith(k + '.')));
+  const despOper5Net  = leaves5_dre.reduce((s, k) => s + (get(k).valDeb - get(k).valCred), 0);
   const deprec_per    = get('5.5.2.07.20').valDeb;
   const provisaoIR    = get('6').valDeb;
   const resultadoAntesIR = lucBruto + rendOper + rendFinanc + rendNaoOper - despOper5Net;

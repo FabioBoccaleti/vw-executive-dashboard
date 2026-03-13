@@ -78,6 +78,10 @@ export function analyzeAccounts(accounts: Record<string, any>) {
   const despPessoal_per = get('2.1.2.01.01').valCred;
   const despFinanc_per = get('5.5.7').valDeb;
   const deprec_per = get('5.5.2.07.20').valDeb;
+  // despOper5Net — soma folhas de '5.' (conta-pai '5' pode não existir ou ter valor parcial)
+  const allKeys5_bp = Object.keys(accounts).filter(k => k.startsWith('5.'));
+  const leaves5_bp  = allKeys5_bp.filter(k => !allKeys5_bp.some(o => o !== k && o.startsWith(k + '.')));
+  const despOper5Net_bp = leaves5_bp.reduce((s, k) => s + ((get(k).valDeb || 0) - (get(k).valCred || 0)), 0);
 
   // PROVISÃO IR + CSLL
   const provisaoIR = { saldo: get('6').valDeb };

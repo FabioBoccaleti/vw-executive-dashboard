@@ -158,7 +158,11 @@ function parseBalancete(text: string) {
   // Resultado Líquido via movimentação Déb/Créd — NBC TG 03 / IAS 7
   // absMov: captura o movimento líquido do período (valCred - valDeb para crédito; valDeb - valCred para débito)
   const absMov = (id: string) => { const a = get(id); return Math.abs((a.valCred || 0) - (a.valDeb || 0)); };
-  const despOper5Net = (get('5').valDeb || 0) - (get('5').valCred || 0);
+  // despOper5Net — soma folhas de '5.' com valDeb−valCred (a conta-pai '5' pode não
+  // existir no balancete ou ter valor diferente da soma das sub-contas)
+  const allKeys5_dfc = Object.keys(accounts).filter(k => k.startsWith('5.'));
+  const leaves5_dfc  = allKeys5_dfc.filter(k => !allKeys5_dfc.some(o => o !== k && o.startsWith(k + '.')));
+  const despOper5Net = leaves5_dfc.reduce((s, k) => s + ((get(k).valDeb || 0) - (get(k).valCred || 0)), 0);
   const resLiq_dfc   = absMov('3.1') - absMov('3.2') - absMov('3.3')
                      - absMov('4') - despOper5Net
                      + absMov('3.4') + absMov('3.5') + absMov('3.6') - absMov('6');
