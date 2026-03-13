@@ -1,13 +1,3 @@
-/**
- * BrandSelector - Componente de seleção de marca
- *
- * Tela inicial para seleção da marca antes de entrar no dashboard.
- * Menu principal com 3 categorias:
- *   1. Demonstrativo de Resultados → expande sub-opções de marcas
- *   2. Sistema de Gerenciamento e Aprovação de Despesas
- *   3. Fluxo de Caixa
- */
-
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,13 +6,8 @@ import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarS
 import { PasswordDialog } from '@/components/PasswordDialog';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Sub-marcas do Demonstrativo de Resultados
 const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
-
-// Opções diretas (sem sub-marcas)
 const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa'];
-
-// Marcas que requerem senha para acesso
 const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa'];
 
 interface BrandSelectorProps {
@@ -35,16 +20,14 @@ interface BrandSelectorProps {
 export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLogout }: BrandSelectorProps) {
   const { canAccessModule, canAccessBrand } = useAuth();
 
-  // Filtra marcas do demonstrativo conforme permissões
-  const allowedDemonstrativobrands = DEMONSTRATIVO_BRANDS.filter(b =>
-    canAccessModule('demonstrativo') && canAccessBrand(b as any)
-  );
   const showDemonstrativo = canAccessModule('demonstrativo');
-  const showDespesas = canAccessModule('despesas');
-  const showFluxoCaixa = canAccessModule('fluxo_caixa');
+  const showDespesas      = canAccessModule('despesas');
+  const showFluxoCaixa    = canAccessModule('fluxo_caixa');
+
+  const allowedDemoBrands = DEMONSTRATIVO_BRANDS.filter(b => canAccessBrand(b as any));
   const allowedDirectBrands = DIRECT_BRANDS.filter(b => {
     if (b === 'aprovacao_despesas') return showDespesas;
-    if (b === 'fluxo_caixa') return showFluxoCaixa;
+    if (b === 'fluxo_caixa')        return showFluxoCaixa;
     return false;
   });
 
@@ -64,10 +47,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
     });
   };
 
-  const handleSelectBrand = (brand: Brand) => {
-    setSelectedBrand(brand);
-  };
-
+  const handleSelectBrand  = (brand: Brand) => setSelectedBrand(brand);
   const handleSelectDirect = (brand: Brand) => {
     if (demonstrativoExpanded) setDemonstrativoExpanded(false);
     setSelectedBrand(brand);
@@ -87,10 +67,10 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
   };
 
   const getBrandIcon = (brand: Brand, size = 'w-8 h-8') => {
-    if (brand === 'consolidado') return <Layers className={size} />;
+    if (brand === 'consolidado')       return <Layers className={size} />;
     if (brand === 'aprovacao_despesas') return <CheckCircle className={size} />;
-    if (brand === 'fluxo_caixa') return <DollarSign className={size} />;
-    if (brand.includes('vw')) return <Car className={size} />;
+    if (brand === 'fluxo_caixa')       return <DollarSign className={size} />;
+    if (brand.includes('vw'))          return <Car className={size} />;
     return <Building2 className={size} />;
   };
 
@@ -125,99 +105,97 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
           </div>
         )}
 
-        {/* ── 3 categorias em linha ── */}
         <div className="grid grid-cols-1 gap-3 mb-8">
 
           {/* Demonstrativo de Resultados */}
           {showDemonstrativo && (
-            className={`transition-all duration-300 h-full ${
-              demonstrativoExpanded || isDemonstrativoSelected
-                ? 'ring-2 ring-offset-2 shadow-lg'
-                : 'hover:shadow-md cursor-pointer'
-            }`}
-            style={{
-              ['--tw-ring-color' as any]: '#4f46e5',
-              borderColor: demonstrativoExpanded || isDemonstrativoSelected ? '#4f46e5' : undefined,
-            }}
-          >
-            {/* Cabeçalho clicável */}
-            <CardContent
-              className="p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer"
-              style={{ minHeight: demonstrativoExpanded ? undefined : '140px' }}
-              onClick={handleToggleDemonstrativo}
+            <Card
+              className={`transition-all duration-300 h-full ${
+                demonstrativoExpanded || isDemonstrativoSelected
+                  ? 'ring-2 ring-offset-2 shadow-lg'
+                  : 'hover:shadow-md cursor-pointer'
+              }`}
+              style={{
+                ['--tw-ring-color' as any]: '#4f46e5',
+                borderColor: demonstrativoExpanded || isDemonstrativoSelected ? '#4f46e5' : undefined,
+              }}
             >
-              <div
-                className="p-3 rounded-full transition-colors duration-300"
-                style={{
-                  backgroundColor: demonstrativoExpanded || isDemonstrativoSelected ? '#ede9fe' : '#f1f5f9',
-                  color: '#4f46e5',
-                }}
+              <CardContent
+                className="p-5 flex flex-col items-center justify-center gap-3 text-center cursor-pointer"
+                style={{ minHeight: demonstrativoExpanded ? undefined : '140px' }}
+                onClick={handleToggleDemonstrativo}
               >
-                <BarChart2 className="w-8 h-8" />
-              </div>
-              <h3
-                className="text-base font-bold transition-colors duration-300"
-                style={{ color: demonstrativoExpanded || isDemonstrativoSelected ? '#4f46e5' : '#334155' }}
-              >
-                Demonstrativo de Resultados
-              </h3>
-              <ChevronDown
-                className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${demonstrativoExpanded ? 'rotate-180' : ''}`}
-              />
-            </CardContent>
+                <div
+                  className="p-3 rounded-full transition-colors duration-300"
+                  style={{
+                    backgroundColor: demonstrativoExpanded || isDemonstrativoSelected ? '#ede9fe' : '#f1f5f9',
+                    color: '#4f46e5',
+                  }}
+                >
+                  <BarChart2 className="w-8 h-8" />
+                </div>
+                <h3
+                  className="text-base font-bold transition-colors duration-300"
+                  style={{ color: demonstrativoExpanded || isDemonstrativoSelected ? '#4f46e5' : '#334155' }}
+                >
+                  Demonstrativo de Resultados
+                </h3>
+                <ChevronDown
+                  className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${demonstrativoExpanded ? 'rotate-180' : ''}`}
+                />
+              </CardContent>
 
-            {/* Sub-marcas dentro do card */}
-            {demonstrativoExpanded && (
-              <div className="px-3 pb-4 grid grid-cols-5 gap-2 animate-in fade-in slide-in-from-top-2 duration-300 border-t border-slate-100 pt-3">
-                {allowedDemonstrativobrands.map((brand) => {
-                  const config = BRAND_CONFIGS[brand];
-                  const isSelected = selectedBrand === brand;
-                  const isHovered = hoveredBrand === brand;
-                  return (
-                    <Card
-                      key={brand}
-                      className={`cursor-pointer transition-all duration-200 ${
-                        isSelected ? 'ring-2 ring-offset-1 shadow-md' : 'hover:shadow-md'
-                      }`}
-                      style={{
-                        borderColor: isSelected ? config.colors.primary : undefined,
-                        ['--tw-ring-color' as any]: config.colors.primary,
-                      }}
-                      onClick={() => handleSelectBrand(brand)}
-                      onMouseEnter={() => setHoveredBrand(brand)}
-                      onMouseLeave={() => setHoveredBrand(null)}
-                    >
-                      <CardContent className="p-2 flex flex-col items-center justify-center gap-1 text-center min-h-[90px]">
-                        <div
-                          className="p-2 rounded-full transition-colors duration-200"
-                          style={{
-                            backgroundColor: isSelected || isHovered ? config.colors.primaryLight : '#f1f5f9',
-                            color: config.colors.primary,
-                          }}
-                        >
-                          {getBrandIcon(brand, 'w-5 h-5')}
-                        </div>
-                        <h3
-                          className="text-xs font-bold"
-                          style={{ color: isSelected || isHovered ? config.colors.primary : '#334155' }}
-                        >
-                          {config.name}
-                        </h3>
-                        {isSelected && (
+              {demonstrativoExpanded && (
+                <div className="px-3 pb-4 grid grid-cols-5 gap-2 animate-in fade-in slide-in-from-top-2 duration-300 border-t border-slate-100 pt-3">
+                  {allowedDemoBrands.map((brand) => {
+                    const config = BRAND_CONFIGS[brand];
+                    const isSelected = selectedBrand === brand;
+                    const isHovered = hoveredBrand === brand;
+                    return (
+                      <Card
+                        key={brand}
+                        className={`cursor-pointer transition-all duration-200 ${
+                          isSelected ? 'ring-2 ring-offset-1 shadow-md' : 'hover:shadow-md'
+                        }`}
+                        style={{
+                          borderColor: isSelected ? config.colors.primary : undefined,
+                          ['--tw-ring-color' as any]: config.colors.primary,
+                        }}
+                        onClick={() => handleSelectBrand(brand)}
+                        onMouseEnter={() => setHoveredBrand(brand)}
+                        onMouseLeave={() => setHoveredBrand(null)}
+                      >
+                        <CardContent className="p-2 flex flex-col items-center justify-center gap-1 text-center min-h-[90px]">
                           <div
-                            className="px-1.5 py-0.5 rounded-full text-xs font-semibold text-white"
-                            style={{ backgroundColor: config.colors.primary }}
+                            className="p-2 rounded-full transition-colors duration-200"
+                            style={{
+                              backgroundColor: isSelected || isHovered ? config.colors.primaryLight : '#f1f5f9',
+                              color: config.colors.primary,
+                            }}
                           >
-                            Selecionado
+                            {getBrandIcon(brand, 'w-5 h-5')}
                           </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
+                          <h3
+                            className="text-xs font-bold"
+                            style={{ color: isSelected || isHovered ? config.colors.primary : '#334155' }}
+                          >
+                            {config.name}
+                          </h3>
+                          {isSelected && (
+                            <div
+                              className="px-1.5 py-0.5 rounded-full text-xs font-semibold text-white"
+                              style={{ backgroundColor: config.colors.primary }}
+                            >
+                              Selecionado
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
           )}
 
           {/* Categorias diretas */}
@@ -298,7 +276,6 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
         description={`O acesso a ${selectedBrand ? BRAND_CONFIGS[selectedBrand].name : ''} requer autorização. Digite a senha para continuar:`}
       />
 
-      {/* Botão Admin fixo no canto inferior direito - visível apenas para admins */}
       {onAdminClick && (
         <button
           onClick={onAdminClick}
