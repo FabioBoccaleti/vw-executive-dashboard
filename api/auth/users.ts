@@ -1,14 +1,12 @@
-import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
-import { promisify } from 'util';
+import { pbkdf2Sync, randomBytes } from 'crypto';
 import { randomUUID } from 'crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { UserRecord } from './_helpers';
 
-const scryptAsync = promisify(scrypt);
-async function hashPassword(password: string): Promise<string> {
+function hashPassword(password: string): string {
   const salt = randomBytes(16).toString('hex');
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString('hex')}.${salt}`;
+  const key = pbkdf2Sync(password, salt, 100_000, 64, 'sha512');
+  return `${key.toString('hex')}.${salt}`;
 }
 import {
   requireAdmin, listUsers, getUserById, saveUser, deleteUser,
@@ -48,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(409).json({ error: 'Usuário já existe' });
       }
 
-      const passwordHash = await hashPassword(password);
+      const passwordHash = hashPassword(password);
       const user: UserRecord = {
         id: randomUUID(),
         name,
@@ -86,7 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         updatedAt: Date.now(),
       };
       if (password) {
-        updated.passwordHash = await hashPassword(password);
+        updated.passwordHash = hashPassword(password);
       }
       await saveUser(updated);
       const { passwordHash: _, ...publicUser } = updated;

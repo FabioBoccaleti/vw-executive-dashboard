@@ -1,94 +1,102 @@
-import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
-import { promisify } from 'util';
-import { randomUUID } from 'crypto';
+import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import {
-  ALL_MODULES, ALL_BRANDS, type UserRecord,
-  getUserByUsername, saveUser, createSession, appendLog, listUsers,
-} from './_helpers';
+import { Redis } from '@upstash/redis';
 
-const scryptAsync = promisify(scrypt);
-
-async function hashPassword(password: string): Promise<string> {
+function hashPassword(password: string): string {
   const salt = randomBytes(16).toString('hex');
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString('hex')}.${salt}`;
+  const key = pbkdf2Sync(password, salt, 100_000, 64, 'sha512');
+  return `${key.toString('hex')}.${salt}`;
 }
 
-async function verifyPassword(password: string, stored: string): Promise<boolean> {
+function verifyPassword(password: string, stored: string): boolean {
   try {
-    const [hashed, salt] = stored.split('.');
-    const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-    return timingSafeEqual(buf, Buffer.from(hashed, 'hex'));
+    const [hash, salt] = stored.split('.');
+    if (!hash || !salt) return false;
+    const key = pbkdf2Sync(password, salt, 100_000, 64, 'sha512');
+    const hashBuf = Buffer.from(hash, 'hex');
+    if (key.length !== hashBuf.length) return false;
+    return timingSafeEqual(key, hashBuf);
   } catch {
     return false;
   }
 }
 
-function setCors(res: VercelResponse) {
+const ALL_MODULES = ['demonstrativo', 'despesas', 'fluxo_caixa'];
+const ALL_BRANDS  = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST')    return res.status(405).json({ error: 'Method not allowed' });
 
   const { username, password } = req.body ?? {};
   if (!username || !password) {
     return res.status(400).json({ error: 'Usuário e senha são obrigatórios' });
   }
 
+  const redis = new Redis({
+    url:   process.env.KV_REST_API_URL!,
+    token: process.env.KV_REST_API_TOKEN!,
+  });
+
+  const SESSION_TTL = 60 * 60 * 8;
+  const USERS_KEY   = 'auth_users_list';
+  const userKey     = (id: string) => `auth_user_${id}`;
+  const sessionKey  = (t: string)  => `auth_session_${t}`;
+
   try {
-    // Verifica se é o primeiro acesso — cria admin padrão
-    const allUsers = await listUsers();
-    if (allUsers.length === 0) {
+    const rawIds = await redis.get<any>(USERS_KEY);
+    const ids: string[] = rawIds ? (typeof rawIds === 'string' ? JSON.parse(rawIds) : rawIds) : [];
+
+    if (ids.length === 0) {
       const initialPassword = process.env.ADMIN_INITIAL_PASSWORD ?? '1985';
-      const passwordHash = await hashPassword(initialPassword);
-      const adminUser: UserRecord = {
-        id: randomUUID(),
-        name: 'Controladoria Sorana',
-        username: 'controladoria@sorana.com.br',
-        passwordHash,
-        role: 'admin',
-        modules: ALL_MODULES,
-        brands: ALL_BRANDS,
-        active: true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+      const passwordHash = hashPassword(initialPassword);
+      const adminId = `admin_${Date.now()}`;
+      const adminUser = {
+        id: adminId, name: 'Controladoria Sorana',
+        username: 'controladoria@sorana.com.br', passwordHash,
+        role: 'admin', modules: ALL_MODULES, brands: ALL_BRANDS,
+        active: true, createdAt: Date.now(), updatedAt: Date.now(),
       };
-      await saveUser(adminUser);
+      await redis.set(userKey(adminId), JSON.stringify(adminUser));
+      await redis.set(USERS_KEY, JSON.stringify([adminId]));
     }
 
-    const user = await getUserByUsername(username);
-    if (!user || !user.active) {
+    const allIdsRaw = await redis.get<any>(USERS_KEY);
+    const allIds: string[] = allIdsRaw ? (typeof allIdsRaw === 'string' ? JSON.parse(allIdsRaw) : allIdsRaw) : [];
+
+    let foundUser: any = null;
+    for (const id of allIds) {
+      const raw = await redis.get<any>(userKey(id));
+      const u = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : null;
+      if (u && u.username.toLowerCase() === (username as string).toLowerCase()) {
+        foundUser = u; break;
+      }
+    }
+
+    if (!foundUser || !foundUser.active) {
       return res.status(401).json({ error: 'Usuário ou senha incorretos' });
     }
 
-    const valid = await verifyPassword(password, user.passwordHash);
-    if (!valid) {
+    if (!verifyPassword(password as string, foundUser.passwordHash)) {
       return res.status(401).json({ error: 'Usuário ou senha incorretos' });
     }
 
-    const token = await createSession(user);
-    await appendLog({ userId: user.id, username: user.username, action: 'login' });
+    const token = `${Date.now()}-${randomBytes(24).toString('hex')}`;
+    const session = {
+      userId: foundUser.id, username: foundUser.username, role: foundUser.role,
+      modules: foundUser.modules, brands: foundUser.brands,
+      expiresAt: Date.now() + SESSION_TTL * 1000,
+    };
+    await redis.setex(sessionKey(token), SESSION_TTL, JSON.stringify(session));
 
-    return res.status(200).json({
-      token,
-      session: {
-        userId: user.id,
-        username: user.username,
-        role: user.role,
-        modules: user.modules,
-        brands: user.brands,
-        expiresAt: Date.now() + 60 * 60 * 8 * 1000,
-      },
-    });
+    return res.status(200).json({ token, session });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('Login error:', msg);
+    console.error('[login] error:', msg);
     return res.status(500).json({ error: `Erro interno: ${msg}` });
   }
 }
