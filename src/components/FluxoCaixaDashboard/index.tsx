@@ -596,7 +596,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   }, [selectedYear, selectedMonth, savedFileKey]);
 
   const TABS = [
-    { id: 'overview', label: 'Visão Geral', icon: <BarChart3 className="w-4 h-4" />, requiresData: true },
+    { id: 'overview', label: selectedMonth === 0 ? 'Visão Geral Ano' : 'Visão Geral Mês', icon: <BarChart3 className="w-4 h-4" />, requiresData: true },
     { id: 'ativo', label: 'Ativo', icon: <Package className="w-4 h-4" />, requiresData: true },
     { id: 'passivo', label: 'Passivo + PL', icon: <Building2 className="w-4 h-4" />, requiresData: true },
     { id: 'resultado', label: 'Resultado', icon: <TrendingUp className="w-4 h-4" />, requiresData: true },
