@@ -3491,12 +3491,26 @@ function IndicadoresTab({ data, fmtBRL, SectionTitle, Badge, janAccounts, select
 
   if (hasAcum) {
     const cur = data.accounts as Record<string, any>;
-    const am = (id: string) => Math.abs(cur[id]?.saldoAtual || 0);
-    const despOper5_a  = Math.abs(cur['5']?.saldoAtual || 0);
-    const resLiq_a     = am('3.1') - am('3.2') - am('3.3') - am('4') - despOper5_a
-                       + am('3.4') + am('3.5') + am('3.6') - am('6');
-    const recLiq_a     = Math.max(am('3.1') - am('3.2') - am('3.3'), 1);
-    const CMV_a        = am('4');
+    const jan = janAccounts as Record<string, any>;
+
+    // Detecta se o balancete é cumulativo YTD (saldoAnt ≠ 0 para contas de resultado)
+    // Em balancetes cumulativos: saldoAtual = acumulado Jan–mês. Em mensais: saldoAtual = só o mês.
+    const isCumul = selectedMonth > 1 && Math.abs(cur['3.1']?.saldoAnt || 0) > 10;
+
+    // amAcum: para balancetes cumulativos, saldoAtual já é o YTD.
+    // Para balancetes mensais, soma Janeiro (janAccounts) + mês atual (cur).
+    const amAcum = (id: string) => isCumul
+      ? Math.abs(cur[id]?.saldoAtual || 0)
+      : Math.abs(jan[id]?.saldoAtual || 0) + Math.abs(cur[id]?.saldoAtual || 0);
+
+    const despOper5_a  = isCumul
+      ? Math.abs(cur['5']?.saldoAtual || 0)
+      : Math.abs(jan['5']?.saldoAtual || 0) + Math.abs(cur['5']?.saldoAtual || 0);
+
+    const resLiq_a     = amAcum('3.1') - amAcum('3.2') - amAcum('3.3') - amAcum('4') - despOper5_a
+                       + amAcum('3.4') + amAcum('3.5') + amAcum('3.6') - amAcum('6');
+    const recLiq_a     = Math.max(amAcum('3.1') - amAcum('3.2') - amAcum('3.3'), 1);
+    const CMV_a        = amAcum('4');
     roic_a = capInvestido !== 0 ? (resLiq_a / capInvestido) * 100 : 0;
     roe_a  = PLatu        !== 0 ? (resLiq_a / PLatu)        * 100 : 0;
     ros_a  = recLiq_a     !== 0 ? (resLiq_a / recLiq_a)    * 100 : 0;
