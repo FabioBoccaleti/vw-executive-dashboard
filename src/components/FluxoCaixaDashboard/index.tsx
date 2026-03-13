@@ -811,7 +811,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} despesasView={despesasView} setDespesasView={setDespesasView} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'parcelamentoRefis' && <ParcelamentoRefisTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
-              {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} />}
+              {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'diagnostico' && <DiagnosticoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
             </div>
           )}
@@ -3440,14 +3440,14 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
   );
 }
 
-function IndicadoresTab({ data, fmtBRL, SectionTitle, Badge }: any) {
+function IndicadoresTab({ data, fmtBRL, SectionTitle, Badge, janAccounts, selectedMonth, selectedYear }: any) {
   const ind = data.indicadores;
   const lqcStatus = ind.liqCorrente >= 1.5 ? 'ok' : ind.liqCorrente >= 1 ? 'warn' : 'bad';
   const lqiStatus = ind.liqImediata >= 0.2 ? 'ok' : ind.liqImediata >= 0.1 ? 'warn' : 'bad';
   const endStatus = ind.endivTotal <= 0.5 ? 'ok' : ind.endivTotal <= 0.7 ? 'warn' : 'bad';
   const pctStatus = ind.partCapTerceiros <= 2 ? 'ok' : ind.partCapTerceiros <= 4 ? 'warn' : 'bad';
 
-  // ── Novos indicadores ─────────────────────────────────────────────────────
+  // ── Base mensal ───────────────────────────────────────────────────────────
   const resLiq      = data.dfc.resLiq;
   const recLiqPer   = data.receitas.liq.per || 1;
   const PLatu       = data.PL.atu || 1;
@@ -3463,48 +3463,107 @@ function IndicadoresTab({ data, fmtBRL, SectionTitle, Badge }: any) {
   const ros         = recLiqPer    !== 0 ? (resLiq / recLiqPer)    * 100 : 0;
   const imobInvest  = ancPlusPNC   !== 0 ? (data.ativo.naoCirc.atu / ancPlusPNC) * 100 : 0;
   const taxaRisco   = data.ativo.circ.atu !== 0 ? passTotal / data.ativo.circ.atu : 0;
+  const margemBruta = ind.margemBruta;
 
-  const roicStatus      = roic > 10  ? 'ok' : roic >= 5   ? 'warn' : 'bad';
-  const roeStatus       = roe  > 15  ? 'ok' : roe  >= 5   ? 'warn' : 'bad';
-  const rosStatus       = ros  > 5   ? 'ok' : ros  >= 1   ? 'warn' : 'bad';
-  const imobInvestStatus = imobInvest <= 100 ? 'ok' : imobInvest <= 120 ? 'warn' : 'bad';
-  const taxaRiscoStatus  = taxaRisco  <= 1   ? 'ok' : taxaRisco  <= 1.5 ? 'warn' : 'bad';
+  const roicStatus       = roic > 10  ? 'ok' as const : roic >= 5   ? 'warn' as const : 'bad' as const;
+  const roeStatus        = roe  > 15  ? 'ok' as const : roe  >= 5   ? 'warn' as const : 'bad' as const;
+  const rosStatus        = ros  > 5   ? 'ok' as const : ros  >= 1   ? 'warn' as const : 'bad' as const;
+  const imobInvestStatus = imobInvest <= 100 ? 'ok' as const : imobInvest <= 120 ? 'warn' as const : 'bad' as const;
+  const taxaRiscoStatus  = taxaRisco  <= 1   ? 'ok' as const : taxaRisco  <= 1.5 ? 'warn' as const : 'bad' as const;
+  const margemBrutaStatus = margemBruta > 10 ? 'ok' as const : margemBruta >= 0 ? 'warn' as const : 'bad' as const;
 
-  const indicadores = [
-    { label: 'Liquidez Corrente', formula: 'AC / PC', value: `${ind.liqCorrente.toFixed(2)}x`, ref: '≥ 1,5x ideal', status: lqcStatus, desc: 'Mede a capacidade de pagar obrigações de curto prazo com ativos circulantes.' },
-    { label: 'Liquidez Imediata', formula: 'Disponib. / PC', value: `${(ind.liqImediata * 100).toFixed(1)}%`, ref: '≥ 20% aceitável', status: lqiStatus, desc: 'Percentual do passivo circulante coberto pelo caixa disponível imediatamente.' },
-    { label: 'Endividamento Geral', formula: 'PT / AT', value: `${(ind.endivTotal * 100).toFixed(1)}%`, ref: '≤ 50% saudável', status: endStatus, desc: 'Proporção do ativo financiada por capital de terceiros (dívidas).' },
-    { label: 'Participação Capital 3ºs', formula: 'PT / PL', value: `${ind.partCapTerceiros.toFixed(1)}x`, ref: '≤ 2x baixo risco', status: pctStatus, desc: 'Quantas vezes o capital de terceiros supera o patrimônio líquido.' },
-    { label: 'Imobilização do PL', formula: 'ANC / PL', value: `${(data.ativo.naoCirc.atu / data.PL.atu * 100).toFixed(0)}%`, ref: '≤ 100%', status: data.ativo.naoCirc.atu <= data.PL.atu ? 'ok' : 'bad', desc: 'Percentual do PL comprometido com ativos não circulantes. Acima de 100% indica que o ANC é financiado por dívidas.' },
-    { label: 'Margem Bruta', formula: 'LB / Rec.Líq.', value: `${ind.margemBruta.toFixed(1)}%`, ref: '> 10% saudável', status: ind.margemBruta > 10 ? 'ok' : ind.margemBruta >= 0 ? 'warn' : 'bad', desc: 'Percentual da receita líquida que sobra após deduzir o custo dos produtos vendidos.' },
-    { label: 'ROIC', formula: 'Res. Líq. / (PL + Dívidas Fin.)', value: `${roic.toFixed(1)}%`, ref: '> 10% ideal', status: roicStatus, desc: 'Retorno sobre o capital investido. Mede a eficiência em gerar lucro a partir de todo o capital empregado (próprio + financeiro).' },
-    { label: 'ROE', formula: 'Res. Líq. / PL', value: `${roe.toFixed(1)}%`, ref: '> 15% ideal', status: roeStatus, desc: 'Retorno sobre o patrimônio líquido. Indica quanto os sócios estão ganhando sobre o capital investido.' },
-    { label: 'ROS (Margem Líquida)', formula: 'Res. Líq. / Rec. Líquida', value: `${ros.toFixed(1)}%`, ref: '> 5% saudável', status: rosStatus, desc: 'Percentual da receita líquida que se converte em lucro líquido após todos os custos, despesas e impostos.' },
-    { label: 'Imob. do Investimento', formula: 'ANC / (PL + PNC)', value: `${imobInvest.toFixed(0)}%`, ref: '≤ 100%', status: imobInvestStatus, desc: 'Mede quanto dos recursos de longo prazo (PL + Passivo NC) está comprometido com ativos não circulantes. Acima de 100% indica financiamento do ANC com recursos de curto prazo.' },
-    { label: 'Taxa de Risco', formula: '(PC + PNC) / AC', value: `${taxaRisco.toFixed(2)}x`, ref: '≤ 1x ideal', status: taxaRiscoStatus, desc: 'Relação entre o total de dívidas (curto + longo prazo) e o ativo circulante. Valores acima de 1x indicam que o passivo total supera os ativos de curto prazo.' },
+  // ── Acumulado YTD ─────────────────────────────────────────────────────────
+  // Indicadores de balanço (Liquidez, Endividamento, Imobilização, Taxa de Risco)
+  // já refletem a posição no final do mês selecionado — sem necessidade de acumulado.
+  // Indicadores de resultado (ROIC, ROE, ROS, Margem Bruta) mostram o mês e o YTD.
+  const hasAcum = !!janAccounts && selectedMonth > 1;
+  const MONTH_SHORT: Record<number, string> = { 1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 5: 'Mai', 6: 'Jun', 7: 'Jul', 8: 'Ago', 9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez' };
+  const shortYear  = String(selectedYear).slice(2);
+  const headerMes  = selectedMonth > 0 ? `${MONTH_SHORT[selectedMonth]}/${shortYear}` : String(selectedYear);
+  const headerAcu  = `Jan – ${MONTH_SHORT[selectedMonth]}/${shortYear}`;
+
+  type St = 'ok' | 'warn' | 'bad';
+  let roic_a = 0, roe_a = 0, ros_a = 0, mb_a = 0;
+  let roic_as: St = 'bad', roe_as: St = 'bad', ros_as: St = 'bad', mb_as: St = 'bad';
+
+  if (hasAcum) {
+    const cur = data.accounts as Record<string, any>;
+    const am = (id: string) => Math.abs(cur[id]?.saldoAtual || 0);
+    const despOper5_a  = Math.abs(cur['5']?.saldoAtual || 0);
+    const resLiq_a     = am('3.1') - am('3.2') - am('3.3') - am('4') - despOper5_a
+                       + am('3.4') + am('3.5') + am('3.6') - am('6');
+    const recLiq_a     = Math.max(am('3.1') - am('3.2') - am('3.3'), 1);
+    const CMV_a        = am('4');
+    roic_a = capInvestido !== 0 ? (resLiq_a / capInvestido) * 100 : 0;
+    roe_a  = PLatu        !== 0 ? (resLiq_a / PLatu)        * 100 : 0;
+    ros_a  = recLiq_a     !== 0 ? (resLiq_a / recLiq_a)    * 100 : 0;
+    mb_a   = recLiq_a     !== 0 ? ((recLiq_a - CMV_a) / recLiq_a) * 100 : 0;
+    roic_as = roic_a > 10 ? 'ok' : roic_a >= 5  ? 'warn' : 'bad';
+    roe_as  = roe_a  > 15 ? 'ok' : roe_a  >= 5  ? 'warn' : 'bad';
+    ros_as  = ros_a  > 5  ? 'ok' : ros_a  >= 1  ? 'warn' : 'bad';
+    mb_as   = mb_a   > 10 ? 'ok' : mb_a   >= 0  ? 'warn' : 'bad';
+  }
+
+  type Ind = { label: string; formula: string; value: string; ref: string; status: St; desc: string; acumValue?: string; acumStatus?: St; };
+
+  const indicadores: Ind[] = [
+    { label: 'Liquidez Corrente',     formula: 'AC / PC',          value: `${ind.liqCorrente.toFixed(2)}x`,          ref: '≥ 1,5x ideal',    status: lqcStatus,       desc: 'Mede a capacidade de pagar obrigações de curto prazo com ativos circulantes.' },
+    { label: 'Liquidez Imediata',     formula: 'Disponib. / PC',   value: `${(ind.liqImediata * 100).toFixed(1)}%`,  ref: '≥ 20% aceitável', status: lqiStatus,       desc: 'Percentual do passivo circulante coberto pelo caixa disponível imediatamente.' },
+    { label: 'Endividamento Geral',   formula: 'PT / AT',          value: `${(ind.endivTotal * 100).toFixed(1)}%`,   ref: '≤ 50% saudável',  status: endStatus,       desc: 'Proporção do ativo financiada por capital de terceiros (dívidas).' },
+    { label: 'Participação Cap. 3ºs', formula: 'PT / PL',          value: `${ind.partCapTerceiros.toFixed(1)}x`,     ref: '≤ 2x baixo risco',status: pctStatus,       desc: 'Quantas vezes o capital de terceiros supera o patrimônio líquido.' },
+    { label: 'Imobilização do PL',    formula: 'ANC / PL',         value: `${(data.ativo.naoCirc.atu / data.PL.atu * 100).toFixed(0)}%`, ref: '≤ 100%', status: data.ativo.naoCirc.atu <= data.PL.atu ? 'ok' : 'bad', desc: 'Percentual do PL comprometido com ativos não circulantes. Acima de 100% indica que o ANC é financiado por dívidas.' },
+    { label: 'Imob. do Investimento', formula: 'ANC / (PL + PNC)', value: `${imobInvest.toFixed(0)}%`,               ref: '≤ 100%',           status: imobInvestStatus,desc: 'Mede quanto dos recursos de longo prazo (PL + Passivo NC) está comprometido com ativos não circulantes.' },
+    { label: 'Taxa de Risco',         formula: '(PC + PNC) / AC',  value: `${taxaRisco.toFixed(2)}x`,                ref: '≤ 1x ideal',       status: taxaRiscoStatus, desc: 'Relação entre o total de dívidas (curto + longo prazo) e o ativo circulante.' },
+    { label: 'Margem Bruta',          formula: 'LB / Rec.Líq.',    value: `${margemBruta.toFixed(1)}%`,              ref: '> 10% saudável',  status: margemBrutaStatus, desc: 'Percentual da receita líquida que sobra após deduzir o custo dos produtos vendidos.',
+      ...(hasAcum ? { acumValue: `${mb_a.toFixed(1)}%`,   acumStatus: mb_as   } : {}) },
+    { label: 'ROIC',                  formula: 'Res. Líq. / (PL + Dívidas Fin.)', value: `${roic.toFixed(1)}%`, ref: '> 10% ideal', status: roicStatus, desc: 'Retorno sobre o capital investido. Mede a eficiência em gerar lucro a partir de todo o capital empregado (próprio + financeiro).',
+      ...(hasAcum ? { acumValue: `${roic_a.toFixed(1)}%`, acumStatus: roic_as } : {}) },
+    { label: 'ROE',                   formula: 'Res. Líq. / PL',   value: `${roe.toFixed(1)}%`,                      ref: '> 15% ideal',     status: roeStatus,  desc: 'Retorno sobre o patrimônio líquido. Indica quanto os sócios estão ganhando sobre o capital investido.',
+      ...(hasAcum ? { acumValue: `${roe_a.toFixed(1)}%`,  acumStatus: roe_as  } : {}) },
+    { label: 'ROS (Margem Líquida)',  formula: 'Res. Líq. / Rec. Líquida', value: `${ros.toFixed(1)}%`,             ref: '> 5% saudável',   status: rosStatus,  desc: 'Percentual da receita líquida que se converte em lucro líquido após todos os custos, despesas e impostos.',
+      ...(hasAcum ? { acumValue: `${ros_a.toFixed(1)}%`,  acumStatus: ros_as  } : {}) },
   ];
+
+  const statusColor = (s: St) =>
+    s === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : s === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400';
 
   return (
     <div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        {indicadores.map((ind2, i) => (
-          <Card key={i}>
-            <CardContent className="pt-6 flex flex-col gap-2.5">
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="text-xs text-muted-foreground mb-0.5">{ind2.formula}</div>
-                  <div className="text-base font-bold text-foreground">{ind2.label}</div>
+        {indicadores.map((ind2, i) => {
+          const isStacked = hasAcum && ind2.acumValue !== undefined;
+          return (
+            <Card key={i}>
+              <CardContent className="pt-6 flex flex-col gap-2.5">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-0.5">{ind2.formula}</div>
+                    <div className="text-base font-bold text-foreground">{ind2.label}</div>
+                  </div>
+                  <Badge label={ind2.status === 'ok' ? '✓ Ok' : ind2.status === 'warn' ? '⚡ Atenção' : '✗ Crítico'} status={ind2.status} />
                 </div>
-                <Badge label={ind2.status === 'ok' ? '✓ Ok' : ind2.status === 'warn' ? '⚡ Atenção' : '✗ Crítico'} status={ind2.status} />
-              </div>
-              <div className={cn('font-mono text-3xl font-bold', ind2.status === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : ind2.status === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400')}>
-                {ind2.value}
-              </div>
-              <div className="text-xs text-muted-foreground/70 leading-relaxed">{ind2.desc}</div>
-              <div className="text-xs font-mono text-muted-foreground/60">Referência: {ind2.ref}</div>
-            </CardContent>
-          </Card>
-        ))}
+                {isStacked ? (
+                  <div className="space-y-1.5">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{headerMes}</div>
+                      <div className={cn('font-mono text-2xl font-bold', statusColor(ind2.status))}>{ind2.value}</div>
+                    </div>
+                    <div className="border-t border-border/50 pt-1.5">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{headerAcu}</div>
+                      <div className={cn('font-mono text-2xl font-bold', statusColor(ind2.acumStatus!))}>{ind2.acumValue}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={cn('font-mono text-3xl font-bold', statusColor(ind2.status))}>
+                    {ind2.value}
+                  </div>
+                )}
+                <div className="text-xs text-muted-foreground/70 leading-relaxed">{ind2.desc}</div>
+                <div className="text-xs font-mono text-muted-foreground/60">Referência: {ind2.ref}</div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
