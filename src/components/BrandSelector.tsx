@@ -101,7 +101,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
               variant="outline"
               size="sm"
               onClick={onLogout}
-              className="text-slate-600 border-slate-300 hover:bg-slate-100 hover:text-slate-800 gap-2"
+              className="text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700 gap-2"
             >
               <LogOut className="w-4 h-4" />
               Sair
