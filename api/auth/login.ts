@@ -68,7 +68,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
   } catch (err) {
-    console.error('Login error:', err);
-    return res.status(500).json({ error: 'Erro interno. Tente novamente.' });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Login error:', msg);
+    return res.status(500).json({ error: `Erro interno: ${msg}` });
   }
 }
