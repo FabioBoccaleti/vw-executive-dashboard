@@ -109,23 +109,25 @@ function parseBalancete(text: string) {
   const capitalSocial = { ant: absAnt('2.3.1.01'), atu: absAtu('2.3.1.01') };
   const resultAcum = { ant: absAnt('2.3.3'), atu: absAtu('2.3.3') };
 
-  // RECEITAS (conta 3 — valores negativos no balancete)
-  const recBruta = { ant: absAnt('3.1'), atu: absAtu('3.1') };
-  const impostosVendas = { per: absAtu('3.2') };
-  const devolucoes = { per: absAtu('3.3') };
-  const rendOper = { ant: absAnt('3.4'), per: absAtu('3.4') };
-  const rendFinanc = { ant: absAnt('3.5'), per: absAtu('3.5') };
-  const rendNaoOper = { ant: absAnt('3.6'), per: absAtu('3.6') };
+  // RECEITAS (conta 3 — usa valCred/valDeb: movimento do período)
+  // saldoAtual em balancetes cumulativos YTD seria Jan–mês, gerando igualdade entre mensal e acumulado.
+  // valCred/valDeb captura apenas o movimento do período, independente do formato do balancete.
+  const recBruta = { ant: absAnt('3.1'), atu: get('3.1').valCred };
+  const impostosVendas = { per: get('3.2').valDeb };
+  const devolucoes = { per: get('3.3').valDeb };
+  const rendOper = { ant: absAnt('3.4'), per: get('3.4').valCred };
+  const rendFinanc = { ant: absAnt('3.5'), per: get('3.5').valCred };
+  const rendNaoOper = { ant: absAnt('3.6'), per: get('3.6').valCred };
   const recLiq = { per: recBruta.atu - impostosVendas.per - devolucoes.per };
 
   // CUSTOS E DESPESAS
-  const CMV = { per: absAtu('4') };
+  const CMV = { per: get('4').valDeb };
   const despPessoal_per = get('2.1.2.01.01').valCred;
   const despFinanc_per = get('5.5.7').valDeb;
   const deprec_per = get('5.5.2.07.20').valDeb;
 
   // PROVISÃO IR + CSLL
-  const provisaoIR = { saldo: absAtu('6') };
+  const provisaoIR = { saldo: get('6').valDeb };
 
   // GERAÇÃO DE CAIXA (método indireto)
   // Estoque total = VW (1.1.2) + Audi (1.1.7.02)
