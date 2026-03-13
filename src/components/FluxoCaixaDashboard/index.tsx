@@ -3262,12 +3262,12 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
     {
       ok: gerarCaixa,
       label: 'Empresa gerou caixa no período',
-      detail: `Variação total: ${d.fluxoTotal >= 0 ? '+' : ''}${fmtBRL(d.fluxoTotal)}`,
+      detail: `Variação total: ${d.fluxoTotal >= 0 ? '+' : '−'}${fmtBRL(d.fluxoTotal)}`,
     },
     {
       ok: operPositivo,
       label: 'Atividade operacional gera caixa',
-      detail: `Fluxo operacional: ${d.fluxoOper >= 0 ? '+' : ''}${fmtBRL(d.fluxoOper)}`,
+      detail: `Fluxo operacional: ${d.fluxoOper >= 0 ? '+' : '−'}${fmtBRL(d.fluxoOper)}`,
     },
     {
       ok: !queimouSignif,
@@ -3295,7 +3295,7 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
     {
       ok: d.varCaixaReal >= 0,
       label: 'Saldo de caixa aumentou (conferência com o balanço)',
-      detail: `Variação real: ${d.varCaixaReal >= 0 ? '+' : ''}${fmtBRL(d.varCaixaReal)}`,
+      detail: `Variação real: ${d.varCaixaReal >= 0 ? '+' : '−'}${fmtBRL(d.varCaixaReal)}`,
     },
   ];
 
@@ -3318,7 +3318,7 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
               <div className={cn('text-xl font-bold mb-2', sc.text)}>{sc.icon} {titulo}</div>
               <p className="text-sm text-muted-foreground leading-relaxed mb-4">{descricao}</p>
               <div className={cn('text-3xl font-bold font-mono', d.fluxoTotal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-                {d.fluxoTotal >= 0 ? '✅' : '❌'} {d.fluxoTotal >= 0 ? '+' : ''}{fmtBRL(d.fluxoTotal)}
+                {d.fluxoTotal >= 0 ? '✅' : '❌'} {d.fluxoTotal >= 0 ? '+' : '−'}{fmtBRL(d.fluxoTotal)}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 {d.fluxoTotal >= 0 ? 'A empresa GEROU caixa no período analisado.' : 'A empresa CONSUMIU caixa no período analisado.'}
@@ -3348,7 +3348,7 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
                     </span>
                   </div>
                   <div className={cn('text-2xl font-bold font-mono mb-1', isPos ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}>
-                    {isPos ? '+' : ''}{fmtBRL(a.value)}
+                    {isPos ? '+' : '−'}{fmtBRL(a.value)}
                   </div>
                   {isMain && <span className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded-full font-semibold">★ Maior fonte</span>}
                   <p className="text-xs text-muted-foreground leading-relaxed mt-2">{a.desc}</p>
@@ -3368,7 +3368,7 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
               <div className="mb-5">
                 <div className="text-sm font-semibold text-foreground mb-4">
                   Composição do Fluxo Operacional&nbsp;
-                  <span className={cn('font-mono', d.fluxoOper >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500')}>{d.fluxoOper >= 0 ? '+' : ''}{fmtBRL(d.fluxoOper)}</span>
+                  <span className={cn('font-mono', d.fluxoOper >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500')}>{d.fluxoOper >= 0 ? '+' : '−'}{fmtBRL(d.fluxoOper)}</span>
                 </div>
                 {[
                   { label: 'Depreciação / Amortização (não-caixa)', value: d.deprec, pctVal: deprecPct, color: 'bg-blue-400', neutral: true, warn: false, note: 'Ajuste contábil — sempre positivo, mas não representa entrada real de dinheiro.' },
@@ -3384,7 +3384,7 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
                         {item.neutral   && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded dark:bg-blue-950 dark:text-blue-400">ℹ️ Não-caixa</span>}
                         {!item.warn && !item.neutral && item.value > 0 && <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded dark:bg-emerald-950 dark:text-emerald-400">✓ OK</span>}
                       </div>
-                      <span className="text-xs font-mono font-semibold text-foreground shrink-0">{item.value >= 0 ? '+' : ''}{fmtBRL(item.value, true)}</span>
+                      <span className="text-xs font-mono font-semibold text-foreground shrink-0">{item.value >= 0 ? '+' : '−'}{fmtBRL(item.value, true)}</span>
                     </div>
                     <div className="relative h-2 bg-muted rounded-full overflow-hidden mb-1">
                       <div className={cn('h-full rounded-full transition-all duration-700', item.color)} style={{ width: `${Math.min(100, item.pctVal)}%` }} />
