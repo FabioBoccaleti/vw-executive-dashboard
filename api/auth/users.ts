@@ -1,7 +1,15 @@
-import bcrypt from 'bcryptjs';
+import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
+import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { UserRecord } from './_helpers';
+
+const scryptAsync = promisify(scrypt);
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString('hex');
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${buf.toString('hex')}.${salt}`;
+}
 import {
   requireAdmin, listUsers, getUserById, saveUser, deleteUser,
 } from './_helpers';
@@ -40,12 +48,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(409).json({ error: 'Usuário já existe' });
       }
 
-      const hash = await bcrypt.hash(password, 12);
+      const passwordHash = await hashPassword(password);
       const user: UserRecord = {
         id: randomUUID(),
         name,
         username,
-        passwordHash: hash,
+        passwordHash,
         role,
         modules: modules ?? [],
         brands: brands ?? [],
@@ -78,7 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         updatedAt: Date.now(),
       };
       if (password) {
-        updated.passwordHash = await bcrypt.hash(password, 12);
+        updated.passwordHash = await hashPassword(password);
       }
       await saveUser(updated);
       const { passwordHash: _, ...publicUser } = updated;

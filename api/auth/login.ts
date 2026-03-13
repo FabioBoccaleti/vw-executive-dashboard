@@ -1,10 +1,29 @@
-import bcrypt from 'bcryptjs';
+import { scrypt, randomBytes, timingSafeEqual } from 'crypto';
+import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   ALL_MODULES, ALL_BRANDS, type UserRecord,
   getUserByUsername, saveUser, createSession, appendLog, listUsers,
 } from './_helpers';
+
+const scryptAsync = promisify(scrypt);
+
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString('hex');
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${buf.toString('hex')}.${salt}`;
+}
+
+async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  try {
+    const [hashed, salt] = stored.split('.');
+    const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+    return timingSafeEqual(buf, Buffer.from(hashed, 'hex'));
+  } catch {
+    return false;
+  }
+}
 
 function setCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -27,12 +46,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const allUsers = await listUsers();
     if (allUsers.length === 0) {
       const initialPassword = process.env.ADMIN_INITIAL_PASSWORD ?? '1985';
-      const hash = await bcrypt.hash(initialPassword, 12);
+      const passwordHash = await hashPassword(initialPassword);
       const adminUser: UserRecord = {
         id: randomUUID(),
         name: 'Controladoria Sorana',
         username: 'controladoria@sorana.com.br',
-        passwordHash: hash,
+        passwordHash,
         role: 'admin',
         modules: ALL_MODULES,
         brands: ALL_BRANDS,
@@ -48,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: 'Usuário ou senha incorretos' });
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
+    const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
       return res.status(401).json({ error: 'Usuário ou senha incorretos' });
     }
