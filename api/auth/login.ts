@@ -26,12 +26,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Verifica se é o primeiro acesso — cria admin padrão
     const allUsers = await listUsers();
     if (allUsers.length === 0) {
-      const initialPassword = process.env.ADMIN_INITIAL_PASSWORD ?? 'Admin@2026';
+      const initialPassword = process.env.ADMIN_INITIAL_PASSWORD ?? '1985';
       const hash = await bcrypt.hash(initialPassword, 12);
       const adminUser: UserRecord = {
         id: randomUUID(),
-        name: 'Administrador',
-        username: 'admin',
+        name: 'Controladoria Sorana',
+        username: 'controladoria@sorana.com.br',
         passwordHash: hash,
         role: 'admin',
         modules: ALL_MODULES,
