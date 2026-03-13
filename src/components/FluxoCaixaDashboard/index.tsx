@@ -3447,6 +3447,29 @@ function IndicadoresTab({ data, fmtBRL, SectionTitle, Badge }: any) {
   const endStatus = ind.endivTotal <= 0.5 ? 'ok' : ind.endivTotal <= 0.7 ? 'warn' : 'bad';
   const pctStatus = ind.partCapTerceiros <= 2 ? 'ok' : ind.partCapTerceiros <= 4 ? 'warn' : 'bad';
 
+  // ── Novos indicadores ─────────────────────────────────────────────────────
+  const resLiq      = data.dfc.resLiq;
+  const recLiqPer   = data.receitas.liq.per || 1;
+  const PLatu       = data.PL.atu || 1;
+  const dividasFin  = (data.emprestCP?.atu || 0) + (data.emprestLP?.atu || 0)
+                    + (data.pessoasLig?.atu || 0) + (data.debitosLig?.atu || 0)
+                    + (data.arrendLP?.atu || 0);
+  const capInvestido = PLatu + dividasFin;
+  const passTotal    = data.passivo.circ.atu + data.passivo.naoCirc.atu;
+  const ancPlusPNC   = PLatu + data.passivo.naoCirc.atu;
+
+  const roic        = capInvestido !== 0 ? (resLiq / capInvestido) * 100 : 0;
+  const roe         = PLatu        !== 0 ? (resLiq / PLatu)        * 100 : 0;
+  const ros         = recLiqPer    !== 0 ? (resLiq / recLiqPer)    * 100 : 0;
+  const imobInvest  = ancPlusPNC   !== 0 ? (data.ativo.naoCirc.atu / ancPlusPNC) * 100 : 0;
+  const taxaRisco   = data.ativo.circ.atu !== 0 ? passTotal / data.ativo.circ.atu : 0;
+
+  const roicStatus      = roic > 10  ? 'ok' : roic >= 5   ? 'warn' : 'bad';
+  const roeStatus       = roe  > 15  ? 'ok' : roe  >= 5   ? 'warn' : 'bad';
+  const rosStatus       = ros  > 5   ? 'ok' : ros  >= 1   ? 'warn' : 'bad';
+  const imobInvestStatus = imobInvest <= 100 ? 'ok' : imobInvest <= 120 ? 'warn' : 'bad';
+  const taxaRiscoStatus  = taxaRisco  <= 1   ? 'ok' : taxaRisco  <= 1.5 ? 'warn' : 'bad';
+
   const indicadores = [
     { label: 'Liquidez Corrente', formula: 'AC / PC', value: `${ind.liqCorrente.toFixed(2)}x`, ref: '≥ 1,5x ideal', status: lqcStatus, desc: 'Mede a capacidade de pagar obrigações de curto prazo com ativos circulantes.' },
     { label: 'Liquidez Imediata', formula: 'Disponib. / PC', value: `${(ind.liqImediata * 100).toFixed(1)}%`, ref: '≥ 20% aceitável', status: lqiStatus, desc: 'Percentual do passivo circulante coberto pelo caixa disponível imediatamente.' },
@@ -3454,6 +3477,11 @@ function IndicadoresTab({ data, fmtBRL, SectionTitle, Badge }: any) {
     { label: 'Participação Capital 3ºs', formula: 'PT / PL', value: `${ind.partCapTerceiros.toFixed(1)}x`, ref: '≤ 2x baixo risco', status: pctStatus, desc: 'Quantas vezes o capital de terceiros supera o patrimônio líquido.' },
     { label: 'Imobilização do PL', formula: 'ANC / PL', value: `${(data.ativo.naoCirc.atu / data.PL.atu * 100).toFixed(0)}%`, ref: '≤ 100%', status: data.ativo.naoCirc.atu <= data.PL.atu ? 'ok' : 'bad', desc: 'Percentual do PL comprometido com ativos não circulantes. Acima de 100% indica que o ANC é financiado por dívidas.' },
     { label: 'Margem Bruta', formula: 'LB / Rec.Líq.', value: `${ind.margemBruta.toFixed(1)}%`, ref: '> 10% saudável', status: ind.margemBruta > 10 ? 'ok' : ind.margemBruta >= 0 ? 'warn' : 'bad', desc: 'Percentual da receita líquida que sobra após deduzir o custo dos produtos vendidos.' },
+    { label: 'ROIC', formula: 'Res. Líq. / (PL + Dívidas Fin.)', value: `${roic.toFixed(1)}%`, ref: '> 10% ideal', status: roicStatus, desc: 'Retorno sobre o capital investido. Mede a eficiência em gerar lucro a partir de todo o capital empregado (próprio + financeiro).' },
+    { label: 'ROE', formula: 'Res. Líq. / PL', value: `${roe.toFixed(1)}%`, ref: '> 15% ideal', status: roeStatus, desc: 'Retorno sobre o patrimônio líquido. Indica quanto os sócios estão ganhando sobre o capital investido.' },
+    { label: 'ROS (Margem Líquida)', formula: 'Res. Líq. / Rec. Líquida', value: `${ros.toFixed(1)}%`, ref: '> 5% saudável', status: rosStatus, desc: 'Percentual da receita líquida que se converte em lucro líquido após todos os custos, despesas e impostos.' },
+    { label: 'Imob. do Investimento', formula: 'ANC / (PL + PNC)', value: `${imobInvest.toFixed(0)}%`, ref: '≤ 100%', status: imobInvestStatus, desc: 'Mede quanto dos recursos de longo prazo (PL + Passivo NC) está comprometido com ativos não circulantes. Acima de 100% indica financiamento do ANC com recursos de curto prazo.' },
+    { label: 'Taxa de Risco', formula: '(PC + PNC) / AC', value: `${taxaRisco.toFixed(2)}x`, ref: '≤ 1x ideal', status: taxaRiscoStatus, desc: 'Relação entre o total de dívidas (curto + longo prazo) e o ativo circulante. Valores acima de 1x indicam que o passivo total supera os ativos de curto prazo.' },
   ];
 
   return (
