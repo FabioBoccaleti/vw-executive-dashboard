@@ -12,7 +12,7 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BRAND_CONFIGS, type Brand } from '@/lib/brands';
-import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, Settings } from 'lucide-react';
+import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, Settings, LogOut } from 'lucide-react';
 import { PasswordDialog } from '@/components/PasswordDialog';
 
 // Sub-marcas do Demonstrativo de Resultados
@@ -28,9 +28,10 @@ interface BrandSelectorProps {
   onSelectBrand: (brand: Brand) => void;
   currentBrand?: Brand;
   onAdminClick?: () => void;
+  onLogout?: () => void;
 }
 
-export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick }: BrandSelectorProps) {
+export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLogout }: BrandSelectorProps) {
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(currentBrand || null);
   const [hoveredBrand, setHoveredBrand] = useState<Brand | null>(null);
   const [demonstrativoExpanded, setDemonstrativoExpanded] = useState<boolean>(
@@ -92,6 +93,21 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick }: Bra
             Selecione uma opção para acessar o painel
           </p>
         </div>
+
+        {/* Botão Sair */}
+        {onLogout && (
+          <div className="flex justify-end mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onLogout}
+              className="text-slate-600 border-slate-300 hover:bg-slate-100 hover:text-slate-800 gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Sair
+            </Button>
+          </div>
+        )}
 
         {/* ── 3 categorias em linha ── */}
         <div className="grid grid-cols-1 gap-3 mb-8">

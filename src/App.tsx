@@ -11,7 +11,7 @@ import { LoginScreen } from '@/components/LoginScreen'
 import { AdminPage } from '@/components/AdminPage'
 
 function AppContent() {
-  const { session, isLoading: authLoading, isAdmin } = useAuth()
+  const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
   const [brand, setBrand] = useState<Brand | null>(null)
   // Sempre mostra o seletor de marca ao iniciar a aplicação
   const [showBrandSelector, setShowBrandSelector] = useState(true)
@@ -166,6 +166,7 @@ function AppContent() {
           onSelectBrand={handleBrandSelect} 
           currentBrand={brand || undefined}
           onAdminClick={isAdmin() ? handleNavigateAdmin : undefined}
+          onLogout={logout}
         />
         <Toaster />
       </div>
