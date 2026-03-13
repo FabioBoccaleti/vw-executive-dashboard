@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { SessionPayload, ModuleId, BrandId } from '@/lib/authTypes';
-import { getSessionData, saveSession, clearSession, apiLogin, apiLogout } from '@/lib/authClient';
+import { getSessionToken, saveSession, clearSession, apiLogin, apiLogout } from '@/lib/authClient';
 
 interface AuthContextValue {
   session: SessionPayload | null;
@@ -19,9 +19,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const data = getSessionData();
-    setSession(data);
-    setIsLoading(false);
+    // Sempre valida o token contra o servidor para obter permissões atualizadas
+    async function validateSession() {
+      const token = getSessionToken();
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Atualiza localStorage com permissões frescas
+          saveSession(token, data.session);
+          setSession(data.session);
+        } else {
+          // Token inválido/expirado
+          clearSession();
+          setSession(null);
+        }
+      } catch {
+        // Falha de rede — usa localStorage como fallback
+        const { getSessionData } = await import('@/lib/authClient');
+        setSession(getSessionData());
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    validateSession();
   }, []);
 
   const login = useCallback(async (username: string, password: string): Promise<string | null> => {
