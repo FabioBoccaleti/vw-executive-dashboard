@@ -44,15 +44,22 @@ export function isLoggedIn(): boolean {
 // ─── Chamadas de API ──────────────────────────────────────────────────────────
 
 export async function apiLogin(username: string, password: string): Promise<{ token: string; session: SessionPayload } | { error: string }> {
+  let res: Response;
   try {
-    const res = await fetch('/api/auth/login', {
+    res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
-    return await res.json();
   } catch {
     return { error: 'Erro de conexão. Verifique sua internet.' };
+  }
+  try {
+    const data = await res.json();
+    if (!res.ok) return { error: data.error ?? `Erro do servidor (${res.status})` };
+    return data;
+  } catch {
+    return { error: `Erro do servidor (${res.status}). Tente novamente.` };
   }
 }
 

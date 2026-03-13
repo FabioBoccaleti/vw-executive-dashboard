@@ -1,7 +1,35 @@
 // ─── Utilitários compartilhados das APIs de autenticação ─────────────────────
 import { Redis } from '@upstash/redis';
 import { randomUUID } from 'crypto';
-import type { UserRecord, SessionPayload } from '../../src/lib/authTypes';
+
+// Tipos inline (evita importação cross-directory que pode falhar no bundler Vercel)
+export type UserRole = 'admin' | 'gestor' | 'leitura';
+export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa';
+export type BrandId = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros';
+export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa'];
+export const ALL_BRANDS: BrandId[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
+
+export interface UserRecord {
+  id: string;
+  name: string;
+  username: string;
+  passwordHash: string;
+  role: UserRole;
+  modules: ModuleId[];
+  brands: BrandId[];
+  active: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SessionPayload {
+  userId: string;
+  username: string;
+  role: UserRole;
+  modules: ModuleId[];
+  brands: BrandId[];
+  expiresAt: number;
+}
 
 export const redis = new Redis({
   url: process.env.KV_REST_API_URL!,

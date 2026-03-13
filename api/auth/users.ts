@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { UserRecord } from '../../src/lib/authTypes';
+import type { UserRecord } from './_helpers';
 import {
   requireAdmin, listUsers, getUserById, saveUser, deleteUser,
 } from './_helpers';
