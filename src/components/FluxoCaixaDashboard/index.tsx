@@ -164,6 +164,11 @@ function parseBalancete(text: string) {
   const dRealizLPCred = realizLPCred.atu - realizLPCred.ant;
 
   const dEmprestCP_01 = emprestCP_01.atu - emprestCP_01.ant; // Fornecedores 2.1.1.01 → operacional
+  // Resíduo de 2.2.1 — sub-contas não mapeadas individualmente → operacional
+  const grupo2_2_1 = { ant: absAnt('2.2.1'), atu: absAtu('2.2.1') };
+  const outros2_2_1Ant = grupo2_2_1.ant - emprestLP.ant - pessoasLig.ant - debitosLig.ant - arrendLP.ant;
+  const outros2_2_1Atu = grupo2_2_1.atu - emprestLP.atu - pessoasLig.atu - debitosLig.atu - arrendLP.atu;
+  const dOutros2_2_1   = outros2_2_1Atu - outros2_2_1Ant;
 
   const fluxoOper =
     resLiq_dfc +
@@ -172,7 +177,8 @@ function parseBalancete(text: string) {
     ajusteDespAntec +
     ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag
     - dRealizLPCred
-    + dEmprestCP_01;
+    + dEmprestCP_01
+    + dOutros2_2_1;
 
   // ── Atividades de Investimento ────────────────────────────────────────────
   const dIntangivel   = intangivel.atu   - intangivel.ant;
@@ -189,12 +195,8 @@ function parseBalancete(text: string) {
   const dDebitosLig = debitosLig.atu - debitosLig.ant;
   const dArrendLP   = arrendLP.atu   - arrendLP.ant;
   const dOutrosPassLP = outrosPassLP.atu - outrosPassLP.ant; // 2.2.3
-  // Resíduo de 2.2.1 — sub-contas não mapeadas individualmente (ex: 2.2.1.03, 2.2.1.05 etc.)
-  const grupo2_2_1 = { ant: absAnt('2.2.1'), atu: absAtu('2.2.1') };
-  const outros2_2_1Ant = grupo2_2_1.ant - emprestLP.ant - pessoasLig.ant - debitosLig.ant - arrendLP.ant;
-  const outros2_2_1Atu = grupo2_2_1.atu - emprestLP.atu - pessoasLig.atu - debitosLig.atu - arrendLP.atu;
-  const dOutros2_2_1   = outros2_2_1Atu - outros2_2_1Ant;
   // NOTA: 2.2.2 (Receitas Diferidas) excluída do financiamento — contém ICMS ST Diferido (não-caixa)
+  // dOutros2_2_1 (resíduo 2.2.1) movido para Atividades Operacionais
 
   const fluxoFinanc =
     dEmprestCP_02 +
@@ -202,8 +204,7 @@ function parseBalancete(text: string) {
     dPessoasLig +
     dDebitosLig +
     dArrendLP   +
-    dOutrosPassLP +
-    dOutros2_2_1;
+    dOutrosPassLP;
 
   const fluxoTotal   = fluxoOper + fluxoInvest + fluxoFinanc;
   const varCaixaReal = disponib.atu - disponib.ant;
@@ -2683,9 +2684,9 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
     const fluxoOper_acum_comForn = resLiq_dfc_acum + deprec_acum
       + ajusteEstoque_acum + ajusteCred_acum + ajusteContasCorr_acum + ajusteValDiv_acum
       + ajusteDespAntec_acum + ajusteFornec_acum + ajusteTrib_acum + ajusteTrab_acum + ajusteContasPag_acum
-      - dRealizLPCred_acum + dEmprestCP_01_acum;
+      - dRealizLPCred_acum + dEmprestCP_01_acum + dOutros2_2_1_acum;
     const fluxoFinanc_acum = dEmprestCP_02_acum + dEmprestLP_acum + dPessoasLig_acum + dDebitosLig_acum
-                           + dArrendLP_acum + dOutrosPassLP_acum + dOutros2_2_1_acum;
+                           + dArrendLP_acum + dOutrosPassLP_acum;
     const fluxoTotal_acum  = fluxoOper_acum_comForn + fluxoInvest_acum + fluxoFinanc_acum;
     const disponibAnt_jan  = getJanAnt('1.1.1');
     const varCaixaReal_acum = getAtu('1.1.1') - disponibAnt_jan;
@@ -2815,6 +2816,9 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
             {(d.emprestCP_01Ant > 0 || d.emprestCP_01Atu > 0 || (d.dEmprestCP_01 !== undefined && d.dEmprestCP_01 !== 0)) && (
               <DFCRow label={`${d.dEmprestCP_01 >= 0 ? '(+)' : '(–)'} Variação Fornecedores (2.1.1.01) ${d.dEmprestCP_01 >= 0 ? '— aumento (fonte de caixa)' : '— redução (uso de caixa)'} (${fmtBRL(d.emprestCP_01Ant, true)} → ${fmtBRL(d.emprestCP_01Atu, true)})`} value={d.dEmprestCP_01} value2={dAcum?.dEmprestCP_01} hasAcum={hasAcum} indent={1} />
             )}
+            {(Math.abs(d.dOutros2_2_1) > 0.01) && (
+              <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos L.P. não mapeados (2.2.1 — demais) (${fmtBRL(d.outros2_2_1Ant, true)} → ${fmtBRL(d.outros2_2_1Atu, true)})`} value={d.dOutros2_2_1} value2={dAcum?.dOutros2_2_1} hasAcum={hasAcum} indent={1} />
+            )}
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={d.fluxoOper} value2={dAcum?.fluxoOper} hasAcum={hasAcum} total highlight />
 
             <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
@@ -2841,9 +2845,6 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
             )}
             {(d.dOutrosPassLP !== 0) && (
               <DFCRow label={`${d.dOutrosPassLP >= 0 ? '(+) Captação' : '(–) Liquidação'} Outros Passivos LP (2.2.3)`} value={d.dOutrosPassLP} value2={dAcum?.dOutrosPassLP} hasAcum={hasAcum} indent={1} />
-            )}
-            {(Math.abs(d.dOutros2_2_1) > 0.01) && (
-              <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos L.P. não mapeados (2.2.1 — demais) (${fmtBRL(d.outros2_2_1Ant, true)} → ${fmtBRL(d.outros2_2_1Atu, true)})`} value={d.dOutros2_2_1} value2={dAcum?.dOutros2_2_1} hasAcum={hasAcum} indent={1} />
             )}
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={d.fluxoFinanc} value2={dAcum?.fluxoFinanc} hasAcum={hasAcum} total highlight />
           </tbody>
@@ -2917,7 +2918,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
   );
   const pagIR           = -provisaoIRMes;
   const rendasRecebidas = rendOperMes + rendFinancMes + rendNaoOperMes;
-  const fluxoOperDireto = recebClientes + pagFornec + pagImpostos + despOperCaixa + pagIR + rendasRecebidas - d.dRealizLPCred + d.dEmprestCP_01;
+  const fluxoOperDireto = recebClientes + pagFornec + pagImpostos + despOperCaixa + pagIR + rendasRecebidas - d.dRealizLPCred + d.dEmprestCP_01 + d.dOutros2_2_1;
   const diff = Math.abs(fluxoOperDireto - d.fluxoOper);
 
   // ── Acumulado YTD: usando saldoAtual (resultado) e variação Jan→mês (patrimonial) ──
@@ -2976,7 +2977,6 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
     const empCP_02_ant = getJanAnt('2.1.1.02'); const empCP_02_atu = getAtu('2.1.1.02');
     const dEmprestCP_01_a = empCP_01_atu - empCP_01_ant;
     const dEmprestCP_02_a = empCP_02_atu - empCP_02_ant;
-    const fluxoOperDireto_a_final = fluxoOperDireto_a + dEmprestCP_01_a;
     const empLP_ant = getJanAnt('2.2.1.07'); const empLP_atu = getAtu('2.2.1.07');
     const pesLig_ant = getJanAnt('2.2.1.01'); const pesLig_atu = getAtu('2.2.1.01');
     const debLig_ant = getJanAnt('2.2.1.02'); const debLig_atu = getAtu('2.2.1.02');
@@ -2985,9 +2985,10 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
     const g221_ant   = getJanAnt('2.2.1');    const g221_atu   = getAtu('2.2.1');
     const out221_ant = g221_ant - empLP_ant - pesLig_ant - debLig_ant - arr_ant;
     const out221_atu = g221_atu - empLP_atu - pesLig_atu - debLig_atu - arr_atu;
+    const dOutros221_a = out221_atu - out221_ant;
+    const fluxoOperDireto_a_final = fluxoOperDireto_a + dEmprestCP_01_a + dOutros221_a;
     const fluxoFinanc_a = dEmprestCP_02_a + (empLP_atu - empLP_ant) + (pesLig_atu - pesLig_ant)
-                        + (debLig_atu - debLig_ant) + (arr_atu - arr_ant) + (outLP_atu - outLP_ant)
-                        + (out221_atu - out221_ant);
+                        + (debLig_atu - debLig_ant) + (arr_atu - arr_ant) + (outLP_atu - outLP_ant);
     const fluxoTotal_a  = fluxoOperDireto_a_final + fluxoInvest_a + fluxoFinanc_a;
     const disponibJan   = getJanAnt('1.1.1');
 
@@ -3136,6 +3137,9 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
               {(d.emprestCP_01Ant > 0 || d.emprestCP_01Atu > 0 || (d.dEmprestCP_01 !== undefined && d.dEmprestCP_01 !== 0)) && (
                 <DFCRow label={`${d.dEmprestCP_01 >= 0 ? '(+)' : '(–)'} Variação Fornecedores (2.1.1.01) ${d.dEmprestCP_01 >= 0 ? '— aumento (fonte de caixa)' : '— redução (uso de caixa)'} (${fmtBRL(d.emprestCP_01Ant, true)} → ${fmtBRL(d.emprestCP_01Atu, true)})`} value={d.dEmprestCP_01} value2={acum?.dEmprestCP_01} hasAcum={hasAcum} indent={1} />
               )}
+              {(Math.abs(d.dOutros2_2_1) > 0.01 || (acum && Math.abs(acum.dOutros221) > 0.01)) && (
+                <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos LP não mapeados (2.2.1 — demais)`} value={d.dOutros2_2_1} value2={acum?.dOutros221} hasAcum={hasAcum} indent={1} />
+              )}
 
               <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={fluxoOperDireto} value2={acum?.fluxoOperDireto} hasAcum={hasAcum} total highlight />
 
@@ -3154,7 +3158,6 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
               {(d.debitosLigAnt > 0 || d.debitosLigAtu > 0) && <DFCRow label={`${d.dDebitosLig >= 0 ? '(+) Captação' : '(–) Liquidação'} Débitos com Ligadas LP (${fmtBRL(d.debitosLigAnt, true)} → ${fmtBRL(d.debitosLigAtu, true)})`} value={d.dDebitosLig} value2={acum?.dDebitosLig} hasAcum={hasAcum} indent={1} />}
               {(d.arrendLPAnt > 0 || d.arrendLPAtu > 0) && <DFCRow label={`${d.dArrendLP >= 0 ? '(+) Novos Arrendamentos LP' : '(–) Amortização Arrendamentos LP'} (${fmtBRL(d.arrendLPAnt, true)} → ${fmtBRL(d.arrendLPAtu, true)})`} value={d.dArrendLP} value2={acum?.dArrendLP} hasAcum={hasAcum} indent={1} />}
               {(d.dOutrosPassLP !== 0 || (acum && acum.dOutrosPassLP !== 0)) && <DFCRow label={`${d.dOutrosPassLP >= 0 ? '(+) Captação' : '(–) Liquidação'} Outros Passivos LP (2.2.3)`} value={d.dOutrosPassLP} value2={acum?.dOutrosPassLP} hasAcum={hasAcum} indent={1} />}
-              {(Math.abs(d.dOutros2_2_1) > 0.01 || (acum && Math.abs(acum.dOutros221) > 0.01)) && <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos LP não mapeados (2.2.1 — demais)`} value={d.dOutros2_2_1} value2={acum?.dOutros221} hasAcum={hasAcum} indent={1} />}
               <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={d.fluxoFinanc} value2={acum?.fluxoFinanc} hasAcum={hasAcum} total highlight />
             </tbody>
             <tfoot>
