@@ -228,14 +228,21 @@ function extractMetrics(rawText: string): ComparativoMetrics {
   const estoqueAudi = absAtu('1.1.7.02');
 
   // ── Valores a Receber ─────────────────────────────────────────────────────
-  const valoresReceber = absAtu('1.1.3');
+  // Mesmas contas da aba Valores a Receber (excluindo 1.1.3.01.02 — Contas Correntes de Ligadas)
+  const valoresReceber = absAtu('1.1.3.01.01') + absAtu('1.1.3.01.03') +
+                         absAtu('1.1.3.01.04') + absAtu('1.1.3.01.06') + absAtu('1.1.3.01.10');
 
-  // ── Endividamento Bancário ────────────────────────────────────────────────
-  const endividamentoCP = absAtu('2.1.1');
+  // ── Endividamento Bancário ─────────────────────────────────────────────
+  // Mesma lógica da aba Endividamento: 2.1.1.02.03 + floor plan líquido VW + floor plan líquido Audi
+  const cpBase = absAtu('2.1.1.02.03');
+  const cpNetVW   = Math.max(0, absAtu('2.1.1.02.01.001') - absAtu('1.1.2.01.01.001'));
+  const cpNetAudi = Math.max(0, absAtu('2.1.4.01.01.007') - absAtu('1.1.7.02.01.001'));
+  const endividamentoCP = cpBase + cpNetVW + cpNetAudi;
   const endividamentoLP = emprestLP.atu;
 
   // ── Mútuo dos Sócios ──────────────────────────────────────────────────────
-  const mutuoSocios = absAtu('2.2.1.01');
+  // Mesma conta da aba Mútuo Sócios: sub-grupo 2.2.1.01.01
+  const mutuoSocios = absAtu('2.2.1.01.01');
 
   // ── Parcelamento Refis ────────────────────────────────────────────────────
   const parcelamentoRefis = absAtu('2.1.2.02.07.020') + absAtu('2.2.1.08.01.020');
@@ -886,17 +893,17 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
                       <CompRow label="Total Estoques"                                                        periods={loadedPeriods} getValue={m => m.estoqueVW + m.estoqueAudi} direction="neutral" isHeader refIdx={refIdx} />
 
                       {/* VALORES A RECEBER */}
-                      <SectionHeader icon="💳" title="Valores a Receber" subtitle="Saldo atual dos créditos de vendas (1.1.3)" colSpan={colSpan} />
+                      <SectionHeader icon="💳" title="Valores a Receber" subtitle="Saldo atual — contas 1.1.3.01.01/03/04/06/10" colSpan={colSpan} />
                       <CompRow label="Total Valores a Receber" desc="Clientes e demais créditos de vendas" periods={loadedPeriods} getValue={m => m.valoresReceber} direction="desc" isHeader refIdx={refIdx} />
 
                       {/* ENDIVIDAMENTO */}
                       <SectionHeader icon="🏦" title="Endividamento Bancário" subtitle="Saldo atual dos empréstimos bancários CP e LP" colSpan={colSpan} />
-                      <CompRow label="Empréstimos — Curto Prazo" desc="Floor plan e empréstimos CP (2.1.1)"   periods={loadedPeriods} getValue={m => m.endividamentoCP} direction="desc" refIdx={refIdx} />
+                      <CompRow label="Empréstimos — Curto Prazo" desc="2.1.1.02.03 + floor plan líquido VW/Audi" periods={loadedPeriods} getValue={m => m.endividamentoCP} direction="desc" refIdx={refIdx} />
                       <CompRow label="Empréstimos — Longo Prazo" desc="Financiamentos bancários LP (2.2.1.07)" periods={loadedPeriods} getValue={m => m.endividamentoLP} direction="desc" refIdx={refIdx} />
                       <CompRow label="Total Endividamento Bancário"                                             periods={loadedPeriods} getValue={m => m.endividamentoCP + m.endividamentoLP} direction="desc" isHeader refIdx={refIdx} />
 
                       {/* MÚTUO DOS SÓCIOS */}
-                      <SectionHeader icon="🤝" title="Mútuo dos Sócios" subtitle="Saldo atual — conta 2.2.1.01" colSpan={colSpan} />
+                      <SectionHeader icon="🤝" title="Mútuo dos Sócios" subtitle="Saldo atual — conta 2.2.1.01.01" colSpan={colSpan} />
                       <CompRow label="Total Mútuo dos Sócios" desc="Aportes e empréstimos entre sócios e empresa" periods={loadedPeriods} getValue={m => m.mutuoSocios} direction="desc" isHeader refIdx={refIdx} />
 
                       {/* PARCELAMENTO REFIS */}
