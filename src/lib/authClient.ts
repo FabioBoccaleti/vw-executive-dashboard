@@ -1,5 +1,5 @@
 // ─── Cliente de autenticação (lado cliente) ───────────────────────────────────
-// Responsável por chamar as APIs de auth e gerenciar o token no localStorage.
+// Responsável por chamar as APIs de auth e gerenciar o token no sessionStorage.
 
 import type { SessionPayload, PublicUser, AccessLogEntry } from './authTypes';
 
@@ -9,12 +9,12 @@ const SESSION_DATA_KEY = 'auth_session_data';
 // ─── Token / Sessão local ─────────────────────────────────────────────────────
 
 export function getSessionToken(): string | null {
-  return localStorage.getItem(SESSION_KEY);
+  return sessionStorage.getItem(SESSION_KEY);
 }
 
 export function getSessionData(): SessionPayload | null {
   try {
-    const raw = localStorage.getItem(SESSION_DATA_KEY);
+    const raw = sessionStorage.getItem(SESSION_DATA_KEY);
     if (!raw) return null;
     const data: SessionPayload = JSON.parse(raw);
     if (data.expiresAt < Date.now()) {
@@ -28,13 +28,13 @@ export function getSessionData(): SessionPayload | null {
 }
 
 export function saveSession(token: string, data: SessionPayload): void {
-  localStorage.setItem(SESSION_KEY, token);
-  localStorage.setItem(SESSION_DATA_KEY, JSON.stringify(data));
+  sessionStorage.setItem(SESSION_KEY, token);
+  sessionStorage.setItem(SESSION_DATA_KEY, JSON.stringify(data));
 }
 
 export function clearSession(): void {
-  localStorage.removeItem(SESSION_KEY);
-  localStorage.removeItem(SESSION_DATA_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_DATA_KEY);
 }
 
 export function isLoggedIn(): boolean {
