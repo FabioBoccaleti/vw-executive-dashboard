@@ -1,0 +1,136 @@
+// ─── Cliente de autenticação (lado cliente) ───────────────────────────────────
+// Responsável por chamar as APIs de auth e gerenciar o token no localStorage.
+
+import type { SessionPayload, PublicUser, AccessLogEntry } from './authTypes';
+
+const SESSION_KEY = 'auth_session_token';
+const SESSION_DATA_KEY = 'auth_session_data';
+
+// ─── Token / Sessão local ─────────────────────────────────────────────────────
+
+export function getSessionToken(): string | null {
+  return localStorage.getItem(SESSION_KEY);
+}
+
+export function getSessionData(): SessionPayload | null {
+  try {
+    const raw = localStorage.getItem(SESSION_DATA_KEY);
+    if (!raw) return null;
+    const data: SessionPayload = JSON.parse(raw);
+    if (data.expiresAt < Date.now()) {
+      clearSession();
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSession(token: string, data: SessionPayload): void {
+  localStorage.setItem(SESSION_KEY, token);
+  localStorage.setItem(SESSION_DATA_KEY, JSON.stringify(data));
+}
+
+export function clearSession(): void {
+  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_DATA_KEY);
+}
+
+export function isLoggedIn(): boolean {
+  return getSessionData() !== null;
+}
+
+// ─── Chamadas de API ──────────────────────────────────────────────────────────
+
+export async function apiLogin(username: string, password: string): Promise<{ token: string; session: SessionPayload } | { error: string }> {
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    return await res.json();
+  } catch {
+    return { error: 'Erro de conexão. Verifique sua internet.' };
+  }
+}
+
+export async function apiLogout(): Promise<void> {
+  const token = getSessionToken();
+  if (token) {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }).catch(() => {});
+  }
+  clearSession();
+}
+
+export async function apiListUsers(): Promise<PublicUser[]> {
+  const token = getSessionToken();
+  const res = await fetch('/api/auth/users', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Não autorizado');
+  const data = await res.json();
+  return data.users;
+}
+
+export async function apiCreateUser(payload: Omit<PublicUser, 'id' | 'createdAt' | 'updatedAt'> & { password: string }): Promise<PublicUser> {
+  const token = getSessionToken();
+  const res = await fetch('/api/auth/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Erro ao criar usuário');
+  }
+  return (await res.json()).user;
+}
+
+export async function apiUpdateUser(id: string, payload: Partial<Omit<PublicUser, 'id' | 'createdAt'> & { password?: string }>): Promise<PublicUser> {
+  const token = getSessionToken();
+  const res = await fetch(`/api/auth/users?id=${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Erro ao atualizar usuário');
+  }
+  return (await res.json()).user;
+}
+
+export async function apiDeleteUser(id: string): Promise<void> {
+  const token = getSessionToken();
+  const res = await fetch(`/api/auth/users?id=${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Erro ao excluir usuário');
+  }
+}
+
+export async function apiGetLogs(): Promise<AccessLogEntry[]> {
+  const token = getSessionToken();
+  const res = await fetch('/api/auth/logs', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Não autorizado');
+  return (await res.json()).logs;
+}
+
+export async function apiValidateAdminPassword(password: string): Promise<boolean> {
+  const res = await fetch('/api/auth/admin-check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  return res.ok;
+}

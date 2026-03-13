@@ -6,13 +6,20 @@ import { FluxoCaixaDashboard } from '@/components/FluxoCaixaDashboard'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
 import { initializeFromDatabase, isProduction, saveSelectedFiscalYear } from '@/lib/dataStorage'
+import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { LoginScreen } from '@/components/LoginScreen'
+import { AdminPage } from '@/components/AdminPage'
 
-function App() {
+function AppContent() {
+  const { session, isLoading: authLoading, isAdmin } = useAuth()
   const [brand, setBrand] = useState<Brand | null>(null)
   // Sempre mostra o seletor de marca ao iniciar a aplicação
   const [showBrandSelector, setShowBrandSelector] = useState(true)
   const [dbLoading, setDbLoading] = useState(true)
   const [dbError, setDbError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState<'app' | 'admin'>(() =>
+    window.location.pathname === '/admin' ? 'admin' : 'app'
+  )
   
   // Inicializa o banco de dados em produção
   useEffect(() => {
@@ -73,7 +80,54 @@ function App() {
   const handleChangeBrand = () => {
     setShowBrandSelector(true)
   }
-  
+
+  const handleNavigateAdmin = () => {
+    window.history.pushState({}, '', '/admin')
+    setCurrentPage('admin')
+  }
+
+  const handleBackFromAdmin = () => {
+    window.history.pushState({}, '', '/')
+    setCurrentPage('app')
+  }
+
+  // Redireciona não-admins que chegam via URL /admin
+  useEffect(() => {
+    if (!authLoading && session && currentPage === 'admin' && session.role !== 'admin') {
+      setCurrentPage('app')
+      window.history.pushState({}, '', '/')
+    }
+  }, [authLoading, session, currentPage])
+
+  // Spinner durante carregamento da sessão
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+      </div>
+    )
+  }
+
+  // Tela de login se não autenticado
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-background">
+        <LoginScreen onSuccess={() => {}} />
+        <Toaster />
+      </div>
+    )
+  }
+
+  // Painel administrativo
+  if (currentPage === 'admin') {
+    return (
+      <div className="min-h-screen bg-background">
+        <AdminPage onBack={handleBackFromAdmin} />
+        <Toaster />
+      </div>
+    )
+  }
+
   // Mostra loading enquanto inicializa o banco de dados
   if (dbLoading && isProduction()) {
     return (
@@ -111,6 +165,7 @@ function App() {
         <BrandSelector 
           onSelectBrand={handleBrandSelect} 
           currentBrand={brand || undefined}
+          onAdminClick={isAdmin() ? handleNavigateAdmin : undefined}
         />
         <Toaster />
       </div>
@@ -140,6 +195,14 @@ function App() {
       )}
       <Toaster />
     </div>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }
 

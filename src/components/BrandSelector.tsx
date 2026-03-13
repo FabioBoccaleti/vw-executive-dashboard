@@ -12,7 +12,7 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BRAND_CONFIGS, type Brand } from '@/lib/brands';
-import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2 } from 'lucide-react';
+import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, Settings } from 'lucide-react';
 import { PasswordDialog } from '@/components/PasswordDialog';
 
 // Sub-marcas do Demonstrativo de Resultados
@@ -27,9 +27,10 @@ const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despes
 interface BrandSelectorProps {
   onSelectBrand: (brand: Brand) => void;
   currentBrand?: Brand;
+  onAdminClick?: () => void;
 }
 
-export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProps) {
+export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick }: BrandSelectorProps) {
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(currentBrand || null);
   const [hoveredBrand, setHoveredBrand] = useState<Brand | null>(null);
   const [demonstrativoExpanded, setDemonstrativoExpanded] = useState<boolean>(
@@ -263,6 +264,17 @@ export function BrandSelector({ onSelectBrand, currentBrand }: BrandSelectorProp
         title="Acesso Restrito"
         description={`O acesso a ${selectedBrand ? BRAND_CONFIGS[selectedBrand].name : ''} requer autorização. Digite a senha para continuar:`}
       />
+
+      {/* Botão Admin fixo no canto inferior direito - visível apenas para admins */}
+      {onAdminClick && (
+        <button
+          onClick={onAdminClick}
+          title="Painel Administrativo"
+          className="fixed bottom-6 right-6 p-3 rounded-full bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 shadow-md transition-colors duration-200 z-50"
+        >
+          <Settings className="w-5 h-5" />
+        </button>
+      )}
     </div>
   );
 }
