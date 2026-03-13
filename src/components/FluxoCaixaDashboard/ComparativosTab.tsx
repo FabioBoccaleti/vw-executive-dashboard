@@ -152,18 +152,20 @@ function extractMetrics(rawText: string): ComparativoMetrics {
   const patrimonioLiquido    = absAtu('2.3');
 
   // ── DRE ──────────────────────────────────────────────────────────────────
-  const recBruta      = absAtu('3.1');
-  const impostosV     = absAtu('3.2');
-  const devolucoes    = absAtu('3.3');
+  // Usa valCred/valDeb (movimento do período) —  saldoAtual em balancetes
+  // cumulativos YTD seria o acumulado Jan–mês, tornando mensal = acumulado.
+  const recBruta      = get('3.1').valCred;
+  const impostosV     = get('3.2').valDeb;
+  const devolucoes    = get('3.3').valDeb;
   const receitaLiquida = recBruta - impostosV - devolucoes;
-  const CMV           = absAtu('4');
+  const CMV           = get('4').valDeb;
   const lucBruto      = receitaLiquida - CMV;
-  const rendOper      = absAtu('3.4');
-  const rendFinanc    = absAtu('3.5');
-  const rendNaoOper   = absAtu('3.6');
+  const rendOper      = get('3.4').valCred;
+  const rendFinanc    = get('3.5').valCred;
+  const rendNaoOper   = get('3.6').valCred;
   const despOper5Net  = (get('5').valDeb || 0) - (get('5').valCred || 0);
   const deprec_per    = get('5.5.2.07.20').valDeb;
-  const provisaoIR    = absAtu('6');
+  const provisaoIR    = get('6').valDeb;
   const resultadoAntesIR = lucBruto + rendOper + rendFinanc + rendNaoOper - despOper5Net;
   const resultadoLiquido = resultadoAntesIR - provisaoIR;
 
@@ -185,6 +187,8 @@ function extractMetrics(rawText: string): ComparativoMetrics {
   const investimentos = { ant: absAnt('1.5.3'),         atu: absAtu('1.5.3')       };
   const realizLPCred  = { ant: absAnt('1.5.1.01.52'), atu: absAtu('1.5.1.01.52') };
   const emprestCP    = { ant: absAnt('2.1.1'),         atu: absAtu('2.1.1')       };
+  const emprestCP_01 = { ant: absAnt('2.1.1.01'),      atu: absAtu('2.1.1.01')    }; // Fornecedores → operacional
+  const emprestCP_02 = { ant: absAnt('2.1.1.02'),      atu: absAtu('2.1.1.02')    }; // Financiamentos CP → financiamento
   const emprestLP    = { ant: absAnt('2.2.1.07'),      atu: absAtu('2.2.1.07')    };
   const pessoasLig   = { ant: absAnt('2.2.1.01'),      atu: absAtu('2.2.1.01')    };
   const debitosLig   = { ant: absAnt('2.2.1.02'),      atu: absAtu('2.2.1.02')    };
@@ -202,17 +206,20 @@ function extractMetrics(rawText: string): ComparativoMetrics {
     (-(contasCorr.atu - contasCorr.ant)) + (-(valDiversos.atu - valDiversos.ant)) +
     (-(despAntec.atu - despAntec.ant)) + (fornecTotal.atu - fornecTotal.ant) +
     (obrigTrib.atu - obrigTrib.ant) + (obrigTrab.atu - obrigTrab.ant) +
-    (contasPagar.atu - contasPagar.ant);
+    (contasPagar.atu - contasPagar.ant) +
+    (emprestCP_01.atu - emprestCP_01.ant) +  // Fornecedores 2.1.1.01 → operacional
+    (outros2_2_1Atu - outros2_2_1Ant);       // Resíduo 2.2.1 → operacional
 
   const fluxoInvestimento =
     -(imobiliz.atu - imobiliz.ant) - (intangivel.atu - intangivel.ant) -
     (realizLPCred.atu - realizLPCred.ant) - (investimentos.atu - investimentos.ant);
 
   const fluxoFinanciamento =
-    (emprestCP.atu - emprestCP.ant) + (emprestLP.atu - emprestLP.ant) +
+    (emprestCP_02.atu - emprestCP_02.ant) + // Financiamentos CP 2.1.1.02 → financiamento
+    (emprestLP.atu - emprestLP.ant) +
     (pessoasLig.atu - pessoasLig.ant) + (debitosLig.atu - debitosLig.ant) +
-    (arrendLP.atu - arrendLP.ant) + (outrosPassLP.atu - outrosPassLP.ant) +
-    (outros2_2_1Atu - outros2_2_1Ant);
+    (arrendLP.atu - arrendLP.ant) + (outrosPassLP.atu - outrosPassLP.ant);
+    // outros2_2_1 movido para operacional
 
   const variacaoCaixa = fluxoOperacional + fluxoInvestimento + fluxoFinanciamento;
 
