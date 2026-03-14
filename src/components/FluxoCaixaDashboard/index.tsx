@@ -3558,6 +3558,7 @@ function IndicadoresTab({ data, fmtBRL, SectionTitle, Badge, janAccounts, select
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {indicadores.map((ind2, i) => {
           const isStacked = hasAcum && ind2.acumValue !== undefined;
+          const badgeLabel = (s: St) => s === 'ok' ? '✓ Ok' : s === 'warn' ? '⚡ Atenção' : '✗ Crítico';
           return (
             <Card key={i}>
               <CardContent className="pt-6 flex flex-col gap-2.5">
@@ -3566,16 +3567,24 @@ function IndicadoresTab({ data, fmtBRL, SectionTitle, Badge, janAccounts, select
                     <div className="text-xs text-muted-foreground mb-0.5">{ind2.formula}</div>
                     <div className="text-base font-bold text-foreground">{ind2.label}</div>
                   </div>
-                  <Badge label={ind2.status === 'ok' ? '✓ Ok' : ind2.status === 'warn' ? '⚡ Atenção' : '✗ Crítico'} status={ind2.status} />
+                  {!isStacked && (
+                    <Badge label={badgeLabel(ind2.status)} status={ind2.status} />
+                  )}
                 </div>
                 {isStacked ? (
                   <div className="space-y-1.5">
                     <div>
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{headerMes}</div>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{headerMes}</div>
+                        <Badge label={badgeLabel(ind2.status)} status={ind2.status} />
+                      </div>
                       <div className={cn('font-mono text-2xl font-bold', statusColor(ind2.status))}>{ind2.value}</div>
                     </div>
                     <div className="border-t border-border/50 pt-1.5">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{headerAcu}</div>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{headerAcu}</div>
+                        <Badge label={badgeLabel(ind2.acumStatus!)} status={ind2.acumStatus!} />
+                      </div>
                       <div className={cn('font-mono text-2xl font-bold', statusColor(ind2.acumStatus!))}>{ind2.acumValue}</div>
                     </div>
                   </div>
