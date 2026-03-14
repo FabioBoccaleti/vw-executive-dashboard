@@ -15,6 +15,7 @@ import { MutuoSociosCharts } from "./MutuoSociosCharts";
 import { ParcelamentoRefisCharts } from "./ParcelamentoRefisCharts";
 import { EndividamentoCharts } from "./EndividamentoCharts";
 import { ReceitasCharts } from "./ReceitasCharts";
+import { FCCaixaDiretoCharts } from "./FCCaixaDiretoCharts";
 import { ComparativoReceitas } from "./ComparativoReceitas";
 import { ProjecaoCaixaChart } from "./ProjecaoCaixaChart";
 
@@ -3020,6 +3021,8 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
   const fluxoOperDireto = recebClientes + pagFornec + pagImpostos + despOperCaixa + pagIR + rendasRecebidas - d.dRealizLPCred + d.dEmprestCP_01 + d.dOutros2_2_1;
   const diff = Math.abs(fluxoOperDireto - d.fluxoOper);
 
+  const [showCharts, setShowCharts] = useState(false);
+
   // ── Acumulado YTD: usando saldoAtual (resultado) e variação Jan→mês (patrimonial) ──
   let acum: any = null;
   if (hasAcum) {
@@ -3128,8 +3131,21 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
   const diffAcum = acum ? Math.abs(acum.fluxoOperDireto - (acum.fluxoInvest + acum.fluxoFinanc + acum.fluxoTotal - acum.fluxoTotal)) : 0;
   // Validação cruzada acum: compara com fluxo indireto acumulado (não disponível aqui — skip)
 
+  if (showCharts) {
+    return <FCCaixaDiretoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
+  }
+
   return (
     <div>
+      {/* Botão Evolução Mensal */}
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => setShowCharts(true)}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
+        >
+          <span>📈</span> Evolução Mensal
+        </button>
+      </div>
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
