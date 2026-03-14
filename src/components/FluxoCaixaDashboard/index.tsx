@@ -2828,8 +2828,23 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
   // Alias para o acumulado ou mensal dependendo do modo (usado nos KPIs sem acum)
   const da = dAcum ?? d;
 
+  const [showCharts, setShowCharts] = useState(false);
+
+  if (showCharts) {
+    return <FCCaixaDiretoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} title="FC Indireto" />;
+  }
+
   return (
     <div>
+      {/* Botão Evolução Mensal */}
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => setShowCharts(true)}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
+        >
+          <span>📈</span> Evolução Mensal
+        </button>
+      </div>
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[

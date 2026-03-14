@@ -31,6 +31,7 @@ interface Props {
   selectedYear: number;
   selectedMonth: number;
   onClose: () => void;
+  title?: string;
 }
 
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -182,7 +183,7 @@ const CHART_DEFS: Array<{ key: keyof DFCValues; label: string }> = [
 ];
 
 // ─── Componente principal ─────────────────────────────────────────────────────
-export function FCCaixaDiretoCharts({ selectedYear, selectedMonth, onClose }: Props) {
+export function FCCaixaDiretoCharts({ selectedYear, selectedMonth, onClose, title = 'FC de Caixa Direto' }: Props) {
   const [loading, setLoading] = useState(true);
   const [monthlyDFC, setMonthlyDFC] = useState<Record<number, DFCValues>>({});
 
@@ -285,7 +286,7 @@ export function FCCaixaDiretoCharts({ selectedYear, selectedMonth, onClose }: Pr
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-bold text-foreground">
-            Evolução Mensal — FC de Caixa Direto
+            Evolução Mensal — {title}
           </h3>
           <p className="text-sm text-muted-foreground mt-0.5">
             {selectedYear} • Jan{upToMonth > 1 ? ` – ${MONTH_LABELS[upToMonth - 1]}` : ''}
