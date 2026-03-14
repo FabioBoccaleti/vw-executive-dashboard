@@ -5,7 +5,7 @@
 // Chaveamento: uma chave por mês/ano → fluxo_caixa_YYYY_MM
 // Chave legada do dez/25 (migração automática): fluxo_caixa_raw_v2
 
-import { kvGet, kvSet, kvDelete, kvKeys } from '@/lib/kvClient';
+import { kvGet, kvSet, kvDelete, kvKeys, kvBulkGet } from '@/lib/kvClient';
 
 // Chave legada usada antes da separação por mês
 const LEGACY_KEY_2025 = 'fluxo_caixa_raw_v2';
@@ -95,6 +95,28 @@ export async function loadFluxoCaixaIndex(): Promise<Record<string, boolean>> {
     return index;
   } catch (err) {
     console.error('Erro ao carregar índice do FluxoCaixa:', err);
+    return {};
+  }
+}
+
+/**
+ * Carrega os balancetes de vários meses de um ano de uma vez (bulk).
+ * Retorna um mapa { month -> rawText } apenas para os meses com dados.
+ */
+export async function loadMultipleMonthsRaw(year: number, months: number[]): Promise<Record<number, string>> {
+  try {
+    const keys = months.map(m => getKey(year, m));
+    const result = await kvBulkGet<FluxoCaixaRaw>(keys);
+    const out: Record<number, string> = {};
+    for (let i = 0; i < months.length; i++) {
+      const val = result[keys[i]];
+      if (val && val.rawText) {
+        out[months[i]] = val.rawText;
+      }
+    }
+    return out;
+  } catch (err) {
+    console.error('Erro ao carregar múltiplos meses:', err);
     return {};
   }
 }
