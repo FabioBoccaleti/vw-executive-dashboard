@@ -16,6 +16,7 @@ import { ParcelamentoRefisCharts } from "./ParcelamentoRefisCharts";
 import { EndividamentoCharts } from "./EndividamentoCharts";
 import { ReceitasCharts } from "./ReceitasCharts";
 import { FCCaixaDiretoCharts } from "./FCCaixaDiretoCharts";
+import { ResultadoCharts } from "./ResultadoCharts";
 import { ComparativoReceitas } from "./ComparativoReceitas";
 import { ProjecaoCaixaChart } from "./ProjecaoCaixaChart";
 
@@ -2464,6 +2465,7 @@ function PassivoTab({ data, SectionTitle, TableRow2, colAnterior, colAtual }: an
 }
 
 function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selectedMonth, selectedYear }: any) {
+  const [showCharts, setShowCharts] = useState(false);
   const d = data;
   const accounts = d.accounts as Record<string, any>;
   const get = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0, desc: '' };
@@ -2582,8 +2584,21 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
       : (val >= 0 ? 'text-foreground/80' : 'text-red-600 dark:text-red-400'),
   });
 
+  if (showCharts) {
+    return <ResultadoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
+  }
+
   return (
     <div>
+      {/* Botão Evolução Mensal */}
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => setShowCharts(true)}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
+        >
+          <span>📈</span> Evolução Mensal
+        </button>
+      </div>
       {/* KPIs — duplo quando mensal */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
