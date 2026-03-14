@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { loadDespesasTipos, saveDespesasTipos } from './despesasStorage';
 import { ComparativoDespesas } from './ComparativoDespesas';
+import { DespesasCharts } from './DespesasCharts';
 
 function toTitleCase(str: string) {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -154,6 +155,7 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
   const [loadingTipos, setLoadingTipos] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showYTD, setShowYTD] = useState(false);
+  const [showCharts, setShowCharts] = useState(false);
   // Ref para debounce do save
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -221,6 +223,10 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
   const canShowYTD = selectedMonth > 1;
   const ytdLabel = canShowYTD ? `Jan – ${YTD_MS[selectedMonth]}/${yr2}` : '';
 
+  if (showCharts) {
+    return <DespesasCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
+  }
+
   if (despesasView === 'comparativo') {
     return (
       <div className="space-y-4">
@@ -239,6 +245,16 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
 
   return (
     <div className="space-y-4">
+
+      {/* Botão Evolução Mensal */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowCharts(true)}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
+        >
+          <span>📈</span> Evolução Mensal
+        </button>
+      </div>
 
       {/* ── Cards de Resumo por Grupo (sempre visíveis) ── */}
       {resumoRows.length > 0 && (
