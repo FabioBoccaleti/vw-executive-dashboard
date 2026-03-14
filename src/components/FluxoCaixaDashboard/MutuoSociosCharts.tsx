@@ -278,7 +278,10 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
 
       {/* Gráficos por sub-conta */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {contasData.map((conta, idx) => {
+        {contasData
+          .filter(conta => Object.values(conta.values).some(v => v > 0))
+          .map((conta) => {
+          const idx = contasData.indexOf(conta);
           const compareVals = compareContasData[idx]?.values || {};
           const chartData = buildChartData(conta.values, compareVals);
           const descLabel = conta.desc ? toTitleCase(conta.desc) : conta.conta;
