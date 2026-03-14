@@ -311,8 +311,11 @@ export function EndividamentoCharts({ selectedYear, selectedMonth, onClose }: Pr
     );
   }
 
-  // Filtra contas sem valores
-  const activeCharts = charts.filter(c => Object.values(c.values).some(v => v > 0));
+  // Filtra contas sem valores e exclui individuais já representadas em Capital de Giro
+  const HIDDEN_INDIVIDUAL = new Set(['2.1.1.02.03.020', '2.2.1.07.01.003']);
+  const activeCharts = charts.filter(c =>
+    !HIDDEN_INDIVIDUAL.has(c.key) && Object.values(c.values).some(v => v > 0)
+  );
 
   return (
     <div className="space-y-6">
