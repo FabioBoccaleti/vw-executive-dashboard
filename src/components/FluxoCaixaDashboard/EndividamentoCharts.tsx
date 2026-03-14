@@ -184,8 +184,8 @@ export function EndividamentoCharts({ selectedYear, selectedMonth, onClose }: Pr
       });
     }
 
-    // 5) Capital de Giro (soma 2.1.1.02.03.020 + 2.2.1.07.01.003)
-    chartItems.push({ key: 'cap_giro', label: 'Capital de Giro (CP + LP)', values: {} });
+    // 5) Capital de Giro VW (soma 2.1.1.02.03.020 + 2.2.1.07.01.003)
+    chartItems.push({ key: 'cap_giro', label: 'Capital de Giro VW', values: {} });
 
     // If we have known keys from main year, reorder to match
     const orderedItems = knownKeys
