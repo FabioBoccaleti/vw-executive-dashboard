@@ -13,6 +13,7 @@ import { ValoresReceberCharts } from "./ValoresReceberCharts";
 import { PosicaoEstoquesCharts } from "./PosicaoEstoquesCharts";
 import { MutuoSociosCharts } from "./MutuoSociosCharts";
 import { ParcelamentoRefisCharts } from "./ParcelamentoRefisCharts";
+import { EndividamentoCharts } from "./EndividamentoCharts";
 import { ComparativoReceitas } from "./ComparativoReceitas";
 import { ProjecaoCaixaChart } from "./ProjecaoCaixaChart";
 
@@ -1423,6 +1424,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
 }
 
 function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnterior, colAtual, janAccounts, selectedMonth, selectedYear }: any) {
+  const [showCharts, setShowCharts] = useState(false);
   const d = data;
   const accounts = d.accounts as Record<string, any>;
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
@@ -1529,8 +1531,20 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
     </>;
   };
 
+  if (showCharts) {
+    return <EndividamentoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
+  }
+
   return (
     <div className="space-y-6">
+      {/* Botão Gráficos */}
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setShowCharts(true)} className="gap-2">
+          <BarChart3 className="h-4 w-4" />
+          Evolução Mensal
+        </Button>
+      </div>
+
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KPI
