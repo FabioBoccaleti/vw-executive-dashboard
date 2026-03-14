@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins, Layers } from "lucide-react";
+import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins, Layers, Download } from "lucide-react";
+import * as XLSX from 'xlsx';
 import { cn } from "@/lib/utils";
 import { loadFluxoCaixaRaw, saveFluxoCaixaData } from "./fluxoCaixaStorage";
 import { ComparativosTab } from "./ComparativosTab";
@@ -3553,8 +3554,269 @@ function IndicadoresTab({ data, fmtBRL, SectionTitle, Badge, janAccounts, select
   const statusColor = (s: St) =>
     s === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : s === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400';
 
+  // ── Exportar detalhamento para Excel ─────────────────────────────────────────
+  const exportIndicadoresExcel = () => {
+    const acc = data.accounts as Record<string, any>;
+    const get = (id: string) => acc[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0, desc: id };
+    const absMov = (id: string) => { const a = get(id); return Math.abs((a.valCred || 0) - (a.valDeb || 0)); };
+    const fmtV = (v: number) => v;
+    const statusLabel = (s: St) => s === 'ok' ? 'Ok' : s === 'warn' ? 'Atenção' : 'Crítico';
+
+    // Helper: calcula despOper5Net para um dado dicionário de contas
+    const calcDespOper5 = (accs: Record<string, any>) => {
+      const g = (id: string) => accs[id] || { valDeb: 0, valCred: 0 };
+      const allK5 = Object.keys(accs).filter(k => k.startsWith('5.'));
+      const leaves5 = allK5.filter(k => !allK5.some(o => o !== k && o.startsWith(k + '.')));
+      return leaves5.reduce((s, k) => s + ((g(k).valDeb || 0) - (g(k).valCred || 0)), 0);
+    };
+
+    type Row = (string | number)[];
+    const rows: Row[] = [];
+    const header = ['Indicador', 'Período', 'Fórmula', 'Componente', 'Conta', 'Descrição da Conta', 'Valor (R$)', 'Resultado', 'Status'];
+    rows.push(header);
+
+    const addSpacer = () => rows.push([]);
+
+    // ── Indicadores de balanço ────────────────────────────────────
+    // Liquidez Corrente = AC / PC
+    const acAtu = Math.abs(get('1.1').saldoAtual);
+    const pcAtu = Math.abs(get('2.1').saldoAtual);
+    rows.push(['Liquidez Corrente', headerMes, 'AC / PC', 'Numerador: AC', '1.1', get('1.1').desc || 'Ativo Circulante', fmtV(acAtu), '', '']);
+    rows.push(['', '', '', 'Denominador: PC', '2.1', get('2.1').desc || 'Passivo Circulante', fmtV(pcAtu), '', '']);
+    rows.push(['', '', '', 'RESULTADO', '', '', '', pcAtu > 0 ? `${(acAtu / pcAtu).toFixed(2)}x` : '0', statusLabel(lqcStatus)]);
+    addSpacer();
+
+    // Liquidez Imediata = Disponib / PC
+    const dispAtu = Math.abs(get('1.1.1').saldoAtual);
+    rows.push(['Liquidez Imediata', headerMes, 'Disponib. / PC', 'Numerador: Disponibilidades', '1.1.1', get('1.1.1').desc || 'Disponibilidades', fmtV(dispAtu), '', '']);
+    rows.push(['', '', '', 'Denominador: PC', '2.1', get('2.1').desc || 'Passivo Circulante', fmtV(pcAtu), '', '']);
+    rows.push(['', '', '', 'RESULTADO', '', '', '', pcAtu > 0 ? `${(dispAtu / pcAtu * 100).toFixed(1)}%` : '0', statusLabel(lqiStatus)]);
+    addSpacer();
+
+    // Endividamento Geral = (PC + PNC) / AT
+    const pncAtu = Math.abs(get('2.2').saldoAtual);
+    const atAtu = Math.abs(get('1').saldoAtual);
+    rows.push(['Endividamento Geral', headerMes, 'PT / AT', 'Numerador: PC', '2.1', get('2.1').desc || 'Passivo Circulante', fmtV(pcAtu), '', '']);
+    rows.push(['', '', '', 'Numerador: PNC', '2.2', get('2.2').desc || 'Passivo Não Circulante', fmtV(pncAtu), '', '']);
+    rows.push(['', '', '', 'Numerador: PT (PC + PNC)', '', '', fmtV(pcAtu + pncAtu), '', '']);
+    rows.push(['', '', '', 'Denominador: AT', '1', get('1').desc || 'Ativo Total', fmtV(atAtu), '', '']);
+    rows.push(['', '', '', 'RESULTADO', '', '', '', atAtu > 0 ? `${((pcAtu + pncAtu) / atAtu * 100).toFixed(1)}%` : '0', statusLabel(endStatus)]);
+    addSpacer();
+
+    // Participação Cap 3ºs = PT / PL
+    const plAtu = Math.abs(get('2.3').saldoAtual);
+    rows.push(['Participação Cap. 3ºs', headerMes, 'PT / PL', 'Numerador: PC', '2.1', get('2.1').desc || 'Passivo Circulante', fmtV(pcAtu), '', '']);
+    rows.push(['', '', '', 'Numerador: PNC', '2.2', get('2.2').desc || 'Passivo Não Circulante', fmtV(pncAtu), '', '']);
+    rows.push(['', '', '', 'Numerador: PT (PC + PNC)', '', '', fmtV(pcAtu + pncAtu), '', '']);
+    rows.push(['', '', '', 'Denominador: PL', '2.3', get('2.3').desc || 'Patrimônio Líquido', fmtV(plAtu), '', '']);
+    rows.push(['', '', '', 'RESULTADO', '', '', '', plAtu > 0 ? `${((pcAtu + pncAtu) / plAtu).toFixed(1)}x` : '0', statusLabel(pctStatus)]);
+    addSpacer();
+
+    // Imobilização do PL = ANC / PL
+    const ancAtu = Math.abs(get('1.5').saldoAtual);
+    const imobPLStatus: St = ancAtu <= plAtu ? 'ok' : 'bad';
+    rows.push(['Imobilização do PL', headerMes, 'ANC / PL', 'Numerador: ANC', '1.5', get('1.5').desc || 'Ativo Não Circulante', fmtV(ancAtu), '', '']);
+    rows.push(['', '', '', 'Denominador: PL', '2.3', get('2.3').desc || 'Patrimônio Líquido', fmtV(plAtu), '', '']);
+    rows.push(['', '', '', 'RESULTADO', '', '', '', plAtu > 0 ? `${(ancAtu / plAtu * 100).toFixed(0)}%` : '0', statusLabel(imobPLStatus)]);
+    addSpacer();
+
+    // Imob. do Investimento = ANC / (PL + PNC)
+    rows.push(['Imob. do Investimento', headerMes, 'ANC / (PL + PNC)', 'Numerador: ANC', '1.5', get('1.5').desc || 'Ativo Não Circulante', fmtV(ancAtu), '', '']);
+    rows.push(['', '', '', 'Denominador: PL', '2.3', get('2.3').desc || 'Patrimônio Líquido', fmtV(plAtu), '', '']);
+    rows.push(['', '', '', 'Denominador: PNC', '2.2', get('2.2').desc || 'Passivo Não Circulante', fmtV(pncAtu), '', '']);
+    rows.push(['', '', '', 'Denominador: (PL + PNC)', '', '', fmtV(plAtu + pncAtu), '', '']);
+    rows.push(['', '', '', 'RESULTADO', '', '', '', (plAtu + pncAtu) > 0 ? `${(ancAtu / (plAtu + pncAtu) * 100).toFixed(0)}%` : '0', statusLabel(imobInvestStatus)]);
+    addSpacer();
+
+    // Taxa de Risco = (PC + PNC) / AC
+    rows.push(['Taxa de Risco', headerMes, '(PC + PNC) / AC', 'Numerador: PC', '2.1', get('2.1').desc || 'Passivo Circulante', fmtV(pcAtu), '', '']);
+    rows.push(['', '', '', 'Numerador: PNC', '2.2', get('2.2').desc || 'Passivo Não Circulante', fmtV(pncAtu), '', '']);
+    rows.push(['', '', '', 'Numerador: (PC + PNC)', '', '', fmtV(pcAtu + pncAtu), '', '']);
+    rows.push(['', '', '', 'Denominador: AC', '1.1', get('1.1').desc || 'Ativo Circulante', fmtV(acAtu), '', '']);
+    rows.push(['', '', '', 'RESULTADO', '', '', '', acAtu > 0 ? `${((pcAtu + pncAtu) / acAtu).toFixed(2)}x` : '0', statusLabel(taxaRiscoStatus)]);
+    addSpacer();
+
+    // ── Indicadores de Resultado (mensal + acumulado) ─────────────────────────
+    // Contas usadas no Resultado Líquido
+    const contasResLiq = [
+      { id: '3.1', sinal: '+', papel: 'Receita Bruta' },
+      { id: '3.2', sinal: '−', papel: 'Impostos s/ Vendas' },
+      { id: '3.3', sinal: '−', papel: 'Devoluções' },
+      { id: '4',   sinal: '−', papel: 'CMV / Custo' },
+      { id: '5',   sinal: '−', papel: 'Despesas Operacionais' },
+      { id: '3.4', sinal: '+', papel: 'Rendimentos Operacionais' },
+      { id: '3.5', sinal: '+', papel: 'Rendimentos Financeiros' },
+      { id: '3.6', sinal: '+', papel: 'Rendimentos Não Operacionais' },
+      { id: '6',   sinal: '−', papel: 'Provisão IR/CSLL' },
+    ];
+
+    // Contas de Dívidas Financeiras (para ROIC)
+    const contasDivFin = [
+      { id: '2.1.1', desc: 'Empréstimos CP' },
+      { id: '2.2.1.07', desc: 'Empréstimos LP' },
+      { id: '2.2.1.01', desc: 'Pessoas Ligadas' },
+      { id: '2.2.1.02', desc: 'Débitos com Ligadas' },
+      { id: '2.2.1.15', desc: 'Arrendamentos LP' },
+    ];
+
+    // Função para gerar linhas de um indicador de resultado
+    const addResultIndicator = (label: string, formula: string, periodo: string,
+      numerador: number, numeradorLinhas: { conta: string; desc: string; valor: number; sinal: string }[],
+      denominador: number, denominadorLinhas: { conta: string; desc: string; valor: number }[],
+      resultado: string, status: St, isMargem?: boolean
+    ) => {
+      // Numerador
+      for (const l of numeradorLinhas) {
+        rows.push([label, periodo, formula, `Numerador (${l.sinal}) ${l.desc}`, l.conta, l.desc, fmtV(l.valor), '', '']);
+        label = ''; formula = '';
+      }
+      rows.push(['', '', '', isMargem ? 'Numerador: Lucro Bruto (Rec.Líq − CMV)' : 'Numerador: Resultado Líquido', '', '', fmtV(numerador), '', '']);
+      // Denominador
+      for (const l of denominadorLinhas) {
+        rows.push(['', '', '', `Denominador: ${l.desc}`, l.conta, l.desc, fmtV(l.valor), '', '']);
+      }
+      if (denominadorLinhas.length > 1) {
+        rows.push(['', '', '', 'Denominador: Total', '', '', fmtV(denominador), '', '']);
+      }
+      rows.push(['', '', '', 'RESULTADO', '', '', '', resultado, statusLabel(status)]);
+    };
+
+    // ── Mensal values ──
+    const despOper5 = calcDespOper5(acc);
+    const resLiqVal = absMov('3.1') - absMov('3.2') - absMov('3.3') - absMov('4') - despOper5
+                    + absMov('3.4') + absMov('3.5') + absMov('3.6') - absMov('6');
+    const recLiqVal = Math.max(absMov('3.1') - absMov('3.2') - absMov('3.3'), 1);
+    const cmvVal    = absMov('4');
+    const lucroBruto = recLiqVal - cmvVal;
+
+    const resLiqLinhas = contasResLiq.map(c => ({
+      conta: c.id, desc: get(c.id).desc || c.papel, sinal: c.sinal,
+      valor: c.id === '5' ? despOper5 : absMov(c.id)
+    }));
+
+    // Margem Bruta — Mensal
+    const mbNumeradorLinhas = [
+      { conta: '3.1', desc: get('3.1').desc || 'Receita Bruta', sinal: '+', valor: absMov('3.1') },
+      { conta: '3.2', desc: get('3.2').desc || 'Impostos s/ Vendas', sinal: '−', valor: absMov('3.2') },
+      { conta: '3.3', desc: get('3.3').desc || 'Devoluções', sinal: '−', valor: absMov('3.3') },
+      { conta: '4', desc: get('4').desc || 'CMV', sinal: '−', valor: cmvVal },
+    ];
+    addResultIndicator('Margem Bruta', 'LB / Rec.Líq.', headerMes,
+      lucroBruto, mbNumeradorLinhas,
+      recLiqVal, [{ conta: '3.1−3.2−3.3', desc: 'Receita Líquida', valor: recLiqVal }],
+      `${margemBruta.toFixed(1)}%`, margemBrutaStatus, true);
+    addSpacer();
+
+    // ROIC — Mensal
+    const divFinVal = dividasFin;
+    const capInvVal = capInvestido;
+    const roicDenomLinhas = [
+      { conta: '2.3', desc: get('2.3').desc || 'Patrimônio Líquido', valor: plAtu },
+      ...contasDivFin.map(c => ({ conta: c.id, desc: get(c.id).desc || c.desc, valor: Math.abs(get(c.id).saldoAtual) }))
+    ];
+    addResultIndicator('ROIC', 'Res.Líq. / (PL + Dív.Fin.)', headerMes,
+      resLiqVal, resLiqLinhas, capInvVal, roicDenomLinhas,
+      `${roic.toFixed(1)}%`, roicStatus);
+    addSpacer();
+
+    // ROE — Mensal
+    addResultIndicator('ROE', 'Res.Líq. / PL', headerMes,
+      resLiqVal, resLiqLinhas,
+      plAtu, [{ conta: '2.3', desc: get('2.3').desc || 'Patrimônio Líquido', valor: plAtu }],
+      `${roe.toFixed(1)}%`, roeStatus);
+    addSpacer();
+
+    // ROS — Mensal
+    addResultIndicator('ROS (Margem Líquida)', 'Res.Líq. / Rec.Líquida', headerMes,
+      resLiqVal, resLiqLinhas,
+      recLiqVal, [{ conta: '3.1−3.2−3.3', desc: 'Receita Líquida', valor: recLiqVal }],
+      `${ros.toFixed(1)}%`, rosStatus);
+    addSpacer();
+
+    // ── Acumulado YTD ──
+    if (hasAcum) {
+      const cur = acc;
+      const jan = janAccounts as Record<string, any>;
+      const isCumul = selectedMonth > 1 && Math.abs(cur['3.1']?.saldoAnt || 0) > 10;
+      const amAcum = (id: string) => isCumul
+        ? Math.abs(cur[id]?.saldoAtual || 0)
+        : Math.abs(jan[id]?.saldoAtual || 0) + Math.abs(cur[id]?.saldoAtual || 0);
+
+      const despOper5_ac = isCumul
+        ? Math.abs(cur['5']?.saldoAtual || 0)
+        : Math.abs(jan['5']?.saldoAtual || 0) + Math.abs(cur['5']?.saldoAtual || 0);
+
+      const resLiqAcum = amAcum('3.1') - amAcum('3.2') - amAcum('3.3') - amAcum('4') - despOper5_ac
+                       + amAcum('3.4') + amAcum('3.5') + amAcum('3.6') - amAcum('6');
+      const recLiqAcum = Math.max(amAcum('3.1') - amAcum('3.2') - amAcum('3.3'), 1);
+      const cmvAcum = amAcum('4');
+      const lucroBrutoAcum = recLiqAcum - cmvAcum;
+
+      const resLiqLinhasAcum = contasResLiq.map(c => ({
+        conta: c.id, desc: get(c.id).desc || c.papel, sinal: c.sinal,
+        valor: c.id === '5' ? despOper5_ac : amAcum(c.id)
+      }));
+
+      // Margem Bruta — Acumulado
+      const mbNumeradorLinhasAcum = [
+        { conta: '3.1', desc: get('3.1').desc || 'Receita Bruta', sinal: '+', valor: amAcum('3.1') },
+        { conta: '3.2', desc: get('3.2').desc || 'Impostos s/ Vendas', sinal: '−', valor: amAcum('3.2') },
+        { conta: '3.3', desc: get('3.3').desc || 'Devoluções', sinal: '−', valor: amAcum('3.3') },
+        { conta: '4', desc: get('4').desc || 'CMV', sinal: '−', valor: cmvAcum },
+      ];
+      addResultIndicator('Margem Bruta', 'LB / Rec.Líq.', headerAcu,
+        lucroBrutoAcum, mbNumeradorLinhasAcum,
+        recLiqAcum, [{ conta: '3.1−3.2−3.3', desc: 'Receita Líquida', valor: recLiqAcum }],
+        `${mb_a.toFixed(1)}%`, mb_as, true);
+      addSpacer();
+
+      // ROIC — Acumulado
+      addResultIndicator('ROIC', 'Res.Líq. / (PL + Dív.Fin.)', headerAcu,
+        resLiqAcum, resLiqLinhasAcum, capInvVal, roicDenomLinhas,
+        `${roic_a.toFixed(1)}%`, roic_as);
+      addSpacer();
+
+      // ROE — Acumulado
+      addResultIndicator('ROE', 'Res.Líq. / PL', headerAcu,
+        resLiqAcum, resLiqLinhasAcum,
+        plAtu, [{ conta: '2.3', desc: get('2.3').desc || 'Patrimônio Líquido', valor: plAtu }],
+        `${roe_a.toFixed(1)}%`, roe_as);
+      addSpacer();
+
+      // ROS — Acumulado
+      addResultIndicator('ROS (Margem Líquida)', 'Res.Líq. / Rec.Líquida', headerAcu,
+        resLiqAcum, resLiqLinhasAcum,
+        recLiqAcum, [{ conta: '3.1−3.2−3.3', desc: 'Receita Líquida', valor: recLiqAcum }],
+        `${ros_a.toFixed(1)}%`, ros_as);
+    }
+
+    // ── Gerar arquivo Excel ──
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    // Ajustar largura das colunas
+    ws['!cols'] = [
+      { wch: 24 }, // Indicador
+      { wch: 16 }, // Período
+      { wch: 28 }, // Fórmula
+      { wch: 36 }, // Componente
+      { wch: 14 }, // Conta
+      { wch: 36 }, // Descrição
+      { wch: 18 }, // Valor
+      { wch: 14 }, // Resultado
+      { wch: 10 }, // Status
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Indicadores');
+    XLSX.writeFile(wb, `Indicadores_${headerMes.replace('/', '-')}_${selectedYear}.xlsx`);
+  };
+
   return (
     <div>
+      <div className="flex justify-end mb-4">
+        <Button variant="outline" size="sm" onClick={exportIndicadoresExcel} className="gap-2">
+          <Download className="h-4 w-4" />
+          Exportar Detalhamento Excel
+        </Button>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {indicadores.map((ind2, i) => {
           const isStacked = hasAcum && ind2.acumValue !== undefined;
