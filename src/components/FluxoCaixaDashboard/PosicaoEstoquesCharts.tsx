@@ -363,7 +363,8 @@ export function PosicaoEstoquesCharts({ selectedYear, selectedMonth, onClose }: 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {vwData.map((conta, idx) => {
             const cmpVals = cmpVwData[idx]?.values || {};
-            const descLabel = conta.desc ? toTitleCase(conta.desc) : conta.conta;
+            const raw = conta.desc ? toTitleCase(conta.desc) : conta.conta;
+            const descLabel = raw.toLowerCase().includes('vw') ? raw : `${raw} VW`;
             return renderChart(conta.conta, descLabel, conta.conta, conta.values, cmpVals);
           })}
           {renderChart('total-vw', 'Total — Estoque VW', 'Soma das 3 contas VW', totalVW, compareTotalVW)}
@@ -379,7 +380,8 @@ export function PosicaoEstoquesCharts({ selectedYear, selectedMonth, onClose }: 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {audiData.map((conta, idx) => {
             const cmpVals = cmpAudiData[idx]?.values || {};
-            const descLabel = conta.desc ? toTitleCase(conta.desc) : conta.conta;
+            const raw = conta.desc ? toTitleCase(conta.desc) : conta.conta;
+            const descLabel = raw.toLowerCase().includes('audi') ? raw : `${raw} Audi`;
             return renderChart(conta.conta, descLabel, conta.conta, conta.values, cmpVals);
           })}
           {renderChart('total-audi', 'Total — Estoque Audi', 'Soma das 3 contas Audi', totalAudi, compareTotalAudi)}
