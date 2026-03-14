@@ -85,14 +85,28 @@ function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-popover border border-border rounded-lg shadow-lg p-3 text-sm">
-      <p className="font-semibold text-foreground mb-1">{label}</p>
-      {payload.map((entry: any, i: number) => (
-        <div key={i} className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: entry.color }} />
-          <span className="text-muted-foreground">{entry.name}:</span>
-          <span className="font-mono font-semibold text-foreground">{fmtBRLFull(entry.value)}</span>
-        </div>
-      ))}
+      <p className="font-semibold text-foreground mb-1.5">{label}</p>
+      {payload.map((entry: any, i: number) => {
+        const varKey = `var_${entry.dataKey}`;
+        const varPct = entry.payload?.[varKey];
+        return (
+          <div key={i} className="mb-1 last:mb-0">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: entry.color }} />
+              <span className="text-muted-foreground">{entry.name}:</span>
+              <span className="font-mono font-semibold text-foreground">{fmtBRLFull(entry.value)}</span>
+            </div>
+            <div className="ml-5 text-xs">
+              {varPct === null || varPct === undefined
+                ? <span className="text-muted-foreground/60">Var: —</span>
+                : <span className={varPct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
+                    Var: {varPct >= 0 ? '+' : ''}{varPct.toFixed(1)}%
+                  </span>
+              }
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -193,13 +207,31 @@ export function ValoresReceberCharts({ selectedYear, selectedMonth, onClose }: P
   const upToMonth = selectedMonth === 0 ? 12 : selectedMonth;
   const months = Array.from({ length: upToMonth }, (_, i) => i + 1);
 
-  // Monta dados para um gráfico
+  // Monta dados para um gráfico (inclui variação % mês anterior)
   const buildChartData = (currentValues: Record<number, number>, compareValues?: Record<number, number>) => {
-    return months.map(m => ({
-      name: MONTH_LABELS[m - 1],
-      [String(selectedYear)]: currentValues[m] || 0,
-      ...(compareYear ? { [String(compareYear)]: compareValues?.[m] || 0 } : {}),
-    }));
+    const curKey = String(selectedYear);
+    const cmpKey = compareYear ? String(compareYear) : null;
+    return months.map((m, idx) => {
+      const curVal = currentValues[m] || 0;
+      const prevCurVal = idx > 0 ? (currentValues[months[idx - 1]] || 0) : null;
+      const varCur = prevCurVal !== null && prevCurVal !== 0 ? ((curVal - prevCurVal) / prevCurVal) * 100 : null;
+
+      const row: Record<string, any> = {
+        name: MONTH_LABELS[m - 1],
+        [curKey]: curVal,
+        [`var_${curKey}`]: varCur,
+      };
+
+      if (cmpKey) {
+        const cmpVal = compareValues?.[m] || 0;
+        const prevCmpVal = idx > 0 ? (compareValues?.[months[idx - 1]] || 0) : null;
+        const varCmp = prevCmpVal !== null && prevCmpVal !== 0 ? ((cmpVal - prevCmpVal) / prevCmpVal) * 100 : null;
+        row[cmpKey] = cmpVal;
+        row[`var_${cmpKey}`] = varCmp;
+      }
+
+      return row;
+    });
   };
 
   if (loading) {
