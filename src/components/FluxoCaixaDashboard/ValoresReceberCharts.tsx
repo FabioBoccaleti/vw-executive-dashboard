@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend, Cell,
+  ResponsiveContainer, Legend,
 } from 'recharts';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -77,16 +77,8 @@ const fmtBRLFull = (v: number) =>
   'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // ─── Cores ────────────────────────────────────────────────────────────────────
-// ─── Cores vibrantes por conta ────────────────────────────────────────────────
-const CONTA_COLORS = [
-  '#6366f1', // indigo - Cheques
-  '#3b82f6', // blue - Duplicatas
-  '#10b981', // emerald - Cartões
-  '#f59e0b', // amber - Garantias
-  '#ef4444', // red - Bonus
-];
-const TOTAL_COLORS = ['#6366f1','#818cf8','#3b82f6','#60a5fa','#10b981','#34d399','#f59e0b','#fbbf24','#ef4444','#f87171','#8b5cf6','#a78bfa'];
-const COLOR_COMPARE = '#cbd5e1'; // slate-300
+const COLOR_CURRENT = '#3b82f6'; // blue-500
+const COLOR_COMPARE = '#94a3b8'; // slate-400
 
 // ─── Tooltip customizado ──────────────────────────────────────────────────────
 function CustomTooltip({ active, payload, label }: any) {
@@ -295,17 +287,13 @@ export function ValoresReceberCharts({ selectedYear, selectedMonth, onClose }: P
           const compareVals = compareContasData[idx]?.values || {};
           const chartData = buildChartData(conta.values, compareVals);
           const descLabel = conta.desc ? toTitleCase(conta.desc) : conta.conta;
-          const color = CONTA_COLORS[idx % CONTA_COLORS.length];
 
           return (
             <Card key={conta.conta}>
               <CardContent className="pt-5 pb-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: color }} />
-                  <div>
-                    <span className="text-xs font-mono text-muted-foreground">{conta.conta}</span>
-                    <h4 className="text-sm font-semibold text-foreground">{descLabel}</h4>
-                  </div>
+                <div className="mb-3">
+                  <span className="text-xs font-mono text-muted-foreground">{conta.conta}</span>
+                  <h4 className="text-sm font-semibold text-foreground">{descLabel}</h4>
                 </div>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={chartData} barGap={compareYear ? 2 : 0}>
@@ -316,13 +304,10 @@ export function ValoresReceberCharts({ selectedYear, selectedMonth, onClose }: P
                     {compareYear && <Legend iconType="square" wrapperStyle={{ fontSize: 12 }} />}
                     <Bar
                       dataKey={String(selectedYear)}
+                      fill={COLOR_CURRENT}
                       radius={[3, 3, 0, 0]}
                       maxBarSize={40}
-                    >
-                      {chartData.map((_, i) => (
-                        <Cell key={i} fill={color} fillOpacity={0.7 + (i / (chartData.length - 1 || 1)) * 0.3} />
-                      ))}
-                    </Bar>
+                    />
                     {compareYear && (
                       <Bar
                         dataKey={String(compareYear)}
@@ -355,13 +340,10 @@ export function ValoresReceberCharts({ selectedYear, selectedMonth, onClose }: P
               {compareYear && <Legend iconType="square" wrapperStyle={{ fontSize: 12 }} />}
               <Bar
                 dataKey={String(selectedYear)}
+                fill={COLOR_CURRENT}
                 radius={[4, 4, 0, 0]}
                 maxBarSize={48}
-              >
-                {buildChartData(totalData, compareTotalData).map((_, i) => (
-                  <Cell key={i} fill={TOTAL_COLORS[i % TOTAL_COLORS.length]} />
-                ))}
-              </Bar>
+              />
               {compareYear && (
                 <Bar
                   dataKey={String(compareYear)}
