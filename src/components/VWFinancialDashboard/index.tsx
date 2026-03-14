@@ -48,7 +48,6 @@ import {
 } from "@/lib/hybridStorage"
 import { DEPARTMENT_LABELS, DEPARTMENTS } from "@/lib/types"
 import { getBrandConfig, BRAND_CONFIGS } from "@/lib/brands"
-import ResultadosCharts from "@/components/VWFinancialDashboard/ResultadosCharts"
 
 // Props interface para VWFinancialDashboard
 interface VWFinancialDashboardProps {
@@ -247,9 +246,6 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   
   // Estado para controlar exibição da tabela de métricas detalhadas
   const [showDetailedMetrics, setShowDetailedMetrics] = useState(false)
-
-  // Estado para controlar exibição dos gráficos de evolução DRE
-  const [showResultadosCharts, setShowResultadosCharts] = useState(false)
   
   // Estado para controlar navegação entre views
   const [currentView, setCurrentView] = useState<'dashboard' | 'comparison'>('dashboard')
@@ -12705,15 +12701,6 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
         </Card>
 
         {/* DRE - Demonstrativo de Resultados do Exercício */}
-        {showResultadosCharts ? (
-          <ResultadosCharts
-            fiscalYear={fiscalYear}
-            department={department}
-            brand={brand}
-            dreData={activeDreData}
-            onClose={() => setShowResultadosCharts(false)}
-          />
-        ) : (
         <div>
           <div className="mb-4 flex items-center justify-between">
             <div>
@@ -12721,12 +12708,6 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
               <p className="text-sm text-slate-600 dark:text-slate-400">Relatório detalhado de desempenho mensal - Ano Fiscal {fiscalYear}</p>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setShowResultadosCharts(true)}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
-              >
-                <span>📈</span> Evolução Mensal
-              </button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -12833,7 +12814,6 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
             </CardContent>
           </Card>
         </div>
-        )}
       </div>
     )}
     
