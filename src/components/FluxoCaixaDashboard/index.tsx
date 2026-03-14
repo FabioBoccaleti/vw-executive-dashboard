@@ -14,6 +14,7 @@ import { PosicaoEstoquesCharts } from "./PosicaoEstoquesCharts";
 import { MutuoSociosCharts } from "./MutuoSociosCharts";
 import { ParcelamentoRefisCharts } from "./ParcelamentoRefisCharts";
 import { EndividamentoCharts } from "./EndividamentoCharts";
+import { ReceitasCharts } from "./ReceitasCharts";
 import { ComparativoReceitas } from "./ComparativoReceitas";
 import { ProjecaoCaixaChart } from "./ProjecaoCaixaChart";
 
@@ -1253,9 +1254,24 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
   const varTotalPct = totalAnt !== 0 ? (varTotal / totalAnt) * 100 : null;
 
   const [showYtd, setShowYtd] = useState(false);
+  const [showCharts, setShowCharts] = useState(false);
+
+  if (showCharts) {
+    return <ReceitasCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
+  }
 
   return (
     <div className="space-y-6">
+      {/* Botão Evolução Mensal */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowCharts(true)}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
+        >
+          <span>📈</span> Evolução Mensal
+        </button>
+      </div>
+
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KPI
