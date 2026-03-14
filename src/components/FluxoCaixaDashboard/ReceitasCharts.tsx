@@ -374,13 +374,27 @@ export function ReceitasCharts({ selectedYear, selectedMonth, onClose }: Props) 
               const idx = charts.indexOf(chart);
               const compareVals = compareCharts[idx]?.values || {};
               const chartData = buildChartData(chart.values, compareVals);
+              const periodTotal = Object.values(chart.values).reduce((s, v) => s + v, 0);
+              const comparePeriodTotal = compareYear ? Object.values(compareVals).reduce((s, v) => s + v, 0) : null;
 
               return (
                 <Card key={chart.key}>
                   <CardContent className="pt-5 pb-4">
                     <div className="mb-3">
                       <span className="text-xs font-mono text-muted-foreground">{chart.key.replace('_net', '')}</span>
-                      <h4 className="text-sm font-semibold text-foreground">{chart.label}</h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-foreground">{chart.label}</h4>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                            Total: {fmtBRLFull(periodTotal)}
+                          </span>
+                          {comparePeriodTotal !== null && (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                              {compareYear}: {fmtBRLFull(comparePeriodTotal)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     <ResponsiveContainer width="100%" height={220}>
                       <BarChart data={chartData} barGap={compareYear ? 2 : 0}>
@@ -417,8 +431,22 @@ export function ReceitasCharts({ selectedYear, selectedMonth, onClose }: Props) 
       <Card>
         <CardContent className="pt-5 pb-4">
           <div className="mb-3">
-            <h4 className="text-base font-bold text-foreground">Total Geral — Receitas</h4>
-            <p className="text-xs text-muted-foreground">Soma de todas as contas</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-base font-bold text-foreground">Total Geral — Receitas</h4>
+                <p className="text-xs text-muted-foreground">Soma de todas as contas</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold px-3 py-1 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                  Total: {fmtBRLFull(Object.values(totalData).reduce((s, v) => s + v, 0))}
+                </span>
+                {compareYear && (
+                  <span className="text-sm font-bold px-3 py-1 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    {compareYear}: {fmtBRLFull(Object.values(compareTotalData).reduce((s, v) => s + v, 0))}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={buildChartData(totalData, compareTotalData)} barGap={compareYear ? 2 : 0}>
