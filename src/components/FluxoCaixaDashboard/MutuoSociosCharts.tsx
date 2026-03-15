@@ -403,6 +403,7 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
         const hasAmort = Object.values(amortValues).some(v => v > 0);
         if (!hasAmort && !compareYear) return null;
         const totalAmort = Object.values(amortValues).reduce((s, v) => s + v, 0);
+        const totalAmortCompare = compareYear ? Object.values(compareAmortValues).reduce((s, v) => s + v, 0) : 0;
         return (
           <Card className="border-t-4 border-t-emerald-500">
             <CardContent className="pt-5 pb-4">
@@ -411,9 +412,16 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
                   <h4 className="text-base font-bold text-foreground">Amortização Mensal — Mútuo Sócios</h4>
                   <p className="text-xs text-muted-foreground">Valor quitado em cada mês: Saldo mês anterior − Saldo mês atual</p>
                 </div>
-                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 whitespace-nowrap">
-                  Total: {fmtBRLFull(totalAmort)}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 whitespace-nowrap">
+                    Total: {fmtBRLFull(totalAmort)}
+                  </span>
+                  {compareYear && (
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 whitespace-nowrap">
+                      {compareYear}: {fmtBRLFull(totalAmortCompare)}
+                    </span>
+                  )}
+                </div>
               </div>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={buildChartData(amortValues, compareYear ? compareAmortValues : undefined)} barGap={compareYear ? 2 : 0}>
