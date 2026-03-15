@@ -382,16 +382,22 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
         </CardContent>
       </Card>
 
-      {/* Gráfico AMORTIZAÇÃO ACUMULADA */}
+      {/* Gráfico AMORTIZAÇÃO MENSAL */}
       {(() => {
         const amortValues: Record<number, number> = {};
-        for (const m of months) {
-          amortValues[m] = Math.max(0, saldoInicioAno - (totalData[m] || saldoInicioAno));
+        for (let i = 0; i < months.length; i++) {
+          const m = months[i];
+          const saldoAnterior = i === 0 ? saldoInicioAno : (totalData[months[i - 1]] || 0);
+          const saldoAtual = totalData[m] || 0;
+          amortValues[m] = Math.max(0, saldoAnterior - saldoAtual);
         }
         const compareAmortValues: Record<number, number> = {};
         if (compareYear) {
-          for (const m of months) {
-            compareAmortValues[m] = Math.max(0, compareSaldoInicioAno - (compareTotalData[m] || compareSaldoInicioAno));
+          for (let i = 0; i < months.length; i++) {
+            const m = months[i];
+            const saldoAnterior = i === 0 ? compareSaldoInicioAno : (compareTotalData[months[i - 1]] || 0);
+            const saldoAtual = compareTotalData[m] || 0;
+            compareAmortValues[m] = Math.max(0, saldoAnterior - saldoAtual);
           }
         }
         const hasAmort = Object.values(amortValues).some(v => v > 0);
@@ -400,8 +406,8 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
           <Card className="border-t-4 border-t-emerald-500">
             <CardContent className="pt-5 pb-4">
               <div className="mb-3">
-                <h4 className="text-base font-bold text-foreground">Amortização Acumulada — Mútuo Sócios</h4>
-                <p className="text-xs text-muted-foreground">Valor quitado desde o início do ano: Saldo início do ano − Saldo atual do mês</p>
+                <h4 className="text-base font-bold text-foreground">Amortização Mensal — Mútuo Sócios</h4>
+                <p className="text-xs text-muted-foreground">Valor quitado em cada mês: Saldo mês anterior − Saldo mês atual</p>
               </div>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={buildChartData(amortValues, compareYear ? compareAmortValues : undefined)} barGap={compareYear ? 2 : 0}>
