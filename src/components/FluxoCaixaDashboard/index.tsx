@@ -2020,9 +2020,9 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, co
   const varTotal = totalAtu - totalAnt;
   const varTotalPct = totalAnt !== 0 ? (varTotal / totalAnt) * 100 : null;
 
+  const mergedDesc = cpDesc || lpDesc || 'Parcelamento Impostos E Contrib.federais';
   const rows = [
-    { conta: '2.1.2.02.07.020', desc: cpDesc, ant: cpAnt, atu: cpAtu, label: 'Curto Prazo (Circ.)' },
-    { conta: '2.2.1.08.01.020', desc: lpDesc, ant: lpAnt, atu: lpAtu, label: 'Longo Prazo (Não Circ.)' },
+    { desc: mergedDesc, ant: totalAnt, atu: totalAtu },
   ];
 
   if (showCharts) {
@@ -2042,25 +2042,25 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, co
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KPI
-          label="Curto Prazo (2.1.2.02.07.020)"
-          value={fmtBRL(cpAtu, true)}
-          sub={`Ant: ${fmtBRL(cpAnt, true)} | Var: ${fmtBRL(cpAtu - cpAnt, true)}`}
-          color={cpAtu > cpAnt ? 'red' : 'emerald'}
-          icon="📅"
-        />
-        <KPI
-          label="Longo Prazo (2.2.1.08.01.020)"
-          value={fmtBRL(lpAtu, true)}
-          sub={`Ant: ${fmtBRL(lpAnt, true)} | Var: ${fmtBRL(lpAtu - lpAnt, true)}`}
-          color={lpAtu > lpAnt ? 'red' : 'emerald'}
-          icon="📆"
-        />
-        <KPI
-          label="Total Parcelamento Refis"
-          value={fmtBRL(totalAtu, true)}
-          sub={`Ant: ${fmtBRL(totalAnt, true)} | Var: ${varTotalPct !== null ? (varTotal >= 0 ? '+' : '') + varTotalPct.toFixed(1) + '%' : '—'}`}
-          color={totalAtu > totalAnt ? 'red' : 'emerald'}
+          label={colAnterior}
+          value={fmtBRL(totalAnt, true)}
+          sub="Saldo do período anterior"
+          color="blue"
           icon="🧾"
+        />
+        <KPI
+          label={colAtual}
+          value={fmtBRL(totalAtu, true)}
+          sub="Saldo do período atual"
+          color={totalAtu > totalAnt ? 'red' : 'emerald'}
+          icon="📋"
+        />
+        <KPI
+          label="Variação"
+          value={fmtBRL(varTotal, true)}
+          sub={varTotalPct !== null ? `${varTotal >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
+          color={totalAtu > totalAnt ? 'red' : 'emerald'}
+          icon="📊"
         />
       </div>
 
@@ -2073,7 +2073,6 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, co
               <thead className="bg-muted/50">
                 <tr>
                   <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Classificação</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
                   <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
@@ -2081,16 +2080,14 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, co
                 </tr>
               </thead>
               <tbody>
-                {rows.map(a => {
+                {rows.map((a, i) => {
                   const varR = a.atu - a.ant;
                   const varP = a.ant !== 0 ? (varR / a.ant) * 100 : null;
                   return (
-                    <tr key={a.conta} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                    <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                       <td className="py-2 px-3">
-                        <span className="text-xs font-mono text-muted-foreground mr-2">{a.conta}</span>
-                        <span className="text-sm text-foreground">{a.desc ? toTitleCase(a.desc) : a.conta}</span>
+                        <span className="text-sm text-foreground">{a.desc ? toTitleCase(a.desc) : 'Parcelamento Refis'}</span>
                       </td>
-                      <td className="py-2 px-3 text-right text-xs text-muted-foreground">{a.label}</td>
                       <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
                       <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
                       <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
@@ -2103,7 +2100,7 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, co
                   );
                 })}
                 <tr className="bg-muted/50 font-bold">
-                  <td colSpan={2} className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL GERAL</td>
+                  <td colSpan={1} className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL GERAL</td>
                   <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(totalAnt)}</td>
                   <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(totalAtu)}</td>
                   <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${varTotal > 0 ? 'text-red-600 dark:text-red-400' : varTotal < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
@@ -2121,16 +2118,14 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, co
 
       {/* ── Tabela de Amortização ── */}
       {(() => {
-        const CONTAS_AMORT = [
-          { id: '2.1.2.02.07.020', desc: cpDesc },
-          { id: '2.2.1.08.01.020', desc: lpDesc },
+        const amortRows = [
+          {
+            id: '2.1.2.02.07.020+2.2.1.08.01.020',
+            desc: mergedDesc,
+            saldoInicioAno: getJanAnt('2.1.2.02.07.020') + getJanAnt('2.2.1.08.01.020'),
+            saldoAtual: totalAtu,
+          },
         ];
-        const amortRows = CONTAS_AMORT.map(c => ({
-          id: c.id,
-          desc: c.desc,
-          saldoInicioAno: getJanAnt(c.id),
-          saldoAtual: Math.abs(getAcc(c.id).saldoAtual),
-        }));
         const totalInicio = amortRows.reduce((s, r) => s + r.saldoInicioAno, 0);
         const totalAtual  = amortRows.reduce((s, r) => s + r.saldoAtual, 0);
         const totalAmort  = totalInicio - totalAtual;
