@@ -62,6 +62,22 @@ function discoverLeafAccounts(accsMap: Record<string, any>): string[] {
   return allIds.filter(k => !allIds.some(other => other !== k && other.startsWith(k + '.'))).sort();
 }
 
+// ─── Extrai saldoAnt do grupo (coluna 3 = Saldo Anterior) ─────────────────────
+function extractGroupSaldoAnt(rawText: string): number {
+  const lines = rawText.split('\n');
+  for (const line of lines) {
+    const parts = line.split(';');
+    if (parts.length < 7) continue;
+    const [nivel, conta, , saldoAnt] = parts;
+    if (nivel?.trim() === 'T') continue;
+    const id = conta?.trim();
+    if (id === GROUP_PREFIX) {
+      return Math.abs(parseFloat((saldoAnt || '0').trim().replace(/\./g, '').replace(',', '.')) || 0);
+    }
+  }
+  return 0;
+}
+
 // ─── Formatação ───────────────────────────────────────────────────────────────
 const fmtBRL = (v: number) => {
   const abs = Math.abs(v);
@@ -120,6 +136,10 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
   const [compareContasData, setCompareContasData] = useState<ContaDados[]>([]);
   const [compareTotalData, setCompareTotalData] = useState<Record<number, number>>({});
 
+  // Amortização acumulada
+  const [saldoInicioAno, setSaldoInicioAno] = useState(0);
+  const [compareSaldoInicioAno, setCompareSaldoInicioAno] = useState(0);
+
   // Carrega índice de anos disponíveis
   useEffect(() => {
     (async () => {
@@ -170,7 +190,11 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
       totals[month] = monthTotal;
     }
 
-    return { contas: contasResult, totals, leafIds };
+    // Saldo início do ano: saldoAnt de Janeiro
+    const janRaw = rawMap[1];
+    const saldoInicioAno = janRaw ? extractGroupSaldoAnt(janRaw) : 0;
+
+    return { contas: contasResult, totals, leafIds, saldoInicioAno };
   }, []);
 
   // Carrega ano principal
@@ -178,9 +202,10 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
     (async () => {
       setLoading(true);
       const upTo = selectedMonth === 0 ? 12 : selectedMonth;
-      const { contas, totals } = await loadYearData(selectedYear, upTo);
+      const { contas, totals, saldoInicioAno: sia } = await loadYearData(selectedYear, upTo);
       setContasData(contas);
       setTotalData(totals);
+      setSaldoInicioAno(sia);
       setLoading(false);
     })();
   }, [selectedYear, selectedMonth, loadYearData]);
@@ -190,14 +215,16 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
     if (!compareYear) {
       setCompareContasData([]);
       setCompareTotalData({});
+      setCompareSaldoInicioAno(0);
       return;
     }
     (async () => {
       const upTo = selectedMonth === 0 ? 12 : selectedMonth;
       const ids = contasData.map(c => c.conta);
-      const { contas, totals } = await loadYearData(compareYear, upTo, ids);
+      const { contas, totals, saldoInicioAno: sia } = await loadYearData(compareYear, upTo, ids);
       setCompareContasData(contas);
       setCompareTotalData(totals);
+      setCompareSaldoInicioAno(sia);
     })();
   }, [compareYear, selectedMonth, loadYearData, contasData]);
 
@@ -323,7 +350,7 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
       </div>
 
       {/* Gráfico TOTAL */}
-      <Card>
+      <Card className="border-t-4 border-t-blue-500">
         <CardContent className="pt-5 pb-4">
           <div className="mb-3">
             <h4 className="text-base font-bold text-foreground">Total — Mútuo Sócios</h4>
@@ -354,6 +381,55 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {/* Gráfico AMORTIZAÇÃO ACUMULADA */}
+      {(() => {
+        const amortValues: Record<number, number> = {};
+        for (const m of months) {
+          amortValues[m] = Math.max(0, saldoInicioAno - (totalData[m] || saldoInicioAno));
+        }
+        const compareAmortValues: Record<number, number> = {};
+        if (compareYear) {
+          for (const m of months) {
+            compareAmortValues[m] = Math.max(0, compareSaldoInicioAno - (compareTotalData[m] || compareSaldoInicioAno));
+          }
+        }
+        const hasAmort = Object.values(amortValues).some(v => v > 0);
+        if (!hasAmort && !compareYear) return null;
+        return (
+          <Card className="border-t-4 border-t-emerald-500">
+            <CardContent className="pt-5 pb-4">
+              <div className="mb-3">
+                <h4 className="text-base font-bold text-foreground">Amortização Acumulada — Mútuo Sócios</h4>
+                <p className="text-xs text-muted-foreground">Valor quitado desde o início do ano: Saldo início do ano − Saldo atual do mês</p>
+              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={buildChartData(amortValues, compareYear ? compareAmortValues : undefined)} barGap={compareYear ? 2 : 0}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtBRL(v)} width={80} />
+                  <Tooltip content={<CustomTooltip />} />
+                  {compareYear && <Legend iconType="square" wrapperStyle={{ fontSize: 12 }} />}
+                  <Bar
+                    dataKey={String(selectedYear)}
+                    fill="#10b981"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={48}
+                  />
+                  {compareYear && (
+                    <Bar
+                      dataKey={String(compareYear)}
+                      fill={COLOR_COMPARE}
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={48}
+                    />
+                  )}
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }
