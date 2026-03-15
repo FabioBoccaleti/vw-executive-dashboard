@@ -1647,8 +1647,8 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                       </td>
                       <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
                       <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
-                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : ''}{fmtBRL(varR)}</td>
-                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : '-'}{fmtBRL(varR)}</td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : '-'}${Math.abs(varP).toFixed(1)}%` : '—'}</td>
                     </tr>
                   );
                 })}
@@ -1664,8 +1664,8 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                       </td>
                       <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(vwCapGiro.ant)}</td>
                       <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(vwCapGiro.atu)}</td>
-                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : ''}{fmtBRL(varR)}</td>
-                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : '-'}{fmtBRL(varR)}</td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : '-'}${Math.abs(varP).toFixed(1)}%` : '—'}</td>
                     </tr>
                   );
                 })()}
@@ -1681,8 +1681,8 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                       </td>
                       <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(netAcc1.ant)}</td>
                       <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(netAcc1.atu)}</td>
-                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : ''}{fmtBRL(varR)}</td>
-                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : '-'}{fmtBRL(varR)}</td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : '-'}${Math.abs(varP).toFixed(1)}%` : '—'}</td>
                     </tr>
                   );
                 })()}
@@ -1698,8 +1698,8 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                       </td>
                       <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(netAcc2.ant)}</td>
                       <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(netAcc2.atu)}</td>
-                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : ''}{fmtBRL(varR)}</td>
-                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : '-'}{fmtBRL(varR)}</td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : '-'}${Math.abs(varP).toFixed(1)}%` : '—'}</td>
                     </tr>
                   );
                 })()}
@@ -1715,8 +1715,8 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                       </td>
                       <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
                       <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
-                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : ''}{fmtBRL(varR)}</td>
-                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : '-'}{fmtBRL(varR)}</td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : '-'}${Math.abs(varP).toFixed(1)}%` : '—'}</td>
                     </tr>
                   );
                 })}
@@ -1725,8 +1725,8 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                   <td className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL BANCÁRIO</td>
                   <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(totalAnt)}</td>
                   <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(totalAtu)}</td>
-                  <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${varTotal > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{varTotal >= 0 ? '+' : ''}{fmtBRL(varTotal)}</td>
-                  <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">{varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}</td>
+                  <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${varTotal > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{varTotal >= 0 ? '+' : '-'}{fmtBRL(varTotal)}</td>
+                  <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">{varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : '-'}${Math.abs(varTotalPct).toFixed(1)}%` : '—'}</td>
                 </tr>
               </tbody>
             </table>
