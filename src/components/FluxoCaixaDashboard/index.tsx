@@ -619,6 +619,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     { id: 'endividamento', label: 'Endividamento', icon: <Landmark className="w-4 h-4" />, requiresData: true },
     { id: 'mutuoSocios', label: 'Mútuo Sócios', icon: <Users className="w-4 h-4" />, requiresData: true },
     { id: 'parcelamentoRefis', label: 'Parcelamento Refis', icon: <Receipt className="w-4 h-4" />, requiresData: true },
+    { id: 'imobilizado', label: 'Imobilizado', icon: <Building2 className="w-4 h-4" />, requiresData: true },
     { id: 'receitas', label: 'Receitas', icon: <TrendingUp className="w-4 h-4" />, requiresData: true },
     { id: 'despesas', label: 'Despesas', icon: <Receipt className="w-4 h-4" />, requiresData: true },
     { id: 'indicadores', label: 'Indicadores', icon: <Target className="w-4 h-4" />, requiresData: true },
@@ -832,6 +833,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} despesasView={despesasView} setDespesasView={setDespesasView} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'parcelamentoRefis' && <ParcelamentoRefisTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
+              {activeTab === 'imobilizado' && <ImobilizadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'indicadores' && <IndicadoresTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} Badge={StatusBadge} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'diagnostico' && <DiagnosticoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} />}
             </div>
@@ -2188,6 +2190,145 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, co
           </Card>
         );
       })()}
+    </div>
+  );
+}
+
+function ImobilizadoTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, selectedMonth, selectedYear }: any) {
+  const accounts = data.accounts as Record<string, any>;
+
+  // Totais do grupo 1.5.5
+  const root = accounts['1.5.5'] || { saldoAnt: 0, saldoAtual: 0 };
+  const totalAnt = Math.abs(root.saldoAnt);
+  const totalAtu = Math.abs(root.saldoAtual);
+  const varTotal = totalAtu - totalAnt;
+  const varTotalPct = totalAnt !== 0 ? (varTotal / totalAnt) * 100 : null;
+
+  // Subgrupos diretos de 1.5.5 (ex: 1.5.5.01, 1.5.5.02 ...)
+  const subGroups = subAccsAtDepth(accounts, '1.5.5', 1);
+  // Caso não haja subgrupos, exibe as folhas diretas
+  const allLeafs = subAccs(accounts, '1.5.5');
+  const groups = subGroups.length > 0
+    ? subGroups.map(sg => ({ ...sg, contas: subAccs(accounts, sg.conta) }))
+    : [{ conta: '1.5.5', desc: root.desc || 'Imobilizado', ant: totalAnt, atu: totalAtu, contas: allLeafs }];
+
+  const renderGroupTable = (contas: any[]) => {
+    const subTotal = contas.reduce((s, c) => ({ ant: s.ant + c.ant, atu: s.atu + c.atu }), { ant: 0, atu: 0 });
+    const subVar = subTotal.atu - subTotal.ant;
+    const subVarPct = subTotal.ant !== 0 ? (subVar / subTotal.ant) * 100 : null;
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
+              <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+              <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
+              <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
+              <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {contas.map(a => {
+              const varR = a.atu - a.ant;
+              const varP = a.ant !== 0 ? (varR / a.ant) * 100 : null;
+              return (
+                <tr key={a.conta} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                  <td className="py-2 px-3">
+                    <span className="text-xs font-mono text-muted-foreground mr-2">{a.conta}</span>
+                    <span className="text-sm text-foreground">{a.desc ? toTitleCase(a.desc) : a.conta}</span>
+                  </td>
+                  <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
+                  <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
+                  <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-emerald-600 dark:text-emerald-400' : varR < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                    {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                  </td>
+                  <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-emerald-600 dark:text-emerald-400' : varR < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                    {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                  </td>
+                </tr>
+              );
+            })}
+            <tr className="bg-muted/50 font-bold">
+              <td className="py-2.5 px-3 text-sm font-bold text-foreground">Subtotal</td>
+              <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(subTotal.ant)}</td>
+              <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(subTotal.atu)}</td>
+              <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${subVar > 0 ? 'text-emerald-600 dark:text-emerald-400' : subVar < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                {subVar >= 0 ? '+' : ''}{fmtBRL(subVar)}
+              </td>
+              <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
+                {subVarPct !== null ? `${subVarPct >= 0 ? '+' : ''}${subVarPct.toFixed(1)}%` : '—'}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* KPI Total */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <KPI
+          label={colAnterior}
+          value={fmtBRL(totalAnt, true)}
+          sub="Saldo do período anterior"
+          color="blue"
+          icon="🏗️"
+        />
+        <KPI
+          label={colAtual}
+          value={fmtBRL(totalAtu, true)}
+          sub="Saldo do período atual"
+          color={totalAtu > totalAnt ? 'emerald' : 'red'}
+          icon="🏭"
+        />
+        <KPI
+          label="Variação"
+          value={fmtBRL(varTotal, true)}
+          sub={varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
+          color={varTotal >= 0 ? 'emerald' : 'red'}
+          icon="📈"
+        />
+      </div>
+
+      {/* Tabelas por subgrupo */}
+      {groups.map(g => (
+        <Card key={g.conta}>
+          <CardContent className="pt-6">
+            <SectionTitle icon="🏗️">
+              {g.desc ? toTitleCase(g.desc) : g.conta} ({g.conta})
+            </SectionTitle>
+            {g.contas.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">Sem movimentação neste período.</p>
+            ) : (
+              renderGroupTable(g.contas)
+            )}
+          </CardContent>
+        </Card>
+      ))}
+
+      {/* Total Geral */}
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <table className="w-full border-collapse">
+            <tbody>
+              <tr className="bg-muted/70">
+                <td className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL IMOBILIZADO (1.5.5)</td>
+                <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(totalAnt)}</td>
+                <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(totalAtu)}</td>
+                <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${varTotal > 0 ? 'text-emerald-600 dark:text-emerald-400' : varTotal < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                  {varTotal >= 0 ? '+' : ''}{fmtBRL(varTotal)}
+                </td>
+                <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
+                  {varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
