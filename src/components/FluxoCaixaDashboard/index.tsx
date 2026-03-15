@@ -1070,8 +1070,8 @@ function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAt
         />
         <KPI
           label="Variação"
-          value={fmtBRL(varTotal, true)}
-          sub={varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
+          value={`${varTotal >= 0 ? '+' : '-'}${fmtBRL(varTotal, true)}`}
+          sub={varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : '-'}${Math.abs(varTotalPct).toFixed(1)}%` : '—'}
           color={varTotal >= 0 ? 'emerald' : 'red'}
           icon="📈"
         />
@@ -1612,14 +1612,14 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
         />
         <KPI
           label="Variação"
-          value={fmtBRL(totalAtu - totalAnt, true)}
-          sub={totalAnt !== 0 ? `${varTotal >= 0 ? '+' : ''}${varTotalPct!.toFixed(1)}%` : '—'}
+          value={`${varTotal >= 0 ? '+' : '-'}${fmtBRL(varTotal, true)}`}
+          sub={totalAnt !== 0 ? `${varTotal >= 0 ? '+' : '-'}${Math.abs(varTotalPct!).toFixed(1)}%` : '—'}
           color={totalAtu > totalAnt ? 'red' : 'emerald'}
           icon="📊"
         />
       </div>
 
-      {/* Tabela Unificada Endividamento Bancário */}
+      {/* Tabela Unificada Endividamento Bancário */
       <Card>
         <CardContent className="pt-6">
           <SectionTitle icon="🏦">Endividamento Bancário</SectionTitle>
@@ -1870,14 +1870,14 @@ function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
         />
         <KPI
           label="Variação"
-          value={fmtBRL(totalAtu - totalAnt, true)}
-          sub={totalAnt !== 0 ? `${((totalAtu - totalAnt) / totalAnt * 100) >= 0 ? '+' : ''}${((totalAtu - totalAnt) / totalAnt * 100).toFixed(1)}%` : '—'}
+          value={`${(totalAtu - totalAnt) >= 0 ? '+' : '-'}${fmtBRL(Math.abs(totalAtu - totalAnt), true)}`}
+          sub={totalAnt !== 0 ? `${((totalAtu - totalAnt) / totalAnt * 100) >= 0 ? '+' : '-'}${Math.abs((totalAtu - totalAnt) / totalAnt * 100).toFixed(1)}%` : '—'}
           color={totalAtu > totalAnt ? 'red' : 'emerald'}
           icon="📊"
         />
       </div>
 
-      {/* Tabela de sub-contas */}
+      {/* Tabela de sub-contas */
       <Card>
         <CardContent className="pt-6">
           <SectionTitle icon="👥">Mútuo Sócios — Grupo 2.2.1.01.01</SectionTitle>
@@ -2059,8 +2059,8 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, co
         />
         <KPI
           label="Variação"
-          value={fmtBRL(varTotal, true)}
-          sub={varTotalPct !== null ? `${varTotal >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
+          value={`${varTotal >= 0 ? '+' : '-'}${fmtBRL(varTotal, true)}`}
+          sub={varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : '-'}${Math.abs(varTotalPct).toFixed(1)}%` : '—'}
           color={totalAtu > totalAnt ? 'red' : 'emerald'}
           icon="📊"
         />
