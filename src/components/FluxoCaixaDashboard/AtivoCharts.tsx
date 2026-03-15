@@ -218,7 +218,7 @@ export function AtivoCharts({ selectedYear, selectedMonth, onClose }: Props) {
             Evolução Mensal — Ativo
           </h3>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {selectedYear} • Jan{upToMonth > 1 ? ` – ${MONTH_LABELS[upToMonth - 1]}` : ''} • Circulante e Não Circulante
+            {selectedYear} • Jan{upToMonth > 1 ? ` – ${MONTH_LABELS[upToMonth - 1]}` : ''} • Circulante, Não Circulante e Total
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -283,6 +283,45 @@ export function AtivoCharts({ selectedYear, selectedMonth, onClose }: Props) {
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={buildChartData(naoCircData, compareNaoCircData)} barGap={compareYear ? 2 : 0}>
+              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtBRL(v)} width={80} />
+              <Tooltip content={<CustomTooltip />} />
+              {compareYear && <Legend iconType="square" wrapperStyle={{ fontSize: 12 }} />}
+              <Bar
+                dataKey={String(selectedYear)}
+                fill={COLOR_CURRENT}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={48}
+              />
+              {compareYear && (
+                <Bar
+                  dataKey={String(compareYear)}
+                  fill={COLOR_COMPARE}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={48}
+                />
+              )}
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Gráfico Total do Ativo */}
+      <Card>
+        <CardContent className="pt-5 pb-4">
+          <div className="mb-3">
+            <h4 className="text-base font-bold text-foreground">Total do Ativo</h4>
+            <p className="text-xs text-muted-foreground">1.1 + 1.5</p>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={buildChartData(
+                Object.fromEntries(months.map(m => [m, (circData[m] || 0) + (naoCircData[m] || 0)])),
+                Object.fromEntries(months.map(m => [m, (compareCircData[m] || 0) + (compareNaoCircData[m] || 0)])),
+              )}
+              barGap={compareYear ? 2 : 0}
+            >
               <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
               <XAxis dataKey="name" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtBRL(v)} width={80} />
