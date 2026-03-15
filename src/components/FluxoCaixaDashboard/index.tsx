@@ -1595,25 +1595,25 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KPI
-          label="Empréstimos Curto Prazo"
-          value={fmtBRL(cpTotal.atu, true)}
-          sub={`Ant: ${fmtBRL(cpTotal.ant, true)} | Var: ${fmtBRL(cpTotal.atu - cpTotal.ant, true)}`}
-          color={cpTotal.atu > cpTotal.ant ? 'red' : 'emerald'}
-          icon="📅"
-        />
-        <KPI
-          label="Empréstimos Longo Prazo"
-          value={fmtBRL(lpTotal.atu, true)}
-          sub={`Ant: ${fmtBRL(lpTotal.ant, true)} | Var: ${fmtBRL(lpTotal.atu - lpTotal.ant, true)}`}
-          color={lpTotal.atu > lpTotal.ant ? 'red' : 'emerald'}
-          icon="📆"
-        />
-        <KPI
-          label="Endividamento Bancário Total"
-          value={fmtBRL(totalAtu, true)}
-          sub={`Ant: ${fmtBRL(totalAnt, true)} | Var: ${varTotalPct !== null ? (varTotal >= 0 ? '+' : '') + varTotalPct.toFixed(1) + '%' : '—'}`}
-          color={totalAtu > totalAnt ? 'red' : 'emerald'}
+          label={colAnterior}
+          value={fmtBRL(totalAnt, true)}
+          sub="Saldo do período anterior"
+          color="blue"
           icon="🏦"
+        />
+        <KPI
+          label={colAtual}
+          value={fmtBRL(totalAtu, true)}
+          sub="Saldo do período atual"
+          color={totalAtu > totalAnt ? 'red' : 'emerald'}
+          icon="📋"
+        />
+        <KPI
+          label="Variação"
+          value={fmtBRL(totalAtu - totalAnt, true)}
+          sub={totalAnt !== 0 ? `${varTotal >= 0 ? '+' : ''}${varTotalPct!.toFixed(1)}%` : '—'}
+          color={totalAtu > totalAnt ? 'red' : 'emerald'}
+          icon="📊"
         />
       </div>
 
