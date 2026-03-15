@@ -1908,10 +1908,10 @@ function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
                         <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
                         <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
                         <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-                          {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                          {varR >= 0 ? '+' : '-'}{fmtBRL(varR)}
                         </td>
                         <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-                          {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                          {varP !== null ? `${varP >= 0 ? '+' : '-'}${Math.abs(varP).toFixed(1)}%` : '—'}
                         </td>
                       </tr>
                     );
@@ -1922,10 +1922,10 @@ function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
                   <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(totalAnt)}</td>
                   <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(totalAtu)}</td>
                   <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${totalAtu - totalAnt > 0 ? 'text-red-600 dark:text-red-400' : totalAtu - totalAnt < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-                    {totalAtu - totalAnt >= 0 ? '+' : ''}{fmtBRL(totalAtu - totalAnt)}
+                    {totalAtu - totalAnt >= 0 ? '+' : '-'}{fmtBRL(totalAtu - totalAnt)}
                   </td>
                   <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
-                    {totalAnt !== 0 ? `${((totalAtu - totalAnt) / totalAnt * 100) >= 0 ? '+' : ''}${((totalAtu - totalAnt) / totalAnt * 100).toFixed(1)}%` : '—'}
+                    {totalAnt !== 0 ? `${((totalAtu - totalAnt) / totalAnt * 100) >= 0 ? '+' : '-'}${Math.abs((totalAtu - totalAnt) / totalAnt * 100).toFixed(1)}%` : '—'}
                   </td>
                 </tr>
               </tbody>
