@@ -402,6 +402,22 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
         }
         const hasAmort = Object.values(amortValues).some(v => v > 0);
         if (!hasAmort && !compareYear) return null;
+
+        // Build chart data com coluna "Total" no final
+        const chartRows = buildChartData(amortValues, compareYear ? compareAmortValues : undefined);
+        const totalCur = Object.values(amortValues).reduce((s, v) => s + v, 0);
+        const totalRow: Record<string, any> = {
+          name: 'Total',
+          [String(selectedYear)]: totalCur,
+          [`var_${String(selectedYear)}`]: null,
+        };
+        if (compareYear) {
+          const totalCmp = Object.values(compareAmortValues).reduce((s, v) => s + v, 0);
+          totalRow[String(compareYear)] = totalCmp;
+          totalRow[`var_${String(compareYear)}`] = null;
+        }
+        chartRows.push(totalRow);
+
         return (
           <Card className="border-t-4 border-t-emerald-500">
             <CardContent className="pt-5 pb-4">
@@ -410,7 +426,7 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
                 <p className="text-xs text-muted-foreground">Valor quitado em cada mês: Saldo mês anterior − Saldo mês atual</p>
               </div>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={buildChartData(amortValues, compareYear ? compareAmortValues : undefined)} barGap={compareYear ? 2 : 0}>
+                <BarChart data={chartRows} barGap={compareYear ? 2 : 0}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtBRL(v)} width={80} />
