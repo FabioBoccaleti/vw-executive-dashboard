@@ -906,10 +906,10 @@ function PosicaoEstoquesTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colA
                     <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
                     <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
                     <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-emerald-600 dark:text-emerald-400' : varR < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
-                      {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                      {varR >= 0 ? '+' : '-'}{fmtBRL(varR)}
                     </td>
                     <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-emerald-600 dark:text-emerald-400' : varR < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
-                      {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                      {varP !== null ? `${varP >= 0 ? '+' : '-'}${Math.abs(varP).toFixed(1)}%` : '—'}
                     </td>
                   </tr>
                 );
@@ -919,10 +919,10 @@ function PosicaoEstoquesTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colA
                 <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(totalAntLocal)}</td>
                 <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(totalAtuLocal)}</td>
                 <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${totalAtuLocal - totalAntLocal > 0 ? 'text-emerald-600 dark:text-emerald-400' : totalAtuLocal - totalAntLocal < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
-                  {totalAtuLocal - totalAntLocal >= 0 ? '+' : ''}{fmtBRL(totalAtuLocal - totalAntLocal)}
+                  {totalAtuLocal - totalAntLocal >= 0 ? '+' : '-'}{fmtBRL(totalAtuLocal - totalAntLocal)}
                 </td>
                 <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
-                  {totalAntLocal !== 0 ? `${((totalAtuLocal - totalAntLocal) / totalAntLocal * 100) >= 0 ? '+' : ''}${((totalAtuLocal - totalAntLocal) / totalAntLocal * 100).toFixed(1)}%` : '—'}
+                  {totalAntLocal !== 0 ? `${((totalAtuLocal - totalAntLocal) / totalAntLocal * 100) >= 0 ? '+' : '-'}${Math.abs((totalAtuLocal - totalAntLocal) / totalAntLocal * 100).toFixed(1)}%` : '—'}
                 </td>
               </tr>
             </tbody>
@@ -1000,10 +1000,10 @@ function PosicaoEstoquesTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colA
                       <td className={`py-2.5 px-3 text-right text-sm font-mono ${isTotal ? 'font-bold text-muted-foreground' : 'text-muted-foreground'}`}>{fmtBRL(row.ant)}</td>
                       <td className={`py-2.5 px-3 text-right text-sm font-mono ${isTotal ? 'font-bold text-foreground' : 'text-foreground'}`}>{fmtBRL(row.atu)}</td>
                       <td className={`py-2.5 px-3 text-right text-sm font-mono ${isTotal ? 'font-bold ' : ''}${varR > 0 ? 'text-emerald-600 dark:text-emerald-400' : varR < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
-                        {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                        {varR >= 0 ? '+' : '-'}{fmtBRL(varR)}
                       </td>
                       <td className={`py-2.5 px-3 text-right text-xs font-mono ${isTotal ? 'font-bold ' : ''}${varR > 0 ? 'text-emerald-600 dark:text-emerald-400' : varR < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
-                        {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                        {varP !== null ? `${varP >= 0 ? '+' : '-'}${Math.abs(varP).toFixed(1)}%` : '—'}
                       </td>
                     </tr>
                   );
