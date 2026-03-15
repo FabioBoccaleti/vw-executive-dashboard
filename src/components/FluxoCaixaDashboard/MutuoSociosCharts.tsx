@@ -402,12 +402,18 @@ export function MutuoSociosCharts({ selectedYear, selectedMonth, onClose }: Prop
         }
         const hasAmort = Object.values(amortValues).some(v => v > 0);
         if (!hasAmort && !compareYear) return null;
+        const totalAmort = Object.values(amortValues).reduce((s, v) => s + v, 0);
         return (
           <Card className="border-t-4 border-t-emerald-500">
             <CardContent className="pt-5 pb-4">
-              <div className="mb-3">
-                <h4 className="text-base font-bold text-foreground">Amortização Mensal — Mútuo Sócios</h4>
-                <p className="text-xs text-muted-foreground">Valor quitado em cada mês: Saldo mês anterior − Saldo mês atual</p>
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h4 className="text-base font-bold text-foreground">Amortização Mensal — Mútuo Sócios</h4>
+                  <p className="text-xs text-muted-foreground">Valor quitado em cada mês: Saldo mês anterior − Saldo mês atual</p>
+                </div>
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 whitespace-nowrap">
+                  Total: {fmtBRLFull(totalAmort)}
+                </span>
               </div>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={buildChartData(amortValues, compareYear ? compareAmortValues : undefined)} barGap={compareYear ? 2 : 0}>
