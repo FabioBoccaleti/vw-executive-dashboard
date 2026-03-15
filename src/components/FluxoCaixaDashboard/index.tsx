@@ -620,7 +620,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     { id: 'receitas', label: 'Receitas', icon: <TrendingUp className="w-4 h-4" />, requiresData: true },
     { id: 'despesas', label: 'Despesas', icon: <Receipt className="w-4 h-4" />, requiresData: true },
     { id: 'indicadores', label: 'Indicadores', icon: <Target className="w-4 h-4" />, requiresData: true },
-    { id: 'diagnostico', label: 'Diagnóstico', icon: <Activity className="w-4 h-4" />, requiresData: true },
+    { id: 'diagnostico', label: selectedMonth === 0 ? 'Diagnóstico Ano' : 'Diagnóstico Mês', icon: <Activity className="w-4 h-4" />, requiresData: true },
     { id: 'comparativos', label: 'Comparativos', icon: <BarChart3 className="w-4 h-4" />, requiresData: false },
   ];
 
