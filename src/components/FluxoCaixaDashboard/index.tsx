@@ -1619,7 +1619,7 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
         />
       </div>
 
-      {/* Tabela Unificada Endividamento Bancário */
+      {/* Tabela Unificada Endividamento Bancário */}
       <Card>
         <CardContent className="pt-6">
           <SectionTitle icon="🏦">Endividamento Bancário</SectionTitle>
@@ -1877,7 +1877,7 @@ function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
         />
       </div>
 
-      {/* Tabela de sub-contas */
+      {/* Tabela de sub-contas */}
       <Card>
         <CardContent className="pt-6">
           <SectionTitle icon="👥">Mútuo Sócios — Grupo 2.2.1.01.01</SectionTitle>
