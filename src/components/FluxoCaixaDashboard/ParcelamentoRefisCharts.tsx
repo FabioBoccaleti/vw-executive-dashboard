@@ -48,6 +48,23 @@ function extractRefisValues(rawText: string): { cp: number; lp: number } {
   return { cp, lp };
 }
 
+// ─── Parser: saldo anterior das 2 contas Refis (coluna 4 = Saldo Anterior) ────
+function extractRefisSaldoAnt(rawText: string): number {
+  let total = 0;
+  const lines = rawText.split('\n');
+  for (const line of lines) {
+    const parts = line.split(';');
+    if (parts.length < 7) continue;
+    const [nivel, conta, , saldoAnt] = parts;
+    if (nivel?.trim() === 'T') continue;
+    const id = conta?.trim();
+    if (id === CONTA_CP || id === CONTA_LP) {
+      total += Math.abs(parseFloat((saldoAnt || '0').trim().replace(/\./g, '').replace(',', '.')) || 0);
+    }
+  }
+  return total;
+}
+
 // ─── Formatação ───────────────────────────────────────────────────────────────
 const fmtBRL = (v: number) => {
   const abs = Math.abs(v);
@@ -104,6 +121,10 @@ export function ParcelamentoRefisCharts({ selectedYear, selectedMonth, onClose }
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [compareTotalData, setCompareTotalData] = useState<Record<number, number>>({});
 
+  // Amortização mensal
+  const [saldoInicioAno, setSaldoInicioAno] = useState(0);
+  const [compareSaldoInicioAno, setCompareSaldoInicioAno] = useState(0);
+
   // Carrega índice de anos disponíveis
   useEffect(() => {
     (async () => {
@@ -130,7 +151,11 @@ export function ParcelamentoRefisCharts({ selectedYear, selectedMonth, onClose }
       totals[month] = cp + lp;
     }
 
-    return totals;
+    // Saldo início do ano: saldoAnt de Janeiro
+    const janRaw = rawMap[1];
+    const saldoInicioAno = janRaw ? extractRefisSaldoAnt(janRaw) : 0;
+
+    return { totals, saldoInicioAno };
   }, []);
 
   // Carrega ano principal
@@ -138,8 +163,9 @@ export function ParcelamentoRefisCharts({ selectedYear, selectedMonth, onClose }
     (async () => {
       setLoading(true);
       const upTo = selectedMonth === 0 ? 12 : selectedMonth;
-      const totals = await loadYearData(selectedYear, upTo);
+      const { totals, saldoInicioAno: sia } = await loadYearData(selectedYear, upTo);
       setTotalData(totals);
+      setSaldoInicioAno(sia);
       setLoading(false);
     })();
   }, [selectedYear, selectedMonth, loadYearData]);
@@ -148,12 +174,14 @@ export function ParcelamentoRefisCharts({ selectedYear, selectedMonth, onClose }
   useEffect(() => {
     if (!compareYear) {
       setCompareTotalData({});
+      setCompareSaldoInicioAno(0);
       return;
     }
     (async () => {
       const upTo = selectedMonth === 0 ? 12 : selectedMonth;
-      const totals = await loadYearData(compareYear, upTo);
+      const { totals, saldoInicioAno: sia } = await loadYearData(compareYear, upTo);
       setCompareTotalData(totals);
+      setCompareSaldoInicioAno(sia);
     })();
   }, [compareYear, selectedMonth, loadYearData]);
 
@@ -264,6 +292,83 @@ export function ParcelamentoRefisCharts({ selectedYear, selectedMonth, onClose }
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {/* Gráfico AMORTIZAÇÃO MENSAL */}
+      {(() => {
+        const amortValues: Record<number, number> = {};
+        for (let i = 0; i < months.length; i++) {
+          const m = months[i];
+          const saldoAnterior = i === 0 ? saldoInicioAno : (totalData[months[i - 1]] || 0);
+          const saldoAtual = totalData[m] || 0;
+          amortValues[m] = Math.max(0, saldoAnterior - saldoAtual);
+        }
+        const compareAmortValues: Record<number, number> = {};
+        if (compareYear) {
+          for (let i = 0; i < months.length; i++) {
+            const m = months[i];
+            const saldoAnterior = i === 0 ? compareSaldoInicioAno : (compareTotalData[months[i - 1]] || 0);
+            const saldoAtual = compareTotalData[m] || 0;
+            compareAmortValues[m] = Math.max(0, saldoAnterior - saldoAtual);
+          }
+        }
+        const hasAmort = Object.values(amortValues).some(v => v > 0);
+        if (!hasAmort && !compareYear) return null;
+        const totalAmort = Object.values(amortValues).reduce((s, v) => s + v, 0);
+        const totalAmortCompare = compareYear ? Object.values(compareAmortValues).reduce((s, v) => s + v, 0) : 0;
+
+        const curKey = String(selectedYear);
+        const cmpKey = compareYear ? String(compareYear) : null;
+        const chartData = months.map((m, idx) => {
+          const curVal = amortValues[m] || 0;
+          const prevCurVal = idx > 0 ? (amortValues[months[idx - 1]] || 0) : null;
+          const varCur = prevCurVal !== null && prevCurVal !== 0 ? ((curVal - prevCurVal) / prevCurVal) * 100 : null;
+          const row: Record<string, any> = { name: MONTH_LABELS[m - 1], [curKey]: curVal, [`var_${curKey}`]: varCur };
+          if (cmpKey) {
+            const cmpVal = compareAmortValues[m] || 0;
+            const prevCmpVal = idx > 0 ? (compareAmortValues[months[idx - 1]] || 0) : null;
+            const varCmp = prevCmpVal !== null && prevCmpVal !== 0 ? ((cmpVal - prevCmpVal) / prevCmpVal) * 100 : null;
+            row[cmpKey] = cmpVal;
+            row[`var_${cmpKey}`] = varCmp;
+          }
+          return row;
+        });
+
+        return (
+          <Card className="border-t-4 border-t-emerald-500">
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h4 className="text-base font-bold text-foreground">Amortização Mensal — Parcelamento Refis</h4>
+                  <p className="text-xs text-muted-foreground">Valor quitado em cada mês: Saldo mês anterior − Saldo mês atual</p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 whitespace-nowrap">
+                    Total: {fmtBRLFull(totalAmort)}
+                  </span>
+                  {compareYear && (
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300 whitespace-nowrap">
+                      {compareYear}: {fmtBRLFull(totalAmortCompare)}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={chartData} barGap={compareYear ? 2 : 0}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmtBRL(v)} width={80} />
+                  <Tooltip content={<CustomTooltip />} />
+                  {compareYear && <Legend iconType="square" wrapperStyle={{ fontSize: 12 }} />}
+                  <Bar dataKey={curKey} fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={48} />
+                  {compareYear && (
+                    <Bar dataKey={String(compareYear)} fill={COLOR_COMPARE} radius={[4, 4, 0, 0]} maxBarSize={48} />
+                  )}
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }
