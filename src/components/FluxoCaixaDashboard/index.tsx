@@ -14,6 +14,7 @@ import { PosicaoEstoquesCharts } from "./PosicaoEstoquesCharts";
 import { MutuoSociosCharts } from "./MutuoSociosCharts";
 import { ParcelamentoRefisCharts } from "./ParcelamentoRefisCharts";
 import { AtivoCharts } from "./AtivoCharts";
+import { PassivoCharts } from "./PassivoCharts";
 import { EndividamentoCharts } from "./EndividamentoCharts";
 import { ReceitasCharts } from "./ReceitasCharts";
 import { FCCaixaDiretoCharts } from "./FCCaixaDiretoCharts";
@@ -809,7 +810,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               )}
               {activeTab === 'overview' && <OverviewTab data={data} fmtBRL={fmtBRL} KPI={KPI} BarGauge={BarGauge} SectionTitle={SectionTitle} />}
               {activeTab === 'ativo' && <AtivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
-              {activeTab === 'passivo' && <PassivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} />}
+              {activeTab === 'passivo' && <PassivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'caixa' && <CaixaTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
@@ -2428,13 +2429,27 @@ function AtivoTab({ data, SectionTitle, TableRow2, colAnterior, colAtual, select
   );
 }
 
-function PassivoTab({ data, SectionTitle, TableRow2, colAnterior, colAtual }: any) {
+function PassivoTab({ data, SectionTitle, TableRow2, colAnterior, colAtual, selectedMonth, selectedYear }: any) {
+  const [showCharts, setShowCharts] = useState(false);
   const d = data;
   const accounts = d.accounts as Record<string, any>;
   const sa = (prefix: string) => subAccs(accounts, prefix);
 
+  if (showCharts) {
+    return <PassivoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
+  }
+
   return (
     <div>
+      <div className="flex justify-end mb-3">
+        <button
+          onClick={() => setShowCharts(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-background text-sm font-medium text-foreground hover:bg-muted transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Evolução Mensal
+        </button>
+      </div>
       <Card>
         <CardContent className="pt-6">
           <SectionTitle icon="🏦">Detalhamento do Passivo e PL</SectionTitle>
