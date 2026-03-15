@@ -2241,10 +2241,10 @@ function ImobilizadoTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
                   <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
                   <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
                   <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-emerald-600 dark:text-emerald-400' : varR < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
-                    {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                    {varR >= 0 ? '+' : '-'}{fmtBRL(varR)}
                   </td>
                   <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-emerald-600 dark:text-emerald-400' : varR < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
-                    {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                    {varP !== null ? `${varP >= 0 ? '+' : '-'}${Math.abs(varP).toFixed(1)}%` : '—'}
                   </td>
                 </tr>
               );
@@ -2254,10 +2254,10 @@ function ImobilizadoTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
               <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(subTotal.ant)}</td>
               <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(subTotal.atu)}</td>
               <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${subVar > 0 ? 'text-emerald-600 dark:text-emerald-400' : subVar < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
-                {subVar >= 0 ? '+' : ''}{fmtBRL(subVar)}
+                {subVar >= 0 ? '+' : '-'}{fmtBRL(subVar)}
               </td>
               <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
-                {subVarPct !== null ? `${subVarPct >= 0 ? '+' : ''}${subVarPct.toFixed(1)}%` : '—'}
+                {subVarPct !== null ? `${subVarPct >= 0 ? '+' : '-'}${Math.abs(subVarPct).toFixed(1)}%` : '—'}
               </td>
             </tr>
           </tbody>
@@ -2319,10 +2319,10 @@ function ImobilizadoTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
                 <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(totalAnt)}</td>
                 <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(totalAtu)}</td>
                 <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${varTotal > 0 ? 'text-emerald-600 dark:text-emerald-400' : varTotal < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
-                  {varTotal >= 0 ? '+' : ''}{fmtBRL(varTotal)}
+                  {varTotal >= 0 ? '+' : '-'}{fmtBRL(varTotal)}
                 </td>
                 <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
-                  {varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
+                  {varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : '-'}${Math.abs(varTotalPct).toFixed(1)}%` : '—'}
                 </td>
               </tr>
             </tbody>
