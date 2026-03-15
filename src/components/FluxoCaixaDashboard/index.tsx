@@ -1514,6 +1514,33 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
   const cpTotCA = rollCA(cpCA);
   const lpTotCA = rollCA(lpCA);
   const grandCA = rollCA([...cpCA, ...lpCA]);
+
+  // ── Tabela unificada (sem separação CP/LP) ────────────────────────────────
+  const cpSubsFiltered = cpSubs.filter(s => s.conta !== '2.1.1.02.03.020');
+  const lpSubsFiltered = lpSubs.filter(s => s.conta !== '2.2.1.07.01.003');
+  const cpVWGiroSub = cpSubs.find(s => s.conta === '2.1.1.02.03.020');
+  const lpVWGiroSub = lpSubs.find(s => s.conta === '2.2.1.07.01.003');
+  // Banco VW - Capital de Giro = soma CP (2.1.1.02.03.020) + LP (2.2.1.07.01.003)
+  const vwCapGiro = {
+    ant: (cpVWGiroSub?.ant || 0) + (lpVWGiroSub?.ant || 0),
+    atu: (cpVWGiroSub?.atu || 0) + (lpVWGiroSub?.atu || 0),
+  };
+  // Captação/Amortização para row merged
+  const vwGiroCA1 = enrichCA('2.1.1.02.03.020', 'Banco VW - Capital de Giro',
+    cpVWGiroSub?.atu || 0, (cpVWGiroSub?.atu || 0) - (cpVWGiroSub?.ant || 0), jst('2.1.1.02.03.020'));
+  const vwGiroCA2 = enrichCA('2.2.1.07.01.003', '',
+    lpVWGiroSub?.atu || 0, (lpVWGiroSub?.atu || 0) - (lpVWGiroSub?.ant || 0), jst('2.2.1.07.01.003'));
+  const vwGiroCA = { ...rollCA([vwGiroCA1, vwGiroCA2]), conta: 'vw-capital-giro', label: 'Banco VW - Capital de Giro' };
+  // Todas as rows unificadas para Captação e Amortização
+  const allCAMerged = [
+    ...cpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu, s.atu - s.ant, jst(s.conta))),
+    vwGiroCA,
+    enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW',   netAcc1.atu, netAcc1.atu - netAcc1.ant, janSt1CA),
+    enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu, netAcc2.atu - netAcc2.ant, janSt2CA),
+    ...lpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu, s.atu - s.ant, jst(s.conta))),
+  ];
+  const grandCAMerged = rollCA(allCAMerged);
+
   const [showCaptAmort, setShowCaptAmort] = useState(false);
   const resultadoRowCA = (tot: { captMes: number; amortMes: number; captYTD: number; amortYTD: number; captAnual: number; amortAnual: number }, label: string, bold: boolean) => {
     const netMes = tot.captMes - tot.amortMes;
@@ -1590,10 +1617,122 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
         />
       </div>
 
-      {/* Tabela CP */}
+      {/* Tabela Unificada Endividamento Bancário */}
       <Card>
         <CardContent className="pt-6">
-          <SectionTitle icon="📅">Empréstimos Bancários — Curto Prazo (2.1.1.02.03)</SectionTitle>
+          <SectionTitle icon="🏦">Endividamento Bancário</SectionTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
+                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Subs CP (excluindo 2.1.1.02.03.020) */}
+                {cpSubsFiltered.map(a => {
+                  const varR = a.atu - a.ant;
+                  const varP = a.ant !== 0 ? (varR / a.ant) * 100 : null;
+                  return (
+                    <tr key={a.conta} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-3">
+                        <span className="text-xs font-mono text-muted-foreground mr-2">{a.conta}</span>
+                        <span className="text-sm text-foreground">{a.desc ? toTitleCase(a.desc) : a.conta}</span>
+                      </td>
+                      <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
+                      <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : ''}{fmtBRL(varR)}</td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}</td>
+                    </tr>
+                  );
+                })}
+                {/* Banco VW - Capital de Giro (2.1.1.02.03.020 CP + 2.2.1.07.01.003 LP) */}
+                {(vwCapGiro.ant !== 0 || vwCapGiro.atu !== 0) && (() => {
+                  const varR = vwCapGiro.atu - vwCapGiro.ant;
+                  const varP = vwCapGiro.ant !== 0 ? (varR / vwCapGiro.ant) * 100 : null;
+                  return (
+                    <tr className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-3">
+                        <span className="text-xs font-mono text-muted-foreground mr-2">2.1.1.02.03.020 + 2.2.1.07.01.003</span>
+                        <span className="text-sm text-foreground">Banco VW - Capital de Giro</span>
+                      </td>
+                      <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(vwCapGiro.ant)}</td>
+                      <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(vwCapGiro.atu)}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : ''}{fmtBRL(varR)}</td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}</td>
+                    </tr>
+                  );
+                })()}
+                {/* Banco Volks Floor Plan Novos VW */}
+                {(netAcc1.ant !== 0 || netAcc1.atu !== 0) && (() => {
+                  const varR = netAcc1.atu - netAcc1.ant;
+                  const varP = netAcc1.ant !== 0 ? (varR / netAcc1.ant) * 100 : null;
+                  return (
+                    <tr className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-3">
+                        <span className="text-xs font-mono text-muted-foreground mr-2">2.1.1.02.01.001</span>
+                        <span className="text-sm text-foreground">Banco Volks Floor Plan Novos VW</span>
+                      </td>
+                      <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(netAcc1.ant)}</td>
+                      <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(netAcc1.atu)}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : ''}{fmtBRL(varR)}</td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}</td>
+                    </tr>
+                  );
+                })()}
+                {/* Banco Volks Floor Plan Novos Audi */}
+                {(netAcc2.ant !== 0 || netAcc2.atu !== 0) && (() => {
+                  const varR = netAcc2.atu - netAcc2.ant;
+                  const varP = netAcc2.ant !== 0 ? (varR / netAcc2.ant) * 100 : null;
+                  return (
+                    <tr className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-3">
+                        <span className="text-xs font-mono text-muted-foreground mr-2">2.1.4.01.01.007</span>
+                        <span className="text-sm text-foreground">Banco Volks Floor Plan Novos Audi</span>
+                      </td>
+                      <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(netAcc2.ant)}</td>
+                      <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(netAcc2.atu)}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : ''}{fmtBRL(varR)}</td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}</td>
+                    </tr>
+                  );
+                })()}
+                {/* Subs LP (excluindo 2.2.1.07.01.003) */}
+                {lpSubsFiltered.map(a => {
+                  const varR = a.atu - a.ant;
+                  const varP = a.ant !== 0 ? (varR / a.ant) * 100 : null;
+                  return (
+                    <tr key={a.conta} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-3">
+                        <span className="text-xs font-mono text-muted-foreground mr-2">{a.conta}</span>
+                        <span className="text-sm text-foreground">{a.desc ? toTitleCase(a.desc) : a.conta}</span>
+                      </td>
+                      <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
+                      <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
+                      <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varR >= 0 ? '+' : ''}{fmtBRL(varR)}</td>
+                      <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}</td>
+                    </tr>
+                  );
+                })}
+                {/* TOTAL BANCÁRIO */}
+                <tr className="bg-muted/50 font-bold">
+                  <td className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL BANCÁRIO</td>
+                  <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(totalAnt)}</td>
+                  <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(totalAtu)}</td>
+                  <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${varTotal > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{varTotal >= 0 ? '+' : ''}{fmtBRL(varTotal)}</td>
+                  <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">{varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Captação e Amortização Bancária */}
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead className="bg-muted/50">
@@ -1689,103 +1828,6 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
         </CardContent>
       </Card>
 
-      {/* Tabela LP */}
-      <Card>
-        <CardContent className="pt-6">
-          <SectionTitle icon="📆">Empréstimos Bancários — Longo Prazo (2.2.1.07)</SectionTitle>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Conta / Descrição</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lpSubs.length === 0 ? (
-                  <tr><td colSpan={5} className="py-6 text-center text-sm text-muted-foreground">Nenhuma sub-conta encontrada em 2.2.1.07</td></tr>
-                ) : (
-                  lpSubs.map(a => {
-                    const varR = a.atu - a.ant;
-                    const varP = a.ant !== 0 ? (varR / a.ant) * 100 : null;
-                    return (
-                      <tr key={a.conta} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                        <td className="py-2 px-3">
-                          <span className="text-xs font-mono text-muted-foreground mr-2">{a.conta}</span>
-                          <span className="text-sm text-foreground">{a.desc ? toTitleCase(a.desc) : a.conta}</span>
-                        </td>
-                        <td className="py-2 px-3 text-right text-sm font-mono text-muted-foreground">{fmtBRL(a.ant)}</td>
-                        <td className="py-2 px-3 text-right text-sm font-mono font-semibold text-foreground">{fmtBRL(a.atu)}</td>
-                        <td className={`py-2 px-3 text-right text-sm font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-                          {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
-                        </td>
-                        <td className={`py-2 px-3 text-right text-xs font-mono ${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-                          {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-                <tr className="bg-muted/50 font-bold">
-                  <td className="py-2.5 px-3 text-sm font-bold text-foreground">TOTAL LONGO PRAZO</td>
-                  <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-muted-foreground">{fmtBRL(lpTotal.ant)}</td>
-                  <td className="py-2.5 px-3 text-right text-sm font-mono font-bold text-foreground">{fmtBRL(lpTotal.atu)}</td>
-                  <td className={`py-2.5 px-3 text-right text-sm font-mono font-bold ${lpTotal.atu - lpTotal.ant > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                    {lpTotal.atu - lpTotal.ant >= 0 ? '+' : ''}{fmtBRL(lpTotal.atu - lpTotal.ant)}
-                  </td>
-                  <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
-                    {lpTotal.ant !== 0 ? `${((lpTotal.atu - lpTotal.ant) / lpTotal.ant * 100) >= 0 ? '+' : ''}${((lpTotal.atu - lpTotal.ant) / lpTotal.ant * 100).toFixed(1)}%` : '—'}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Consolidado */}
-      <Card className="border-2 border-border">
-        <CardContent className="pt-6">
-          <SectionTitle icon="🏦">Consolidado do Endividamento Bancário</SectionTitle>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="py-2.5 px-3 text-left text-xs uppercase tracking-wider text-muted-foreground">Classificação</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAnterior}</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">{colAtual}</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Variação R$</th>
-                  <th className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-muted-foreground">Var %</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[{ label: 'Curto Prazo (2.1.1.02.03)', ant: cpTotal.ant, atu: cpTotal.atu }, { label: 'Longo Prazo (2.2.1.07)', ant: lpTotal.ant, atu: lpTotal.atu }, { label: 'TOTAL GERAL', ant: totalAnt, atu: totalAtu }].map((row, i) => {
-                  const isTotal = i === 2;
-                  const varR = row.atu - row.ant;
-                  const varP = row.ant !== 0 ? (varR / row.ant) * 100 : null;
-                  return (
-                    <tr key={row.label} className={isTotal ? 'bg-muted/70 font-bold' : 'border-b border-border/50'}>
-                      <td className={`py-2.5 px-3 text-sm ${isTotal ? 'font-bold text-foreground' : 'text-muted-foreground'}`}>{row.label}</td>
-                      <td className={`py-2.5 px-3 text-right text-sm font-mono ${isTotal ? 'font-bold text-muted-foreground' : 'text-muted-foreground'}`}>{fmtBRL(row.ant)}</td>
-                      <td className={`py-2.5 px-3 text-right text-sm font-mono ${isTotal ? 'font-bold text-foreground' : 'text-foreground'}`}>{fmtBRL(row.atu)}</td>
-                      <td className={`py-2.5 px-3 text-right text-sm font-mono ${isTotal ? 'font-bold ' : ''}${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-                        {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
-                      </td>
-                      <td className={`py-2.5 px-3 text-right text-xs font-mono ${isTotal ? 'font-bold ' : ''}${varR > 0 ? 'text-red-600 dark:text-red-400' : varR < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-                        {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Captação e Amortização Bancária */}
       <Card>
         <CardContent className="pt-6">
@@ -1838,10 +1880,7 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                 )}
               </thead>
               <tbody>
-                <tr className="bg-muted/20">
-                  <td colSpan={CA_nCols} className="py-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Curto Prazo</td>
-                </tr>
-                {cpCA.map(r => (
+                {allCAMerged.map(r => (
                   <tr key={r.conta} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
                     <td className="py-2.5 px-3 text-foreground">
                       <span className="text-xs font-mono text-muted-foreground mr-2">{r.conta}</span>{r.label}
@@ -1849,34 +1888,11 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                     {movColsCA(r, false)}
                   </tr>
                 ))}
-                <tr className="bg-muted/50 border-b-2 border-border">
-                  <td className="py-2.5 px-3 font-bold text-foreground">Total Curto Prazo</td>
-                  {movColsCA(cpTotCA, true)}
-                </tr>
-                {resultadoRowCA(cpTotCA, 'Resultado da Amortização ou Captação Curto Prazo', false)}
-                {lpCA.length > 0 && <>
-                  <tr className="bg-muted/20">
-                    <td colSpan={CA_nCols} className="py-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Longo Prazo</td>
-                  </tr>
-                  {lpCA.map(r => (
-                    <tr key={r.conta} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
-                      <td className="py-2.5 px-3 text-foreground">
-                        <span className="text-xs font-mono text-muted-foreground mr-2">{r.conta}</span>{r.label}
-                      </td>
-                      {movColsCA(r, false)}
-                    </tr>
-                  ))}
-                  <tr className="bg-muted/50 border-b-2 border-border">
-                    <td className="py-2.5 px-3 font-bold text-foreground">Total Longo Prazo</td>
-                    {movColsCA(lpTotCA, true)}
-                  </tr>
-                  {resultadoRowCA(lpTotCA, 'Resultado da Amortização ou Captação Longo Prazo', false)}
-                </>}
                 <tr className="bg-primary/10">
-                  <td className="py-3 px-3 font-bold text-foreground">TOTAL GERAL</td>
-                  {movColsCA(grandCA, true)}
+                  <td className="py-3 px-3 font-bold text-foreground">TOTAL BANCÁRIO</td>
+                  {movColsCA(grandCAMerged, true)}
                 </tr>
-                {resultadoRowCA(grandCA, 'Resultado da Amortização ou Captação Geral', true)}
+                {resultadoRowCA(grandCAMerged, 'Resultado da Amortização ou Captação Bancária', true)}
               </tbody>
             </table>
           </div>
