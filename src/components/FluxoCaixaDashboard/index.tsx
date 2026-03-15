@@ -1053,14 +1053,14 @@ function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAt
       {/* KPI Total */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KPI
-          label="Total Anterior"
+          label={colAnterior}
           value={fmtBRL(totalAnt, true)}
           sub="Saldo do período anterior"
           color="blue"
           icon="📋"
         />
         <KPI
-          label="Total Atual"
+          label={colAtual}
           value={fmtBRL(totalAtu, true)}
           sub="Saldo do período atual"
           color={totalAtu > totalAnt ? 'emerald' : 'red'}
