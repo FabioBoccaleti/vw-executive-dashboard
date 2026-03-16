@@ -300,7 +300,7 @@ export function ImobilizadoCharts({ selectedYear, selectedMonth, onClose }: Prop
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {contasData.map((c) => {
+          {contasData.filter(c => Object.values(c.values).some(v => v !== 0)).map((c) => {
             const cmpC = compareContasData.find(cc => cc.conta === c.conta);
             const chartData = buildChartData(c.values, cmpC?.values || {});
             const descLabel = c.desc ? toTitleCase(c.desc) : c.conta;
