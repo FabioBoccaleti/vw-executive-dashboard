@@ -18,6 +18,7 @@ import { PassivoCharts } from "./PassivoCharts";
 import { EndividamentoCharts } from "./EndividamentoCharts";
 import { ReceitasCharts } from "./ReceitasCharts";
 import { FCCaixaDiretoCharts } from "./FCCaixaDiretoCharts";
+import { ImobilizadoCharts } from "./ImobilizadoCharts";
 import { ResultadoCharts } from "./ResultadoCharts";
 import { ComparativoReceitas } from "./ComparativoReceitas";
 import { ProjecaoCaixaChart } from "./ProjecaoCaixaChart";
@@ -2196,6 +2197,11 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, co
 
 function ImobilizadoTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, selectedMonth, selectedYear }: any) {
   const accounts = data.accounts as Record<string, any>;
+  const [showCharts, setShowCharts] = useState(false);
+
+  if (showCharts) {
+    return <ImobilizadoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
+  }
 
   // Totais do grupo 1.5.5
   const root = accounts['1.5.5'] || { saldoAnt: 0, saldoAtual: 0 };
@@ -2268,6 +2274,16 @@ function ImobilizadoTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
 
   return (
     <div className="space-y-6">
+      {/* Botão Evolução Mensal */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowCharts(true)}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
+        >
+          <span>📈</span> Evolução Mensal
+        </button>
+      </div>
+
       {/* KPI Total */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KPI
