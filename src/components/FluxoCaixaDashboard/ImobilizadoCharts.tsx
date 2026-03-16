@@ -46,16 +46,24 @@ function parseImobilizado(rawText: string): ParsedMonth {
   const descMap: Record<string, string> = {};
   const valMap: Record<string, number> = {};
 
+  let root155: number | null = null;
+
   for (const line of rawText.split('\n')) {
     const parts = line.split(';');
     if (parts.length < 7) continue;
     const [nivel, conta, desc, , , , saldoAtual] = parts;
     if (nivel?.trim() === 'T') continue;
     const id = conta?.trim();
-    if (!id || !id.startsWith('1.5.5.')) continue;
+    if (!id) continue;
+    const val = parseFloat((saldoAtual || '0').trim().replace(/\./g, '').replace(',', '.')) || 0;
+    // Captura o valor líquido da conta raiz 1.5.5
+    if (id === '1.5.5') {
+      root155 = Math.abs(val);
+      continue;
+    }
+    if (!id.startsWith('1.5.5.')) continue;
     ids.add(id);
     if (desc?.trim()) descMap[id] = desc.trim();
-    const val = parseFloat((saldoAtual || '0').trim().replace(/\./g, '').replace(',', '.')) || 0;
     valMap[id] = Math.abs(val);
   }
 
@@ -69,8 +77,15 @@ function parseImobilizado(rawText: string): ParsedMonth {
 
   for (const leafId of leafIds) {
     const val = valMap[leafId] || 0;
-    total155 += val;
     contas[leafId] = { desc: descMap[leafId] || leafId, val };
+  }
+
+  // Usa o valor líquido da linha 1.5.5 do balancete (já desconta depreciações).
+  // Fallback: soma das folhas caso a conta raiz não esteja no arquivo.
+  if (root155 !== null) {
+    total155 = root155;
+  } else {
+    total155 = leafIds.reduce((s, id) => s + (valMap[id] || 0), 0);
   }
 
   return { contas, total155 };
