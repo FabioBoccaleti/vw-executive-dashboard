@@ -14,9 +14,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Pergunta inválida' })
   }
 
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    return res.status(500).json({ error: 'OPENAI_API_KEY não configurada no servidor' })
+    return res.status(500).json({ error: 'ANTHROPIC_API_KEY não configurada no servidor' })
   }
 
   const systemPrompt = `Você é um assistente financeiro especializado em análise contábil de concessionárias de veículos do grupo Sorana (marcas Volkswagen e Audi).
@@ -33,31 +33,32 @@ DADOS FINANCEIROS:
 ${(typeof context === 'string' ? context : '').slice(0, 100000)}`
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 3000,
+        system: systemPrompt,
         messages: [
-          { role: 'system', content: systemPrompt },
           { role: 'user', content: question },
         ],
         temperature: 0.3,
-        max_tokens: 3000,
       }),
     })
 
     if (!response.ok) {
       const err = await response.text()
-      console.error('OpenAI error:', err)
+      console.error('Anthropic error:', err)
       return res.status(502).json({ error: 'Erro ao consultar a IA. Verifique a chave da API.' })
     }
 
     const data = await response.json()
-    const answer = data.choices?.[0]?.message?.content || 'Sem resposta.'
+    const answer = data.content?.[0]?.text || 'Sem resposta.'
 
     return res.status(200).json({ answer })
   } catch (error) {
