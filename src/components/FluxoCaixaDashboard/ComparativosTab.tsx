@@ -213,11 +213,12 @@ function extractMetrics(rawText: string, tipos: Record<string, string> = {}): Co
     (obrigTrib.atu - obrigTrib.ant) + (obrigTrab.atu - obrigTrab.ant) +
     (contasPagar.atu - contasPagar.ant) +
     (emprestCP_01.atu - emprestCP_01.ant) +  // Fornecedores 2.1.1.01 → operacional
-    (outros2_2_1Atu - outros2_2_1Ant);       // Resíduo 2.2.1 → operacional
+    (outros2_2_1Atu - outros2_2_1Ant) +      // Resíduo 2.2.1 → operacional
+    -(realizLPCred.atu - realizLPCred.ant);  // Créditos LP c/ ligadas → operacional (alinhado ao FC Direto)
 
   const fluxoInvestimento =
     -(imobiliz.atu - imobiliz.ant) - (intangivel.atu - intangivel.ant) -
-    (realizLPCred.atu - realizLPCred.ant) - (investimentos.atu - investimentos.ant);
+    (investimentos.atu - investimentos.ant);
 
   const fluxoFinanciamento =
     (emprestCP_02.atu - emprestCP_02.ant) + // Financiamentos CP 2.1.1.02 → financiamento
