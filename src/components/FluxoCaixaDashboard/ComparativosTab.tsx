@@ -265,7 +265,16 @@ function extractMetrics(rawText: string): ComparativoMetrics {
   const categoriasDespesas: DespesaCategoria[] = DESPESA_CATS.map(c => ({
     label: c.label,
     conta: c.conta,
-    valor: Math.abs(get(c.conta).valDeb - get(c.conta).valCred),
+    // Soma as contas-folha do grupo (igual ao método de despOper5Net)
+    // para casos em que a conta-pai não tem valDeb/valCred próprios no balancete
+    valor: (() => {
+      const parentVal = Math.abs(get(c.conta).valDeb - get(c.conta).valCred);
+      if (parentVal > 0) return parentVal;
+      // fallback: acumula folhas
+      const keysUnder = Object.keys(acc).filter(k => k.startsWith(c.conta + '.'));
+      const leaves = keysUnder.filter(k => !keysUnder.some(o => o !== k && o.startsWith(k + '.')));
+      return leaves.reduce((s, k) => s + (get(k).valDeb - get(k).valCred), 0);
+    })(),
   })).filter(c => c.valor > 0);
 
   // Se nenhuma subcategoria encontrada, usa grupo 5 inteiro
