@@ -2302,7 +2302,7 @@ function ImobilizadoTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
         />
         <KPI
           label="Variação"
-          value={fmtBRL(varTotal, true)}
+          value={`${varTotal >= 0 ? '+' : '-'}${fmtBRL(varTotal, true)}`}
           sub={varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
           color={varTotal >= 0 ? 'emerald' : 'red'}
           icon="📈"
