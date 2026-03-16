@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { loadFluxoCaixaRaw, loadFluxoCaixaIndex } from "./fluxoCaixaStorage";
+import { GRUPOS_CONFIG, classificarTipo } from "./DespesasTab";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const YEARS = [2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028];
@@ -250,32 +251,24 @@ function extractMetrics(rawText: string): ComparativoMetrics {
   // ── Parcelamento Refis ────────────────────────────────────────────────────
   const parcelamentoRefis = absAtu('2.1.2.02.07.020') + absAtu('2.2.1.08.01.020');
 
-  // ── Despesas — categorias expandíveis ────────────────────────────────────
-  // Subcategorias do grupo 5 (Despesas Operacionais)
-  const DESPESA_CATS: { label: string; conta: string }[] = [
-    { label: 'Despesas com Pessoal',             conta: '5.5.1' },
-    { label: 'Despesas com Veículos e Frota',     conta: '5.5.2' },
-    { label: 'Despesas com Imóveis',              conta: '5.5.3' },
-    { label: 'Despesas com Terceiros / Serviços', conta: '5.5.4' },
-    { label: 'Despesas Financeiras',              conta: '5.5.7' },
-    { label: 'Despesas com Marketing',            conta: '5.5.8' },
-    { label: 'Outras Despesas Operacionais',      conta: '5.5.9' },
-  ];
+  // ── Despesas — categorias expandíveis (mesmo método da aba Despesas) ────────
+  // Obtém contas-folha do grupo 5, classifica por keyword e soma por grupo
+  const allKeys5_cats = Object.keys(acc).filter(k => k.startsWith('5.'));
+  const leaves5_cats  = allKeys5_cats.filter(k => !allKeys5_cats.some(o => o !== k && o.startsWith(k + '.')));
 
-  const categoriasDespesas: DespesaCategoria[] = DESPESA_CATS.map(c => ({
-    label: c.label,
-    conta: c.conta,
-    // Soma as contas-folha do grupo (igual ao método de despOper5Net)
-    // para casos em que a conta-pai não tem valDeb/valCred próprios no balancete
-    valor: (() => {
-      const parentVal = Math.abs(get(c.conta).valDeb - get(c.conta).valCred);
-      if (parentVal > 0) return parentVal;
-      // fallback: acumula folhas
-      const keysUnder = Object.keys(acc).filter(k => k.startsWith(c.conta + '.'));
-      const leaves = keysUnder.filter(k => !keysUnder.some(o => o !== k && o.startsWith(k + '.')));
-      return leaves.reduce((s, k) => s + (get(k).valDeb - get(k).valCred), 0);
-    })(),
-  })).filter(c => c.valor > 0);
+  const grupoSums: number[] = Array(GRUPOS_CONFIG.length).fill(0);
+  for (const k of leaves5_cats) {
+    const entry = acc[k];
+    if (!entry) continue;
+    const val = (entry.valDeb as number) - (entry.valCred as number);
+    if (val === 0) continue;
+    const grupoIdx = classificarTipo(entry.desc as string);
+    grupoSums[grupoIdx] += val;
+  }
+
+  const categoriasDespesas: DespesaCategoria[] = GRUPOS_CONFIG
+    .map((g, i) => ({ label: g.label, conta: g.id, valor: grupoSums[i] }))
+    .filter(c => c.valor > 0);
 
   // Se nenhuma subcategoria encontrada, usa grupo 5 inteiro
   if (categoriasDespesas.length === 0) {
