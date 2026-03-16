@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins, Layers, Download } from "lucide-react";
+import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins, Layers, Download, Sparkles } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { cn } from "@/lib/utils";
 import { loadFluxoCaixaRaw, saveFluxoCaixaData } from "./fluxoCaixaStorage";
@@ -22,6 +22,7 @@ import { ImobilizadoCharts } from "./ImobilizadoCharts";
 import { ResultadoCharts } from "./ResultadoCharts";
 import { ComparativoReceitas } from "./ComparativoReceitas";
 import { ProjecaoCaixaChart } from "./ProjecaoCaixaChart";
+import { PerguntasRespostasTab } from "./PerguntasRespostasTab";
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
 function parseBalancete(text: string) {
@@ -626,6 +627,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     { id: 'indicadores', label: 'Indicadores', icon: <Target className="w-4 h-4" />, requiresData: true },
     { id: 'diagnostico', label: selectedMonth === 0 ? 'Diagnóstico Ano' : 'Diagnóstico Mês', icon: <Activity className="w-4 h-4" />, requiresData: true },
     { id: 'comparativos', label: 'Comparativos', icon: <BarChart3 className="w-4 h-4" />, requiresData: false },
+    { id: 'perguntasRespostas', label: 'Perguntas e Respostas', icon: <Sparkles className="w-4 h-4" />, requiresData: false },
   ];
 
   return (
@@ -776,6 +778,10 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
           {activeTab === 'comparativos' ? (
             <div className="animate-in fade-in duration-500">
               <ComparativosTab selectedYear={selectedYear} selectedMonth={selectedMonth} />
+            </div>
+          ) : activeTab === 'perguntasRespostas' ? (
+            <div className="animate-in fade-in duration-500">
+              <PerguntasRespostasTab data={data} selectedMonth={selectedMonth} selectedYear={selectedYear} prevMonthAccounts={prevMonthAccounts} janAccounts={janAccounts} />
             </div>
           ) : loading && !data ? (
             <div className="flex flex-col items-center justify-center py-32 gap-4 text-slate-500">
