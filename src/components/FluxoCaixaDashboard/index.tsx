@@ -1377,14 +1377,14 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                               : varR < 0 ? 'text-red-600 dark:text-red-400'
                               : 'text-muted-foreground'
                             }`}>
-                              {varR >= 0 ? '+' : ''}{fmtBRL(varR)}
+                              {varR > 0 ? '+' : varR < 0 ? '-' : ''}{fmtBRL(varR)}
                             </td>
                             <td className={`py-2 px-3 text-right text-xs font-mono ${
                               varR > 0 ? 'text-emerald-600 dark:text-emerald-400'
                               : varR < 0 ? 'text-red-600 dark:text-red-400'
                               : 'text-muted-foreground'
                             }`}>
-                              {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                              {varP !== null ? `${varP >= 0 ? '+' : '-'}${Math.abs(varP).toFixed(1)}%` : '—'}
                             </td>
                             {showYtd && (
                               <td className="py-2 pl-8 pr-3 text-right text-sm font-mono font-semibold text-amber-700 dark:text-amber-400 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/10">
@@ -1404,14 +1404,14 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                           : gVar < 0 ? 'text-red-600 dark:text-red-400'
                           : 'text-muted-foreground'
                         }`}>
-                          {gVar >= 0 ? '+' : ''}{fmtBRL(gVar)}
+                          {gVar > 0 ? '+' : gVar < 0 ? '-' : ''}{fmtBRL(gVar)}
                         </td>
                         <td className={`py-2 px-3 text-right text-xs font-mono font-semibold ${
                           gVar > 0 ? 'text-emerald-600 dark:text-emerald-400'
                           : gVar < 0 ? 'text-red-600 dark:text-red-400'
                           : 'text-muted-foreground'
                         }`}>
-                          {gVarPct !== null ? `${gVarPct >= 0 ? '+' : ''}${gVarPct.toFixed(1)}%` : '—'}
+                          {gVarPct !== null ? `${gVarPct >= 0 ? '+' : '-'}${Math.abs(gVarPct).toFixed(1)}%` : '—'}
                         </td>
                         {showYtd && (
                           <td className="py-2 pl-8 pr-3 text-right text-sm font-mono font-bold text-amber-700 dark:text-amber-400 border-l-2 border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20">
@@ -1432,10 +1432,10 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                     : varTotal < 0 ? 'text-red-600 dark:text-red-400'
                     : 'text-muted-foreground'
                   }`}>
-                    {varTotal >= 0 ? '+' : ''}{fmtBRL(varTotal)}
+                    {varTotal > 0 ? '+' : varTotal < 0 ? '-' : ''}{fmtBRL(varTotal)}
                   </td>
                   <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
-                    {varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
+                    {varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : '-'}${Math.abs(varTotalPct).toFixed(1)}%` : '—'}}
                   </td>
                   {showYtd && (
                     <td className="py-2.5 pl-8 pr-3 text-right text-sm font-mono font-bold text-amber-700 dark:text-amber-400 border-l-2 border-amber-300 dark:border-amber-700 bg-amber-100/60 dark:bg-amber-950/30">
