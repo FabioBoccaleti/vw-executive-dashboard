@@ -1303,8 +1303,8 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
         />
         <KPI
           label="Variação"
-          value={fmtBRL(varTotal, true)}
-          sub={varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : ''}${varTotalPct.toFixed(1)}%` : '—'}
+          value={`${varTotal > 0 ? '+' : varTotal < 0 ? '-' : ''}${fmtBRL(varTotal, true)}`}
+          sub={varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : '-'}${Math.abs(varTotalPct).toFixed(1)}%` : '—'}
           color={varTotal >= 0 ? 'emerald' : 'red'}
           icon="📈"
         />
