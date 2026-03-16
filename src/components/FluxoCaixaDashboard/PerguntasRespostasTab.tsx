@@ -200,8 +200,9 @@ export function PerguntasRespostasTab({ data, selectedMonth, selectedYear, prevM
       const json = await res.json();
 
       if (!res.ok) {
+        const errMsg = json.hint ? `${json.error}\n\n${json.hint}` : (json.error || 'Erro ao processar a pergunta');
         setError(json.error || 'Erro ao processar a pergunta');
-        setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${json.error || 'Erro ao processar a pergunta'}` }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${errMsg}` }]);
       } else {
         setMessages(prev => [...prev, { role: 'assistant', content: json.answer }]);
       }

@@ -16,7 +16,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY não configurada no servidor' })
+    // Diagnóstico: listar quais env vars de API existem (sem revelar valores)
+    const envHints = Object.keys(process.env)
+      .filter(k => /anthropic|claude|openai|ai[_-]|api[_-]key/i.test(k))
+      .map(k => `${k}=***`)
+    console.error('ANTHROPIC_API_KEY ausente. Vars encontradas:', envHints)
+    return res.status(500).json({
+      error: 'ANTHROPIC_API_KEY não configurada no servidor',
+      hint: envHints.length ? `Variáveis similares encontradas: ${envHints.join(', ')}` : 'Nenhuma variável de API de IA encontrada nas env vars. Configure ANTHROPIC_API_KEY no Vercel.'
+    })
   }
 
   const systemPrompt = `Você é um assistente financeiro especializado em análise contábil de concessionárias de veículos do grupo Sorana (marcas Volkswagen e Audi).
