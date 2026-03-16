@@ -924,9 +924,7 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
 
                       {/* ENDIVIDAMENTO */}
                       <SectionHeader icon="🏦" title="Endividamento Bancário" subtitle="Saldo atual dos empréstimos bancários CP e LP" colSpan={colSpan} />
-                      <CompRow label="Empréstimos — Curto Prazo" desc="2.1.1.02.03 + floor plan líquido VW/Audi" periods={loadedPeriods} getValue={m => m.endividamentoCP} direction="desc" refIdx={refIdx} />
-                      <CompRow label="Empréstimos — Longo Prazo" desc="Financiamentos bancários LP (2.2.1.07)" periods={loadedPeriods} getValue={m => m.endividamentoLP} direction="desc" refIdx={refIdx} />
-                      <CompRow label="Total Endividamento Bancário"                                             periods={loadedPeriods} getValue={m => m.endividamentoCP + m.endividamentoLP} direction="desc" isHeader refIdx={refIdx} />
+                      <CompRow label="Total Endividamento Bancário" desc="Empréstimos CP + LP" periods={loadedPeriods} getValue={m => m.endividamentoCP + m.endividamentoLP} direction="desc" isHeader refIdx={refIdx} />
 
                       {/* MÚTUO DOS SÓCIOS */}
                       <SectionHeader icon="🤝" title="Mútuo dos Sócios" subtitle="Saldo atual — conta 2.2.1.01.01" colSpan={colSpan} />
