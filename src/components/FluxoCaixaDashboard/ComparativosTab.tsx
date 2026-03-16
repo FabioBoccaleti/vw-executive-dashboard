@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { loadFluxoCaixaRaw, loadFluxoCaixaIndex } from "./fluxoCaixaStorage";
 import { GRUPOS_CONFIG, classificarTipo } from "./DespesasTab";
+import { loadDespesasTipos } from "./despesasStorage";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const YEARS = [2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028];
@@ -120,7 +121,7 @@ function fmtPct(v: number): string {
 }
 
 // ─── METRICS EXTRACTOR ───────────────────────────────────────────────────────
-function extractMetrics(rawText: string): ComparativoMetrics {
+function extractMetrics(rawText: string, tipos: Record<string, string> = {}): ComparativoMetrics {
   const lines = rawText.split('\n').filter(l => l.trim());
   const acc: Record<string, { saldoAnt: number; saldoAtual: number; valDeb: number; valCred: number; desc: string }> = {};
 
@@ -251,29 +252,48 @@ function extractMetrics(rawText: string): ComparativoMetrics {
   // ── Parcelamento Refis ────────────────────────────────────────────────────
   const parcelamentoRefis = absAtu('2.1.2.02.07.020') + absAtu('2.2.1.08.01.020');
 
-  // ── Despesas — categorias expandíveis (mesmo método da aba Despesas) ────────
-  // Obtém contas-folha do grupo 5, classifica por keyword e soma por grupo
+  // ── Despesas — categorias expandíveis (idêntico à aba Despesas) ────────────
+  // 1. Agrupa contas-folha pelo tipo manualmente atribuído (mesmo KV da DespesasTab)
+  // 2. Para cada tipo string, aplica classificarTipo() para chegar ao GRUPOS_CONFIG
+  // Contas sem tipo atribuído são excluídas (igual ao comportamento da DespesasTab)
   const allKeys5_cats = Object.keys(acc).filter(k => k.startsWith('5.'));
   const leaves5_cats  = allKeys5_cats.filter(k => !allKeys5_cats.some(o => o !== k && o.startsWith(k + '.')));
 
-  const grupoSums: number[] = Array(GRUPOS_CONFIG.length).fill(0);
+  // Passo 1: agrupar por tipo string → soma de vals (igual ao resumoMap da DespesasTab)
+  const tipoSums: Record<string, number> = {};
   for (const k of leaves5_cats) {
     const entry = acc[k];
     if (!entry) continue;
+    const tipo = tipos[k]?.trim();
+    if (!tipo) continue; // sem tipo atribuído → exclui (igual DespesasTab)
     const val = (entry.valDeb as number) - (entry.valCred as number);
     if (val === 0) continue;
-    const grupoIdx = classificarTipo(entry.desc as string);
-    grupoSums[grupoIdx] += val;
+    tipoSums[tipo] = (tipoSums[tipo] ?? 0) + val;
+  }
+
+  // Passo 2: classificar tipo strings em GRUPOS_CONFIG
+  const grupoSums: number[] = Array(GRUPOS_CONFIG.length).fill(0);
+  for (const [tipo, val] of Object.entries(tipoSums)) {
+    grupoSums[classificarTipo(tipo)] += val;
   }
 
   const categoriasDespesas: DespesaCategoria[] = GRUPOS_CONFIG
     .map((g, i) => ({ label: g.label, conta: g.id, valor: grupoSums[i] }))
     .filter(c => c.valor > 0);
 
-  // Se nenhuma subcategoria encontrada, usa grupo 5 inteiro
+  // Se nenhuma subcategoria encontrada (tipos não carregados), usa raw desc como fallback
   if (categoriasDespesas.length === 0) {
-    const v5 = Math.abs(get('5').valDeb - get('5').valCred);
-    if (v5 > 0) categoriasDespesas.push({ label: 'Total Despesas Operacionais', conta: '5', valor: v5 });
+    const grupoFallback: number[] = Array(GRUPOS_CONFIG.length).fill(0);
+    for (const k of leaves5_cats) {
+      const entry = acc[k];
+      if (!entry) continue;
+      const val = (entry.valDeb as number) - (entry.valCred as number);
+      if (val === 0) continue;
+      grupoFallback[classificarTipo(entry.desc as string)] += val;
+    }
+    GRUPOS_CONFIG.forEach((g, i) => {
+      if (grupoFallback[i] > 0) categoriasDespesas.push({ label: g.label, conta: g.id, valor: grupoFallback[i] });
+    });
   }
 
   const totalDespesas = despOper5Net;
@@ -617,6 +637,7 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
   const defaultYear = selectedYear ?? new Date().getFullYear();
   const defaultMonth = selectedMonth !== undefined ? selectedMonth : 0;
   const [availableKeys, setAvailableKeys] = useState<Record<string, boolean>>({});
+  const [despTipos,     setDespTipos]     = useState<Record<string, string>>({});
   const [indexLoading,  setIndexLoading]  = useState(true);
   const [indexError,    setIndexError]    = useState<string | null>(null);
 
@@ -644,11 +665,11 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
     return oldest;
   })();
 
-  // ── Load index on mount ───────────────────────────────────────────────────
+  // ── Load index + tipos on mount ───────────────────────────────────────────
   useEffect(() => {
     setIndexLoading(true);
-    loadFluxoCaixaIndex()
-      .then(idx => { setAvailableKeys(idx); setIndexError(null); })
+    Promise.all([loadFluxoCaixaIndex(), loadDespesasTipos()])
+      .then(([idx, tipos]) => { setAvailableKeys(idx); setDespTipos(tipos); setIndexError(null); })
       .catch(e  => setIndexError(String(e)))
       .finally(() => setIndexLoading(false));
   }, []);
@@ -696,7 +717,7 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
           results.push({ period, metrics: null, loaded: false, error: 'Sem dados' });
           continue;
         }
-        results.push({ period, metrics: extractMetrics(entry.rawText), loaded: true, error: null });
+        results.push({ period, metrics: extractMetrics(entry.rawText, despTipos), loaded: true, error: null });
       } catch (e: any) {
         results.push({ period, metrics: null, loaded: false, error: String(e) });
       }
