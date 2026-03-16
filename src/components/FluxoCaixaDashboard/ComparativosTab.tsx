@@ -72,6 +72,18 @@ interface ComparativoMetrics {
   mutuoSocios:          number;
   // Parcelamento Refis
   parcelamentoRefis:    number;
+  // Indicadores Financeiros
+  liqCorrente:          number;
+  liqImediata:          number;
+  endivGeral:           number;
+  partCapTerc:          number;
+  imobPL:               number;
+  imobInvest:           number;
+  taxaRisco:            number;
+  margemBruta:          number;
+  roic:                 number;
+  roe:                  number;
+  ros:                  number;
   // Despesas
   totalDespesas:        number;
   categoriasDespesas:   DespesaCategoria[];
@@ -299,6 +311,25 @@ function extractMetrics(rawText: string, tipos: Record<string, string> = {}): Co
 
   const totalDespesas = categoriasDespesas.reduce((s, c) => s + c.valor, 0);
 
+  // ── Indicadores Financeiros ───────────────────────────────────────────────
+  const disponib = absAtu('1.1.1');
+  const passTotal = passivoCirculante + passivoNaoCirculante;
+  const dividasFin = emprestCP.atu + emprestLP.atu + pessoasLig.atu + debitosLig.atu + arrendLP.atu;
+  const capInvestido = patrimonioLiquido + dividasFin;
+  const ancPlusPNC = patrimonioLiquido + passivoNaoCirculante;
+
+  const liqCorrente = passivoCirculante > 0 ? ativoCirculante / passivoCirculante : 0;
+  const liqImediata = passivoCirculante > 0 ? (disponib / passivoCirculante) * 100 : 0;
+  const endivGeral  = ativoTotal > 0 ? (passTotal / ativoTotal) * 100 : 0;
+  const partCapTerc = patrimonioLiquido > 0 ? passTotal / patrimonioLiquido : 0;
+  const imobPL      = patrimonioLiquido > 0 ? (ativoNaoCirculante / patrimonioLiquido) * 100 : 0;
+  const imobInvest  = ancPlusPNC > 0 ? (ativoNaoCirculante / ancPlusPNC) * 100 : 0;
+  const taxaRisco   = ativoCirculante > 0 ? passTotal / ativoCirculante : 0;
+  const margemBruta = receitaLiquida > 0 ? ((receitaLiquida - CMV) / receitaLiquida) * 100 : 0;
+  const roic        = capInvestido > 0 ? (resultadoLiquido / capInvestido) * 100 : 0;
+  const roe         = patrimonioLiquido > 0 ? (resultadoLiquido / patrimonioLiquido) * 100 : 0;
+  const ros         = receitaLiquida > 0 ? (resultadoLiquido / receitaLiquida) * 100 : 0;
+
   return {
     ativoCirculante, ativoNaoCirculante, ativoTotal,
     passivoCirculante, passivoNaoCirculante, patrimonioLiquido,
@@ -307,6 +338,8 @@ function extractMetrics(rawText: string, tipos: Record<string, string> = {}): Co
     estoqueVW, estoqueAudi, valoresReceber,
     endividamentoCP, endividamentoLP,
     mutuoSocios, parcelamentoRefis,
+    liqCorrente, liqImediata, endivGeral, partCapTerc, imobPL, imobInvest, taxaRisco,
+    margemBruta, roic, roe, ros,
     totalDespesas, categoriasDespesas,
   };
 }
@@ -415,9 +448,13 @@ interface CompRowProps {
   isHeader?:  boolean;
   indent?:    boolean;
   refIdx:     number;
+  fmtFn?:     (v: number) => string;
+  fmtFullFn?: (v: number) => string;
 }
 
-function CompRow({ label, desc, periods, getValue, direction = 'neutral', isHeader = false, indent = false, refIdx }: CompRowProps) {
+function CompRow({ label, desc, periods, getValue, direction = 'neutral', isHeader = false, indent = false, refIdx, fmtFn, fmtFullFn }: CompRowProps) {
+  const displayFmt = fmtFn ?? fmtBRL;
+  const tooltipFmt = fmtFullFn ?? fmtBRLFull;
   const values = periods.map(p => (p.metrics ? getValue(p.metrics) : null));
   const ref    = values[refIdx];
   const nonNull = values.filter((v): v is number => v !== null);
@@ -487,10 +524,10 @@ function CompRow({ label, desc, periods, getValue, direction = 'neutral', isHead
             <div className={cn(
               'text-sm font-mono font-semibold',
               isHeader ? 'text-foreground' : 'text-foreground/90',
-            )} title={fmtBRLFull(val)}>
+            )} title={tooltipFmt(val)}>
               {val < 0
-                ? <span className="text-red-600 dark:text-red-400">({fmtBRL(Math.abs(val))})</span>
-                : fmtBRL(val)}
+                ? <span className="text-red-600 dark:text-red-400">({displayFmt(Math.abs(val))})</span>
+                : displayFmt(val)}
             </div>
             {deltaEl}
             {isBest && direction !== 'neutral' && (
@@ -905,6 +942,20 @@ export function ComparativosTab({ selectedYear, selectedMonth }: { selectedYear?
                       <CompRow label="Receita Líquida"                   desc="Receita bruta − impostos − devoluções"          periods={loadedPeriods} getValue={m => m.receitaLiquida}      direction="asc" refIdx={refIdx} />
                       <CompRow label="Resultado Antes do IR/CSLL"        desc="Lucro operacional antes da tributação"           periods={loadedPeriods} getValue={m => m.resultadoAntesIR}   direction="asc" isHeader refIdx={refIdx} />
                       <CompRow label="Resultado Líquido do Exercício"    desc="Lucro/Prejuízo após IR e CSLL"                   periods={loadedPeriods} getValue={m => m.resultadoLiquido}   direction="asc" isHeader refIdx={refIdx} />
+
+                      {/* INDICADORES */}
+                      <SectionHeader icon="📐" title="Indicadores Financeiros" subtitle="Ratios de liquidez, endividamento e rentabilidade" colSpan={colSpan} />
+                      <CompRow label="Liquidez Corrente"      desc="AC / PC — ≥ 1,5x ideal"           periods={loadedPeriods} getValue={m => m.liqCorrente}  direction="asc"  refIdx={refIdx} fmtFn={v => `${v.toFixed(2)}x`}  fmtFullFn={v => `${v.toFixed(4)}x`} />
+                      <CompRow label="Liquidez Imediata"      desc="Disponib. / PC — ≥ 20% aceitável" periods={loadedPeriods} getValue={m => m.liqImediata}  direction="asc"  refIdx={refIdx} fmtFn={v => `${v.toFixed(1)}%`}  fmtFullFn={v => `${v.toFixed(2)}%`} />
+                      <CompRow label="Endividamento Geral"    desc="PT / AT — ≤ 50% saudável"         periods={loadedPeriods} getValue={m => m.endivGeral}   direction="desc" refIdx={refIdx} fmtFn={v => `${v.toFixed(1)}%`}  fmtFullFn={v => `${v.toFixed(2)}%`} />
+                      <CompRow label="Participação Cap. 3ºs"  desc="PT / PL — ≤ 2x baixo risco"      periods={loadedPeriods} getValue={m => m.partCapTerc}  direction="desc" refIdx={refIdx} fmtFn={v => `${v.toFixed(1)}x`}  fmtFullFn={v => `${v.toFixed(3)}x`} />
+                      <CompRow label="Imobilização do PL"     desc="ANC / PL — ≤ 100%"                periods={loadedPeriods} getValue={m => m.imobPL}       direction="desc" refIdx={refIdx} fmtFn={v => `${v.toFixed(0)}%`}  fmtFullFn={v => `${v.toFixed(2)}%`} />
+                      <CompRow label="Imob. do Investimento"  desc="ANC / (PL + PNC) — ≤ 100%"       periods={loadedPeriods} getValue={m => m.imobInvest}   direction="desc" refIdx={refIdx} fmtFn={v => `${v.toFixed(0)}%`}  fmtFullFn={v => `${v.toFixed(2)}%`} />
+                      <CompRow label="Taxa de Risco"          desc="(PC + PNC) / AC — ≤ 1x ideal"    periods={loadedPeriods} getValue={m => m.taxaRisco}    direction="desc" refIdx={refIdx} fmtFn={v => `${v.toFixed(2)}x`}  fmtFullFn={v => `${v.toFixed(4)}x`} />
+                      <CompRow label="Margem Bruta"           desc="LB / Rec.Líq. — > 10% saudável"  periods={loadedPeriods} getValue={m => m.margemBruta}  direction="asc"  refIdx={refIdx} fmtFn={v => `${v.toFixed(1)}%`}  fmtFullFn={v => `${v.toFixed(2)}%`} isHeader />
+                      <CompRow label="ROIC"                   desc="Res.Líq. / (PL + Dív.Fin.) — > 10% ideal" periods={loadedPeriods} getValue={m => m.roic} direction="asc" refIdx={refIdx} fmtFn={v => `${v.toFixed(1)}%`} fmtFullFn={v => `${v.toFixed(2)}%`} />
+                      <CompRow label="ROE"                    desc="Res.Líq. / PL — > 15% ideal"     periods={loadedPeriods} getValue={m => m.roe}          direction="asc"  refIdx={refIdx} fmtFn={v => `${v.toFixed(1)}%`}  fmtFullFn={v => `${v.toFixed(2)}%`} />
+                      <CompRow label="ROS (Margem Líquida)"   desc="Res.Líq. / Rec.Líq. — > 5% saudável" periods={loadedPeriods} getValue={m => m.ros}      direction="asc"  refIdx={refIdx} fmtFn={v => `${v.toFixed(1)}%`}  fmtFullFn={v => `${v.toFixed(2)}%`} isHeader />
 
                       {/* FLUXO DE CAIXA */}
                       <SectionHeader icon="💰" title="Fluxo de Caixa Direto" subtitle="Geração e consumo de caixa no período" colSpan={colSpan} />
