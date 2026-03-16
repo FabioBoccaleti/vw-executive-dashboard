@@ -1,6 +1,6 @@
 /**
  * Gráficos de Evolução — Imobilizado (1.5.5)
- * Exibe um gráfico de barras por subgrupo (+ total geral) com evolução mês a mês.
+ * Exibe um gráfico de barras por conta folha (+ total geral) com evolução mês a mês.
  * Opção de comparar com outro ano (barras agrupadas).
  */
 
@@ -15,10 +15,10 @@ import { loadMultipleMonthsRaw, loadFluxoCaixaIndex } from './fluxoCaixaStorage'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-interface SubgrupoDados {
+interface ContaDados {
   conta: string;
   desc: string;
-  values: Record<number, number>; // month -> total agregado das folhas
+  values: Record<number, number>; // month -> saldo da conta folha
 }
 
 interface Props {
@@ -34,10 +34,10 @@ const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'S
 const toTitleCase = (str: string) =>
   str.toLowerCase().replace(/(?:^|\s)\S/g, (c) => c.toUpperCase());
 
-// ─── Parser — extrai subgrupos e folhas de 1.5.5 ─────────────────────────────
+// ─── Parser — extrai contas folha de 1.5.5 ──────────────────────────────────
 
 type ParsedMonth = {
-  subgrupos: Record<string, { desc: string; total: number }>;
+  contas: Record<string, { desc: string; val: number }>;
   total155: number;
 };
 
@@ -59,28 +59,21 @@ function parseImobilizado(rawText: string): ParsedMonth {
     valMap[id] = Math.abs(val);
   }
 
-  // Identificar folhas (contas sem filhos na base)
-  const leafIds = Array.from(ids).filter(
-    id => !Array.from(ids).some(other => other !== id && other.startsWith(id + '.'))
-  );
+  // Apenas contas folha (sem filhos na base)
+  const leafIds = Array.from(ids)
+    .filter(id => !Array.from(ids).some(other => other !== id && other.startsWith(id + '.')))
+    .sort();
 
-  // Agrupar folhas pelo subgrupo direto de 1.5.5 (1.5.5.XX)
-  const subgrupoMap: Record<string, { desc: string; total: number }> = {};
+  const contas: Record<string, { desc: string; val: number }> = {};
   let total155 = 0;
 
   for (const leafId of leafIds) {
-    const segments = leafId.split('.');
-    if (segments.length < 4) continue;
-    const sgId = segments.slice(0, 4).join('.');
     const val = valMap[leafId] || 0;
     total155 += val;
-    if (!subgrupoMap[sgId]) {
-      subgrupoMap[sgId] = { desc: descMap[sgId] || sgId, total: 0 };
-    }
-    subgrupoMap[sgId].total += val;
+    contas[leafId] = { desc: descMap[leafId] || leafId, val };
   }
 
-  return { subgrupos: subgrupoMap, total155 };
+  return { contas, total155 };
 }
 
 // ─── Formatação ───────────────────────────────────────────────────────────────
@@ -136,13 +129,13 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export function ImobilizadoCharts({ selectedYear, selectedMonth, onClose }: Props) {
   const [loading, setLoading] = useState(true);
-  const [subgruposData, setSubgruposData] = useState<SubgrupoDados[]>([]);
+  const [contasData, setContasData] = useState<ContaDados[]>([]);
   const [totalData, setTotalData] = useState<Record<number, number>>({});
 
   // Comparativo
   const [compareYear, setCompareYear] = useState<number | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
-  const [compareSubgruposData, setCompareSubgruposData] = useState<SubgrupoDados[]>([]);
+  const [compareContasData, setCompareContasData] = useState<ContaDados[]>([]);
   const [compareTotalData, setCompareTotalData] = useState<Record<number, number>>({});
 
   // Carrega índice de anos disponíveis
@@ -163,36 +156,36 @@ export function ImobilizadoCharts({ selectedYear, selectedMonth, onClose }: Prop
     const months = Array.from({ length: upToMonth }, (_, i) => i + 1);
     const rawMap = await loadMultipleMonthsRaw(year, months);
 
-    const sgOrder: string[] = [];
-    const sgDescMap: Record<string, string> = {};
-    const sgByMonth: Record<string, Record<number, number>> = {};
+    const contaOrder: string[] = [];
+    const contaDescMap: Record<string, string> = {};
+    const contaByMonth: Record<string, Record<number, number>> = {};
     const totalByMonth: Record<number, number> = {};
 
     for (const month of months) {
       const raw = rawMap[month];
       if (!raw) continue;
-      const { subgrupos, total155 } = parseImobilizado(raw);
+      const { contas, total155 } = parseImobilizado(raw);
       totalByMonth[month] = total155;
 
-      for (const [sgId, { desc, total }] of Object.entries(subgrupos)) {
-        if (!sgOrder.includes(sgId)) {
-          sgOrder.push(sgId);
-          sgDescMap[sgId] = desc;
+      for (const [contaId, { desc, val }] of Object.entries(contas)) {
+        if (!contaOrder.includes(contaId)) {
+          contaOrder.push(contaId);
+          contaDescMap[contaId] = desc;
         }
-        if (!sgByMonth[sgId]) sgByMonth[sgId] = {};
-        sgByMonth[sgId][month] = total;
+        if (!contaByMonth[contaId]) contaByMonth[contaId] = {};
+        contaByMonth[contaId][month] = val;
       }
     }
 
-    sgOrder.sort();
+    contaOrder.sort();
 
-    const resultado: SubgrupoDados[] = sgOrder.map(sgId => ({
-      conta: sgId,
-      desc: sgDescMap[sgId] || sgId,
-      values: sgByMonth[sgId] || {},
+    const resultado: ContaDados[] = contaOrder.map(contaId => ({
+      conta: contaId,
+      desc: contaDescMap[contaId] || contaId,
+      values: contaByMonth[contaId] || {},
     }));
 
-    return { subgrupos: resultado, totals: totalByMonth };
+    return { contas: resultado, totals: totalByMonth };
   }, []);
 
   // Carrega ano principal
@@ -200,8 +193,8 @@ export function ImobilizadoCharts({ selectedYear, selectedMonth, onClose }: Prop
     (async () => {
       setLoading(true);
       const upTo = selectedMonth === 0 ? 12 : selectedMonth;
-      const { subgrupos, totals } = await loadYearData(selectedYear, upTo);
-      setSubgruposData(subgrupos);
+      const { contas, totals } = await loadYearData(selectedYear, upTo);
+      setContasData(contas);
       setTotalData(totals);
       setLoading(false);
     })();
@@ -210,14 +203,14 @@ export function ImobilizadoCharts({ selectedYear, selectedMonth, onClose }: Prop
   // Carrega ano comparativo
   useEffect(() => {
     if (!compareYear) {
-      setCompareSubgruposData([]);
+      setCompareContasData([]);
       setCompareTotalData({});
       return;
     }
     (async () => {
       const upTo = selectedMonth === 0 ? 12 : selectedMonth;
-      const { subgrupos, totals } = await loadYearData(compareYear, upTo);
-      setCompareSubgruposData(subgrupos);
+      const { contas, totals } = await loadYearData(compareYear, upTo);
+      setCompareContasData(contas);
       setCompareTotalData(totals);
     })();
   }, [compareYear, selectedMonth, loadYearData]);
@@ -298,8 +291,8 @@ export function ImobilizadoCharts({ selectedYear, selectedMonth, onClose }: Prop
         </div>
       </div>
 
-      {/* Gráficos por subgrupo */}
-      {subgruposData.length === 0 ? (
+      {/* Gráficos por conta */}
+      {contasData.length === 0 ? (
         <Card>
           <CardContent className="flex items-center justify-center py-12">
             <p className="text-sm text-muted-foreground">Nenhum dado de Imobilizado encontrado para este período.</p>
@@ -307,16 +300,16 @@ export function ImobilizadoCharts({ selectedYear, selectedMonth, onClose }: Prop
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {subgruposData.map((sg) => {
-            const cmpSg = compareSubgruposData.find(c => c.conta === sg.conta);
-            const chartData = buildChartData(sg.values, cmpSg?.values || {});
-            const descLabel = sg.desc ? toTitleCase(sg.desc) : sg.conta;
+          {contasData.map((c) => {
+            const cmpC = compareContasData.find(cc => cc.conta === c.conta);
+            const chartData = buildChartData(c.values, cmpC?.values || {});
+            const descLabel = c.desc ? toTitleCase(c.desc) : c.conta;
 
             return (
-              <Card key={sg.conta}>
+              <Card key={c.conta}>
                 <CardContent className="pt-5 pb-4">
                   <div className="mb-3">
-                    <span className="text-xs font-mono text-muted-foreground">{sg.conta}</span>
+                    <span className="text-xs font-mono text-muted-foreground">{c.conta}</span>
                     <h4 className="text-sm font-semibold text-foreground">{descLabel}</h4>
                   </div>
                   <ResponsiveContainer width="100%" height={220}>
@@ -354,7 +347,7 @@ export function ImobilizadoCharts({ selectedYear, selectedMonth, onClose }: Prop
         <CardContent className="pt-5 pb-4">
           <div className="mb-3">
             <h4 className="text-base font-bold text-foreground">Total — Imobilizado (1.5.5)</h4>
-            <p className="text-xs text-muted-foreground">Soma de todos os subgrupos</p>
+            <p className="text-xs text-muted-foreground">Soma de todas as contas</p>
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={buildChartData(totalData, compareTotalData)} barGap={compareYear ? 2 : 0}>
