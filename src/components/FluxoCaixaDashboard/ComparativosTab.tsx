@@ -296,7 +296,7 @@ function extractMetrics(rawText: string, tipos: Record<string, string> = {}): Co
     });
   }
 
-  const totalDespesas = despOper5Net;
+  const totalDespesas = categoriasDespesas.reduce((s, c) => s + c.valor, 0);
 
   return {
     ativoCirculante, ativoNaoCirculante, ativoTotal,
