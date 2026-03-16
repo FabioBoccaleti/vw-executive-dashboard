@@ -1435,7 +1435,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
                     {varTotal > 0 ? '+' : varTotal < 0 ? '-' : ''}{fmtBRL(varTotal)}
                   </td>
                   <td className="py-2.5 px-3 text-right text-xs font-mono font-bold text-muted-foreground">
-                    {varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : '-'}${Math.abs(varTotalPct).toFixed(1)}%` : '—'}}
+                    {varTotalPct !== null ? `${varTotalPct >= 0 ? '+' : '-'}${Math.abs(varTotalPct).toFixed(1)}%` : '—'}
                   </td>
                   {showYtd && (
                     <td className="py-2.5 pl-8 pr-3 text-right text-sm font-mono font-bold text-amber-700 dark:text-amber-400 border-l-2 border-amber-300 dark:border-amber-700 bg-amber-100/60 dark:bg-amber-950/30">
