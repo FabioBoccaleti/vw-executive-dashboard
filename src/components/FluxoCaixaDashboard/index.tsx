@@ -123,19 +123,19 @@ function parseBalancete(text: string) {
   const capitalSocial = { ant: absAnt('2.3.1.01'), atu: absAtu('2.3.1.01') };
   const resultAcum = { ant: absAnt('2.3.3'), atu: absAtu('2.3.3') };
 
-  // RECEITAS (conta 3 — usa valCred/valDeb: movimento do período)
-  // saldoAtual em balancetes cumulativos YTD seria Jan–mês, gerando igualdade entre mensal e acumulado.
-  // valCred/valDeb captura apenas o movimento do período, independente do formato do balancete.
-  const recBruta = { ant: absAnt('3.1'), atu: get('3.1').valCred };
-  const impostosVendas = { per: get('3.2').valDeb };
-  const devolucoes = { per: get('3.3').valDeb };
-  const rendOper = { ant: absAnt('3.4'), per: get('3.4').valCred };
-  const rendFinanc = { ant: absAnt('3.5'), per: get('3.5').valCred };
-  const rendNaoOper = { ant: absAnt('3.6'), per: get('3.6').valCred };
+  // RECEITAS (conta 3 — usa movimento líquido do período)
+  // Usa |valCred − valDeb| para funcionar tanto no mensal quanto no balancete anual,
+  // onde podem existir estornos/ajustes no lado oposto da conta.
+  const recBruta = { ant: absAnt('3.1'), atu: Math.abs((get('3.1').valCred || 0) - (get('3.1').valDeb || 0)) };
+  const impostosVendas = { per: Math.abs((get('3.2').valDeb || 0) - (get('3.2').valCred || 0)) };
+  const devolucoes = { per: Math.abs((get('3.3').valDeb || 0) - (get('3.3').valCred || 0)) };
+  const rendOper = { ant: absAnt('3.4'), per: Math.abs((get('3.4').valCred || 0) - (get('3.4').valDeb || 0)) };
+  const rendFinanc = { ant: absAnt('3.5'), per: Math.abs((get('3.5').valCred || 0) - (get('3.5').valDeb || 0)) };
+  const rendNaoOper = { ant: absAnt('3.6'), per: Math.abs((get('3.6').valCred || 0) - (get('3.6').valDeb || 0)) };
   const recLiq = { per: recBruta.atu - impostosVendas.per - devolucoes.per };
 
   // CUSTOS E DESPESAS
-  const CMV = { per: get('4').valDeb };
+  const CMV = { per: Math.abs((get('4').valDeb || 0) - (get('4').valCred || 0)) };
   const despPessoal_per = get('2.1.2.01.01').valCred;
   const despFinanc_per = get('5.5.7').valDeb;
   const deprec_per = get('5.5.2.07.20').valDeb;
