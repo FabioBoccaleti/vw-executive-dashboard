@@ -142,6 +142,8 @@ function extractMetrics(rawText: string): ComparativoMetrics {
   const get    = (id: string) => acc[id] ?? { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0, desc: '' };
   const absAnt = (id: string) => Math.abs(get(id).saldoAnt);
   const absAtu = (id: string) => Math.abs(get(id).saldoAtual);
+  // Movimento líquido do mês — mesmo método do ResultadoTab
+  const absMon = (id: string) => { const a = get(id); return Math.abs(a.valDeb - a.valCred); };
 
   // ── Balanço Patrimonial ───────────────────────────────────────────────────
   const ativoCirculante      = absAtu('1.1');
@@ -151,26 +153,22 @@ function extractMetrics(rawText: string): ComparativoMetrics {
   const passivoNaoCirculante = absAtu('2.2');
   const patrimonioLiquido    = absAtu('2.3');
 
-  // ── DRE ──────────────────────────────────────────────────────────────────
-  // Usa valCred/valDeb (movimento do período) —  saldoAtual em balancetes
-  // cumulativos YTD seria o acumulado Jan–mês, tornando mensal = acumulado.
-  const recBruta      = get('3.1').valCred;
-  const impostosV     = get('3.2').valDeb;
-  const devolucoes    = get('3.3').valDeb;
+  // ── DRE — mesmo método do ResultadoTab (movimento líquido do mês) ─────────
+  const recBruta      = absMon('3.1');
+  const impostosV     = absMon('3.2');
+  const devolucoes    = absMon('3.3');
   const receitaLiquida = recBruta - impostosV - devolucoes;
-  const CMV           = get('4').valDeb;
+  const CMV           = absMon('4');
   const lucBruto      = receitaLiquida - CMV;
-  const rendOper      = get('3.4').valCred;
-  const rendFinanc    = get('3.5').valCred;
-  const rendNaoOper   = get('3.6').valCred;
-  // Despesas grupo 5 — soma das contas-folha usando valDeb−valCred (mesmo método
-  // do ResultadoTab "Mês"). A conta-pai '5' pode não existir no balancete ou
-  // conter valor diferente da soma das sub-contas, causando despesas subestimadas.
+  const rendOper      = absMon('3.4');
+  const rendFinanc    = absMon('3.5');
+  const rendNaoOper   = absMon('3.6');
+  // Despesas grupo 5 — soma das contas-folha usando valDeb−valCred (signed)
   const allKeys5_dre = Object.keys(acc).filter(k => k.startsWith('5.'));
   const leaves5_dre  = allKeys5_dre.filter(k => !allKeys5_dre.some(o => o !== k && o.startsWith(k + '.')));
   const despOper5Net  = leaves5_dre.reduce((s, k) => s + (get(k).valDeb - get(k).valCred), 0);
   const deprec_per    = get('5.5.2.07.20').valDeb;
-  const provisaoIR    = get('6').valDeb;
+  const provisaoIR    = absMon('6');
   const resultadoAntesIR = lucBruto + rendOper + rendFinanc + rendNaoOper - despOper5Net;
   const resultadoLiquido = resultadoAntesIR - provisaoIR;
 
