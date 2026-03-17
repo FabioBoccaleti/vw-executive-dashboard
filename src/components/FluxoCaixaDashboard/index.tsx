@@ -3482,9 +3482,9 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Caixa Operacional (Direto)', mes: fluxoOperDireto,  acu: acum?.fluxoOperDireto, icon: '🏭', color: (v: number) => v >= 0 ? 'emerald' : 'red' },
-          { label: 'Caixa de Investimento',      mes: fluxoInvestDireto, acu: acum?.fluxoInvest,    icon: '🏗️', color: (v: number) => v >= 0 ? 'emerald' : 'amber' },
-          { label: 'Caixa de Financiamento',     mes: fluxoFinancDireto, acu: acum?.fluxoFinanc,    icon: '🏦', color: (v: number) => v >= 0 ? 'blue' : 'amber' },
+          { label: 'Caixa Operacional (Direto)', mes: fluxoOperDireto + d.dPL_extra - d.dIntangivel,  acu: acum ? acum.fluxoOperDireto + acum.dPL_extra - acum.dIntangivel : undefined, icon: '🏭', color: (v: number) => v >= 0 ? 'emerald' : 'red' },
+          { label: 'Caixa de Investimento',      mes: fluxoInvestDireto + d.dIntangivel, acu: acum ? acum.fluxoInvest + acum.dIntangivel : undefined,    icon: '🏗️', color: (v: number) => v >= 0 ? 'emerald' : 'amber' },
+          { label: 'Caixa de Financiamento',     mes: fluxoFinancDireto - d.dPL_extra, acu: acum ? acum.fluxoFinanc - acum.dPL_extra : undefined,    icon: '🏦', color: (v: number) => v >= 0 ? 'blue' : 'amber' },
           { label: 'Variação Total de Caixa',    mes: fluxoTotalDireto,  acu: acum?.fluxoTotal,     icon: '💰', color: (v: number) => v >= 0 ? 'emerald' : 'red' },
         ].map((kpi, i) => {
           const colorMap: any = {
