@@ -409,12 +409,12 @@ const DFCRow = ({ label, value, value2, hasAcum, indent = 0, highlight, total }:
       {total ? '' : (v < 0 ? ')' : '')}
     </td>
   );
+  const emptyCell = (key?: string) => <td key={key} className={cn('py-2.5 px-3 w-[20%]')} />;
   return (
     <tr className={cn(highlight && 'bg-emerald-50 dark:bg-emerald-950/20', total && 'bg-muted/50')}>
       <td className={cn('py-2.5 px-3 text-sm', total || highlight ? 'font-bold text-foreground' : 'text-muted-foreground')} style={{ paddingLeft: 12 + indent * 20 }}>{label}</td>
-      {renderVal(value, isPos)}
-      {hasAcum && value2 !== undefined && renderVal(value2, isPos2)}
-      {hasAcum && value2 === undefined && <td className="py-2.5 px-3 text-right text-muted-foreground/40 w-[20%] border-l border-border/20">—</td>}
+      {highlight && !total ? emptyCell('v1') : renderVal(value, isPos)}
+      {hasAcum && highlight && !total ? emptyCell('v2') : hasAcum && value2 !== undefined ? renderVal(value2, isPos2) : hasAcum && value2 === undefined ? <td className="py-2.5 px-3 text-right text-muted-foreground/40 w-[20%] border-l border-border/20">—</td> : null}
     </tr>
   );
 };
