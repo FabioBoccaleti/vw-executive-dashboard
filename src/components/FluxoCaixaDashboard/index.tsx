@@ -211,7 +211,6 @@ function parseBalancete(text: string) {
 
   const fluxoOper =
     resLiq_dfc +
-    deprec_per +
     ajusteEstoque + ajusteCred + ajusteContasCorr + ajusteValDiv +
     ajusteDespAntec + ajusteOutrasAtivAudi +
     ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag
@@ -3174,7 +3173,6 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
           <tbody>
             <DFCRow label="ATIVIDADES OPERACIONAIS" value={0} value2={0} hasAcum={hasAcum} highlight />
             <DFCRow label={`${d.resLiq >= 0 ? '(+)' : '(–)'} Resultado Líquido do Exercício (base NBC TG 03)`} value={d.resLiq} value2={dAcum?.resLiq} hasAcum={hasAcum} indent={1} />
-            <DFCRow label="(+) Depreciações e Amortizações (não caixa)" value={d.deprec} value2={dAcum?.deprec} hasAcum={hasAcum} indent={1} />
             <DFCRow label={`${d.ajusteEstoque >= 0 ? '(+)' : '(–)'} Variação de Estoques VW + Audi ${d.dEstoque < 0 ? '— redução (fonte de caixa)' : '— aumento (uso de caixa)'} (1.1.2 + 1.1.7.02)`} value={d.ajusteEstoque} value2={dAcum?.ajusteEstoque} hasAcum={hasAcum} indent={1} />
             <DFCRow label={`    ↳ Estoques VW (1.1.2): ${fmtBRL(data.estoques.ant, true)} → ${fmtBRL(data.estoques.atu, true)}`} value={-(data.estoques.atu - data.estoques.ant)} value2={dAcum ? -(dAcum.estoques.atu - dAcum.estoques.ant) : undefined} hasAcum={hasAcum} indent={2} />
             <DFCRow label={`    ↳ Estoques Audi (1.1.7.02): ${fmtBRL(data.estAudi.ant, true)} → ${fmtBRL(data.estAudi.atu, true)}`} value={-(data.estAudi.atu - data.estAudi.ant)} value2={dAcum ? -(dAcum.estAudi.atu - dAcum.estAudi.ant) : undefined} hasAcum={hasAcum} indent={2} />
@@ -3327,7 +3325,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
   const pagImpostos   = -(impostosVMes - d.dObrigTrib);
   // outrasAtivAudiResiduo: outros ativos Audi além do estoque — ajuste operacional
   const despOperCaixa = -(
-    (d.despOper5Net - d.deprec) - d.dContasPag - d.dObrigTrab + d.dDespAntec + d.dValDiv + d.outrasAtivAudiResiduo
+    d.despOper5Net - d.dContasPag - d.dObrigTrab + d.dDespAntec + d.dValDiv + d.outrasAtivAudiResiduo
   );
   const pagIR               = -provisaoIRMes;
   const rendasRecebidas     = rendOperMes + rendFinancMes + rendNaoOperMes;
@@ -3387,7 +3385,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
     const pagFornec_a     = -(CMV_a + dEstoque_a - dFornec_a);
     const pagImpostos_a   = -(impostosV_a - dObrigTrib_a);
     const despOperCaixa_a = -(
-      (despOper5Net_a - deprec_a) - dContasPag_a - dObrigTrab_a + dDespAntec_a + dValDiv_a + outrasAtivAudiResiduo_a
+      despOper5Net_a - dContasPag_a - dObrigTrab_a + dDespAntec_a + dValDiv_a + outrasAtivAudiResiduo_a
     );
     const pagIR_a           = -provisaoIR_a;
     const rendasRecebidas_a = rendOper_a + rendFinanc_a + rendNaoOper_a;
@@ -3570,7 +3568,6 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
 
               <DFCRow label="(–) Pagamentos de Despesas Operacionais" value={despOperCaixa} value2={acum?.despOperCaixa} hasAcum={hasAcum} indent={1} />
               <DFCRow label={`    ↳ Despesas operacionais do período (conta 5, líquido): ${fmtBRL(d.despOper5Net, true)}`} value={-d.despOper5Net} value2={acum ? -acum.despOper5Net : undefined} hasAcum={hasAcum} indent={2} />
-              <DFCRow label={`    ↳ (+) Depreciação/Amortização (não-caixa): ${fmtBRL(d.deprec, true)}`} value={d.deprec} value2={acum?.deprec} hasAcum={hasAcum} indent={2} />
               {(d.dContasPag !== 0 || (acum && acum.dContasPag !== 0)) && <DFCRow label={`    ↳ ${d.dContasPag > 0 ? '(+)' : '(–)'} Variação Contas a Pagar (2.1.2.03)`} value={d.dContasPag} value2={acum?.dContasPag} hasAcum={hasAcum} indent={2} />}
               {(d.dObrigTrab !== 0 || (acum && acum.dObrigTrab !== 0)) && <DFCRow label={`    ↳ ${d.dObrigTrab > 0 ? '(+)' : '(–)'} Variação Obrig. Trabalhistas (2.1.2.01)`} value={d.dObrigTrab} value2={acum?.dObrigTrab} hasAcum={hasAcum} indent={2} />}
               {(d.dDespAntec !== 0 || (acum && acum.dDespAntec !== 0)) && <DFCRow label={`    ↳ ${d.dDespAntec > 0 ? '(–)' : '(+)'} Variação Despesas Antecipadas (1.1.6)`} value={-d.dDespAntec} value2={acum ? -acum.dDespAntec : undefined} hasAcum={hasAcum} indent={2} />}
