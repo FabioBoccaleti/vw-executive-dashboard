@@ -102,8 +102,8 @@ function parseDRE(rawText: string): DREValues {
   const resultadoAntesIR =
     lucroBruto - despesasOperacionais + rendasOperacionais + rendasFinanceiras + rendasNaoOperacionais;
 
-  // Provisão IR + CSLL
-  const provisaoIR = absMov('6');
+  // Provisão IR + CSLL com sinal: devedor → positivo (deduz), credor → negativo (adiciona)
+  const provisaoIR = (get('6').valDeb || 0) - (get('6').valCred || 0);
 
   // Resultado Líquido
   const resultadoLiquido = resultadoAntesIR - provisaoIR;
