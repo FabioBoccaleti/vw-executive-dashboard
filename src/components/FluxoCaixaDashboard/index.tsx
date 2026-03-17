@@ -877,7 +877,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'overview' && <OverviewTab data={data} fmtBRL={fmtBRL} KPI={KPI} BarGauge={BarGauge} SectionTitle={SectionTitle} />}
               {activeTab === 'ativo' && <AtivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'passivo' && <PassivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
-              {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
+              {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} ytdAccountsSums={ytdAccountsSums} />}
               {activeTab === 'caixa' && <CaixaTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
@@ -2631,35 +2631,47 @@ function PassivoTab({ data, SectionTitle, TableRow2, colAnterior, colAtual, sele
   );
 }
 
-function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selectedMonth, selectedYear }: any) {
+function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selectedMonth, selectedYear, ytdAccountsSums }: any) {
   const [showCharts, setShowCharts] = useState(false);
   const d = data;
   const accounts = d.accounts as Record<string, any>;
   const get = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0, desc: '' };
 
-  // Acumulado YTD — usa saldoAtual
-  const absAtu = (id: string) => Math.abs(get(id).saldoAtual);
+  // Acumulado YTD — soma mensal de Jan até mês selecionado via ytdAccountsSums
+  // ytdAccountsSums[id] = Σ(valCred − valDeb) de Jan até selectedMonth
+  const isMonthly = selectedMonth > 0;
+  const hasYtd = isMonthly && ytdAccountsSums && Object.keys(ytdAccountsSums).length > 0;
+  // Para contas de receita/resultado (natureza credora): ytdAccS[id] é positivo → abs preserva
+  // Para contas de custo/despesa (natureza devedora): ytdAccS[id] é negativo → abs preserva
+  const absYtd = (id: string) => hasYtd ? Math.abs(ytdAccountsSums[id] ?? 0) : Math.abs(get(id).saldoAtual);
   // Movimento do mês — usa valDeb / valCred
   const absMon = (id: string) => { const a = get(id); return Math.abs(a.valDeb - a.valCred); };
-  const isMonthly = selectedMonth > 0;
 
-  // ── Valores Acumulado (saldoAtual) ────────────────────────────────────
-  const recBruta    = absAtu('3.1');
-  const impostosV   = absAtu('3.2');
-  const devolucoes  = absAtu('3.3');
+  // ── Valores Acumulado (soma mensal YTD) ──────────────────────────────
+  const recBruta    = absYtd('3.1');
+  const impostosV   = absYtd('3.2');
+  const devolucoes  = absYtd('3.3');
   const recLiq      = recBruta - impostosV - devolucoes;
-  const CMV         = absAtu('4');
+  const CMV         = absYtd('4');
   const lucBruto    = recLiq - CMV;
-  const rendOper    = absAtu('3.4');
-  const rendFinanc  = absAtu('3.5');
-  const rendNaoOper = absAtu('3.6');
+  const rendOper    = absYtd('3.4');
+  const rendFinanc  = absYtd('3.5');
+  const rendNaoOper = absYtd('3.6');
 
-  const allKeys5 = Object.keys(accounts).filter(k => k.startsWith('5.'));
-  const leaves5  = allKeys5.filter(k => !allKeys5.some(other => other !== k && other.startsWith(k + '.')));
+  // Para despesas 5.x: quando hasYtd, usa-se os keys do ytdAccountsSums para cobrir todas as
+  // contas que tiveram movimento em qualquer mês de Jan até o mês selecionado
+  const allKeys5Base = Object.keys(accounts).filter(k => k.startsWith('5.'));
+  const allKeys5Ytd  = hasYtd ? Object.keys(ytdAccountsSums).filter(k => k.startsWith('5.')) : [];
+  const allKeys5     = hasYtd
+    ? Array.from(new Set([...allKeys5Base, ...allKeys5Ytd]))
+    : allKeys5Base;
+  const leaves5 = allKeys5.filter(k => !allKeys5.some(other => other !== k && other.startsWith(k + '.')));
 
   const groupTotals: Record<string, { desc: string; valor: number }> = {};
   for (const k of leaves5) {
-    const val = get(k).saldoAtual;
+    // ytdAccountsSums armazena (valCred − valDeb): para contas de despesa (natureza devedora)
+    // esse valor é negativo, por isso negamos para obter o total positivo
+    const val = hasYtd ? -(ytdAccountsSums[k] ?? 0) : get(k).saldoAtual;
     if (val === 0) continue;
     const gk = k.split('.').slice(0, 2).join('.');
     if (!groupTotals[gk]) groupTotals[gk] = { desc: accounts[gk]?.desc || gk, valor: 0 };
@@ -2702,7 +2714,7 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
 
   const lucAnteIR    = lucBruto    - despTotal    + rendOper    + rendFinanc    + rendNaoOper;
   const lucAnteIRMes = lucBrutoMes - despTotalMes + rendOperMes + rendFinancMes + rendNaoOperMes;
-  const provisaoIR    = absAtu('6');
+  const provisaoIR    = absYtd('6');
   const provisaoIRMes = absMon('6');
   const resLiq    = lucAnteIR    - provisaoIR;
   const resLiqMes = lucAnteIRMes - provisaoIRMes;
