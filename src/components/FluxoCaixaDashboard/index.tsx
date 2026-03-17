@@ -2714,8 +2714,16 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
 
   const lucAnteIR    = lucBruto    - despTotal    + rendOper    + rendFinanc    + rendNaoOper;
   const lucAnteIRMes = lucBrutoMes - despTotalMes + rendOperMes + rendFinancMes + rendNaoOperMes;
-  const provisaoIR    = absYtd('6');
-  const provisaoIRMes = absMon('6');
+
+  // Provisão IR/CSLL com sinal: devedor (valDeb > valCred) → positivo → deduz resultado
+  // credor (valCred > valDeb) → negativo → adiciona ao resultado (reversão/benefício fiscal)
+  const getSign6Mes = (): number => { const a = get('6'); return a.valDeb - a.valCred; };
+  const getSign6Ytd = (): number => {
+    if (hasYtd) return -(ytdAccountsSums['6'] ?? 0); // ytdSums = valCred−valDeb, negamos para valDeb−valCred
+    return get('6').saldoAtual;
+  };
+  const provisaoIRMes = getSign6Mes(); // positivo = dedutor, negativo = adicionador
+  const provisaoIR    = getSign6Ytd();
   const resLiq    = lucAnteIR    - provisaoIR;
   const resLiqMes = lucAnteIRMes - provisaoIRMes;
 
@@ -2750,7 +2758,8 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
     })),
     { label: '  (+) Rendas Financeiras',                   valueMes: rendFinancMes,  valueAcu: rendFinanc,  type: 'sub'      },
     { label: 'RESULTADO ANTES DO IR/CSLL',                 valueMes: lucAnteIRMes,   valueAcu: lucAnteIR,   type: 'subtotal' },
-    ...((provisaoIR > 0 || provisaoIRMes > 0)
+    ...((provisaoIR !== 0 || provisaoIRMes !== 0)
+      // provisaoIR/Mes tem sinal: positivo = dedutor (mostrar negado), negativo = credor (mostrar positivo)
       ? [{ label: '  (–) Provisão IR + CSLL', valueMes: -provisaoIRMes, valueAcu: -provisaoIR, type: 'sub' }]
       : []),
     { label: 'RESULTADO LÍQUIDO DO EXERCÍCIO',             valueMes: resLiqMes,      valueAcu: resLiq,      type: 'total'    },
