@@ -3315,7 +3315,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
   const rendOperMes    = absMov('3.4');
   const rendFinancMes  = absMov('3.5');
   const rendNaoOperMes = absMov('3.6');
-  const provisaoIRMes  = absMov('6');
+  const provisaoIRMes  = (mAccounts['6']?.valDeb || 0) - (mAccounts['6']?.valCred || 0);
 
   const recebClientes = recBrutaMes - devolucoesMes - d.dCred - d.dContasCorr;
   const pagFornec     = -(CMVMes + d.dEstoque - d.dFornec);
@@ -3351,7 +3351,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
     const rendOper_a       = getAtu('3.4');
     const rendFinanc_a     = getAtu('3.5');
     const rendNaoOper_a    = getAtu('3.6');
-    const provisaoIR_a     = getAtu('6');
+    const provisaoIR_a     = (cur['6']?.saldoAtual || 0);  // sinal preservado: devedor (+) deduz · credor (−) adiciona
     const despOper5Net_a   = Math.abs(cur['5']?.saldoAtual || 0);
     const deprec_a         = Math.abs(cur['5.5.2.07.20']?.saldoAtual || 0);
 
