@@ -3197,10 +3197,10 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
             {(Math.abs(d.dRecDiferidas) > 0.01 || (dAcum && Math.abs(dAcum.dRecDiferidas) > 0.01)) && (
               <DFCRow label={`${d.dRecDiferidas >= 0 ? '(+)' : '(–)'} Variação Receitas Diferidas / ICMS ST (2.2.2)`} value={d.dRecDiferidas} value2={dAcum?.dRecDiferidas} hasAcum={hasAcum} indent={1} />
             )}
-            {(Math.abs(d.ajusteResidualBP) > 0.01 || (dAcum && Math.abs(dAcum.ajusteResidualBP) > 0.01)) && (
-              <DFCRow label={`${d.ajusteResidualBP >= 0 ? '(+)' : '(–)'} Outros ajustes patrimoniais (depreciação líquida + contas residuais)`} value={d.ajusteResidualBP} value2={dAcum?.ajusteResidualBP} hasAcum={hasAcum} indent={1} />
+            {(Math.abs(d.ajusteResidualBP + d.dPL_extra) > 0.01 || (dAcum && Math.abs((dAcum.ajusteResidualBP ?? 0) + (dAcum.dPL_extra ?? 0)) > 0.01)) && (
+              <DFCRow label={`${(d.ajusteResidualBP + d.dPL_extra) >= 0 ? '(+)' : '(–)'} Outros ajustes patrimoniais (depreciação líquida + contas residuais)`} value={d.ajusteResidualBP + d.dPL_extra} value2={dAcum ? (dAcum.ajusteResidualBP + dAcum.dPL_extra) : undefined} hasAcum={hasAcum} indent={1} />
             )}
-            <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={d.fluxoOper} value2={dAcum?.fluxoOper} hasAcum={hasAcum} total highlight />
+            <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={d.fluxoOper + d.dPL_extra} value2={dAcum ? (dAcum.fluxoOper + dAcum.dPL_extra) : undefined} hasAcum={hasAcum} total highlight />
 
             <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
             <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado (1.5.5)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} value2={dAcum ? -(dAcum.imobiliz.atu - dAcum.imobiliz.ant) : undefined} hasAcum={hasAcum} indent={1} />
@@ -3230,10 +3230,7 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
             {(d.dOutrosPassLP !== 0) && (
               <DFCRow label={`${d.dOutrosPassLP >= 0 ? '(+) Captação' : '(–) Liquidação'} Outros Passivos LP (2.2.3)`} value={d.dOutrosPassLP} value2={dAcum?.dOutrosPassLP} hasAcum={hasAcum} indent={1} />
             )}
-            {(Math.abs(d.dPL_extra) > 0.01 || (dAcum && Math.abs(dAcum.dPL_extra) > 0.01)) && (
-              <DFCRow label={`${d.dPL_extra >= 0 ? '(+) Aporte de Capital / Outros PL' : '(–) Retirada / Dividendos (2.3 excl. resultado)'}`} value={d.dPL_extra} value2={dAcum?.dPL_extra} hasAcum={hasAcum} indent={1} />
-            )}
-            <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={d.fluxoFinanc} value2={dAcum?.fluxoFinanc} hasAcum={hasAcum} total highlight />
+            <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={d.fluxoFinanc - d.dPL_extra} value2={dAcum ? (dAcum.fluxoFinanc - dAcum.dPL_extra) : undefined} hasAcum={hasAcum} total highlight />
           </tbody>
           <tfoot>
             <tr className="bg-emerald-50/50 dark:bg-emerald-950/20 border-t-2 border-emerald-500/30">
@@ -3593,11 +3590,11 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
               {(Math.abs(d.dRecDiferidas) > 0.01 || (acum && Math.abs(acum.dRecDiferidas) > 0.01)) && (
                 <DFCRow label={`${d.dRecDiferidas >= 0 ? '(+)' : '(–)'} Variação Receitas Diferidas / ICMS ST (2.2.2)`} value={d.dRecDiferidas} value2={acum?.dRecDiferidas} hasAcum={hasAcum} indent={1} />
               )}
-              {(Math.abs(d.ajusteResidualBP) > 0.01 || (acum && Math.abs(acum.ajusteResidualBP) > 0.01)) && (
-                <DFCRow label={`${d.ajusteResidualBP >= 0 ? '(+)' : '(–)'} Outros ajustes patrimoniais (depreciação líquida + contas residuais)`} value={d.ajusteResidualBP} value2={acum?.ajusteResidualBP} hasAcum={hasAcum} indent={1} />
+              {(Math.abs(d.ajusteResidualBP + d.dPL_extra) > 0.01 || (acum && Math.abs((acum.ajusteResidualBP ?? 0) + (acum.dPL_extra ?? 0)) > 0.01)) && (
+                <DFCRow label={`${(d.ajusteResidualBP + d.dPL_extra) >= 0 ? '(+)' : '(–)'} Outros ajustes patrimoniais (depreciação líquida + contas residuais)`} value={d.ajusteResidualBP + d.dPL_extra} value2={acum ? (acum.ajusteResidualBP + acum.dPL_extra) : undefined} hasAcum={hasAcum} indent={1} />
               )}
 
-              <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={fluxoOperDireto} value2={acum?.fluxoOperDireto} hasAcum={hasAcum} total highlight />
+              <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={fluxoOperDireto + d.dPL_extra} value2={acum ? (acum.fluxoOperDireto + acum.dPL_extra) : undefined} hasAcum={hasAcum} total highlight />
 
               {/* ── Investimento ── */}
               <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
@@ -3617,10 +3614,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
               {(d.debitosLigAnt > 0 || d.debitosLigAtu > 0) && <DFCRow label={`${d.dDebitosLig >= 0 ? '(+) Captação' : '(–) Liquidação'} Débitos com Ligadas LP (${fmtBRL(d.debitosLigAnt, true)} → ${fmtBRL(d.debitosLigAtu, true)})`} value={d.dDebitosLig} value2={acum?.dDebitosLig} hasAcum={hasAcum} indent={1} />}
               {(d.arrendLPAnt > 0 || d.arrendLPAtu > 0) && <DFCRow label={`${d.dArrendLP >= 0 ? '(+) Novos Arrendamentos LP' : '(–) Amortização Arrendamentos LP'} (${fmtBRL(d.arrendLPAnt, true)} → ${fmtBRL(d.arrendLPAtu, true)})`} value={d.dArrendLP} value2={acum?.dArrendLP} hasAcum={hasAcum} indent={1} />}
               {(d.dOutrosPassLP !== 0 || (acum && acum.dOutrosPassLP !== 0)) && <DFCRow label={`${d.dOutrosPassLP >= 0 ? '(+) Captação' : '(–) Liquidação'} Outros Passivos LP (2.2.3)`} value={d.dOutrosPassLP} value2={acum?.dOutrosPassLP} hasAcum={hasAcum} indent={1} />}
-              {(Math.abs(d.dPL_extra) > 0.01 || (acum && Math.abs(acum.dPL_extra) > 0.01)) && (
-                <DFCRow label={`${d.dPL_extra >= 0 ? '(+) Aporte de Capital / Outros PL' : '(–) Retirada / Dividendos (2.3 excl. resultado)'}`} value={d.dPL_extra} value2={acum?.dPL_extra} hasAcum={hasAcum} indent={1} />
-              )}
-              <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={fluxoFinancDireto} value2={acum?.fluxoFinanc} hasAcum={hasAcum} total highlight />
+              <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE FINANCIAMENTO" value={fluxoFinancDireto - d.dPL_extra} value2={acum ? (acum.fluxoFinanc - acum.dPL_extra) : undefined} hasAcum={hasAcum} total highlight />
             </tbody>
             <tfoot>
               <tr className="bg-emerald-50/50 dark:bg-emerald-950/20 border-t-2 border-emerald-500/30">
