@@ -396,7 +396,7 @@ const TableRow2 = ({ label, ant, atu, highlight, indent = 0 }: any) => {
   );
 };
 
-const DFCRow = ({ label, value, value2, hasAcum, indent = 0, highlight, total }: any) => {
+const DFCRow = ({ label, value, value2, hasAcum, indent = 0, highlight, total, sectionTotal, sectionTotal2 }: any) => {
   const isPos = value >= 0;
   const isPos2 = (value2 ?? 0) >= 0;
   const renderVal = (v: number, pos: boolean) => (
@@ -409,12 +409,18 @@ const DFCRow = ({ label, value, value2, hasAcum, indent = 0, highlight, total }:
       {total ? '' : (v < 0 ? ')' : '')}
     </td>
   );
+  const renderSectionTotal = (v: number) => (
+    <td className={cn('py-2.5 px-3 text-right font-mono text-xs text-muted-foreground', hasAcum && 'w-[20%]')}>
+      {v !== 0 ? `${v > 0 ? '+' : '−'} ${fmtBRL(Math.abs(v))}` : ''}
+    </td>
+  );
   return (
     <tr className={cn(highlight && 'bg-emerald-50 dark:bg-emerald-950/20', total && 'bg-muted/50')}>
       <td className={cn('py-2.5 px-3 text-sm', total || highlight ? 'font-bold text-foreground' : 'text-muted-foreground')} style={{ paddingLeft: 12 + indent * 20 }}>{label}</td>
-      {renderVal(value, isPos)}
-      {hasAcum && value2 !== undefined && renderVal(value2, isPos2)}
-      {hasAcum && value2 === undefined && <td className="py-2.5 px-3 text-right text-muted-foreground/40 w-[20%] border-l border-border/20">—</td>}
+      {sectionTotal !== undefined ? renderSectionTotal(sectionTotal) : renderVal(value, isPos)}
+      {hasAcum && sectionTotal !== undefined && renderSectionTotal(sectionTotal2 ?? 0)}
+      {hasAcum && sectionTotal === undefined && value2 !== undefined && renderVal(value2, isPos2)}
+      {hasAcum && sectionTotal === undefined && value2 === undefined && <td className="py-2.5 px-3 text-right text-muted-foreground/40 w-[20%] border-l border-border/20">—</td>}
     </tr>
   );
 };
@@ -3551,7 +3557,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
             </thead>
             <tbody>
               {/* ── Operacional ── */}
-              <DFCRow label="ATIVIDADES OPERACIONAIS" value={0} value2={0} hasAcum={hasAcum} highlight />
+              <DFCRow label="ATIVIDADES OPERACIONAIS" sectionTotal={fluxoOperDireto + d.dPL_extra - d.dIntangivel} sectionTotal2={acum ? (acum.fluxoOperDireto + acum.dPL_extra - acum.dIntangivel) : 0} hasAcum={hasAcum} highlight />
               <DFCRow label="(+) Recebimentos de Clientes" value={recebClientes} value2={acum?.recebClientes} hasAcum={hasAcum} indent={1} />
               <DFCRow label={`    ↳ Receita Bruta: ${fmtBRL(recBrutaMes, true)}`} value={recBrutaMes} value2={acum?.recBruta} hasAcum={hasAcum} indent={2} />
               {(devolucoesMes !== 0 || (acum && acum.devolucoes !== 0)) && <DFCRow label="    ↳ (–) Devoluções devolvidas a clientes" value={-devolucoesMes} value2={acum ? -acum.devolucoes : undefined} hasAcum={hasAcum} indent={2} />}
@@ -3598,7 +3604,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
               <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={fluxoOperDireto + d.dPL_extra - d.dIntangivel} value2={acum ? (acum.fluxoOperDireto + acum.dPL_extra - acum.dIntangivel) : undefined} hasAcum={hasAcum} total highlight />
 
               {/* ── Investimento ── */}
-              <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
+              <DFCRow label="ATIVIDADES DE INVESTIMENTO" sectionTotal={fluxoInvestDireto + d.dIntangivel} sectionTotal2={acum ? (acum.fluxoInvest + acum.dIntangivel) : 0} hasAcum={hasAcum} highlight />
               <DFCRow label={`${-(data.imobiliz.atu - data.imobiliz.ant) >= 0 ? '(+)' : '(–)'} Variação Líquida do Imobilizado (1.5.5)`} value={-(data.imobiliz.atu - data.imobiliz.ant)} value2={acum ? -(acum.imobiliz.atu - acum.imobiliz.ant) : undefined} hasAcum={hasAcum} indent={1} />
               {(d.dInvestimentos !== 0 || (acum && acum.dInvest !== 0)) && <DFCRow label={`${-d.dInvestimentos >= 0 ? '(+)' : '(–)'} Variação de Investimentos (1.5.3) ${fmtBRL(d.investimentosAnt, true)} → ${fmtBRL(d.investimentosAtu, true)}`} value={-d.dInvestimentos} value2={acum ? -acum.dInvest : undefined} hasAcum={hasAcum} indent={1} />}
               {(d.dRealizLPOutros !== 0 || (acum && acum.dRealizLPOutros !== 0)) && (
@@ -3607,7 +3613,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
               <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES DE INVESTIMENTO" value={fluxoInvestDireto + d.dIntangivel} value2={acum ? (acum.fluxoInvest + acum.dIntangivel) : undefined} hasAcum={hasAcum} total highlight />
 
               {/* ── Financiamento ── */}
-              <DFCRow label="ATIVIDADES DE FINANCIAMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
+              <DFCRow label="ATIVIDADES DE FINANCIAMENTO" sectionTotal={fluxoFinancDireto - d.dPL_extra} sectionTotal2={acum ? (acum.fluxoFinanc - acum.dPL_extra) : 0} hasAcum={hasAcum} highlight />
               {(d.emprestCP_02Ant > 0 || d.emprestCP_02Atu > 0) && <DFCRow label={`${d.dEmprestCP_02 >= 0 ? '(+) Captação' : '(–) Amortização'} Financiamentos CP / Floor Plan (2.1.1.02) (${fmtBRL(d.emprestCP_02Ant, true)} → ${fmtBRL(d.emprestCP_02Atu, true)})`} value={d.dEmprestCP_02} value2={acum?.dEmprestCP_02} hasAcum={hasAcum} indent={1} />}
               {(d.emprestLPAnt > 0 || d.emprestLPAtu > 0) && <DFCRow label={`${d.dEmprestLP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos Bancários LP (${fmtBRL(d.emprestLPAnt, true)} → ${fmtBRL(d.emprestLPAtu, true)})`} value={d.dEmprestLP} value2={acum?.dEmprestLP} hasAcum={hasAcum} indent={1} />}
               {(d.pessoasLigAnt > 0 || d.pessoasLigAtu > 0) && <DFCRow label={`${d.dPessoasLig >= 0 ? '(+) Aporte' : '(–) Retirada'} Sócios / Pessoas Ligadas (${fmtBRL(d.pessoasLigAnt, true)} → ${fmtBRL(d.pessoasLigAtu, true)})`} value={d.dPessoasLig} value2={acum?.dPessoasLig} hasAcum={hasAcum} indent={1} />}
