@@ -3108,9 +3108,9 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Fluxo Operacional',    mes: d.fluxoOper,   acu: dAcum?.fluxoOper,   icon: '⚙️',  color: (v: number) => v >= 0 ? 'emerald' : 'red',   sub: 'Principal fonte de caixa' },
-          { label: 'Fluxo de Investimento', mes: d.fluxoInvest, acu: dAcum?.fluxoInvest, icon: '🏗️', color: (v: number) => v >= 0 ? 'emerald' : 'amber',  sub: 'Imobilizado + Intangível + Créditos LP' },
-          { label: 'Fluxo de Financiamento',mes: d.fluxoFinanc, acu: dAcum?.fluxoFinanc, icon: '🏛️', color: (v: number) => v >= 0 ? 'amber' : 'red',     sub: `Floor Plan ${d.dEmprestCP >= 0 ? '+' : ''}${fmtBRL(d.dEmprestCP, true)} | Arrend. ${d.dArrendLP >= 0 ? '+' : ''}${fmtBRL(d.dArrendLP, true)}` },
+          { label: 'Fluxo Operacional',    mes: d.fluxoOper + d.dPL_extra - d.dIntangivel,   acu: dAcum ? dAcum.fluxoOper + dAcum.dPL_extra - dAcum.dIntangivel : undefined,   icon: '⚙️',  color: (v: number) => v >= 0 ? 'emerald' : 'red',   sub: 'Principal fonte de caixa' },
+          { label: 'Fluxo de Investimento', mes: d.fluxoInvest + d.dIntangivel, acu: dAcum ? dAcum.fluxoInvest + dAcum.dIntangivel : undefined, icon: '🏗️', color: (v: number) => v >= 0 ? 'emerald' : 'amber',  sub: 'Imobilizado + Intangível + Créditos LP' },
+          { label: 'Fluxo de Financiamento',mes: d.fluxoFinanc - d.dPL_extra, acu: dAcum ? dAcum.fluxoFinanc - dAcum.dPL_extra : undefined, icon: '🏛️', color: (v: number) => v >= 0 ? 'amber' : 'red',     sub: `Floor Plan ${d.dEmprestCP >= 0 ? '+' : ''}${fmtBRL(d.dEmprestCP, true)} | Arrend. ${d.dArrendLP >= 0 ? '+' : ''}${fmtBRL(d.dArrendLP, true)}` },
           { label: 'Var. Total de Caixa',   mes: d.fluxoTotal,  acu: dAcum?.fluxoTotal,  icon: '💰',  color: (v: number) => v >= 0 ? 'emerald' : 'red',   sub: `Var. real no balanço: ${fmtBRL(d.varCaixaReal, true)}` },
         ].map((kpi, i) => {
           const colorClasses: any = {
