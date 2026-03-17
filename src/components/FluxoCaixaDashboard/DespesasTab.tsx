@@ -224,12 +224,17 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
 
   // Agrupar resumoRows nos 4 grupos
   const totalGeral = resumoRows.reduce((s, [, v]) => s + v, 0);
+  // Todos os tipos presentes no YTD (inclui tipos zerados no mês atual mas com movimento anterior)
+  const allYtdTipos = Object.keys(resumoMapYTD);
   const gruposData = GRUPOS_CONFIG.map((g, idx) => {
     const itens = resumoRows
       .filter(([tipo]) => classificarTipo(tipo) === idx)
       .sort((a, b) => b[1] - a[1]);
     const total = itens.reduce((s, [, v]) => s + v, 0);
-    const totalYTD = itens.reduce((s, [tipo]) => s + (resumoMapYTD[tipo] ?? 0), 0);
+    // totalYTD: soma todos os tipos do grupo em resumoMapYTD, não apenas os de resumoRows
+    const totalYTD = allYtdTipos
+      .filter(tipo => classificarTipo(tipo) === idx)
+      .reduce((s, tipo) => s + (resumoMapYTD[tipo] ?? 0), 0);
     const pct = totalGeral !== 0 ? (total / totalGeral) * 100 : 0;
     return { ...g, itens, total, totalYTD, pct };
   });
