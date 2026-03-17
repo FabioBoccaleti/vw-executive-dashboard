@@ -199,15 +199,28 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
   const resumoRows = Object.entries(resumoMap).sort((a, b) => b[1] - a[1]);
 
   // YTD acumulado por tipo — usa ytdAccountsSums (soma mensal Jan→mês) quando disponível
-  // ytdAccountsSums[id] = Σ(valCred − valDeb): para despesas (natureza devedora) é negativo → negamos
+  // Percorre TODAS as contas-folha 5.* do YTD (não apenas visibleRows) para incluir
+  // contas que tiveram movimento em meses anteriores mas ficaram zeradas no mês atual
   const hasYtdSums = !!ytdAccountsSums && Object.keys(ytdAccountsSums).length > 0;
-  const resumoMapYTD = visibleRows.reduce<Record<string, number>>((acc, r) => {
-    const tipo = tipos[r.conta]?.trim();
-    if (!tipo) return acc;
-    const ytdVal = hasYtdSums ? -(ytdAccountsSums![r.conta] ?? 0) : r.ytd;
-    acc[tipo] = (acc[tipo] ?? 0) + ytdVal;
-    return acc;
-  }, {});
+  const resumoMapYTD = (() => {
+    if (hasYtdSums) {
+      const allYtdKeys5 = Object.keys(ytdAccountsSums!).filter(k => k.startsWith('5.'));
+      const leafYtdKeys5 = allYtdKeys5.filter(k => !allYtdKeys5.some(o => o !== k && o.startsWith(k + '.')));
+      return leafYtdKeys5.reduce<Record<string, number>>((acc, conta) => {
+        const tipo = tipos[conta]?.trim();
+        if (!tipo) return acc;
+        acc[tipo] = (acc[tipo] ?? 0) + (-(ytdAccountsSums![conta] ?? 0));
+        return acc;
+      }, {});
+    }
+    // Fallback: usa visibleRows com saldoAtual
+    return visibleRows.reduce<Record<string, number>>((acc, r) => {
+      const tipo = tipos[r.conta]?.trim();
+      if (!tipo) return acc;
+      acc[tipo] = (acc[tipo] ?? 0) + r.ytd;
+      return acc;
+    }, {});
+  })();
 
   // Agrupar resumoRows nos 4 grupos
   const totalGeral = resumoRows.reduce((s, [, v]) => s + v, 0);
