@@ -145,9 +145,10 @@ interface DespesasTabProps {
   setDespesasView?: (v: 'normal' | 'comparativo') => void;
   selectedMonth?: number;
   selectedYear?: number;
+  ytdAccountsSums?: Record<string, number>;
 }
 
-export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setShowTabela, despesasView = 'normal', setDespesasView, selectedMonth = 0, selectedYear = new Date().getFullYear() }: DespesasTabProps) {
+export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setShowTabela, despesasView = 'normal', setDespesasView, selectedMonth = 0, selectedYear = new Date().getFullYear(), ytdAccountsSums }: DespesasTabProps) {
   const accounts = data.accounts as Record<string, any>;
   const rows = grupo5Leaves(accounts);
 
@@ -197,11 +198,14 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
   }, {});
   const resumoRows = Object.entries(resumoMap).sort((a, b) => b[1] - a[1]);
 
-  // YTD acumulado por tipo (saldoAtual = acumulado desde jan)
+  // YTD acumulado por tipo — usa ytdAccountsSums (soma mensal Jan→mês) quando disponível
+  // ytdAccountsSums[id] = Σ(valCred − valDeb): para despesas (natureza devedora) é negativo → negamos
+  const hasYtdSums = !!ytdAccountsSums && Object.keys(ytdAccountsSums).length > 0;
   const resumoMapYTD = visibleRows.reduce<Record<string, number>>((acc, r) => {
     const tipo = tipos[r.conta]?.trim();
     if (!tipo) return acc;
-    acc[tipo] = (acc[tipo] ?? 0) + r.ytd;
+    const ytdVal = hasYtdSums ? -(ytdAccountsSums![r.conta] ?? 0) : r.ytd;
+    acc[tipo] = (acc[tipo] ?? 0) + ytdVal;
     return acc;
   }, {});
 
