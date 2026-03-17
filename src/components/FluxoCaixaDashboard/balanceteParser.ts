@@ -112,6 +112,7 @@ export function analyzeAccounts(accounts: Record<string, any>) {
   const ajusteTrib       = dObrigTrib;
   const ajusteTrab       = dObrigTrab;
   const ajusteContasPag  = dContasPag;
+  const dEmprestCP_01 = emprestCP_01.atu - emprestCP_01.ant; // Fornecedores 2.1.1.01 → operacional
 
   const fluxoOper =
     deprec_per +
@@ -129,7 +130,6 @@ export function analyzeAccounts(accounts: Record<string, any>) {
 
   // ── Atividades de Financiamento ─────────────────────────────────────────────
   const dEmprestCP  = emprestCP.atu  - emprestCP.ant; // total 2.1.1 (referência)
-  const dEmprestCP_01 = emprestCP_01.atu - emprestCP_01.ant; // Fornecedores → operacional
   const dEmprestCP_02 = emprestCP_02.atu - emprestCP_02.ant; // Financiamentos CP → financiamento
   const dEmprestLP  = emprestLP.atu  - emprestLP.ant;
   const dPessoasLig = pessoasLig.atu - pessoasLig.ant;

@@ -164,9 +164,6 @@ function parseBalancete(text: string) {
   // Realizável LP — resíduo além de 1.5.1.01.52 (créditos c/ ligadas já rastreados)
   // Classificado como investimento (ativo não circulante não-imobilizado)
   const dRealizLPOutros = (realizLP.atu - realizLPCred.atu) - (realizLP.ant - realizLPCred.ant);
-  // Variação de PL além do resultado (aportes / retiradas / distribuição de dividendos)
-  const dPL = PL.atu - PL.ant;
-  const dPL_extra = dPL - resLiq_dfc; // lucro/prejuízo já entra via resLiq_dfc
 
   // Ajustes operacionais (redução de ativo = fonte; redução de passivo = uso)
   const ajusteEstoque        = -dEstoque;
@@ -193,6 +190,11 @@ function parseBalancete(text: string) {
                      - absMov('4') - despOper5Net
                      + absMov('3.4') + absMov('3.5') + absMov('3.6')
                      - ((get('6').valDeb || 0) - (get('6').valCred || 0));
+
+  // Variação de PL além do resultado (aportes / retiradas / distribuição de dividendos)
+  // Declarado APÓS resLiq_dfc — resLiq_dfc precisa estar definido antes do cálculo
+  const dPL = PL.atu - PL.ant;
+  const dPL_extra = dPL - resLiq_dfc; // lucro/prejuízo já entra via resLiq_dfc
 
   const dRealizLPCred = realizLPCred.atu - realizLPCred.ant;
 
@@ -1273,7 +1275,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
     };
   });
 
-  const GROUPS: Array<{ label: string; contas: Array<{ conta: string; desc: string; ant: number; atu: number }> }> = [
+  const GROUPS: Array<{ label: string; contas: Array<{ conta: string; desc: string; ant: number; atu: number; ytd: number }> }> = [
     {
       label: '1 — Receita de Vendas',
       contas: [
