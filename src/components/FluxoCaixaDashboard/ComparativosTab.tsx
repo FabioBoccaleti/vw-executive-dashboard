@@ -261,8 +261,7 @@ function extractMetrics(rawText: string, tipos: Record<string, string> = {}): Co
     dPL_extra;
 
   // Ajuste residual: captura depreciação e sub-contas não mapeadas
-  const disponib = { ant: absAnt('1.1.1'), atu: absAtu('1.1.1') };
-  const varCaixaReal = disponib.atu - disponib.ant;
+  const varCaixaReal = absAtu('1.1.1') - absAnt('1.1.1');
   const ajusteResidualBP = varCaixaReal - (fluxoOperBase + fluxoInvestBase + fluxoFinancBase);
 
   // Valores finais com reclassificações de seção (espelham a tabela FC Direto/Indireto):
