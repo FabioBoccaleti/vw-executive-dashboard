@@ -95,10 +95,11 @@ function parseDFC(rawText: string): DFCValues {
   const leaves5 = allKeys5.filter(k => !allKeys5.some(o => o !== k && o.startsWith(k + '.')));
   const despOper5Net = leaves5.reduce((s, k) => s + ((get(k).valDeb || 0) - (get(k).valCred || 0)), 0);
 
-  // Resultado líquido
+  // Resultado líquido — provisão IR/CSLL com sinal: devedor → positivo (deduz), credor → negativo (adiciona)
   const resLiq = absMov('3.1') - absMov('3.2') - absMov('3.3')
     - absMov('4') - despOper5Net
-    + absMov('3.4') + absMov('3.5') + absMov('3.6') - absMov('6');
+    + absMov('3.4') + absMov('3.5') + absMov('3.6')
+    - ((get('6').valDeb || 0) - (get('6').valCred || 0));
 
   // ── Fluxo Operacional (método indireto) ─────────────────
   const fluxoOper =

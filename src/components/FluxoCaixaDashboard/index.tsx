@@ -140,8 +140,8 @@ function parseBalancete(text: string) {
   const despFinanc_per = get('5.5.7').valDeb;
   const deprec_per = get('5.5.2.07.20').valDeb;
 
-  // PROVISÃO IR + CSLL
-  const provisaoIR = { saldo: get('6').valDeb };
+  // PROVISÃO IR + CSLL — sinal preservado: devedor → positivo (deduz), credor → negativo (adiciona)
+  const provisaoIR = { saldo: (get('6').valDeb || 0) - (get('6').valCred || 0) };
 
   // GERAÇÃO DE CAIXA (método indireto)
   // Estoque total = VW (1.1.2) + Audi (1.1.7.02)
@@ -177,9 +177,11 @@ function parseBalancete(text: string) {
   const allKeys5_dfc = Object.keys(accounts).filter(k => k.startsWith('5.'));
   const leaves5_dfc  = allKeys5_dfc.filter(k => !allKeys5_dfc.some(o => o !== k && o.startsWith(k + '.')));
   const despOper5Net = leaves5_dfc.reduce((s, k) => s + ((get(k).valDeb || 0) - (get(k).valCred || 0)), 0);
+  // Provisão IR/CSLL com sinal: devedor → positivo (deduz), credor → negativo (adiciona)
   const resLiq_dfc   = absMov('3.1') - absMov('3.2') - absMov('3.3')
                      - absMov('4') - despOper5Net
-                     + absMov('3.4') + absMov('3.5') + absMov('3.6') - absMov('6');
+                     + absMov('3.4') + absMov('3.5') + absMov('3.6')
+                     - ((get('6').valDeb || 0) - (get('6').valCred || 0));
 
   const dRealizLPCred = realizLPCred.atu - realizLPCred.ant;
 

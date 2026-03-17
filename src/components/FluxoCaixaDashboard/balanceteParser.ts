@@ -84,8 +84,8 @@ export function analyzeAccounts(accounts: Record<string, any>) {
   const leaves5_bp  = allKeys5_bp.filter(k => !allKeys5_bp.some(o => o !== k && o.startsWith(k + '.')));
   const despOper5Net_bp = leaves5_bp.reduce((s, k) => s + ((get(k).valDeb || 0) - (get(k).valCred || 0)), 0);
 
-  // PROVISÃO IR + CSLL
-  const provisaoIR = { saldo: get('6').valDeb };
+  // PROVISÃO IR + CSLL — sinal preservado: devedor → positivo (deduz), credor → negativo (adiciona)
+  const provisaoIR = { saldo: (get('6').valDeb || 0) - (get('6').valCred || 0) };
 
   // GERAÇÃO DE CAIXA (método indireto)
   // Estoque total = VW (1.1.2) + Audi (1.1.7.02)
