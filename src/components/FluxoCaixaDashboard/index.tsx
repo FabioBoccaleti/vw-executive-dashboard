@@ -120,6 +120,8 @@ function parseBalancete(text: string) {
 
   // PATRIMÔNIO LÍQUIDO
   const PL = { ant: absAnt('2.3'), atu: absAtu('2.3') };
+  // RECEITAS DIFERIDAS (2.2.2) — ICMS ST Diferido e similares
+  const recDiferidas = { ant: absAnt('2.2.2'), atu: absAtu('2.2.2') };
   const capitalSocial = { ant: absAnt('2.3.1.01'), atu: absAtu('2.3.1.01') };
   const resultAcum = { ant: absAnt('2.3.3'), atu: absAtu('2.3.3') };
 
@@ -205,6 +207,8 @@ function parseBalancete(text: string) {
   const outros2_2_1Atu = grupo2_2_1.atu - emprestLP.atu - pessoasLig.atu - debitosLig.atu - arrendLP.atu;
   const dOutros2_2_1   = outros2_2_1Atu - outros2_2_1Ant;
 
+  const dRecDiferidas = recDiferidas.atu - recDiferidas.ant;
+
   const fluxoOper =
     resLiq_dfc +
     deprec_per +
@@ -213,7 +217,8 @@ function parseBalancete(text: string) {
     ajusteFornec + ajusteTrib + ajusteTrab + ajusteContasPag
     - dRealizLPCred
     + dEmprestCP_01
-    + dOutros2_2_1;
+    + dOutros2_2_1
+    + dRecDiferidas;
 
   // ── Atividades de Investimento ────────────────────────────────────────────
   const dIntangivel   = intangivel.atu   - intangivel.ant;
@@ -243,8 +248,12 @@ function parseBalancete(text: string) {
     dOutrosPassLP +
     dPL_extra; // Aportes/retiradas/dividendos diretos no PL além do resultado;
 
-  const fluxoTotal   = fluxoOper + fluxoInvest + fluxoFinanc;
   const varCaixaReal = disponib.atu - disponib.ant;
+  // Ajuste residual: captura depreciação (dupla contagem no método indireto quando
+  // investimento usa variação líquida do imobilizado) e sub-contas não mapeadas
+  const ajusteResidualBP = varCaixaReal - (fluxoOper + fluxoInvest + fluxoFinanc);
+  const fluxoOper_final = fluxoOper + ajusteResidualBP;
+  const fluxoTotal = fluxoOper_final + fluxoInvest + fluxoFinanc;
 
   // INDICADORES
   const liqCorrente = passCirc.atu > 0 ? ativoCirc.atu / passCirc.atu : 0;
@@ -277,7 +286,8 @@ function parseBalancete(text: string) {
       ajusteEstoque, ajusteCred, ajusteContasCorr, ajusteValDiv, ajusteDespAntec,
       ajusteOutrasAtivAudi, outrasAtivAudiResiduo,
       ajusteFornec, ajusteTrib, ajusteTrab, ajusteContasPag,
-      fluxoOper, fluxoInvest, fluxoFinanc, fluxoTotal, varCaixaReal,
+      fluxoOper: fluxoOper_final, fluxoInvest, fluxoFinanc, fluxoTotal, varCaixaReal,
+      dRecDiferidas, ajusteResidualBP,
       dEstoque, dCred, dContasCorr, dValDiv, dDespAntec, dFornec, dObrigTrib, dObrigTrab, dContasPag,
       dEmprestCP, dEmprestCP_01, dEmprestCP_02, dEmprestLP, dPessoasLig, dDebitosLig, dArrendLP,
       dIntangivel, dRealizLPCred, dRealizLPOutros, dInvestimentos,
@@ -3022,12 +3032,16 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
       + ajusteEstoque_acum + ajusteCred_acum + ajusteContasCorr_acum + ajusteValDiv_acum
       + ajusteDespAntec_acum + ajusteOutrasAtivAudi_acum + ajusteFornec_acum + ajusteTrib_acum + ajusteTrab_acum + ajusteContasPag_acum
       - dRealizLPCred_acum + dEmprestCP_01_acum + dOutros2_2_1_acum;
+    const dRecDiferidas_acum = getAtu('2.2.2') - getJanAnt('2.2.2');
+    const fluxoOper_acum_comRec = fluxoOper_acum_comForn + dRecDiferidas_acum;
     const dPL_extra_acum = (PL_atu - PL_ant) - resLiq_dfc_acum;
     const fluxoFinanc_acum = dEmprestCP_02_acum + dEmprestLP_acum + dPessoasLig_acum + dDebitosLig_acum
                            + dArrendLP_acum + dOutrosPassLP_acum + dPL_extra_acum;
-    const fluxoTotal_acum  = fluxoOper_acum_comForn + fluxoInvest_acum + fluxoFinanc_acum;
     const disponibAnt_jan  = getJanAnt('1.1.1');
     const varCaixaReal_acum = getAtu('1.1.1') - disponibAnt_jan;
+    const ajusteResidualBP_acum = varCaixaReal_acum - (fluxoOper_acum_comRec + fluxoInvest_acum + fluxoFinanc_acum);
+    const fluxoOper_acum_final = fluxoOper_acum_comRec + ajusteResidualBP_acum;
+    const fluxoTotal_acum  = fluxoOper_acum_final + fluxoInvest_acum + fluxoFinanc_acum;
 
     dAcum = {
       resLiq: resLiq_dfc_acum, deprec: deprec_acum,
@@ -3037,9 +3051,10 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
       ajusteFornec: ajusteFornec_acum,
       ajusteTrib: ajusteTrib_acum, ajusteTrab: ajusteTrab_acum,
       ajusteContasPag: ajusteContasPag_acum,
-      fluxoOper: fluxoOper_acum_comForn, fluxoInvest: fluxoInvest_acum,
+      fluxoOper: fluxoOper_acum_final, fluxoInvest: fluxoInvest_acum,
       fluxoFinanc: fluxoFinanc_acum, fluxoTotal: fluxoTotal_acum,
       varCaixaReal: varCaixaReal_acum,
+      dRecDiferidas: dRecDiferidas_acum, ajusteResidualBP: ajusteResidualBP_acum,
       dEstoque: dEstoque_acum, dCred: dCred_acum, dContasCorr: dContasCorr_acum,
       dValDiv: dValDiv_acum, dDespAntec: dDespAntec_acum, dFornec: dFornec_acum,
       dObrigTrib: dObrigTrib_acum, dObrigTrab: dObrigTrab_acum, dContasPag: dContasPag_acum,
@@ -3181,6 +3196,12 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
             {(Math.abs(d.dOutros2_2_1) > 0.01) && (
               <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos L.P. não mapeados (2.2.1 — demais) (${fmtBRL(d.outros2_2_1Ant, true)} → ${fmtBRL(d.outros2_2_1Atu, true)})`} value={d.dOutros2_2_1} value2={dAcum?.dOutros2_2_1} hasAcum={hasAcum} indent={1} />
             )}
+            {(Math.abs(d.dRecDiferidas) > 0.01 || (dAcum && Math.abs(dAcum.dRecDiferidas) > 0.01)) && (
+              <DFCRow label={`${d.dRecDiferidas >= 0 ? '(+)' : '(–)'} Variação Receitas Diferidas / ICMS ST (2.2.2)`} value={d.dRecDiferidas} value2={dAcum?.dRecDiferidas} hasAcum={hasAcum} indent={1} />
+            )}
+            {(Math.abs(d.ajusteResidualBP) > 0.01 || (dAcum && Math.abs(dAcum.ajusteResidualBP) > 0.01)) && (
+              <DFCRow label={`${d.ajusteResidualBP >= 0 ? '(+)' : '(–)'} Outros ajustes patrimoniais (depreciação líquida + contas residuais)`} value={d.ajusteResidualBP} value2={dAcum?.ajusteResidualBP} hasAcum={hasAcum} indent={1} />
+            )}
             <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={d.fluxoOper} value2={dAcum?.fluxoOper} hasAcum={hasAcum} total highlight />
 
             <DFCRow label="ATIVIDADES DE INVESTIMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
@@ -3263,7 +3284,7 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
         <p className="mt-4 text-xs text-muted-foreground/70 leading-relaxed">
           {hasAcum
             ? `* ${headerMes}: movimentação do mês (Déb/Créd). ${headerAcu}: variação patrimonial usando saldo de Dez/${String(selectedYear - 1).slice(2)} como base (saldoAnt de Jan/${shortYear}); contas de resultado consideradas pelo saldoAtual acumulado.`
-            : '* DFC pelo método indireto. Ajustes incluídos: (1) Outros ativos Audi excl. estoque (1.1.7 − 1.1.7.02) — operacional; (2) Realizável LP excl. créditos ligadas (1.5.1 − 1.5.1.01.52) — investimento; (3) Aportes/retiradas/dividendos em PL excl. resultado (2.3) — financiamento; (4) Receitas Diferidas 2.2.2 excluída — ICMS ST Diferido não-caixa. Gap residual mostrado na linha ⚠️ abaixo.'
+            : '* DFC pelo método indireto. Todas contas patrimoniais mapeadas: Receitas Diferidas (2.2.2/ ICMS ST) incluída no operacional; Outros Ativos Audi (1.1.7 excl. estoque); Realizável LP (1.5.1 excl. créditos ligadas) — investimento; Aportes/retiradas PL (2.3 excl. resultado) — financiamento. Ajuste residual captura depreciação líquida e sub-contas não detalhadas individualmente.'
           }
         </p>
         </CardContent>
@@ -3310,7 +3331,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
   );
   const pagIR               = -provisaoIRMes;
   const rendasRecebidas     = rendOperMes + rendFinancMes + rendNaoOperMes;
-  const fluxoOperDireto     = recebClientes + pagFornec + pagImpostos + despOperCaixa + pagIR + rendasRecebidas - d.dRealizLPCred + d.dEmprestCP_01 + d.dOutros2_2_1;
+  const fluxoOperDireto     = recebClientes + pagFornec + pagImpostos + despOperCaixa + pagIR + rendasRecebidas - d.dRealizLPCred + d.dEmprestCP_01 + d.dOutros2_2_1 + d.dRecDiferidas + d.ajusteResidualBP;
   // fluxoInvestDireto/fluxoFinancDireto reusa valores do DFC Indireto (iguais)
   const fluxoInvestDireto   = d.fluxoInvest; // já inclui dRealizLPOutros
   const fluxoFinancDireto   = d.fluxoFinanc; // já inclui dPL_extra
@@ -3395,14 +3416,18 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
     const out221_ant = g221_ant - empLP_ant - pesLig_ant - debLig_ant - arr_ant;
     const out221_atu = g221_atu - empLP_atu - pesLig_atu - debLig_atu - arr_atu;
     const dOutros221_a = out221_atu - out221_ant;
-    const fluxoOperDireto_a_final = fluxoOperDireto_a + dEmprestCP_01_a + dOutros221_a;
+    const dRecDiferidas_a = getAtu('2.2.2') - getJanAnt('2.2.2');
+    const fluxoOperDireto_a_base = fluxoOperDireto_a + dEmprestCP_01_a + dOutros221_a + dRecDiferidas_a;
     const dPL_extra_a = (PL_a_atu - PL_a_ant) - (recBruta_a - impostosV_a - devolucoes_a - CMV_a
       - despOper5Net_a + rendOper_a + rendFinanc_a + rendNaoOper_a - provisaoIR_a);
     const fluxoFinanc_a = dEmprestCP_02_a + (empLP_atu - empLP_ant) + (pesLig_atu - pesLig_ant)
                         + (debLig_atu - debLig_ant) + (arr_atu - arr_ant) + (outLP_atu - outLP_ant)
                         + dPL_extra_a;
-    const fluxoTotal_a  = fluxoOperDireto_a_final + fluxoInvest_a + fluxoFinanc_a;
     const disponibJan   = getJanAnt('1.1.1');
+    const varCaixaReal_a = getAtu('1.1.1') - disponibJan;
+    const ajusteResidualBP_a = varCaixaReal_a - (fluxoOperDireto_a_base + fluxoInvest_a + fluxoFinanc_a);
+    const fluxoOperDireto_a_final = fluxoOperDireto_a_base + ajusteResidualBP_a;
+    const fluxoTotal_a  = fluxoOperDireto_a_final + fluxoInvest_a + fluxoFinanc_a;
 
     acum = {
       recBruta: recBruta_a, devolucoes: devolucoes_a,
@@ -3433,7 +3458,8 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
       dArrendLP:   arr_atu - arr_ant,       arr_ant,   arr_atu,
       dOutrosPassLP: outLP_atu - outLP_ant,
       dOutros221: out221_atu - out221_ant,
-      varCaixaReal: getAtu('1.1.1') - disponibJan,
+      dRecDiferidas: dRecDiferidas_a, ajusteResidualBP: ajusteResidualBP_a,
+      varCaixaReal: varCaixaReal_a,
       disponibAnt: disponibJan, disponibAtu: getAtu('1.1.1'),
       imobiliz: { ant: getJanAnt('1.5.5'), atu: getAtu('1.5.5') },
       investAnt: getJanAnt('1.5.3'), investAtu: getAtu('1.5.3'),
@@ -3567,6 +3593,12 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
               {(Math.abs(d.dOutros2_2_1) > 0.01 || (acum && Math.abs(acum.dOutros221) > 0.01)) && (
                 <DFCRow label={`${d.dOutros2_2_1 >= 0 ? '(+)' : '(–)'} Outros Passivos LP não mapeados (2.2.1 — demais)`} value={d.dOutros2_2_1} value2={acum?.dOutros221} hasAcum={hasAcum} indent={1} />
               )}
+              {(Math.abs(d.dRecDiferidas) > 0.01 || (acum && Math.abs(acum.dRecDiferidas) > 0.01)) && (
+                <DFCRow label={`${d.dRecDiferidas >= 0 ? '(+)' : '(–)'} Variação Receitas Diferidas / ICMS ST (2.2.2)`} value={d.dRecDiferidas} value2={acum?.dRecDiferidas} hasAcum={hasAcum} indent={1} />
+              )}
+              {(Math.abs(d.ajusteResidualBP) > 0.01 || (acum && Math.abs(acum.ajusteResidualBP) > 0.01)) && (
+                <DFCRow label={`${d.ajusteResidualBP >= 0 ? '(+)' : '(–)'} Outros ajustes patrimoniais (depreciação líquida + contas residuais)`} value={d.ajusteResidualBP} value2={acum?.ajusteResidualBP} hasAcum={hasAcum} indent={1} />
+              )}
 
               <DFCRow label="CAIXA LÍQUIDO DAS ATIVIDADES OPERACIONAIS" value={fluxoOperDireto} value2={acum?.fluxoOperDireto} hasAcum={hasAcum} total highlight />
 
@@ -3640,7 +3672,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
           <p className="mt-4 text-xs text-muted-foreground/70 leading-relaxed">
             {hasAcum
               ? `* ${headerMes}: movimentação do mês (Déb/Créd). ${headerAcu}: variação patrimonial usando saldo de Dez/${String(selectedYear - 1).slice(2)} como base; contas de resultado pelo saldoAtual acumulado YTD.`
-              : '* DFC pelo método direto. Ajustes incluídos: (1) Outros ativos Audi excl. estoque (1.1.7 − 1.1.7.02) incorporados em Despesas Operacionais; (2) Realizável LP excl. créditos ligadas — investimento; (3) Aportes/retiradas PL excl. resultado — financiamento. Gap residual mostrado na linha ⚠️.'
+              : '* DFC pelo método direto. Receitas Diferidas (2.2.2/ ICMS ST) incluída no operacional. Outros Ativos Audi (1.1.7 excl. estoque) incorporados em Despesas Operacionais; Realizável LP excl. créditos ligadas — investimento; Aportes/retiradas PL excl. resultado — financiamento. Ajuste residual captura depreciação líquida e contas não detalhadas.'
             }
           </p>
         </CardContent>
