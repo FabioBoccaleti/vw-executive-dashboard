@@ -182,7 +182,8 @@ function extractMetrics(rawText: string, tipos: Record<string, string> = {}): Co
   const leaves5_dre  = allKeys5_dre.filter(k => !allKeys5_dre.some(o => o !== k && o.startsWith(k + '.')));
   const despOper5Net  = leaves5_dre.reduce((s, k) => s + (get(k).valDeb - get(k).valCred), 0);
   const deprec_per    = get('5.5.2.07.20').valDeb;
-  const provisaoIR    = absMon('6');
+  // Provisão IR/CSLL com sinal: devedor → positivo (deduz), credor → negativo (adiciona)
+  const provisaoIR    = (get('6').valDeb || 0) - (get('6').valCred || 0);
   const resultadoAntesIR = lucBruto + rendOper + rendFinanc + rendNaoOper - despOper5Net;
   const resultadoLiquido = resultadoAntesIR - provisaoIR;
 
