@@ -140,7 +140,7 @@ function parseBalancete(text: string) {
   const CMV = { per: Math.abs((get('4').valDeb || 0) - (get('4').valCred || 0)) };
   const despPessoal_per = get('2.1.2.01.01').valCred;
   const despFinanc_per = get('5.5.7').valDeb;
-  const deprec_per = get('5.5.2.07.20').valDeb;
+  const deprec_per = (get('5.5.2.07.20').valDeb || 0) - (get('5.5.2.07.20').valCred || 0);
 
   // PROVISÃO IR + CSLL — sinal preservado: devedor → positivo (deduz), credor → negativo (adiciona)
   const provisaoIR = { saldo: (get('6').valDeb || 0) - (get('6').valCred || 0) };
