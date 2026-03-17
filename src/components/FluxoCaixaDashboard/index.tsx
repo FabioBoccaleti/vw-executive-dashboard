@@ -3676,23 +3676,28 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
 function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
   const d = data.dfc;
 
+  // Valores ajustados — iguais aos totais da tabela DFC
+  const fluxoOperAdj   = d.fluxoOper   + d.dPL_extra - d.dIntangivel;
+  const fluxoInvestAdj = d.fluxoInvest + d.dIntangivel;
+  const fluxoFinancAdj = d.fluxoFinanc - d.dPL_extra;
+
   // Utilitário: percentual absoluto de `part` em relação a `whole`
   const pctOf = (part: number, whole: number) =>
     whole !== 0 ? Math.round((Math.abs(part) / Math.abs(whole)) * 100) : 0;
 
   // ── Flags de sustentabilidade ──────────────────────────────────────────────
   const queimouEstoque  = d.ajusteEstoque > 0;                      // estoque caiu → entrou caixa
-  const estoquePct      = d.fluxoOper > 0 ? pctOf(d.ajusteEstoque, d.fluxoOper) : 0;
+  const estoquePct      = fluxoOperAdj > 0 ? pctOf(d.ajusteEstoque, fluxoOperAdj) : 0;
   const queimouSignif   = queimouEstoque && estoquePct >= 30;        // ≥ 30% do oper vem de estoque
 
   const atrasouFornec   = d.ajusteFornec > 0;                       // fornecedores subiram → postergação
-  const fornecPct       = d.fluxoOper > 0 ? pctOf(d.ajusteFornec, d.fluxoOper) : 0;
+  const fornecPct       = fluxoOperAdj > 0 ? pctOf(d.ajusteFornec, fluxoOperAdj) : 0;
   const atrasouSignif   = atrasouFornec && fornecPct >= 30;
 
-  const deprecPct       = d.fluxoOper > 0 ? pctOf(d.deprec, d.fluxoOper) : 0;
-  const credPct         = d.fluxoOper > 0 ? pctOf(d.ajusteCred, d.fluxoOper) : 0;
+  const deprecPct       = fluxoOperAdj > 0 ? pctOf(d.deprec, fluxoOperAdj) : 0;
+  const credPct         = fluxoOperAdj > 0 ? pctOf(d.ajusteCred, fluxoOperAdj) : 0;
 
-  const operPositivo    = d.fluxoOper > 0;
+  const operPositivo    = fluxoOperAdj > 0;
   const operSustentavel = operPositivo && !queimouSignif && !atrasouSignif;
   const gerarCaixa      = d.fluxoTotal >= 0;
 
@@ -3729,9 +3734,9 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
 
   // ── Atividades ─────────────────────────────────────────────────────────────
   const atividades = [
-    { label: 'Operacional',    value: d.fluxoOper,   icon: '⚙️', desc: 'Resultado das atividades-fim da empresa (vendas, custos e capital de giro)' },
-    { label: 'Investimento',   value: d.fluxoInvest, icon: '🏗️', desc: 'Compra/venda de imobilizado, intangível e créditos de longo prazo' },
-    { label: 'Financiamento',  value: d.fluxoFinanc, icon: '🏛️', desc: 'Empréstimos, arrendamentos, aportes e retiradas de sócios' },
+    { label: 'Operacional',    value: fluxoOperAdj,   icon: '⚙️', desc: 'Resultado das atividades-fim da empresa (vendas, custos e capital de giro)' },
+    { label: 'Investimento',   value: fluxoInvestAdj, icon: '🏗️', desc: 'Compra/venda de imobilizado, intangível e créditos de longo prazo' },
+    { label: 'Financiamento',  value: fluxoFinancAdj, icon: '🏛️', desc: 'Empréstimos, arrendamentos, aportes e retiradas de sócios' },
   ];
 
   // ── Checklist ──────────────────────────────────────────────────────────────
@@ -3744,7 +3749,7 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
     {
       ok: operPositivo,
       label: 'Atividade operacional gera caixa',
-      detail: `Fluxo operacional: ${d.fluxoOper >= 0 ? '+' : '−'}${fmtBRL(d.fluxoOper)}`,
+      detail: `Fluxo operacional: ${fluxoOperAdj >= 0 ? '+' : '−'}${fmtBRL(fluxoOperAdj)}`,
     },
     {
       ok: !queimouSignif,
@@ -3841,11 +3846,11 @@ function DiagnosticoTab({ data, fmtBRL, SectionTitle }: any) {
         <SectionTitle icon="🔬">É sustentável? Análise do Caixa Operacional</SectionTitle>
         <Card>
           <CardContent className="pt-6">
-            {d.fluxoOper !== 0 && (
+            {fluxoOperAdj !== 0 && (
               <div className="mb-5">
                 <div className="text-sm font-semibold text-foreground mb-4">
                   Composição do Fluxo Operacional&nbsp;
-                  <span className={cn('font-mono', d.fluxoOper >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500')}>{d.fluxoOper >= 0 ? '+' : '−'}{fmtBRL(d.fluxoOper)}</span>
+                  <span className={cn('font-mono', fluxoOperAdj >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500')}>{fluxoOperAdj >= 0 ? '+' : '−'}{fmtBRL(fluxoOperAdj)}</span>
                 </div>
                 {[
                   { label: 'Depreciação / Amortização (não-caixa)', value: d.deprec, pctVal: deprecPct, color: 'bg-blue-400', neutral: true, warn: false, note: 'Ajuste contábil — sempre positivo, mas não representa entrada real de dinheiro.' },
