@@ -218,29 +218,61 @@ function extractMetrics(rawText: string, tipos: Record<string, string> = {}): Co
   const estTotalAnt  = estoques.ant + estAudi.ant;
   const estTotalAtu  = estoques.atu + estAudi.atu;
 
-  const fluxoOperacional =
-    resultadoLiquido + deprec_per +
+  // Outros ativos Audi além do estoque (1.1.7 excl. 1.1.7.02): capital de giro operacional Audi
+  const outrasAtivAudiAnt = absAnt('1.1.7') - absAnt('1.1.7.02');
+  const outrasAtivAudiAtu = absAtu('1.1.7') - absAtu('1.1.7.02');
+  const outrasAtivAudiResiduo = outrasAtivAudiAtu - outrasAtivAudiAnt;
+  // Receitas Diferidas (2.2.2) — ICMS ST Diferido: variação → operacional
+  const dRecDiferidas = absAtu('2.2.2') - absAnt('2.2.2');
+  // Realizável LP além de 1.5.1.01.52 (créditos c/ ligadas já rastreados) → investimento
+  const realizLP = { ant: absAnt('1.5.1'), atu: absAtu('1.5.1') };
+  const dRealizLPOutros = (realizLP.atu - realizLPCred.atu) - (realizLP.ant - realizLPCred.ant);
+  // dIntangivel: reclassificado de Investimento → Operacionais (igual à tabela)
+  const dIntangivel = intangivel.atu - intangivel.ant;
+  // Variação de PL além do resultado (aportes/retiradas/dividendos)
+  const PL = { ant: absAnt('2.3'), atu: absAtu('2.3') };
+  const dPL_extra = (PL.atu - PL.ant) - resultadoLiquido;
+
+  // Fluxo Operacional base (sem ajuste residual, sem deprec — capturada pelo ajuste)
+  const fluxoOperBase =
+    resultadoLiquido +
     (-(estTotalAtu - estTotalAnt)) + (-(creditos.atu - creditos.ant)) +
     (-(contasCorr.atu - contasCorr.ant)) + (-(valDiversos.atu - valDiversos.ant)) +
-    (-(despAntec.atu - despAntec.ant)) + (fornecTotal.atu - fornecTotal.ant) +
+    (-(despAntec.atu - despAntec.ant)) + (-outrasAtivAudiResiduo) +
+    (fornecTotal.atu - fornecTotal.ant) +
     (obrigTrib.atu - obrigTrib.ant) + (obrigTrab.atu - obrigTrab.ant) +
     (contasPagar.atu - contasPagar.ant) +
     (emprestCP_01.atu - emprestCP_01.ant) +  // Fornecedores 2.1.1.01 → operacional
     (outros2_2_1Atu - outros2_2_1Ant) +      // Resíduo 2.2.1 → operacional
-    -(realizLPCred.atu - realizLPCred.ant);  // Créditos LP c/ ligadas → operacional (alinhado ao FC Direto)
+    dRecDiferidas +                           // Receitas Diferidas (2.2.2) → operacional
+    -(realizLPCred.atu - realizLPCred.ant);  // Créditos LP c/ ligadas → operacional
 
-  const fluxoInvestimento =
-    -(imobiliz.atu - imobiliz.ant) - (intangivel.atu - intangivel.ant) -
-    (investimentos.atu - investimentos.ant);
+  // Fluxo Investimento base
+  const fluxoInvestBase =
+    -(imobiliz.atu - imobiliz.ant) - dIntangivel -
+    (investimentos.atu - investimentos.ant) - dRealizLPOutros;
 
-  const fluxoFinanciamento =
-    (emprestCP_02.atu - emprestCP_02.ant) + // Financiamentos CP 2.1.1.02 → financiamento
+  // Fluxo Financiamento base (inclui dPL_extra)
+  const fluxoFinancBase =
+    (emprestCP_02.atu - emprestCP_02.ant) +
     (emprestLP.atu - emprestLP.ant) +
     (pessoasLig.atu - pessoasLig.ant) + (debitosLig.atu - debitosLig.ant) +
-    (arrendLP.atu - arrendLP.ant) + (outrosPassLP.atu - outrosPassLP.ant);
-    // outros2_2_1 movido para operacional
+    (arrendLP.atu - arrendLP.ant) + (outrosPassLP.atu - outrosPassLP.ant) +
+    dPL_extra;
 
-  const variacaoCaixa = fluxoOperacional + fluxoInvestimento + fluxoFinanciamento;
+  // Ajuste residual: captura depreciação e sub-contas não mapeadas
+  const disponib = { ant: absAnt('1.1.1'), atu: absAtu('1.1.1') };
+  const varCaixaReal = disponib.atu - disponib.ant;
+  const ajusteResidualBP = varCaixaReal - (fluxoOperBase + fluxoInvestBase + fluxoFinancBase);
+
+  // Valores finais com reclassificações de seção (espelham a tabela FC Direto/Indireto):
+  //   Intangível → Operacionais (−dIntangivel no Invest, +dIntangivel no Oper)
+  //   dPL_extra  → Operacionais (+dPL_extra no Oper, −dPL_extra no Financ)
+  const fluxoOperacional  = fluxoOperBase + ajusteResidualBP + dPL_extra - dIntangivel;
+  const fluxoInvestimento = fluxoInvestBase + dIntangivel;
+  const fluxoFinanciamento = fluxoFinancBase - dPL_extra;
+
+  const variacaoCaixa = fluxoOperacional + fluxoInvestimento + fluxoFinanciamento; // = varCaixaReal
 
   // ── Estoques ──────────────────────────────────────────────────────────────
   const estoqueVW   = absAtu('1.1.2');
