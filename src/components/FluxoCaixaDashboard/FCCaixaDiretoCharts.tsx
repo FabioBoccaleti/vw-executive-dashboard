@@ -64,31 +64,31 @@ function parseDFC(rawText: string): DFCValues {
   const absMov = (id: string) => { const a = get(id); return Math.abs((a.valCred || 0) - (a.valDeb || 0)); };
 
   // ── Variações patrimoniais ──────────────────────────────────────
-  const dEstoque   = (absAtu('1.1.2') + absAtu('1.1.7.02')) - (absAnt('1.1.2') + absAnt('1.1.7.02'));
-  const dCred      = absAtu('1.1.3') - absAnt('1.1.3');
+  // Estoque total = VW (1.1.2) + Audi (1.1.7.02)
+  const dEstoque = (absAtu('1.1.2') + absAtu('1.1.7.02')) - (absAnt('1.1.2') + absAnt('1.1.7.02'));
+  const dCred = absAtu('1.1.3') - absAnt('1.1.3');
   const dContasCorr = absAtu('1.1.4') - absAnt('1.1.4');
-  const dValDiv    = absAtu('1.1.5') - absAnt('1.1.5');
+  const dValDiv = absAtu('1.1.5') - absAnt('1.1.5');
   const dDespAntec = absAtu('1.1.6') - absAnt('1.1.6');
-  const dFornec    = (absAtu('2.1.3') + absAtu('2.1.4')) - (absAnt('2.1.3') + absAnt('2.1.4'));
+  // Outros ativos Audi (1.1.7 exceto estoque 1.1.7.02): capital de giro operacional Audi
+  const outrasAtivAudiResiduo = (absAtu('1.1.7') - absAtu('1.1.7.02')) - (absAnt('1.1.7') - absAnt('1.1.7.02'));
+  const dFornec = (absAtu('2.1.3') + absAtu('2.1.4')) - (absAnt('2.1.3') + absAnt('2.1.4'));
   const dObrigTrib = absAtu('2.1.2.02') - absAnt('2.1.2.02');
   const dObrigTrab = absAtu('2.1.2.01') - absAnt('2.1.2.01');
   const dContasPag = absAtu('2.1.2.03') - absAnt('2.1.2.03');
   const dRealizLPCred = absAtu('1.5.1.01.52') - absAnt('1.5.1.01.52');
   const dEmprestCP_01 = absAtu('2.1.1.01') - absAnt('2.1.1.01');
+  // Receitas Diferidas (2.2.2) — ICMS ST Diferido: variação → operacional
+  const dRecDiferidas = absAtu('2.2.2') - absAnt('2.2.2');
 
-  // Resíduo 2.2.1
-  const g221_ant = absAnt('2.2.1');
-  const g221_atu = absAtu('2.2.1');
+  // Resíduo 2.2.1 (sub-contas não mapeadas individualmente → operacional)
   const empLP_ant = absAnt('2.2.1.07'); const empLP_atu = absAtu('2.2.1.07');
   const pesLig_ant = absAnt('2.2.1.01'); const pesLig_atu = absAtu('2.2.1.01');
   const debLig_ant = absAnt('2.2.1.02'); const debLig_atu = absAtu('2.2.1.02');
   const arr_ant = absAnt('2.2.1.15'); const arr_atu = absAtu('2.2.1.15');
-  const out221_ant = g221_ant - empLP_ant - pesLig_ant - debLig_ant - arr_ant;
-  const out221_atu = g221_atu - empLP_atu - pesLig_atu - debLig_atu - arr_atu;
+  const out221_ant = absAnt('2.2.1') - empLP_ant - pesLig_ant - debLig_ant - arr_ant;
+  const out221_atu = absAtu('2.2.1') - empLP_atu - pesLig_atu - debLig_atu - arr_atu;
   const dOutros2_2_1 = out221_atu - out221_ant;
-
-  // Depreciação
-  const deprec = get('5.5.2.07.20').valDeb;
 
   // despOper5Net — soma folhas de 5.*
   const allKeys5 = Object.keys(accounts).filter(k => k.startsWith('5.'));
@@ -101,30 +101,49 @@ function parseDFC(rawText: string): DFCValues {
     + absMov('3.4') + absMov('3.5') + absMov('3.6')
     - ((get('6').valDeb || 0) - (get('6').valCred || 0));
 
-  // ── Fluxo Operacional (método indireto) ─────────────────
-  const fluxoOper =
-    resLiq + deprec
+  // Variação de PL além do resultado (aportes/retiradas/dividendos diretos no PL)
+  const dPL_extra = (absAtu('2.3') - absAnt('2.3')) - resLiq;
+
+  // ── Fluxo Operacional (base, sem ajuste residual) ─────────────────
+  // Nota: deprec NÃO entra aqui — é capturada pelo ajusteResidualBP abaixo
+  const fluxoOperBase =
+    resLiq
     + (-dEstoque) + (-dCred) + (-dContasCorr) + (-dValDiv) + (-dDespAntec)
+    + (-outrasAtivAudiResiduo)
     + dFornec + dObrigTrib + dObrigTrab + dContasPag
-    - dRealizLPCred + dEmprestCP_01 + dOutros2_2_1;
+    - dRealizLPCred + dEmprestCP_01 + dOutros2_2_1 + dRecDiferidas;
 
-  // ── Fluxo Investimento ─────────────────────────────────
-  const fluxoInvest =
+  // ── Fluxo Investimento (base) ──────────────────────────────────────
+  const dIntangivel = absAtu('1.5.7') - absAnt('1.5.7');
+  // Realizável LP além de 1.5.1.01.52 (créditos c/ ligadas já rastreados)
+  const dRealizLPOutros = (absAtu('1.5.1') - absAtu('1.5.1.01.52')) - (absAnt('1.5.1') - absAnt('1.5.1.01.52'));
+  const fluxoInvestBase =
     -(absAtu('1.5.5') - absAnt('1.5.5'))
-    - (absAtu('1.5.7') - absAnt('1.5.7'))
-    - (absAtu('1.5.3') - absAnt('1.5.3'));
+    - dIntangivel
+    - (absAtu('1.5.3') - absAnt('1.5.3'))
+    - dRealizLPOutros;
 
-  // ── Fluxo Financiamento ────────────────────────────────
+  // ── Fluxo Financiamento (base) ────────────────────────────────────
   const dEmprestCP_02 = absAtu('2.1.1.02') - absAnt('2.1.1.02');
   const dEmprestLP = empLP_atu - empLP_ant;
   const dPessoasLig = pesLig_atu - pesLig_ant;
   const dDebitosLig = debLig_atu - debLig_ant;
   const dArrendLP = arr_atu - arr_ant;
   const dOutrosPassLP = absAtu('2.2.3') - absAnt('2.2.3');
+  const fluxoFinancBase = dEmprestCP_02 + dEmprestLP + dPessoasLig + dDebitosLig + dArrendLP + dOutrosPassLP + dPL_extra;
 
-  const fluxoFinanc = dEmprestCP_02 + dEmprestLP + dPessoasLig + dDebitosLig + dArrendLP + dOutrosPassLP;
+  // ── Ajuste residual (captura depreciação e sub-contas não mapeadas) ──
+  const varCaixaReal = absAtu('1.1.1') - absAnt('1.1.1');
+  const ajusteResidualBP = varCaixaReal - (fluxoOperBase + fluxoInvestBase + fluxoFinancBase);
+  const fluxoOperFinal = fluxoOperBase + ajusteResidualBP;
 
-  const fluxoTotal = fluxoOper + fluxoInvest + fluxoFinanc;
+  // ── Valores exibidos (espelham seções da tabela FC Indireto) ──────
+  // Intangível reclassificado: Operacionais −dIntangivel  |  Investimento +dIntangivel
+  // dPL_extra reclassificado: Operacionais +dPL_extra     |  Financiamento −dPL_extra
+  const fluxoOper = fluxoOperFinal + dPL_extra - dIntangivel;
+  const fluxoInvest = fluxoInvestBase + dIntangivel;
+  const fluxoFinanc = fluxoFinancBase - dPL_extra;
+  const fluxoTotal = fluxoOper + fluxoInvest + fluxoFinanc; // = varCaixaReal
 
   return { fluxoOper, fluxoInvest, fluxoFinanc, fluxoTotal };
 }
