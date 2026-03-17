@@ -446,6 +446,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [receitasView, setReceitasView] = useState<'normal' | 'comparativo'>('normal');
   const [janAccounts, setJanAccounts] = useState<Record<string, any> | null>(null);
   const [prevMonthAccounts, setPrevMonthAccounts] = useState<Record<string, any> | null>(null);
+  const [ytdAccountsSums, setYtdAccountsSums] = useState<Record<string, number>>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
   const MONTHS = [
@@ -518,44 +519,79 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         setLoading(true);
         setData(null);
 
-        const raw = await loadFluxoCaixaRaw(selectedYear, selectedMonth);
+        if (selectedMonth > 0) {
+          // Carregar todos os meses de Jan até selectedMonth em paralelo
+          // + Dez do ano anterior se selectedMonth === 1 (para comparação com mês anterior)
+          const ytdPromises = Array.from({ length: selectedMonth }, (_, i) =>
+            loadFluxoCaixaRaw(selectedYear, i + 1)
+          );
+          const prevYearDecPromise = selectedMonth === 1
+            ? loadFluxoCaixaRaw(selectedYear - 1, 12)
+            : Promise.resolve(null);
 
-        // Carregar balancete de Janeiro para cálculo acumulado YTD
-        if (selectedMonth > 1) {
-          const janRaw = await loadFluxoCaixaRaw(selectedYear, 1);
-          if (janRaw?.rawText) {
-            const janParsed = parseBalancete(janRaw.rawText);
+          const [ytdRaws, prevYearDec] = await Promise.all([
+            Promise.all(ytdPromises),
+            prevYearDecPromise,
+          ]);
+
+          const currentRaw = ytdRaws[selectedMonth - 1];
+          const prevMonthRaw = selectedMonth === 1 ? prevYearDec : ytdRaws[selectedMonth - 2];
+
+          // Jan accounts (usados por outras abas como CaixaTab)
+          if (selectedMonth > 1 && ytdRaws[0]?.rawText) {
+            const janParsed = parseBalancete(ytdRaws[0].rawText);
             setJanAccounts(Object.keys(janParsed.accounts).length >= 10 ? janParsed.accounts : null);
           } else {
             setJanAccounts(null);
           }
-        } else {
-          setJanAccounts(null);
-        }
 
-        // Carregar balancete do mês anterior para cálculo de receitas
-        if (selectedMonth !== 0) {
-          const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
-          const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
-          const prevRaw = await loadFluxoCaixaRaw(prevYear, prevMonth);
-          if (prevRaw?.rawText) {
-            const prevParsed = parseBalancete(prevRaw.rawText);
+          // Prev month accounts (para colunas de comparação)
+          if (prevMonthRaw?.rawText) {
+            const prevParsed = parseBalancete(prevMonthRaw.rawText);
             setPrevMonthAccounts(Object.keys(prevParsed.accounts).length >= 10 ? prevParsed.accounts : null);
           } else {
             setPrevMonthAccounts(null);
           }
-        } else {
-          setPrevMonthAccounts(null);
-        }
 
-        if (raw?.rawText) {
-          console.log(`✅ Balancete ${MONTH_NAMES[selectedMonth]}/${selectedYear} carregado do Redis — re-parseando...`);
-          const parsed = parseBalancete(raw.rawText);
-          if (Object.keys(parsed.accounts).length >= 10) {
-            setData(parsed);
-            setSavedFileNames(prev => ({ ...prev, [savedFileKey]: raw.fileName }));
-            setActiveTab('overview');
-            return;
+          // YTD: somar movimentos (valCred − valDeb) de Jan até selectedMonth
+          const ytdSums: Record<string, number> = {};
+          for (const mRaw of ytdRaws) {
+            if (mRaw?.rawText) {
+              const mParsed = parseBalancete(mRaw.rawText);
+              for (const [id, acc] of Object.entries(mParsed.accounts)) {
+                ytdSums[id] = (ytdSums[id] ?? 0) + ((acc as any).valCred - (acc as any).valDeb);
+              }
+            }
+          }
+          setYtdAccountsSums(ytdSums);
+
+          // Dados do mês atual
+          if (currentRaw?.rawText) {
+            console.log(`✅ Balancete ${MONTH_NAMES[selectedMonth]}/${selectedYear} carregado do Redis — re-parseando...`);
+            const parsed = parseBalancete(currentRaw.rawText);
+            if (Object.keys(parsed.accounts).length >= 10) {
+              setData(parsed);
+              setSavedFileNames(prev => ({ ...prev, [savedFileKey]: currentRaw.fileName }));
+              setActiveTab('overview');
+              return;
+            }
+          }
+        } else {
+          // selectedMonth === 0: modo anual
+          const raw = await loadFluxoCaixaRaw(selectedYear, 0);
+          setJanAccounts(null);
+          setPrevMonthAccounts(null);
+          setYtdAccountsSums({});
+
+          if (raw?.rawText) {
+            console.log(`✅ Balancete ${MONTH_NAMES[selectedMonth]}/${selectedYear} carregado do Redis — re-parseando...`);
+            const parsed = parseBalancete(raw.rawText);
+            if (Object.keys(parsed.accounts).length >= 10) {
+              setData(parsed);
+              setSavedFileNames(prev => ({ ...prev, [savedFileKey]: raw.fileName }));
+              setActiveTab('overview');
+              return;
+            }
           }
         }
 
@@ -596,6 +632,28 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         } else {
           console.warn('⚠️ Não foi possível salvar no Redis, mas os dados estão em memória');
           setRedisWarning('Os dados foram carregados na sessão, mas não foi possível salvar no banco de dados (Redis). Ao recarregar a página os dados serão perdidos. Verifique se as variáveis KV_REST_API_URL e KV_REST_API_TOKEN estão configuradas na Vercel.');
+        }
+
+        // Recalcular YTD somando meses anteriores + mês recém-importado
+        if (selectedMonth > 0) {
+          const ytdSums: Record<string, number> = {};
+          if (selectedMonth > 1) {
+            const prevRaws = await Promise.all(
+              Array.from({ length: selectedMonth - 1 }, (_, i) => loadFluxoCaixaRaw(selectedYear, i + 1))
+            );
+            for (const mRaw of prevRaws) {
+              if (mRaw?.rawText) {
+                const mParsed = parseBalancete(mRaw.rawText);
+                for (const [id, acc] of Object.entries(mParsed.accounts)) {
+                  ytdSums[id] = (ytdSums[id] ?? 0) + ((acc as any).valCred - (acc as any).valDeb);
+                }
+              }
+            }
+          }
+          for (const [id, acc] of Object.entries(parsed.accounts)) {
+            ytdSums[id] = (ytdSums[id] ?? 0) + ((acc as any).valCred - (acc as any).valDeb);
+          }
+          setYtdAccountsSums(ytdSums);
         }
 
         setSavedFileNames(prev => ({ ...prev, [savedFileKey]: file.name }));
@@ -824,7 +882,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
-              {activeTab === 'receitas' && receitasView === 'normal' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} prevMonthAccounts={prevMonthAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
+              {activeTab === 'receitas' && receitasView === 'normal' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} prevMonthAccounts={prevMonthAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} ytdAccountsSums={ytdAccountsSums} />}
               {activeTab === 'receitas' && receitasView === 'comparativo' && (
                 <div className="space-y-4">
                   <button
@@ -1140,17 +1198,18 @@ function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAt
   );
 }
 
-function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, prevMonthAccounts, selectedMonth, selectedYear }: any) {
+function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, prevMonthAccounts, selectedMonth, selectedYear, ytdAccountsSums }: any) {
   const accounts = data.accounts as Record<string, any>;
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0 };
   const getPrev = (id: string) => (prevMonthAccounts || {})[id] || { valDeb: 0, valCred: 0 };
+  const ytdSums: Record<string, number> = ytdAccountsSums || {};
 
   // Movimentação do mês atual: crédito − débito (contas de receita têm natureza credora)
   const mov = (id: string) => { const a = getAcc(id); return a.valCred - a.valDeb; };
   // Movimentação do mês anterior (zero se balancete não disponível)
   const movPrev = (id: string) => { if (!prevMonthAccounts) return 0; const a = getPrev(id); return a.valCred - a.valDeb; };
-  // YTD acumulado: saldoAtual já é cumulativo Jan→mês atual
-  const ytdVal = (id: string) => Math.abs(getAcc(id).saldoAtual);
+  // YTD acumulado: soma de (valCred − valDeb) de Jan até o mês selecionado
+  const ytdVal = (id: string) => ytdSums[id] ?? 0;
 
   // Label do acumulado ex: "Jan–Jul/25"
   const MSHORT = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -1191,7 +1250,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
       desc: (g.desc || p.gross) + (SUFFIX_MAP[p.gross] ?? ''),
       ant: prevMonthAccounts ? (gP.valCred - gP.valDeb) - (dP.valDeb - dP.valCred) : 0,
       atu: (g.valCred - g.valDeb) - (d.valDeb - d.valCred),
-      ytd: Math.abs(g.saldoAtual) - Math.abs(d.saldoAtual),
+      ytd: (ytdSums[p.gross] ?? 0) + (ytdSums[p.ded] ?? 0),
     };
   });
 
