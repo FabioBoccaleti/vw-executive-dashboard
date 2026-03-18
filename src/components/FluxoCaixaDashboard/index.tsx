@@ -1651,15 +1651,19 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
     return { captYTD: capt, amortYTD: amort };
   };
 
-  const enrichCA = (conta: string, label: string, deltaMes: number, ytdObj: { captYTD: number; amortYTD: number }) => ({
-    conta, label,
-    captMes:    Math.max(0,  deltaMes),
-    amortMes:   Math.max(0, -deltaMes),
-    captYTD:    ytdObj.captYTD,
-    amortYTD:   ytdObj.amortYTD,
-    captAnual:  Math.abs((accounts[conta] || {}).valCred || 0),
-    amortAnual: Math.abs((accounts[conta] || {}).valDeb  || 0),
-  });
+  const enrichCA = (conta: string, label: string, deltaMes: number, ytdObj: { captYTD: number; amortYTD: number }) => {
+    const acc = accounts[conta] || {};
+    const deltaAnual = Math.abs(acc.saldoAtual || 0) - Math.abs(acc.saldoAnt || 0);
+    return {
+      conta, label,
+      captMes:    Math.max(0,  deltaMes),
+      amortMes:   Math.max(0, -deltaMes),
+      captYTD:    ytdObj.captYTD,
+      amortYTD:   ytdObj.amortYTD,
+      captAnual:  Math.max(0,  deltaAnual),
+      amortAnual: Math.max(0, -deltaAnual),
+    };
+  };
   // Pré-computar YTDs especiais uma única vez
   const ytd1 = netYTD1();
   const ytd2 = netYTD2();
@@ -1703,15 +1707,23 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
     amortMes:   Math.max(0, -vwGiroDeltaMes),
     captYTD:    ytdVwGiro.captYTD,
     amortYTD:   ytdVwGiro.amortYTD,
-    captAnual:  Math.abs((accounts['2.1.1.02.03.020'] || {}).valCred || 0) + Math.abs((accounts['2.2.1.07.01.003'] || {}).valCred || 0),
-    amortAnual: Math.abs((accounts['2.1.1.02.03.020'] || {}).valDeb  || 0) + Math.abs((accounts['2.2.1.07.01.003'] || {}).valDeb  || 0),
+    captAnual:  Math.max(0,  vwGiroDeltaMes),
+    amortAnual: Math.max(0, -vwGiroDeltaMes),
   };
   // Todas as rows unificadas para Captação e Amortização
   const allCAMerged = [
     ...cpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu - s.ant, stdYTD(s.conta))),
     vwGiroCA,
-    enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW',   netAcc1.atu - netAcc1.ant, ytd1),
-    enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu - netAcc2.ant, ytd2),
+    {
+      ...enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW', netAcc1.atu - netAcc1.ant, ytd1),
+      captAnual:  Math.max(0,  netAcc1.atu - netAcc1.ant),
+      amortAnual: Math.max(0, -(netAcc1.atu - netAcc1.ant)),
+    },
+    {
+      ...enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu - netAcc2.ant, ytd2),
+      captAnual:  Math.max(0,  netAcc2.atu - netAcc2.ant),
+      amortAnual: Math.max(0, -(netAcc2.atu - netAcc2.ant)),
+    },
     ...lpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu - s.ant, stdYTD(s.conta))),
   ];
   const grandCAMerged = rollCA(allCAMerged);
