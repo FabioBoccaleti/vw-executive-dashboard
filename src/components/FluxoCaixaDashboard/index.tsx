@@ -2925,7 +2925,8 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   // Totais Ano Anterior (balancete anual com comparativo)
   const despTotalPrev  = allDespRows.reduce((s, x) => s + x.valorPrev, 0);
   const lucAnteIRPrev  = lucBrutoPrev - despTotalPrev + rendOperPrev + rendFinancPrev + rendNaoOperPrev;
-  const provisaoIRPrev = hasPrevYear ? Math.abs(getPrev('6').saldoAtual) : 0;
+  // Sinal preservado: devedor (> 0) = deduz, credor (< 0) = reversão/benefício fiscal
+  const provisaoIRPrev = hasPrevYear ? getPrev('6').saldoAtual : 0;
   const resLiqPrev     = lucAnteIRPrev - provisaoIRPrev;
 
   // Cabeçalhos das colunas
