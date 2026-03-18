@@ -2865,7 +2865,7 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   const leaves5Prev  = allKeys5Prev.filter(k => !allKeys5Prev.some(other => other !== k && other.startsWith(k + '.')));
   const groupTotalsPrev: Record<string, { desc: string; valor: number }> = {};
   for (const k of leaves5Prev) {
-    const val = Math.abs(getPrev(k).saldoAtual);
+    const val = getPrev(k).saldoAtual;
     if (val === 0) continue;
     const gk = k.split('.').slice(0, 2).join('.');
     if (!groupTotalsPrev[gk]) groupTotalsPrev[gk] = { desc: prevYearAccounts[gk]?.desc || gk, valor: 0 };
