@@ -2920,7 +2920,10 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   const getSign6Mes = (): number => { const a = get('6'); return a.valDeb - a.valCred; };
   const getSign6Ytd = (): number => {
     if (hasYtd) return -(ytdAccountsSums['6'] ?? 0); // ytdSums = valCred−valDeb, negamos para valDeb−valCred
-    return get('6').valDeb - get('6').valCred; // modo anual: movimento do período, não saldoAtual
+    // Modo anual: inclui saldoAnt da conta 6 (carryforward de exercícios anteriores)
+    // saldoAtual = saldoAnt + (valDeb − valCred) → equivale ao saldo acumulado do balancete
+    const a = get('6');
+    return (a.saldoAnt || 0) + (a.valDeb - a.valCred);
   };
   const provisaoIRMes = getSign6Mes(); // positivo = dedutor, negativo = adicionador
   const provisaoIR    = getSign6Ytd();
@@ -2931,8 +2934,8 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   const despTotalPrev  = allDespRows.reduce((s, x) => s + x.valorPrev, 0);
   const lucAnteIRPrev  = lucBrutoPrev - despTotalPrev + rendOperPrev + rendFinancPrev + rendNaoOperPrev;
   // Sinal preservado: devedor (> 0) = deduz, credor (< 0) = reversão/benefício fiscal
-  // Usa valDeb−valCred para evitar distorção do saldoAnt de abertura
-  const provisaoIRPrev = hasPrevYear ? getPrev('6').valDeb - getPrev('6').valCred : 0;
+  // Inclui saldoAnt para bater com o saldoAtual do balancete
+  const provisaoIRPrev = hasPrevYear ? (getPrev('6').saldoAnt || 0) + (getPrev('6').valDeb - getPrev('6').valCred) : 0;
   const resLiqPrev     = lucAnteIRPrev - provisaoIRPrev;
 
   // Cabeçalhos das colunas
