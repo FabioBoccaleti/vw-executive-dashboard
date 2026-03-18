@@ -1996,7 +1996,12 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
                 )}
               </thead>
               <tbody>
-                {allCAMerged.map(r => (
+                {allCAMerged
+                  .filter(r => isMo
+                    ? r.captMes > 0 || r.amortMes > 0 || r.captYTD > 0 || r.amortYTD > 0
+                    : r.captAnual > 0 || r.amortAnual > 0
+                  )
+                  .map(r => (
                   <tr key={r.conta} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
                     <td className="py-2.5 px-3 text-foreground">
                       <span className="text-xs font-mono text-muted-foreground mr-2">{r.conta}</span>{r.label}
