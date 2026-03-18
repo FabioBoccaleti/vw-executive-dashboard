@@ -1710,8 +1710,18 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
   const allCAMerged = [
     ...cpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu - s.ant, stdYTD(s.conta))),
     vwGiroCA,
-    enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW',   netAcc1.atu - netAcc1.ant, ytd1),
-    enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu - netAcc2.ant, ytd2),
+    {
+      ...enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW', netAcc1.atu - netAcc1.ant, ytd1),
+      // Balancete anual: subtrai movimentação da conta ativa 1.1.2.01.01.001
+      captAnual:  Math.max(0, Math.abs((accounts['2.1.1.02.01.001'] || {}).valCred || 0) - Math.abs((accounts['1.1.2.01.01.001'] || {}).valCred || 0)),
+      amortAnual: Math.max(0, Math.abs((accounts['2.1.1.02.01.001'] || {}).valDeb  || 0) - Math.abs((accounts['1.1.2.01.01.001'] || {}).valDeb  || 0)),
+    },
+    {
+      ...enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu - netAcc2.ant, ytd2),
+      // Balancete anual: subtrai movimentação da conta ativa 1.1.7.02.01.001
+      captAnual:  Math.max(0, Math.abs((accounts['2.1.4.01.01.007'] || {}).valCred || 0) - Math.abs((accounts['1.1.7.02.01.001'] || {}).valCred || 0)),
+      amortAnual: Math.max(0, Math.abs((accounts['2.1.4.01.01.007'] || {}).valDeb  || 0) - Math.abs((accounts['1.1.7.02.01.001'] || {}).valDeb  || 0)),
+    },
     ...lpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu - s.ant, stdYTD(s.conta))),
   ];
   const grandCAMerged = rollCA(allCAMerged);
