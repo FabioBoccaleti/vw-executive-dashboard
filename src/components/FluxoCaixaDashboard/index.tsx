@@ -476,6 +476,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [receitasView, setReceitasView] = useState<'normal' | 'comparativo'>('normal');
   const [janAccounts, setJanAccounts] = useState<Record<string, any> | null>(null);
   const [prevMonthAccounts, setPrevMonthAccounts] = useState<Record<string, any> | null>(null);
+  const [prevYearAccounts, setPrevYearAccounts] = useState<Record<string, any> | null>(null);
   const [ytdAccountsSums, setYtdAccountsSums] = useState<Record<string, number>>({});
   const [allMonthsAccounts, setAllMonthsAccounts] = useState<Array<Record<string, any>>>([]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -565,6 +566,8 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             prevYearDecPromise,
           ]);
 
+          setPrevYearAccounts(null); // não usado no modo mensal
+
           const currentRaw = ytdRaws[selectedMonth - 1];
           const prevMonthRaw = selectedMonth === 1 ? prevYearDec : ytdRaws[selectedMonth - 2];
 
@@ -615,11 +618,22 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
           }
         } else {
           // selectedMonth === 0: modo anual
-          const raw = await loadFluxoCaixaRaw(selectedYear, 0);
+          const [raw, prevYearRaw] = await Promise.all([
+            loadFluxoCaixaRaw(selectedYear, 0),
+            loadFluxoCaixaRaw(selectedYear - 1, 0),
+          ]);
           setJanAccounts(null);
           setPrevMonthAccounts(null);
           setYtdAccountsSums({});
           setAllMonthsAccounts([]);
+
+          // Carregar accounts do ano anterior para coluna de comparação
+          if (prevYearRaw?.rawText) {
+            const prevParsed = parseBalancete(prevYearRaw.rawText);
+            setPrevYearAccounts(Object.keys(prevParsed.accounts).length >= 10 ? prevParsed.accounts : null);
+          } else {
+            setPrevYearAccounts(null);
+          }
 
           if (raw?.rawText) {
             console.log(`✅ Balancete ${MONTH_NAMES[selectedMonth]}/${selectedYear} carregado do Redis — re-parseando...`);
@@ -926,7 +940,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'valoresReceber' && <ValoresReceberTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
-              {activeTab === 'receitas' && receitasView === 'normal' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} prevMonthAccounts={prevMonthAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} ytdAccountsSums={ytdAccountsSums} />}
+              {activeTab === 'receitas' && receitasView === 'normal' && <ReceitasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} prevMonthAccounts={prevMonthAccounts} prevYearAccounts={prevYearAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} ytdAccountsSums={ytdAccountsSums} />}
               {activeTab === 'receitas' && receitasView === 'comparativo' && (
                 <div className="space-y-4">
                   <button
@@ -1242,16 +1256,18 @@ function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAt
   );
 }
 
-function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, prevMonthAccounts, selectedMonth, selectedYear, ytdAccountsSums }: any) {
+function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, prevMonthAccounts, prevYearAccounts, selectedMonth, selectedYear, ytdAccountsSums }: any) {
   const accounts = data.accounts as Record<string, any>;
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0 };
-  const getPrev = (id: string) => (prevMonthAccounts || {})[id] || { valDeb: 0, valCred: 0 };
+  // No modo anual (selectedMonth === 0) usa prevYearAccounts; no mensal usa prevMonthAccounts
+  const prevAccounts = selectedMonth === 0 ? prevYearAccounts : prevMonthAccounts;
+  const getPrev = (id: string) => (prevAccounts || {})[id] || { valDeb: 0, valCred: 0 };
   const ytdSums: Record<string, number> = ytdAccountsSums || {};
 
   // Movimentação do mês atual: crédito − débito (contas de receita têm natureza credora)
   const mov = (id: string) => { const a = getAcc(id); return a.valCred - a.valDeb; };
-  // Movimentação do mês anterior (zero se balancete não disponível)
-  const movPrev = (id: string) => { if (!prevMonthAccounts) return 0; const a = getPrev(id); return a.valCred - a.valDeb; };
+  // Movimentação do período anterior (ano anterior no balancete anual, mês anterior no mensal)
+  const movPrev = (id: string) => { if (!prevAccounts) return 0; const a = getPrev(id); return a.valCred - a.valDeb; };
   // YTD acumulado: soma de (valCred − valDeb) de Jan até o mês selecionado
   const ytdVal = (id: string) => ytdSums[id] ?? 0;
 
@@ -1292,7 +1308,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
     return {
       conta: p.gross,
       desc: (g.desc || p.gross) + (SUFFIX_MAP[p.gross] ?? ''),
-      ant: prevMonthAccounts ? (gP.valCred - gP.valDeb) - (dP.valDeb - dP.valCred) : 0,
+      ant: prevAccounts ? (gP.valCred - gP.valDeb) - (dP.valDeb - dP.valCred) : 0,
       atu: (g.valCred - g.valDeb) - (d.valDeb - d.valCred),
       ytd: (ytdSums[p.gross] ?? 0) + (ytdSums[p.ded] ?? 0),
     };
