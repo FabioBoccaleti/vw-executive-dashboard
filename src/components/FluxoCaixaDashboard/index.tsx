@@ -2811,12 +2811,15 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   const hasPrevYear = isAnual && prevYearAccounts && Object.keys(prevYearAccounts).length > 0;
   // Para contas de receita/resultado (natureza credora): ytdAccS[id] é positivo → abs preserva
   // Para contas de custo/despesa (natureza devedora): ytdAccS[id] é negativo → abs preserva
-  const absYtd = (id: string) => hasYtd ? Math.abs(ytdAccountsSums[id] ?? 0) : Math.abs(get(id).saldoAtual);
+  // Modo anual: usa movimento do período (valCred−valDeb) para evitar distorção do saldoAnt
+  const absYtd = (id: string) => hasYtd
+    ? Math.abs(ytdAccountsSums[id] ?? 0)
+    : Math.abs(get(id).valCred - get(id).valDeb);
   // Movimento do mês — usa valDeb / valCred
   const absMon = (id: string) => { const a = get(id); return Math.abs(a.valDeb - a.valCred); };
-  // Ano anterior (modo anual): saldoAtual do prevYearAccounts
+  // Ano anterior (modo anual): movimento do período (valCred−valDeb), nunca saldoAtual
   const getPrev = (id: string) => (prevYearAccounts || {})[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0 };
-  const absYtdPrev = (id: string) => hasPrevYear ? Math.abs(getPrev(id).saldoAtual) : 0;
+  const absYtdPrev = (id: string) => hasPrevYear ? Math.abs(getPrev(id).valCred - getPrev(id).valDeb) : 0;
 
   // ── Valores Acumulado (soma mensal YTD) ──────────────────────────────
   const recBruta    = absYtd('3.1');
@@ -2853,7 +2856,8 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   for (const k of leaves5) {
     // ytdAccountsSums armazena (valCred − valDeb): para contas de despesa (natureza devedora)
     // esse valor é negativo, por isso negamos para obter o total positivo
-    const val = hasYtd ? -(ytdAccountsSums[k] ?? 0) : get(k).saldoAtual;
+    // Modo anual (não hasYtd): usa valDeb−valCred para evitar distorção do saldoAnt de abertura
+    const val = hasYtd ? -(ytdAccountsSums[k] ?? 0) : (get(k).valDeb - get(k).valCred);
     if (val === 0) continue;
     const gk = k.split('.').slice(0, 2).join('.');
     if (!groupTotals[gk]) groupTotals[gk] = { desc: accounts[gk]?.desc || gk, valor: 0 };
@@ -2865,7 +2869,8 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   const leaves5Prev  = allKeys5Prev.filter(k => !allKeys5Prev.some(other => other !== k && other.startsWith(k + '.')));
   const groupTotalsPrev: Record<string, { desc: string; valor: number }> = {};
   for (const k of leaves5Prev) {
-    const val = getPrev(k).saldoAtual;
+    // Usa valDeb−valCred para evitar distorção do saldoAnt de abertura
+    const val = getPrev(k).valDeb - getPrev(k).valCred;
     if (val === 0) continue;
     const gk = k.split('.').slice(0, 2).join('.');
     if (!groupTotalsPrev[gk]) groupTotalsPrev[gk] = { desc: prevYearAccounts[gk]?.desc || gk, valor: 0 };
@@ -2915,7 +2920,7 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   const getSign6Mes = (): number => { const a = get('6'); return a.valDeb - a.valCred; };
   const getSign6Ytd = (): number => {
     if (hasYtd) return -(ytdAccountsSums['6'] ?? 0); // ytdSums = valCred−valDeb, negamos para valDeb−valCred
-    return get('6').saldoAtual;
+    return get('6').valDeb - get('6').valCred; // modo anual: movimento do período, não saldoAtual
   };
   const provisaoIRMes = getSign6Mes(); // positivo = dedutor, negativo = adicionador
   const provisaoIR    = getSign6Ytd();
@@ -2926,7 +2931,8 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   const despTotalPrev  = allDespRows.reduce((s, x) => s + x.valorPrev, 0);
   const lucAnteIRPrev  = lucBrutoPrev - despTotalPrev + rendOperPrev + rendFinancPrev + rendNaoOperPrev;
   // Sinal preservado: devedor (> 0) = deduz, credor (< 0) = reversão/benefício fiscal
-  const provisaoIRPrev = hasPrevYear ? getPrev('6').saldoAtual : 0;
+  // Usa valDeb−valCred para evitar distorção do saldoAnt de abertura
+  const provisaoIRPrev = hasPrevYear ? getPrev('6').valDeb - getPrev('6').valCred : 0;
   const resLiqPrev     = lucAnteIRPrev - provisaoIRPrev;
 
   // Cabeçalhos das colunas
