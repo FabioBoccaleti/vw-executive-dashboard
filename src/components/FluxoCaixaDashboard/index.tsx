@@ -1710,18 +1710,8 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
   const allCAMerged = [
     ...cpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu - s.ant, stdYTD(s.conta))),
     vwGiroCA,
-    {
-      ...enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW', netAcc1.atu - netAcc1.ant, ytd1),
-      // Balancete anual: subtrai movimentação da conta ativa 1.1.2.01.01.001
-      captAnual:  Math.abs((accounts['2.1.1.02.01.001'] || {}).valCred || 0) - Math.abs((accounts['1.1.2.01.01.001'] || {}).valCred || 0),
-      amortAnual: Math.abs((accounts['2.1.1.02.01.001'] || {}).valDeb  || 0) - Math.abs((accounts['1.1.2.01.01.001'] || {}).valDeb  || 0),
-    },
-    {
-      ...enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu - netAcc2.ant, ytd2),
-      // Balancete anual: subtrai movimentação da conta ativa 1.1.7.02.01.001
-      captAnual:  Math.abs((accounts['2.1.4.01.01.007'] || {}).valCred || 0) - Math.abs((accounts['1.1.7.02.01.001'] || {}).valCred || 0),
-      amortAnual: Math.abs((accounts['2.1.4.01.01.007'] || {}).valDeb  || 0) - Math.abs((accounts['1.1.7.02.01.001'] || {}).valDeb  || 0),
-    },
+    enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW',   netAcc1.atu - netAcc1.ant, ytd1),
+    enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu - netAcc2.ant, ytd2),
     ...lpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu - s.ant, stdYTD(s.conta))),
   ];
   const grandCAMerged = rollCA(allCAMerged);
@@ -1758,8 +1748,8 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
       </>;
     }
     return <>
-      <td className={cn('py-2.5 px-3 text-right text-sm font-mono border-l border-border/40', r.captAnual > 0 ? cn('text-red-600 dark:text-red-400', bold && 'font-bold') : r.captAnual < 0 ? cn('text-emerald-600 dark:text-emerald-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{r.captAnual !== 0 ? (r.captAnual < 0 ? '− ' : '') + fmtBRL(Math.abs(r.captAnual)) : '—'}</td>
-      <td className={cn('py-2.5 px-3 text-right text-sm font-mono', r.amortAnual > 0 ? cn('text-emerald-600 dark:text-emerald-400', bold && 'font-bold') : r.amortAnual < 0 ? cn('text-red-600 dark:text-red-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{r.amortAnual !== 0 ? (r.amortAnual < 0 ? '− ' : '') + fmtBRL(Math.abs(r.amortAnual)) : '—'}</td>
+      <td className={cn('py-2.5 px-3 text-right text-sm font-mono border-l border-border/40', r.captAnual > 0 ? cn('text-red-600 dark:text-red-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{r.captAnual > 0 ? fmtBRL(r.captAnual) : '—'}</td>
+      <td className={cn('py-2.5 px-3 text-right text-sm font-mono', r.amortAnual > 0 ? cn('text-emerald-600 dark:text-emerald-400', bold && 'font-bold') : 'text-muted-foreground/40')}>{r.amortAnual > 0 ? fmtBRL(r.amortAnual) : '—'}</td>
     </>;
   };
 
