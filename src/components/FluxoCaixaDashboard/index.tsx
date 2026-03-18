@@ -1711,8 +1711,32 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
     amortAnual: Math.max(0, -vwGiroDeltaMes),
   };
   // Todas as rows unificadas para Captação e Amortização
+  // Contas que tiveram movimentação acumulada em meses anteriores mas saldo zero no mês atual
+  // Garante que apareçam na coluna YTD mesmo quando o saldo do mês corrente é zero
+  const collectYtdExtras = (prefix: string, excludes: string[], currentIds: Set<string>): Array<{conta: string, desc: string}> => {
+    if (!CA_hasYTD) return [];
+    const seen = new Map<string, string>();
+    for (const m of allMoAccounts) {
+      const mKeys = Object.keys(m);
+      for (const k of mKeys) {
+        if (!k.startsWith(prefix + '.')) continue;
+        if (excludes.includes(k)) continue;
+        if (currentIds.has(k)) continue;
+        if (seen.has(k)) continue;
+        const isLeaf = !mKeys.some(o => o !== k && o.startsWith(k + '.'));
+        if (isLeaf) seen.set(k, m[k]?.desc || k);
+      }
+    }
+    return Array.from(seen.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([conta, desc]) => ({ conta, desc }));
+  };
+  const cpSubsIds = new Set(cpSubsFiltered.map(s => s.conta));
+  const lpSubsIds = new Set(lpSubsFiltered.map(s => s.conta));
+  const cpExtras = collectYtdExtras('2.1.1.02.03', ['2.1.1.02.03.020'], cpSubsIds);
+  const lpExtras = collectYtdExtras('2.2.1.07', ['2.2.1.07.01.003'], lpSubsIds);
+
   const allCAMerged = [
     ...cpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu - s.ant, stdYTD(s.conta))),
+    ...cpExtras.map(e => enrichCA(e.conta, e.desc ? toTitleCase(e.desc) : e.conta, 0, stdYTD(e.conta))),
     vwGiroCA,
     {
       ...enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW', netAcc1.atu - netAcc1.ant, ytd1),
@@ -1725,6 +1749,7 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
       amortAnual: Math.max(0, -(netAcc2.atu - netAcc2.ant)),
     },
     ...lpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu - s.ant, stdYTD(s.conta))),
+    ...lpExtras.map(e => enrichCA(e.conta, e.desc ? toTitleCase(e.desc) : e.conta, 0, stdYTD(e.conta))),
   ];
   const grandCAMerged = rollCA(allCAMerged);
 
