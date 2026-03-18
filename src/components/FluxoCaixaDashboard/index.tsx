@@ -935,7 +935,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
               {activeTab === 'overview' && <OverviewTab data={data} fmtBRL={fmtBRL} KPI={KPI} BarGauge={BarGauge} SectionTitle={SectionTitle} />}
               {activeTab === 'ativo' && <AtivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'passivo' && <PassivoTab data={data} SectionTitle={SectionTitle} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
-              {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} ytdAccountsSums={ytdAccountsSums} />}
+              {activeTab === 'resultado' && <ResultadoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} ytdAccountsSums={ytdAccountsSums} prevYearAccounts={prevYearAccounts} />}
               {activeTab === 'caixa' && <CaixaTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'caixaDireto' && <CaixaDiretoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} DFCRow={DFCRow} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'posicaoEstoques' && <PosicaoEstoquesTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
@@ -2796,7 +2796,7 @@ function PassivoTab({ data, SectionTitle, TableRow2, colAnterior, colAtual, sele
   );
 }
 
-function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selectedMonth, selectedYear, ytdAccountsSums }: any) {
+function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selectedMonth, selectedYear, ytdAccountsSums, prevYearAccounts }: any) {
   const [showCharts, setShowCharts] = useState(false);
   const d = data;
   const accounts = d.accounts as Record<string, any>;
@@ -2806,11 +2806,17 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   // ytdAccountsSums[id] = Σ(valCred − valDeb) de Jan até selectedMonth
   const isMonthly = selectedMonth > 0;
   const hasYtd = isMonthly && ytdAccountsSums && Object.keys(ytdAccountsSums).length > 0;
+  // Modo anual com comparativo ao ano anterior
+  const isAnual = selectedMonth === 0;
+  const hasPrevYear = isAnual && prevYearAccounts && Object.keys(prevYearAccounts).length > 0;
   // Para contas de receita/resultado (natureza credora): ytdAccS[id] é positivo → abs preserva
   // Para contas de custo/despesa (natureza devedora): ytdAccS[id] é negativo → abs preserva
   const absYtd = (id: string) => hasYtd ? Math.abs(ytdAccountsSums[id] ?? 0) : Math.abs(get(id).saldoAtual);
   // Movimento do mês — usa valDeb / valCred
   const absMon = (id: string) => { const a = get(id); return Math.abs(a.valDeb - a.valCred); };
+  // Ano anterior (modo anual): saldoAtual do prevYearAccounts
+  const getPrev = (id: string) => (prevYearAccounts || {})[id] || { saldoAnt: 0, saldoAtual: 0, valDeb: 0, valCred: 0 };
+  const absYtdPrev = (id: string) => hasPrevYear ? Math.abs(getPrev(id).saldoAtual) : 0;
 
   // ── Valores Acumulado (soma mensal YTD) ──────────────────────────────
   const recBruta    = absYtd('3.1');
@@ -2822,6 +2828,17 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   const rendOper    = absYtd('3.4');
   const rendFinanc  = absYtd('3.5');
   const rendNaoOper = absYtd('3.6');
+
+  // ── Valores Ano Anterior (balancete anual com comparativo) ──────────────────
+  const recBrutaPrev    = absYtdPrev('3.1');
+  const impostosVPrev   = absYtdPrev('3.2');
+  const devolucoesPrev  = absYtdPrev('3.3');
+  const recLiqPrev      = recBrutaPrev - impostosVPrev - devolucoesPrev;
+  const CMVPrev         = absYtdPrev('4');
+  const lucBrutoPrev    = recLiqPrev - CMVPrev;
+  const rendOperPrev    = absYtdPrev('3.4');
+  const rendFinancPrev  = absYtdPrev('3.5');
+  const rendNaoOperPrev = absYtdPrev('3.6');
 
   // Para despesas 5.x: quando hasYtd, usa-se os keys do ytdAccountsSums para cobrir todas as
   // contas que tiveram movimento em qualquer mês de Jan até o mês selecionado
@@ -2841,6 +2858,18 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
     const gk = k.split('.').slice(0, 2).join('.');
     if (!groupTotals[gk]) groupTotals[gk] = { desc: accounts[gk]?.desc || gk, valor: 0 };
     groupTotals[gk].valor += val;
+  }
+
+  // Despesas Ano Anterior (balancete anual)
+  const allKeys5Prev = hasPrevYear ? Object.keys(prevYearAccounts).filter(k => k.startsWith('5.')) : [];
+  const leaves5Prev  = allKeys5Prev.filter(k => !allKeys5Prev.some(other => other !== k && other.startsWith(k + '.')));
+  const groupTotalsPrev: Record<string, { desc: string; valor: number }> = {};
+  for (const k of leaves5Prev) {
+    const val = Math.abs(getPrev(k).saldoAtual);
+    if (val === 0) continue;
+    const gk = k.split('.').slice(0, 2).join('.');
+    if (!groupTotalsPrev[gk]) groupTotalsPrev[gk] = { desc: prevYearAccounts[gk]?.desc || gk, valor: 0 };
+    groupTotalsPrev[gk].valor += val;
   }
 
   // ── Valores Mês (valDeb / valCred) ───────────────────────────────────
@@ -2864,15 +2893,16 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   }
 
   // ── Merge union de despesas (acumulado + mês) ─────────────────────────
-  const allDespKeys = Array.from(new Set([...Object.keys(groupTotals), ...Object.keys(groupTotalsMes)])).sort();
+  const allDespKeys = Array.from(new Set([...Object.keys(groupTotals), ...Object.keys(groupTotalsMes), ...Object.keys(groupTotalsPrev)])).sort();
   const allDespRows = allDespKeys
     .map(k => ({
       conta: k,
-      desc: groupTotals[k]?.desc || groupTotalsMes[k]?.desc || k,
+      desc: groupTotals[k]?.desc || groupTotalsMes[k]?.desc || groupTotalsPrev[k]?.desc || k,
       valorMes: groupTotalsMes[k]?.valor || 0,
       valorAcu: groupTotals[k]?.valor || 0,
+      valorPrev: groupTotalsPrev[k]?.valor || 0,
     }))
-    .filter(r => r.valorMes !== 0 || r.valorAcu !== 0);
+    .filter(r => r.valorMes !== 0 || r.valorAcu !== 0 || r.valorPrev !== 0);
 
   const despTotal    = allDespRows.reduce((s, x) => s + x.valorAcu, 0);
   const despTotalMes = allDespRows.reduce((s, x) => s + x.valorMes, 0);
@@ -2892,7 +2922,13 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   const resLiq    = lucAnteIR    - provisaoIR;
   const resLiqMes = lucAnteIRMes - provisaoIRMes;
 
-  // ── Cabeçalhos das colunas ────────────────────────────────────────────
+  // Totais Ano Anterior (balancete anual com comparativo)
+  const despTotalPrev  = allDespRows.reduce((s, x) => s + x.valorPrev, 0);
+  const lucAnteIRPrev  = lucBrutoPrev - despTotalPrev + rendOperPrev + rendFinancPrev + rendNaoOperPrev;
+  const provisaoIRPrev = hasPrevYear ? Math.abs(getPrev('6').saldoAtual) : 0;
+  const resLiqPrev     = lucAnteIRPrev - provisaoIRPrev;
+
+  // Cabeçalhos das colunas
   const MONTH_SHORT: Record<number, string> = {
     1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 5: 'Mai', 6: 'Jun',
     7: 'Jul', 8: 'Ago', 9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez',
@@ -2902,32 +2938,33 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
   const headerAcu = isMonthly ? `Jan – ${MONTH_SHORT[selectedMonth]}/${shortYear}` : colAtual;
 
   // ── Linhas do DRE ─────────────────────────────────────────────────────
-  type DRERow = { label: string; valueMes: number; valueAcu: number; type: string };
+  type DRERow = { label: string; valueMes: number; valueAcu: number; valuePrev: number; type: string };
   const rows: DRERow[] = [
-    { label: 'RECEITA BRUTA DE VENDAS',                    valueMes: recBrutaMes,    valueAcu: recBruta,    type: 'header'   },
-    { label: '  (–) Impostos sobre Vendas',                valueMes: -impostosVMes,  valueAcu: -impostosV,  type: 'sub'      },
-    { label: '  (–) Devoluções de Vendas',                 valueMes: -devolucoesMes, valueAcu: -devolucoes, type: 'sub'      },
-    { label: 'RECEITA LÍQUIDA',                            valueMes: recLiqMes,      valueAcu: recLiq,      type: 'subtotal' },
-    { label: '  (–) Custo das Mercadorias Vendidas (CMV)', valueMes: -CMVMes,        valueAcu: -CMV,        type: 'sub'      },
-    { label: 'LUCRO (PREJUÍZO) BRUTO',                     valueMes: lucBrutoMes,    valueAcu: lucBruto,    type: 'subtotal' },
-    { label: 'RENDAS OPERACIONAIS',                        valueMes: rendOperMes,    valueAcu: rendOper,    type: 'group'    },
-    ...((rendNaoOper !== 0 || rendNaoOperMes !== 0)
-      ? [{ label: 'RENDAS NÃO OPERACIONAIS', valueMes: rendNaoOperMes, valueAcu: rendNaoOper, type: 'group' }]
+    { label: 'RECEITA BRUTA DE VENDAS',                    valueMes: recBrutaMes,    valueAcu: recBruta,    valuePrev: recBrutaPrev,    type: 'header'   },
+    { label: '  (–) Impostos sobre Vendas',                valueMes: -impostosVMes,  valueAcu: -impostosV,  valuePrev: -impostosVPrev,  type: 'sub'      },
+    { label: '  (–) Devoluções de Vendas',                 valueMes: -devolucoesMes, valueAcu: -devolucoes, valuePrev: -devolucoesPrev, type: 'sub'      },
+    { label: 'RECEITA LÍQUIDA',                            valueMes: recLiqMes,      valueAcu: recLiq,      valuePrev: recLiqPrev,      type: 'subtotal' },
+    { label: '  (–) Custo das Mercadorias Vendidas (CMV)', valueMes: -CMVMes,        valueAcu: -CMV,        valuePrev: -CMVPrev,        type: 'sub'      },
+    { label: 'LUCRO (PREJUÍZO) BRUTO',                     valueMes: lucBrutoMes,    valueAcu: lucBruto,    valuePrev: lucBrutoPrev,    type: 'subtotal' },
+    { label: 'RENDAS OPERACIONAIS',                        valueMes: rendOperMes,    valueAcu: rendOper,    valuePrev: rendOperPrev,    type: 'group'    },
+    ...((rendNaoOper !== 0 || rendNaoOperMes !== 0 || rendNaoOperPrev !== 0)
+      ? [{ label: 'RENDAS NÃO OPERACIONAIS', valueMes: rendNaoOperMes, valueAcu: rendNaoOper, valuePrev: rendNaoOperPrev, type: 'group' }]
       : []),
-    { label: 'DESPESAS OPERACIONAIS',                      valueMes: -despTotalMes,  valueAcu: -despTotal,  type: 'group'    },
+    { label: 'DESPESAS OPERACIONAIS',                      valueMes: -despTotalMes,  valueAcu: -despTotal,  valuePrev: -despTotalPrev,  type: 'group'    },
     ...allDespRows.map(s => ({
       label: `    (–) ${toTitleCase(s.desc)}`,
       valueMes: -s.valorMes,
       valueAcu: -s.valorAcu,
+      valuePrev: -s.valorPrev,
       type: 'sub',
     })),
-    { label: '  (+) Rendas Financeiras',                   valueMes: rendFinancMes,  valueAcu: rendFinanc,  type: 'sub'      },
-    { label: 'RESULTADO ANTES DO IR/CSLL',                 valueMes: lucAnteIRMes,   valueAcu: lucAnteIR,   type: 'subtotal' },
-    ...((provisaoIR !== 0 || provisaoIRMes !== 0)
+    { label: '  (+) Rendas Financeiras',                   valueMes: rendFinancMes,  valueAcu: rendFinanc,  valuePrev: rendFinancPrev,  type: 'sub'      },
+    { label: 'RESULTADO ANTES DO IR/CSLL',                 valueMes: lucAnteIRMes,   valueAcu: lucAnteIR,   valuePrev: lucAnteIRPrev,   type: 'subtotal' },
+    ...((provisaoIR !== 0 || provisaoIRMes !== 0 || provisaoIRPrev !== 0)
       // provisaoIR/Mes tem sinal: positivo = dedutor (mostrar negado), negativo = credor (mostrar positivo)
-      ? [{ label: '  (–) Provisão IR + CSLL', valueMes: -provisaoIRMes, valueAcu: -provisaoIR, type: 'sub' }]
+      ? [{ label: '  (–) Provisão IR + CSLL', valueMes: -provisaoIRMes, valueAcu: -provisaoIR, valuePrev: -provisaoIRPrev, type: 'sub' }]
       : []),
-    { label: 'RESULTADO LÍQUIDO DO EXERCÍCIO',             valueMes: resLiqMes,      valueAcu: resLiq,      type: 'total'    },
+    { label: 'RESULTADO LÍQUIDO DO EXERCÍCIO',             valueMes: resLiqMes,      valueAcu: resLiq,      valuePrev: resLiqPrev,      type: 'total'    },
   ];
 
   const renderCell = (val: number, important: boolean) => ({
@@ -2952,13 +2989,13 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
           <span>📈</span> Evolução Mensal
         </button>
       </div>
-      {/* KPIs — duplo quando mensal */}
+      {/* KPIs — duplo quando mensal, comparativo quando anual com ano anterior */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Receita Bruta',       mes: recBrutaMes,  acu: recBruta,  icon: '💼' },
-          { label: 'Receita Líquida',     mes: recLiqMes,    acu: recLiq,    icon: '📊' },
-          { label: 'Lucro / Prej. Bruto', mes: lucBrutoMes,  acu: lucBruto,  icon: '📦' },
-          { label: 'Resultado Líquido',   mes: resLiqMes,    acu: resLiq,    icon: '🏆' },
+          { label: 'Receita Bruta',       mes: recBrutaMes,  acu: recBruta,  prev: recBrutaPrev,  icon: '💼' },
+          { label: 'Receita Líquida',     mes: recLiqMes,    acu: recLiq,    prev: recLiqPrev,    icon: '📊' },
+          { label: 'Lucro / Prej. Bruto', mes: lucBrutoMes,  acu: lucBruto,  prev: lucBrutoPrev,  icon: '📦' },
+          { label: 'Resultado Líquido',   mes: resLiqMes,    acu: resLiq,    prev: resLiqPrev,    icon: '🏆' },
         ].map((kpi, i) => (
           <Card key={i}>
             <CardContent className="pt-5 pb-4">
@@ -2979,6 +3016,33 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
                       {i >= 2 && kpi.acu > 0 ? '+' : i >= 2 && kpi.acu < 0 ? '−' : ''}{fmtBRL(kpi.acu, true)}
                     </div>
                   </div>
+                </div>
+              ) : hasPrevYear ? (
+                <div className="space-y-2">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">{selectedYear - 1}</div>
+                    <div className="text-base font-semibold text-muted-foreground">
+                      {fmtBRL(kpi.prev, true)}
+                    </div>
+                  </div>
+                  <div className="border-t border-border/50 pt-2">
+                    <div className="text-[10px] uppercase tracking-wider text-foreground mb-0.5">{selectedYear}</div>
+                    <div className={cn('text-xl font-bold', kpi.acu >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
+                      {i >= 2 && kpi.acu > 0 ? '+' : i >= 2 && kpi.acu < 0 ? '−' : ''}{fmtBRL(kpi.acu, true)}
+                    </div>
+                  </div>
+                  {(() => {
+                    const varV = kpi.acu - kpi.prev;
+                    const varP = kpi.prev !== 0 ? (varV / Math.abs(kpi.prev)) * 100 : null;
+                    return (
+                      <div className="border-t border-border/50 pt-1">
+                        <span className={cn('text-xs font-semibold', varV >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
+                          {varV >= 0 ? '+' : ''}{fmtBRL(varV, true)}
+                          {varP !== null && <span className="ml-1 text-[10px]">({varP >= 0 ? '+' : ''}{varP.toFixed(1)}%)</span>}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 <div className={cn('text-2xl font-bold', kpi.acu >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
@@ -3003,12 +3067,28 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
                     {headerMes}
                   </th>
                 )}
+                {hasPrevYear && (
+                  <th className="py-2.5 px-4 text-right text-xs font-bold uppercase tracking-wider text-muted-foreground w-[16%]">
+                    {selectedYear - 1}
+                  </th>
+                )}
                 <th className={cn(
-                  'py-2.5 px-4 text-right text-xs font-bold uppercase tracking-wider w-[22%]',
-                  isMonthly ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
+                  'py-2.5 px-4 text-right text-xs font-bold uppercase tracking-wider',
+                  hasPrevYear ? 'w-[16%] text-foreground' : 'w-[22%]',
+                  isMonthly ? 'text-emerald-600 dark:text-emerald-400' : (!hasPrevYear && 'text-muted-foreground'),
                 )}>
-                  {headerAcu}
+                  {hasPrevYear ? String(selectedYear) : headerAcu}
                 </th>
+                {hasPrevYear && (
+                  <>
+                    <th className="py-2.5 px-4 text-right text-xs font-bold uppercase tracking-wider text-muted-foreground w-[14%]">
+                      Variação R$
+                    </th>
+                    <th className="py-2.5 px-4 text-right text-xs font-bold uppercase tracking-wider text-muted-foreground w-[10%]">
+                      Var %
+                    </th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -3020,6 +3100,10 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
                 const isGroup   = r.type === 'group';
                 const mesCell   = renderCell(r.valueMes, important);
                 const acuCell   = renderCell(r.valueAcu, important);
+                const prevCell  = renderCell(r.valuePrev, important);
+                const varV      = r.valueAcu - r.valuePrev;
+                const varP      = r.valuePrev !== 0 ? (varV / Math.abs(r.valuePrev)) * 100 : null;
+                const varColor  = varV > 0 ? 'text-emerald-600 dark:text-emerald-400' : varV < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground';
                 return (
                   <tr key={i} className={cn(
                     'border-b border-border',
@@ -3036,9 +3120,24 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
                         {mesCell.text}
                       </td>
                     )}
+                    {hasPrevYear && (
+                      <td className={cn('py-3 px-4 text-right text-sm font-mono tabular-nums', important ? 'font-bold' : '', prevCell.color)}>
+                        {prevCell.text}
+                      </td>
+                    )}
                     <td className={cn('py-3 px-4 text-right text-sm font-mono tabular-nums', important ? 'font-bold' : '', acuCell.color)}>
                       {acuCell.text}
                     </td>
+                    {hasPrevYear && (
+                      <>
+                        <td className={cn('py-3 px-4 text-right text-sm font-mono tabular-nums', important ? 'font-bold' : '', varColor)}>
+                          {varV > 0 ? `+${fmtBRL(varV)}` : varV < 0 ? `(${fmtBRL(Math.abs(varV))})` : '—'}
+                        </td>
+                        <td className={cn('py-3 px-4 text-right text-xs font-mono tabular-nums', important ? 'font-semibold' : '', varColor)}>
+                          {varP !== null ? `${varP >= 0 ? '+' : ''}${varP.toFixed(1)}%` : '—'}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 );
               })}
@@ -3047,7 +3146,9 @@ function ResultadoTab({ data, fmtBRL, SectionTitle, colAnterior, colAtual, selec
           <p className="mt-4 text-xs text-muted-foreground/70 leading-relaxed">
             {isMonthly
               ? `* Mês (${headerMes}): movimentação do período (Déb/Créd). Acumulado (${headerAcu}): saldo atual YTD.`
-              : '* DRE calculada com base no saldo atual (YTD) do balancete. Para encerramento definitivo, consultar as demonstrações completas.'
+              : hasPrevYear
+                ? `* Comparativo ${selectedYear - 1} vs ${selectedYear} com base no saldo atual (YTD) do balancete. Para encerramento definitivo, consultar as demonstrações completas.`
+                : '* DRE calculada com base no saldo atual (YTD) do balancete. Para encerramento definitivo, consultar as demonstrações completas.'
             }
           </p>
         </CardContent>
