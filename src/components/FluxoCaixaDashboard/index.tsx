@@ -477,6 +477,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [janAccounts, setJanAccounts] = useState<Record<string, any> | null>(null);
   const [prevMonthAccounts, setPrevMonthAccounts] = useState<Record<string, any> | null>(null);
   const [ytdAccountsSums, setYtdAccountsSums] = useState<Record<string, number>>({});
+  const [allMonthsAccounts, setAllMonthsAccounts] = useState<Array<Record<string, any>>>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const MONTHS = [
@@ -584,16 +585,22 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
           }
 
           // YTD: somar movimentos (valCred − valDeb) de Jan até selectedMonth
+          // + guardar accounts de cada mês para cálculo de captação/amortização acumulado
           const ytdSums: Record<string, number> = {};
+          const allMonthsAccountsArr: Array<Record<string, any>> = [];
           for (const mRaw of ytdRaws) {
             if (mRaw?.rawText) {
               const mParsed = parseBalancete(mRaw.rawText);
+              allMonthsAccountsArr.push(mParsed.accounts);
               for (const [id, acc] of Object.entries(mParsed.accounts)) {
                 ytdSums[id] = (ytdSums[id] ?? 0) + ((acc as any).valCred - (acc as any).valDeb);
               }
+            } else {
+              allMonthsAccountsArr.push({});
             }
           }
           setYtdAccountsSums(ytdSums);
+          setAllMonthsAccounts(allMonthsAccountsArr);
 
           // Dados do mês atual
           if (currentRaw?.rawText) {
@@ -612,6 +619,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
           setJanAccounts(null);
           setPrevMonthAccounts(null);
           setYtdAccountsSums({});
+          setAllMonthsAccounts([]);
 
           if (raw?.rawText) {
             console.log(`✅ Balancete ${MONTH_NAMES[selectedMonth]}/${selectedYear} carregado do Redis — re-parseando...`);
@@ -667,6 +675,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
         // Recalcular YTD somando meses anteriores + mês recém-importado
         if (selectedMonth > 0) {
           const ytdSums: Record<string, number> = {};
+          const allMonthsAccountsArr: Array<Record<string, any>> = [];
           if (selectedMonth > 1) {
             const prevRaws = await Promise.all(
               Array.from({ length: selectedMonth - 1 }, (_, i) => loadFluxoCaixaRaw(selectedYear, i + 1))
@@ -674,16 +683,21 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
             for (const mRaw of prevRaws) {
               if (mRaw?.rawText) {
                 const mParsed = parseBalancete(mRaw.rawText);
+                allMonthsAccountsArr.push(mParsed.accounts);
                 for (const [id, acc] of Object.entries(mParsed.accounts)) {
                   ytdSums[id] = (ytdSums[id] ?? 0) + ((acc as any).valCred - (acc as any).valDeb);
                 }
+              } else {
+                allMonthsAccountsArr.push({});
               }
             }
           }
           for (const [id, acc] of Object.entries(parsed.accounts)) {
             ytdSums[id] = (ytdSums[id] ?? 0) + ((acc as any).valCred - (acc as any).valDeb);
           }
+          allMonthsAccountsArr.push(parsed.accounts);
           setYtdAccountsSums(ytdSums);
+          setAllMonthsAccounts(allMonthsAccountsArr);
         }
 
         setSavedFileNames(prev => ({ ...prev, [savedFileKey]: file.name }));
@@ -924,7 +938,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
                   <ComparativoReceitas fmtBRL={fmtBRL} />
                 </div>
               )}
-              {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
+              {activeTab === 'endividamento' && <EndividamentoTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} TableRow2={TableRow2} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} allMonthsAccounts={allMonthsAccounts} />}
               {activeTab === 'despesas' && <DespesasTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} showTabela={showTabelaDespesas} setShowTabela={setShowTabelaDespesas} despesasView={despesasView} setDespesasView={setDespesasView} selectedMonth={selectedMonth} selectedYear={selectedYear} ytdAccountsSums={ytdAccountsSums} />}
               {activeTab === 'mutuoSocios' && <MutuoSociosTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
               {activeTab === 'parcelamentoRefis' && <ParcelamentoRefisTab data={data} fmtBRL={fmtBRL} SectionTitle={SectionTitle} KPI={KPI} colAnterior={colAnterior} colAtual={colAtual} janAccounts={janAccounts} selectedMonth={selectedMonth} selectedYear={selectedYear} />}
@@ -1541,7 +1555,7 @@ function ReceitasTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, p
   );
 }
 
-function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnterior, colAtual, janAccounts, selectedMonth, selectedYear }: any) {
+function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnterior, colAtual, janAccounts, selectedMonth, selectedYear, allMonthsAccounts }: any) {
   const [showCharts, setShowCharts] = useState(false);
   const d = data;
   const accounts = d.accounts as Record<string, any>;
@@ -1575,31 +1589,88 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
   const isMo = selectedMonth > 0;
   const CA_MS: Record<number, string> = {1:'Jan',2:'Fev',3:'Mar',4:'Abr',5:'Mai',6:'Jun',7:'Jul',8:'Ago',9:'Set',10:'Out',11:'Nov',12:'Dez'};
   const CA_yr2 = String(selectedYear || new Date().getFullYear()).slice(2);
-  const CA_ytdLbl = (isMo && selectedMonth > 1) ? `Jan – ${CA_MS[selectedMonth]}/${CA_yr2}` : colAtual;
-  const CA_hasYTD = isMo && selectedMonth > 1 && !!janAccounts;
-  const CA_nCols = isMo ? (CA_hasYTD ? 5 : 3) : 3;
-  const jg = (id: string) => ((janAccounts as Record<string, any>) || {})[id] || { saldoAnt: 0, valDeb: 0, valCred: 0 };
-  const jst = (id: string) => janAccounts ? Math.abs(jg(id).saldoAnt) : 0;
-  const enrichCA = (conta: string, label: string, saldoAtu: number, deltaMes: number, janStart: number) => {
-    const deltaYTD = saldoAtu - janStart;
-    return {
-      conta, label,
-      captMes:   Math.max(0,  deltaMes),
-      amortMes:  Math.max(0, -deltaMes),
-      captYTD:   Math.max(0,  deltaYTD),
-      amortYTD:  Math.max(0, -deltaYTD),
-      captAnual: Math.abs((accounts[conta] || {}).valCred || 0),
-      amortAnual: Math.abs((accounts[conta] || {}).valDeb || 0),
-    };
+  const allMoAccounts: Array<Record<string, any>> = allMonthsAccounts || [];
+  const CA_hasYTD = isMo && selectedMonth > 1 && allMoAccounts.length > 0;
+  const CA_ytdLbl = CA_hasYTD ? `Jan – ${CA_MS[selectedMonth]}/${CA_yr2}` : colAtual;
+
+  // Calcula captYTD e amortYTD para uma conta padrão somando o delta de cada mês
+  const stdYTD = (id: string): { captYTD: number; amortYTD: number } => {
+    let capt = 0, amort = 0;
+    for (const m of allMoAccounts) {
+      const a = m[id];
+      if (!a) continue;
+      const d = Math.abs(a.saldoAtual) - Math.abs(a.saldoAnt);
+      capt += Math.max(0, d);
+      amort += Math.max(0, -d);
+    }
+    return { captYTD: capt, amortYTD: amort };
   };
-  const janSt1CA = janAccounts ? Math.max(0, Math.abs(jg('2.1.1.02.01.001').saldoAnt) - Math.abs(jg('1.1.2.01.01.001').saldoAnt)) : 0;
-  const janSt2CA = janAccounts ? Math.max(0, Math.abs(jg('2.1.4.01.01.007').saldoAnt) - Math.abs(jg('1.1.7.02.01.001').saldoAnt)) : 0;
+
+  // YTD para netAcc1 (Banco Volks Floor Plan Novos VW) — conta líquida passivo−ativo
+  const netYTD1 = (): { captYTD: number; amortYTD: number } => {
+    let capt = 0, amort = 0;
+    for (const m of allMoAccounts) {
+      const passivo = m['2.1.1.02.01.001'] || { saldoAnt: 0, saldoAtual: 0 };
+      const ativo   = m['1.1.2.01.01.001'] || { saldoAnt: 0, saldoAtual: 0 };
+      const netAnt = Math.max(0, Math.abs(passivo.saldoAnt)   - Math.abs(ativo.saldoAnt));
+      const netAtu = Math.max(0, Math.abs(passivo.saldoAtual) - Math.abs(ativo.saldoAtual));
+      const d = netAtu - netAnt;
+      capt  += Math.max(0, d);
+      amort += Math.max(0, -d);
+    }
+    return { captYTD: capt, amortYTD: amort };
+  };
+
+  // YTD para netAcc2 (Banco Volks Floor Plan Novos Audi) — conta líquida passivo−ativo
+  const netYTD2 = (): { captYTD: number; amortYTD: number } => {
+    let capt = 0, amort = 0;
+    for (const m of allMoAccounts) {
+      const passivo = m['2.1.4.01.01.007'] || { saldoAnt: 0, saldoAtual: 0 };
+      const ativo   = m['1.1.7.02.01.001'] || { saldoAnt: 0, saldoAtual: 0 };
+      const netAnt = Math.max(0, Math.abs(passivo.saldoAnt)   - Math.abs(ativo.saldoAnt));
+      const netAtu = Math.max(0, Math.abs(passivo.saldoAtual) - Math.abs(ativo.saldoAtual));
+      const d = netAtu - netAnt;
+      capt  += Math.max(0, d);
+      amort += Math.max(0, -d);
+    }
+    return { captYTD: capt, amortYTD: amort };
+  };
+
+  // YTD para Banco VW Capital de Giro — soma CP+LP mês a mês
+  const vwGiroYTDFn = (): { captYTD: number; amortYTD: number } => {
+    let capt = 0, amort = 0;
+    for (const m of allMoAccounts) {
+      const cp = m['2.1.1.02.03.020'] || { saldoAnt: 0, saldoAtual: 0 };
+      const lp = m['2.2.1.07.01.003'] || { saldoAnt: 0, saldoAtual: 0 };
+      const netAnt = Math.abs(cp.saldoAnt)   + Math.abs(lp.saldoAnt);
+      const netAtu = Math.abs(cp.saldoAtual) + Math.abs(lp.saldoAtual);
+      const d = netAtu - netAnt;
+      capt  += Math.max(0, d);
+      amort += Math.max(0, -d);
+    }
+    return { captYTD: capt, amortYTD: amort };
+  };
+
+  const enrichCA = (conta: string, label: string, deltaMes: number, ytdObj: { captYTD: number; amortYTD: number }) => ({
+    conta, label,
+    captMes:    Math.max(0,  deltaMes),
+    amortMes:   Math.max(0, -deltaMes),
+    captYTD:    ytdObj.captYTD,
+    amortYTD:   ytdObj.amortYTD,
+    captAnual:  Math.abs((accounts[conta] || {}).valCred || 0),
+    amortAnual: Math.abs((accounts[conta] || {}).valDeb  || 0),
+  });
+  // Pré-computar YTDs especiais uma única vez
+  const ytd1 = netYTD1();
+  const ytd2 = netYTD2();
+  const ytdVwGiro = vwGiroYTDFn();
+
   const cpCA = [
-    ...cpSubs.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu, s.atu - s.ant, jst(s.conta))),
-    enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW',   netAcc1.atu, netAcc1.atu - netAcc1.ant, janSt1CA),
-    enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu, netAcc2.atu - netAcc2.ant, janSt2CA),
+    ...cpSubs.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu - s.ant, stdYTD(s.conta))),
+    enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW',   netAcc1.atu - netAcc1.ant, ytd1),
+    enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu - netAcc2.ant, ytd2),
   ];
-  const lpCA = lpSubs.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu, s.atu - s.ant, jst(s.conta)));
+  const lpCA = lpSubs.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu - s.ant, stdYTD(s.conta)));
   const rollCA = (rows: { captMes: number; amortMes: number; captYTD: number; amortYTD: number; captAnual: number; amortAnual: number }[]) =>
     rows.reduce((a, r) => ({
       captMes:    a.captMes    + r.captMes,
@@ -1623,19 +1694,25 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
     ant: (cpVWGiroSub?.ant || 0) + (lpVWGiroSub?.ant || 0),
     atu: (cpVWGiroSub?.atu || 0) + (lpVWGiroSub?.atu || 0),
   };
-  // Captação/Amortização para row merged
-  const vwGiroCA1 = enrichCA('2.1.1.02.03.020', 'Banco VW - Capital de Giro',
-    cpVWGiroSub?.atu || 0, (cpVWGiroSub?.atu || 0) - (cpVWGiroSub?.ant || 0), jst('2.1.1.02.03.020'));
-  const vwGiroCA2 = enrichCA('2.2.1.07.01.003', '',
-    lpVWGiroSub?.atu || 0, (lpVWGiroSub?.atu || 0) - (lpVWGiroSub?.ant || 0), jst('2.2.1.07.01.003'));
-  const vwGiroCA = { ...rollCA([vwGiroCA1, vwGiroCA2]), conta: 'vw-capital-giro', label: 'Banco VW - Capital de Giro' };
+  // Captação/Amortização para row merged — YTD calculado somando CP+LP mês a mês
+  const vwGiroDeltaMes = vwCapGiro.atu - vwCapGiro.ant;
+  const vwGiroCA = {
+    conta: 'vw-capital-giro',
+    label: 'Banco VW - Capital de Giro',
+    captMes:    Math.max(0,  vwGiroDeltaMes),
+    amortMes:   Math.max(0, -vwGiroDeltaMes),
+    captYTD:    ytdVwGiro.captYTD,
+    amortYTD:   ytdVwGiro.amortYTD,
+    captAnual:  Math.abs((accounts['2.1.1.02.03.020'] || {}).valCred || 0) + Math.abs((accounts['2.2.1.07.01.003'] || {}).valCred || 0),
+    amortAnual: Math.abs((accounts['2.1.1.02.03.020'] || {}).valDeb  || 0) + Math.abs((accounts['2.2.1.07.01.003'] || {}).valDeb  || 0),
+  };
   // Todas as rows unificadas para Captação e Amortização
   const allCAMerged = [
-    ...cpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu, s.atu - s.ant, jst(s.conta))),
+    ...cpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu - s.ant, stdYTD(s.conta))),
     vwGiroCA,
-    enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW',   netAcc1.atu, netAcc1.atu - netAcc1.ant, janSt1CA),
-    enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu, netAcc2.atu - netAcc2.ant, janSt2CA),
-    ...lpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu, s.atu - s.ant, jst(s.conta))),
+    enrichCA('2.1.1.02.01.001', 'Banco Volks Floor Plan Novos VW',   netAcc1.atu - netAcc1.ant, ytd1),
+    enrichCA('2.1.4.01.01.007', 'Banco Volks Floor Plan Novos Audi', netAcc2.atu - netAcc2.ant, ytd2),
+    ...lpSubsFiltered.map(s => enrichCA(s.conta, s.desc ? toTitleCase(s.desc) : s.conta, s.atu - s.ant, stdYTD(s.conta))),
   ];
   const grandCAMerged = rollCA(allCAMerged);
 
