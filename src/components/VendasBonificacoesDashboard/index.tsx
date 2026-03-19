@@ -1,6 +1,6 @@
-import { Fragment, useState, useEffect } from 'react';
+import { Fragment, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus } from 'lucide-react';
+import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from './vendasStorage';
 
@@ -63,6 +63,109 @@ function fmtDate(v: string): string {
   return y && m && d ? `${d}/${m}/${y}` : v;
 }
 
+// ─── Today in YYYY-MM-DD ──────────────────────────────────────────────────────
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ─── Filter helpers ───────────────────────────────────────────────────────────
+type FilterValues = Partial<Record<keyof VendasRow, string>>;
+
+function rowMatchesFilters(row: VendasRow, filters: FilterValues): boolean {
+  for (const [key, term] of Object.entries(filters) as [keyof VendasRow, string][]) {
+    if (!term) continue;
+    const cell = (row[key] ?? '').toString().toLowerCase();
+    const t    = term.toLowerCase().trim();
+    if (!cell.includes(t)) return false;
+  }
+  return true;
+}
+
+// ─── FilterCell ───────────────────────────────────────────────────────────────
+interface FilterCellProps {
+  col: ColDef;
+  value: string;
+  onChange: (v: string) => void;
+}
+function FilterCell({ col, value, onChange }: FilterCellProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const hasValue = value.length > 0;
+
+  if (col.type === 'date') {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="DD/MM/AAAA"
+          className={`w-full min-w-0 bg-white border rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+            hasValue ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'
+          }`}
+        />
+        <input
+          type="date"
+          value={value ? (() => {
+            const parts = value.split('/');
+            if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            return '';
+          })() : ''}
+          defaultValue={todayISO()}
+          onChange={e => {
+            const [y, m, d] = e.target.value.split('-');
+            if (y && m && d) onChange(`${d}/${m}/${y}`);
+          }}
+          onClick={e => { if (!(e.currentTarget as HTMLInputElement).value) (e.currentTarget as HTMLInputElement).value = todayISO(); }}
+          className="w-6 h-6 opacity-0 absolute pointer-events-none"
+          id={`datepicker-${col.key}`}
+        />
+        <label
+          htmlFor={`datepicker-${col.key}`}
+          title="Selecionar data"
+          className="flex-shrink-0 cursor-pointer text-slate-400 hover:text-amber-600 transition-colors"
+          onClick={() => {
+            const el = document.getElementById(`datepicker-${col.key}`) as HTMLInputElement | null;
+            if (el) { if (!el.value) el.value = todayISO(); el.showPicker?.(); }
+          }}
+        >
+          <Search className="w-3.5 h-3.5" />
+        </label>
+        {hasValue && (
+          <button onClick={() => onChange('')} className="flex-shrink-0 text-slate-300 hover:text-red-400 transition-colors">
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative flex items-center">
+      <Search className="absolute left-1.5 w-3 h-3 text-slate-300 pointer-events-none" />
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Filtrar…"
+        className={`w-full min-w-0 bg-white border rounded pl-5 pr-5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+          col.type === 'currency' ? 'text-right' : 'text-left'
+        } ${hasValue ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'}`}
+      />
+      {hasValue && (
+        <button
+          onClick={() => onChange('')}
+          className="absolute right-1.5 text-slate-300 hover:text-red-400 transition-colors"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── CurrencyCell (defined outside to avoid remount on parent re-render) ──────
 interface CurrencyCellProps { value: string; onChange: (v: string) => void; }
 function CurrencyCell({ value, onChange }: CurrencyCellProps) {
@@ -116,6 +219,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
   const [deleteId, setDeleteId]   = useState<string | null>(null);
   const [saving, setSaving]       = useState(false);
   const [loading, setLoading]     = useState(true);
+  const [filters, setFilters]     = useState<FilterValues>({});
 
   useEffect(() => {
     loadVendasRows().then(r => { setRows(r); setLoading(false); });
@@ -170,6 +274,14 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
     toast.success('Registro removido com sucesso');
   };
 
+  const setFilter = (key: keyof VendasRow, value: string) =>
+    setFilters(prev => ({ ...prev, [key]: value }));
+
+  const clearFilters = () => setFilters({});
+
+  const hasActiveFilters = Object.values(filters).some(v => v && v.length > 0);
+  const filteredRows     = hasActiveFilters ? rows.filter(r => rowMatchesFilters(r, filters)) : rows;
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -201,7 +313,10 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
                 Demonstrativo de Vendas e Bonificações
               </h1>
               <p className="text-amber-200 text-xs mt-0.5">
-                {rows.length} {rows.length === 1 ? 'registro' : 'registros'}
+                {hasActiveFilters
+                  ? `${filteredRows.length} de ${rows.length} ${rows.length === 1 ? 'registro' : 'registros'}`
+                  : `${rows.length} ${rows.length === 1 ? 'registro' : 'registros'}`
+                }
               </p>
             </div>
           </div>
@@ -211,6 +326,15 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
                 <span className="w-3 h-3 border-2 border-amber-200 border-t-transparent rounded-full animate-spin" />
                 Salvando...
               </span>
+            )}
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1.5 text-xs text-amber-100 border border-amber-400/50 bg-amber-700/40 hover:bg-amber-700/70 rounded-md px-2.5 py-1 transition-colors"
+              >
+                <FilterX className="w-3.5 h-3.5" />
+                Limpar filtros
+              </button>
             )}
             <Button
               variant="ghost"
@@ -267,18 +391,47 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
                   Ações
                 </th>
               </tr>
+
+              {/* ── FILTER ROW ── */}
+              <tr>
+                <th
+                  className="sticky left-0 z-40 bg-slate-50 border-r border-b border-slate-200 px-1 py-1.5"
+                  style={{ top: 'var(--header-height, 44px)' }}
+                />
+                {COLUMNS.map(col => (
+                  <th
+                    key={`f-${col.key}`}
+                    className="sticky z-30 bg-slate-50 border-r border-b border-slate-200 px-1.5 py-1.5"
+                    style={{ top: 'var(--header-height, 44px)' }}
+                  >
+                    <FilterCell
+                      col={col}
+                      value={filters[col.key] ?? ''}
+                      onChange={v => setFilter(col.key, v)}
+                    />
+                  </th>
+                ))}
+                <th
+                  className="sticky right-0 z-40 bg-slate-50 border-l border-b border-slate-200 px-1 py-1.5"
+                  style={{ top: 'var(--header-height, 44px)' }}
+                />
+              </tr>
             </thead>
 
             {/* ── TBODY ── */}
             <tbody>
-              <InsertZoneTr colSpan={totalCols} onInsert={() => insertAt(0)} />
+              {!hasActiveFilters && (
+                <InsertZoneTr colSpan={totalCols} onInsert={() => insertAt(0)} />
+              )}
 
-              {rows.map((row, idx) => {
+              {filteredRows.map((row, idx) => {
                 const isEditing = editingId === row.id;
                 const isDelete  = deleteId === row.id;
                 const isEven    = idx % 2 === 0;
                 const rowBg     = isEditing ? '#fffbeb' : isEven ? '#ffffff' : '#f8fafc';
                 const draft     = isEditing ? editDraft! : row;
+                // real index in full array for insert operations
+                const realIdx   = rows.indexOf(row);
 
                 return (
                   <Fragment key={row.id}>
@@ -289,7 +442,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
                         className="sticky left-0 z-20 text-center text-xs text-slate-400 font-mono border-r border-slate-200 px-2 py-2"
                         style={{ background: rowBg }}
                       >
-                        {idx + 1}
+                        {realIdx + 1}
                       </td>
 
                       {/* Data cells */}
@@ -403,7 +556,9 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
                       </td>
                     </tr>
 
-                    <InsertZoneTr colSpan={totalCols} onInsert={() => insertAt(idx + 1)} />
+                    {!hasActiveFilters && (
+                      <InsertZoneTr colSpan={totalCols} onInsert={() => insertAt(realIdx + 1)} />
+                    )}
                   </Fragment>
                 );
               })}
@@ -413,15 +568,29 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
 
         {/* ── Footer bar ── */}
         <div className="flex items-center justify-between flex-shrink-0 px-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => insertAt(rows.length)}
-            className="text-amber-700 border-amber-300 hover:bg-amber-50 gap-1.5 font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            Adicionar linha
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => insertAt(rows.length)}
+              disabled={hasActiveFilters}
+              title={hasActiveFilters ? 'Limpe os filtros para adicionar linhas' : ''}
+              className="text-amber-700 border-amber-300 hover:bg-amber-50 gap-1.5 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Plus className="w-4 h-4" />
+              Adicionar linha
+            </Button>
+            {hasActiveFilters && (
+              <span className="text-xs text-amber-600 flex items-center gap-1">
+                <Search className="w-3 h-3" />
+                {filteredRows.length === 0
+                  ? 'Nenhum registro encontrado'
+                  : `${filteredRows.length} de ${rows.length} registros`}
+                {' · '}
+                <button onClick={clearFilters} className="underline hover:text-amber-800">Limpar filtros</button>
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-400 flex items-center gap-1">
             <Pencil className="w-3 h-3 inline-block" />
             Clique para editar · Passe o cursor entre linhas para inserir
