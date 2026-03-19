@@ -345,6 +345,10 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
       - (parseFloat(draft.remuneracaoGerenciaSupervisorUsados) || 0)
     );
     draft.situacaoComissao = calcSituacaoComissao(draft);
+    // Local de Pgto: se Negociação Direta, preenche com o nome da blindadora
+    if (draft.situacaoNegociacaoBlindadora === 'Negociação Direta') {
+      draft.localPgtoBlindagem = draft.blindadora;
+    }
     setEditDraft(draft);
   };
 
@@ -382,6 +386,14 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
       }
       if (field === 'numeroNFComissao' || field === 'comissaoBrutaSorana' || field === 'valorVendaBlindagem' || field === 'custoBlindagem') {
         updated.situacaoComissao = calcSituacaoComissao(updated);
+      }
+      if (field === 'situacaoNegociacaoBlindadora' || field === 'blindadora') {
+        if (updated.situacaoNegociacaoBlindadora === 'Negociação Direta') {
+          updated.localPgtoBlindagem = updated.blindadora;
+        } else {
+          // Ao mudar para Pagamento Antecipado, limpa para forçar seleção no dropdown
+          updated.localPgtoBlindagem = '';
+        }
       }
       return updated;
     });
@@ -696,6 +708,24 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                     <option key={r.id} value={r.nome}>{r.nome}</option>
                                   ))}
                                 </select>
+                              ) : col.key === 'localPgtoBlindagem' ? (
+                                editDraft!.situacaoNegociacaoBlindadora === 'Negociação Direta' ? (
+                                  <span className="text-slate-500 italic text-sm">
+                                    {editDraft!.blindadora || <span className="text-slate-300">—</span>}
+                                  </span>
+                                ) : (
+                                  <select
+                                    value={val}
+                                    onChange={e => changeField(col.key, e.target.value)}
+                                    className="w-full bg-white border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                  >
+                                    <option value="">— Selecione —</option>
+                                    <option value="Sorana">Sorana</option>
+                                    {editDraft!.blindadora && (
+                                      <option value={editDraft!.blindadora}>{editDraft!.blindadora}</option>
+                                    )}
+                                  </select>
+                                )
                               ) : col.key === 'situacaoNegociacaoBlindadora' ? (
                                 <select
                                   value={val || 'Negociação Direta'}
