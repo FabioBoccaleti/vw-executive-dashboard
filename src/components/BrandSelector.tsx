@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BRAND_CONFIGS, type Brand } from '@/lib/brands';
-import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, Settings, LogOut } from 'lucide-react';
+import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, TrendingUp, Settings, LogOut } from 'lucide-react';
 import { PasswordDialog } from '@/components/PasswordDialog';
 import { useAuth } from '@/contexts/AuthContext';
 
 const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
-const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa'];
-const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa'];
+const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes'];
+const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes'];
 
 interface BrandSelectorProps {
   onSelectBrand: (brand: Brand) => void;
@@ -20,14 +20,16 @@ interface BrandSelectorProps {
 export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLogout }: BrandSelectorProps) {
   const { canAccessModule, canAccessBrand } = useAuth();
 
-  const showDemonstrativo = canAccessModule('demonstrativo');
-  const showDespesas      = canAccessModule('despesas');
-  const showFluxoCaixa    = canAccessModule('fluxo_caixa');
+  const showDemonstrativo       = canAccessModule('demonstrativo');
+  const showDespesas             = canAccessModule('despesas');
+  const showFluxoCaixa           = canAccessModule('fluxo_caixa');
+  const showVendasBonificacoes   = canAccessModule('vendas_bonificacoes');
 
   const allowedDemoBrands = DEMONSTRATIVO_BRANDS.filter(b => canAccessBrand(b as any));
   const allowedDirectBrands = DIRECT_BRANDS.filter(b => {
-    if (b === 'aprovacao_despesas') return showDespesas;
-    if (b === 'fluxo_caixa')        return showFluxoCaixa;
+    if (b === 'aprovacao_despesas')   return showDespesas;
+    if (b === 'fluxo_caixa')          return showFluxoCaixa;
+    if (b === 'vendas_bonificacoes')  return showVendasBonificacoes;
     return false;
   });
 
@@ -67,10 +69,11 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
   };
 
   const getBrandIcon = (brand: Brand, size = 'w-8 h-8') => {
-    if (brand === 'consolidado')       return <Layers className={size} />;
-    if (brand === 'aprovacao_despesas') return <CheckCircle className={size} />;
-    if (brand === 'fluxo_caixa')       return <DollarSign className={size} />;
-    if (brand.includes('vw'))          return <Car className={size} />;
+    if (brand === 'consolidado')          return <Layers className={size} />;
+    if (brand === 'aprovacao_despesas')   return <CheckCircle className={size} />;
+    if (brand === 'fluxo_caixa')          return <DollarSign className={size} />;
+    if (brand === 'vendas_bonificacoes')  return <TrendingUp className={size} />;
+    if (brand.includes('vw'))             return <Car className={size} />;
     return <Building2 className={size} />;
   };
 

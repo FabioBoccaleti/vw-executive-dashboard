@@ -3,6 +3,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { VWFinancialDashboard } from '@/components/VWFinancialDashboard'
 import { DespesasDashboard } from '@/components/DespesasDashboard'
 import { FluxoCaixaDashboard } from '@/components/FluxoCaixaDashboard'
+import { VendasBonificacoesDashboard } from '@/components/VendasBonificacoesDashboard'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
 import { initializeFromDatabase, isProduction, saveSelectedFiscalYear } from '@/lib/dataStorage'
@@ -188,6 +189,8 @@ function AppContent() {
         <DespesasDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'fluxo_caixa' ? (
         <FluxoCaixaDashboard onChangeBrand={handleChangeBrand} />
+      ) : brand === 'vendas_bonificacoes' ? (
+        <VendasBonificacoesDashboard onChangeBrand={handleChangeBrand} />
       ) : (
         <VWFinancialDashboard 
           brand={brand} 

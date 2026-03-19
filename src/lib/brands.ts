@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes';
 
 // Interface de configuração visual da marca
 export interface BrandConfig {
@@ -213,10 +213,35 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-accent': '#4ade80',
     }
   },
+  vendas_bonificacoes: {
+    id: 'vendas_bonificacoes',
+    name: 'Demonstrativo de Vendas e Bonificações',
+    shortName: 'Vendas',
+    colors: {
+      primary: '#b45309',
+      primaryHover: '#92400e',
+      primaryLight: '#fef3c7',
+      secondary: '#f59e0b',
+      accent: '#fbbf24',
+      headerBg: 'bg-[#b45309]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#b45309] hover:bg-[#92400e]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-amber-100 dark:bg-amber-900/30',
+      badgeText: 'text-amber-800 dark:text-amber-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#b45309',
+      '--brand-primary-hover': '#92400e',
+      '--brand-primary-light': '#fef3c7',
+      '--brand-secondary': '#f59e0b',
+      '--brand-accent': '#fbbf24',
+    }
+  },
 };
 
 // Lista de marcas disponíveis (para iteração) - ordem de exibição
-export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa'];
+export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes'];
 
 // Chave de armazenamento para marca selecionada
 export const SELECTED_BRAND_KEY = 'selected_brand';
