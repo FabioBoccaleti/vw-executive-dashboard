@@ -318,6 +318,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [vendedores, setVendedores]   = useState<Vendedor[]>([]);
   const [inlineNFId, setInlineNFId]   = useState<string | null>(null);
   const [inlineNFValue, setInlineNFValue] = useState('');
+  const [inlineAcertoId, setInlineAcertoId] = useState<string | null>(null);
+  const [inlineAcertoValue, setInlineAcertoValue] = useState('');
 
   useEffect(() => {
     Promise.all([loadVendasRows(), loadCatalogo(), loadRevendas(), loadBlinadadoras(), loadRegras(), loadVendedores()]).then(([r, c, rv, bl, rg, vd]) => {
@@ -435,6 +437,17 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     setInlineNFValue('');
     await persist(updated);
     toast.success('Nº NF salvo com sucesso');
+  };
+
+  const saveInlineAcerto = async (rowId: string) => {
+    const dateVal = inlineAcertoValue;
+    if (!dateVal) return;
+    const updated = rows.map(r => r.id === rowId ? { ...r, dataAcerto: dateVal } : r);
+    setRows(updated);
+    setInlineAcertoId(null);
+    setInlineAcertoValue('');
+    await persist(updated);
+    toast.success('Data de Acerto salva com sucesso');
   };
 
   const insertAt = async (index: number) => {
@@ -654,11 +667,15 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                             </td>
                           );
                         }
+                        const isBlindadoraPagoCol = BLINDADORA_PAGTO_KEYS.has(col.key);
+                        const rowHasAcerto = !!row.dataAcerto;
                         const cellHighlight = val && RESULTADO_KEYS.has(col.key)
                           ? 'bg-emerald-50 text-emerald-800 font-semibold'
                           : val && REMUNERACAO_KEYS.has(col.key)
                           ? 'bg-sky-50 text-sky-800 font-semibold'
-                          : val && BLINDADORA_PAGTO_KEYS.has(col.key)
+                          : val && isBlindadoraPagoCol && rowHasAcerto
+                          ? 'bg-emerald-100 text-emerald-800 font-bold ring-1 ring-emerald-300'
+                          : val && isBlindadoraPagoCol
                           ? 'bg-orange-100 text-orange-900 font-bold ring-1 ring-orange-300'
                           : col.key === 'situacaoComissao' && val === 'Emitir Nota de Intermediação'
                           ? 'bg-amber-50 text-amber-800'
@@ -788,8 +805,31 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                 />
                               )
                             ) : (
-                              col.type === 'currency' ? (
+                              col.type === 'currency' && isBlindadoraPagoCol && rowHasAcerto && val ? (
+                                <span className="font-bold text-emerald-700">Concluído</span>
+                              ) : col.type === 'currency' ? (
                                 <span className="font-mono tabular-nums">{fmtCurrency(val)}</span>
+                              ) : col.key === 'dataAcerto' && !isEditing && (row.valorAPagarBlindadora || row.valorAReceberBlindadora) ? (
+                                // Quick-edit inline: Data de Acerto editável direto na célula quando habilitada
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="date"
+                                    value={inlineAcertoId === row.id ? inlineAcertoValue : (val || '')}
+                                    onFocus={() => { setInlineAcertoId(row.id); setInlineAcertoValue(val || ''); }}
+                                    onChange={e => { setInlineAcertoId(row.id); setInlineAcertoValue(e.target.value); }}
+                                    onKeyDown={e => { if (e.key === 'Enter') saveInlineAcerto(row.id); if (e.key === 'Escape') { setInlineAcertoId(null); setInlineAcertoValue(''); } }}
+                                    className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
+                                  />
+                                  {inlineAcertoId === row.id && inlineAcertoValue && inlineAcertoValue !== val && (
+                                    <button
+                                      onClick={() => saveInlineAcerto(row.id)}
+                                      className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white rounded transition-colors"
+                                      title="Salvar Data de Acerto"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
                               ) : col.type === 'date' ? (
                                 <span>{fmtDate(val)}</span>
                               ) : col.key === 'numeroNFComissao' && !val ? (
