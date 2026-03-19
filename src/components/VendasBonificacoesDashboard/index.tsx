@@ -376,9 +376,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
                 {COLUMNS.map(col => (
                   <th
                     key={col.key}
-                    className={`sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-gray-600 align-top leading-snug ${
-                      col.type === 'currency' ? 'text-right' : 'text-left'
-                    }`}
+                    className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-gray-600 align-top leading-snug text-center"
                     style={{ background: '#374151' }}
                   >
                     {col.label}
