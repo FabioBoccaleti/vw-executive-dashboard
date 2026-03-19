@@ -30,6 +30,7 @@ export type CargoVendedor = typeof CARGOS_VENDEDOR[number];
 
 export interface Vendedor {
   id: string;
+  codigo?: string;
   nome: string;
   cargo: CargoVendedor;
 }

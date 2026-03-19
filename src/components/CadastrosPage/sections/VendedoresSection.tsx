@@ -10,9 +10,11 @@ export function VendedoresSection() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [novoNome, setNovoNome] = useState('');
+  const [novoCodigo, setNovoCodigo] = useState('');
   const [novoCargo, setNovoCargo] = useState<CargoVendedor>('Vendedor');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNome, setEditNome] = useState('');
+  const [editCodigo, setEditCodigo] = useState('');
   const [editCargo, setEditCargo] = useState<CargoVendedor>('Vendedor');
 
   useEffect(() => {
@@ -33,15 +35,26 @@ export function VendedoresSection() {
   const add = async () => {
     const nome = novoNome.trim();
     if (!nome) return;
-    await persist([...items, { id: crypto.randomUUID(), nome, cargo: novoCargo }]);
+    const codigo = novoCodigo.trim() || undefined;
+    if (codigo && items.some(i => i.codigo?.toLowerCase() === codigo.toLowerCase())) {
+      toast.error('Já existe um vendedor com esse código.');
+      return;
+    }
+    await persist([...items, { id: crypto.randomUUID(), codigo, nome, cargo: novoCargo }]);
     setNovoNome('');
+    setNovoCodigo('');
     toast.success('Vendedor cadastrado');
   };
 
   const saveEdit = async () => {
     const nome = editNome.trim();
     if (!nome || !editingId) return;
-    await persist(items.map(i => i.id === editingId ? { ...i, nome, cargo: editCargo } : i));
+    const codigo = editCodigo.trim() || undefined;
+    if (codigo && items.some(i => i.id !== editingId && i.codigo?.toLowerCase() === codigo.toLowerCase())) {
+      toast.error('Já existe um vendedor com esse código.');
+      return;
+    }
+    await persist(items.map(i => i.id === editingId ? { ...i, codigo, nome, cargo: editCargo } : i));
     setEditingId(null);
     toast.success('Vendedor atualizado');
   };
@@ -56,6 +69,13 @@ export function VendedoresSection() {
   return (
     <div>
       <div className="flex gap-2 mb-5">
+        <Input
+          placeholder="Código (opcional)..."
+          value={novoCodigo}
+          onChange={e => setNovoCodigo(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') add(); }}
+          className="w-36"
+        />
         <Input
           placeholder="Nome do vendedor..."
           value={novoNome}
@@ -79,6 +99,7 @@ export function VendedoresSection() {
         <table className="w-full text-sm">
           <thead>
             <tr style={{ background: '#1f2937' }}>
+              <th className="text-white text-left px-4 py-3 text-xs font-semibold w-32">Código</th>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold">Nome</th>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold">Cargo</th>
               <th className="text-white text-center px-4 py-3 text-xs font-semibold w-24">Ações</th>
@@ -86,10 +107,17 @@ export function VendedoresSection() {
           </thead>
           <tbody>
             {items.length === 0 && (
-              <tr><td colSpan={3} className="text-center text-slate-400 text-xs py-8">Nenhum vendedor cadastrado</td></tr>
+              <tr><td colSpan={4} className="text-center text-slate-400 text-xs py-8">Nenhum vendedor cadastrado</td></tr>
             )}
             {items.map((item, idx) => (
               <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                <td className="px-4 py-2 text-xs text-slate-700 w-32">
+                  {editingId === item.id ? (
+                    <Input value={editCodigo} onChange={e => setEditCodigo(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Escape') setEditingId(null); }}
+                      className="h-7 text-xs" placeholder="Código..." />
+                  ) : <span className="text-slate-500 font-mono">{item.codigo ?? '—'}</span>}
+                </td>
                 <td className="px-4 py-2 text-xs text-slate-700">
                   {editingId === item.id ? (
                     <Input value={editNome} onChange={e => setEditNome(e.target.value)}
@@ -114,7 +142,7 @@ export function VendedoresSection() {
                       </>
                     ) : (
                       <>
-                        <button onClick={() => { setEditingId(item.id); setEditNome(item.nome); setEditCargo(item.cargo); }} className="text-blue-500 hover:text-blue-700 p-1 rounded"><Pencil className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => { setEditingId(item.id); setEditNome(item.nome); setEditCodigo(item.codigo ?? ''); setEditCargo(item.cargo); }} className="text-blue-500 hover:text-blue-700 p-1 rounded"><Pencil className="w-3.5 h-3.5" /></button>
                         <button onClick={() => remove(item.id)} className="text-red-400 hover:text-red-600 p-1 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
                       </>
                     )}
