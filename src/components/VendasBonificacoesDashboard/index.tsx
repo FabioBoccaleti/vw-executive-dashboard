@@ -7,7 +7,7 @@ import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
 import { loadRevendas, loadBlinadadoras, loadRegras, loadVendedores, type Revenda, type Blindadora, type RegraRemuneracao, type Vendedor } from '@/components/CadastrosPage/cadastrosStorage';
 
 // ─── Campos calculados automaticamente (somente leitura no modo edição) ────────
-const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados', 'comissaoBrutaSorana']);
+const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados', 'comissaoBrutaSorana', 'situacaoComissao']);
 const RESULTADO_KEYS    = new Set<string>(['lucroOperacao', 'comissaoBrutaSorana']);
 const REMUNERACAO_KEYS  = new Set<string>(['remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados']);
 
@@ -126,6 +126,12 @@ function fmtDate(v: string): string {
   if (!v) return '';
   const [y, m, d] = v.split('-');
   return y && m && d ? `${d}/${m}/${y}` : v;
+}
+
+function calcSituacaoComissao(row: Pick<VendasRow, 'numeroNFComissao' | 'comissaoBrutaSorana'>): string {
+  if (row.numeroNFComissao) return 'Nota de Intermediação Emitida';
+  if (row.comissaoBrutaSorana) return 'Emitir Nota de Intermediação';
+  return '';
 }
 
 // ─── Today in YYYY-MM-DD ──────────────────────────────────────────────────────
@@ -334,6 +340,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
       - (parseFloat(draft.remuneracaoDiretoria) || 0)
       - (parseFloat(draft.remuneracaoGerenciaSupervisorUsados) || 0)
     );
+    draft.situacaoComissao = calcSituacaoComissao(draft);
     setEditDraft(draft);
   };
 
@@ -368,6 +375,9 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
           - (parseFloat(updated.remuneracaoDiretoria) || 0)
           - (parseFloat(updated.remuneracaoGerenciaSupervisorUsados) || 0)
         );
+      }
+      if (field === 'numeroNFComissao' || field === 'comissaoBrutaSorana' || field === 'valorVendaBlindagem' || field === 'custoBlindagem') {
+        updated.situacaoComissao = calcSituacaoComissao(updated);
       }
       return updated;
     });
@@ -593,6 +603,10 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                           ? 'bg-emerald-50 text-emerald-800 font-semibold'
                           : val && REMUNERACAO_KEYS.has(col.key)
                           ? 'bg-sky-50 text-sky-800 font-semibold'
+                          : col.key === 'situacaoComissao' && val === 'Emitir Nota de Intermediação'
+                          ? 'bg-amber-50 text-amber-800'
+                          : col.key === 'situacaoComissao' && val === 'Nota de Intermediação Emitida'
+                          ? 'text-slate-500'
                           : 'text-slate-700';
                         return (
                           <td
@@ -606,6 +620,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                 <span className={`italic text-xs font-mono tabular-nums ${
                                   val && RESULTADO_KEYS.has(col.key)   ? 'text-emerald-700 font-semibold' :
                                   val && REMUNERACAO_KEYS.has(col.key) ? 'text-sky-700 font-semibold' :
+                                  col.key === 'situacaoComissao' && val === 'Emitir Nota de Intermediação' ? 'text-amber-700 font-bold not-italic' :
+                                  col.key === 'situacaoComissao' && val === 'Nota de Intermediação Emitida' ? 'text-slate-500 not-italic' :
                                   'text-slate-400'
                                 }`}>
                                   {col.type === 'currency' ? fmtCurrency(val) : val || '—'}
@@ -687,7 +703,9 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                 <span>{fmtDate(val)}</span>
                               ) : (
                                 val
-                                  ? <span>{val}</span>
+                                  ? col.key === 'situacaoComissao' && val === 'Emitir Nota de Intermediação'
+                                    ? <span className="font-bold text-amber-700">{val}</span>
+                                    : <span>{val}</span>
                                   : <span className="text-slate-300 select-none">—</span>
                               )
                             )}
