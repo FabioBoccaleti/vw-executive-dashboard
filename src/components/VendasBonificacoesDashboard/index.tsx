@@ -1,8 +1,10 @@
 import { Fragment, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX } from 'lucide-react';
+import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from './vendasStorage';
+import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
+import { CatalogoCadastro } from './CatalogoCadastro';
 
 // ─── Column definitions ────────────────────────────────────────────────────────
 type ColType = 'text' | 'currency' | 'date';
@@ -220,9 +222,15 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
   const [saving, setSaving]       = useState(false);
   const [loading, setLoading]     = useState(true);
   const [filters, setFilters]     = useState<FilterValues>({});
+  const [catalogoOpen, setCatalogoOpen]   = useState(false);
+  const [catalogo, setCatalogo]           = useState<CatalogoVeiculos>({ marcas: [], modelos: [] });
 
   useEffect(() => {
-    loadVendasRows().then(r => { setRows(r); setLoading(false); });
+    Promise.all([loadVendasRows(), loadCatalogo()]).then(([r, c]) => {
+      setRows(r);
+      setCatalogo(c);
+      setLoading(false);
+    });
   }, []);
 
   const persist = async (updated: VendasRow[]) => {
@@ -336,6 +344,15 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
                 Limpar filtros
               </button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCatalogoOpen(true)}
+              className="text-white border border-white/30 hover:bg-white/15 gap-2"
+            >
+              <BookOpen className="w-4 h-4" />
+              Cadastro
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -463,6 +480,25 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
                                   onChange={e => changeField(col.key, e.target.value)}
                                   className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
                                 />
+                              ) : col.key === 'veiculo' && catalogo.modelos.length > 0 ? (
+                                <select
+                                  value={val}
+                                  onChange={e => changeField(col.key, e.target.value)}
+                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                >
+                                  <option value="">— Selecione —</option>
+                                  {catalogo.marcas.map(marca => (
+                                    <optgroup key={marca.id} label={marca.nome}>
+                                      {catalogo.modelos
+                                        .filter(m => m.marcaId === marca.id)
+                                        .map(m => (
+                                          <option key={m.id} value={`${marca.nome} ${m.modelo}`}>
+                                            {m.modelo}
+                                          </option>
+                                        ))}
+                                    </optgroup>
+                                  ))}
+                                </select>
                               ) : (
                                 <input
                                   type="text"
@@ -597,5 +633,12 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
 
       </div>
     </div>
+
+    <CatalogoCadastro
+      open={catalogoOpen}
+      onOpenChange={setCatalogoOpen}
+      catalogo={catalogo}
+      onCatalogoChange={setCatalogo}
+    />
   );
 }
