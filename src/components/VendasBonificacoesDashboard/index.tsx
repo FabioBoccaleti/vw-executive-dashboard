@@ -1,10 +1,11 @@
 import { Fragment, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen } from 'lucide-react';
+import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from './vendasStorage';
 import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
 import { loadRevendas, loadBlinadadoras, loadRegras, loadVendedores, type Revenda, type Blindadora, type RegraRemuneracao, type Vendedor } from '@/components/CadastrosPage/cadastrosStorage';
+import { VendasAnalise } from './VendasAnalise';
 
 // ─── Campos calculados automaticamente (somente leitura no modo edição) ────────
 const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados', 'comissaoBrutaSorana', 'situacaoComissao', 'valorAPagarBlindadora', 'valorAReceberBlindadora']);
@@ -320,6 +321,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [inlineNFValue, setInlineNFValue] = useState('');
   const [inlineAcertoId, setInlineAcertoId] = useState<string | null>(null);
   const [inlineAcertoValue, setInlineAcertoValue] = useState('');
+  const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('tabela');
 
   useEffect(() => {
     Promise.all([loadVendasRows(), loadCatalogo(), loadRevendas(), loadBlinadadoras(), loadRegras(), loadVendedores()]).then(([r, c, rv, bl, rg, vd]) => {
@@ -521,7 +523,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                 Salvando...
               </span>
             )}
-            {hasActiveFilters && (
+            {hasActiveFilters && activeTab === 'tabela' && (
               <button
                 onClick={clearFilters}
                 className="flex items-center gap-1.5 text-xs text-amber-100 border border-amber-400/50 bg-amber-700/40 hover:bg-amber-700/70 rounded-md px-2.5 py-1 transition-colors"
@@ -530,6 +532,31 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                 Limpar filtros
               </button>
             )}
+            {/* Abas */}
+            <div className="flex items-center bg-white/10 rounded-lg p-0.5 gap-0.5">
+              <button
+                onClick={() => setActiveTab('tabela')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  activeTab === 'tabela'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <TableProperties className="w-3.5 h-3.5" />
+                Tabela
+              </button>
+              <button
+                onClick={() => setActiveTab('analise')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  activeTab === 'analise'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <BarChart2 className="w-3.5 h-3.5" />
+                Análise
+              </button>
+            </div>
             <Button
               variant="ghost"
               size="sm"
@@ -553,8 +580,18 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
       </header>
 
       {/* ── Content ── */}
-      <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
+      <div className="flex-1 flex flex-col min-h-0">
 
+        {/* ── ABA ANÁLISE ── */}
+        {activeTab === 'analise' && (
+          <div className="flex-1 overflow-auto" style={{ maxHeight: 'calc(100vh - 72px)' }}>
+            <VendasAnalise rows={rows} />
+          </div>
+        )}
+
+        {/* ── ABA TABELA ── */}
+        {activeTab === 'tabela' && (
+        <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
         {/* Table card */}
         <div
           className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-auto flex-1"
@@ -973,6 +1010,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
             Clique para editar · Passe o cursor entre linhas para inserir
           </p>
         </div>
+        </div>
+        )}
 
       </div>
     </div>
