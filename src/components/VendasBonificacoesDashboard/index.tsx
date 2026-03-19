@@ -4,6 +4,7 @@ import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, Bo
 import { toast } from 'sonner';
 import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from './vendasStorage';
 import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
+import { loadRevendas, loadBlinadadoras, type Revenda, type Blindadora } from '@/components/CadastrosPage/cadastrosStorage';
 
 // ─── Column definitions ────────────────────────────────────────────────────────
 type ColType = 'text' | 'currency' | 'date' | 'calc';
@@ -238,12 +239,16 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [saving, setSaving]       = useState(false);
   const [loading, setLoading]     = useState(true);
   const [filters, setFilters]     = useState<FilterValues>({});
-  const [catalogo, setCatalogo]   = useState<CatalogoVeiculos>({ marcas: [], modelos: [] });
+  const [catalogo, setCatalogo]     = useState<CatalogoVeiculos>({ marcas: [], modelos: [] });
+  const [revendas, setRevendas]       = useState<Revenda[]>([]);
+  const [blindadoras, setBlinadadoras] = useState<Blindadora[]>([]);
 
   useEffect(() => {
-    Promise.all([loadVendasRows(), loadCatalogo()]).then(([r, c]) => {
+    Promise.all([loadVendasRows(), loadCatalogo(), loadRevendas(), loadBlinadadoras()]).then(([r, c, rv, bl]) => {
       setRows(r);
-      setCatalogo(c);
+      setCatalogo(c as CatalogoVeiculos);
+      setRevendas(rv as Revenda[]);
+      setBlinadadoras(bl as Blindadora[]);
       setLoading(false);
     });
   }, []);
@@ -526,6 +531,28 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                           </option>
                                         ))}
                                     </optgroup>
+                                  ))}
+                                </select>
+                              ) : col.key === 'revenda' && revendas.length > 0 ? (
+                                <select
+                                  value={val}
+                                  onChange={e => changeField(col.key, e.target.value)}
+                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                >
+                                  <option value="">— Selecione —</option>
+                                  {revendas.map(r => (
+                                    <option key={r.id} value={r.nome}>{r.nome}</option>
+                                  ))}
+                                </select>
+                              ) : col.key === 'blindadora' && blindadoras.length > 0 ? (
+                                <select
+                                  value={val}
+                                  onChange={e => changeField(col.key, e.target.value)}
+                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                >
+                                  <option value="">— Selecione —</option>
+                                  {blindadoras.map(b => (
+                                    <option key={b.id} value={b.nome}>{b.nome}</option>
                                   ))}
                                 </select>
                               ) : (
