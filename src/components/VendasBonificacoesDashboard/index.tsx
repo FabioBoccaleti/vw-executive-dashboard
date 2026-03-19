@@ -7,7 +7,7 @@ import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
 import { loadRevendas, loadBlinadadoras, loadRegras, loadVendedores, type Revenda, type Blindadora, type RegraRemuneracao, type Vendedor } from '@/components/CadastrosPage/cadastrosStorage';
 
 // ─── Campos calculados automaticamente (somente leitura no modo edição) ────────
-const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria']);
+const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados']);
 
 // Converte número no formato pt-BR ("1.200,50") ou número simples ("1200.5") para number
 function parseBR(s: string): number {
@@ -324,6 +324,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     draft.remuneracaoVendedor  = calcRemuneracaoField(draft, 'Vendedor', regras);
     draft.remuneracaoGerencia  = calcRemuneracaoField(draft, 'Gerência', regras);
     draft.remuneracaoDiretoria = calcRemuneracaoField(draft, 'Diretoria', regras);
+    draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras);
     setEditDraft(draft);
   };
 
@@ -350,6 +351,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         updated.remuneracaoVendedor  = calcRemuneracaoField(updated, 'Vendedor',  regras);
         updated.remuneracaoGerencia  = calcRemuneracaoField(updated, 'Gerência',  regras);
         updated.remuneracaoDiretoria = calcRemuneracaoField(updated, 'Diretoria', regras);
+        updated.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(updated, 'Supervisor de Usados', regras);
       }
       return updated;
     });
