@@ -368,25 +368,25 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
             <thead>
               <tr>
                 <th
-                  className="sticky left-0 top-0 z-40 text-white text-center text-xs font-semibold px-2 py-3 border-r border-amber-800"
-                  style={{ background: '#78350f' }}
+                  className="sticky left-0 top-0 z-40 text-white text-center text-xs font-semibold px-2 py-3 border-r border-gray-600"
+                  style={{ background: '#1f2937' }}
                 >
                   #
                 </th>
                 {COLUMNS.map(col => (
                   <th
                     key={col.key}
-                    className={`sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-amber-800 align-top leading-snug ${
+                    className={`sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-gray-600 align-top leading-snug ${
                       col.type === 'currency' ? 'text-right' : 'text-left'
                     }`}
-                    style={{ background: '#92400e' }}
+                    style={{ background: '#374151' }}
                   >
                     {col.label}
                   </th>
                 ))}
                 <th
-                  className="sticky right-0 top-0 z-40 text-white text-center text-xs font-semibold px-2 py-3 border-l border-amber-800 whitespace-nowrap"
-                  style={{ background: '#78350f' }}
+                  className="sticky right-0 top-0 z-40 text-white text-center text-xs font-semibold px-2 py-3 border-l border-gray-600 whitespace-nowrap"
+                  style={{ background: '#1f2937' }}
                 >
                   Ações
                 </th>
