@@ -7,7 +7,7 @@ import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
 import { loadRevendas, loadBlinadadoras, loadRegras, loadVendedores, type Revenda, type Blindadora, type RegraRemuneracao, type Vendedor } from '@/components/CadastrosPage/cadastrosStorage';
 
 // ─── Campos calculados automaticamente (somente leitura no modo edição) ────────
-const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados']);
+const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados', 'comissaoBrutaSorana']);
 
 // Converte número no formato pt-BR ("1.200,50") ou número simples ("1200.5") para number
 function parseBR(s: string): number {
@@ -325,6 +325,13 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     draft.remuneracaoGerencia  = calcRemuneracaoField(draft, 'Gerência', regras);
     draft.remuneracaoDiretoria = calcRemuneracaoField(draft, 'Diretoria', regras);
     draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras);
+    draft.comissaoBrutaSorana = String(
+      (parseFloat(draft.lucroOperacao) || 0)
+      - (parseFloat(draft.remuneracaoVendedor) || 0)
+      - (parseFloat(draft.remuneracaoGerencia) || 0)
+      - (parseFloat(draft.remuneracaoDiretoria) || 0)
+      - (parseFloat(draft.remuneracaoGerenciaSupervisorUsados) || 0)
+    );
     setEditDraft(draft);
   };
 
@@ -352,6 +359,13 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         updated.remuneracaoGerencia  = calcRemuneracaoField(updated, 'Gerência',  regras);
         updated.remuneracaoDiretoria = calcRemuneracaoField(updated, 'Diretoria', regras);
         updated.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(updated, 'Supervisor de Usados', regras);
+        updated.comissaoBrutaSorana = String(
+          (parseFloat(updated.lucroOperacao) || 0)
+          - (parseFloat(updated.remuneracaoVendedor) || 0)
+          - (parseFloat(updated.remuneracaoGerencia) || 0)
+          - (parseFloat(updated.remuneracaoDiretoria) || 0)
+          - (parseFloat(updated.remuneracaoGerenciaSupervisorUsados) || 0)
+        );
       }
       return updated;
     });
