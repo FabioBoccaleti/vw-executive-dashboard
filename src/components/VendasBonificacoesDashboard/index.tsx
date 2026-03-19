@@ -8,8 +8,9 @@ import { loadRevendas, loadBlinadadoras, loadRegras, loadVendedores, type Revend
 
 // ─── Campos calculados automaticamente (somente leitura no modo edição) ────────
 const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados', 'comissaoBrutaSorana', 'situacaoComissao', 'valorAPagarBlindadora', 'valorAReceberBlindadora']);
-const RESULTADO_KEYS    = new Set<string>(['lucroOperacao', 'comissaoBrutaSorana']);
-const REMUNERACAO_KEYS  = new Set<string>(['remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados']);
+const RESULTADO_KEYS        = new Set<string>(['lucroOperacao', 'comissaoBrutaSorana']);
+const REMUNERACAO_KEYS      = new Set<string>(['remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados']);
+const BLINDADORA_PAGTO_KEYS = new Set<string>(['valorAPagarBlindadora', 'valorAReceberBlindadora']);
 
 // Converte número no formato pt-BR ("1.200,50") ou número simples ("1200.5") para number
 function parseBR(s: string): number {
@@ -656,6 +657,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                           ? 'bg-emerald-50 text-emerald-800 font-semibold'
                           : val && REMUNERACAO_KEYS.has(col.key)
                           ? 'bg-sky-50 text-sky-800 font-semibold'
+                          : val && BLINDADORA_PAGTO_KEYS.has(col.key)
+                          ? 'bg-orange-100 text-orange-900 font-bold ring-1 ring-orange-300'
                           : col.key === 'situacaoComissao' && val === 'Emitir Nota de Intermediação'
                           ? 'bg-amber-50 text-amber-800'
                           : col.key === 'situacaoComissao' && val === 'Nota de Intermediação Emitida'
@@ -671,8 +674,9 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                               CALC_READONLY_KEYS.has(col.key) ? (
                                 // Campo calculado automaticamente: exibe somente leitura
                                 <span className={`italic text-sm font-mono tabular-nums ${
-                                  val && RESULTADO_KEYS.has(col.key)   ? 'text-emerald-700 font-semibold' :
-                                  val && REMUNERACAO_KEYS.has(col.key) ? 'text-sky-700 font-semibold' :
+                                  val && RESULTADO_KEYS.has(col.key)         ? 'text-emerald-700 font-semibold' :
+                                  val && REMUNERACAO_KEYS.has(col.key)       ? 'text-sky-700 font-semibold' :
+                                  val && BLINDADORA_PAGTO_KEYS.has(col.key)  ? 'text-orange-800 font-bold not-italic' :
                                   col.key === 'situacaoComissao' && val === 'Emitir Nota de Intermediação' ? 'text-amber-700 font-bold not-italic' :
                                   col.key === 'situacaoComissao' && val === 'Nota de Intermediação Emitida' ? 'text-slate-500 not-italic' :
                                   'text-slate-400'
