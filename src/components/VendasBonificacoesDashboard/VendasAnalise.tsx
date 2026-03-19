@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, LabelList,
 } from 'recharts';
 import { type VendasRow } from './vendasStorage';
-import { TrendingUp, TrendingDown, Minus, Plus, X } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Plus, X, Check } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -340,6 +340,23 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
     { label: 'Rem. Sup. Usados',   key: 'remSupervisor',fmt: fmtBRLFull },
     { label: 'Total Remunerações', key: 'remTotal',   fmt: fmtBRLFull },
   ];
+
+  // ── Notas a emitir por blindadora (total geral, apenas filtro de marca) ──
+  const notasAEmitirData = useMemo(() => {
+    const pending = brandRows.filter(r => r.situacaoComissao === 'Emitir Nota de Intermediação');
+    const map = new Map<string, { qtd: number; valor: number }>();
+    pending.forEach(r => {
+      const key = r.blindadora || 'Não informada';
+      const cur = map.get(key) || { qtd: 0, valor: 0 };
+      map.set(key, { qtd: cur.qtd + 1, valor: cur.valor + n(r.comissaoBrutaSorana) });
+    });
+    const items = [...map.entries()]
+      .map(([blindadora, v]) => ({ blindadora, qtd: v.qtd, valor: v.valor }))
+      .sort((a, b) => b.valor - a.valor);
+    const totalQtd  = items.reduce((a, i) => a + i.qtd, 0);
+    const totalValor = items.reduce((a, i) => a + i.valor, 0);
+    return { items, totalQtd, totalValor };
+  }, [brandRows]);
 
   // ── Contagem por marca (badges do seletor) ──
   const brandCounts = useMemo(() => {
@@ -836,6 +853,76 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
                 ))}
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {/* ── NOTAS DE INTERMEDIAÇÃO A EMITIR ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <SectionTitle>Notas de Intermediação a Emitir</SectionTitle>
+          {notasAEmitirData.totalQtd > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-600 border border-red-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+              {notasAEmitirData.totalQtd} nota{notasAEmitirData.totalQtd !== 1 ? 's' : ''} pendente{notasAEmitirData.totalQtd !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
+        {notasAEmitirData.items.length === 0 ? (
+          <div className="py-8 text-center text-slate-400">
+            <Check className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm font-medium">Nenhuma nota pendente</p>
+            <p className="text-xs mt-0.5">Todas as comissões já possuem nota emitida.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-slate-100">
+                  <th className="text-left py-2.5 px-3 text-xs font-bold text-slate-400 uppercase tracking-wide">#</th>
+                  <th className="text-left py-2.5 px-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Blindadora</th>
+                  <th className="text-center py-2.5 px-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Qtd. Notas</th>
+                  <th className="text-right py-2.5 px-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Valor Total (Comissão Sorana)</th>
+                  <th className="text-right py-2.5 px-3 text-xs font-bold text-slate-400 uppercase tracking-wide">% do Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {notasAEmitirData.items.map((item, i) => (
+                  <tr key={item.blindadora} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                    <td className="py-2.5 px-3 text-slate-400 font-mono text-xs">{i + 1}</td>
+                    <td className="py-2.5 px-3">
+                      <span className="font-semibold text-slate-700">{item.blindadora}</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                        {item.qtd}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-semibold text-red-600">
+                      {fmtBRLFull(item.valor)}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-400 text-xs">
+                      {notasAEmitirData.totalValor > 0 ? fmtPct(item.valor / notasAEmitirData.totalValor * 100) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-200 bg-slate-50">
+                  <td colSpan={2} className="py-3 px-3 text-xs font-bold text-slate-600 uppercase tracking-wide">Total Geral</td>
+                  <td className="py-3 px-3 text-center">
+                    <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-600 text-white">
+                      {notasAEmitirData.totalQtd}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono font-bold text-red-700 text-base">
+                    {fmtBRLFull(notasAEmitirData.totalValor)}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono text-slate-400 text-xs">100,0%</td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         )}
       </div>
