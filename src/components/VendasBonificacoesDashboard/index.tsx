@@ -8,6 +8,8 @@ import { loadRevendas, loadBlinadadoras, loadRegras, loadVendedores, type Revend
 
 // ─── Campos calculados automaticamente (somente leitura no modo edição) ────────
 const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados', 'comissaoBrutaSorana']);
+const RESULTADO_KEYS    = new Set<string>(['lucroOperacao', 'comissaoBrutaSorana']);
+const REMUNERACAO_KEYS  = new Set<string>(['remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados']);
 
 // Converte número no formato pt-BR ("1.200,50") ou número simples ("1200.5") para number
 function parseBR(s: string): number {
@@ -574,26 +576,38 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                         const isRight = col.type === 'currency' || col.type === 'calc';
                         if (col.type === 'calc') {
                           const displayed = col.calc ? col.calc(row) : '';
+                          const calcHighlight = displayed && RESULTADO_KEYS.has(col.key)
+                            ? 'bg-emerald-50 text-emerald-800 font-semibold'
+                            : 'text-slate-500 bg-slate-50/60';
                           return (
                             <td
                               key={`${col.key}-calc-${ci}`}
-                              className="border-r border-slate-100 px-2 py-1.5 text-xs text-right text-slate-500 font-mono tabular-nums bg-slate-50/60"
+                              className={`border-r border-slate-100 px-2 py-1.5 text-xs text-right font-mono tabular-nums ${calcHighlight}`}
                               style={{ verticalAlign: 'middle' }}
                             >
                               {displayed || <span className="text-slate-300 select-none">—</span>}
                             </td>
                           );
                         }
+                        const cellHighlight = val && RESULTADO_KEYS.has(col.key)
+                          ? 'bg-emerald-50 text-emerald-800 font-semibold'
+                          : val && REMUNERACAO_KEYS.has(col.key)
+                          ? 'bg-sky-50 text-sky-800 font-semibold'
+                          : 'text-slate-700';
                         return (
                           <td
                             key={`${col.key}-${ci}`}
-                            className={`border-r border-slate-100 px-2 py-1.5 text-xs ${isRight ? 'text-right' : 'text-left'} text-slate-700`}
+                            className={`border-r border-slate-100 px-2 py-1.5 text-xs ${isRight ? 'text-right' : 'text-left'} ${cellHighlight}`}
                             style={{ verticalAlign: 'middle' }}
                           >
                             {isEditing ? (
                               CALC_READONLY_KEYS.has(col.key) ? (
                                 // Campo calculado automaticamente: exibe somente leitura
-                                <span className="text-slate-400 italic text-xs font-mono tabular-nums">
+                                <span className={`italic text-xs font-mono tabular-nums ${
+                                  val && RESULTADO_KEYS.has(col.key)   ? 'text-emerald-700 font-semibold' :
+                                  val && REMUNERACAO_KEYS.has(col.key) ? 'text-sky-700 font-semibold' :
+                                  'text-slate-400'
+                                }`}>
                                   {col.type === 'currency' ? fmtCurrency(val) : val || '—'}
                                 </span>
                               ) : col.type === 'currency' ? (
