@@ -355,18 +355,20 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     const venda = parseFloat(draft.valorVendaBlindagem) || 0;
     const custo = parseFloat(draft.custoBlindagem) || 0;
     draft.lucroOperacao = String(venda - custo);
-    // Remunerações calculadas pelas regras
-    draft.remuneracaoVendedor  = calcRemuneracaoField(draft, 'Vendedor', regras);
-    draft.remuneracaoGerencia  = calcRemuneracaoField(draft, 'Gerência', regras);
-    draft.remuneracaoDiretoria = calcRemuneracaoField(draft, 'Diretoria', regras);
-    draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras);
-    draft.comissaoBrutaSorana = String(
-      (parseFloat(draft.lucroOperacao) || 0)
-      - (parseFloat(draft.remuneracaoVendedor) || 0)
-      - (parseFloat(draft.remuneracaoGerencia) || 0)
-      - (parseFloat(draft.remuneracaoDiretoria) || 0)
-      - (parseFloat(draft.remuneracaoGerenciaSupervisorUsados) || 0)
-    );
+    // Remunerações e Sorana: congeladas se NF já foi emitida
+    if (!draft.numeroNFComissao) {
+      draft.remuneracaoVendedor  = calcRemuneracaoField(draft, 'Vendedor', regras);
+      draft.remuneracaoGerencia  = calcRemuneracaoField(draft, 'Gerência', regras);
+      draft.remuneracaoDiretoria = calcRemuneracaoField(draft, 'Diretoria', regras);
+      draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras);
+      draft.comissaoBrutaSorana = String(
+        (parseFloat(draft.lucroOperacao) || 0)
+        - (parseFloat(draft.remuneracaoVendedor) || 0)
+        - (parseFloat(draft.remuneracaoGerencia) || 0)
+        - (parseFloat(draft.remuneracaoDiretoria) || 0)
+        - (parseFloat(draft.remuneracaoGerenciaSupervisorUsados) || 0)
+      );
+    }
     draft.situacaoComissao = calcSituacaoComissao(draft);
     // Local de Pgto: se Negociação Direta, preenche com o nome da blindadora
     if (draft.situacaoNegociacaoBlindadora === 'Negociação Direta') {
@@ -396,17 +398,20 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         const venda = parseFloat(field === 'valorVendaBlindagem' ? value : prev.valorVendaBlindagem) || 0;
         const custo = parseFloat(field === 'custoBlindagem'       ? value : prev.custoBlindagem) || 0;
         updated.lucroOperacao = String(venda - custo);
-        updated.remuneracaoVendedor  = calcRemuneracaoField(updated, 'Vendedor',  regras);
-        updated.remuneracaoGerencia  = calcRemuneracaoField(updated, 'Gerência',  regras);
-        updated.remuneracaoDiretoria = calcRemuneracaoField(updated, 'Diretoria', regras);
-        updated.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(updated, 'Supervisor de Usados', regras);
-        updated.comissaoBrutaSorana = String(
-          (parseFloat(updated.lucroOperacao) || 0)
-          - (parseFloat(updated.remuneracaoVendedor) || 0)
-          - (parseFloat(updated.remuneracaoGerencia) || 0)
-          - (parseFloat(updated.remuneracaoDiretoria) || 0)
-          - (parseFloat(updated.remuneracaoGerenciaSupervisorUsados) || 0)
-        );
+        // Remunerações e Sorana: congeladas se NF já foi emitida
+        if (!updated.numeroNFComissao) {
+          updated.remuneracaoVendedor  = calcRemuneracaoField(updated, 'Vendedor',  regras);
+          updated.remuneracaoGerencia  = calcRemuneracaoField(updated, 'Gerência',  regras);
+          updated.remuneracaoDiretoria = calcRemuneracaoField(updated, 'Diretoria', regras);
+          updated.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(updated, 'Supervisor de Usados', regras);
+          updated.comissaoBrutaSorana = String(
+            (parseFloat(updated.lucroOperacao) || 0)
+            - (parseFloat(updated.remuneracaoVendedor) || 0)
+            - (parseFloat(updated.remuneracaoGerencia) || 0)
+            - (parseFloat(updated.remuneracaoDiretoria) || 0)
+            - (parseFloat(updated.remuneracaoGerenciaSupervisorUsados) || 0)
+          );
+        }
       }
       if (field === 'numeroNFComissao' || field === 'comissaoBrutaSorana' || field === 'valorVendaBlindagem' || field === 'custoBlindagem') {
         updated.situacaoComissao = calcSituacaoComissao(updated);
