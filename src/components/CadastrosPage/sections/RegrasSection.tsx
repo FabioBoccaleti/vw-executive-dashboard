@@ -11,6 +11,16 @@ import {
 
 const MAX_FAIXAS = 5;
 
+// Interpreta string digitada pelo usuário e retorna formatado pt-BR (ex: "1200" → "1.200,00")
+function formatBRL(raw: string): string {
+  if (!raw.trim()) return '';
+  // Remove separadores de milhar (ponto), substitui vírgula decimal por ponto
+  const normalized = raw.replace(/\./g, '').replace(',', '.');
+  const num = parseFloat(normalized);
+  if (isNaN(num)) return raw;
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 const emptyFaixa = (): FaixaValor => ({ id: crypto.randomUUID(), de: '', ate: '', premio: '' });
 
 const emptyRegra = (): Omit<RegraRemuneracao, 'id'> => ({
@@ -62,14 +72,17 @@ function FaixasEditor({
               <tr key={f.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                 <td className="px-2 py-1">
                   <Input value={f.de} onChange={e => update(f.id, 'de', e.target.value)}
+                    onBlur={e => { const v = formatBRL(e.target.value); if (v) update(f.id, 'de', v); }}
                     placeholder="0,00" className="h-7 text-xs" />
                 </td>
                 <td className="px-2 py-1">
                   <Input value={f.ate} onChange={e => update(f.id, 'ate', e.target.value)}
+                    onBlur={e => { const v = formatBRL(e.target.value); if (v) update(f.id, 'ate', v); }}
                     placeholder="em diante" className="h-7 text-xs" />
                 </td>
                 <td className="px-2 py-1">
                   <Input value={f.premio} onChange={e => update(f.id, 'premio', e.target.value)}
+                    onBlur={e => { const v = formatBRL(e.target.value); if (v) update(f.id, 'premio', v); }}
                     placeholder="0,00" className="h-7 text-xs" />
                 </td>
                 <td className="px-2 py-1 text-center">
