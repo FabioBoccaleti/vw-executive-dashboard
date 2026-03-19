@@ -52,12 +52,24 @@ export const BASES_CALCULO = [
   'Custo da Blindagem',
 ] as const;
 
+export type TipoPremio = 'percentual' | 'faixas';
+
+export interface FaixaValor {
+  id: string;
+  de: string;
+  ate: string; // vazio = "em diante"
+  premio: string;
+}
+
 export interface RegraRemuneracao {
   id: string;
   nome: string;
   cargo: string;
   baseCalculo: string;
-  percentual: string;
+  tipoPremio: TipoPremio;
+  percentual: string;      // usado quando tipoPremio === 'percentual'
+  faixas: FaixaValor[];    // usado quando tipoPremio === 'faixas'
+  revendaId: string;       // '' = todas as revendas
 }
 
 export async function loadRegras(): Promise<RegraRemuneracao[]> {
