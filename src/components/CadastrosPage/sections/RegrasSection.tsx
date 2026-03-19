@@ -89,6 +89,74 @@ function FaixasEditor({
   );
 }
 
+function FormFields({
+  draft,
+  setDraft,
+  revendas,
+}: {
+  draft: Omit<RegraRemuneracao, 'id'>;
+  setDraft: (fn: (prev: typeof draft) => typeof draft) => void;
+  revendas: Revenda[];
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="text-xs font-medium text-slate-600 mb-1 block">Nome da Regra</label>
+        <Input placeholder="Ex: Comissão Vendedor VW" value={draft.nome}
+          onChange={e => setDraft(p => ({ ...p, nome: e.target.value }))} className="text-sm" />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-slate-600 mb-1 block">Cargo</label>
+        <select value={draft.cargo} onChange={e => setDraft(p => ({ ...p, cargo: e.target.value }))}
+          className="w-full border rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-400">
+          {CARGOS_VENDEDOR.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-slate-600 mb-1 block">Base de Cálculo</label>
+        <select value={draft.baseCalculo} onChange={e => setDraft(p => ({ ...p, baseCalculo: e.target.value }))}
+          className="w-full border rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-400">
+          {BASES_CALCULO.map(b => <option key={b} value={b}>{b}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-slate-600 mb-1 block">Revenda</label>
+        <select value={draft.revendaId} onChange={e => setDraft(p => ({ ...p, revendaId: e.target.value }))}
+          className="w-full border rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-400">
+          <option value="">Todas as revendas</option>
+          {revendas.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+        </select>
+      </div>
+      <div className="col-span-2">
+        <label className="text-xs font-medium text-slate-600 mb-1 block">Tipo de Prêmio</label>
+        <div className="flex gap-4">
+          {(['percentual', 'faixas'] as TipoPremio[]).map(t => (
+            <label key={t} className="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
+              <input type="radio" name="tipoPremio" value={t} checked={draft.tipoPremio === t}
+                onChange={() => setDraft(p => ({ ...p, tipoPremio: t }))}
+                className="accent-gray-700" />
+              {t === 'percentual' ? 'Percentual (%)' : 'Faixas de Valor (R$)'}
+            </label>
+          ))}
+        </div>
+      </div>
+      {draft.tipoPremio === 'percentual' && (
+        <div>
+          <label className="text-xs font-medium text-slate-600 mb-1 block">Percentual (%)</label>
+          <Input placeholder="Ex: 5.5" type="number" min="0" max="100" step="0.1"
+            value={draft.percentual} onChange={e => setDraft(p => ({ ...p, percentual: e.target.value }))} className="text-sm" />
+        </div>
+      )}
+      {draft.tipoPremio === 'faixas' && (
+        <FaixasEditor
+          faixas={draft.faixas.length > 0 ? draft.faixas : [emptyFaixa()]}
+          onChange={faixas => setDraft(p => ({ ...p, faixas }))}
+        />
+      )}
+    </div>
+  );
+}
+
 export function RegrasSection() {
   const [items, setItems] = useState<RegraRemuneracao[]>([]);
   const [revendas, setRevendas] = useState<Revenda[]>([]);
@@ -153,84 +221,13 @@ export function RegrasSection() {
 
   if (loading) return <div className="text-slate-400 text-sm py-8 text-center">Carregando...</div>;
 
-  const FormFields = ({
-    draft,
-    setDraft,
-  }: {
-    draft: Omit<RegraRemuneracao, 'id'>;
-    setDraft: (fn: (prev: typeof draft) => typeof draft) => void;
-  }) => (
-    <div className="grid grid-cols-2 gap-3">
-      {/* Nome */}
-      <div>
-        <label className="text-xs font-medium text-slate-600 mb-1 block">Nome da Regra</label>
-        <Input placeholder="Ex: Comissão Vendedor VW" value={draft.nome}
-          onChange={e => setDraft(p => ({ ...p, nome: e.target.value }))} className="text-sm" />
-      </div>
-      {/* Cargo */}
-      <div>
-        <label className="text-xs font-medium text-slate-600 mb-1 block">Cargo</label>
-        <select value={draft.cargo} onChange={e => setDraft(p => ({ ...p, cargo: e.target.value }))}
-          className="w-full border rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-400">
-          {CARGOS_VENDEDOR.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-      {/* Base de Cálculo */}
-      <div>
-        <label className="text-xs font-medium text-slate-600 mb-1 block">Base de Cálculo</label>
-        <select value={draft.baseCalculo} onChange={e => setDraft(p => ({ ...p, baseCalculo: e.target.value }))}
-          className="w-full border rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-400">
-          {BASES_CALCULO.map(b => <option key={b} value={b}>{b}</option>)}
-        </select>
-      </div>
-      {/* Revenda */}
-      <div>
-        <label className="text-xs font-medium text-slate-600 mb-1 block">Revenda</label>
-        <select value={draft.revendaId} onChange={e => setDraft(p => ({ ...p, revendaId: e.target.value }))}
-          className="w-full border rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-400">
-          <option value="">Todas as revendas</option>
-          {revendas.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
-        </select>
-      </div>
-      {/* Tipo de Prêmio */}
-      <div className="col-span-2">
-        <label className="text-xs font-medium text-slate-600 mb-1 block">Tipo de Prêmio</label>
-        <div className="flex gap-4">
-          {(['percentual', 'faixas'] as TipoPremio[]).map(t => (
-            <label key={t} className="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
-              <input type="radio" name="tipoPremio" value={t} checked={draft.tipoPremio === t}
-                onChange={() => setDraft(p => ({ ...p, tipoPremio: t }))}
-                className="accent-gray-700" />
-              {t === 'percentual' ? 'Percentual (%)' : 'Faixas de Valor (R$)'}
-            </label>
-          ))}
-        </div>
-      </div>
-      {/* Percentual */}
-      {draft.tipoPremio === 'percentual' && (
-        <div>
-          <label className="text-xs font-medium text-slate-600 mb-1 block">Percentual (%)</label>
-          <Input placeholder="Ex: 5.5" type="number" min="0" max="100" step="0.1"
-            value={draft.percentual} onChange={e => setDraft(p => ({ ...p, percentual: e.target.value }))} className="text-sm" />
-        </div>
-      )}
-      {/* Faixas */}
-      {draft.tipoPremio === 'faixas' && (
-        <FaixasEditor
-          faixas={draft.faixas.length > 0 ? draft.faixas : [emptyFaixa()]}
-          onChange={faixas => setDraft(p => ({ ...p, faixas }))}
-        />
-      )}
-    </div>
-  );
-
   return (
     <div>
-      {/* Formulário de adição */}
       <div className="bg-white border rounded-lg p-4 mb-5">
         <FormFields
           draft={novo}
           setDraft={fn => setNovo(p => fn(p))}
+          revendas={revendas}
         />
         <div className="flex justify-end mt-3">
           <Button onClick={add} disabled={saving || !isValid(novo)} size="sm"
@@ -261,11 +258,9 @@ export function RegrasSection() {
               const isEditing = editingId === item.id;
               const isExpanded = expandedId === item.id;
               const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50';
-
               return (
                 <>
                   <tr key={item.id} className={rowBg}>
-                    {/* Expand toggle (faixas only) */}
                     <td className="px-2 py-2 text-center">
                       {item.tipoPremio === 'faixas' && item.faixas.length > 0 && !isEditing && (
                         <button onClick={() => setExpandedId(isExpanded ? null : item.id)}
@@ -274,12 +269,12 @@ export function RegrasSection() {
                         </button>
                       )}
                     </td>
-
                     {isEditing && editDraft ? (
                       <td colSpan={5} className="px-4 py-3">
                         <FormFields
                           draft={editDraft}
                           setDraft={fn => setEditDraft(p => p ? fn(p) as RegraRemuneracao : p)}
+                          revendas={revendas}
                         />
                       </td>
                     ) : (
@@ -295,7 +290,6 @@ export function RegrasSection() {
                         </td>
                       </>
                     )}
-
                     <td className="px-4 py-2">
                       <div className="flex items-center justify-center gap-1.5">
                         {isEditing ? (
@@ -313,8 +307,6 @@ export function RegrasSection() {
                       </div>
                     </td>
                   </tr>
-
-                  {/* Faixas expandidas */}
                   {isExpanded && !isEditing && item.tipoPremio === 'faixas' && (
                     <tr key={`${item.id}-faixas`} className={rowBg}>
                       <td />
@@ -349,5 +341,3 @@ export function RegrasSection() {
     </div>
   );
 }
-
-
