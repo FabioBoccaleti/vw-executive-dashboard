@@ -7,7 +7,7 @@ import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
 import { loadRevendas, loadBlinadadoras, loadRegras, loadVendedores, type Revenda, type Blindadora, type RegraRemuneracao, type Vendedor } from '@/components/CadastrosPage/cadastrosStorage';
 
 // ─── Campos calculados automaticamente (somente leitura no modo edição) ────────
-const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados', 'comissaoBrutaSorana', 'situacaoComissao']);
+const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados', 'comissaoBrutaSorana', 'situacaoComissao', 'valorAPagarBlindadora', 'valorAReceberBlindadora']);
 const RESULTADO_KEYS    = new Set<string>(['lucroOperacao', 'comissaoBrutaSorana']);
 const REMUNERACAO_KEYS  = new Set<string>(['remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados']);
 
@@ -126,6 +126,23 @@ function fmtDate(v: string): string {
   if (!v) return '';
   const [y, m, d] = v.split('-');
   return y && m && d ? `${d}/${m}/${y}` : v;
+}
+
+function calcValoresPagamento(draft: VendasRow): void {
+  if (draft.situacaoNegociacaoBlindadora !== 'Pagamento Antecipado p/ Blindadora') {
+    draft.valorAPagarBlindadora   = '';
+    draft.valorAReceberBlindadora = '';
+    return;
+  }
+  const custo = parseFloat(draft.custoBlindagem) || 0;
+  const venda = parseFloat(draft.valorVendaBlindagem) || 0;
+  if (draft.localPgtoBlindagem === 'Sorana') {
+    draft.valorAPagarBlindadora   = String(venda - custo);
+    draft.valorAReceberBlindadora = '';
+  } else if (draft.localPgtoBlindagem && draft.localPgtoBlindagem !== 'Sorana') {
+    draft.valorAReceberBlindadora = String(custo);
+    draft.valorAPagarBlindadora   = '';
+  }
 }
 
 function calcSituacaoComissao(row: Pick<VendasRow, 'numeroNFComissao' | 'comissaoBrutaSorana'>): string {
@@ -349,6 +366,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     if (draft.situacaoNegociacaoBlindadora === 'Negociação Direta') {
       draft.localPgtoBlindagem = draft.blindadora;
     }
+    calcValoresPagamento(draft);
     setEditDraft(draft);
   };
 
@@ -394,6 +412,9 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
           // Ao mudar para Pagamento Antecipado, limpa para forçar seleção no dropdown
           updated.localPgtoBlindagem = '';
         }
+      }
+      if (field === 'situacaoNegociacaoBlindadora' || field === 'blindadora' || field === 'localPgtoBlindagem' || field === 'valorVendaBlindagem' || field === 'custoBlindagem') {
+        calcValoresPagamento(updated);
       }
       return updated;
     });
