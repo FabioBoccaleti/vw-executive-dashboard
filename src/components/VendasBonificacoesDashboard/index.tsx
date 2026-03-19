@@ -6,8 +6,8 @@ import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from '
 import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
 
 // ─── Column definitions ────────────────────────────────────────────────────────
-type ColType = 'text' | 'currency' | 'date';
-interface ColDef { key: keyof VendasRow; label: string; type: ColType; width: number; }
+type ColType = 'text' | 'currency' | 'date' | 'calc';
+interface ColDef { key: keyof VendasRow; label: string; type: ColType; width: number; calc?: (row: VendasRow) => string; }
 
 const COLUMNS: ColDef[] = [
   { key: 'veiculo',                             label: 'Veículo',                                                               type: 'text',     width: 140 },
@@ -20,6 +20,14 @@ const COLUMNS: ColDef[] = [
   { key: 'dataVenda',                           label: 'Data da Venda',                                                         type: 'date',     width: 130 },
   { key: 'valorVendaBlindagem',                 label: 'Valor da Venda da Blindagem',                                           type: 'currency', width: 145 },
   { key: 'lucroOperacao',                       label: 'Lucro da Operação',                                                     type: 'currency', width: 135 },
+  { key: 'lucroOperacao',                       label: '% Lucro da Operação',                                                   type: 'calc',     width: 100,
+    calc: (row) => {
+      const venda = parseFloat(row.valorVendaBlindagem);
+      const lucro = parseFloat(row.lucroOperacao);
+      if (!venda || isNaN(venda) || isNaN(lucro)) return '';
+      return (lucro / venda * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+    },
+  } as unknown as ColDef,
   { key: 'localPgtoBlindagem',                  label: 'Local de Pgto da Blindagem',                                            type: 'text',     width: 155 },
   { key: 'nomeVendedor',                        label: 'Nome do Vendedor',                                                      type: 'text',     width: 150 },
   { key: 'remuneracaoVendedor',                 label: 'Remuneração Vendedor',                                                  type: 'currency', width: 135 },
@@ -27,6 +35,14 @@ const COLUMNS: ColDef[] = [
   { key: 'remuneracaoDiretoria',                label: 'Remuneração Diretoria',                                                 type: 'currency', width: 135 },
   { key: 'remuneracaoGerenciaSupervisorUsados', label: 'Remuneração Gerência / Supervisor de Usados',                           type: 'currency', width: 160 },
   { key: 'comissaoBrutaSorana',                 label: 'Comissão Bruta Sorana',                                                 type: 'currency', width: 145 },
+  { key: 'comissaoBrutaSorana',                 label: '% Rentabilidade Bruta Sorana',                                          type: 'calc',     width: 115,
+    calc: (row) => {
+      const venda = parseFloat(row.valorVendaBlindagem);
+      const comissao = parseFloat(row.comissaoBrutaSorana);
+      if (!venda || isNaN(venda) || isNaN(comissao)) return '';
+      return (comissao / venda * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+    },
+  } as unknown as ColDef,
   { key: 'numeroNFComissao',                    label: 'Nº NF de Comissão',                                                     type: 'text',     width: 120 },
   { key: 'situacaoComissao',                    label: 'Situação da Comissão',                                                  type: 'text',     width: 155 },
   { key: 'valorAPagarBlindadora',               label: 'Valor a Pagar p/ Blindadora',                                           type: 'currency', width: 145 },
@@ -389,9 +405,9 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                 >
                   #
                 </th>
-                {COLUMNS.map(col => (
+                {COLUMNS.map((col, ci) => (
                   <th
-                    key={col.key}
+                    key={`h-${col.key}-${ci}`}
                     className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-gray-600 align-top leading-snug text-center"
                     style={{ background: '#374151' }}
                   >
@@ -412,17 +428,19 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                   className="sticky left-0 z-40 bg-slate-50 border-r border-b border-slate-200 px-1 py-1.5"
                   style={{ top: 'var(--header-height, 44px)' }}
                 />
-                {COLUMNS.map(col => (
+                {COLUMNS.map((col, ci) => (
                   <th
-                    key={`f-${col.key}`}
+                    key={`f-${col.key}-${ci}`}
                     className="sticky z-30 bg-slate-50 border-r border-b border-slate-200 px-1.5 py-1.5"
                     style={{ top: 'var(--header-height, 44px)' }}
                   >
-                    <FilterCell
-                      col={col}
-                      value={filters[col.key] ?? ''}
-                      onChange={v => setFilter(col.key, v)}
-                    />
+                    {col.type !== 'calc' && (
+                      <FilterCell
+                        col={col}
+                        value={filters[col.key] ?? ''}
+                        onChange={v => setFilter(col.key, v)}
+                      />
+                    )}
                   </th>
                 ))}
                 <th
@@ -460,12 +478,24 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                       </td>
 
                       {/* Data cells */}
-                      {COLUMNS.map(col => {
+                      {COLUMNS.map((col, ci) => {
                         const val = (draft as VendasRow)[col.key] as string;
-                        const isRight = col.type === 'currency';
+                        const isRight = col.type === 'currency' || col.type === 'calc';
+                        if (col.type === 'calc') {
+                          const displayed = col.calc ? col.calc(row) : '';
+                          return (
+                            <td
+                              key={`${col.key}-calc-${ci}`}
+                              className="border-r border-slate-100 px-2 py-1.5 text-xs text-right text-slate-500 font-mono tabular-nums bg-slate-50/60"
+                              style={{ verticalAlign: 'middle' }}
+                            >
+                              {displayed || <span className="text-slate-300 select-none">—</span>}
+                            </td>
+                          );
+                        }
                         return (
                           <td
-                            key={col.key}
+                            key={`${col.key}-${ci}`}
                             className={`border-r border-slate-100 px-2 py-1.5 text-xs ${isRight ? 'text-right' : 'text-left'} text-slate-700`}
                             style={{ verticalAlign: 'middle' }}
                           >
