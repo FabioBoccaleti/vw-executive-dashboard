@@ -4,7 +4,51 @@ import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, Bo
 import { toast } from 'sonner';
 import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from './vendasStorage';
 import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
-import { loadRevendas, loadBlinadadoras, type Revenda, type Blindadora } from '@/components/CadastrosPage/cadastrosStorage';
+import { loadRevendas, loadBlinadadoras, loadRegras, loadVendedores, type Revenda, type Blindadora, type RegraRemuneracao, type Vendedor } from '@/components/CadastrosPage/cadastrosStorage';
+
+// ─── Campos calculados automaticamente (somente leitura no modo edição) ────────
+const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria']);
+
+// Converte número no formato pt-BR ("1.200,50") ou número simples ("1200.5") para number
+function parseBR(s: string): number {
+  if (!s) return 0;
+  const hasComma = s.includes(',');
+  const hasDot   = s.includes('.');
+  let clean = s.trim().replace(/R\$\s*/g, '');
+  if (hasComma) {
+    // "1.200,50" → 1200.50
+    clean = clean.replace(/\./g, '').replace(',', '.');
+  }
+  return parseFloat(clean) || 0;
+}
+
+function getBaseValue(row: VendasRow, baseCalculo: string): number {
+  switch (baseCalculo) {
+    case 'Lucro da Operação':          return parseFloat(row.lucroOperacao) || 0;
+    case 'Valor da Venda da Blindagem': return parseFloat(row.valorVendaBlindagem) || 0;
+    case 'Custo da Blindagem':         return parseFloat(row.custoBlindagem) || 0;
+    default: return 0;
+  }
+}
+
+function calcRemuneracaoField(row: VendasRow, cargo: string, regras: RegraRemuneracao[]): string {
+  const regra = regras.find(r => r.cargo === cargo);
+  if (!regra) return '';
+  const base = getBaseValue(row, regra.baseCalculo);
+  if (regra.tipoPremio === 'percentual') {
+    const pct = parseBR(regra.percentual);
+    return String(base * pct / 100);
+  }
+  // faixas: encontra a faixa onde base se encaixa
+  for (const faixa of regra.faixas) {
+    const de  = parseBR(faixa.de);
+    const ate = faixa.ate ? parseBR(faixa.ate) : Infinity;
+    if (base >= de && (faixa.ate === '' || base < ate)) {
+      return String(parseBR(faixa.premio));
+    }
+  }
+  return '';
+}
 
 // ─── Column definitions ────────────────────────────────────────────────────────
 type ColType = 'text' | 'currency' | 'date' | 'calc';
@@ -24,8 +68,9 @@ const COLUMNS: ColDef[] = [
   { key: 'lucroOperacao',                       label: '% Lucro da Operação',                                                   type: 'calc',     width: 100,
     calc: (row) => {
       const venda = parseFloat(row.valorVendaBlindagem);
-      const lucro = parseFloat(row.lucroOperacao);
-      if (!venda || isNaN(venda) || isNaN(lucro)) return '';
+      const custo = parseFloat(row.custoBlindagem);
+      if (!venda || isNaN(venda) || isNaN(custo)) return '';
+      const lucro = venda - custo;
       return (lucro / venda * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
     },
   } as unknown as ColDef,
@@ -242,13 +287,17 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [catalogo, setCatalogo]     = useState<CatalogoVeiculos>({ marcas: [], modelos: [] });
   const [revendas, setRevendas]       = useState<Revenda[]>([]);
   const [blindadoras, setBlinadadoras] = useState<Blindadora[]>([]);
+  const [regras, setRegras]           = useState<RegraRemuneracao[]>([]);
+  const [vendedores, setVendedores]   = useState<Vendedor[]>([]);
 
   useEffect(() => {
-    Promise.all([loadVendasRows(), loadCatalogo(), loadRevendas(), loadBlinadadoras()]).then(([r, c, rv, bl]) => {
+    Promise.all([loadVendasRows(), loadCatalogo(), loadRevendas(), loadBlinadadoras(), loadRegras(), loadVendedores()]).then(([r, c, rv, bl, rg, vd]) => {
       setRows(r);
       setCatalogo(c as CatalogoVeiculos);
       setRevendas(rv as Revenda[]);
       setBlinadadoras(bl as Blindadora[]);
+      setRegras(rg as RegraRemuneracao[]);
+      setVendedores(vd as Vendedor[]);
       setLoading(false);
     });
   }, []);
@@ -266,7 +315,16 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const startEdit = (row: VendasRow) => {
     setDeleteId(null);
     setEditingId(row.id);
-    setEditDraft({ ...row });
+    const draft = { ...row };
+    // Lucro da Operação = Valor da Venda - Custo
+    const venda = parseFloat(draft.valorVendaBlindagem) || 0;
+    const custo = parseFloat(draft.custoBlindagem) || 0;
+    draft.lucroOperacao = String(venda - custo);
+    // Remunerações calculadas pelas regras
+    draft.remuneracaoVendedor  = calcRemuneracaoField(draft, 'Vendedor', regras);
+    draft.remuneracaoGerencia  = calcRemuneracaoField(draft, 'Gerência', regras);
+    draft.remuneracaoDiretoria = calcRemuneracaoField(draft, 'Diretoria', regras);
+    setEditDraft(draft);
   };
 
   const cancelEdit = () => { setEditingId(null); setEditDraft(null); };
@@ -282,7 +340,19 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   };
 
   const changeField = (field: keyof VendasRow, value: string) =>
-    setEditDraft(prev => prev ? { ...prev, [field]: value } : prev);
+    setEditDraft(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, [field]: value };
+      if (field === 'valorVendaBlindagem' || field === 'custoBlindagem') {
+        const venda = parseFloat(field === 'valorVendaBlindagem' ? value : prev.valorVendaBlindagem) || 0;
+        const custo = parseFloat(field === 'custoBlindagem'       ? value : prev.custoBlindagem) || 0;
+        updated.lucroOperacao = String(venda - custo);
+        updated.remuneracaoVendedor  = calcRemuneracaoField(updated, 'Vendedor',  regras);
+        updated.remuneracaoGerencia  = calcRemuneracaoField(updated, 'Gerência',  regras);
+        updated.remuneracaoDiretoria = calcRemuneracaoField(updated, 'Diretoria', regras);
+      }
+      return updated;
+    });
 
   const insertAt = async (index: number) => {
     const row = createEmptyRow();
@@ -505,7 +575,12 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                             style={{ verticalAlign: 'middle' }}
                           >
                             {isEditing ? (
-                              col.type === 'currency' ? (
+                              CALC_READONLY_KEYS.has(col.key) ? (
+                                // Campo calculado automaticamente: exibe somente leitura
+                                <span className="text-slate-400 italic text-xs font-mono tabular-nums">
+                                  {col.type === 'currency' ? fmtCurrency(val) : val || '—'}
+                                </span>
+                              ) : col.type === 'currency' ? (
                                 <CurrencyCell value={val} onChange={v => changeField(col.key, v)} />
                               ) : col.type === 'date' ? (
                                 <input
@@ -514,6 +589,17 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                   onChange={e => changeField(col.key, e.target.value)}
                                   className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
                                 />
+                              ) : col.key === 'nomeVendedor' && vendedores.length > 0 ? (
+                                <select
+                                  value={val}
+                                  onChange={e => changeField(col.key, e.target.value)}
+                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                >
+                                  <option value="">— Selecione —</option>
+                                  {vendedores.map(v => (
+                                    <option key={v.id} value={v.nome}>{v.nome}</option>
+                                  ))}
+                                </select>
                               ) : col.key === 'veiculo' && catalogo.modelos.length > 0 ? (
                                 <select
                                   value={val}
