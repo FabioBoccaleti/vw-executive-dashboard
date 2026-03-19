@@ -301,7 +301,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
       {/* ── Header ── */}
       <header
         className="text-white shadow-lg flex-shrink-0"
-        style={{ background: 'linear-gradient(135deg, #78350f 0%, #b45309 100%)' }}
+        style={{ background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)' }}
       >
         <div className="px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
