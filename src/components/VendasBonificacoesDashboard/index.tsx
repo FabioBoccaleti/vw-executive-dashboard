@@ -304,6 +304,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
   const totalCols = COLUMNS.length + 2;
 
   return (
+  <Fragment>
     <div className="min-h-screen bg-slate-100 flex flex-col">
 
       {/* ── Header ── */}
@@ -640,5 +641,6 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
       catalogo={catalogo}
       onCatalogoChange={setCatalogo}
     />
+  </Fragment>
   );
 }
