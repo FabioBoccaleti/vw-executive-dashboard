@@ -55,6 +55,7 @@ function periodLabel(tipo: PeriodType, value: number, year: number): string {
 }
 
 type PeriodType = 'mes' | 'bimestre' | 'trimestre' | 'semestre';
+type BrandFilter = 'Todas' | 'VW' | 'Audi';
 
 interface PeriodSlot { year: number; tipo: PeriodType; value: number; }
 
@@ -166,6 +167,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
   const [selectedYear, setSelectedYear]         = useState(currentYear);
   const [monthChip, setMonthChip]               = useState<number | null>(null);
   const [selectedBlindadora, setSelectedBlindadora] = useState('Todas');
+  const [selectedBrand, setSelectedBrand]       = useState<BrandFilter>('Todas');
 
   // ── Comparativo ──
   const [periods, setPeriods] = useState<PeriodSlot[]>([
@@ -179,15 +181,22 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
     return years.sort();
   }, [rows, currentYear]);
 
-  // Blindadoras disponíveis
+  // Linhas pré-filtradas por marca
+  const brandRows = useMemo(() => {
+    if (selectedBrand === 'Todas') return rows;
+    const term = selectedBrand.toLowerCase();
+    return rows.filter(r => r.revenda.toLowerCase().includes(term));
+  }, [rows, selectedBrand]);
+
+  // Blindadoras disponíveis (restritas à marca selecionada)
   const availableBlindadoras = useMemo(() => {
-    return ['Todas', ...[...new Set(rows.map(r => r.blindadora).filter(Boolean))].sort()];
-  }, [rows]);
+    return ['Todas', ...[...new Set(brandRows.map(r => r.blindadora).filter(Boolean))].sort()];
+  }, [brandRows]);
 
   // Linhas filtradas para análise principal
   const filteredRows = useMemo(
-    () => filterRows(rows, selectedYear, monthChip, selectedBlindadora),
-    [rows, selectedYear, monthChip, selectedBlindadora]
+    () => filterRows(brandRows, selectedYear, monthChip, selectedBlindadora),
+    [brandRows, selectedYear, monthChip, selectedBlindadora]
   );
 
   const metrics = useMemo(() => calcMetrics(filteredRows), [filteredRows]);
@@ -196,7 +205,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
   const monthlyData = useMemo(() => {
     return MONTHS.map((label, mi) => {
       const m = mi + 1;
-      const mRows = rows.filter(r =>
+      const mRows = brandRows.filter(r =>
         getRowYear(r) === selectedYear &&
         getRowMonth(r) === m &&
         (selectedBlindadora === 'Todas' || r.blindadora === selectedBlindadora)
@@ -206,7 +215,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
       const sorana  = mRows.reduce((a, r) => a + n(r.comissaoBrutaSorana), 0);
       return { label, receita, lucro, sorana, qtd: mRows.length };
     });
-  }, [rows, selectedYear, selectedBlindadora]);
+  }, [brandRows, selectedYear, selectedBlindadora]);
 
   // ── Por modelo ──
   const modeloData = useMemo(() => {
@@ -259,7 +268,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
   // ── Por blindadora ──
   const blindadoraData = useMemo(() => {
     const map = new Map<string, { qtd: number; receita: number; custo: number; lucro: number }>();
-    rows.filter(r => getRowYear(r) === selectedYear && (monthChip === null || getRowMonth(r) === monthChip)).forEach(r => {
+    brandRows.filter(r => getRowYear(r) === selectedYear && (monthChip === null || getRowMonth(r) === monthChip)).forEach(r => {
       const key = r.blindadora || 'Não informada';
       const cur = map.get(key) || { qtd: 0, receita: 0, custo: 0, lucro: 0 };
       map.set(key, {
@@ -278,7 +287,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
         receita: v.receita,
       }))
       .sort((a, b) => b.receita - a.receita);
-  }, [rows, selectedYear, monthChip]);
+  }, [brandRows, selectedYear, monthChip]);
 
   // ── Remunerações pizza ──
   const remPieData = useMemo(() => [
@@ -291,8 +300,8 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
 
   // ── Comparativo de períodos ──
   const periodMetrics = useMemo(
-    () => periods.map(slot => ({ slot, metrics: calcMetrics(filterByPeriod(rows, slot, selectedBlindadora)) })),
-    [periods, rows, selectedBlindadora]
+    () => periods.map(slot => ({ slot, metrics: calcMetrics(filterByPeriod(brandRows, slot, selectedBlindadora)) })),
+    [periods, brandRows, selectedBlindadora]
   );
 
   const addPeriod = () => {
@@ -332,10 +341,71 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
     { label: 'Total Remunerações', key: 'remTotal',   fmt: fmtBRLFull },
   ];
 
+  // ── Contagem por marca (badges do seletor) ──
+  const brandCounts = useMemo(() => {
+    const scoped = rows.filter(r =>
+      getRowYear(r) === selectedYear && (monthChip === null || getRowMonth(r) === monthChip)
+    );
+    return {
+      todas: scoped.length,
+      vw:   scoped.filter(r => r.revenda.toLowerCase().includes('vw')).length,
+      audi: scoped.filter(r => r.revenda.toLowerCase().includes('audi')).length,
+    };
+  }, [rows, selectedYear, monthChip]);
+
   const hasData = filteredRows.length > 0;
+
+  const brandOptions: { value: BrandFilter; label: string; shortLabel: string; color: string; textColor: string; count: number }[] = [
+    { value: 'Todas', label: 'Todas as Revendas', shortLabel: 'Todas',       color: '#f59e0b', textColor: '#ffffff', count: brandCounts.todas },
+    { value: 'VW',    label: 'Revenda VW',        shortLabel: 'Revenda VW',  color: '#001E50', textColor: '#ffffff', count: brandCounts.vw   },
+    { value: 'Audi',  label: 'Revenda Audi',      shortLabel: 'Revenda Audi',color: '#BB0A21', textColor: '#ffffff', count: brandCounts.audi },
+  ];
 
   return (
     <div className="p-4 space-y-6 bg-slate-50 min-h-full">
+
+      {/* ── BRAND SWITCHER ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Visualizar por</span>
+          <div className="inline-flex bg-slate-100 rounded-xl p-1 gap-1">
+            {brandOptions.map(opt => {
+              const isActive = selectedBrand === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setSelectedBrand(opt.value)}
+                  className="relative flex items-center gap-2.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 focus:outline-none"
+                  style={isActive
+                    ? { background: opt.color, color: opt.textColor, boxShadow: `0 2px 8px ${opt.color}55` }
+                    : { color: '#64748b' }
+                  }
+                >
+                  <span className="whitespace-nowrap">{opt.shortLabel}</span>
+                  <span
+                    className="text-xs px-1.5 py-0.5 rounded-full font-bold tabular-nums transition-all duration-200"
+                    style={isActive
+                      ? { backgroundColor: 'rgba(255,255,255,0.25)', color: '#ffffff' }
+                      : { backgroundColor: '#e2e8f0', color: '#64748b' }
+                    }
+                  >
+                    {opt.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {selectedBrand !== 'Todas' && (
+            <span
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+              style={{ backgroundColor: brandOptions.find(o => o.value === selectedBrand)!.color + '18', color: brandOptions.find(o => o.value === selectedBrand)!.color }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: brandOptions.find(o => o.value === selectedBrand)!.color }} />
+              Filtrado: {brandOptions.find(o => o.value === selectedBrand)!.label}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* ── FILTROS GLOBAIS ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
