@@ -4,7 +4,6 @@ import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, Bo
 import { toast } from 'sonner';
 import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from './vendasStorage';
 import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
-import { CatalogoCadastro } from './CatalogoCadastro';
 
 // ─── Column definitions ────────────────────────────────────────────────────────
 type ColType = 'text' | 'currency' | 'date';
@@ -212,9 +211,10 @@ function InsertZoneTr({ colSpan, onInsert }: { colSpan: number; onInsert: () => 
 // ─── Main component ────────────────────────────────────────────────────────────
 interface VendasBonificacoesDashboardProps {
   onChangeBrand: () => void;
+  onOpenCadastros: () => void;
 }
 
-export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoesDashboardProps) {
+export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: VendasBonificacoesDashboardProps) {
   const [rows, setRows]           = useState<VendasRow[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<VendasRow | null>(null);
@@ -222,8 +222,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
   const [saving, setSaving]       = useState(false);
   const [loading, setLoading]     = useState(true);
   const [filters, setFilters]     = useState<FilterValues>({});
-  const [catalogoOpen, setCatalogoOpen]   = useState(false);
-  const [catalogo, setCatalogo]           = useState<CatalogoVeiculos>({ marcas: [], modelos: [] });
+  const [catalogo, setCatalogo]   = useState<CatalogoVeiculos>({ marcas: [], modelos: [] });
 
   useEffect(() => {
     Promise.all([loadVendasRows(), loadCatalogo()]).then(([r, c]) => {
@@ -304,7 +303,6 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
   const totalCols = COLUMNS.length + 2;
 
   return (
-  <Fragment>
     <div className="min-h-screen bg-slate-100 flex flex-col">
 
       {/* ── Header ── */}
@@ -348,7 +346,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setCatalogoOpen(true)}
+              onClick={onOpenCadastros}
               className="text-white border border-white/30 hover:bg-white/15 gap-2"
             >
               <BookOpen className="w-4 h-4" />
@@ -634,13 +632,5 @@ export function VendasBonificacoesDashboard({ onChangeBrand }: VendasBonificacoe
 
       </div>
     </div>
-
-    <CatalogoCadastro
-      open={catalogoOpen}
-      onOpenChange={setCatalogoOpen}
-      catalogo={catalogo}
-      onCatalogoChange={setCatalogo}
-    />
-  </Fragment>
   );
 }

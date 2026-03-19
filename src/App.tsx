@@ -4,6 +4,7 @@ import { VWFinancialDashboard } from '@/components/VWFinancialDashboard'
 import { DespesasDashboard } from '@/components/DespesasDashboard'
 import { FluxoCaixaDashboard } from '@/components/FluxoCaixaDashboard'
 import { VendasBonificacoesDashboard } from '@/components/VendasBonificacoesDashboard'
+import { CadastrosPage } from '@/components/CadastrosPage'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
 import { initializeFromDatabase, isProduction, saveSelectedFiscalYear } from '@/lib/dataStorage'
@@ -18,7 +19,7 @@ function AppContent() {
   const [showBrandSelector, setShowBrandSelector] = useState(true)
   const [dbLoading, setDbLoading] = useState(true)
   const [dbError, setDbError] = useState<string | null>(null)
-  const [currentPage, setCurrentPage] = useState<'app' | 'admin'>(() =>
+  const [currentPage, setCurrentPage] = useState<'app' | 'admin' | 'cadastros'>(() =>
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
   
@@ -129,6 +130,16 @@ function AppContent() {
     )
   }
 
+  // Página de cadastros
+  if (currentPage === 'cadastros') {
+    return (
+      <div className="min-h-screen bg-background">
+        <CadastrosPage onBack={() => setCurrentPage('app')} />
+        <Toaster />
+      </div>
+    )
+  }
+
   // Mostra loading enquanto inicializa o banco de dados
   if (dbLoading && isProduction()) {
     return (
@@ -190,7 +201,7 @@ function AppContent() {
       ) : brand === 'fluxo_caixa' ? (
         <FluxoCaixaDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'vendas_bonificacoes' ? (
-        <VendasBonificacoesDashboard onChangeBrand={handleChangeBrand} />
+        <VendasBonificacoesDashboard onChangeBrand={handleChangeBrand} onOpenCadastros={() => setCurrentPage('cadastros')} />
       ) : (
         <VWFinancialDashboard 
           brand={brand} 
