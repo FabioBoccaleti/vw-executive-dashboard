@@ -321,7 +321,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [inlineNFValue, setInlineNFValue] = useState('');
   const [inlineAcertoId, setInlineAcertoId] = useState<string | null>(null);
   const [inlineAcertoValue, setInlineAcertoValue] = useState('');
-  const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('tabela');
+  const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('analise');
 
   useEffect(() => {
     Promise.all([loadVendasRows(), loadCatalogo(), loadRevendas(), loadBlinadadoras(), loadRegras(), loadVendedores()]).then(([r, c, rv, bl, rg, vd]) => {
