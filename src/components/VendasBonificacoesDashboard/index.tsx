@@ -252,7 +252,7 @@ function CurrencyCell({ value, onChange }: CurrencyCellProps) {
         onChange(parsed);
         setLocal(toDisplayNumber(parsed));
       }}
-      className="w-full text-right bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 font-mono tabular-nums"
+      className="w-full text-right bg-white border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 font-mono tabular-nums"
       placeholder="0,00"
     />
   );
@@ -574,7 +574,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
 
                       {/* Row number */}
                       <td
-                        className="sticky left-0 z-20 text-center text-xs text-slate-400 font-mono border-r border-slate-200 px-2 py-2"
+                        className="sticky left-0 z-20 text-center text-sm text-slate-400 font-mono border-r border-slate-200 px-2 py-2.5"
                         style={{ background: rowBg }}
                       >
                         {realIdx + 1}
@@ -592,7 +592,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                           return (
                             <td
                               key={`${col.key}-calc-${ci}`}
-                              className={`border-r border-slate-100 px-2 py-1.5 text-xs text-right font-mono tabular-nums ${calcHighlight}`}
+                              className={`border-r border-slate-100 px-2 py-2.5 text-sm text-right font-mono tabular-nums ${calcHighlight}`}
                               style={{ verticalAlign: 'middle' }}
                             >
                               {displayed || <span className="text-slate-300 select-none">—</span>}
@@ -611,13 +611,13 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                         return (
                           <td
                             key={`${col.key}-${ci}`}
-                            className={`border-r border-slate-100 px-2 py-1.5 text-xs ${isRight ? 'text-right' : 'text-left'} ${cellHighlight}`}
+                            className={`border-r border-slate-100 px-2 py-2.5 text-sm ${isRight ? 'text-right' : 'text-left'} ${cellHighlight}`}
                             style={{ verticalAlign: 'middle' }}
                           >
                             {isEditing ? (
                               CALC_READONLY_KEYS.has(col.key) ? (
                                 // Campo calculado automaticamente: exibe somente leitura
-                                <span className={`italic text-xs font-mono tabular-nums ${
+                                <span className={`italic text-sm font-mono tabular-nums ${
                                   val && RESULTADO_KEYS.has(col.key)   ? 'text-emerald-700 font-semibold' :
                                   val && REMUNERACAO_KEYS.has(col.key) ? 'text-sky-700 font-semibold' :
                                   col.key === 'situacaoComissao' && val === 'Emitir Nota de Intermediação' ? 'text-amber-700 font-bold not-italic' :
@@ -633,13 +633,13 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                   type="date"
                                   value={val}
                                   onChange={e => changeField(col.key, e.target.value)}
-                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
                                 />
                               ) : col.key === 'nomeVendedor' && vendedores.length > 0 ? (
                                 <select
                                   value={val}
                                   onChange={e => changeField(col.key, e.target.value)}
-                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
                                 >
                                   <option value="">— Selecione —</option>
                                   {vendedores.map(v => (
@@ -650,7 +650,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                 <select
                                   value={val}
                                   onChange={e => changeField(col.key, e.target.value)}
-                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
                                 >
                                   <option value="">— Selecione —</option>
                                   {catalogo.marcas.map(marca => (
@@ -669,7 +669,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                 <select
                                   value={val}
                                   onChange={e => changeField(col.key, e.target.value)}
-                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
                                 >
                                   <option value="">— Selecione —</option>
                                   {revendas.map(r => (
@@ -680,7 +680,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                 <select
                                   value={val}
                                   onChange={e => changeField(col.key, e.target.value)}
-                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
                                 >
                                   <option value="">— Selecione —</option>
                                   {blindadoras.map(b => (
@@ -692,7 +692,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                   type="text"
                                   value={val}
                                   onChange={e => changeField(col.key, e.target.value)}
-                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
                                   placeholder="—"
                                 />
                               )
