@@ -25,6 +25,7 @@ export interface VendasRow {
   situacaoComissao: string;
   valorAPagarBlindadora: string;
   valorAReceberBlindadora: string;
+  dataAcerto: string;
 }
 
 export function createEmptyRow(): VendasRow {
@@ -51,6 +52,7 @@ export function createEmptyRow(): VendasRow {
     situacaoComissao: '',
     valorAPagarBlindadora: '',
     valorAReceberBlindadora: '',
+    dataAcerto: '',
   };
 }
 

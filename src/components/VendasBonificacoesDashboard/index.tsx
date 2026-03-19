@@ -96,6 +96,7 @@ const COLUMNS: ColDef[] = [
   { key: 'situacaoComissao',                    label: 'Situação da Comissão',                                                  type: 'text',     width: 155 },
   { key: 'valorAPagarBlindadora',               label: 'Valor a Pagar p/ Blindadora',                                           type: 'currency', width: 145 },
   { key: 'valorAReceberBlindadora',             label: 'Valor a Receber da Blindadora pela Antecipação da Blindagem',            type: 'currency', width: 185 },
+  { key: 'dataAcerto',                           label: 'Data de Acerto',                                                         type: 'date',     width: 130 },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -685,13 +686,23 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                 </span>
                               ) : col.type === 'currency' ? (
                                 <CurrencyCell value={val} onChange={v => changeField(col.key, v)} />
-                              ) : col.type === 'date' ? (
-                                <input
-                                  type="date"
-                                  value={val}
-                                  onChange={e => changeField(col.key, e.target.value)}
-                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                                />
+                              ) : col.type === 'date' ? (() => {
+                                  const disabledDate = col.key === 'dataAcerto' && !draft.valorAPagarBlindadora && !draft.valorAReceberBlindadora;
+                                  return (
+                                    <input
+                                      type="date"
+                                      value={val}
+                                      disabled={disabledDate}
+                                      onChange={e => changeField(col.key, e.target.value)}
+                                      title={disabledDate ? 'Preencha Valor a Pagar ou Valor a Receber da Blindadora primeiro' : undefined}
+                                      className={`w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${
+                                        disabledDate
+                                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                          : 'bg-white border-amber-300 focus:ring-amber-400'
+                                      }`}
+                                    />
+                                  );
+                                })()
                               ) : col.key === 'nomeVendedor' && vendedores.length > 0 ? (
                                 <select
                                   value={val}
