@@ -326,6 +326,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     setDeleteId(null);
     setEditingId(row.id);
     const draft = { ...row };
+    // Garante valor padrão para situacaoNegociacaoBlindadora
+    if (!draft.situacaoNegociacaoBlindadora) draft.situacaoNegociacaoBlindadora = 'Negociação Direta';
     // Lucro da Operação = Valor da Venda - Custo
     const venda = parseFloat(draft.valorVendaBlindagem) || 0;
     const custo = parseFloat(draft.custoBlindagem) || 0;
@@ -693,6 +695,15 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                   {revendas.map(r => (
                                     <option key={r.id} value={r.nome}>{r.nome}</option>
                                   ))}
+                                </select>
+                              ) : col.key === 'situacaoNegociacaoBlindadora' ? (
+                                <select
+                                  value={val || 'Negociação Direta'}
+                                  onChange={e => changeField(col.key, e.target.value)}
+                                  className="w-full bg-white border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                >
+                                  <option value="Negociação Direta">Negociação Direta</option>
+                                  <option value="Pagamento Antecipado p/ Blindadora">Pagamento Antecipado p/ Blindadora</option>
                                 </select>
                               ) : col.key === 'blindadora' && blindadoras.length > 0 ? (
                                 <select

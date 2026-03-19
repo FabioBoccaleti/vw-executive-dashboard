@@ -36,7 +36,7 @@ export function createEmptyRow(): VendasRow {
     blindadora: '',
     custoBlindagem: '',
     dataPagamentoBlindadora: '',
-    situacaoNegociacaoBlindadora: '',
+    situacaoNegociacaoBlindadora: 'Negociação Direta',
     dataVenda: '',
     valorVendaBlindagem: '',
     lucroOperacao: '',
