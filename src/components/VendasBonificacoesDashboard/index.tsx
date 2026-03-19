@@ -686,23 +686,19 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                 </span>
                               ) : col.type === 'currency' ? (
                                 <CurrencyCell value={val} onChange={v => changeField(col.key, v)} />
-                              ) : col.type === 'date' ? (() => {
-                                  const disabledDate = col.key === 'dataAcerto' && !draft.valorAPagarBlindadora && !draft.valorAReceberBlindadora;
-                                  return (
-                                    <input
-                                      type="date"
-                                      value={val}
-                                      disabled={disabledDate}
-                                      onChange={e => changeField(col.key, e.target.value)}
-                                      title={disabledDate ? 'Preencha Valor a Pagar ou Valor a Receber da Blindadora primeiro' : undefined}
-                                      className={`w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${
-                                        disabledDate
-                                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                                          : 'bg-white border-amber-300 focus:ring-amber-400'
-                                      }`}
-                                    />
-                                  );
-                                })()
+                              ) : col.type === 'date' ? (
+                                <input
+                                  type="date"
+                                  value={val}
+                                  disabled={col.key === 'dataAcerto' && !draft.valorAPagarBlindadora && !draft.valorAReceberBlindadora}
+                                  onChange={e => changeField(col.key, e.target.value)}
+                                  title={col.key === 'dataAcerto' && !draft.valorAPagarBlindadora && !draft.valorAReceberBlindadora ? 'Preencha Valor a Pagar ou Valor a Receber da Blindadora primeiro' : undefined}
+                                  className={`w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${
+                                    col.key === 'dataAcerto' && !draft.valorAPagarBlindadora && !draft.valorAReceberBlindadora
+                                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                      : 'bg-white border-amber-300 focus:ring-amber-400'
+                                  }`}
+                                />
                               ) : col.key === 'nomeVendedor' && vendedores.length > 0 ? (
                                 <select
                                   value={val}
