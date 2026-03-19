@@ -297,6 +297,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [blindadoras, setBlinadadoras] = useState<Blindadora[]>([]);
   const [regras, setRegras]           = useState<RegraRemuneracao[]>([]);
   const [vendedores, setVendedores]   = useState<Vendedor[]>([]);
+  const [inlineNFId, setInlineNFId]   = useState<string | null>(null);
+  const [inlineNFValue, setInlineNFValue] = useState('');
 
   useEffect(() => {
     Promise.all([loadVendasRows(), loadCatalogo(), loadRevendas(), loadBlinadadoras(), loadRegras(), loadVendedores()]).then(([r, c, rv, bl, rg, vd]) => {
@@ -381,6 +383,22 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
       }
       return updated;
     });
+
+  const saveInlineNF = async (rowId: string) => {
+    const nf = inlineNFValue.trim();
+    if (!nf) return;
+    const updated = rows.map(r => {
+      if (r.id !== rowId) return r;
+      const next = { ...r, numeroNFComissao: nf };
+      next.situacaoComissao = calcSituacaoComissao(next);
+      return next;
+    });
+    setRows(updated);
+    setInlineNFId(null);
+    setInlineNFValue('');
+    await persist(updated);
+    toast.success('Nº NF salvo com sucesso');
+  };
 
   const insertAt = async (index: number) => {
     const row = createEmptyRow();
@@ -701,6 +719,28 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                 <span className="font-mono tabular-nums">{fmtCurrency(val)}</span>
                               ) : col.type === 'date' ? (
                                 <span>{fmtDate(val)}</span>
+                              ) : col.key === 'numeroNFComissao' && !val ? (
+                                // Quick-edit inline: célula vazia permite digitar sem abrir modo edição
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="text"
+                                    value={inlineNFId === row.id ? inlineNFValue : ''}
+                                    onFocus={() => { setInlineNFId(row.id); setInlineNFValue(''); }}
+                                    onChange={e => { setInlineNFId(row.id); setInlineNFValue(e.target.value); }}
+                                    onKeyDown={e => { if (e.key === 'Enter') saveInlineNF(row.id); if (e.key === 'Escape') { setInlineNFId(null); setInlineNFValue(''); } }}
+                                    className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
+                                    placeholder="Digitar Nº NF…"
+                                  />
+                                  {inlineNFId === row.id && inlineNFValue.trim() && (
+                                    <button
+                                      onClick={() => saveInlineNF(row.id)}
+                                      className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white rounded transition-colors"
+                                      title="Salvar Nº NF"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
                               ) : (
                                 val
                                   ? col.key === 'situacaoComissao' && val === 'Emitir Nota de Intermediação'
