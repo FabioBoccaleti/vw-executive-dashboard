@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, LabelList,
+  PieChart, Pie, Cell, LabelList, ComposedChart, Line,
 } from 'recharts';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -331,6 +331,15 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
 
   const metrics = useMemo(() => calcMetrics(filteredRows), [filteredRows]);
 
+  // ── Métricas do mês anterior (para deltas no Spotlight) ──
+  const prevMonthMetrics = useMemo(() => {
+    if (monthChip === null) return null;
+    const prevM = monthChip === 1 ? 12 : monthChip - 1;
+    const prevY = monthChip === 1 ? selectedYear - 1 : selectedYear;
+    const prevRows = filterRows(brandRows, prevY, prevM, selectedBlindadora);
+    return { ...calcMetrics(prevRows), label: `${MONTHS[prevM - 1]}/${prevY}` };
+  }, [brandRows, selectedYear, monthChip, selectedBlindadora]);
+
   // ── Dados mensais (gráfico de evolução) ──
   const monthlyData = useMemo(() => {
     const maxMonth = monthChip !== null ? monthChip : 12;
@@ -630,23 +639,6 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
         </div>
       </div>
 
-      {/* ── EVOLUÇÃO MENSAL ── */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <SectionTitle>Evolução Mensal — {selectedYear}</SectionTitle>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-            <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={80} />
-            <Tooltip content={<MonthlyTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="receita" name="Receita" fill="#f59e0b" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="lucro" name="Lucro Operação" fill="#10b981" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="sorana" name="Comissão Sorana" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
       {/* ── ANÁLISE POR DIMENSÃO ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
@@ -728,6 +720,95 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
           ) : <EmptyChart />}
         </div>
       </div>
+
+      {/* ── EVOLUÇÃO MENSAL / SPOTLIGHT DO MÊS ── */}
+      {monthChip !== null ? (
+        /* ── SPOTLIGHT: mês específico selecionado ── */
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-5 bg-gradient-to-r from-slate-800 to-slate-700 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-0.5">Desempenho Mensal</p>
+              <h2 className="text-xl font-bold text-white">{MONTHS[monthChip - 1]} · {selectedYear}</h2>
+            </div>
+            {prevMonthMetrics && (
+              <span className="text-xs text-slate-300 bg-slate-700/60 border border-slate-600 px-3 py-1.5 rounded-full">
+                vs {prevMonthMetrics.label}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y divide-slate-100">
+            {/* Receita */}
+            <div className="p-5">
+              <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest mb-3">Receita</p>
+              <p className="text-2xl font-bold text-amber-600 font-mono mb-2">{fmtBRL(metrics.receita)}</p>
+              {prevMonthMetrics && <DeltaBadge base={prevMonthMetrics.receita} current={metrics.receita} />}
+              <p className="text-xs text-slate-400 mt-1">{metrics.qtd} venda{metrics.qtd !== 1 ? 's' : ''} · TM {fmtBRL(metrics.ticketMedio)}</p>
+            </div>
+            {/* Lucro */}
+            <div className="p-5">
+              <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest mb-3">Lucro da Operação</p>
+              <p className="text-2xl font-bold text-emerald-600 font-mono mb-2">{fmtBRL(metrics.lucro)}</p>
+              {prevMonthMetrics && <DeltaBadge base={prevMonthMetrics.lucro} current={metrics.lucro} />}
+              <p className="text-xs text-slate-400 mt-1">Custo: {fmtBRL(metrics.custo)}</p>
+            </div>
+            {/* Margem */}
+            <div className="p-5">
+              <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest mb-3">Margem %</p>
+              <p className={`text-2xl font-bold font-mono mb-2 ${
+                metrics.margem >= 20 ? 'text-emerald-600' : metrics.margem >= 10 ? 'text-amber-600' : 'text-red-500'
+              }`}>{fmtPct(metrics.margem)}</p>
+              {prevMonthMetrics && <DeltaBadge base={prevMonthMetrics.margem} current={metrics.margem} />}
+            </div>
+            {/* % Sorana */}
+            <div className="p-5">
+              <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest mb-3">% Sorana / Receita</p>
+              <p className="text-2xl font-bold text-violet-600 font-mono mb-2">
+                {metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) : '—'}
+              </p>
+              {prevMonthMetrics && metrics.receita > 0 && prevMonthMetrics.receita > 0 && (
+                <DeltaBadge
+                  base={prevMonthMetrics.sorana / prevMonthMetrics.receita * 100}
+                  current={metrics.sorana / metrics.receita * 100}
+                />
+              )}
+              <p className="text-xs text-slate-400 mt-1">Comissão: {fmtBRL(metrics.sorana)}</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ── COMBO CHART: ano todo ── */
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <SectionTitle>Evolução Mensal — {selectedYear}</SectionTitle>
+            <span className="text-xs text-slate-400 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full hidden sm:inline">
+              linha = % Sorana/Receita → eixo direito
+            </span>
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <ComposedChart data={monthlyData} margin={{ top: 4, right: 55, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="left" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={85} />
+              <YAxis yAxisId="right" orientation="right" tickFormatter={v => v.toFixed(1) + '%'} tick={{ fontSize: 10 }} width={44} domain={[0, 'dataMax + 4']} />
+              <Tooltip content={<MonthlyTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar yAxisId="left" dataKey="receita" name="Receita" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+              <Bar yAxisId="left" dataKey="lucro" name="Lucro Operação" fill="#10b981" radius={[3, 3, 0, 0]} />
+              <Bar yAxisId="left" dataKey="sorana" name="Comissão Sorana" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="soranaPct"
+                name="% Sorana/Receita"
+                stroke="#7c3aed"
+                strokeWidth={2.5}
+                dot={{ fill: '#7c3aed', r: 3, strokeWidth: 0 }}
+                activeDot={{ r: 5 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* ── PERFORMANCE POR VENDEDOR ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
