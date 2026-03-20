@@ -1102,6 +1102,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                             ) : (
                               col.type === 'currency' && isBlindadoraPagoCol && rowHasAcerto && val ? (
                                 <span className="font-bold text-emerald-700">Concluído</span>
+                              ) : col.type === 'currency' && col.key === 'lucroOperacao' && !row.valorVendaBlindagem ? (
+                                <span className="text-slate-300 select-none">—</span>
                               ) : col.type === 'currency' ? (
                                 <span className="font-mono tabular-nums">{fmtCurrency(val)}</span>
                               ) : col.key === 'dataAcerto' && !isEditing && (row.valorAPagarBlindadora || row.valorAReceberBlindadora) ? (
