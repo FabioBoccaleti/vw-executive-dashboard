@@ -3,8 +3,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LabelList,
 } from 'recharts';
+import * as XLSX from 'xlsx';
 import { type VendasRow } from './vendasStorage';
-import { TrendingUp, TrendingDown, Minus, Plus, X, Check } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Plus, X, Check, Download } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -154,6 +155,78 @@ function DeltaBadge({ base, current }: { base: number; current: number }) {
   if (Math.abs(delta) < 0.05) return <span className="text-slate-400 text-xs flex items-center gap-0.5"><Minus className="w-3 h-3" />0%</span>;
   if (delta > 0) return <span className="text-emerald-600 text-xs font-semibold flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />+{fmtPct(delta)}</span>;
   return <span className="text-red-500 text-xs font-semibold flex items-center gap-0.5"><TrendingDown className="w-3 h-3" />{fmtPct(delta)}</span>;
+}
+
+// ─── Excel Export ─────────────────────────────────────────────────────────────
+const HEADER_STYLE = {
+  font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 },
+  fill: { fgColor: { rgb: '1E293B' } },
+  alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+  border: { bottom: { style: 'thin', color: { rgb: '475569' } } },
+};
+const TOTAL_STYLE = {
+  font: { bold: true, sz: 11 },
+  fill: { fgColor: { rgb: 'F1F5F9' } },
+  alignment: { horizontal: 'right' },
+};
+const CURRENCY_FMT = 'R$\\ #,##0.00';
+
+function applyHeaderRow(ws: XLSX.WorkSheet, colCount: number) {
+  for (let c = 0; c < colCount; c++) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws[addr]) ws[addr].s = HEADER_STYLE;
+  }
+}
+
+function buildSheet(rows: VendasRow[]): XLSX.WorkSheet {
+  const data: (string | number)[][] = [
+    ['#', 'Revenda', 'Blindadora', 'Chassi', 'Data da Venda', 'Comissão Sorana'],
+    ...rows.map((r, i) => [
+      i + 1,
+      r.revenda || '',
+      r.blindadora || '',
+      r.chassi || '',
+      r.dataVenda ? r.dataVenda.split('-').reverse().join('/') : '',
+      parseFloat(r.comissaoBrutaSorana) || 0,
+    ]),
+    ['', '', '', '', 'TOTAL', rows.reduce((a, r) => a + (parseFloat(r.comissaoBrutaSorana) || 0), 0)],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 4 }, { wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 14 }, { wch: 20 }];
+  applyHeaderRow(ws, 6);
+
+  for (let r = 1; r <= rows.length + 1; r++) {
+    const addr = XLSX.utils.encode_cell({ r, c: 5 });
+    if (ws[addr]) {
+      ws[addr].t = 'n';
+      ws[addr].z = CURRENCY_FMT;
+      if (r === rows.length + 1) ws[addr].s = TOTAL_STYLE;
+    }
+  }
+  const totalLabelAddr = XLSX.utils.encode_cell({ r: rows.length + 1, c: 4 });
+  if (ws[totalLabelAddr]) ws[totalLabelAddr].s = TOTAL_STYLE;
+
+  return ws;
+}
+
+function exportNotasExcel(pendingRows: VendasRow[], brandLabel: string) {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, buildSheet(pendingRows), 'Geral');
+
+  const byBlindadora = new Map<string, VendasRow[]>();
+  pendingRows.forEach(r => {
+    const key = r.blindadora || 'Não informada';
+    if (!byBlindadora.has(key)) byBlindadora.set(key, []);
+    byBlindadora.get(key)!.push(r);
+  });
+  byBlindadora.forEach((rows, name) => {
+    XLSX.utils.book_append_sheet(wb, buildSheet(rows), name.slice(0, 31));
+  });
+
+  const today = new Date().toISOString().split('T')[0];
+  const brand = brandLabel.toLowerCase().replace(/\s+/g, '-');
+  XLSX.writeFile(wb, `notas-intermediacao-${brand}-${today}.xlsx`);
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -861,12 +934,26 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
           <SectionTitle>Notas de Intermediação a Emitir</SectionTitle>
-          {notasAEmitirData.totalQtd > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-600 border border-red-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
-              {notasAEmitirData.totalQtd} nota{notasAEmitirData.totalQtd !== 1 ? 's' : ''} pendente{notasAEmitirData.totalQtd !== 1 ? 's' : ''}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {notasAEmitirData.totalQtd > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-600 border border-red-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+                {notasAEmitirData.totalQtd} nota{notasAEmitirData.totalQtd !== 1 ? 's' : ''} pendente{notasAEmitirData.totalQtd !== 1 ? 's' : ''}
+              </span>
+            )}
+            {notasAEmitirData.totalQtd > 0 && (
+              <button
+                onClick={() => exportNotasExcel(
+                  brandRows.filter(r => r.situacaoComissao === 'Emitir Nota de Intermediação'),
+                  brandOptions.find(o => o.value === selectedBrand)!.label
+                )}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Exportar Excel
+              </button>
+            )}
+          </div>
         </div>
 
         {notasAEmitirData.items.length === 0 ? (
