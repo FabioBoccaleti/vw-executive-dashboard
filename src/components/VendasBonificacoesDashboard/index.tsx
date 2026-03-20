@@ -483,10 +483,10 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     const draft = { ...row };
     // Garante valor padrão para situacaoNegociacaoBlindadora
     if (!draft.situacaoNegociacaoBlindadora) draft.situacaoNegociacaoBlindadora = 'Negociação Direta';
-    // Lucro da Operação = Valor da Venda - Custo
+    // Lucro da Operação = Valor da Venda - Custo (vazio se venda não informada)
     const venda = parseFloat(draft.valorVendaBlindagem) || 0;
     const custo = parseFloat(draft.custoBlindagem) || 0;
-    draft.lucroOperacao = String(venda - custo);
+    draft.lucroOperacao = draft.valorVendaBlindagem ? String(venda - custo) : '';
     // Remunerações e Sorana: congeladas se NF já foi emitida
     if (!draft.numeroNFComissao) {
       draft.remuneracaoVendedor  = calcRemuneracaoField(draft, 'Vendedor', regras);
@@ -527,9 +527,10 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
       if (!prev) return prev;
       const updated = { ...prev, [field]: value };
       if (field === 'valorVendaBlindagem' || field === 'custoBlindagem') {
-        const venda = parseFloat(field === 'valorVendaBlindagem' ? value : prev.valorVendaBlindagem) || 0;
-        const custo = parseFloat(field === 'custoBlindagem'       ? value : prev.custoBlindagem) || 0;
-        updated.lucroOperacao = String(venda - custo);
+        const vendaStr = field === 'valorVendaBlindagem' ? value : prev.valorVendaBlindagem;
+        const venda = parseFloat(vendaStr) || 0;
+        const custo = parseFloat(field === 'custoBlindagem' ? value : prev.custoBlindagem) || 0;
+        updated.lucroOperacao = vendaStr ? String(venda - custo) : '';
         // Remunerações e Sorana: congeladas se NF já foi emitida
         if (!updated.numeroNFComissao) {
           updated.remuneracaoVendedor  = calcRemuneracaoField(updated, 'Vendedor',  regras);
@@ -698,7 +699,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         // Recalcular tudo do zero
         const venda = parseFloat(draft.valorVendaBlindagem) || 0;
         const custo = parseFloat(draft.custoBlindagem) || 0;
-        draft.lucroOperacao = String(venda - custo);
+        draft.lucroOperacao = draft.valorVendaBlindagem ? String(venda - custo) : '';
         draft.remuneracaoVendedor                 = calcRemuneracaoField(draft, 'Vendedor',            regras);
         draft.remuneracaoGerencia                 = calcRemuneracaoField(draft, 'Gerência',            regras);
         draft.remuneracaoDiretoria                = calcRemuneracaoField(draft, 'Diretoria',           regras);
