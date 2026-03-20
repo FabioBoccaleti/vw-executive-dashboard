@@ -434,7 +434,10 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
   const saveNotaEdit = async () => {
     if (!notaEditDraft || !onUpdateRow) return;
     setNotaSaving(true);
-    try { await onUpdateRow(notaEditDraft); }
+    const toSave: VendasRow = notaEditDraft.numeroNFComissao?.trim()
+      ? { ...notaEditDraft, situacaoComissao: 'Nota de Intermediação Emitida' }
+      : notaEditDraft;
+    try { await onUpdateRow(toSave); }
     finally { setNotaSaving(false); setNotaEditId(null); setNotaEditDraft(null); }
   };
 
