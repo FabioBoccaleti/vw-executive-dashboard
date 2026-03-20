@@ -310,7 +310,7 @@ interface FilterCellProps {
   col: ColDef;
   value: string;
   onChange: (v: string) => void;
-  // Para Revenda / Blindadora
+  // Para Revenda / Blindadora / Situação da Comissão
   options?: string[];
   // Para Data da Venda
   filterYear?: number | null;
@@ -318,8 +318,11 @@ interface FilterCellProps {
   availableYears?: number[];
   onYearChange?: (y: number | null) => void;
   onMonthChange?: (m: number | null) => void;
+  // Para Valor da Venda da Blindagem
+  blindagemMode?: '' | 'com_valor' | 'vazia';
+  onBlindagemModeChange?: (m: '' | 'com_valor' | 'vazia') => void;
 }
-function FilterCell({ col, value, onChange, options, filterYear, filterMonth, availableYears, onYearChange, onMonthChange }: FilterCellProps) {
+function FilterCell({ col, value, onChange, options, filterYear, filterMonth, availableYears, onYearChange, onMonthChange, blindagemMode, onBlindagemModeChange }: FilterCellProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const hasValue = value.length > 0;
   const hasQuickFilter = (filterYear != null) || (filterMonth != null);
@@ -445,7 +448,44 @@ function FilterCell({ col, value, onChange, options, filterYear, filterMonth, av
     );
   }
 
-  // ── Texto com dropdown de opções (Revenda / Blindadora) ─────────────────────
+  // ── Valor da Venda da Blindagem: dropdown Com valor / Vazia ──────────────────
+  if (col.key === 'valorVendaBlindagem' && onBlindagemModeChange !== undefined) {
+    return (
+      <div className="flex flex-col gap-1">
+        <select
+          value={blindagemMode ?? ''}
+          onChange={e => onBlindagemModeChange(e.target.value as '' | 'com_valor' | 'vazia')}
+          className={`w-full min-w-0 bg-white border rounded px-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+            blindagemMode ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'
+          }`}
+        >
+          <option value="">Todas</option>
+          <option value="com_valor">Com valor</option>
+          <option value="vazia">Vazia</option>
+        </select>
+        <div className="relative flex items-center">
+          <Search className="absolute left-1.5 w-3 h-3 text-slate-300 pointer-events-none" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder="Busca livre…"
+            className={`w-full min-w-0 bg-white border rounded pl-5 pr-5 py-1 text-xs text-right focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+              hasValue ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'
+            }`}
+          />
+          {hasValue && (
+            <button onClick={() => onChange('')} className="absolute right-1.5 text-slate-300 hover:text-red-400 transition-colors">
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Texto com dropdown de opções (Revenda / Blindadora / Situação Comissão) ──
   if (options && options.length > 0) {
     return (
       <div className="flex flex-col gap-1">
@@ -563,9 +603,10 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [deleteId, setDeleteId]   = useState<string | null>(null);
   const [saving, setSaving]       = useState(false);
   const [loading, setLoading]     = useState(true);
-  const [filters, setFilters]       = useState<FilterValues>({});
-  const [filterYear, setFilterYear]   = useState<number | null>(null);
-  const [filterMonth, setFilterMonth] = useState<number | null>(null);
+  const [filters, setFilters]             = useState<FilterValues>({});
+  const [filterYear, setFilterYear]         = useState<number | null>(null);
+  const [filterMonth, setFilterMonth]       = useState<number | null>(null);
+  const [filterBlindagemMode, setFilterBlindagemMode] = useState<'' | 'com_valor' | 'vazia'>('');
   const [catalogo, setCatalogo]     = useState<CatalogoVeiculos>({ marcas: [], modelos: [] });
   const [revendas, setRevendas]       = useState<Revenda[]>([]);
   const [blindadoras, setBlinadadoras] = useState<Blindadora[]>([]);
@@ -735,7 +776,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const setFilter = (key: keyof VendasRow, value: string) =>
     setFilters(prev => ({ ...prev, [key]: value }));
 
-  const clearFilters = () => { setFilters({}); setFilterYear(null); setFilterMonth(null); };
+  const clearFilters = () => { setFilters({}); setFilterYear(null); setFilterMonth(null); setFilterBlindagemMode(''); };
 
   // ── Import Excel ──────────────────────────────────────────────────────────────
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -857,11 +898,12 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     toast.success(`${importPreview.length} ${importPreview.length === 1 ? 'registro importado' : 'registros importados'} com sucesso`);
   };
 
-  const availableRevendas    = useMemo(() => [...new Set(rows.map(r => r.revenda).filter(Boolean))].sort() as string[], [rows]);
-  const availableBlindadoras  = useMemo(() => [...new Set(rows.map(r => r.blindadora).filter(Boolean))].sort() as string[], [rows]);
-  const availableYears        = useMemo(() => [...new Set(rows.map(r => r.dataVenda?.split('-')[0]).filter(Boolean))].map(Number).sort((a,b)=>b-a), [rows]);
+  const availableRevendas          = useMemo(() => [...new Set(rows.map(r => r.revenda).filter(Boolean))].sort() as string[], [rows]);
+  const availableBlindadoras        = useMemo(() => [...new Set(rows.map(r => r.blindadora).filter(Boolean))].sort() as string[], [rows]);
+  const availableSituacoesComissao  = useMemo(() => [...new Set(rows.map(r => r.situacaoComissao).filter(Boolean))].sort() as string[], [rows]);
+  const availableYears              = useMemo(() => [...new Set(rows.map(r => r.dataVenda?.split('-')[0]).filter(Boolean))].map(Number).sort((a,b)=>b-a), [rows]);
 
-  const hasActiveFilters = Object.values(filters).some(v => v && v.length > 0) || filterYear != null || filterMonth != null;
+  const hasActiveFilters = Object.values(filters).some(v => v && v.length > 0) || filterYear != null || filterMonth != null || !!filterBlindagemMode;
   const filteredRows     = hasActiveFilters
     ? rows.filter(r => {
         if (!rowMatchesFilters(r, filters)) return false;
@@ -872,6 +914,12 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         if (filterMonth != null) {
           const m = r.dataVenda ? parseInt(r.dataVenda.split('-')[1]) : 0;
           if (m !== filterMonth) return false;
+        }
+        if (filterBlindagemMode === 'com_valor') {
+          if (!r.valorVendaBlindagem || !parseFloat(r.valorVendaBlindagem)) return false;
+        }
+        if (filterBlindagemMode === 'vazia') {
+          if (r.valorVendaBlindagem && parseFloat(r.valorVendaBlindagem)) return false;
         }
         return true;
       })
@@ -1046,12 +1094,14 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                         col={col}
                         value={filters[col.key] ?? ''}
                         onChange={v => setFilter(col.key, v)}
-                        options={col.key === 'revenda' ? availableRevendas : col.key === 'blindadora' ? availableBlindadoras : undefined}
+                        options={col.key === 'revenda' ? availableRevendas : col.key === 'blindadora' ? availableBlindadoras : col.key === 'situacaoComissao' ? availableSituacoesComissao : undefined}
                         filterYear={col.key === 'dataVenda' ? filterYear : undefined}
                         filterMonth={col.key === 'dataVenda' ? filterMonth : undefined}
                         availableYears={col.key === 'dataVenda' ? availableYears : undefined}
                         onYearChange={col.key === 'dataVenda' ? setFilterYear : undefined}
                         onMonthChange={col.key === 'dataVenda' ? setFilterMonth : undefined}
+                        blindagemMode={col.key === 'valorVendaBlindagem' ? filterBlindagemMode : undefined}
+                        onBlindagemModeChange={col.key === 'valorVendaBlindagem' ? setFilterBlindagemMode : undefined}
                       />
                     )}
                   </th>
