@@ -1459,11 +1459,21 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                                 <input
                                   type="date"
                                   value={val}
-                                  disabled={col.key === 'dataAcerto' && !draft.valorAPagarBlindadora && !draft.valorAReceberBlindadora}
+                                  disabled={
+                                    (col.key === 'dataAcerto' && !draft.valorAPagarBlindadora && !draft.valorAReceberBlindadora) ||
+                                    (col.key === 'dataPagamentoBlindadora' && draft.situacaoNegociacaoBlindadora === 'Negociação Direta')
+                                  }
                                   onChange={e => changeField(col.key, e.target.value)}
-                                  title={col.key === 'dataAcerto' && !draft.valorAPagarBlindadora && !draft.valorAReceberBlindadora ? 'Preencha Valor a Pagar ou Valor a Receber da Blindadora primeiro' : undefined}
-                                  className={`w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${
+                                  title={
                                     col.key === 'dataAcerto' && !draft.valorAPagarBlindadora && !draft.valorAReceberBlindadora
+                                      ? 'Preencha Valor a Pagar ou Valor a Receber da Blindadora primeiro'
+                                      : col.key === 'dataPagamentoBlindadora' && draft.situacaoNegociacaoBlindadora === 'Negociação Direta'
+                                      ? 'Indisponível para Negociação Direta'
+                                      : undefined
+                                  }
+                                  className={`w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 ${
+                                    (col.key === 'dataAcerto' && !draft.valorAPagarBlindadora && !draft.valorAReceberBlindadora) ||
+                                    (col.key === 'dataPagamentoBlindadora' && draft.situacaoNegociacaoBlindadora === 'Negociação Direta')
                                       ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
                                       : 'bg-white border-amber-300 focus:ring-amber-400'
                                   }`}
