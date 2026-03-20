@@ -150,6 +150,26 @@ function CustomTooltipBRL({ active, payload, label }: { active?: boolean; payloa
   );
 }
 
+function MonthlyTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string; payload?: { soranaPct: number } }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const soranaPct = payload[0]?.payload?.soranaPct;
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm">
+      <p className="font-semibold text-slate-700 mb-2">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color }} className="font-mono">
+          {p.name}: {fmtBRLFull(p.value)}
+        </p>
+      ))}
+      {soranaPct !== undefined && (
+        <p className="font-mono mt-1 pt-1 border-t border-slate-100" style={{ color: '#8b5cf6' }}>
+          % Rentabilidade Sorana: {fmtPct(soranaPct)}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function DeltaBadge({ base, current }: { base: number; current: number }) {
   if (base === 0) return <span className="text-slate-300 text-xs">—</span>;
   const delta = ((current - base) / Math.abs(base)) * 100;
@@ -324,7 +344,8 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
       const receita = mRows.reduce((a, r) => a + n(r.valorVendaBlindagem), 0);
       const lucro   = mRows.reduce((a, r) => a + n(r.lucroOperacao), 0);
       const sorana  = mRows.reduce((a, r) => a + n(r.comissaoBrutaSorana), 0);
-      return { label, receita, lucro, sorana, qtd: mRows.length };
+      const soranaPct = receita > 0 ? (sorana / receita) * 100 : 0;
+      return { label, receita, lucro, sorana, soranaPct, qtd: mRows.length };
     });
   }, [brandRows, selectedYear, selectedBlindadora, monthChip]);
 
@@ -617,7 +638,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
             <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={80} />
-            <Tooltip content={<CustomTooltipBRL />} />
+            <Tooltip content={<MonthlyTooltip />} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Bar dataKey="receita" name="Receita" fill="#f59e0b" radius={[3, 3, 0, 0]} />
             <Bar dataKey="lucro" name="Lucro Operação" fill="#10b981" radius={[3, 3, 0, 0]} />
