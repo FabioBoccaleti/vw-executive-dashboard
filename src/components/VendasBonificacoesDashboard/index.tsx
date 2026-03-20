@@ -619,9 +619,19 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('analise');
   const [importPreview, setImportPreview] = useState<VendasRow[] | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    Promise.all([loadVendasRows(), loadCatalogo(), loadRevendas(), loadBlinadadoras(), loadRegras(), loadVendedores()]).then(([r, c, rv, bl, rg, vd]) => {
+    if (activeTab === 'tabela' && tableContainerRef.current) {
+      // Aguarda o DOM renderizar antes de rolar
+      requestAnimationFrame(() => {
+        if (tableContainerRef.current)
+          tableContainerRef.current.scrollTop = tableContainerRef.current.scrollHeight;
+      });
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
       setRows(r);
       setCatalogo(c as CatalogoVeiculos);
       setRevendas(rv as Revenda[]);
@@ -1041,6 +1051,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
         {/* Table card */}
         <div
+          ref={tableContainerRef}
           className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-auto flex-1"
           style={{ maxHeight: 'calc(100vh - 180px)' }}
         >
