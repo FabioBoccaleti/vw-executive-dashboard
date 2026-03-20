@@ -159,61 +159,90 @@ function DeltaBadge({ base, current }: { base: number; current: number }) {
 }
 
 // ─── Excel Export ─────────────────────────────────────────────────────────────
-const HEADER_STYLE = {
-  font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 },
-  fill: { fgColor: { rgb: '1E293B' } },
-  alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-  border: { bottom: { style: 'thin', color: { rgb: '475569' } } },
-};
-const TOTAL_STYLE = {
-  font: { bold: true, sz: 11 },
-  fill: { fgColor: { rgb: 'F1F5F9' } },
-  alignment: { horizontal: 'right' },
-};
-const CURRENCY_FMT = 'R$\\ #,##0.00';
+const COLS_NOTAS = [
+  { header: '#',               width: 5  },
+  { header: 'Revenda',         width: 24 },
+  { header: 'Blindadora',      width: 24 },
+  { header: 'Chassi',          width: 22 },
+  { header: 'Data da Venda',   width: 16 },
+  { header: 'Comissão Sorana', width: 22 },
+];
 
-function applyHeaderRow(ws: XLSX.WorkSheet, colCount: number) {
-  for (let c = 0; c < colCount; c++) {
-    const addr = XLSX.utils.encode_cell({ r: 0, c });
-    if (ws[addr]) ws[addr].s = HEADER_STYLE;
-  }
+async function buildSheetInWb(
+  wb: ExcelJS.Workbook,
+  sheetRows: VendasRow[],
+  sheetName: string,
+  tabColor: string,
+  titleLabel: string,
+) {
+  const ws = wb.addWorksheet(sheetName, {
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 2 }],
+    properties: { tabColor: { argb: tabColor } },
+  });
+  ws.columns = COLS_NOTAS.map(c => ({ width: c.width }));
+
+  // Row 1: merged title
+  const titleRow = ws.addRow([titleLabel]);
+  ws.mergeCells(1, 1, 1, COLS_NOTAS.length);
+  titleRow.height = 28;
+  titleRow.eachCell(cell => {
+    cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    cell.font      = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border    = { top: { style: 'thin', color: { argb: 'FF1E293B' } }, bottom: { style: 'thin', color: { argb: 'FF1E293B' } }, left: { style: 'thin', color: { argb: 'FF1E293B' } }, right: { style: 'thin', color: { argb: 'FF1E293B' } } };
+  });
+
+  // Row 2: headers
+  const headerRow = ws.addRow(COLS_NOTAS.map(c => c.header));
+  headerRow.height = 32;
+  headerRow.eachCell(cell => {
+    cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+    cell.font      = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border    = { top: { style: 'thin', color: { argb: 'FF475569' } }, bottom: { style: 'medium', color: { argb: 'FF94A3B8' } }, left: { style: 'thin', color: { argb: 'FF475569' } }, right: { style: 'thin', color: { argb: 'FF475569' } } };
+  });
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: COLS_NOTAS.length } };
+
+  const BTHIN = { style: 'thin' as const, color: { argb: 'FFE2E8F0' } };
+  const BRL_FMT = '"R$"\\ #,##0.00';
+
+  // Data rows
+  sheetRows.forEach((r, ri) => {
+    const bg  = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF8FAFC';
+    const dateVal = r.dataVenda ? (() => { const [y, m, d] = r.dataVenda.split('-'); return (y && m && d) ? new Date(+y, +m - 1, +d) : ''; })() : '';
+    const dr = ws.addRow([ri + 1, r.revenda || '', r.blindadora || '', r.chassi || '', dateVal, parseFloat(r.comissaoBrutaSorana) || null]);
+    dr.height = 17;
+    dr.eachCell({ includeEmpty: true }, (cell, ci) => {
+      cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.border = { top: BTHIN, bottom: BTHIN, left: BTHIN, right: BTHIN };
+      cell.font   = { size: 9.5 };
+      if (ci === 5) { if (cell.value instanceof Date) cell.numFmt = 'DD/MM/YYYY'; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+      else if (ci === 6) { cell.numFmt = BRL_FMT; cell.alignment = { horizontal: 'right', vertical: 'middle' }; cell.font = { size: 9.5, name: 'Courier New' }; }
+      else { cell.alignment = { horizontal: ci === 1 ? 'center' : 'left', vertical: 'middle' }; }
+    });
+  });
+
+  // Totals row
+  const total = sheetRows.reduce((s, r) => s + (parseFloat(r.comissaoBrutaSorana) || 0), 0);
+  const totRow = ws.addRow(['', '', '', '', 'TOTAL', total]);
+  totRow.height = 22;
+  totRow.eachCell({ includeEmpty: true }, (cell, ci) => {
+    cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    cell.border = { top: { style: 'medium', color: { argb: 'FF94A3B8' } }, bottom: { style: 'medium', color: { argb: 'FF334155' } }, left: { style: 'thin', color: { argb: 'FF475569' } }, right: { style: 'thin', color: { argb: 'FF475569' } } };
+    if (ci === 5) { cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+    else if (ci === 6) { cell.numFmt = BRL_FMT; cell.font = { bold: true, size: 10, color: { argb: 'FFFBBF24' }, name: 'Courier New' }; cell.alignment = { horizontal: 'right', vertical: 'middle' }; }
+    else { cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } }; }
+  });
 }
 
-function buildSheet(rows: VendasRow[]): XLSX.WorkSheet {
-  const data: (string | number)[][] = [
-    ['#', 'Revenda', 'Blindadora', 'Chassi', 'Data da Venda', 'Comissão Sorana'],
-    ...rows.map((r, i) => [
-      i + 1,
-      r.revenda || '',
-      r.blindadora || '',
-      r.chassi || '',
-      r.dataVenda ? r.dataVenda.split('-').reverse().join('/') : '',
-      parseFloat(r.comissaoBrutaSorana) || 0,
-    ]),
-    ['', '', '', '', 'TOTAL', rows.reduce((a, r) => a + (parseFloat(r.comissaoBrutaSorana) || 0), 0)],
-  ];
+async function exportNotasExcel(pendingRows: VendasRow[], brandLabel: string, tabColor: string) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Sorana Executive Dashboard';
+  wb.created = new Date();
 
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 4 }, { wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 14 }, { wch: 20 }];
-  applyHeaderRow(ws, 6);
-
-  for (let r = 1; r <= rows.length + 1; r++) {
-    const addr = XLSX.utils.encode_cell({ r, c: 5 });
-    if (ws[addr]) {
-      ws[addr].t = 'n';
-      ws[addr].z = CURRENCY_FMT;
-      if (r === rows.length + 1) ws[addr].s = TOTAL_STYLE;
-    }
-  }
-  const totalLabelAddr = XLSX.utils.encode_cell({ r: rows.length + 1, c: 4 });
-  if (ws[totalLabelAddr]) ws[totalLabelAddr].s = TOTAL_STYLE;
-
-  return ws;
-}
-
-function exportNotasExcel(pendingRows: VendasRow[], brandLabel: string) {
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, buildSheet(pendingRows), 'Geral');
+  const today     = new Date().toLocaleDateString('pt-BR');
+  const titleGeral = `Notas de Intermediação a Emitir — ${brandLabel} — ${today}`;
+  await buildSheetInWb(wb, pendingRows, 'Geral', tabColor, titleGeral);
 
   const byBlindadora = new Map<string, VendasRow[]>();
   pendingRows.forEach(r => {
@@ -221,13 +250,17 @@ function exportNotasExcel(pendingRows: VendasRow[], brandLabel: string) {
     if (!byBlindadora.has(key)) byBlindadora.set(key, []);
     byBlindadora.get(key)!.push(r);
   });
-  byBlindadora.forEach((rows, name) => {
-    XLSX.utils.book_append_sheet(wb, buildSheet(rows), name.slice(0, 31));
-  });
+  for (const [name, rows] of byBlindadora.entries()) {
+    await buildSheetInWb(wb, rows, name.slice(0, 31), tabColor, `${name} — ${today}`);
+  }
 
-  const today = new Date().toISOString().split('T')[0];
-  const brand = brandLabel.toLowerCase().replace(/\s+/g, '-');
-  XLSX.writeFile(wb, `notas-intermediacao-${brand}-${today}.xlsx`);
+  const buf     = await wb.xlsx.writeBuffer();
+  const dateStr = new Date().toISOString().split('T')[0];
+  const brand   = brandLabel.toLowerCase().replace(/\s+/g, '-');
+  saveAs(
+    new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    `notas-intermediacao-${brand}-${dateStr}.xlsx`
+  );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -944,13 +977,13 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
             )}
             {notasAEmitirData.totalQtd > 0 && (
               <button
-                onClick={() => {
+                onClick={async () => {
                   const opt = brandOptions.find(o => o.value === selectedBrand)!;
                   const tabColor = selectedBrand === 'VW' ? 'FF001E50' : selectedBrand === 'Audi' ? 'FFBB0A21' : 'FF1E293B';
-                  exportNotasExcel(
+                  await exportNotasExcel(
                     brandRows.filter(r => r.situacaoComissao === 'Emitir Nota de Intermediação'),
                     opt.label,
-                    tabColor as 'FF1E293B' | 'FF001E50' | 'FFBB0A21',
+                    tabColor,
                   );
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-sm"
