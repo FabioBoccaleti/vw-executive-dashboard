@@ -482,7 +482,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
   const remPieData = useMemo(() => [
     { name: 'Vendedor',    value: metrics.remVendedor,  color: '#f59e0b' },
     { name: 'Gerência',    value: metrics.remGerencia,  color: '#3b82f6' },
-    { name: 'Diretoria',   value: metrics.remDiretoria, color: '#8b5cf6' },
+    { name: 'Diretoria Comercial', value: metrics.remDiretoria, color: '#8b5cf6' },
     { name: 'Sup. Usados', value: metrics.remSupervisor,color: '#10b981' },
     { name: 'Sorana',      value: metrics.sorana,       color: '#ef4444' },
   ].filter(d => d.value > 0), [metrics]);
@@ -525,7 +525,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
     { label: 'Comissão Sorana',    key: 'sorana',     fmt: fmtBRLFull },
     { label: 'Rem. Vendedores',    key: 'remVendedor',fmt: fmtBRLFull },
     { label: 'Rem. Gerência',      key: 'remGerencia',fmt: fmtBRLFull },
-    { label: 'Rem. Diretoria',     key: 'remDiretoria',fmt: fmtBRLFull },
+    { label: 'Rem. Diretoria Comercial', key: 'remDiretoria',fmt: fmtBRLFull },
     { label: 'Rem. Sup. Usados',   key: 'remSupervisor',fmt: fmtBRLFull },
     { label: 'Total Remunerações', key: 'remTotal',   fmt: fmtBRLFull },
   ];
@@ -979,7 +979,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
               {[
                 { label: 'Vendedores',    value: metrics.remVendedor,  color: 'text-amber-600' },
                 { label: 'Gerência',      value: metrics.remGerencia,  color: 'text-blue-600' },
-                { label: 'Diretoria',     value: metrics.remDiretoria, color: 'text-violet-600' },
+                { label: 'Diretoria Comercial', value: metrics.remDiretoria, color: 'text-violet-600' },
                 { label: 'Sup. Usados',   value: metrics.remSupervisor,color: 'text-emerald-600' },
                 { label: 'Sorana',        value: metrics.sorana,       color: 'text-red-600' },
                 { label: 'Total',         value: metrics.remTotal + metrics.sorana, color: 'text-slate-800' },

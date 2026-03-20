@@ -89,7 +89,7 @@ const COLUMNS: ColDef[] = [
   { key: 'nomeVendedor',                        label: 'Nome do Vendedor',                                                      type: 'text',     width: 150 },
   { key: 'remuneracaoVendedor',                 label: 'Remuneração Vendedor',                                                  type: 'currency', width: 135 },
   { key: 'remuneracaoGerencia',                 label: 'Remuneração Gerência',                                                  type: 'currency', width: 135 },
-  { key: 'remuneracaoDiretoria',                label: 'Remuneração Diretoria',                                                 type: 'currency', width: 135 },
+  { key: 'remuneracaoDiretoria',                label: 'Remuneração Diretoria Comercial',                                                 type: 'currency', width: 135 },
   { key: 'remuneracaoGerenciaSupervisorUsados', label: 'Remuneração Gerência / Supervisor de Usados',                           type: 'currency', width: 160 },
   { key: 'comissaoBrutaSorana',                 label: 'Comissão Bruta Sorana',                                                 type: 'currency', width: 145 },
   { key: 'comissaoBrutaSorana',                 label: '% Rentabilidade Bruta Sorana',                                          type: 'calc',     width: 115,
