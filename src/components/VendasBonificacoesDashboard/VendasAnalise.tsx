@@ -313,7 +313,8 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
 
   // ── Dados mensais (gráfico de evolução) ──
   const monthlyData = useMemo(() => {
-    return MONTHS.map((label, mi) => {
+    const maxMonth = monthChip !== null ? monthChip : 12;
+    return MONTHS.slice(0, maxMonth).map((label, mi) => {
       const m = mi + 1;
       const mRows = brandRows.filter(r =>
         getRowYear(r) === selectedYear &&
@@ -325,7 +326,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
       const sorana  = mRows.reduce((a, r) => a + n(r.comissaoBrutaSorana), 0);
       return { label, receita, lucro, sorana, qtd: mRows.length };
     });
-  }, [brandRows, selectedYear, selectedBlindadora]);
+  }, [brandRows, selectedYear, selectedBlindadora, monthChip]);
 
   // ── Por modelo ──
   const modeloData = useMemo(() => {
