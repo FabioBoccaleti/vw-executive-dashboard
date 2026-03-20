@@ -90,6 +90,7 @@ interface Metrics {
   lucro: number;
   margem: number;
   sorana: number;
+  soranaPct: number;
   ticketMedio: number;
   remVendedor: number;
   remGerencia: number;
@@ -111,7 +112,8 @@ function calcMetrics(rows: VendasRow[]): Metrics {
   const remDiretoria = rows.reduce((a, r) => a + n(r.remuneracaoDiretoria), 0);
   const remSupervisor = rows.reduce((a, r) => a + n(r.remuneracaoGerenciaSupervisorUsados), 0);
   const remTotal = remVendedor + remGerencia + remDiretoria + remSupervisor;
-  return { qtd, receita, custo, lucro, margem, sorana, ticketMedio, remVendedor, remGerencia, remDiretoria, remSupervisor, remTotal };
+  const soranaPct = receita > 0 ? (sorana / receita) * 100 : 0;
+  return { qtd, receita, custo, lucro, margem, sorana, soranaPct, ticketMedio, remVendedor, remGerencia, remDiretoria, remSupervisor, remTotal };
 }
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
@@ -503,9 +505,10 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
     { label: 'Receita',            key: 'receita',    fmt: fmtBRLFull },
     { label: 'Custo',              key: 'custo',      fmt: fmtBRLFull },
     { label: 'Lucro Bruto',  key: 'lucro',      fmt: fmtBRLFull },
-    { label: 'Margem %',           key: 'margem',     fmt: fmtPct },
+    { label: 'Margem Bruta %',      key: 'margem',     fmt: fmtPct },
     { label: 'Ticket Médio',       key: 'ticketMedio',fmt: fmtBRLFull },
     { label: 'Comissão Sorana',    key: 'sorana',     fmt: fmtBRLFull },
+    { label: '% Rentabilidade Sorana', key: 'soranaPct', fmt: fmtPct },
     { label: 'Rem. Vendedores',    key: 'remVendedor',fmt: fmtBRLFull },
     { label: 'Rem. Gerência',      key: 'remGerencia',fmt: fmtBRLFull },
     { label: 'Rem. Diretoria Comercial', key: 'remDiretoria',fmt: fmtBRLFull },
