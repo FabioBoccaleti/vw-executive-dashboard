@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download, Upload } from 'lucide-react';
+import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download, Upload, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from './vendasStorage';
 import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
@@ -618,6 +618,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [inlineAcertoValue, setInlineAcertoValue] = useState('');
   const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('analise');
   const [importPreview, setImportPreview] = useState<VendasRow[] | null>(null);
+  const [recalcConfirm, setRecalcConfirm] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -782,6 +783,35 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     if (editingId === id) { setEditingId(null); setEditDraft(null); }
     await persist(updated);
     toast.success('Registro removido com sucesso');
+  };
+
+  const recalcularRemuneracoes = async () => {
+    const updated = rows.map(row => {
+      // Registros com NF emitida ficam congelados
+      if (row.numeroNFComissao) return row;
+      const draft = { ...row };
+      const venda = parseFloat(draft.valorVendaBlindagem) || 0;
+      const custo = parseFloat(draft.custoBlindagem) || 0;
+      draft.lucroOperacao = draft.valorVendaBlindagem ? String(venda - custo) : '';
+      draft.remuneracaoVendedor                 = calcRemuneracaoField(draft, 'Vendedor',            regras);
+      draft.remuneracaoGerencia                 = calcRemuneracaoField(draft, 'Gerência',            regras);
+      draft.remuneracaoDiretoria                = calcRemuneracaoField(draft, 'Diretoria',           regras);
+      draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras);
+      draft.comissaoBrutaSorana = String(
+        (parseFloat(draft.lucroOperacao) || 0)
+        - (parseFloat(draft.remuneracaoVendedor) || 0)
+        - (parseFloat(draft.remuneracaoGerencia) || 0)
+        - (parseFloat(draft.remuneracaoDiretoria) || 0)
+        - (parseFloat(draft.remuneracaoGerenciaSupervisorUsados) || 0)
+      );
+      draft.situacaoComissao = calcSituacaoComissao(draft);
+      return draft;
+    });
+    setRows(updated);
+    setRecalcConfirm(false);
+    await persist(updated);
+    const qtd = updated.filter(r => !r.numeroNFComissao).length;
+    toast.success(`Remunerações recalculadas em ${qtd} ${qtd === 1 ? 'registro' : 'registros'} (sem NF emitida)`);
   };
 
   const setFilter = (key: keyof VendasRow, value: string) =>
@@ -1481,6 +1511,16 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
               <Upload className="w-4 h-4" />
               Importar Excel
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRecalcConfirm(true)}
+              className="text-violet-700 border-violet-300 hover:bg-violet-50 gap-1.5 font-medium"
+              title="Recalcula remunerações com as regras atuais. Registros com NF emitida não são alterados."
+            >
+              <RefreshCw className="w-4 h-4" />
+              Recalcular Remunerações
+            </Button>
             <input
               ref={importInputRef}
               type="file"
@@ -1508,6 +1548,59 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         )}
 
       </div>
+
+      {/* ── Modal de confirmação de recálculo ── */}
+      {recalcConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-5">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-violet-100 rounded-xl flex-shrink-0">
+                <RefreshCw className="w-5 h-5 text-violet-700" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">Recalcular Remunerações</h3>
+                <p className="text-sm text-slate-500 mt-1">Aplica as regras de remuneração atuais a todos os registros.</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-4 flex flex-col gap-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Registros que serão recalculados:</span>
+                <span className="font-bold text-violet-700">{rows.filter(r => !r.numeroNFComissao).length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Registros congelados (NF emitida):</span>
+                <span className="font-bold text-slate-500">{rows.filter(r => !!r.numeroNFComissao).length}</span>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-600">
+              Os campos <strong>Remuneração Gerência / Supervisor</strong>, demais remunerações e
+              a <strong>Comissão Bruta Sorana</strong> serão atualizados conforme as regras
+              cadastradas atualmente. Registros com Nº NF preenchido não serão alterados.
+            </p>
+
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRecalcConfirm(false)}
+                className="border-slate-300 text-slate-600"
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={recalcularRemuneracoes}
+                className="bg-violet-600 hover:bg-violet-700 text-white gap-1.5"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Confirmar Recálculo
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal de confirmação de importação ── */}
       {importPreview && (
