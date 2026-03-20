@@ -713,6 +713,9 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
               {/* Ranking TM Comissão */}
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Ticket Médio de Comissões</p>
+                {(() => {
+                  const maxTmComissao = Math.max(...revendaData.map(r => r.tmComissao), 0);
+                  return (
                 <div className="space-y-2">
                   {revendaData.map((r, i) => (
                     <div key={r.name} className="flex items-center gap-2">
@@ -729,7 +732,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
                             <div
                               className="h-1.5 rounded-full transition-all"
                               style={{
-                                width: `${revendaData[0].tmComissao > 0 ? (r.tmComissao / revendaData[0].tmComissao) * 100 : 0}%`,
+                                width: `${maxTmComissao > 0 ? Math.min((r.tmComissao / maxTmComissao) * 100, 100) : 0}%`,
                                 background: PALETTE[i % PALETTE.length],
                               }}
                             />
@@ -740,6 +743,8 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
                     </div>
                   ))}
                 </div>
+                  );
+                })()}
               </div>
             </>
           ) : <EmptyChart />}
