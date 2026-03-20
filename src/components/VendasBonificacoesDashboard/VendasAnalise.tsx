@@ -522,7 +522,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
         sorana: v.sorana,
         soranaPct: v.receita > 0 ? (v.sorana / v.receita) * 100 : 0,
       }))
-      .sort((a, b) => b.qtd - a.qtd);
+      .sort((a, b) => b.qtd - a.qtd || b.sorana - a.sorana);
   }, [filteredRows]);
 
   // ── Por blindadora ──
