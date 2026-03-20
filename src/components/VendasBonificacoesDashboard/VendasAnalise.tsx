@@ -122,9 +122,9 @@ const PERIOD_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6'];
 interface KpiCardProps { label: string; value: string; sub?: string; color?: string; }
 function KpiCard({ label, value, sub, color = 'text-slate-800' }: KpiCardProps) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex flex-col gap-1 min-w-0">
-      <span className="text-xs text-slate-400 font-medium uppercase tracking-wide leading-tight">{label}</span>
-      <span className={`text-xl font-bold leading-tight ${color} truncate`}>{value}</span>
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-3 py-3 flex flex-col gap-0.5 min-w-0">
+      <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide leading-tight">{label}</span>
+      <span className={`text-lg font-bold leading-tight ${color} truncate`}>{value}</span>
       {sub && <span className="text-xs text-slate-400">{sub}</span>}
     </div>
   );
@@ -478,7 +478,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
     { label: 'Qtd de Vendas',      key: 'qtd',        fmt: v => String(v) },
     { label: 'Receita',            key: 'receita',    fmt: fmtBRLFull },
     { label: 'Custo',              key: 'custo',      fmt: fmtBRLFull },
-    { label: 'Lucro da Operação',  key: 'lucro',      fmt: fmtBRLFull },
+    { label: 'Lucro Bruto',  key: 'lucro',      fmt: fmtBRLFull },
     { label: 'Margem %',           key: 'margem',     fmt: fmtPct },
     { label: 'Ticket Médio',       key: 'ticketMedio',fmt: fmtBRLFull },
     { label: 'Comissão Sorana',    key: 'sorana',     fmt: fmtBRLFull },
@@ -635,11 +635,11 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
       {/* ── KPI CARDS ── */}
       <div>
         <SectionTitle>Visão Geral — {monthChip ? `${MONTHS[monthChip - 1]}/${selectedYear}` : String(selectedYear)}</SectionTitle>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
           <KpiCard label="Total de Vendas" value={String(metrics.qtd)} color="text-slate-800" />
           <KpiCard label="Receita Total" value={fmtBRL(metrics.receita)} color="text-amber-600" />
           <KpiCard label="Custo Total" value={fmtBRL(metrics.custo)} color="text-red-500" />
-          <KpiCard label="Lucro da Operação" value={fmtBRL(metrics.lucro)} color="text-emerald-600" />
+          <KpiCard label="Lucro Bruto" value={fmtBRL(metrics.lucro)} color="text-emerald-600" />
           <KpiCard label="Margem Bruta%" value={fmtPct(metrics.margem)} color={metrics.margem >= 20 ? 'text-emerald-600' : metrics.margem >= 10 ? 'text-amber-600' : 'text-red-500'} />
           <KpiCard label="Ticket Médio" value={fmtBRL(metrics.ticketMedio)} color="text-sky-600" sub={metrics.qtd > 0 ? `TM Comissão: ${fmtBRL(metrics.sorana / metrics.qtd)}` : undefined} />
           <KpiCard label="Comissão Sorana" value={fmtBRL(metrics.sorana)} color="text-violet-600" sub={metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) + ' da receita' : undefined} />
@@ -797,7 +797,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
             </div>
             {/* Lucro */}
             <div className="p-5">
-              <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest mb-3">Lucro da Operação</p>
+              <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest mb-3">Lucro Bruto</p>
               <p className="text-2xl font-bold text-emerald-600 font-mono mb-2">{fmtBRL(metrics.lucro)}</p>
               {prevMonthMetrics && <DeltaBadge base={prevMonthMetrics.lucro} current={metrics.lucro} />}
               <p className="text-xs text-slate-400 mt-1">Custo: {fmtBRL(metrics.custo)}</p>
@@ -841,7 +841,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
               <Tooltip content={<MonthlyTooltip />} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar yAxisId="left" dataKey="receita" name="Receita" fill="#f59e0b" radius={[3, 3, 0, 0]} />
-              <Bar yAxisId="left" dataKey="lucro" name="Lucro Operação" fill="#10b981" radius={[3, 3, 0, 0]} />
+              <Bar yAxisId="left" dataKey="lucro" name="Lucro Bruto" fill="#10b981" radius={[3, 3, 0, 0]} />
               <Bar yAxisId="left" dataKey="sorana" name="Comissão Sorana" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
             </ComposedChart>
           </ResponsiveContainer>
