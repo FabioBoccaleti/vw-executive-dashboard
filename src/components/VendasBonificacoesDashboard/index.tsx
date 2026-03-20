@@ -791,6 +791,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
 
   const recalcularRemuneracoes = async () => {
     const updated = rows.map(row => {
+      // Registros com NF emitida ficam congelados
+      if (row.numeroNFComissao) return row;
       const draft = { ...row };
       const venda = parseFloat(draft.valorVendaBlindagem) || 0;
       const custo = parseFloat(draft.custoBlindagem) || 0;
@@ -812,7 +814,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     setRows(updated);
     setRecalcConfirm(false);
     await persist(updated);
-    toast.success(`Remunerações recalculadas em ${updated.length} ${updated.length === 1 ? 'registro' : 'registros'}`);
+    const qtd = updated.filter(r => !r.numeroNFComissao).length;
+    toast.success(`Remunerações recalculadas em ${qtd} ${qtd === 1 ? 'registro' : 'registros'} (sem NF emitida)`);
   };
 
   const setFilter = (key: keyof VendasRow, value: string) =>
@@ -1566,15 +1569,19 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
 
             <div className="bg-slate-50 rounded-xl p-4 flex flex-col gap-2 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Total de registros que serão recalculados:</span>
-                <span className="font-bold text-violet-700">{rows.length}</span>
+                <span className="text-slate-500">Registros que serão recalculados:</span>
+                <span className="font-bold text-violet-700">{rows.filter(r => !r.numeroNFComissao).length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Registros congelados (Nº NF emitida):</span>
+                <span className="font-bold text-slate-500">{rows.filter(r => !!r.numeroNFComissao).length}</span>
               </div>
             </div>
 
             <p className="text-sm text-slate-600">
               Os campos <strong>Remuneração Gerência / Supervisor</strong>, demais remunerações e
-              a <strong>Comissão Bruta Sorana</strong> de <strong>todos</strong> os registros
-              serão atualizados conforme as regras cadastradas atualmente.
+              a <strong>Comissão Bruta Sorana</strong> serão atualizados conforme as regras
+              cadastradas atualmente. Registros com Nº NF preenchido não serão alterados.
             </p>
 
             <div className="flex gap-3 justify-end">
