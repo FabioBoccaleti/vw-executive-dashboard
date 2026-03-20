@@ -121,10 +121,10 @@ const PALETTE = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4
 const PERIOD_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6'];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-interface KpiCardProps { label: string; value: string; sub?: string; color?: string; }
-function KpiCard({ label, value, sub, color = 'text-slate-800' }: KpiCardProps) {
+interface KpiCardProps { label: string; value: string; sub?: string; color?: string; accentColor?: string; }
+function KpiCard({ label, value, sub, color = 'text-slate-800', accentColor }: KpiCardProps) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-3 py-3 flex flex-col gap-0.5 min-w-0">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-3 py-3 flex flex-col gap-0.5 min-w-0" style={accentColor ? { borderLeft: `4px solid ${accentColor}` } : undefined}>
       <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide leading-tight">{label}</span>
       <span className={`text-lg font-bold leading-tight ${color} truncate`}>{value}</span>
       {sub && <span className="text-xs text-slate-400">{sub}</span>}
@@ -662,16 +662,21 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
       {/* ── KPI CARDS ── */}
       <div>
         <SectionTitle>Visão Geral — {monthChip ? `${MONTHS[monthChip - 1]}/${selectedYear}` : String(selectedYear)}</SectionTitle>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-          <KpiCard label="Total de Vendas" value={String(metrics.qtd)} color="text-slate-800" />
-          <KpiCard label="Receita Total" value={fmtBRL(metrics.receita)} color="text-amber-600" />
-          <KpiCard label="Custo Total" value={fmtBRL(metrics.custo)} color="text-red-500" />
-          <KpiCard label="Lucro Bruto" value={fmtBRL(metrics.lucro)} color="text-emerald-600" />
-          <KpiCard label="Margem Bruta%" value={fmtPct(metrics.margem)} color={metrics.margem >= 20 ? 'text-emerald-600' : metrics.margem >= 10 ? 'text-amber-600' : 'text-red-500'} />
-          <KpiCard label="Ticket Médio" value={fmtBRL(metrics.ticketMedio)} color="text-sky-600" sub={metrics.qtd > 0 ? `TM Comissão: ${fmtBRL(metrics.sorana / metrics.qtd)}` : undefined} />
-          <KpiCard label="Comissão Sorana" value={fmtBRL(metrics.sorana)} color="text-violet-600" sub={metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) + ' da receita' : undefined} />
-          <KpiCard label="% Rentabilidade Sorana" value={metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) : '—'} color="text-fuchsia-600" />
-        </div>
+        {(() => {
+          const accent = selectedBrand === 'VW' ? '#001E50' : selectedBrand === 'Audi' ? '#BB0A21' : '#3b82f6';
+          return (
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+              <KpiCard label="Total de Vendas" value={String(metrics.qtd)} color="text-slate-800" accentColor={accent} />
+              <KpiCard label="Receita Total" value={fmtBRL(metrics.receita)} color="text-amber-600" accentColor={accent} />
+              <KpiCard label="Custo Total" value={fmtBRL(metrics.custo)} color="text-red-500" accentColor={accent} />
+              <KpiCard label="Lucro Bruto" value={fmtBRL(metrics.lucro)} color="text-emerald-600" accentColor={accent} />
+              <KpiCard label="Margem Bruta%" value={fmtPct(metrics.margem)} color={metrics.margem >= 20 ? 'text-emerald-600' : metrics.margem >= 10 ? 'text-amber-600' : 'text-red-500'} accentColor={accent} />
+              <KpiCard label="Ticket Médio" value={fmtBRL(metrics.ticketMedio)} color="text-sky-600" sub={metrics.qtd > 0 ? `TM Comissão: ${fmtBRL(metrics.sorana / metrics.qtd)}` : undefined} accentColor={accent} />
+              <KpiCard label="Comissão Sorana" value={fmtBRL(metrics.sorana)} color="text-violet-600" sub={metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) + ' da receita' : undefined} accentColor={accent} />
+              <KpiCard label="% Rentabilidade Sorana" value={metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) : '—'} color="text-fuchsia-600" accentColor={accent} />
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── ANÁLISE POR DIMENSÃO ── */}
