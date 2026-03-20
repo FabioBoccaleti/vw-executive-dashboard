@@ -1263,7 +1263,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         >
           <table className="border-collapse text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
             <colgroup>
-              <col style={{ width: 44, minWidth: 44 }} />
+              <col style={{ width: 56, minWidth: 56 }} />
               {COLUMNS.map(c => <col key={c.key} style={{ width: c.width, minWidth: c.width }} />)}
               <col style={{ width: 130, minWidth: 130 }} />
             </colgroup>
