@@ -998,7 +998,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
             </div>
             <div>
               <h1 className="text-base font-bold leading-tight tracking-tight">
-                Demonstrativo de Vendas e Bonificações
+                Análise e Controle das Vendas de Blindagem
               </h1>
               <p className="text-amber-200 text-xs mt-0.5">
                 {hasActiveFilters

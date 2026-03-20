@@ -893,9 +893,8 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
                             </span>
                           </div>
                           <div className="pt-1.5 border-t border-white/60 space-y-1">
-                            <p className="text-xs text-slate-400">Comissão Sorana: <span className="font-semibold text-violet-600 font-mono">{fmtBRL(v.sorana)}</span></p>
                             <p className="text-xs text-slate-400">% Rentabilidade: <span className="font-semibold text-fuchsia-600 font-mono">{fmtPct(v.soranaPct)}</span></p>
-                            <p className="text-xs text-slate-400">Remuneração: <span className="font-semibold text-sky-600 font-mono">{fmtBRL(v.remVendedor)}</span></p>
+                            <p className="text-xs text-slate-400">Remuneração Vendedor: <span className="font-semibold text-sky-600 font-mono">{fmtBRL(v.remVendedor)}</span></p>
                           </div>
                         </div>
                       </div>
