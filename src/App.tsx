@@ -4,6 +4,7 @@ import { VWFinancialDashboard } from '@/components/VWFinancialDashboard'
 import { DespesasDashboard } from '@/components/DespesasDashboard'
 import { FluxoCaixaDashboard } from '@/components/FluxoCaixaDashboard'
 import { VendasBonificacoesDashboard } from '@/components/VendasBonificacoesDashboard'
+import { VendasSelectionPage } from '@/components/VendasBonificacoesDashboard/VendasSelectionPage'
 import { CadastrosPage } from '@/components/CadastrosPage'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
@@ -22,6 +23,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<'app' | 'admin' | 'cadastros'>(() =>
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
+  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem'>('selection')
   
   // Inicializa o banco de dados em produção
   useEffect(() => {
@@ -80,6 +82,7 @@ function AppContent() {
   }
   
   const handleChangeBrand = () => {
+    setVendasSubPage('selection')
     setShowBrandSelector(true)
   }
 
@@ -201,7 +204,17 @@ function AppContent() {
       ) : brand === 'fluxo_caixa' ? (
         <FluxoCaixaDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'vendas_bonificacoes' ? (
-        <VendasBonificacoesDashboard onChangeBrand={handleChangeBrand} onOpenCadastros={() => setCurrentPage('cadastros')} />
+        vendasSubPage === 'selection' ? (
+          <VendasSelectionPage
+            onSelect={() => setVendasSubPage('blindagem')}
+            onChangeBrand={handleChangeBrand}
+          />
+        ) : (
+          <VendasBonificacoesDashboard
+            onChangeBrand={() => setVendasSubPage('selection')}
+            onOpenCadastros={() => setCurrentPage('cadastros')}
+          />
+        )
       ) : (
         <VWFinancialDashboard 
           brand={brand} 
