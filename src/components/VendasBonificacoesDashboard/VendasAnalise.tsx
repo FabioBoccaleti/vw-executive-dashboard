@@ -37,6 +37,7 @@ function periodMonths(tipo: PeriodType, value: number): number[] {
   if (tipo === 'bimestre') { const s = (value - 1) * 2 + 1; return [s, s + 1]; }
   if (tipo === 'trimestre') { const s = (value - 1) * 3 + 1; return [s, s + 1, s + 2]; }
   if (tipo === 'semestre') { const s = (value - 1) * 6 + 1; return [s, s + 1, s + 2, s + 3, s + 4, s + 5]; }
+  if (tipo === 'anual') return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   return [];
 }
 
@@ -53,10 +54,11 @@ function periodLabel(tipo: PeriodType, value: number, year: number): string {
   if (tipo === 'semestre') {
     return value === 1 ? `1º Sem/${String(year).slice(2)}` : `2º Sem/${String(year).slice(2)}`;
   }
+  if (tipo === 'anual') return String(year);
   return '';
 }
 
-type PeriodType = 'mes' | 'bimestre' | 'trimestre' | 'semestre';
+type PeriodType = 'mes' | 'bimestre' | 'trimestre' | 'semestre' | 'anual';
 type BrandFilter = 'Todas' | 'VW' | 'Audi';
 
 interface PeriodSlot { year: number; tipo: PeriodType; value: number; }
@@ -152,12 +154,18 @@ function CustomTooltipBRL({ active, payload, label }: { active?: boolean; payloa
   );
 }
 
-function MonthlyTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string; payload?: { soranaPct: number } }[]; label?: string }) {
+function MonthlyTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string; payload?: { soranaPct: number; qtd: number } }[]; label?: string }) {
   if (!active || !payload?.length) return null;
   const soranaPct = payload[0]?.payload?.soranaPct;
+  const qtd = payload[0]?.payload?.qtd;
   return (
     <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm">
       <p className="font-semibold text-slate-700 mb-2">{label}</p>
+      {qtd !== undefined && (
+        <p className="font-mono text-slate-500 mb-1">
+          Volume: {qtd} venda{qtd !== 1 ? 's' : ''}
+        </p>
+      )}
       {payload.map((p, i) => (
         <p key={i} style={{ color: p.color }} className="font-mono">
           {p.name}: {fmtBRLFull(p.value)}
@@ -491,6 +499,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
     { tipo: 'bimestre', label: 'Bimestre', count: 6 },
     { tipo: 'trimestre', label: 'Trimestre', count: 4 },
     { tipo: 'semestre', label: 'Semestre', count: 2 },
+    { tipo: 'anual', label: 'Anual', count: 1 },
   ];
 
   const periodoValueLabels: Record<PeriodType, string[]> = {
@@ -498,6 +507,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
     bimestre: ['1º Bim (Jan-Fev)', '2º Bim (Mar-Abr)', '3º Bim (Mai-Jun)', '4º Bim (Jul-Ago)', '5º Bim (Set-Out)', '6º Bim (Nov-Dez)'],
     trimestre: ['1º Trim (Jan-Mar)', '2º Trim (Abr-Jun)', '3º Trim (Jul-Set)', '4º Trim (Out-Dez)'],
     semestre: ['1º Sem (Jan-Jun)', '2º Sem (Jul-Dez)'],
+    anual: ['Ano Completo'],
   };
 
   const comparativoRows: { label: string; key: keyof Metrics; fmt: (v: number) => string }[] = [
@@ -870,8 +880,8 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
                         </div>
                         <div className="space-y-2">
                           <div>
-                            <p className="text-xs text-slate-400 mb-0.5">Receita</p>
-                            <p className={`text-lg font-bold font-mono ${textAccent[i]}`}>{fmtBRL(v.receita)}</p>
+                            <p className="text-xs text-slate-400 mb-0.5">Comissão Sorana</p>
+                            <p className={`text-lg font-bold font-mono ${textAccent[i]}`}>{fmtBRL(v.sorana)}</p>
                           </div>
                           <div className="w-full bg-white/70 rounded-full h-1.5">
                             <div className={`h-1.5 rounded-full bg-gradient-to-r ${gradients[i]} transition-all`} style={{ width: `${barPct}%` }} />
@@ -1084,15 +1094,17 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
               </select>
 
               {/* Valor */}
-              <select
-                value={slot.value}
-                onChange={e => updatePeriod(i, { value: Number(e.target.value) })}
-                className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
-              >
-                {periodoValueLabels[slot.tipo].map((label, vi) => (
-                  <option key={vi + 1} value={vi + 1}>{label}</option>
-                ))}
-              </select>
+              {slot.tipo !== 'anual' && (
+                <select
+                  value={slot.value}
+                  onChange={e => updatePeriod(i, { value: Number(e.target.value) })}
+                  className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                >
+                  {periodoValueLabels[slot.tipo].map((label, vi) => (
+                    <option key={vi + 1} value={vi + 1}>{label}</option>
+                  ))}
+                </select>
+              )}
 
               {periods.length > 1 && (
                 <button
