@@ -620,21 +620,44 @@ function ModalInput({ label, value, onChange, placeholder }: { label: string; va
     </div>
   );
 }
-function ModalInputNum({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function ModalInputCurrency({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  // Exibe formatado em pt-BR; salva internamente como número puro
+  const [display, setDisplay] = React.useState(() => {
+    const n = parseFloat(value);
+    return isNaN(n) ? '' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  });
+  React.useEffect(() => {
+    const n = parseFloat(value);
+    if (!isNaN(n)) setDisplay(n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    else if (!value) setDisplay('');
+  }, [value]);
+  function handleChange(raw: string) {
+    setDisplay(raw);
+    // converte pt-BR "1.200,50" para número puro
+    const clean = raw.replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(clean);
+    onChange(isNaN(n) ? '' : String(n));
+  }
+  function handleBlur() {
+    const clean = display.replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(clean);
+    if (!isNaN(n)) setDisplay(n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    else setDisplay('');
+  }
   return (
     <div>
       <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
-      <input type="number" value={value} onChange={e => onChange(e.target.value)} step="0.01" min="0"
+      <input type="text" inputMode="decimal" value={display} onChange={e => handleChange(e.target.value)} onBlur={handleBlur}
         className="w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white font-mono" />
     </div>
   );
 }
-function ModalInputDate({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function ModalInputDate({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
   return (
     <div>
       <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
-      <input type="date" value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white" />
+      <input type="date" value={value} onChange={e => onChange(e.target.value)} disabled={disabled}
+        className={`w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 ${disabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}`} />
     </div>
   );
 }
@@ -1935,8 +1958,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                     onChange={v => changeModalField('situacaoNegociacaoBlindadora', v)}
                     options={['Negociação Direta', 'Pagamento Antecipado p/ Blindadora']}
                   />
-                  <ModalInputNum label="Custo da Blindagem (R$)" value={modalDraft.custoBlindagem} onChange={v => changeModalField('custoBlindagem', v)} />
-                  <ModalInputDate label="Data do Pagamento Blindadora" value={modalDraft.dataPagamentoBlindadora} onChange={v => changeModalField('dataPagamentoBlindadora', v)} />
+                  <ModalInputCurrency label="Custo da Blindagem (R$)" value={modalDraft.custoBlindagem} onChange={v => changeModalField('custoBlindagem', v)} />
+                  <ModalInputDate label="Data do Pagamento Blindadora" value={modalDraft.dataPagamentoBlindadora} onChange={v => changeModalField('dataPagamentoBlindadora', v)} disabled={modalDraft.situacaoNegociacaoBlindadora === 'Negociação Direta'} />
                   {modalDraft.situacaoNegociacaoBlindadora === 'Negociação Direta' ? (
                     <ModalReadonly label="Local de Pgto Blindagem" value={modalDraft.localPgtoBlindagem || '—'} />
                   ) : (
@@ -1961,7 +1984,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                 <ModalSectionTitle num={3} color="bg-emerald-100 text-emerald-600">Venda</ModalSectionTitle>
                 <div className="grid grid-cols-2 gap-4">
                   <ModalInputDate label="Data da Venda" value={modalDraft.dataVenda} onChange={v => changeModalField('dataVenda', v)} />
-                  <ModalInputNum label="Valor da Venda da Blindagem (R$)" value={modalDraft.valorVendaBlindagem} onChange={v => changeModalField('valorVendaBlindagem', v)} />
+                  <ModalInputCurrency label="Valor da Venda da Blindagem (R$)" value={modalDraft.valorVendaBlindagem} onChange={v => changeModalField('valorVendaBlindagem', v)} />
                 </div>
                 {!!modalDraft.lucroOperacao && (
                   <div className="mt-3 grid grid-cols-2 gap-4">
@@ -2024,7 +2047,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                       undefined
                     }
                   />
-                  <ModalInputDate label="Data de Acerto" value={modalDraft.dataAcerto} onChange={v => changeModalField('dataAcerto', v)} />
+                  <ModalInputDate label="Data de Acerto" value={modalDraft.dataAcerto} onChange={v => changeModalField('dataAcerto', v)} disabled={modalDraft.situacaoNegociacaoBlindadora === 'Negociação Direta'} />
                 </div>
               </section>
             </div>
