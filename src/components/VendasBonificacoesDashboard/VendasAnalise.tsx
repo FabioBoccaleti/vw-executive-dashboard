@@ -188,23 +188,6 @@ function BlindadoraTooltip({ active, payload, label }: { active?: boolean; paylo
   );
 }
 
-function VendedorTooltip({ active, payload, label }: { active?: boolean; payload?: { payload?: { qtd: number; receita: number; lucro: number; sorana: number; soranaPct: number; remVendedor: number } }[]; label?: string }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload;
-  if (!d) return null;
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm">
-      <p className="font-semibold text-slate-700 mb-2">{label}</p>
-      <p className="font-mono" style={{ color: '#64748b' }}>Qtd Vendas: {d.qtd}</p>
-      <p className="font-mono" style={{ color: '#f59e0b' }}>Receita: {fmtBRLFull(d.receita)}</p>
-      <p className="font-mono" style={{ color: '#10b981' }}>Lucro Bruto: {fmtBRLFull(d.lucro)}</p>
-      <p className="font-mono" style={{ color: '#8b5cf6' }}>Comissão Sorana: {fmtBRLFull(d.sorana)}</p>
-      <p className="font-mono mt-1 pt-1 border-t border-slate-100" style={{ color: '#8b5cf6' }}>% Rentabilidade Sorana: {fmtPct(d.soranaPct)}</p>
-      <p className="font-mono" style={{ color: '#0ea5e9' }}>Remuneração: {fmtBRLFull(d.remVendedor)}</p>
-    </div>
-  );
-}
-
 function DeltaBadge({ base, current }: { base: number; current: number }) {
   if (base === 0) return <span className="text-slate-300 text-xs">—</span>;
   const delta = ((current - base) / Math.abs(base)) * 100;
@@ -946,24 +929,6 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
               );
             })()}
 
-            {/* ── Gráfico Top 10 ── */}
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
-                Top {Math.min(vendedorData.length, 10)} — Receita vs Lucro vs Sorana
-              </p>
-              <ResponsiveContainer width="100%" height={Math.min(vendedorData.length, 10) * 36 + 40}>
-                <BarChart data={vendedorData.slice(0, 10)} layout="vertical" margin={{ left: 8, right: 16 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                  <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
-                  <Tooltip content={<VendedorTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="receita" name="Receita" fill="#f59e0b" radius={[0, 3, 3, 0]} />
-                  <Bar dataKey="lucro" name="Lucro Bruto" fill="#10b981" radius={[0, 3, 3, 0]} />
-                  <Bar dataKey="sorana" name="Comissão Sorana" fill="#8b5cf6" radius={[0, 3, 3, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
 
           </div>
         ) : <EmptyChart />}
