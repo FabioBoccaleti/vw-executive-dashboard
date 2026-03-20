@@ -1351,15 +1351,14 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
 
                       {/* Row number + open modal button */}
                       <td
-                        className="sticky left-0 z-20 text-center border-r border-slate-200 px-1 py-1.5"
-                        style={{ background: rowBg }}
+                        className="sticky left-0 z-20 text-center border-r border-slate-200 px-1 py-1"
+                        style={{ background: rowBg, minWidth: '52px' }}
                       >
-                        <div className="flex flex-col items-center gap-0.5">
+                        <div className="flex flex-col items-center gap-1">
                           <button
                             onClick={() => openModal(row)}
-                            className="w-5 h-5 rounded bg-indigo-100 text-indigo-600 hover:bg-indigo-200 flex items-center justify-center text-xs font-bold leading-none transition-colors"
+                            className="w-6 h-6 rounded-md bg-indigo-500 text-white hover:bg-indigo-600 active:scale-95 flex items-center justify-center text-sm font-bold leading-none transition-all shadow-sm"
                             title="Abrir formulário completo de edição"
-                            tabIndex={-1}
                           >+</button>
                           <span className="text-xs text-slate-400 font-mono">{realIdx + 1}</span>
                         </div>
