@@ -787,6 +787,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
                   <LabelList dataKey="qtd" position="right" formatter={(v: number) => `${v}x`} style={{ fontSize: 11, fill: '#64748b' }} />
                 </Bar>
                 <Bar dataKey="lucro" name="Lucro Bruto" fill="#10b981" radius={[0, 3, 3, 0]} />
+                <Bar dataKey="sorana" name="Comissão Sorana" fill="#8b5cf6" radius={[0, 3, 3, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : <EmptyChart />}
