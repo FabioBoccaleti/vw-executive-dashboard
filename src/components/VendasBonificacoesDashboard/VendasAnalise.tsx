@@ -311,6 +311,87 @@ async function exportNotasExcel(pendingRows: VendasRow[], brandLabel: string, ta
   );
 }
 
+// ─── Export Análise ──────────────────────────────────────────────────────────
+const COLS_ANALISE = [
+  { header: '#',               width: 5  },
+  { header: 'Revenda',         width: 24 },
+  { header: 'Blindadora',      width: 24 },
+  { header: 'Chassi',          width: 22 },
+  { header: 'Data da Venda',   width: 16 },
+  { header: 'Nome do Vendedor',width: 26 },
+  { header: 'Comissão Sorana', width: 22 },
+];
+
+async function exportAnaliseExcel(exportRows: VendasRow[], periodLabel: string, brandLabel: string) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Sorana Executive Dashboard';
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet('Vendas', {
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 2 }],
+    properties: { tabColor: { argb: 'FFF59E0B' } },
+  });
+  ws.columns = COLS_ANALISE.map(c => ({ width: c.width }));
+
+  const titleLabel = `Vendas de Blindagem — ${brandLabel} — ${periodLabel}`;
+  const titleRow = ws.addRow([titleLabel]);
+  ws.mergeCells(1, 1, 1, COLS_ANALISE.length);
+  titleRow.height = 28;
+  titleRow.eachCell(cell => {
+    cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    cell.font      = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border    = { top: { style: 'thin', color: { argb: 'FF1E293B' } }, bottom: { style: 'thin', color: { argb: 'FF1E293B' } }, left: { style: 'thin', color: { argb: 'FF1E293B' } }, right: { style: 'thin', color: { argb: 'FF1E293B' } } };
+  });
+
+  const headerRow = ws.addRow(COLS_ANALISE.map(c => c.header));
+  headerRow.height = 32;
+  headerRow.eachCell(cell => {
+    cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+    cell.font      = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border    = { top: { style: 'thin', color: { argb: 'FF475569' } }, bottom: { style: 'medium', color: { argb: 'FF94A3B8' } }, left: { style: 'thin', color: { argb: 'FF475569' } }, right: { style: 'thin', color: { argb: 'FF475569' } } };
+  });
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: COLS_ANALISE.length } };
+
+  const BTHIN = { style: 'thin' as const, color: { argb: 'FFE2E8F0' } };
+  const BRL_FMT = '"R$"\ #,##0.00';
+
+  exportRows.forEach((r, ri) => {
+    const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF8FAFC';
+    const dateVal = r.dataVenda ? (() => { const [y, m, d] = r.dataVenda.split('-'); return (y && m && d) ? new Date(+y, +m - 1, +d) : ''; })() : '';
+    const dr = ws.addRow([ri + 1, r.revenda || '', r.blindadora || '', r.chassi || '', dateVal, r.nomeVendedor || '', parseFloat(r.comissaoBrutaSorana) || null]);
+    dr.height = 17;
+    dr.eachCell({ includeEmpty: true }, (cell, ci) => {
+      cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.border = { top: BTHIN, bottom: BTHIN, left: BTHIN, right: BTHIN };
+      cell.font   = { size: 9.5 };
+      if (ci === 5) { if (cell.value instanceof Date) cell.numFmt = 'DD/MM/YYYY'; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+      else if (ci === 7) { cell.numFmt = BRL_FMT; cell.alignment = { horizontal: 'right', vertical: 'middle' }; cell.font = { size: 9.5, name: 'Courier New' }; }
+      else { cell.alignment = { horizontal: ci === 1 ? 'center' : 'left', vertical: 'middle' }; }
+    });
+  });
+
+  const total = exportRows.reduce((s, r) => s + (parseFloat(r.comissaoBrutaSorana) || 0), 0);
+  const totRow = ws.addRow(['', '', '', '', '', 'TOTAL', total]);
+  totRow.height = 22;
+  totRow.eachCell({ includeEmpty: true }, (cell, ci) => {
+    cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    cell.border = { top: { style: 'medium', color: { argb: 'FF94A3B8' } }, bottom: { style: 'medium', color: { argb: 'FF334155' } }, left: { style: 'thin', color: { argb: 'FF475569' } }, right: { style: 'thin', color: { argb: 'FF475569' } } };
+    if (ci === 6) { cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; }
+    else if (ci === 7) { cell.numFmt = BRL_FMT; cell.font = { bold: true, size: 10, color: { argb: 'FFFBBF24' }, name: 'Courier New' }; cell.alignment = { horizontal: 'right', vertical: 'middle' }; }
+    else { cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } }; }
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  const dateStr = new Date().toISOString().split('T')[0];
+  const brand = brandLabel.toLowerCase().replace(/\s+/g, '-');
+  saveAs(
+    new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    `vendas-blindagem-${brand}-${periodLabel.toLowerCase().replace(/\//g, '-')}-${dateStr}.xlsx`
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 interface VendasAnaliseProps { rows: VendasRow[]; }
 
@@ -666,6 +747,19 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
               );
             })}
           </div>
+
+          {/* Exportar Excel */}
+          <button
+            onClick={async () => {
+              const periodLbl = monthChip ? `${MONTHS[monthChip - 1]}-${selectedYear}` : String(selectedYear);
+              const brandLbl = selectedBrand === 'Todas' ? 'Todas as Revendas' : selectedBrand === 'VW' ? 'Revenda VW' : 'Revenda Audi';
+              await exportAnaliseExcel(filteredRows, periodLbl, brandLbl);
+            }}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-sm flex-shrink-0"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Exportar Excel
+          </button>
         </div>
       </div>
 
