@@ -3,7 +3,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LabelList,
 } from 'recharts';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import { type VendasRow } from './vendasStorage';
 import { TrendingUp, TrendingDown, Minus, Plus, X, Check, Download } from 'lucide-react';
 
@@ -943,10 +944,15 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
             )}
             {notasAEmitirData.totalQtd > 0 && (
               <button
-                onClick={() => exportNotasExcel(
-                  brandRows.filter(r => r.situacaoComissao === 'Emitir Nota de Intermediação'),
-                  brandOptions.find(o => o.value === selectedBrand)!.label
-                )}
+                onClick={() => {
+                  const opt = brandOptions.find(o => o.value === selectedBrand)!;
+                  const tabColor = selectedBrand === 'VW' ? 'FF001E50' : selectedBrand === 'Audi' ? 'FFBB0A21' : 'FF1E293B';
+                  exportNotasExcel(
+                    brandRows.filter(r => r.situacaoComissao === 'Emitir Nota de Intermediação'),
+                    opt.label,
+                    tabColor as 'FF1E293B' | 'FF001E50' | 'FFBB0A21',
+                  );
+                }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-sm"
               >
                 <Download className="w-3.5 h-3.5" />
