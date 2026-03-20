@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download, Upload, RefreshCw } from 'lucide-react';
+import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download, Upload, RefreshCw, Package, ListRestart } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from './vendasStorage';
 import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
@@ -623,6 +623,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('analise');
   const [importPreview, setImportPreview] = useState<VendasRow[] | null>(null);
   const [recalcConfirm, setRecalcConfirm] = useState(false);
+  const [estoqueMode, setEstoqueMode] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -949,8 +950,9 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const availableYears              = useMemo(() => [...new Set(rows.map(r => r.dataVenda?.split('-')[0]).filter(Boolean))].map(Number).sort((a,b)=>b-a), [rows]);
 
   const hasActiveFilters = Object.values(filters).some(v => v && v.length > 0) || filterYear != null || filterMonth != null || !!filterBlindagemMode;
+  const estoqueBaseRows = estoqueMode ? rows.filter(r => !r.dataVenda) : rows;
   const filteredRows     = hasActiveFilters
-    ? rows.filter(r => {
+    ? estoqueBaseRows.filter(r => {
         if (!rowMatchesFilters(r, filters)) return false;
         if (filterYear != null) {
           const y = r.dataVenda ? parseInt(r.dataVenda.split('-')[0]) : 0;
@@ -968,7 +970,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         }
         return true;
       })
-    : rows;
+    : estoqueBaseRows;
 
   if (loading) {
     return (
@@ -1525,6 +1527,28 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
               <RefreshCw className="w-4 h-4" />
               Recalcular Remunerações
             </Button>
+            {!estoqueMode ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEstoqueMode(true)}
+                className="text-sky-700 border-sky-300 hover:bg-sky-50 gap-1.5 font-medium"
+                title="Exibe apenas veículos sem Data da Venda (em estoque)"
+              >
+                <Package className="w-4 h-4" />
+                Em Estoque
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEstoqueMode(false)}
+                className="bg-sky-500 text-white border-sky-500 hover:bg-sky-600 gap-1.5 font-medium"
+              >
+                <ListRestart className="w-4 h-4" />
+                Ver Todos
+              </Button>
+            )}
             <input
               ref={importInputRef}
               type="file"
