@@ -973,10 +973,15 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-1 mb-1">
                             <span className="text-xs font-medium text-slate-700 truncate">{v.name}</span>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="text-xs font-mono font-semibold text-amber-600">{fmtBRL(v.remVendedor)}</span>
-                              <span className="text-xs text-slate-400 tabular-nums">{v.qtd}x</span>
-                              <span className="text-xs text-slate-400">{v.receita > 0 ? fmtPct(v.remVendedor / v.receita * 100) : '—'}</span>
+                            <div className="flex items-center gap-4 flex-shrink-0">
+                              <div className="text-right">
+                                <p className="text-[10px] text-slate-400 leading-none mb-0.5">Volume</p>
+                                <p className="text-xs font-mono font-semibold text-slate-600 tabular-nums">{v.qtd}x</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-[10px] text-slate-400 leading-none mb-0.5">Remuneração</p>
+                                <p className="text-xs font-mono font-semibold text-amber-600">{fmtBRL(v.remVendedor)}</p>
+                              </div>
                             </div>
                           </div>
                           <div className="w-full bg-slate-100 rounded-full h-1">
