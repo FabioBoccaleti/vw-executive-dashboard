@@ -188,6 +188,23 @@ function BlindadoraTooltip({ active, payload, label }: { active?: boolean; paylo
   );
 }
 
+function VendedorTooltip({ active, payload, label }: { active?: boolean; payload?: { payload?: { qtd: number; receita: number; lucro: number; sorana: number; soranaPct: number; remVendedor: number } }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0]?.payload;
+  if (!d) return null;
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm">
+      <p className="font-semibold text-slate-700 mb-2">{label}</p>
+      <p className="font-mono" style={{ color: '#64748b' }}>Qtd Vendas: {d.qtd}</p>
+      <p className="font-mono" style={{ color: '#f59e0b' }}>Receita: {fmtBRLFull(d.receita)}</p>
+      <p className="font-mono" style={{ color: '#10b981' }}>Lucro Bruto: {fmtBRLFull(d.lucro)}</p>
+      <p className="font-mono" style={{ color: '#8b5cf6' }}>Comissão Sorana: {fmtBRLFull(d.sorana)}</p>
+      <p className="font-mono mt-1 pt-1 border-t border-slate-100" style={{ color: '#8b5cf6' }}>% Rentabilidade Sorana: {fmtPct(d.soranaPct)}</p>
+      <p className="font-mono" style={{ color: '#0ea5e9' }}>Remuneração: {fmtBRLFull(d.remVendedor)}</p>
+    </div>
+  );
+}
+
 function DeltaBadge({ base, current }: { base: number; current: number }) {
   if (base === 0) return <span className="text-slate-300 text-xs">—</span>;
   const delta = ((current - base) / Math.abs(base)) * 100;
@@ -408,15 +425,16 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
 
   // ── Por vendedor ──
   const vendedorData = useMemo(() => {
-    const map = new Map<string, { qtd: number; receita: number; lucro: number; remVendedor: number }>();
+    const map = new Map<string, { qtd: number; receita: number; lucro: number; remVendedor: number; sorana: number }>();
     filteredRows.forEach(r => {
       const key = r.nomeVendedor || 'Não informado';
-      const cur = map.get(key) || { qtd: 0, receita: 0, lucro: 0, remVendedor: 0 };
+      const cur = map.get(key) || { qtd: 0, receita: 0, lucro: 0, remVendedor: 0, sorana: 0 };
       map.set(key, {
         qtd: cur.qtd + 1,
         receita: cur.receita + n(r.valorVendaBlindagem),
         lucro: cur.lucro + n(r.lucroOperacao),
         remVendedor: cur.remVendedor + n(r.remuneracaoVendedor),
+        sorana: cur.sorana + n(r.comissaoBrutaSorana),
       });
     });
     return [...map.entries()]
@@ -427,8 +445,10 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
         lucro: v.lucro,
         margem: v.receita > 0 ? (v.lucro / v.receita) * 100 : 0,
         remVendedor: v.remVendedor,
+        sorana: v.sorana,
+        soranaPct: v.receita > 0 ? (v.sorana / v.receita) * 100 : 0,
       }))
-      .sort((a, b) => b.receita - a.receita);
+      .sort((a, b) => b.qtd - a.qtd);
   }, [filteredRows]);
 
   // ── Por blindadora ──
@@ -828,129 +848,117 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
           <div className="space-y-6">
 
             {/* ── Pódio Top 3 ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {vendedorData.slice(0, 3).map((v, i) => {
-                const medals  = ['🥇', '🥈', '🥉'];
-                const gradients = ['from-amber-400 to-amber-600', 'from-slate-400 to-slate-500', 'from-orange-400 to-orange-500'];
-                const bgBorder  = ['bg-amber-50 border-amber-200', 'bg-slate-50 border-slate-200', 'bg-orange-50 border-orange-200'];
-                const textAccent = ['text-amber-600', 'text-slate-600', 'text-orange-500'];
-                const topReceita = vendedorData[0].receita;
-                const barPct = topReceita > 0 ? (v.receita / topReceita) * 100 : 0;
-                const initials = v.name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-                return (
-                  <div key={v.name} className={`rounded-xl border p-4 ${bgBorder[i]} relative overflow-hidden`}>
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradients[i]} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm`}>
-                        {initials}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          <span className="text-base leading-none">{medals[i]}</span>
-                          <span className="text-xs font-bold text-slate-400">#{i + 1}</span>
-                        </div>
-                        <p className="text-sm font-bold text-slate-800 leading-tight truncate">{v.name}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-xs text-slate-400 mb-0.5">Receita</p>
-                        <p className={`text-lg font-bold font-mono ${textAccent[i]}`}>{fmtBRL(v.receita)}</p>
-                      </div>
-                      <div className="w-full bg-white/70 rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full bg-gradient-to-r ${gradients[i]} transition-all`}
-                          style={{ width: `${barPct}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-500">
-                          <span className="font-semibold">{v.qtd}</span> venda{v.qtd !== 1 ? 's' : ''}
-                        </span>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          v.margem >= 20 ? 'bg-emerald-100 text-emerald-700' :
-                          v.margem >= 10 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'
-                        }`}>
-                          {fmtPct(v.margem)}
-                        </span>
-                      </div>
-                      <div className="pt-1.5 border-t border-white/60">
-                        <p className="text-xs text-slate-400">
-                          Remuneração: <span className="font-semibold text-sky-600 font-mono">{fmtBRL(v.remVendedor)}</span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* ── Lista compacta rank 4+ ── */}
-            {vendedorData.length > 3 && (
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Demais vendedores</p>
-                <div className="divide-y divide-slate-50">
-                  {(showAllVendedores ? vendedorData.slice(3) : vendedorData.slice(3, 9)).map((v, i) => {
-                    const rank = i + 4;
-                    const topReceita = vendedorData[0].receita;
-                    const barPct = topReceita > 0 ? (v.receita / topReceita) * 100 : 0;
+            {(() => {
+              const totalQtd = vendedorData.reduce((s, v) => s + v.qtd, 0);
+              const medals  = ['🥇', '🥈', '🥉'];
+              const gradients = ['from-amber-400 to-amber-600', 'from-slate-400 to-slate-500', 'from-orange-400 to-orange-500'];
+              const bgBorder  = ['bg-amber-50 border-amber-200', 'bg-slate-50 border-slate-200', 'bg-orange-50 border-orange-200'];
+              const textAccent = ['text-amber-600', 'text-slate-600', 'text-orange-500'];
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {vendedorData.slice(0, 3).map((v, i) => {
+                    const topQtd = vendedorData[0].qtd;
+                    const barPct = topQtd > 0 ? (v.qtd / topQtd) * 100 : 0;
+                    const volPct = totalQtd > 0 ? (v.qtd / totalQtd) * 100 : 0;
                     const initials = v.name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
                     return (
-                      <div key={v.name} className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-slate-50 transition-colors">
-                        <span className="text-xs font-bold text-slate-300 w-5 text-center flex-shrink-0">#{rank}</span>
-                        <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold flex-shrink-0">
-                          {initials}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="text-sm font-medium text-slate-700 truncate">{v.name}</span>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="text-xs font-mono font-semibold text-amber-600">{fmtBRL(v.receita)}</span>
-                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                                v.margem >= 20 ? 'bg-emerald-100 text-emerald-700' :
-                                v.margem >= 10 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'
-                              }`}>
-                                {fmtPct(v.margem)}
-                              </span>
-                              <span className="text-xs text-slate-400 tabular-nums">{v.qtd}x</span>
-                              <span className="hidden sm:inline text-xs text-sky-500 font-mono">{fmtBRL(v.remVendedor)}</span>
-                            </div>
+                      <div key={v.name} className={`rounded-xl border p-4 ${bgBorder[i]} relative overflow-hidden`}>
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradients[i]} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm`}>
+                            {initials}
                           </div>
-                          <div className="w-full bg-slate-100 rounded-full h-1">
-                            <div className="h-1 rounded-full bg-slate-300 transition-all" style={{ width: `${barPct}%` }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="text-base leading-none">{medals[i]}</span>
+                              <span className="text-xs font-bold text-slate-400">#{i + 1}</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-800 leading-tight truncate">{v.name}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Receita</p>
+                            <p className={`text-lg font-bold font-mono ${textAccent[i]}`}>{fmtBRL(v.receita)}</p>
+                          </div>
+                          <div className="w-full bg-white/70 rounded-full h-1.5">
+                            <div className={`h-1.5 rounded-full bg-gradient-to-r ${gradients[i]} transition-all`} style={{ width: `${barPct}%` }} />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-slate-500">
+                              <span className="font-semibold">{v.qtd}</span> venda{v.qtd !== 1 ? 's' : ''}
+                              <span className="ml-1 text-slate-400">({fmtPct(volPct)} do volume)</span>
+                            </span>
+                          </div>
+                          <div className="pt-1.5 border-t border-white/60 space-y-1">
+                            <p className="text-xs text-slate-400">Comissão Sorana: <span className="font-semibold text-violet-600 font-mono">{fmtBRL(v.sorana)}</span></p>
+                            <p className="text-xs text-slate-400">% Rentabilidade: <span className="font-semibold text-fuchsia-600 font-mono">{fmtPct(v.soranaPct)}</span></p>
+                            <p className="text-xs text-slate-400">Remuneração: <span className="font-semibold text-sky-600 font-mono">{fmtBRL(v.remVendedor)}</span></p>
                           </div>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-                {vendedorData.length > 9 && (
-                  <button
-                    onClick={() => setShowAllVendedores(prev => !prev)}
-                    className="mt-3 w-full text-center text-xs font-semibold text-slate-400 hover:text-amber-600 py-2 rounded-lg hover:bg-amber-50 transition-colors border border-dashed border-slate-200 hover:border-amber-300"
-                  >
-                    {showAllVendedores
-                      ? '▲ Mostrar menos'
-                      : `▼ Ver todos os ${vendedorData.length - 3} vendedores restantes`
-                    }
-                  </button>
-                )}
-              </div>
-            )}
+              );
+            })()}
+
+            {/* ── Tabela Todos os Vendedores ── */}
+            {(() => {
+              const totalQtd = vendedorData.reduce((s, v) => s + v.qtd, 0);
+              return (
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Todos os Vendedores</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-100">
+                          <th className="text-left py-2 px-2 text-slate-400 font-semibold w-8">#</th>
+                          <th className="text-left py-2 px-2 text-slate-400 font-semibold">Vendedor</th>
+                          <th className="text-right py-2 px-2 text-slate-400 font-semibold">Qtd</th>
+                          <th className="text-right py-2 px-2 text-slate-400 font-semibold">% Volume</th>
+                          <th className="text-right py-2 px-2 text-slate-400 font-semibold">Comissão Sorana</th>
+                          <th className="text-right py-2 px-2 text-slate-400 font-semibold">% Rent. Sorana</th>
+                          <th className="text-right py-2 px-2 text-slate-400 font-semibold">Remuneração</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vendedorData.map((v, i) => {
+                          const volPct = totalQtd > 0 ? (v.qtd / totalQtd) * 100 : 0;
+                          const isPodium = i < 3;
+                          return (
+                            <tr key={v.name} className={`border-b border-slate-50 hover:bg-slate-50 transition-colors ${isPodium ? 'font-semibold' : ''}`}>
+                              <td className="py-2 px-2 text-slate-400 font-bold">#{i + 1}</td>
+                              <td className="py-2 px-2 text-slate-700">{v.name}</td>
+                              <td className="py-2 px-2 text-right tabular-nums text-slate-600">{v.qtd}</td>
+                              <td className="py-2 px-2 text-right tabular-nums text-slate-500">{fmtPct(volPct)}</td>
+                              <td className="py-2 px-2 text-right tabular-nums font-mono text-violet-600">{fmtBRL(v.sorana)}</td>
+                              <td className="py-2 px-2 text-right tabular-nums font-mono text-fuchsia-600">{fmtPct(v.soranaPct)}</td>
+                              <td className="py-2 px-2 text-right tabular-nums font-mono text-sky-600">{fmtBRL(v.remVendedor)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ── Gráfico Top 10 ── */}
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
-                Top {Math.min(vendedorData.length, 10)} — Receita vs Lucro
+                Top {Math.min(vendedorData.length, 10)} — Receita vs Lucro vs Sorana
               </p>
               <ResponsiveContainer width="100%" height={Math.min(vendedorData.length, 10) * 36 + 40}>
                 <BarChart data={vendedorData.slice(0, 10)} layout="vertical" margin={{ left: 8, right: 16 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                   <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
-                  <Tooltip content={<CustomTooltipBRL />} />
+                  <Tooltip content={<VendedorTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="receita" name="Receita" fill="#f59e0b" radius={[0, 3, 3, 0]} />
-                  <Bar dataKey="lucro" name="Lucro" fill="#10b981" radius={[0, 3, 3, 0]} />
+                  <Bar dataKey="lucro" name="Lucro Bruto" fill="#10b981" radius={[0, 3, 3, 0]} />
+                  <Bar dataKey="sorana" name="Comissão Sorana" fill="#8b5cf6" radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
