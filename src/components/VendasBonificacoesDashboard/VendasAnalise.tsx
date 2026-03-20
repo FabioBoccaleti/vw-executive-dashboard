@@ -815,9 +815,10 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
       </div>
 
       {/* ── EVOLUÇÃO MENSAL ── */}
+      {monthChip === null && (
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
-          <SectionTitle>Evolução Mensal — {monthChip ? `${MONTHS[monthChip - 1]}/${selectedYear}` : String(selectedYear)}</SectionTitle>
+          <SectionTitle>Evolução Mensal — {String(selectedYear)}</SectionTitle>
         </div>
         <ResponsiveContainer width="100%" height={280}>
           <ComposedChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
@@ -832,6 +833,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+      )}
 
       {/* ── PERFORMANCE POR VENDEDOR ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
