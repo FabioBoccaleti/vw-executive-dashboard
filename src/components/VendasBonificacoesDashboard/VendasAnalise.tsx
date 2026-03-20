@@ -170,6 +170,24 @@ function MonthlyTooltip({ active, payload, label }: { active?: boolean; payload?
   );
 }
 
+function BlindadoraTooltip({ active, payload, label }: { active?: boolean; payload?: { payload?: { qtd: number; receita: number; lucro: number; sorana: number; soranaPct: number } }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0]?.payload;
+  if (!d) return null;
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm">
+      <p className="font-semibold text-slate-700 mb-2">{label}</p>
+      <p className="font-mono" style={{ color: '#64748b' }}>Total de Vendas: {d.qtd}</p>
+      <p className="font-mono" style={{ color: '#f59e0b' }}>Receita: {fmtBRLFull(d.receita)}</p>
+      <p className="font-mono" style={{ color: '#10b981' }}>Lucro Bruto: {fmtBRLFull(d.lucro)}</p>
+      <p className="font-mono" style={{ color: '#8b5cf6' }}>Comissão Sorana: {fmtBRLFull(d.sorana)}</p>
+      <p className="font-mono mt-1 pt-1 border-t border-slate-100" style={{ color: '#8b5cf6' }}>
+        % Rentabilidade Sorana: {fmtPct(d.soranaPct)}
+      </p>
+    </div>
+  );
+}
+
 function DeltaBadge({ base, current }: { base: number; current: number }) {
   if (base === 0) return <span className="text-slate-300 text-xs">—</span>;
   const delta = ((current - base) / Math.abs(base)) * 100;
@@ -415,15 +433,16 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
 
   // ── Por blindadora ──
   const blindadoraData = useMemo(() => {
-    const map = new Map<string, { qtd: number; receita: number; custo: number; lucro: number }>();
+    const map = new Map<string, { qtd: number; receita: number; custo: number; lucro: number; sorana: number }>();
     brandRows.filter(r => getRowYear(r) === selectedYear && (monthChip === null || getRowMonth(r) === monthChip)).forEach(r => {
       const key = r.blindadora || 'Não informada';
-      const cur = map.get(key) || { qtd: 0, receita: 0, custo: 0, lucro: 0 };
+      const cur = map.get(key) || { qtd: 0, receita: 0, custo: 0, lucro: 0, sorana: 0 };
       map.set(key, {
         qtd: cur.qtd + 1,
         receita: cur.receita + n(r.valorVendaBlindagem),
         custo: cur.custo + n(r.custoBlindagem),
         lucro: cur.lucro + n(r.lucroOperacao),
+        sorana: cur.sorana + n(r.comissaoBrutaSorana),
       });
     });
     return [...map.entries()]
@@ -433,6 +452,8 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
         custoMedio: v.qtd > 0 ? v.custo / v.qtd : 0,
         lucro: v.lucro,
         receita: v.receita,
+        sorana: v.sorana,
+        soranaPct: v.receita > 0 ? (v.sorana / v.receita) * 100 : 0,
       }))
       .sort((a, b) => b.receita - a.receita);
   }, [brandRows, selectedYear, monthChip]);
@@ -760,12 +781,12 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={70} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80} />
-                <Tooltip content={<CustomTooltipBRL />} />
+                <Tooltip content={<BlindadoraTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="receita" name="Receita" fill="#f59e0b" radius={[0, 3, 3, 0]}>
                   <LabelList dataKey="qtd" position="right" formatter={(v: number) => `${v}x`} style={{ fontSize: 11, fill: '#64748b' }} />
                 </Bar>
-                <Bar dataKey="lucro" name="Lucro" fill="#10b981" radius={[0, 3, 3, 0]} />
+                <Bar dataKey="lucro" name="Lucro Bruto" fill="#10b981" radius={[0, 3, 3, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : <EmptyChart />}
