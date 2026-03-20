@@ -528,7 +528,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
 
   // ── Notas a emitir por blindadora (total geral, apenas filtro de marca) ──
   const notasAEmitirData = useMemo(() => {
-    const pending = brandRows.filter(r => r.situacaoComissao === 'Emitir Nota de Intermediação');
+    const pending = brandRows.filter(r => !r.numeroNFComissao && !!r.dataVenda);
     const map = new Map<string, { qtd: number; valor: number }>();
     pending.forEach(r => {
       const key = r.blindadora || 'Não informada';
@@ -1201,7 +1201,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
                   const opt = brandOptions.find(o => o.value === selectedBrand)!;
                   const tabColor = selectedBrand === 'VW' ? 'FF001E50' : selectedBrand === 'Audi' ? 'FFBB0A21' : 'FF1E293B';
                   await exportNotasExcel(
-                    brandRows.filter(r => r.situacaoComissao === 'Emitir Nota de Intermediação'),
+                    brandRows.filter(r => !r.numeroNFComissao && !!r.dataVenda),
                     opt.label,
                     tabColor,
                   );
