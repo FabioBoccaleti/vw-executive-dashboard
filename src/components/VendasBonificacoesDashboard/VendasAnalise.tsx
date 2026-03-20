@@ -634,7 +634,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
           <KpiCard label="Custo Total" value={fmtBRL(metrics.custo)} color="text-red-500" />
           <KpiCard label="Lucro da Operação" value={fmtBRL(metrics.lucro)} color="text-emerald-600" />
           <KpiCard label="Margem %" value={fmtPct(metrics.margem)} color={metrics.margem >= 20 ? 'text-emerald-600' : metrics.margem >= 10 ? 'text-amber-600' : 'text-red-500'} />
-          <KpiCard label="Ticket Médio" value={fmtBRL(metrics.ticketMedio)} color="text-sky-600" />
+          <KpiCard label="Ticket Médio" value={fmtBRL(metrics.ticketMedio)} color="text-sky-600" sub={metrics.qtd > 0 ? `TM Comissão: ${fmtBRL(metrics.sorana / metrics.qtd)}` : undefined} />
           <KpiCard label="Comissão Sorana" value={fmtBRL(metrics.sorana)} color="text-violet-600" sub={metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) + ' da receita' : undefined} />
         </div>
       </div>
