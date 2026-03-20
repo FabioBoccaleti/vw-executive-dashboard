@@ -1,11 +1,13 @@
 import { Fragment, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties } from 'lucide-react';
+import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from './vendasStorage';
 import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
 import { loadRevendas, loadBlinadadoras, loadRegras, loadVendedores, type Revenda, type Blindadora, type RegraRemuneracao, type Vendedor } from '@/components/CadastrosPage/cadastrosStorage';
 import { VendasAnalise } from './VendasAnalise';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 // ─── Campos calculados automaticamente (somente leitura no modo edição) ────────
 const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados', 'comissaoBrutaSorana', 'situacaoComissao', 'valorAPagarBlindadora', 'valorAReceberBlindadora']);
@@ -158,6 +160,133 @@ function calcSituacaoComissao(row: Pick<VendasRow, 'numeroNFComissao' | 'comissa
 function todayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ─── Export Tabela to Excel ───────────────────────────────────────────────────
+async function exportTabelaExcel(exportRows: VendasRow[]): Promise<void> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Sorana Executive Dashboard';
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet('Demonstrativo de Vendas', {
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 2 }],
+    properties: { tabColor: { argb: 'FFF59E0B' } },
+  });
+
+  ws.columns = COLUMNS.map(col => ({ width: Math.max(10, Math.round(col.width / 6.5)) }));
+
+  // ── Row 1: Merged title ──────────────────────────────────────────────────────
+  const today = new Date().toLocaleDateString('pt-BR');
+  const titleRow = ws.addRow([`Demonstrativo de Vendas e Bonificações — ${today}`]);
+  ws.mergeCells(1, 1, 1, COLUMNS.length);
+  titleRow.height = 30;
+  titleRow.eachCell(cell => {
+    cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    cell.font  = { color: { argb: 'FFFFFFFF' }, bold: true, size: 13 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF1E293B' } }, bottom: { style: 'thin', color: { argb: 'FF1E293B' } },
+      left: { style: 'thin', color: { argb: 'FF1E293B' } }, right: { style: 'thin', color: { argb: 'FF1E293B' } },
+    };
+  });
+
+  // ── Row 2: Headers ───────────────────────────────────────────────────────────
+  const headerRow = ws.addRow(COLUMNS.map(c => c.label));
+  headerRow.height = 38;
+  headerRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 9.5 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = {
+      top:    { style: 'thin',   color: { argb: 'FF475569' } },
+      bottom: { style: 'medium', color: { argb: 'FF94A3B8' } },
+      left:   { style: 'thin',   color: { argb: 'FF475569' } },
+      right:  { style: 'thin',   color: { argb: 'FF475569' } },
+    };
+  });
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: COLUMNS.length } };
+
+  // ── Data rows ────────────────────────────────────────────────────────────────
+  const BTHIN = { style: 'thin' as const, color: { argb: 'FFE2E8F0' } };
+  const BRL_FMT = '"R$"\\ #,##0.00';
+
+  exportRows.forEach((row, ri) => {
+    const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF8FAFC';
+    const values = COLUMNS.map(col => {
+      if (col.type === 'calc')     return col.calc ? col.calc(row) : '';
+      if (col.type === 'currency') return parseFloat(row[col.key] as string) || null;
+      if (col.type === 'date') {
+        const v = row[col.key] as string;
+        if (!v) return null;
+        const [y, m, d] = v.split('-');
+        return (y && m && d) ? new Date(+y, +m - 1, +d) : v;
+      }
+      return (row[col.key] as string) || '';
+    });
+
+    const dr = ws.addRow(values);
+    dr.height = 17;
+
+    dr.eachCell({ includeEmpty: true }, (cell, ci) => {
+      const col = COLUMNS[ci - 1];
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.border = { top: BTHIN, bottom: BTHIN, left: BTHIN, right: BTHIN };
+      if (!col) return;
+      if (col.type === 'currency') {
+        cell.numFmt = BRL_FMT;
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.font = { size: 9.5, name: 'Courier New' };
+      } else if (col.type === 'date') {
+        if (cell.value instanceof Date) cell.numFmt = 'DD/MM/YYYY';
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.font = { size: 9.5 };
+      } else if (col.type === 'calc') {
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.font = { size: 9.5 };
+      } else {
+        cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: false };
+        cell.font = { size: 9.5 };
+      }
+    });
+  });
+
+  // ── Totals row ───────────────────────────────────────────────────────────────
+  const totals = COLUMNS.map((col, i) => {
+    if (i === 0) return 'TOTAL';
+    if (col.type === 'currency')
+      return exportRows.reduce((s, r) => s + (parseFloat(r[col.key] as string) || 0), 0);
+    return null;
+  });
+
+  const totalRow = ws.addRow(totals);
+  totalRow.height = 22;
+  totalRow.eachCell({ includeEmpty: true }, (cell, ci) => {
+    const col = COLUMNS[ci - 1];
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    cell.border = {
+      top:    { style: 'medium', color: { argb: 'FF94A3B8' } },
+      bottom: { style: 'medium', color: { argb: 'FF334155' } },
+      left:   { style: 'thin',   color: { argb: 'FF475569' } },
+      right:  { style: 'thin',   color: { argb: 'FF475569' } },
+    };
+    if (!col) return;
+    if (col.type === 'currency') {
+      cell.numFmt = BRL_FMT;
+      cell.alignment = { horizontal: 'right', vertical: 'middle' };
+      cell.font = { bold: true, size: 10, color: { argb: 'FFFBBF24' }, name: 'Courier New' };
+    } else {
+      cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+    }
+  });
+
+  // ── Save ──────────────────────────────────────────────────────────────────────
+  const buf = await wb.xlsx.writeBuffer();
+  const dateStr = new Date().toISOString().split('T')[0];
+  saveAs(
+    new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    `demonstrativo-vendas-${dateStr}.xlsx`
+  );
 }
 
 // ─── Filter helpers ───────────────────────────────────────────────────────────
@@ -998,6 +1127,15 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
             >
               <Plus className="w-4 h-4" />
               Adicionar linha
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportTabelaExcel(filteredRows)}
+              className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 gap-1.5 font-medium"
+            >
+              <Download className="w-4 h-4" />
+              Exportar Excel
             </Button>
             {hasActiveFilters && (
               <span className="text-xs text-amber-600 flex items-center gap-1">
