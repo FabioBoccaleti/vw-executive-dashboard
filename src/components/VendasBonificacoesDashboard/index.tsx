@@ -38,8 +38,12 @@ function getBaseValue(row: VendasRow, baseCalculo: string): number {
   }
 }
 
-function calcRemuneracaoField(row: VendasRow, cargo: string, regras: RegraRemuneracao[]): string {
-  const regra = regras.find(r => r.cargo === cargo);
+function calcRemuneracaoField(row: VendasRow, cargo: string, regras: RegraRemuneracao[], revendas: Revenda[] = []): string {
+  // Prioridade: regra específica para a revenda da linha; fallback para regra com revendaId vazio (todas)
+  const revendaIdDaLinha = revendas.find(rv => rv.nome === row.revenda)?.id ?? '';
+  const regra =
+    regras.find(r => r.cargo === cargo && r.revendaId && r.revendaId === revendaIdDaLinha) ??
+    regras.find(r => r.cargo === cargo && !r.revendaId);
   if (!regra) return '';
   const base = getBaseValue(row, regra.baseCalculo);
   if (regra.tipoPremio === 'percentual') {
@@ -666,10 +670,10 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     draft.lucroOperacao = draft.valorVendaBlindagem ? String(venda - custo) : '';
     // Remunerações e Sorana: congeladas se NF já foi emitida
     if (!draft.numeroNFComissao) {
-      draft.remuneracaoVendedor  = calcRemuneracaoField(draft, 'Vendedor', regras);
-      draft.remuneracaoGerencia  = calcRemuneracaoField(draft, 'Gerência', regras);
-      draft.remuneracaoDiretoria = calcRemuneracaoField(draft, 'Diretoria', regras);
-      draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras);
+      draft.remuneracaoVendedor  = calcRemuneracaoField(draft, 'Vendedor', regras, revendas);
+      draft.remuneracaoGerencia  = calcRemuneracaoField(draft, 'Gerência', regras, revendas);
+      draft.remuneracaoDiretoria = calcRemuneracaoField(draft, 'Diretoria', regras, revendas);
+      draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras, revendas);
       draft.comissaoBrutaSorana = String(
         (parseFloat(draft.lucroOperacao) || 0)
         - (parseFloat(draft.remuneracaoVendedor) || 0)
@@ -710,10 +714,10 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         updated.lucroOperacao = vendaStr ? String(venda - custo) : '';
         // Remunerações e Sorana: congeladas se NF já foi emitida
         if (!updated.numeroNFComissao) {
-          updated.remuneracaoVendedor  = calcRemuneracaoField(updated, 'Vendedor',  regras);
-          updated.remuneracaoGerencia  = calcRemuneracaoField(updated, 'Gerência',  regras);
-          updated.remuneracaoDiretoria = calcRemuneracaoField(updated, 'Diretoria', regras);
-          updated.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(updated, 'Supervisor de Usados', regras);
+          updated.remuneracaoVendedor  = calcRemuneracaoField(updated, 'Vendedor',  regras, revendas);
+          updated.remuneracaoGerencia  = calcRemuneracaoField(updated, 'Gerência',  regras, revendas);
+          updated.remuneracaoDiretoria = calcRemuneracaoField(updated, 'Diretoria', regras, revendas);
+          updated.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(updated, 'Supervisor de Usados', regras, revendas);
           updated.comissaoBrutaSorana = String(
             (parseFloat(updated.lucroOperacao) || 0)
             - (parseFloat(updated.remuneracaoVendedor) || 0)
@@ -791,10 +795,10 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
       const venda = parseFloat(draft.valorVendaBlindagem) || 0;
       const custo = parseFloat(draft.custoBlindagem) || 0;
       draft.lucroOperacao = draft.valorVendaBlindagem ? String(venda - custo) : '';
-      draft.remuneracaoVendedor                 = calcRemuneracaoField(draft, 'Vendedor',            regras);
-      draft.remuneracaoGerencia                 = calcRemuneracaoField(draft, 'Gerência',            regras);
-      draft.remuneracaoDiretoria                = calcRemuneracaoField(draft, 'Diretoria',           regras);
-      draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras);
+      draft.remuneracaoVendedor                 = calcRemuneracaoField(draft, 'Vendedor',            regras, revendas);
+      draft.remuneracaoGerencia                 = calcRemuneracaoField(draft, 'Gerência',            regras, revendas);
+      draft.remuneracaoDiretoria                = calcRemuneracaoField(draft, 'Diretoria',           regras, revendas);
+      draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras, revendas);
       draft.comissaoBrutaSorana = String(
         (parseFloat(draft.lucroOperacao) || 0)
         - (parseFloat(draft.remuneracaoVendedor) || 0)
@@ -903,10 +907,10 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         const venda = parseFloat(draft.valorVendaBlindagem) || 0;
         const custo = parseFloat(draft.custoBlindagem) || 0;
         draft.lucroOperacao = draft.valorVendaBlindagem ? String(venda - custo) : '';
-        draft.remuneracaoVendedor                 = calcRemuneracaoField(draft, 'Vendedor',            regras);
-        draft.remuneracaoGerencia                 = calcRemuneracaoField(draft, 'Gerência',            regras);
-        draft.remuneracaoDiretoria                = calcRemuneracaoField(draft, 'Diretoria',           regras);
-        draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras);
+        draft.remuneracaoVendedor                 = calcRemuneracaoField(draft, 'Vendedor',            regras, revendas);
+        draft.remuneracaoGerencia                 = calcRemuneracaoField(draft, 'Gerência',            regras, revendas);
+        draft.remuneracaoDiretoria                = calcRemuneracaoField(draft, 'Diretoria',           regras, revendas);
+        draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras, revendas);
         draft.comissaoBrutaSorana = String(
           (parseFloat(draft.lucroOperacao) || 0)
           - (parseFloat(draft.remuneracaoVendedor) || 0)
