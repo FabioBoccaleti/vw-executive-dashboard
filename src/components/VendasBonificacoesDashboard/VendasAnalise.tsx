@@ -640,9 +640,10 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
           <KpiCard label="Receita Total" value={fmtBRL(metrics.receita)} color="text-amber-600" />
           <KpiCard label="Custo Total" value={fmtBRL(metrics.custo)} color="text-red-500" />
           <KpiCard label="Lucro da Operação" value={fmtBRL(metrics.lucro)} color="text-emerald-600" />
-          <KpiCard label="Margem %" value={fmtPct(metrics.margem)} color={metrics.margem >= 20 ? 'text-emerald-600' : metrics.margem >= 10 ? 'text-amber-600' : 'text-red-500'} />
+          <KpiCard label="Margem Bruta%" value={fmtPct(metrics.margem)} color={metrics.margem >= 20 ? 'text-emerald-600' : metrics.margem >= 10 ? 'text-amber-600' : 'text-red-500'} />
           <KpiCard label="Ticket Médio" value={fmtBRL(metrics.ticketMedio)} color="text-sky-600" sub={metrics.qtd > 0 ? `TM Comissão: ${fmtBRL(metrics.sorana / metrics.qtd)}` : undefined} />
           <KpiCard label="Comissão Sorana" value={fmtBRL(metrics.sorana)} color="text-violet-600" sub={metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) + ' da receita' : undefined} />
+          <KpiCard label="% Rentabilidade Sorana" value={metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) : '—'} color="text-fuchsia-600" />
         </div>
       </div>
 
@@ -830,31 +831,18 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
             <SectionTitle>Evolução Mensal — {selectedYear}</SectionTitle>
-            <span className="text-xs text-slate-400 bg-slate-50 border border-slate-200 px-3 py-1 rounded-full hidden sm:inline">
-              linha = % Sorana/Receita → eixo direito
-            </span>
           </div>
           <ResponsiveContainer width="100%" height={280}>
-            <ComposedChart data={monthlyData} margin={{ top: 4, right: 55, left: 0, bottom: 0 }}>
+            <ComposedChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis yAxisId="left" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={85} />
-              <YAxis yAxisId="right" orientation="right" tickFormatter={v => v.toFixed(1) + '%'} tick={{ fontSize: 10 }} width={44} domain={[0, 'dataMax + 4']} />
+
               <Tooltip content={<MonthlyTooltip />} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar yAxisId="left" dataKey="receita" name="Receita" fill="#f59e0b" radius={[3, 3, 0, 0]} />
               <Bar yAxisId="left" dataKey="lucro" name="Lucro Operação" fill="#10b981" radius={[3, 3, 0, 0]} />
               <Bar yAxisId="left" dataKey="sorana" name="Comissão Sorana" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="soranaPct"
-                name="% Sorana/Receita"
-                stroke="#7c3aed"
-                strokeWidth={2.5}
-                dot={{ fill: '#7c3aed', r: 3, strokeWidth: 0 }}
-                activeDot={{ r: 5 }}
-              />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
