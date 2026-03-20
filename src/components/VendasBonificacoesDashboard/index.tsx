@@ -622,11 +622,11 @@ function ModalInput({ label, value, onChange, placeholder }: { label: string; va
 }
 function ModalInputCurrency({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   // Exibe formatado em pt-BR; salva internamente como número puro
-  const [display, setDisplay] = React.useState(() => {
+  const [display, setDisplay] = useState(() => {
     const n = parseFloat(value);
     return isNaN(n) ? '' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   });
-  React.useEffect(() => {
+  useEffect(() => {
     const n = parseFloat(value);
     if (!isNaN(n)) setDisplay(n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
     else if (!value) setDisplay('');
