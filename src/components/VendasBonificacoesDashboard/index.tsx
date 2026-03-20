@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download } from 'lucide-react';
+import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from './vendasStorage';
 import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
@@ -8,6 +8,7 @@ import { loadRevendas, loadBlinadadoras, loadRegras, loadVendedores, type Revend
 import { VendasAnalise } from './VendasAnalise';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
 
 // ─── Campos calculados automaticamente (somente leitura no modo edição) ────────
 const CALC_READONLY_KEYS = new Set<string>(['lucroOperacao', 'remuneracaoVendedor', 'remuneracaoGerencia', 'remuneracaoDiretoria', 'remuneracaoGerenciaSupervisorUsados', 'comissaoBrutaSorana', 'situacaoComissao', 'valorAPagarBlindadora', 'valorAReceberBlindadora']);
@@ -451,6 +452,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [inlineAcertoId, setInlineAcertoId] = useState<string | null>(null);
   const [inlineAcertoValue, setInlineAcertoValue] = useState('');
   const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('analise');
+  const [importPreview, setImportPreview] = useState<VendasRow[] | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     Promise.all([loadVendasRows(), loadCatalogo(), loadRevendas(), loadBlinadadoras(), loadRegras(), loadVendedores()]).then(([r, c, rv, bl, rg, vd]) => {
@@ -608,6 +611,126 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     setFilters(prev => ({ ...prev, [key]: value }));
 
   const clearFilters = () => setFilters({});
+
+  // ── Import Excel ──────────────────────────────────────────────────────────────
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const buf = await file.arrayBuffer();
+      const wb  = XLSX.read(buf, { cellDates: true });
+      const ws  = wb.Sheets[wb.SheetNames[0]];
+      if (!ws) { toast.error('Planilha não encontrada no arquivo.'); return; }
+
+      const raw = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' });
+
+      // Row 0 = título mesclado, Row 1 = cabeçalhos, Row 2+ = dados, última = total
+      const dataRaws = (raw as unknown[][]).slice(2).filter(row => {
+        const first = String(row[0] ?? '').trim();
+        const hasData = row.some(c => c !== '' && c !== null && c !== undefined);
+        return hasData && first !== 'TOTAL';
+      });
+
+      if (dataRaws.length === 0) { toast.error('Nenhum dado encontrado no arquivo.'); return; }
+
+      const str = (v: unknown): string => {
+        if (v === null || v === undefined || v === '') return '';
+        return String(v).trim();
+      };
+      const cur = (v: unknown): string => {
+        if (v === null || v === undefined || v === '') return '';
+        const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[^0-9.,-]/g, '').replace(',', '.'));
+        return isNaN(n) ? '' : String(n);
+      };
+      const dat = (v: unknown): string => {
+        if (!v) return '';
+        if (v instanceof Date) {
+          const y = v.getFullYear();
+          const m = String(v.getMonth() + 1).padStart(2, '0');
+          const d = String(v.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}`;
+        }
+        const s = String(v).trim();
+        // DD/MM/YYYY
+        const parts = s.split('/');
+        if (parts.length === 3 && parts[2].length === 4) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        // YYYY-MM-DD passthrough
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        return '';
+      };
+
+      // Mapeamento de colunas conforme COLUMNS (índice 0..23):
+      // 0:veiculo 1:chassi 2:revenda 3:blindadora 4:custoBlindagem
+      // 5:dataPagamentoBlindadora 6:situacaoNegociacaoBlindadora 7:dataVenda
+      // 8:valorVendaBlindagem 9:lucroOperacao(calc) 10:%lucro(calc)
+      // 11:localPgtoBlindagem 12:nomeVendedor
+      // 13:remVendedor(calc) 14:remGerencia(calc) 15:remDiretoria(calc) 16:remSupervisor(calc)
+      // 17:comissaoBruta(calc) 18:%rentabilidade(calc)
+      // 19:numeroNFComissao 20:situacaoComissao(calc) 21:valorAPagar(calc) 22:valorAReceber(calc) 23:dataAcerto
+      const imported: VendasRow[] = dataRaws.map(row => {
+        const draft: VendasRow = {
+          id: crypto.randomUUID(),
+          veiculo:                             str(row[0]),
+          chassi:                              str(row[1]),
+          revenda:                             str(row[2]),
+          blindadora:                          str(row[3]),
+          custoBlindagem:                      cur(row[4]),
+          dataPagamentoBlindadora:             dat(row[5]),
+          situacaoNegociacaoBlindadora:        str(row[6]) || 'Negociação Direta',
+          dataVenda:                           dat(row[7]),
+          valorVendaBlindagem:                 cur(row[8]),
+          lucroOperacao:                       '',
+          localPgtoBlindagem:                  str(row[11]),
+          nomeVendedor:                        str(row[12]),
+          remuneracaoVendedor:                 '',
+          remuneracaoGerencia:                 '',
+          remuneracaoDiretoria:                '',
+          remuneracaoGerenciaSupervisorUsados: '',
+          comissaoBrutaSorana:                 '',
+          numeroNFComissao:                    str(row[19]),
+          situacaoComissao:                    '',
+          valorAPagarBlindadora:               '',
+          valorAReceberBlindadora:             '',
+          dataAcerto:                          dat(row[23]),
+        };
+
+        // Recalcular tudo do zero
+        const venda = parseFloat(draft.valorVendaBlindagem) || 0;
+        const custo = parseFloat(draft.custoBlindagem) || 0;
+        draft.lucroOperacao = String(venda - custo);
+        draft.remuneracaoVendedor                 = calcRemuneracaoField(draft, 'Vendedor',            regras);
+        draft.remuneracaoGerencia                 = calcRemuneracaoField(draft, 'Gerência',            regras);
+        draft.remuneracaoDiretoria                = calcRemuneracaoField(draft, 'Diretoria',           regras);
+        draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras);
+        draft.comissaoBrutaSorana = String(
+          (parseFloat(draft.lucroOperacao) || 0)
+          - (parseFloat(draft.remuneracaoVendedor) || 0)
+          - (parseFloat(draft.remuneracaoGerencia) || 0)
+          - (parseFloat(draft.remuneracaoDiretoria) || 0)
+          - (parseFloat(draft.remuneracaoGerenciaSupervisorUsados) || 0)
+        );
+        draft.situacaoComissao = calcSituacaoComissao(draft);
+        if (draft.situacaoNegociacaoBlindadora === 'Negociação Direta') {
+          draft.localPgtoBlindagem = draft.blindadora;
+        }
+        calcValoresPagamento(draft);
+        return draft;
+      }).filter(r => r.veiculo || r.chassi || r.revenda || r.blindadora);
+
+      setImportPreview(imported);
+    } catch {
+      toast.error('Erro ao ler o arquivo. Verifique se é um Excel válido exportado por esta tela.');
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!importPreview) return;
+    setRows(importPreview);
+    setImportPreview(null);
+    await persist(importPreview);
+    toast.success(`${importPreview.length} ${importPreview.length === 1 ? 'registro importado' : 'registros importados'} com sucesso`);
+  };
 
   const hasActiveFilters = Object.values(filters).some(v => v && v.length > 0);
   const filteredRows     = hasActiveFilters ? rows.filter(r => rowMatchesFilters(r, filters)) : rows;
@@ -1137,6 +1260,22 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
               <Download className="w-4 h-4" />
               Exportar Excel
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => importInputRef.current?.click()}
+              className="text-blue-700 border-blue-300 hover:bg-blue-50 gap-1.5 font-medium"
+            >
+              <Upload className="w-4 h-4" />
+              Importar Excel
+            </Button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleImportFile}
+            />
             {hasActiveFilters && (
               <span className="text-xs text-amber-600 flex items-center gap-1">
                 <Search className="w-3 h-3" />
@@ -1157,6 +1296,59 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         )}
 
       </div>
+
+      {/* ── Modal de confirmação de importação ── */}
+      {importPreview && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-5">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-blue-100 rounded-xl flex-shrink-0">
+                <Upload className="w-5 h-5 text-blue-700" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">Confirmar Importação</h3>
+                <p className="text-sm text-slate-500 mt-1">Esta ação é irreversível.</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-4 flex flex-col gap-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Registros no arquivo:</span>
+                <span className="font-bold text-blue-700">{importPreview.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Registros atuais (serão substituídos):</span>
+                <span className="font-bold text-red-600">{rows.length}</span>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-600">
+              Todos os <strong>{rows.length}</strong> registros existentes serão apagados e
+              substituídos pelos <strong>{importPreview.length}</strong> do arquivo.
+              Os campos calculados serão recalculados pelas regras atuais.
+            </p>
+
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setImportPreview(null)}
+                className="border-slate-300 text-slate-600"
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={confirmImport}
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                Confirmar Importação
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
