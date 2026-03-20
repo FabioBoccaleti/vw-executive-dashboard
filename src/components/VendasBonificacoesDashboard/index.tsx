@@ -109,9 +109,9 @@ const COLUMNS: ColDef[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtCurrency(raw: string): string {
-  if (!raw) return '';
+  if (!raw) return '—';
   const n = parseFloat(raw);
-  return isNaN(n) ? '' : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  return isNaN(n) ? '—' : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function toDisplayNumber(raw: string): string {
@@ -595,11 +595,6 @@ function InsertZoneTr({ colSpan, onInsert }: { colSpan: number; onInsert: () => 
 }
 
 // ─── Modal field helpers ──────────────────────────────────────────────────────
-function fmtCurrency(v: string): string {
-  const n = parseFloat(v);
-  if (!v || isNaN(n)) return '—';
-  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
 type ModalHighlight = 'green' | 'sky' | 'orange' | 'amber' | 'slate';
 const MODAL_HL: Record<ModalHighlight, string> = {
   green:  'bg-emerald-50 text-emerald-800 font-semibold border-emerald-200',
