@@ -79,6 +79,7 @@ function AppContent() {
     }
     
     setShowBrandSelector(false)
+    if (selectedBrand === 'vendas_bonificacoes') setVendasSubPage('selection')
   }
   
   const handleChangeBrand = () => {

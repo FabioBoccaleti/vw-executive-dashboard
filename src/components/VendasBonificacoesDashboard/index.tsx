@@ -632,6 +632,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   }, [activeTab]);
 
   useEffect(() => {
+    Promise.all([loadVendasRows(), loadCatalogo(), loadRevendas(), loadBlinadadoras(), loadRegras(), loadVendedores()]).then(([r, c, rv, bl, rg, vd]) => {
       setRows(r);
       setCatalogo(c as CatalogoVeiculos);
       setRevendas(rv as Revenda[]);
