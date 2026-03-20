@@ -918,7 +918,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
                           <th className="text-right py-2 px-2 text-slate-400 font-semibold">% Volume</th>
                           <th className="text-right py-2 px-2 text-slate-400 font-semibold">Comissão Sorana</th>
                           <th className="text-right py-2 px-2 text-slate-400 font-semibold">% Rent. Sorana</th>
-                          <th className="text-right py-2 px-2 text-slate-400 font-semibold">Remuneração</th>
+                          <th className="text-right py-2 px-2 text-slate-400 font-semibold">Remuneração Vendedor</th>
                         </tr>
                       </thead>
                       <tbody>
