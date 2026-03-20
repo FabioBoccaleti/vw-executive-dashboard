@@ -304,15 +304,98 @@ function rowMatchesFilters(row: VendasRow, filters: FilterValues): boolean {
 }
 
 // ─── FilterCell ───────────────────────────────────────────────────────────────
+const MONTHS_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
 interface FilterCellProps {
   col: ColDef;
   value: string;
   onChange: (v: string) => void;
+  // Para Revenda / Blindadora
+  options?: string[];
+  // Para Data da Venda
+  filterYear?: number | null;
+  filterMonth?: number | null;
+  availableYears?: number[];
+  onYearChange?: (y: number | null) => void;
+  onMonthChange?: (m: number | null) => void;
 }
-function FilterCell({ col, value, onChange }: FilterCellProps) {
+function FilterCell({ col, value, onChange, options, filterYear, filterMonth, availableYears, onYearChange, onMonthChange }: FilterCellProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const hasValue = value.length > 0;
+  const hasQuickFilter = (filterYear != null) || (filterMonth != null);
 
+  // ── Data da Venda: ano/mês + campo de texto ─────────────────────────────────
+  if (col.key === 'dataVenda' && onYearChange && onMonthChange) {
+    return (
+      <div className="flex flex-col gap-1">
+        {/* Selects rápidos de ano/mês */}
+        <div className="flex gap-1">
+          <select
+            value={filterYear ?? ''}
+            onChange={e => onYearChange(e.target.value ? Number(e.target.value) : null)}
+            className={`flex-1 min-w-0 bg-white border rounded px-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+              filterYear != null ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'
+            }`}
+          >
+            <option value="">Ano</option>
+            {(availableYears ?? []).map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select
+            value={filterMonth ?? ''}
+            onChange={e => onMonthChange(e.target.value ? Number(e.target.value) : null)}
+            className={`flex-1 min-w-0 bg-white border rounded px-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+              filterMonth != null ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'
+            }`}
+          >
+            <option value="">Mês</option>
+            {MONTHS_PT.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+          </select>
+          {(hasQuickFilter) && (
+            <button onClick={() => { onYearChange(null); onMonthChange(null); }} className="flex-shrink-0 text-slate-300 hover:text-red-400 transition-colors" title="Limpar ano/mês">
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+        {/* Campo de texto livre */}
+        <div className="flex items-center gap-1">
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder="DD/MM/AAAA"
+            className={`w-full min-w-0 bg-white border rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+              hasValue ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'
+            }`}
+          />
+          <input
+            type="date"
+            value={value ? (() => { const p = value.split('/'); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : ''; })() : ''}
+            defaultValue={todayISO()}
+            onChange={e => { const [y, m, d] = e.target.value.split('-'); if (y && m && d) onChange(`${d}/${m}/${y}`); }}
+            onClick={e => { if (!(e.currentTarget as HTMLInputElement).value) (e.currentTarget as HTMLInputElement).value = todayISO(); }}
+            className="w-6 h-6 opacity-0 absolute pointer-events-none"
+            id={`datepicker-${col.key}`}
+          />
+          <label
+            htmlFor={`datepicker-${col.key}`}
+            title="Selecionar data"
+            className="flex-shrink-0 cursor-pointer text-slate-400 hover:text-amber-600 transition-colors"
+            onClick={() => { const el = document.getElementById(`datepicker-${col.key}`) as HTMLInputElement | null; if (el) { if (!el.value) el.value = todayISO(); el.showPicker?.(); } }}
+          >
+            <Search className="w-3.5 h-3.5" />
+          </label>
+          {hasValue && (
+            <button onClick={() => onChange('')} className="flex-shrink-0 text-slate-300 hover:text-red-400 transition-colors">
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Date genérica (sem ano/mês) ──────────────────────────────────────────────
   if (col.type === 'date') {
     return (
       <div className="flex items-center gap-1">
@@ -362,6 +445,45 @@ function FilterCell({ col, value, onChange }: FilterCellProps) {
     );
   }
 
+  // ── Texto com dropdown de opções (Revenda / Blindadora) ─────────────────────
+  if (options && options.length > 0) {
+    return (
+      <div className="flex flex-col gap-1">
+        {/* Dropdown rápido */}
+        <select
+          value={hasValue && options.includes(value) ? value : ''}
+          onChange={e => onChange(e.target.value)}
+          className={`w-full min-w-0 bg-white border rounded px-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+            hasValue && options.includes(value) ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'
+          }`}
+        >
+          <option value="">Todas</option>
+          {options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+        {/* Campo de texto livre */}
+        <div className="relative flex items-center">
+          <Search className="absolute left-1.5 w-3 h-3 text-slate-300 pointer-events-none" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder="Busca livre…"
+            className={`w-full min-w-0 bg-white border rounded pl-5 pr-5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+              hasValue ? 'border-amber-400 ring-1 ring-amber-300' : 'border-slate-200'
+            }`}
+          />
+          {hasValue && (
+            <button onClick={() => onChange('')} className="absolute right-1.5 text-slate-300 hover:text-red-400 transition-colors">
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Texto genérico ───────────────────────────────────────────────────────────
   return (
     <div className="relative flex items-center">
       <Search className="absolute left-1.5 w-3 h-3 text-slate-300 pointer-events-none" />
@@ -441,7 +563,9 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [deleteId, setDeleteId]   = useState<string | null>(null);
   const [saving, setSaving]       = useState(false);
   const [loading, setLoading]     = useState(true);
-  const [filters, setFilters]     = useState<FilterValues>({});
+  const [filters, setFilters]       = useState<FilterValues>({});
+  const [filterYear, setFilterYear]   = useState<number | null>(null);
+  const [filterMonth, setFilterMonth] = useState<number | null>(null);
   const [catalogo, setCatalogo]     = useState<CatalogoVeiculos>({ marcas: [], modelos: [] });
   const [revendas, setRevendas]       = useState<Revenda[]>([]);
   const [blindadoras, setBlinadadoras] = useState<Blindadora[]>([]);
@@ -611,7 +735,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const setFilter = (key: keyof VendasRow, value: string) =>
     setFilters(prev => ({ ...prev, [key]: value }));
 
-  const clearFilters = () => setFilters({});
+  const clearFilters = () => { setFilters({}); setFilterYear(null); setFilterMonth(null); };
 
   // ── Import Excel ──────────────────────────────────────────────────────────────
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -733,8 +857,25 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     toast.success(`${importPreview.length} ${importPreview.length === 1 ? 'registro importado' : 'registros importados'} com sucesso`);
   };
 
-  const hasActiveFilters = Object.values(filters).some(v => v && v.length > 0);
-  const filteredRows     = hasActiveFilters ? rows.filter(r => rowMatchesFilters(r, filters)) : rows;
+  const availableRevendas    = useMemo(() => [...new Set(rows.map(r => r.revenda).filter(Boolean))].sort() as string[], [rows]);
+  const availableBlindadoras  = useMemo(() => [...new Set(rows.map(r => r.blindadora).filter(Boolean))].sort() as string[], [rows]);
+  const availableYears        = useMemo(() => [...new Set(rows.map(r => r.dataVenda?.split('-')[0]).filter(Boolean))].map(Number).sort((a,b)=>b-a), [rows]);
+
+  const hasActiveFilters = Object.values(filters).some(v => v && v.length > 0) || filterYear != null || filterMonth != null;
+  const filteredRows     = hasActiveFilters
+    ? rows.filter(r => {
+        if (!rowMatchesFilters(r, filters)) return false;
+        if (filterYear != null) {
+          const y = r.dataVenda ? parseInt(r.dataVenda.split('-')[0]) : 0;
+          if (y !== filterYear) return false;
+        }
+        if (filterMonth != null) {
+          const m = r.dataVenda ? parseInt(r.dataVenda.split('-')[1]) : 0;
+          if (m !== filterMonth) return false;
+        }
+        return true;
+      })
+    : rows;
 
   if (loading) {
     return (
@@ -905,6 +1046,12 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                         col={col}
                         value={filters[col.key] ?? ''}
                         onChange={v => setFilter(col.key, v)}
+                        options={col.key === 'revenda' ? availableRevendas : col.key === 'blindadora' ? availableBlindadoras : undefined}
+                        filterYear={col.key === 'dataVenda' ? filterYear : undefined}
+                        filterMonth={col.key === 'dataVenda' ? filterMonth : undefined}
+                        availableYears={col.key === 'dataVenda' ? availableYears : undefined}
+                        onYearChange={col.key === 'dataVenda' ? setFilterYear : undefined}
+                        onMonthChange={col.key === 'dataVenda' ? setFilterMonth : undefined}
                       />
                     )}
                   </th>
