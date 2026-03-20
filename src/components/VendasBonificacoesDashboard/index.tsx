@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
