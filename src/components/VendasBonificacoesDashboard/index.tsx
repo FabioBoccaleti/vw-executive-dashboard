@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download, Upload, RefreshCw, Package, ListRestart } from 'lucide-react';
+import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download, Upload, RefreshCw, Package, ListRestart, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from './vendasStorage';
 import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
@@ -624,6 +624,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [importPreview, setImportPreview] = useState<VendasRow[] | null>(null);
   const [recalcConfirm, setRecalcConfirm] = useState(false);
   const [estoqueMode, setEstoqueMode] = useState(false);
+  const [notasAEmitirMode, setNotasAEmitirMode] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -950,7 +951,11 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const availableYears              = useMemo(() => [...new Set(rows.map(r => r.dataVenda?.split('-')[0]).filter(Boolean))].map(Number).sort((a,b)=>b-a), [rows]);
 
   const hasActiveFilters = Object.values(filters).some(v => v && v.length > 0) || filterYear != null || filterMonth != null || !!filterBlindagemMode;
-  const estoqueBaseRows = estoqueMode ? rows.filter(r => !r.dataVenda) : rows;
+  const estoqueBaseRows = estoqueMode
+    ? rows.filter(r => !r.dataVenda)
+    : notasAEmitirMode
+      ? rows.filter(r => !!r.dataVenda && !r.numeroNFComissao)
+      : rows;
   const filteredRows     = hasActiveFilters
     ? estoqueBaseRows.filter(r => {
         if (!rowMatchesFilters(r, filters)) return false;
@@ -1534,23 +1539,35 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
               <RefreshCw className="w-4 h-4" />
               Recalcular Remunerações
             </Button>
-            {!estoqueMode ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEstoqueMode(true)}
-                className="text-sky-700 border-sky-300 hover:bg-sky-50 gap-1.5 font-medium"
-                title="Exibe apenas veículos sem Data da Venda (em estoque)"
-              >
-                <Package className="w-4 h-4" />
-                Em Estoque
-              </Button>
+            {!estoqueMode && !notasAEmitirMode ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEstoqueMode(true)}
+                  className="text-sky-700 border-sky-300 hover:bg-sky-50 gap-1.5 font-medium"
+                  title="Exibe apenas veículos sem Data da Venda (em estoque)"
+                >
+                  <Package className="w-4 h-4" />
+                  Em Estoque
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setNotasAEmitirMode(true)}
+                  className="text-orange-700 border-orange-300 hover:bg-orange-50 gap-1.5 font-medium"
+                  title="Exibe apenas linhas com Data da Venda preenchida e sem Nº NF de Comissão"
+                >
+                  <FileText className="w-4 h-4" />
+                  Notas a Emitir
+                </Button>
+              </>
             ) : (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setEstoqueMode(false)}
-                className="bg-sky-500 text-white border-sky-500 hover:bg-sky-600 gap-1.5 font-medium"
+                onClick={() => { setEstoqueMode(false); setNotasAEmitirMode(false); }}
+                className="bg-gray-500 text-white border-gray-500 hover:bg-gray-600 gap-1.5 font-medium"
               >
                 <ListRestart className="w-4 h-4" />
                 Ver Todos
