@@ -594,6 +594,87 @@ function InsertZoneTr({ colSpan, onInsert }: { colSpan: number; onInsert: () => 
   );
 }
 
+// ─── Modal field helpers ──────────────────────────────────────────────────────
+function fmtCurrency(v: string): string {
+  const n = parseFloat(v);
+  if (!v || isNaN(n)) return '—';
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+type ModalHighlight = 'green' | 'sky' | 'orange' | 'amber' | 'slate';
+const MODAL_HL: Record<ModalHighlight, string> = {
+  green:  'bg-emerald-50 text-emerald-800 font-semibold border-emerald-200',
+  sky:    'bg-sky-50 text-sky-800 font-semibold border-sky-200',
+  orange: 'bg-orange-50 text-orange-800 font-semibold border-orange-200',
+  amber:  'bg-amber-50 text-amber-800 border-amber-200',
+  slate:  'bg-slate-100 text-slate-500 border-slate-200',
+};
+function ModalReadonly({ label, value, highlight }: { label: string; value: string; highlight?: ModalHighlight }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
+      <div className={`px-3 py-2 rounded-lg text-sm border font-mono tabular-nums ${highlight ? MODAL_HL[highlight] : 'bg-slate-50 text-slate-500 border-slate-200'}`}>{value}</div>
+    </div>
+  );
+}
+function ModalInput({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
+      <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        className="w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white" />
+    </div>
+  );
+}
+function ModalInputNum({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
+      <input type="number" value={value} onChange={e => onChange(e.target.value)} step="0.01" min="0"
+        className="w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white font-mono" />
+    </div>
+  );
+}
+function ModalInputDate({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
+      <input type="date" value={value} onChange={e => onChange(e.target.value)}
+        className="w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white" />
+    </div>
+  );
+}
+function ModalSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
+      <select value={value} onChange={e => onChange(e.target.value)}
+        className="w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white">
+        <option value="">— Selecione —</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+function ModalDatalist({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
+  const listId = `mdl-${label.replace(/\W/g, '')}`;
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
+      <input list={listId} value={value} onChange={e => onChange(e.target.value)}
+        className="w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white" />
+      <datalist id={listId}>{options.map(o => <option key={o} value={o} />)}</datalist>
+    </div>
+  );
+}
+function ModalSectionTitle({ num, color, children }: { num: number; color: string; children: React.ReactNode }) {
+  return (
+    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+      <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold ${color}`}>{num}</span>
+      {children}
+    </h3>
+  );
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 interface VendasBonificacoesDashboardProps {
   onChangeBrand: () => void;
@@ -625,6 +706,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [recalcConfirm, setRecalcConfirm] = useState(false);
   const [estoqueMode, setEstoqueMode] = useState(false);
   const [notasAEmitirMode, setNotasAEmitirMode] = useState(false);
+  const [modalDraft, setModalDraft] = useState<VendasRow | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -703,6 +785,81 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     setEditDraft(null);
     await persist(updated);
     toast.success('Linha salva com sucesso');
+  };
+
+  const openModal = (row: VendasRow) => {
+    const draft = { ...row };
+    if (!draft.situacaoNegociacaoBlindadora) draft.situacaoNegociacaoBlindadora = 'Negociação Direta';
+    const venda = parseFloat(draft.valorVendaBlindagem) || 0;
+    const custo = parseFloat(draft.custoBlindagem) || 0;
+    draft.lucroOperacao = draft.valorVendaBlindagem ? String(venda - custo) : '';
+    if (!draft.numeroNFComissao) {
+      draft.remuneracaoVendedor  = calcRemuneracaoField(draft, 'Vendedor', regras, revendas);
+      draft.remuneracaoGerencia  = calcRemuneracaoField(draft, 'Gerência', regras, revendas);
+      draft.remuneracaoDiretoria = calcRemuneracaoField(draft, 'Diretoria', regras, revendas);
+      draft.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(draft, 'Supervisor de Usados', regras, revendas);
+      draft.comissaoBrutaSorana = String(
+        (parseFloat(draft.lucroOperacao) || 0)
+        - (parseFloat(draft.remuneracaoVendedor) || 0)
+        - (parseFloat(draft.remuneracaoGerencia) || 0)
+        - (parseFloat(draft.remuneracaoDiretoria) || 0)
+        - (parseFloat(draft.remuneracaoGerenciaSupervisorUsados) || 0)
+      );
+    }
+    draft.situacaoComissao = calcSituacaoComissao(draft);
+    if (draft.situacaoNegociacaoBlindadora === 'Negociação Direta') draft.localPgtoBlindagem = draft.blindadora;
+    calcValoresPagamento(draft);
+    setModalDraft(draft);
+  };
+
+  const closeModal = () => setModalDraft(null);
+
+  const changeModalField = (field: keyof VendasRow, value: string) =>
+    setModalDraft(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, [field]: value };
+      if (field === 'valorVendaBlindagem' || field === 'custoBlindagem') {
+        const vendaStr = field === 'valorVendaBlindagem' ? value : prev.valorVendaBlindagem;
+        const venda = parseFloat(vendaStr) || 0;
+        const custo = parseFloat(field === 'custoBlindagem' ? value : prev.custoBlindagem) || 0;
+        updated.lucroOperacao = vendaStr ? String(venda - custo) : '';
+        if (!updated.numeroNFComissao) {
+          updated.remuneracaoVendedor  = calcRemuneracaoField(updated, 'Vendedor',  regras, revendas);
+          updated.remuneracaoGerencia  = calcRemuneracaoField(updated, 'Gerência',  regras, revendas);
+          updated.remuneracaoDiretoria = calcRemuneracaoField(updated, 'Diretoria', regras, revendas);
+          updated.remuneracaoGerenciaSupervisorUsados = calcRemuneracaoField(updated, 'Supervisor de Usados', regras, revendas);
+          updated.comissaoBrutaSorana = String(
+            (parseFloat(updated.lucroOperacao) || 0)
+            - (parseFloat(updated.remuneracaoVendedor) || 0)
+            - (parseFloat(updated.remuneracaoGerencia) || 0)
+            - (parseFloat(updated.remuneracaoDiretoria) || 0)
+            - (parseFloat(updated.remuneracaoGerenciaSupervisorUsados) || 0)
+          );
+        }
+      }
+      if (field === 'numeroNFComissao' || field === 'comissaoBrutaSorana' || field === 'valorVendaBlindagem' || field === 'custoBlindagem') {
+        updated.situacaoComissao = calcSituacaoComissao(updated);
+      }
+      if (field === 'situacaoNegociacaoBlindadora' || field === 'blindadora') {
+        updated.localPgtoBlindagem = updated.situacaoNegociacaoBlindadora === 'Negociação Direta' ? updated.blindadora : '';
+      }
+      if (field === 'situacaoNegociacaoBlindadora' || field === 'blindadora' || field === 'localPgtoBlindagem' || field === 'valorVendaBlindagem' || field === 'custoBlindagem') {
+        calcValoresPagamento(updated);
+      }
+      return updated;
+    });
+
+  const saveModal = async () => {
+    if (!modalDraft) return;
+    // Se NF preenchida, garante situação correta
+    const toSave: VendasRow = modalDraft.numeroNFComissao?.trim()
+      ? { ...modalDraft, situacaoComissao: 'Nota de Intermediação Emitida' }
+      : modalDraft;
+    const updated = rows.map(r => r.id === toSave.id ? toSave : r);
+    setRows(updated);
+    setModalDraft(null);
+    await persist(updated);
+    toast.success('Registro salvo com sucesso');
   };
 
   const changeField = (field: keyof VendasRow, value: string) =>
@@ -1192,12 +1349,20 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                   <Fragment key={row.id}>
                     <tr style={{ background: rowBg }} className="transition-colors group/row">
 
-                      {/* Row number */}
+                      {/* Row number + open modal button */}
                       <td
-                        className="sticky left-0 z-20 text-center text-sm text-slate-400 font-mono border-r border-slate-200 px-2 py-2.5"
+                        className="sticky left-0 z-20 text-center border-r border-slate-200 px-1 py-1.5"
                         style={{ background: rowBg }}
                       >
-                        {realIdx + 1}
+                        <div className="flex flex-col items-center gap-0.5">
+                          <button
+                            onClick={() => openModal(row)}
+                            className="w-5 h-5 rounded bg-indigo-100 text-indigo-600 hover:bg-indigo-200 flex items-center justify-center text-xs font-bold leading-none transition-colors"
+                            title="Abrir formulário completo de edição"
+                            tabIndex={-1}
+                          >+</button>
+                          <span className="text-xs text-slate-400 font-mono">{realIdx + 1}</span>
+                        </div>
                       </td>
 
                       {/* Data cells */}
@@ -1701,6 +1866,162 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
               >
                 <Check className="w-4 h-4" />
                 Confirmar Importação
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL DE EDIÇÃO COMPLETA ── */}
+      {modalDraft && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={closeModal}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-slate-50 rounded-t-xl shrink-0">
+              <div>
+                <h2 className="text-base font-bold text-slate-800">Editar Registro</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {modalDraft.veiculo || '—'} &bull; Chassi: <span className="font-mono">{modalDraft.chassi || '—'}</span>
+                </p>
+              </div>
+              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-6 overflow-y-auto">
+
+              {/* Seção 1: Identificação */}
+              <section>
+                <ModalSectionTitle num={1} color="bg-indigo-100 text-indigo-600">Identificação do Veículo</ModalSectionTitle>
+                <div className="grid grid-cols-2 gap-4">
+                  <ModalInput label="Veículo" value={modalDraft.veiculo} onChange={v => changeModalField('veiculo', v)} />
+                  <ModalInput label="Chassi" value={modalDraft.chassi} onChange={v => changeModalField('chassi', v)} />
+                  <ModalSelect label="Revenda" value={modalDraft.revenda} onChange={v => changeModalField('revenda', v)} options={availableRevendas} />
+                  <ModalSelect label="Blindadora" value={modalDraft.blindadora} onChange={v => changeModalField('blindadora', v)} options={availableBlindadoras} />
+                </div>
+              </section>
+
+              {/* Seção 2: Negociação com Blindadora */}
+              <section>
+                <ModalSectionTitle num={2} color="bg-amber-100 text-amber-600">Negociação com Blindadora</ModalSectionTitle>
+                <div className="grid grid-cols-2 gap-4">
+                  <ModalSelect
+                    label="Situação da Negociação"
+                    value={modalDraft.situacaoNegociacaoBlindadora}
+                    onChange={v => changeModalField('situacaoNegociacaoBlindadora', v)}
+                    options={['Negociação Direta', 'Pagamento Antecipado p/ Blindadora']}
+                  />
+                  <ModalInputNum label="Custo da Blindagem (R$)" value={modalDraft.custoBlindagem} onChange={v => changeModalField('custoBlindagem', v)} />
+                  <ModalInputDate label="Data do Pagamento Blindadora" value={modalDraft.dataPagamentoBlindadora} onChange={v => changeModalField('dataPagamentoBlindadora', v)} />
+                  {modalDraft.situacaoNegociacaoBlindadora === 'Negociação Direta' ? (
+                    <ModalReadonly label="Local de Pgto Blindagem" value={modalDraft.localPgtoBlindagem || '—'} />
+                  ) : (
+                    <ModalSelect
+                      label="Local de Pgto Blindagem"
+                      value={modalDraft.localPgtoBlindagem}
+                      onChange={v => changeModalField('localPgtoBlindagem', v)}
+                      options={['Sorana', ...availableBlindadoras]}
+                    />
+                  )}
+                  {!!modalDraft.valorAPagarBlindadora && (
+                    <ModalReadonly label="Valor a Pagar p/ Blindadora" value={fmtCurrency(modalDraft.valorAPagarBlindadora)} highlight="orange" />
+                  )}
+                  {!!modalDraft.valorAReceberBlindadora && (
+                    <ModalReadonly label="Valor a Receber da Blindadora" value={fmtCurrency(modalDraft.valorAReceberBlindadora)} highlight="orange" />
+                  )}
+                </div>
+              </section>
+
+              {/* Seção 3: Venda */}
+              <section>
+                <ModalSectionTitle num={3} color="bg-emerald-100 text-emerald-600">Venda</ModalSectionTitle>
+                <div className="grid grid-cols-2 gap-4">
+                  <ModalInputDate label="Data da Venda" value={modalDraft.dataVenda} onChange={v => changeModalField('dataVenda', v)} />
+                  <ModalInputNum label="Valor da Venda da Blindagem (R$)" value={modalDraft.valorVendaBlindagem} onChange={v => changeModalField('valorVendaBlindagem', v)} />
+                </div>
+                {!!modalDraft.lucroOperacao && (
+                  <div className="mt-3 grid grid-cols-2 gap-4">
+                    <ModalReadonly label="Lucro da Operação" value={fmtCurrency(modalDraft.lucroOperacao)} highlight="green" />
+                    <ModalReadonly
+                      label="% Lucro da Operação"
+                      highlight="green"
+                      value={(() => {
+                        const venda = parseFloat(modalDraft.valorVendaBlindagem);
+                        const lucro = parseFloat(modalDraft.lucroOperacao);
+                        if (!venda || isNaN(lucro)) return '—';
+                        return (lucro / venda * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+                      })()}
+                    />
+                  </div>
+                )}
+              </section>
+
+              {/* Seção 4: Remunerações */}
+              <section>
+                <ModalSectionTitle num={4} color="bg-sky-100 text-sky-600">Remunerações (calculadas automaticamente)</ModalSectionTitle>
+                <div className="grid grid-cols-2 gap-4">
+                  <ModalReadonly label="Remuneração Vendedor" value={fmtCurrency(modalDraft.remuneracaoVendedor)} highlight="sky" />
+                  <ModalReadonly label="Remuneração Gerência" value={fmtCurrency(modalDraft.remuneracaoGerencia)} highlight="sky" />
+                  <ModalReadonly label="Remuneração Diretoria Comercial" value={fmtCurrency(modalDraft.remuneracaoDiretoria)} highlight="sky" />
+                  <ModalReadonly label="Remuneração Gerência / Supervisor de Usados" value={fmtCurrency(modalDraft.remuneracaoGerenciaSupervisorUsados)} highlight="sky" />
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  <ModalReadonly label="Comissão Bruta Sorana" value={fmtCurrency(modalDraft.comissaoBrutaSorana)} highlight="green" />
+                  <ModalReadonly
+                    label="% Rentabilidade Bruta Sorana"
+                    highlight="green"
+                    value={(() => {
+                      const venda = parseFloat(modalDraft.valorVendaBlindagem);
+                      const comissao = parseFloat(modalDraft.comissaoBrutaSorana);
+                      if (!venda || isNaN(comissao)) return '—';
+                      return (comissao / venda * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+                    })()}
+                  />
+                </div>
+              </section>
+
+              {/* Seção 5: Faturamento */}
+              <section>
+                <ModalSectionTitle num={5} color="bg-violet-100 text-violet-600">Faturamento</ModalSectionTitle>
+                <div className="grid grid-cols-2 gap-4">
+                  <ModalDatalist
+                    label="Nome do Vendedor"
+                    value={modalDraft.nomeVendedor}
+                    onChange={v => changeModalField('nomeVendedor', v)}
+                    options={vendedores.map(v => v.nome)}
+                  />
+                  <ModalInput label="Nº NF de Comissão" value={modalDraft.numeroNFComissao} onChange={v => changeModalField('numeroNFComissao', v)} placeholder="Ex: 001" />
+                  <ModalReadonly
+                    label="Situação da Comissão"
+                    value={modalDraft.situacaoComissao || '—'}
+                    highlight={
+                      modalDraft.situacaoComissao === 'Emitir Nota de Intermediação' ? 'amber' :
+                      modalDraft.situacaoComissao === 'Nota de Intermediação Emitida' ? 'slate' :
+                      undefined
+                    }
+                  />
+                  <ModalInputDate label="Data de Acerto" value={modalDraft.dataAcerto} onChange={v => changeModalField('dataAcerto', v)} />
+                </div>
+              </section>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-3 px-6 py-4 border-t bg-slate-50 rounded-b-xl shrink-0">
+              <Button variant="outline" size="sm" onClick={closeModal} className="border-slate-300 text-slate-600">
+                <X className="w-4 h-4 mr-1.5" />
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={saveModal} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5">
+                <Check className="w-4 h-4" />
+                Salvar
               </Button>
             </div>
           </div>
