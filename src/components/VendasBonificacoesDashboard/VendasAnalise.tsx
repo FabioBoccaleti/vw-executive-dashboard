@@ -281,6 +281,9 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
     { year: currentYear, tipo: 'mes', value: currentMonth },
   ]);
 
+  const [showAllVendedores, setShowAllVendedores] = useState(false);
+  const [showAllRanking, setShowAllRanking] = useState(false);
+
   // Anos disponíveis nos dados
   const availableYears = useMemo(() => {
     const years = [...new Set(rows.map(getRowYear).filter(y => y > 2000))].sort();
@@ -706,50 +709,146 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
 
       {/* ── PERFORMANCE POR VENDEDOR ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <SectionTitle>Performance por Vendedor</SectionTitle>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Performance por Vendedor</h2>
+          {vendedorData.length > 0 && (
+            <span className="text-xs text-slate-400 font-medium px-2.5 py-1 bg-slate-100 rounded-full">
+              {vendedorData.length} vendedor{vendedorData.length !== 1 ? 'es' : ''}
+            </span>
+          )}
+        </div>
+
         {vendedorData.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Tabela */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="text-left py-2 px-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">#</th>
-                    <th className="text-left py-2 px-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">Vendedor</th>
-                    <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">Vendas</th>
-                    <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">Receita</th>
-                    <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">Lucro</th>
-                    <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">Margem</th>
-                    <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">Remuneração</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendedorData.map((v, i) => (
-                    <tr key={v.name} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                      <td className="py-2 px-2 text-slate-400 font-mono text-xs">{i + 1}</td>
-                      <td className="py-2 px-2 font-medium text-slate-700">{v.name}</td>
-                      <td className="py-2 px-2 text-right font-mono text-slate-600">{v.qtd}</td>
-                      <td className="py-2 px-2 text-right font-mono text-amber-600 font-semibold">{fmtBRL(v.receita)}</td>
-                      <td className="py-2 px-2 text-right font-mono text-emerald-600 font-semibold">{fmtBRL(v.lucro)}</td>
-                      <td className={`py-2 px-2 text-right font-mono font-semibold ${v.margem >= 20 ? 'text-emerald-600' : v.margem >= 10 ? 'text-amber-600' : 'text-red-500'}`}>{fmtPct(v.margem)}</td>
-                      <td className="py-2 px-2 text-right font-mono text-sky-600">{fmtBRL(v.remVendedor)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="space-y-6">
+
+            {/* ── Pódio Top 3 ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {vendedorData.slice(0, 3).map((v, i) => {
+                const medals  = ['🥇', '🥈', '🥉'];
+                const gradients = ['from-amber-400 to-amber-600', 'from-slate-400 to-slate-500', 'from-orange-400 to-orange-500'];
+                const bgBorder  = ['bg-amber-50 border-amber-200', 'bg-slate-50 border-slate-200', 'bg-orange-50 border-orange-200'];
+                const textAccent = ['text-amber-600', 'text-slate-600', 'text-orange-500'];
+                const topReceita = vendedorData[0].receita;
+                const barPct = topReceita > 0 ? (v.receita / topReceita) * 100 : 0;
+                const initials = v.name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                return (
+                  <div key={v.name} className={`rounded-xl border p-4 ${bgBorder[i]} relative overflow-hidden`}>
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradients[i]} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm`}>
+                        {initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-base leading-none">{medals[i]}</span>
+                          <span className="text-xs font-bold text-slate-400">#{i + 1}</span>
+                        </div>
+                        <p className="text-sm font-bold text-slate-800 leading-tight truncate">{v.name}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-xs text-slate-400 mb-0.5">Receita</p>
+                        <p className={`text-lg font-bold font-mono ${textAccent[i]}`}>{fmtBRL(v.receita)}</p>
+                      </div>
+                      <div className="w-full bg-white/70 rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full bg-gradient-to-r ${gradients[i]} transition-all`}
+                          style={{ width: `${barPct}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-500">
+                          <span className="font-semibold">{v.qtd}</span> venda{v.qtd !== 1 ? 's' : ''}
+                        </span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          v.margem >= 20 ? 'bg-emerald-100 text-emerald-700' :
+                          v.margem >= 10 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'
+                        }`}>
+                          {fmtPct(v.margem)}
+                        </span>
+                      </div>
+                      <div className="pt-1.5 border-t border-white/60">
+                        <p className="text-xs text-slate-400">
+                          Remuneração: <span className="font-semibold text-sky-600 font-mono">{fmtBRL(v.remVendedor)}</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            {/* Gráfico */}
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={vendedorData} layout="vertical" margin={{ left: 8, right: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} />
-                <Tooltip content={<CustomTooltipBRL />} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="receita" name="Receita" fill="#f59e0b" radius={[0, 3, 3, 0]} />
-                <Bar dataKey="lucro" name="Lucro" fill="#10b981" radius={[0, 3, 3, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+
+            {/* ── Lista compacta rank 4+ ── */}
+            {vendedorData.length > 3 && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Demais vendedores</p>
+                <div className="divide-y divide-slate-50">
+                  {(showAllVendedores ? vendedorData.slice(3) : vendedorData.slice(3, 9)).map((v, i) => {
+                    const rank = i + 4;
+                    const topReceita = vendedorData[0].receita;
+                    const barPct = topReceita > 0 ? (v.receita / topReceita) * 100 : 0;
+                    const initials = v.name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                    return (
+                      <div key={v.name} className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-slate-50 transition-colors">
+                        <span className="text-xs font-bold text-slate-300 w-5 text-center flex-shrink-0">#{rank}</span>
+                        <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold flex-shrink-0">
+                          {initials}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-sm font-medium text-slate-700 truncate">{v.name}</span>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-xs font-mono font-semibold text-amber-600">{fmtBRL(v.receita)}</span>
+                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                                v.margem >= 20 ? 'bg-emerald-100 text-emerald-700' :
+                                v.margem >= 10 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'
+                              }`}>
+                                {fmtPct(v.margem)}
+                              </span>
+                              <span className="text-xs text-slate-400 tabular-nums">{v.qtd}x</span>
+                              <span className="hidden sm:inline text-xs text-sky-500 font-mono">{fmtBRL(v.remVendedor)}</span>
+                            </div>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-1">
+                            <div className="h-1 rounded-full bg-slate-300 transition-all" style={{ width: `${barPct}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {vendedorData.length > 9 && (
+                  <button
+                    onClick={() => setShowAllVendedores(prev => !prev)}
+                    className="mt-3 w-full text-center text-xs font-semibold text-slate-400 hover:text-amber-600 py-2 rounded-lg hover:bg-amber-50 transition-colors border border-dashed border-slate-200 hover:border-amber-300"
+                  >
+                    {showAllVendedores
+                      ? '▲ Mostrar menos'
+                      : `▼ Ver todos os ${vendedorData.length - 3} vendedores restantes`
+                    }
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* ── Gráfico Top 10 ── */}
+            <div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
+                Top {Math.min(vendedorData.length, 10)} — Receita vs Lucro
+              </p>
+              <ResponsiveContainer width="100%" height={Math.min(vendedorData.length, 10) * 36 + 40}>
+                <BarChart data={vendedorData.slice(0, 10)} layout="vertical" margin={{ left: 8, right: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
+                  <Tooltip content={<CustomTooltipBRL />} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="receita" name="Receita" fill="#f59e0b" radius={[0, 3, 3, 0]} />
+                  <Bar dataKey="lucro" name="Lucro" fill="#10b981" radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
           </div>
         ) : <EmptyChart />}
       </div>
@@ -778,27 +877,43 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
             {/* Ranking individual de vendedores */}
             {vendedorData.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Ranking individual</p>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left py-1.5 px-1 text-xs font-semibold text-slate-400">Vendedor</th>
-                      <th className="text-right py-1.5 px-1 text-xs font-semibold text-slate-400">Vendas</th>
-                      <th className="text-right py-1.5 px-1 text-xs font-semibold text-slate-400">Remuneração</th>
-                      <th className="text-right py-1.5 px-1 text-xs font-semibold text-slate-400">% da Receita</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {vendedorData.map((v, i) => (
-                      <tr key={v.name} className={i % 2 === 0 ? '' : 'bg-slate-50/60'}>
-                        <td className="py-1.5 px-1 font-medium text-slate-700">{v.name}</td>
-                        <td className="py-1.5 px-1 text-right font-mono text-slate-500">{v.qtd}</td>
-                        <td className="py-1.5 px-1 text-right font-mono text-amber-600 font-semibold">{fmtBRL(v.remVendedor)}</td>
-                        <td className="py-1.5 px-1 text-right font-mono text-slate-500">{v.receita > 0 ? fmtPct(v.remVendedor / v.receita * 100) : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Ranking individual</p>
+                <div className="space-y-1">
+                  {(showAllRanking ? vendedorData : vendedorData.slice(0, 5)).map((v, i) => {
+                    const topRem = vendedorData[0]?.remVendedor || 0;
+                    const barPct = topRem > 0 ? (v.remVendedor / topRem) * 100 : 0;
+                    const initials = v.name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                    return (
+                      <div key={v.name} className="flex items-center gap-2 py-1.5 px-1 rounded-lg hover:bg-slate-50 transition-colors">
+                        <span className="text-xs font-bold text-slate-300 w-4 text-right flex-shrink-0">{i + 1}</span>
+                        <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 text-xs font-bold flex-shrink-0">
+                          {initials}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <span className="text-xs font-medium text-slate-700 truncate">{v.name}</span>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-xs font-mono font-semibold text-amber-600">{fmtBRL(v.remVendedor)}</span>
+                              <span className="text-xs text-slate-400 tabular-nums">{v.qtd}x</span>
+                              <span className="text-xs text-slate-400">{v.receita > 0 ? fmtPct(v.remVendedor / v.receita * 100) : '—'}</span>
+                            </div>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-1">
+                            <div className="h-1 rounded-full bg-amber-400 transition-all" style={{ width: `${barPct}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {vendedorData.length > 5 && (
+                  <button
+                    onClick={() => setShowAllRanking(prev => !prev)}
+                    className="mt-2 w-full text-center text-xs font-semibold text-slate-400 hover:text-amber-600 py-1.5 rounded-lg hover:bg-amber-50 transition-colors"
+                  >
+                    {showAllRanking ? '▲ Mostrar menos' : `▼ Ver todos os ${vendedorData.length} vendedores`}
+                  </button>
+                )}
               </div>
             )}
           </div>
