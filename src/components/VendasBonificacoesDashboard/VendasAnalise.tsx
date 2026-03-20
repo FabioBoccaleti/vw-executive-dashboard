@@ -370,14 +370,21 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
 
   // ── Por revenda ──
   const revendaData = useMemo(() => {
-    const map = new Map<string, { qtd: number; receita: number }>();
+    const map = new Map<string, { qtd: number; receita: number; sorana: number }>();
     filteredRows.forEach(r => {
       const key = r.revenda || 'Não informada';
-      const cur = map.get(key) || { qtd: 0, receita: 0 };
-      map.set(key, { qtd: cur.qtd + 1, receita: cur.receita + n(r.valorVendaBlindagem) });
+      const cur = map.get(key) || { qtd: 0, receita: 0, sorana: 0 };
+      map.set(key, { qtd: cur.qtd + 1, receita: cur.receita + n(r.valorVendaBlindagem), sorana: cur.sorana + n(r.comissaoBrutaSorana) });
     });
     return [...map.entries()]
-      .map(([name, v]) => ({ name, qtd: v.qtd, receita: v.receita, ticketMedio: v.qtd > 0 ? v.receita / v.qtd : 0 }))
+      .map(([name, v]) => ({
+        name,
+        qtd: v.qtd,
+        receita: v.receita,
+        sorana: v.sorana,
+        ticketMedio: v.qtd > 0 ? v.receita / v.qtd : 0,
+        tmComissao: v.qtd > 0 ? v.sorana / v.qtd : 0,
+      }))
       .sort((a, b) => b.receita - a.receita);
   }, [filteredRows]);
 
@@ -671,10 +678,10 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
 
         {/* Revendas */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col gap-4">
-          <SectionTitle>Revendas — Volume & Ticket Médio</SectionTitle>
+          <SectionTitle>Revendas — Volume & Ticket Médio de Vendas</SectionTitle>
           {revendaData.length > 0 ? (
             <>
-              {/* Ranking list */}
+              {/* Ranking TM Vendas */}
               <div className="space-y-2">
                 {revendaData.map((r, i) => (
                   <div key={r.name} className="flex items-center gap-2">
@@ -699,22 +706,40 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
                   </div>
                 ))}
               </div>
+
               {/* Divider */}
               <div className="border-t border-slate-100" />
-              {/* Bar chart: Receita + Lucro */}
+
+              {/* Ranking TM Comissão */}
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Receita vs Lucro</p>
-                <ResponsiveContainer width="100%" height={revendaData.length * 32 + 24}>
-                  <BarChart data={revendaData} layout="vertical" margin={{ left: 0, right: 10, top: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                    <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={70} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={70} />
-                    <Tooltip content={<CustomTooltipBRL />} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="receita" name="Receita" fill="#f59e0b" radius={[0, 3, 3, 0]} />
-                    <Bar dataKey="lucro" name="Lucro" fill="#10b981" radius={[0, 3, 3, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Ticket Médio de Comissões</p>
+                <div className="space-y-2">
+                  {revendaData.map((r, i) => (
+                    <div key={r.name} className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: PALETTE[i % PALETTE.length] }}>
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-slate-700 truncate">{r.name}</span>
+                          <span className="text-xs font-semibold text-slate-500 flex-shrink-0">{r.qtd} venda{r.qtd !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-0.5">
+                          <div className="flex-1 bg-slate-100 rounded-full h-1.5">
+                            <div
+                              className="h-1.5 rounded-full transition-all"
+                              style={{
+                                width: `${revendaData[0].tmComissao > 0 ? (r.tmComissao / revendaData[0].tmComissao) * 100 : 0}%`,
+                                background: PALETTE[i % PALETTE.length],
+                              }}
+                            />
+                          </div>
+                          <span className="text-xs text-slate-400 flex-shrink-0 font-mono">TM: {fmtBRL(r.tmComissao)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </>
           ) : <EmptyChart />}
