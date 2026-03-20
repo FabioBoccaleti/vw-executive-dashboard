@@ -650,6 +650,24 @@ function ModalSelect({ label, value, onChange, options }: { label: string; value
     </div>
   );
 }
+function ModalSelectGrouped({ label, value, onChange, marcas, modelos }: { label: string; value: string; onChange: (v: string) => void; marcas: import('./catalogoStorage').MarcaVeiculo[]; modelos: import('./catalogoStorage').ModeloVeiculo[] }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
+      <select value={value} onChange={e => onChange(e.target.value)}
+        className="w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white">
+        <option value="">— Selecione —</option>
+        {marcas.map(marca => (
+          <optgroup key={marca.id} label={marca.nome}>
+            {modelos.filter(m => m.marcaId === marca.id).map(m => (
+              <option key={m.id} value={`${marca.nome} ${m.modelo}`}>{m.modelo}</option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    </div>
+  );
+}
 function ModalDatalist({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
   const listId = `mdl-${label.replace(/\W/g, '')}`;
   return (
@@ -1896,7 +1914,11 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
               <section>
                 <ModalSectionTitle num={1} color="bg-indigo-100 text-indigo-600">Identificação do Veículo</ModalSectionTitle>
                 <div className="grid grid-cols-2 gap-4">
-                  <ModalInput label="Veículo" value={modalDraft.veiculo} onChange={v => changeModalField('veiculo', v)} />
+                  {catalogo.modelos.length > 0 ? (
+                    <ModalSelectGrouped label="Veículo" value={modalDraft.veiculo} onChange={v => changeModalField('veiculo', v)} marcas={catalogo.marcas} modelos={catalogo.modelos} />
+                  ) : (
+                    <ModalInput label="Veículo" value={modalDraft.veiculo} onChange={v => changeModalField('veiculo', v)} />
+                  )}
                   <ModalInput label="Chassi" value={modalDraft.chassi} onChange={v => changeModalField('chassi', v)} />
                   <ModalSelect label="Revenda" value={modalDraft.revenda} onChange={v => changeModalField('revenda', v)} options={availableRevendas} />
                   <ModalSelect label="Blindadora" value={modalDraft.blindadora} onChange={v => changeModalField('blindadora', v)} options={availableBlindadoras} />
