@@ -393,9 +393,12 @@ async function exportAnaliseExcel(exportRows: VendasRow[], periodLabel: string, 
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-interface VendasAnaliseProps { rows: VendasRow[]; }
+interface VendasAnaliseProps {
+  rows: VendasRow[];
+  onUpdateRow?: (updated: VendasRow) => Promise<void>;
+}
 
-export function VendasAnalise({ rows }: VendasAnaliseProps) {
+export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
 
@@ -412,6 +415,28 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
 
   const [showAllVendedores, setShowAllVendedores] = useState(false);
   const [showAllRanking, setShowAllRanking] = useState(false);
+
+  // ── Notas: expand & edição inline ──
+  const [expandedBlindadoras, setExpandedBlindadoras] = useState<Set<string>>(new Set());
+  const [notaEditId, setNotaEditId] = useState<string | null>(null);
+  const [notaEditDraft, setNotaEditDraft] = useState<VendasRow | null>(null);
+  const [notaSaving, setNotaSaving] = useState(false);
+
+  const toggleBlindadora = (name: string) =>
+    setExpandedBlindadoras(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+
+  const startNotaEdit = (r: VendasRow) => { setNotaEditId(r.id); setNotaEditDraft({ ...r }); };
+  const cancelNotaEdit = () => { setNotaEditId(null); setNotaEditDraft(null); };
+  const saveNotaEdit = async () => {
+    if (!notaEditDraft || !onUpdateRow) return;
+    setNotaSaving(true);
+    try { await onUpdateRow(notaEditDraft); }
+    finally { setNotaSaving(false); setNotaEditId(null); setNotaEditDraft(null); }
+  };
 
   // Anos disponíveis nos dados
   const availableYears = useMemo(() => {
@@ -1320,7 +1345,7 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b-2 border-slate-100">
-                  <th className="text-left py-2.5 px-3 text-xs font-bold text-slate-400 uppercase tracking-wide">#</th>
+                  <th className="text-left py-2.5 px-3 text-xs font-bold text-slate-400 uppercase tracking-wide w-8">#</th>
                   <th className="text-left py-2.5 px-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Blindadora</th>
                   <th className="text-center py-2.5 px-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Qtd. Notas</th>
                   <th className="text-right py-2.5 px-3 text-xs font-bold text-slate-400 uppercase tracking-wide">Valor Total (Comissão Sorana)</th>
@@ -1328,25 +1353,170 @@ export function VendasAnalise({ rows }: VendasAnaliseProps) {
                 </tr>
               </thead>
               <tbody>
-                {notasAEmitirData.items.map((item, i) => (
-                  <tr key={item.blindadora} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                    <td className="py-2.5 px-3 text-slate-400 font-mono text-xs">{i + 1}</td>
-                    <td className="py-2.5 px-3">
-                      <span className="font-semibold text-slate-700">{item.blindadora}</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">
-                        {item.qtd}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-semibold text-red-600">
-                      {fmtBRLFull(item.valor)}
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-400 text-xs">
-                      {notasAEmitirData.totalValor > 0 ? fmtPct(item.valor / notasAEmitirData.totalValor * 100) : '—'}
-                    </td>
-                  </tr>
-                ))}
+                {notasAEmitirData.items.map((item, i) => {
+                  const isExpanded = expandedBlindadoras.has(item.blindadora);
+                  const itemRows = brandRows.filter(r => !r.numeroNFComissao && !!r.dataVenda && r.blindadora === item.blindadora);
+                  return (
+                    <>
+                      <tr key={item.blindadora} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                        <td className="py-2.5 px-3 text-slate-400 font-mono text-xs">{i + 1}</td>
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-2">
+                            {onUpdateRow && (
+                              <button
+                                onClick={() => toggleBlindadora(item.blindadora)}
+                                title={isExpanded ? 'Recolher' : 'Expandir vendas'}
+                                className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold transition-colors flex-shrink-0 ${
+                                  isExpanded
+                                    ? 'bg-amber-500 text-white'
+                                    : 'bg-slate-100 text-slate-500 hover:bg-amber-100 hover:text-amber-700'
+                                }`}
+                              >
+                                {isExpanded ? '−' : '+'}
+                              </button>
+                            )}
+                            <span className="font-semibold text-slate-700">{item.blindadora}</span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                            {item.qtd}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-red-600">
+                          {fmtBRLFull(item.valor)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono text-slate-400 text-xs">
+                          {notasAEmitirData.totalValor > 0 ? fmtPct(item.valor / notasAEmitirData.totalValor * 100) : '—'}
+                        </td>
+                      </tr>
+
+                      {/* ── Linhas expandidas ── */}
+                      {isExpanded && (
+                        <tr key={`${item.blindadora}-expand`}>
+                          <td colSpan={5} className="p-0">
+                            <div className="bg-amber-50 border-y border-amber-200 px-4 py-3">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b border-amber-200">
+                                    <th className="text-left py-1.5 px-2 font-semibold text-slate-500">Chassi</th>
+                                    <th className="text-left py-1.5 px-2 font-semibold text-slate-500">Veículo</th>
+                                    <th className="text-left py-1.5 px-2 font-semibold text-slate-500">Revenda</th>
+                                    <th className="text-left py-1.5 px-2 font-semibold text-slate-500">Data da Venda</th>
+                                    <th className="text-left py-1.5 px-2 font-semibold text-slate-500">Vendedor</th>
+                                    <th className="text-left py-1.5 px-2 font-semibold text-slate-500">Nº NF Comissão</th>
+                                    <th className="text-right py-1.5 px-2 font-semibold text-slate-500">Comissão Sorana</th>
+                                    <th className="text-left py-1.5 px-2 font-semibold text-slate-500">Situação</th>
+                                    <th className="w-20" />
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {itemRows.map(r => {
+                                    const isEditingNota = notaEditId === r.id;
+                                    const draft = isEditingNota ? notaEditDraft! : r;
+                                    return (
+                                      <tr key={r.id} className={`border-b border-amber-100 last:border-0 ${
+                                        isEditingNota ? 'bg-white ring-1 ring-amber-400 rounded' : 'hover:bg-amber-100/60'
+                                      }`}>
+                                        {/* Chassi */}
+                                        <td className="py-1.5 px-2">
+                                          {isEditingNota
+                                            ? <input className="w-full border border-amber-300 rounded px-1.5 py-1 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" value={draft.chassi} onChange={e => setNotaEditDraft(d => d && ({ ...d, chassi: e.target.value }))} />
+                                            : <span className="font-mono text-slate-600">{r.chassi || '—'}</span>
+                                          }
+                                        </td>
+                                        {/* Veículo */}
+                                        <td className="py-1.5 px-2">
+                                          {isEditingNota
+                                            ? <input className="w-full border border-amber-300 rounded px-1.5 py-1 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" value={draft.veiculo} onChange={e => setNotaEditDraft(d => d && ({ ...d, veiculo: e.target.value }))} />
+                                            : <span className="text-slate-700">{r.veiculo || '—'}</span>
+                                          }
+                                        </td>
+                                        {/* Revenda */}
+                                        <td className="py-1.5 px-2">
+                                          {isEditingNota
+                                            ? <input className="w-full border border-amber-300 rounded px-1.5 py-1 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" value={draft.revenda} onChange={e => setNotaEditDraft(d => d && ({ ...d, revenda: e.target.value }))} />
+                                            : <span className="text-slate-700">{r.revenda || '—'}</span>
+                                          }
+                                        </td>
+                                        {/* Data da Venda */}
+                                        <td className="py-1.5 px-2">
+                                          {isEditingNota
+                                            ? <input type="date" className="border border-amber-300 rounded px-1.5 py-1 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" value={draft.dataVenda} onChange={e => setNotaEditDraft(d => d && ({ ...d, dataVenda: e.target.value }))} />
+                                            : <span className="font-mono text-slate-600">{r.dataVenda ? r.dataVenda.split('-').reverse().join('/') : '—'}</span>
+                                          }
+                                        </td>
+                                        {/* Vendedor */}
+                                        <td className="py-1.5 px-2">
+                                          {isEditingNota
+                                            ? <input className="w-full border border-amber-300 rounded px-1.5 py-1 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" value={draft.nomeVendedor} onChange={e => setNotaEditDraft(d => d && ({ ...d, nomeVendedor: e.target.value }))} />
+                                            : <span className="text-slate-700">{r.nomeVendedor || '—'}</span>
+                                          }
+                                        </td>
+                                        {/* Nº NF */}
+                                        <td className="py-1.5 px-2">
+                                          {isEditingNota
+                                            ? <input className="w-full border border-amber-300 rounded px-1.5 py-1 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Ex: 001" value={draft.numeroNFComissao} onChange={e => setNotaEditDraft(d => d && ({ ...d, numeroNFComissao: e.target.value }))} />
+                                            : <span className={`font-mono ${r.numeroNFComissao ? 'text-emerald-600 font-semibold' : 'text-red-400'}`}>{r.numeroNFComissao || 'Pendente'}</span>
+                                          }
+                                        </td>
+                                        {/* Comissão */}
+                                        <td className="py-1.5 px-2 text-right">
+                                          {isEditingNota
+                                            ? <input type="number" className="w-28 border border-amber-300 rounded px-1.5 py-1 bg-white text-xs text-right focus:outline-none focus:ring-1 focus:ring-amber-400" value={draft.comissaoBrutaSorana} onChange={e => setNotaEditDraft(d => d && ({ ...d, comissaoBrutaSorana: e.target.value }))} />
+                                            : <span className="font-mono font-semibold text-violet-600">{fmtBRLFull(n(r.comissaoBrutaSorana))}</span>
+                                          }
+                                        </td>
+                                        {/* Situação */}
+                                        <td className="py-1.5 px-2">
+                                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                                            r.numeroNFComissao
+                                              ? 'bg-emerald-100 text-emerald-700'
+                                              : 'bg-amber-100 text-amber-700'
+                                          }`}>
+                                            {r.numeroNFComissao ? 'NF Emitida' : 'Emitir NF'}
+                                          </span>
+                                        </td>
+                                        {/* Ações */}
+                                        <td className="py-1.5 px-2">
+                                          {isEditingNota ? (
+                                            <div className="flex items-center gap-1">
+                                              <button
+                                                onClick={saveNotaEdit}
+                                                disabled={notaSaving}
+                                                className="flex items-center gap-0.5 px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-semibold disabled:opacity-50"
+                                              >
+                                                <Check className="w-3 h-3" />
+                                                {notaSaving ? 'Salvando...' : 'Salvar'}
+                                              </button>
+                                              <button
+                                                onClick={cancelNotaEdit}
+                                                className="flex items-center gap-0.5 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-xs font-semibold"
+                                              >
+                                                <X className="w-3 h-3" />
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <button
+                                              onClick={() => startNotaEdit(r)}
+                                              className="px-2 py-1 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 rounded transition-colors"
+                                            >
+                                              Editar
+                                            </button>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-slate-200 bg-slate-50">

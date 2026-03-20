@@ -1079,7 +1079,14 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         {/* ── ABA ANÁLISE ── */}
         {activeTab === 'analise' && (
           <div className="flex-1 overflow-auto" style={{ maxHeight: 'calc(100vh - 72px)' }}>
-            <VendasAnalise rows={rows} />
+            <VendasAnalise
+              rows={rows}
+              onUpdateRow={async (updated) => {
+                const next = rows.map(r => r.id === updated.id ? updated : r);
+                setRows(next);
+                await persist(next);
+              }}
+            />
           </div>
         )}
 
