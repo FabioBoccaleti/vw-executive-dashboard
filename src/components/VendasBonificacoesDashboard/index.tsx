@@ -1977,6 +1977,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
               type="password"
               value={lockPassword}
               autoFocus
+              autoComplete="off"
               onChange={e => setLockPassword(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter') handleUnlockConfirm();
