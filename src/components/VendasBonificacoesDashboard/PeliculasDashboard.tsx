@@ -11,14 +11,14 @@ import {
 } from './peliculasStorage';
 import {
   loadPeliculasVendedores, loadPeliculasVendedoresAcessorios, loadPeliculasProdutos,
-  loadPeliculasAliquotas,
+  loadPeliculasAliquotas, loadPeliculasRegras, type RegraRemuneracao,
 } from '@/components/CadastrosPage/cadastrosStorage';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 
 // ─── Campos calculados (somente leitura no modo edição) ──────────────────────
-const CALC_READONLY_KEYS = new Set<string>(['receitaLiquida', 'lucroBruto', 'impostos']);
+const CALC_READONLY_KEYS = new Set<string>(['receitaLiquida', 'lucroBruto', 'impostos', 'comissaoVendedor', 'comissaoVendedorAcessorios']);
 const DATE_READONLY_KEYS  = new Set<string>(['dataRegistro']);
 const RESULTADO_KEYS     = new Set<string>(['lucroBruto']);
 const RL_KEY             = 'receitaLiquida';
@@ -287,10 +287,15 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [cadastroVendedoresAcessorios, setCadastroVendedoresAcessorios] = useState<string[]>([]);
   const [cadastroProdutos, setCadastroProdutos] = useState<string[]>([]);
   const [aliquotaTotal, setAliquotaTotal] = useState(0);
+  const [regras, setRegras] = useState<RegraRemuneracao[]>([]);
+  const [vendedoresCompletos, setVendedoresCompletos] = useState<Array<{ nome: string; cargo: string }>>([]);
 
   useEffect(() => {
     loadPeliculasRows().then(r => { setRows(r); setLoading(false); });
-    loadPeliculasVendedores().then(list => setCadastroVendedores(list.map(v => v.nome)));
+    loadPeliculasVendedores().then(list => {
+      setCadastroVendedores(list.map(v => v.nome));
+      setVendedoresCompletos(list.map(v => ({ nome: v.nome, cargo: v.cargo })));
+    });
     loadPeliculasVendedoresAcessorios().then(list => setCadastroVendedoresAcessorios(list.map(v => v.nome)));
     loadPeliculasProdutos().then(list => setCadastroProdutos(list.map(p => p.nome)));
     loadPeliculasAliquotas().then(list => {
@@ -300,7 +305,13 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
         .reduce((s, a) => s + (parseFloat(a.aliquota) || 0), 0);
       setAliquotaTotal(total);
     });
+    loadPeliculasRegras().then(r => setRegras(r));
   }, []);
+
+  const comissaoCtx = useMemo(() => ({
+    regras,
+    vendedores: vendedoresCompletos,
+  }), [regras, vendedoresCompletos]);
 
   useEffect(() => {
     if (activeTab === 'tabela' && tableContainerRef.current) {
@@ -324,7 +335,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const startEdit = (row: PeliculasRow) => {
     setDeleteId(null);
     setEditingId(row.id);
-    setEditDraft(recalcPeliculasRow({ ...row }, aliquotaTotal));
+    setEditDraft(recalcPeliculasRow({ ...row }, aliquotaTotal, comissaoCtx));
   };
 
   const cancelEdit = () => { setEditingId(null); setEditDraft(null); };
@@ -348,7 +359,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const changeField = (field: keyof PeliculasRow, value: string) =>
     setEditDraft(prev => {
       if (!prev) return prev;
-      const next = recalcPeliculasRow({ ...prev, [field]: value }, aliquotaTotal);
+      const next = recalcPeliculasRow({ ...prev, [field]: value }, aliquotaTotal, comissaoCtx);
       return next;
     });
 
@@ -445,7 +456,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
         draft.comissaoVendedor            = cur(row[12]);
         draft.comissaoVendedorAcessorios  = cur(row[13]);
         draft.situacao                    = str(row[14]);
-        return recalcPeliculasRow(draft, aliquotaTotal);
+        return recalcPeliculasRow(draft, aliquotaTotal, comissaoCtx);
       });
       setImportPreview(imported);
     } catch {

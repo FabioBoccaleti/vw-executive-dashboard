@@ -48,7 +48,38 @@ export function createEmptyPeliculasRow(): PeliculasRow {
   };
 }
 
-export function recalcPeliculasRow(row: PeliculasRow, totalAliquotaPct = 0): PeliculasRow {
+export interface ComissaoContext {
+  regras: Array<{ cargo: string; tipoPremio: string; faixas: Array<{ de: string; ate: string; premio: string }> }>;
+  vendedores: Array<{ nome: string; cargo: string }>;
+}
+
+function parseBRNum(s: string): number {
+  if (!s?.trim()) return NaN;
+  return parseFloat(s.replace(/\./g, '').replace(',', '.'));
+}
+
+function calcComissaoPorCargo(
+  cargo: string,
+  lucroBruto: number,
+  receitaLiquida: number,
+  regras: ComissaoContext['regras'],
+): string {
+  if (!cargo || lucroBruto <= 0) return '0';
+  const matched = regras.filter(r => r.cargo === cargo && r.tipoPremio === 'faixas');
+  if (!matched.length) return '0';
+  const pctLB = receitaLiquida ? (lucroBruto / receitaLiquida) * 100 : 0;
+  const regra = matched[0];
+  const faixa = regra.faixas.find(f => {
+    const de = parseBRNum(f.de);
+    const ate = f.ate?.trim() ? parseBRNum(f.ate) : Infinity;
+    return !isNaN(de) && pctLB >= de && pctLB <= ate;
+  });
+  if (!faixa) return '0';
+  const pct = parseBRNum(faixa.premio);
+  return isNaN(pct) ? '0' : String(lucroBruto * pct / 100);
+}
+
+export function recalcPeliculasRow(row: PeliculasRow, totalAliquotaPct = 0, comissaoCtx?: ComissaoContext): PeliculasRow {
   const venda = parseFloat(row.valorVenda) || 0;
   row.impostos = row.valorVenda ? String(venda * totalAliquotaPct / 100) : '';
   const imp   = parseFloat(row.impostos)   || 0;
@@ -56,6 +87,14 @@ export function recalcPeliculasRow(row: PeliculasRow, totalAliquotaPct = 0): Pel
   row.receitaLiquida = row.valorVenda ? String(rl) : '';
   const custo = parseFloat(row.custoPrestador) || 0;
   row.lucroBruto = row.receitaLiquida ? String(rl - custo) : '';
+  const lb = parseFloat(row.lucroBruto) || 0;
+  if (comissaoCtx) {
+    const cargoVendedor = comissaoCtx.vendedores.find(v => v.nome === row.vendedor)?.cargo ?? '';
+    row.comissaoVendedor = calcComissaoPorCargo(cargoVendedor, lb, rl, comissaoCtx.regras);
+    row.comissaoVendedorAcessorios = row.vendedorAcessorios?.trim()
+      ? calcComissaoPorCargo('Vendedor de Acessórios', lb, rl, comissaoCtx.regras)
+      : '0';
+  }
   return row;
 }
 
