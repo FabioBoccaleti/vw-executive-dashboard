@@ -112,6 +112,8 @@ function normalizeRows(rows: VendasRow[]): { rows: VendasRow[]; changed: boolean
     'Carlos': 'Carlos José Bargieri',
     'Rosemeire': 'Rosemeire Aparecida Campos',
     'Vinicius': 'Vinicius Assolini Cardoso',
+    'Marcel': 'Marcel Toni Souto',
+    'Rogerio': 'Rogerio Matos Custodio',
   };
   let changed = false;
   const normalized = rows.map(row => {
