@@ -2,7 +2,7 @@ import { Fragment, useState, useEffect, useRef, useMemo, type ChangeEvent } from
 import { Button } from '@/components/ui/button';
 import {
   LogOut, Layers, Pencil, Trash2, Check, X, Plus, Search,
-  FilterX, BarChart2, TableProperties, Download, Upload,
+  FilterX, BarChart2, TableProperties, Download, Upload, BookOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -239,9 +239,10 @@ function KpiCard({ label, value, sub, color }: { label: string; value: string; s
 // ─── Main Component ───────────────────────────────────────────────────────────
 interface PeliculasDashboardProps {
   onBack: () => void;
+  onOpenCadastros?: () => void;
 }
 
-export function PeliculasDashboard({ onBack }: PeliculasDashboardProps) {
+export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboardProps) {
   const [rows, setRows]           = useState<PeliculasRow[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<PeliculasRow | null>(null);
@@ -476,6 +477,17 @@ export function PeliculasDashboard({ onBack }: PeliculasDashboardProps) {
                 Análise
               </button>
             </div>
+            {onOpenCadastros && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onOpenCadastros}
+                className="text-white border border-white/30 hover:bg-white/15 gap-2"
+              >
+                <BookOpen className="w-4 h-4" />
+                Cadastro
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

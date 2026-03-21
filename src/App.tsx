@@ -25,6 +25,7 @@ function AppContent() {
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
   const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas'>('selection')
+  const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas'>('blindagem')
   
   // Inicializa o banco de dados em produção
   useEffect(() => {
@@ -139,7 +140,7 @@ function AppContent() {
   if (currentPage === 'cadastros') {
     return (
       <div className="min-h-screen bg-background">
-        <CadastrosPage onBack={() => setCurrentPage('app')} />
+        <CadastrosPage onBack={() => setCurrentPage('app')} variant={cadastrosVariant} />
         <Toaster />
       </div>
     )
@@ -212,11 +213,14 @@ function AppContent() {
             onChangeBrand={handleChangeBrand}
           />
         ) : vendasSubPage === 'peliculas' ? (
-          <PeliculasDashboard onBack={() => setVendasSubPage('selection')} />
+          <PeliculasDashboard
+            onBack={() => setVendasSubPage('selection')}
+            onOpenCadastros={() => { setCadastrosVariant('peliculas'); setCurrentPage('cadastros'); }}
+          />
         ) : (
           <VendasBonificacoesDashboard
             onChangeBrand={() => setVendasSubPage('selection')}
-            onOpenCadastros={() => setCurrentPage('cadastros')}
+            onOpenCadastros={() => { setCadastrosVariant('blindagem'); setCurrentPage('cadastros'); }}
           />
         )
       ) : (

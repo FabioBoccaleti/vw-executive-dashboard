@@ -1,12 +1,17 @@
 import { useState } from 'react';
-import { ArrowLeft, Car, Shield, Users, Percent, Store } from 'lucide-react';
+import { ArrowLeft, Car, Shield, Users, Percent, Store, Wrench } from 'lucide-react';
 import { VeiculosSection } from './sections/VeiculosSection';
 import { BlinadorasSection } from './sections/BlinadorasSection';
 import { VendedoresSection } from './sections/VendedoresSection';
 import { RevendasSection } from './sections/RevendasSection';
 import { RegrasSection } from './sections/RegrasSection';
+import { PrestadoresSection } from './sections/PrestadoresSection';
+import { PeliculasVeiculosSection } from './sections/PeliculasVeiculosSection';
+import { PeliculasVendedoresSection } from './sections/PeliculasVendedoresSection';
+import { PeliculasRevendasSection } from './sections/PeliculasRevendasSection';
+import { PeliculasRegrasSection } from './sections/PeliculasRegrasSection';
 
-type SectionId = 'veiculos' | 'blindadoras' | 'vendedores' | 'revendas' | 'regras';
+type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'revendas' | 'regras';
 
 interface MenuItem {
   id: SectionId;
@@ -15,20 +20,31 @@ interface MenuItem {
   icon: React.ReactNode;
 }
 
-const MENU_ITEMS: MenuItem[] = [
-  { id: 'veiculos',    label: 'Veículos',               description: 'Marcas e modelos',          icon: <Car className="w-5 h-5" /> },
-  { id: 'blindadoras', label: 'Blindadoras',             description: 'Empresas de blindagem',     icon: <Shield className="w-5 h-5" /> },
-  { id: 'revendas',    label: 'Revendas',                description: 'Concessionárias e revendas', icon: <Store className="w-5 h-5" /> },
-  { id: 'vendedores',  label: 'Vendedores',              description: 'Equipe de vendas e cargos', icon: <Users className="w-5 h-5" /> },
+const MENU_BLINDAGEM: MenuItem[] = [
+  { id: 'veiculos',    label: 'Veículos',               description: 'Marcas e modelos',               icon: <Car className="w-5 h-5" /> },
+  { id: 'blindadoras', label: 'Blindadoras',             description: 'Empresas de blindagem',          icon: <Shield className="w-5 h-5" /> },
+  { id: 'revendas',    label: 'Revendas',                description: 'Concessionárias e revendas',     icon: <Store className="w-5 h-5" /> },
+  { id: 'vendedores',  label: 'Vendedores',              description: 'Equipe de vendas e cargos',      icon: <Users className="w-5 h-5" /> },
   { id: 'regras',      label: 'Regras de Remuneração',   description: 'Percentuais e bases de cálculo', icon: <Percent className="w-5 h-5" /> },
+];
+
+const MENU_PELICULAS: MenuItem[] = [
+  { id: 'veiculos',     label: 'Veículos',               description: 'Marcas e modelos',               icon: <Car className="w-5 h-5" /> },
+  { id: 'prestadores',  label: 'Prestadores de Serviço', description: 'Empresas prestadoras',           icon: <Wrench className="w-5 h-5" /> },
+  { id: 'revendas',     label: 'Revendas',               description: 'Concessionárias e revendas',     icon: <Store className="w-5 h-5" /> },
+  { id: 'vendedores',   label: 'Vendedores',             description: 'Equipe de vendas e cargos',      icon: <Users className="w-5 h-5" /> },
+  { id: 'regras',       label: 'Regras de Remuneração',  description: 'Percentuais e bases de cálculo', icon: <Percent className="w-5 h-5" /> },
 ];
 
 interface CadastrosPageProps {
   onBack: () => void;
+  variant?: 'blindagem' | 'peliculas';
 }
 
-export function CadastrosPage({ onBack }: CadastrosPageProps) {
+export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPageProps) {
   const [activeSection, setActiveSection] = useState<SectionId>('veiculos');
+  const isPeliculas = variant === 'peliculas';
+  const MENU_ITEMS = isPeliculas ? MENU_PELICULAS : MENU_BLINDAGEM;
 
   const current = MENU_ITEMS.find(m => m.id === activeSection)!;
 
@@ -37,7 +53,9 @@ export function CadastrosPage({ onBack }: CadastrosPageProps) {
       {/* ── Header ── */}
       <header
         className="text-white shadow-lg flex-shrink-0"
-        style={{ background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)' }}
+        style={isPeliculas
+          ? { background: 'linear-gradient(135deg, #312e81 0%, #4338ca 100%)' }
+          : { background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)' }}
       >
         <div className="px-6 py-4 flex items-center gap-4">
           <button
@@ -48,7 +66,10 @@ export function CadastrosPage({ onBack }: CadastrosPageProps) {
             Voltar
           </button>
           <div className="h-5 w-px bg-white/30" />
-          <h1 className="text-base font-bold tracking-tight">Cadastros</h1>
+          <div>
+            <h1 className="text-base font-bold tracking-tight">Cadastros</h1>
+            {isPeliculas && <p className="text-xs text-white/60 mt-0.5">Películas na Audi</p>}
+          </div>
         </div>
       </header>
 
@@ -67,7 +88,7 @@ export function CadastrosPage({ onBack }: CadastrosPageProps) {
                     ? 'text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'
                 }`}
-                style={activeSection === item.id ? { background: '#1f2937' } : {}}
+                style={activeSection === item.id ? { background: isPeliculas ? '#312e81' : '#1f2937' } : {}}>
               >
                 <span className={`mt-0.5 flex-shrink-0 ${activeSection === item.id ? 'text-white' : 'text-slate-400'}`}>
                   {item.icon}
@@ -94,11 +115,16 @@ export function CadastrosPage({ onBack }: CadastrosPageProps) {
               <p className="text-sm text-slate-500">{current.description}</p>
             </div>
 
-            {activeSection === 'veiculos'    && <VeiculosSection />}
-            {activeSection === 'blindadoras' && <BlinadorasSection />}
-            {activeSection === 'revendas'    && <RevendasSection />}
-            {activeSection === 'vendedores'  && <VendedoresSection />}
-            {activeSection === 'regras'      && <RegrasSection />}
+            {!isPeliculas && activeSection === 'veiculos'    && <VeiculosSection />}
+            {!isPeliculas && activeSection === 'blindadoras' && <BlinadorasSection />}
+            {!isPeliculas && activeSection === 'revendas'    && <RevendasSection />}
+            {!isPeliculas && activeSection === 'vendedores'  && <VendedoresSection />}
+            {!isPeliculas && activeSection === 'regras'      && <RegrasSection />}
+            {isPeliculas  && activeSection === 'veiculos'    && <PeliculasVeiculosSection />}
+            {isPeliculas  && activeSection === 'prestadores' && <PrestadoresSection />}
+            {isPeliculas  && activeSection === 'revendas'    && <PeliculasRevendasSection />}
+            {isPeliculas  && activeSection === 'vendedores'  && <PeliculasVendedoresSection />}
+            {isPeliculas  && activeSection === 'regras'      && <PeliculasRegrasSection />}
           </div>
         </main>
       </div>

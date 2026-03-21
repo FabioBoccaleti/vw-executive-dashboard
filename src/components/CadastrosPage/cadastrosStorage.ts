@@ -95,3 +95,56 @@ export async function loadRevendas(): Promise<Revenda[]> {
 export async function saveRevendas(items: Revenda[]): Promise<boolean> {
   return kvSet(KEY_REVENDAS, items);
 }
+
+// ── Películas: Prestadores de Serviço ─────────────────────────────────────────
+const KEY_PELICULAS_PRESTADORES = 'peliculas_cadastro_prestadores';
+
+export interface Prestador {
+  id: string;
+  nome: string;
+}
+
+export async function loadPrestadores(): Promise<Prestador[]> {
+  return (await kvGet<Prestador[]>(KEY_PELICULAS_PRESTADORES)) ?? [];
+}
+
+export async function savePrestadores(items: Prestador[]): Promise<boolean> {
+  return kvSet(KEY_PELICULAS_PRESTADORES, items);
+}
+
+// ── Películas: Vendedores ──────────────────────────────────────────────────────
+const KEY_PELICULAS_VENDEDORES = 'peliculas_cadastro_vendedores';
+
+export async function loadPeliculasVendedores(): Promise<Vendedor[]> {
+  return (await kvGet<Vendedor[]>(KEY_PELICULAS_VENDEDORES)) ?? [];
+}
+
+export async function savePeliculasVendedores(items: Vendedor[]): Promise<boolean> {
+  return kvSet(KEY_PELICULAS_VENDEDORES, items);
+}
+
+// ── Películas: Revendas ────────────────────────────────────────────────────────
+const KEY_PELICULAS_REVENDAS = 'peliculas_cadastro_revendas';
+
+export async function loadPeliculasRevendas(): Promise<Revenda[]> {
+  return (await kvGet<Revenda[]>(KEY_PELICULAS_REVENDAS)) ?? [];
+}
+
+export async function savePeliculasRevendas(items: Revenda[]): Promise<boolean> {
+  return kvSet(KEY_PELICULAS_REVENDAS, items);
+}
+
+// ── Películas: Regras de Remuneração ──────────────────────────────────────────
+const KEY_PELICULAS_REGRAS = 'peliculas_cadastro_regras';
+
+export const BASES_CALCULO_PELICULAS = [
+  'Lucro Bruto',
+] as const;
+
+export async function loadPeliculasRegras(): Promise<RegraRemuneracao[]> {
+  return (await kvGet<RegraRemuneracao[]>(KEY_PELICULAS_REGRAS)) ?? [];
+}
+
+export async function savePeliculasRegras(items: RegraRemuneracao[]): Promise<boolean> {
+  return kvSet(KEY_PELICULAS_REGRAS, items);
+}
