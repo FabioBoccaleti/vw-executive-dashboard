@@ -44,7 +44,7 @@ function FaixasEditor({ faixas, onChange }: { faixas: FaixaValor[]; onChange: (f
   return (
     <div className="col-span-2">
       <div className="flex items-center justify-between mb-1">
-        <label className="text-xs font-medium text-slate-600">Faixas de Prêmio (R$)</label>
+        <label className="text-xs font-medium text-slate-600">Faixas de Comissões</label>
         {faixas.length < MAX_FAIXAS && (
           <button type="button" onClick={() => onChange([...faixas, emptyFaixa()])}
             className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-0.5">
@@ -56,9 +56,9 @@ function FaixasEditor({ faixas, onChange }: { faixas: FaixaValor[]; onChange: (f
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-slate-100">
-              <th className="text-left px-3 py-1.5 text-slate-600 font-medium">De R$</th>
-              <th className="text-left px-3 py-1.5 text-slate-600 font-medium">Até R$ <span className="text-slate-400 font-normal">(vazio = em diante)</span></th>
-              <th className="text-left px-3 py-1.5 text-slate-600 font-medium">Prêmio R$</th>
+              <th className="text-left px-3 py-1.5 text-slate-600 font-medium">De %</th>
+              <th className="text-left px-3 py-1.5 text-slate-600 font-medium">Até % <span className="text-slate-400 font-normal">(vazio = em diante)</span></th>
+              <th className="text-left px-3 py-1.5 text-slate-600 font-medium">Comissão %</th>
               <th className="w-8" />
             </tr>
           </thead>
@@ -68,7 +68,7 @@ function FaixasEditor({ faixas, onChange }: { faixas: FaixaValor[]; onChange: (f
                 <td className="px-2 py-1">
                   <Input value={f.de} onChange={e => update(f.id, 'de', e.target.value)}
                     onBlur={e => { const v = formatBRL(e.target.value); if (v) update(f.id, 'de', v); }}
-                    placeholder="0,00" className="h-7 text-xs" />
+                    placeholder="0,00%" className="h-7 text-xs" />
                 </td>
                 <td className="px-2 py-1">
                   <Input value={f.ate} onChange={e => update(f.id, 'ate', e.target.value)}
@@ -78,7 +78,7 @@ function FaixasEditor({ faixas, onChange }: { faixas: FaixaValor[]; onChange: (f
                 <td className="px-2 py-1">
                   <Input value={f.premio} onChange={e => update(f.id, 'premio', e.target.value)}
                     onBlur={e => { const v = formatBRL(e.target.value); if (v) update(f.id, 'premio', v); }}
-                    placeholder="0,00" className="h-7 text-xs" />
+                    placeholder="0,00%" className="h-7 text-xs" />
                 </td>
                 <td className="px-2 py-1 text-center">
                   {faixas.length > 1 && (
@@ -139,7 +139,7 @@ function FormFields({ draft, setDraft, revendas }: {
               <input type="radio" name="tipoPremioP" value={t} checked={draft.tipoPremio === t}
                 onChange={() => setDraft(p => ({ ...p, tipoPremio: t }))}
                 className="accent-indigo-700" />
-              {t === 'percentual' ? 'Percentual (%)' : 'Faixas de Valor (R$)'}
+              {t === 'percentual' ? 'Percentual (%)' : 'Faixas de Rentabilidade'}
             </label>
           ))}
         </div>
