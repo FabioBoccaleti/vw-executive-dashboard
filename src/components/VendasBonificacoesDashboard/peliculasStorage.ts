@@ -14,6 +14,11 @@ export interface PeliculasRow {
   receitaLiquida: string;   // calculado: valorVenda - impostos
   custoPrestador: string;
   lucroBruto: string;       // calculado: receitaLiquida - custoPrestador
+  vendedor: string;
+  vendedorAcessorios: string;
+  comissaoVendedor: string;
+  comissaoVendedorAcessorios: string;
+  situacao: string;
 }
 
 export function createEmptyPeliculasRow(): PeliculasRow {
@@ -29,6 +34,11 @@ export function createEmptyPeliculasRow(): PeliculasRow {
     receitaLiquida: '',
     custoPrestador: '',
     lucroBruto: '',
+    vendedor: '',
+    vendedorAcessorios: '',
+    comissaoVendedor: '',
+    comissaoVendedorAcessorios: '',
+    situacao: '',
   };
 }
 

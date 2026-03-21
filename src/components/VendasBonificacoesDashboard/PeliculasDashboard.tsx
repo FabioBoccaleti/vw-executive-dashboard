@@ -75,7 +75,12 @@ const COLUMNS: ColDef[] = [
   { key: 'impostos',       label: 'Impostos',                 type: 'currency', width: 125 },
   { key: 'receitaLiquida', label: 'Receita Líquida',          type: 'currency', width: 140 },
   { key: 'custoPrestador', label: 'Custo Prestador',          type: 'currency', width: 140 },
-  { key: 'lucroBruto',     label: 'Lucro Bruto',              type: 'currency', width: 130 },
+  { key: 'lucroBruto',                  label: 'Lucro Bruto',                        type: 'currency', width: 130 },
+  { key: 'vendedor',                   label: 'Vendedor',                           type: 'text',     width: 160 },
+  { key: 'vendedorAcessorios',         label: 'Vendedor de Acessórios',             type: 'text',     width: 175 },
+  { key: 'comissaoVendedor',           label: 'Comissão Vendedor',                  type: 'currency', width: 160 },
+  { key: 'comissaoVendedorAcessorios', label: 'Comissão Vendedor de Acessórios',    type: 'currency', width: 200 },
+  { key: 'situacao',                   label: 'Situação',                           type: 'text',     width: 130 },
 ];
 
 // % Lucro Bruto is displayed as extra column (not stored)
@@ -390,7 +395,12 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
         draft.produto        = str(row[4]);
         draft.valorVenda     = cur(row[5]);
         draft.impostos       = cur(row[6]);
-        draft.custoPrestador = cur(row[8]);
+        draft.custoPrestador              = cur(row[8]);
+        draft.vendedor                    = str(row[10]);
+        draft.vendedorAcessorios          = str(row[11]);
+        draft.comissaoVendedor            = cur(row[12]);
+        draft.comissaoVendedorAcessorios  = cur(row[13]);
+        draft.situacao                    = str(row[14]);
         return recalcPeliculasRow(draft);
       });
       setImportPreview(imported);
