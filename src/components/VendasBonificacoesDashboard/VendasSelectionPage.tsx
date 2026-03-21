@@ -48,7 +48,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-400 leading-snug">
-                Em Desenvolvimento
+                Análise e Controle de Vendas de Películas na Audi
               </h2>
               <span className="inline-block mt-2 text-xs font-medium text-slate-400 bg-slate-100 rounded-full px-3 py-0.5">
                 Em breve
