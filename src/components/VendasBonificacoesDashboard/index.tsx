@@ -621,33 +621,36 @@ function ModalInput({ label, value, onChange, placeholder }: { label: string; va
   );
 }
 function ModalInputCurrency({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  // Exibe formatado em pt-BR; salva internamente como número puro
+  const focused = useRef(false);
   const [display, setDisplay] = useState(() => {
     const n = parseFloat(value);
     return isNaN(n) ? '' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   });
   useEffect(() => {
-    const n = parseFloat(value);
-    if (!isNaN(n)) setDisplay(n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-    else if (!value) setDisplay('');
+    if (!focused.current) {
+      const n = parseFloat(value);
+      if (!isNaN(n)) setDisplay(n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+      else if (!value) setDisplay('');
+    }
   }, [value]);
   function handleChange(raw: string) {
     setDisplay(raw);
-    // converte pt-BR "1.200,50" para número puro
-    const clean = raw.replace(/\./g, '').replace(',', '.');
-    const n = parseFloat(clean);
-    onChange(isNaN(n) ? '' : String(n));
+    const parsed = parseBrazilianNumber(raw);
+    onChange(parsed);
   }
   function handleBlur() {
-    const clean = display.replace(/\./g, '').replace(',', '.');
-    const n = parseFloat(clean);
+    focused.current = false;
+    const n = parseFloat(parseBrazilianNumber(display));
     if (!isNaN(n)) setDisplay(n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
     else setDisplay('');
   }
   return (
     <div>
       <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
-      <input type="text" inputMode="decimal" value={display} onChange={e => handleChange(e.target.value)} onBlur={handleBlur}
+      <input type="text" inputMode="decimal" value={display}
+        onChange={e => handleChange(e.target.value)}
+        onFocus={e => { focused.current = true; e.target.select(); }}
+        onBlur={handleBlur}
         className="w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white font-mono" />
     </div>
   );
