@@ -5,6 +5,7 @@ const KEY = 'peliculas_audi_rows';
 export interface PeliculasRow {
   id: string;
   dataRegistro: string;
+  dataEncerramento: string;
   numeroOS: string;
   codigoCliente: string;
   nomeCliente: string;
@@ -27,6 +28,7 @@ export function createEmptyPeliculasRow(): PeliculasRow {
   return {
     id: crypto.randomUUID(),
     dataRegistro,
+    dataEncerramento: '',
     numeroOS: '',
     codigoCliente: '',
     nomeCliente: '',
