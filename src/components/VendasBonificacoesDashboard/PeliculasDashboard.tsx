@@ -608,8 +608,12 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
               <table className="border-collapse text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
                 <colgroup>
                   <col style={{ width: 56, minWidth: 56 }} />
-                  {COLUMNS.map(c => <col key={c.key} style={{ width: c.width, minWidth: c.width }} />)}
-                  <col style={{ width: 115, minWidth: 115 }} /> {/* % Lucro Bruto */}
+                  {COLUMNS.map(c => (
+                    <Fragment key={c.key}>
+                      <col style={{ width: c.width, minWidth: c.width }} />
+                      {c.key === 'lucroBruto' && <col style={{ width: 115, minWidth: 115 }} />}
+                    </Fragment>
+                  ))}
                   <col style={{ width: 110, minWidth: 110 }} /> {/* Ações */}
                 </colgroup>
 
@@ -618,11 +622,15 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                   <tr>
                     <th className="sticky left-0 top-0 z-40 text-white text-center text-xs font-semibold px-2 py-3 border-r border-indigo-700" style={{ background: '#312e81' }}>#</th>
                     {COLUMNS.map((col, ci) => (
-                      <th key={`h-${col.key}-${ci}`} className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-indigo-600 align-top leading-snug text-center" style={{ background: '#4338ca' }}>
-                        {col.label}
-                      </th>
+                      <Fragment key={`h-${col.key}-${ci}`}>
+                        <th className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-indigo-600 align-top leading-snug text-center" style={{ background: '#4338ca' }}>
+                          {col.label}
+                        </th>
+                        {col.key === 'lucroBruto' && (
+                          <th className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-indigo-600 align-top leading-snug text-center" style={{ background: '#4338ca' }}>{EXTRA_PCT_LABEL}</th>
+                        )}
+                      </Fragment>
                     ))}
-                    <th className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-indigo-600 align-top leading-snug text-center" style={{ background: '#4338ca' }}>{EXTRA_PCT_LABEL}</th>
                     <th className="sticky right-0 top-0 z-40 text-white text-center text-xs font-semibold px-2 py-3 border-l border-indigo-700 whitespace-nowrap" style={{ background: '#312e81' }}>Ações</th>
                   </tr>
 
@@ -630,19 +638,23 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                   <tr>
                     <th className="sticky left-0 z-40 bg-slate-50 border-r border-b border-slate-200 px-1 py-1.5" style={{ top: 'var(--header-height, 44px)' }} />
                     {COLUMNS.map((col, ci) => (
-                      <th key={`f-${col.key}-${ci}`} className="sticky z-30 bg-slate-50 border-r border-b border-slate-200 px-1.5 py-1.5" style={{ top: 'var(--header-height, 44px)' }}>
-                        <div className="relative flex items-center">
-                          <Search className="absolute left-1.5 w-3 h-3 text-slate-300 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={filters[col.key] ?? ''}
-                            onChange={e => setFilter(col.key, e.target.value)}
-                            className={`w-full min-w-0 bg-white border rounded pl-5 pr-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400 ${(filters[col.key]?.length ?? 0) > 0 ? 'border-indigo-400 ring-1 ring-indigo-300' : 'border-slate-200'}`}
-                          />
-                        </div>
-                      </th>
+                      <Fragment key={`f-${col.key}-${ci}`}>
+                        <th className="sticky z-30 bg-slate-50 border-r border-b border-slate-200 px-1.5 py-1.5" style={{ top: 'var(--header-height, 44px)' }}>
+                          <div className="relative flex items-center">
+                            <Search className="absolute left-1.5 w-3 h-3 text-slate-300 pointer-events-none" />
+                            <input
+                              type="text"
+                              value={filters[col.key] ?? ''}
+                              onChange={e => setFilter(col.key, e.target.value)}
+                              className={`w-full min-w-0 bg-white border rounded pl-5 pr-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400 ${(filters[col.key]?.length ?? 0) > 0 ? 'border-indigo-400 ring-1 ring-indigo-300' : 'border-slate-200'}`}
+                            />
+                          </div>
+                        </th>
+                        {col.key === 'lucroBruto' && (
+                          <th className="sticky z-30 bg-slate-50 border-r border-b border-slate-200 px-1 py-1.5" style={{ top: 'var(--header-height, 44px)' }} />
+                        )}
+                      </Fragment>
                     ))}
-                    <th className="sticky z-30 bg-slate-50 border-r border-b border-slate-200 px-1 py-1.5" style={{ top: 'var(--header-height, 44px)' }} />
                     <th className="sticky right-0 z-40 bg-slate-50 border-l border-b border-slate-200 px-1 py-1.5" style={{ top: 'var(--header-height, 44px)' }} />
                   </tr>
                 </thead>
@@ -749,13 +761,13 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                                   )
                                 )}
                               </td>
+                              {col.key === 'lucroBruto' && (
+                                <td className="border-r border-slate-100 px-2 py-2.5 text-sm text-right font-mono tabular-nums bg-violet-50 text-violet-800 font-semibold" style={{ verticalAlign: 'middle' }}>
+                                  {pctDisplay}
+                                </td>
+                              )}
                             );
-                          })}
-
-                          {/* % Lucro Bruto (extra calc column) */}
-                          <td className="border-r border-slate-100 px-2 py-2.5 text-sm text-right font-mono tabular-nums bg-violet-50 text-violet-800 font-semibold" style={{ verticalAlign: 'middle' }}>
-                            {pctDisplay}
-                          </td>
+                          }}
 
                           {/* Actions */}
                           <td className="sticky right-0 z-20 border-l border-slate-200 px-2 py-1.5" style={{ background: rowBg, minWidth: 110 }}>
