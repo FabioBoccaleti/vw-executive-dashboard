@@ -18,7 +18,7 @@ import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 
 // ─── Campos calculados (somente leitura no modo edição) ──────────────────────
-const CALC_READONLY_KEYS = new Set<string>(['receitaLiquida', 'lucroBruto', 'impostos', 'comissaoVendedor', 'comissaoVendedorAcessorios']);
+const CALC_READONLY_KEYS = new Set<string>(['receitaLiquida', 'lucroBruto', 'impostos', 'comissaoVendedor', 'comissaoVendedorAcessorios', 'situacao']);
 const DATE_READONLY_KEYS  = new Set<string>(['dataRegistro']);
 const RESULTADO_KEYS     = new Set<string>(['lucroBruto']);
 const RL_KEY             = 'receitaLiquida';

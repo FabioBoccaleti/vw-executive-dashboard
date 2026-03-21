@@ -97,6 +97,14 @@ export function recalcPeliculasRow(row: PeliculasRow, totalAliquotaPct = 0, comi
       ? calcComissaoPorCargo('Vendedor de Acessórios', lb, rl, comissaoCtx.regras)
       : '0';
   }
+  // Situação automática
+  if (!row.dataEncerramento?.trim()) {
+    row.situacao = 'Em Andamento';
+  } else if (row.nfPrestador?.trim()) {
+    row.situacao = 'Processo Finalizado';
+  } else {
+    row.situacao = 'Encerrada';
+  }
   return row;
 }
 
