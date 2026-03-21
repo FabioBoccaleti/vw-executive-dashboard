@@ -63,10 +63,10 @@ type BrandFilter = 'Todas' | 'VW' | 'Audi';
 
 interface PeriodSlot { year: number; tipo: PeriodType; value: number; }
 
-function filterRows(rows: VendasRow[], year: number, monthChip: number | null, blindadora: string): VendasRow[] {
+function filterRows(rows: VendasRow[], year: number | 'Todos', monthChip: number | null, blindadora: string): VendasRow[] {
   return rows.filter(r => {
     if (!r.dataVenda) return false;
-    if (getRowYear(r) !== year) return false;
+    if (year !== 'Todos' && getRowYear(r) !== year) return false;
     if (monthChip !== null && getRowMonth(r) !== monthChip) return false;
     if (blindadora !== 'Todas' && r.blindadora !== blindadora) return false;
     return true;
@@ -403,7 +403,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
   const currentMonth = new Date().getMonth() + 1;
 
   // ── Filtros globais ──
-  const [selectedYear, setSelectedYear]         = useState(currentYear);
+  const [selectedYear, setSelectedYear]         = useState<number | 'Todos'>(currentYear);
   const [monthChip, setMonthChip]               = useState<number | null>(null);
   const [selectedBlindadora, setSelectedBlindadora] = useState('Todas');
   const [selectedBrand, setSelectedBrand]       = useState<BrandFilter>('Todas');
@@ -470,7 +470,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
 
   // ── Métricas do mês anterior (para deltas no Spotlight) ──
   const prevMonthMetrics = useMemo(() => {
-    if (monthChip === null) return null;
+    if (monthChip === null || selectedYear === 'Todos') return null;
     const prevM = monthChip === 1 ? 12 : monthChip - 1;
     const prevY = monthChip === 1 ? selectedYear - 1 : selectedYear;
     const prevRows = filterRows(brandRows, prevY, prevM, selectedBlindadora);
@@ -483,7 +483,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
     return MONTHS.slice(0, maxMonth).map((label, mi) => {
       const m = mi + 1;
       const mRows = brandRows.filter(r =>
-        getRowYear(r) === selectedYear &&
+        (selectedYear === 'Todos' || getRowYear(r) === selectedYear) &&
         getRowMonth(r) === m &&
         (selectedBlindadora === 'Todas' || r.blindadora === selectedBlindadora)
       );
@@ -556,7 +556,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
   // ── Por blindadora ──
   const blindadoraData = useMemo(() => {
     const map = new Map<string, { qtd: number; receita: number; custo: number; lucro: number; sorana: number }>();
-    brandRows.filter(r => getRowYear(r) === selectedYear && (monthChip === null || getRowMonth(r) === monthChip)).forEach(r => {
+    brandRows.filter(r => (selectedYear === 'Todos' || getRowYear(r) === selectedYear) && (monthChip === null || getRowMonth(r) === monthChip)).forEach(r => {
       const key = r.blindadora || 'Não informada';
       const cur = map.get(key) || { qtd: 0, receita: 0, custo: 0, lucro: 0, sorana: 0 };
       map.set(key, {
@@ -655,7 +655,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
   // ── Contagem por marca (badges do seletor) ──
   const brandCounts = useMemo(() => {
     const scoped = rows.filter(r =>
-      getRowYear(r) === selectedYear && (monthChip === null || getRowMonth(r) === monthChip)
+      (selectedYear === 'Todos' || getRowYear(r) === selectedYear) && (monthChip === null || getRowMonth(r) === monthChip)
     );
     return {
       todas: scoped.length,
@@ -727,9 +727,10 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ano</span>
             <select
               value={selectedYear}
-              onChange={e => setSelectedYear(Number(e.target.value))}
+              onChange={e => setSelectedYear(e.target.value === 'Todos' ? 'Todos' : Number(e.target.value))}
               className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
             >
+              <option value="Todos">Todos</option>
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
@@ -757,7 +758,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
             </button>
             {MONTHS.map((m, mi) => {
               const month = mi + 1;
-              const isCurrent = month === currentMonth && selectedYear === currentYear;
+              const isCurrent = month === currentMonth && selectedYear === currentYear && selectedYear !== 'Todos';
               return (
                 <button
                   key={month}
@@ -779,7 +780,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
           {/* Exportar Excel */}
           <button
             onClick={async () => {
-              const periodLbl = monthChip ? `${MONTHS[monthChip - 1]}-${selectedYear}` : String(selectedYear);
+              const periodLbl = monthChip ? `${MONTHS[monthChip - 1]}-${selectedYear === 'Todos' ? 'TodosAnos' : selectedYear}` : (selectedYear === 'Todos' ? 'Todos os Anos' : String(selectedYear));
               const brandLbl = selectedBrand === 'Todas' ? 'Todas as Revendas' : selectedBrand === 'VW' ? 'Revenda VW' : 'Revenda Audi';
               await exportAnaliseExcel(filteredRows, periodLbl, brandLbl);
             }}
@@ -793,7 +794,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
 
       {/* ── KPI CARDS ── */}
       <div>
-        <SectionTitle>Visão Geral — {monthChip ? `${MONTHS[monthChip - 1]}/${selectedYear}` : String(selectedYear)}</SectionTitle>
+        <SectionTitle>Visão Geral — {monthChip ? `${MONTHS[monthChip - 1]}/${selectedYear === 'Todos' ? 'Todos os Anos' : selectedYear}` : (selectedYear === 'Todos' ? 'Todos os Anos' : String(selectedYear))}</SectionTitle>
         {(() => {
           const accent = selectedBrand === 'VW' ? '#001E50' : selectedBrand === 'Audi' ? '#BB0A21' : '#3b82f6';
           return (
@@ -941,7 +942,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
       {monthChip === null && (
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
-          <SectionTitle>Evolução Mensal — {String(selectedYear)}</SectionTitle>
+          <SectionTitle>Evolução Mensal — {selectedYear === 'Todos' ? 'Todos os Anos' : String(selectedYear)}</SectionTitle>
         </div>
         <ResponsiveContainer width="100%" height={280}>
           <ComposedChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
