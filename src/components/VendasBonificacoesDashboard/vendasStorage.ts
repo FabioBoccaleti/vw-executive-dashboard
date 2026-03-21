@@ -62,6 +62,21 @@ function normalizeRows(rows: VendasRow[]): { rows: VendasRow[]; changed: boolean
     'Bola': 'Luiz Arlindo Rodrigues de Oliveira',
     'Orlando': 'Orlando Chodin Neto',
     'Rodrigo': 'Rodrigo de Araujo Andrade',
+    'Adilson': 'Adilson Bezerra Dos Santos',
+    'Aide': 'Aide Silva',
+    'Alex': 'Alex Sander da Costa Malachim',
+    'Geminiani': 'Alexandre Geminiani',
+    'Latorre': 'Alexandre Pires Latorre',
+    'Aline': 'Alexandre Pires Latorre',
+    'Cesar': 'Cesar Luiz Garcia Lourenco',
+    'Willian': 'Doarci William Tostes',
+    'William': 'Doarci William Tostes',
+    'Francisco': 'Francisco Nilton Carlos Soares',
+    'Chico': 'Francisco Nilton Carlos Soares',
+    'Julio': 'Julio Roberto Crepaldi',
+    'Camargo': 'Camargo Leandro Andrade',
+    'Leandro': 'Leandro Pereira dos Santos',
+    'Capeli': 'Luciano Capeli',
   };
   let changed = false;
   const normalized = rows.map(row => {
