@@ -189,3 +189,21 @@ export async function loadPeliculasVendedoresAcessorios(): Promise<VendedorAcess
 export async function savePeliculasVendedoresAcessorios(items: VendedorAcessorios[]): Promise<boolean> {
   return kvSet(KEY_PELICULAS_VENDEDORES_ACESSORIOS, items);
 }
+
+// ── Películas: Alíquotas de Imposto ────────────────────────────────────────────
+const KEY_PELICULAS_ALIQUOTAS = 'peliculas_cadastro_aliquotas';
+
+export interface AliquotaImposto {
+  id: string;
+  tipoImposto: string;  // ex.: ISS, PIS, COFINS
+  aliquota: string;     // percentual (%)
+  encargos: string;     // percentual (%)
+}
+
+export async function loadPeliculasAliquotas(): Promise<AliquotaImposto[]> {
+  return (await kvGet<AliquotaImposto[]>(KEY_PELICULAS_ALIQUOTAS)) ?? [];
+}
+
+export async function savePeliculasAliquotas(items: AliquotaImposto[]): Promise<boolean> {
+  return kvSet(KEY_PELICULAS_ALIQUOTAS, items);
+}
