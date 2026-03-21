@@ -7,7 +7,7 @@ import {
   loadPeliculasRegras,
   savePeliculasRegras,
   loadPeliculasRevendas,
-  CARGOS_VENDEDOR,
+  CARGOS_VENDEDOR_PELICULAS as CARGOS_VENDEDOR,
   BASES_CALCULO_PELICULAS,
   type RegraRemuneracao,
   type FaixaValor,

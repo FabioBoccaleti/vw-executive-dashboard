@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   loadPeliculasVendedores,
   savePeliculasVendedores,
-  CARGOS_VENDEDOR,
+  CARGOS_VENDEDOR_PELICULAS as CARGOS_VENDEDOR,
   type Vendedor,
   type CargoVendedor,
 } from '../cadastrosStorage';
