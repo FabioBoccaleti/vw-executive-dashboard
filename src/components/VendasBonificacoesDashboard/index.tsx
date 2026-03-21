@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download, Upload, RefreshCw, Package, ListRestart, FileText } from 'lucide-react';
+import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download, Upload, RefreshCw, Package, ListRestart, FileText, Lock, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from './vendasStorage';
 import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
@@ -746,6 +746,9 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [estoqueMode, setEstoqueMode] = useState(false);
   const [notasAEmitirMode, setNotasAEmitirMode] = useState(false);
   const [modalDraft, setModalDraft] = useState<VendasRow | null>(null);
+  const [unlockedRowId, setUnlockedRowId] = useState<string | null>(null);
+  const [lockPendingRow, setLockPendingRow] = useState<VendasRow | null>(null);
+  const [lockPassword, setLockPassword] = useState('');
   const importInputRef = useRef<HTMLInputElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -781,7 +784,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     }
   };
 
-  const startEdit = (row: VendasRow) => {
+  const startEdit = (row: VendasRow, keepRemuneracoes = false) => {
     setDeleteId(null);
     setEditingId(row.id);
     const draft = { ...row };
@@ -791,8 +794,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     const venda = parseFloat(draft.valorVendaBlindagem) || 0;
     const custo = parseFloat(draft.custoBlindagem) || 0;
     draft.lucroOperacao = draft.valorVendaBlindagem ? String(venda - custo) : '';
-    // Remunerações e Sorana: congeladas se NF já foi emitida
-    if (!draft.numeroNFComissao) {
+    // Remunerações e Sorana: congeladas se NF já foi emitida ou se keepRemuneracoes (edição manual)
+    if (!draft.numeroNFComissao && !keepRemuneracoes) {
       draft.remuneracaoVendedor  = calcRemuneracaoField(draft, 'Vendedor', regras, revendas);
       draft.remuneracaoGerencia  = calcRemuneracaoField(draft, 'Gerência', regras, revendas);
       draft.remuneracaoDiretoria = calcRemuneracaoField(draft, 'Diretoria', regras, revendas);
@@ -814,7 +817,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     setEditDraft(draft);
   };
 
-  const cancelEdit = () => { setEditingId(null); setEditDraft(null); };
+  const cancelEdit = () => { setEditingId(null); setEditDraft(null); setUnlockedRowId(null); };
 
   const saveEdit = async () => {
     if (!editDraft) return;
@@ -822,8 +825,22 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     setRows(updated);
     setEditingId(null);
     setEditDraft(null);
+    setUnlockedRowId(null);
     await persist(updated);
     toast.success('Linha salva com sucesso');
+  };
+
+  const handleUnlockConfirm = () => {
+    if (lockPassword !== '1985') {
+      toast.error('Senha incorreta');
+      setLockPassword('');
+      return;
+    }
+    if (!lockPendingRow) return;
+    setUnlockedRowId(lockPendingRow.id);
+    startEdit(lockPendingRow, true);
+    setLockPendingRow(null);
+    setLockPassword('');
   };
 
   const openModal = (row: VendasRow) => {
@@ -926,6 +943,17 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         }
       }
       if (field === 'numeroNFComissao' || field === 'comissaoBrutaSorana' || field === 'valorVendaBlindagem' || field === 'custoBlindagem') {
+        updated.situacaoComissao = calcSituacaoComissao(updated);
+      }
+      if (REMUNERACAO_KEYS.has(field)) {
+        // Remuneração editada manualmente: recalcula Comissão Bruta em cascata
+        updated.comissaoBrutaSorana = String(
+          (parseFloat(updated.lucroOperacao) || 0)
+          - (parseFloat(updated.remuneracaoVendedor) || 0)
+          - (parseFloat(updated.remuneracaoGerencia) || 0)
+          - (parseFloat(updated.remuneracaoDiretoria) || 0)
+          - (parseFloat(updated.remuneracaoGerenciaSupervisorUsados) || 0)
+        );
         updated.situacaoComissao = calcSituacaoComissao(updated);
       }
       if (field === 'situacaoNegociacaoBlindadora' || field === 'blindadora') {
@@ -1444,7 +1472,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                             style={{ verticalAlign: 'middle' }}
                           >
                             {isEditing ? (
-                              CALC_READONLY_KEYS.has(col.key) ? (
+                              CALC_READONLY_KEYS.has(col.key) && !(REMUNERACAO_KEYS.has(col.key) && unlockedRowId === row.id) ? (
                                 // Campo calculado automaticamente: exibe somente leitura
                                 <span className={`italic text-sm font-mono tabular-nums ${
                                   val && RESULTADO_KEYS.has(col.key)         ? 'text-emerald-700 font-semibold' :
@@ -1662,6 +1690,11 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                         ) : isEditing ? (
                           /* ── Edit mode actions ── */
                           <div className="flex items-center justify-center gap-1.5">
+                            {unlockedRowId === row.id && (
+                              <span title="Remunerações desbloqueadas para edição manual" className="text-sky-500 flex-shrink-0">
+                                <LockOpen className="w-3.5 h-3.5" />
+                              </span>
+                            )}
                             <button
                               onClick={saveEdit}
                               title="Salvar linha"
@@ -1687,6 +1720,13 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                               className="p-1.5 rounded-md text-amber-600 hover:bg-amber-50 transition-colors"
                             >
                               <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => { setLockPendingRow(row); setLockPassword(''); }}
+                              title="Editar remunerações manualmente (requer senha)"
+                              className="p-1.5 rounded-md text-sky-500 hover:bg-sky-50 transition-colors"
+                            >
+                              <Lock className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => { setEditingId(null); setEditDraft(null); setDeleteId(row.id); }}
@@ -1914,6 +1954,53 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
               >
                 <Check className="w-4 h-4" />
                 Confirmar Importação
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de senha para edição manual de remunerações ── */}
+      {lockPendingRow && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-5">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-sky-100 rounded-xl flex-shrink-0">
+                <Lock className="w-5 h-5 text-sky-700" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">Editar Remunerações</h3>
+                <p className="text-sm text-slate-500 mt-1">Digite a senha para liberar a edição manual das remunerações desta linha.</p>
+              </div>
+            </div>
+            <input
+              type="password"
+              value={lockPassword}
+              autoFocus
+              onChange={e => setLockPassword(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleUnlockConfirm();
+                if (e.key === 'Escape') { setLockPendingRow(null); setLockPassword(''); }
+              }}
+              placeholder="Senha"
+              className="w-full px-3 py-2 rounded-lg text-sm border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:border-sky-400"
+            />
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setLockPendingRow(null); setLockPassword(''); }}
+                className="border-slate-300 text-slate-600"
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleUnlockConfirm}
+                className="bg-sky-600 hover:bg-sky-700 text-white gap-1.5"
+              >
+                <LockOpen className="w-4 h-4" />
+                Desbloquear
               </Button>
             </div>
           </div>
