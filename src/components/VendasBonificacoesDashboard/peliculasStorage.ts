@@ -48,8 +48,9 @@ export function createEmptyPeliculasRow(): PeliculasRow {
   };
 }
 
-export function recalcPeliculasRow(row: PeliculasRow): PeliculasRow {
+export function recalcPeliculasRow(row: PeliculasRow, totalAliquotaPct = 0): PeliculasRow {
   const venda = parseFloat(row.valorVenda) || 0;
+  row.impostos = row.valorVenda ? String(venda * totalAliquotaPct / 100) : '';
   const imp   = parseFloat(row.impostos)   || 0;
   const rl    = row.valorVenda ? venda - imp : 0;
   row.receitaLiquida = row.valorVenda ? String(rl) : '';

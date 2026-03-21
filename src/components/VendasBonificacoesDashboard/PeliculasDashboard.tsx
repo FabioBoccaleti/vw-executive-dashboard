@@ -11,13 +11,14 @@ import {
 } from './peliculasStorage';
 import {
   loadPeliculasVendedores, loadPeliculasVendedoresAcessorios, loadPeliculasProdutos,
+  loadPeliculasAliquotas,
 } from '@/components/CadastrosPage/cadastrosStorage';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 
 // ─── Campos calculados (somente leitura no modo edição) ──────────────────────
-const CALC_READONLY_KEYS = new Set<string>(['receitaLiquida', 'lucroBruto']);
+const CALC_READONLY_KEYS = new Set<string>(['receitaLiquida', 'lucroBruto', 'impostos']);
 const DATE_READONLY_KEYS  = new Set<string>(['dataRegistro']);
 const RESULTADO_KEYS     = new Set<string>(['lucroBruto']);
 const RL_KEY             = 'receitaLiquida';
@@ -285,12 +286,20 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [cadastroVendedores, setCadastroVendedores] = useState<string[]>([]);
   const [cadastroVendedoresAcessorios, setCadastroVendedoresAcessorios] = useState<string[]>([]);
   const [cadastroProdutos, setCadastroProdutos] = useState<string[]>([]);
+  const [aliquotaTotal, setAliquotaTotal] = useState(0);
 
   useEffect(() => {
     loadPeliculasRows().then(r => { setRows(r); setLoading(false); });
     loadPeliculasVendedores().then(list => setCadastroVendedores(list.map(v => v.nome)));
     loadPeliculasVendedoresAcessorios().then(list => setCadastroVendedoresAcessorios(list.map(v => v.nome)));
     loadPeliculasProdutos().then(list => setCadastroProdutos(list.map(p => p.nome)));
+    loadPeliculasAliquotas().then(list => {
+      const TIPOS = ['iss', 'pis', 'cofins'];
+      const total = list
+        .filter(a => TIPOS.includes(a.tipoImposto.toLowerCase()))
+        .reduce((s, a) => s + (parseFloat(a.aliquota) || 0), 0);
+      setAliquotaTotal(total);
+    });
   }, []);
 
   useEffect(() => {
@@ -315,7 +324,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const startEdit = (row: PeliculasRow) => {
     setDeleteId(null);
     setEditingId(row.id);
-    setEditDraft(recalcPeliculasRow({ ...row }));
+    setEditDraft(recalcPeliculasRow({ ...row }, aliquotaTotal));
   };
 
   const cancelEdit = () => { setEditingId(null); setEditDraft(null); };
@@ -339,7 +348,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const changeField = (field: keyof PeliculasRow, value: string) =>
     setEditDraft(prev => {
       if (!prev) return prev;
-      const next = recalcPeliculasRow({ ...prev, [field]: value });
+      const next = recalcPeliculasRow({ ...prev, [field]: value }, aliquotaTotal);
       return next;
     });
 
@@ -436,7 +445,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
         draft.comissaoVendedor            = cur(row[12]);
         draft.comissaoVendedorAcessorios  = cur(row[13]);
         draft.situacao                    = str(row[14]);
-        return recalcPeliculasRow(draft);
+        return recalcPeliculasRow(draft, aliquotaTotal);
       });
       setImportPreview(imported);
     } catch {
