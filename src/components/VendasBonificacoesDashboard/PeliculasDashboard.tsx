@@ -696,7 +696,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                     const rowBg     = isEditing ? '#eef2ff' : isEven ? '#ffffff' : '#f8fafc';
                     const draft     = isEditing ? editDraft! : row;
                     const realIdx   = rows.indexOf(row);
-                    const pctDisplay = fmtPct(row.lucroBruto, row.receitaLiquida);
+                    const pctDisplay = fmtPct(draft.lucroBruto, draft.receitaLiquida);
 
                     return (
                       <Fragment key={row.id}>
