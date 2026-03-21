@@ -1,4 +1,5 @@
 import { kvGet, kvSet } from '@/lib/kvClient';
+import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
 
 const KEY = 'vendas_bonificacoes_rows';
 
@@ -123,13 +124,64 @@ function normalizeRows(rows: VendasRow[]): { rows: VendasRow[]; changed: boolean
   return { rows: normalized, changed };
 }
 
+function normalizeVeiculos(
+  rows: VendasRow[],
+  catalogo: CatalogoVeiculos
+): { rows: VendasRow[]; changed: boolean } {
+  // Nomes de todas as marcas conhecidas (para detectar se já tem marca)
+  const allBrandNames = catalogo.marcas.map(m => m.nome.toLowerCase());
+
+  // Apenas marcas VW
+  const vwBrands = catalogo.marcas.filter(m =>
+    m.nome.toLowerCase() === 'vw' || m.nome.toLowerCase() === 'volkswagen'
+  );
+  const vwBrandIds = new Set(vwBrands.map(m => m.id));
+
+  // Modelos VW ordenados do mais longo para o mais curto (casa nomes compostos primeiro)
+  const vwModelos = catalogo.modelos
+    .filter(m => vwBrandIds.has(m.marcaId))
+    .sort((a, b) => b.modelo.length - a.modelo.length);
+
+  if (vwModelos.length === 0) return { rows, changed: false };
+
+  let changed = false;
+  const normalized = rows.map(row => {
+    const v = row.veiculo.trim();
+    if (!v) return row;
+
+    // Já começa com uma marca conhecida → não mexe
+    const vLower = v.toLowerCase();
+    const hasBrand = allBrandNames.some(b => vLower === b || vLower.startsWith(b + ' '));
+    if (hasBrand) return row;
+
+    // Tenta casar com algum modelo VW (case-insensitive)
+    const match = vwModelos.find(m => {
+      const mLower = m.modelo.toLowerCase();
+      return vLower === mLower || vLower.startsWith(mLower + ' ') || vLower.startsWith(mLower);
+    });
+
+    if (match) {
+      changed = true;
+      return { ...row, veiculo: `VW ${match.modelo}` };
+    }
+
+    return row;
+  });
+
+  return { rows: normalized, changed };
+}
+
 export async function loadVendasRows(): Promise<VendasRow[]> {
   try {
-    const data = await kvGet<VendasRow[]>(KEY);
+    const [data, catalogo] = await Promise.all([
+      kvGet<VendasRow[]>(KEY),
+      loadCatalogo(),
+    ]);
     if (data && data.length > 0) {
-      const { rows, changed } = normalizeRows(data);
-      if (changed) await kvSet(KEY, rows);
-      return rows;
+      const { rows: r1, changed: c1 } = normalizeRows(data);
+      const { rows: r2, changed: c2 } = normalizeVeiculos(r1, catalogo);
+      if (c1 || c2) await kvSet(KEY, r2);
+      return r2;
     }
   } catch { /* fallback */ }
   return Array.from({ length: 10 }, createEmptyRow);
