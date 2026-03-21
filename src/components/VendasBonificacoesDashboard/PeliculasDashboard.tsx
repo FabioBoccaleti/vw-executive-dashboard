@@ -102,6 +102,7 @@ const COLUMNS: ColDef[] = [
   { key: 'vendedorAcessorios',         label: 'Vendedor de Acessórios',             type: 'text',     width: 175 },
   { key: 'comissaoVendedor',           label: 'Comissão Vendedor',                  type: 'currency', width: 160 },
   { key: 'comissaoVendedorAcessorios', label: 'Comissão Vendedor de Acessórios',    type: 'currency', width: 200 },
+  { key: 'nfPrestador',               label: 'Número NF Prestador do Serviço',   type: 'text',     width: 200 },
   { key: 'situacao',                   label: 'Situação',                           type: 'text',     width: 130 },
 ];
 
