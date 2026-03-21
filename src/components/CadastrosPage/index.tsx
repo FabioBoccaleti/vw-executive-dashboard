@@ -88,7 +88,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
                     ? 'text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'
                 }`}
-                style={activeSection === item.id ? { background: isPeliculas ? '#312e81' : '#1f2937' } : {}}>
+                style={activeSection === item.id ? { background: isPeliculas ? '#312e81' : '#1f2937' } : {}}
               >
                 <span className={`mt-0.5 flex-shrink-0 ${activeSection === item.id ? 'text-white' : 'text-slate-400'}`}>
                   {item.icon}
