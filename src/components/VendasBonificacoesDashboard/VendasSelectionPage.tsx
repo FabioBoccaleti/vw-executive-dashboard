@@ -1,7 +1,7 @@
-import { Shield, Clock } from 'lucide-react';
+import { Shield, Layers } from 'lucide-react';
 
 interface VendasSelectionPageProps {
-  onSelect: (option: 'blindagem') => void;
+  onSelect: (option: 'blindagem' | 'peliculas') => void;
   onChangeBrand: () => void;
 }
 
@@ -41,20 +41,20 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
             </div>
           </button>
 
-          {/* Card desabilitado — Em Desenvolvimento */}
-          <div className="flex-1 bg-white rounded-2xl border-2 border-slate-200 shadow-sm p-8 flex flex-col items-center gap-4 text-center opacity-50 cursor-not-allowed select-none">
-            <div className="p-4 rounded-full bg-slate-100">
-              <Clock className="w-10 h-10 text-slate-400" />
+          {/* Card ativo — Análise e Controle de Vendas de Películas na Audi */}
+          <button
+            onClick={() => onSelect('peliculas')}
+            className="flex-1 bg-white rounded-2xl border-2 border-indigo-400 shadow-md hover:shadow-xl hover:border-indigo-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-indigo-50 group-hover:bg-indigo-100 transition-colors">
+              <Layers className="w-10 h-10 text-indigo-500" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-400 leading-snug">
-                Análise e Controle de Vendas de Películas na Audi
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Análise e Controle de Vendas<br />de Películas na Audi
               </h2>
-              <span className="inline-block mt-2 text-xs font-medium text-slate-400 bg-slate-100 rounded-full px-3 py-0.5">
-                Em breve
-              </span>
             </div>
-          </div>
+          </button>
 
         </div>
       </div>

@@ -5,6 +5,7 @@ import { DespesasDashboard } from '@/components/DespesasDashboard'
 import { FluxoCaixaDashboard } from '@/components/FluxoCaixaDashboard'
 import { VendasBonificacoesDashboard } from '@/components/VendasBonificacoesDashboard'
 import { VendasSelectionPage } from '@/components/VendasBonificacoesDashboard/VendasSelectionPage'
+import { PeliculasDashboard } from '@/components/VendasBonificacoesDashboard/PeliculasDashboard'
 import { CadastrosPage } from '@/components/CadastrosPage'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
@@ -23,7 +24,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<'app' | 'admin' | 'cadastros'>(() =>
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
-  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem'>('selection')
+  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas'>('selection')
   
   // Inicializa o banco de dados em produção
   useEffect(() => {
@@ -207,9 +208,11 @@ function AppContent() {
       ) : brand === 'vendas_bonificacoes' ? (
         vendasSubPage === 'selection' ? (
           <VendasSelectionPage
-            onSelect={() => setVendasSubPage('blindagem')}
+            onSelect={(option) => setVendasSubPage(option)}
             onChangeBrand={handleChangeBrand}
           />
+        ) : vendasSubPage === 'peliculas' ? (
+          <PeliculasDashboard onBack={() => setVendasSubPage('selection')} />
         ) : (
           <VendasBonificacoesDashboard
             onChangeBrand={() => setVendasSubPage('selection')}
