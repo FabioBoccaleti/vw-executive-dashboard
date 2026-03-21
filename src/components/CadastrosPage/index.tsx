@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Car, Shield, Users, Percent, Store, Wrench } from 'lucide-react';
+import { ArrowLeft, Car, Shield, Users, Percent, Store, Wrench, ShoppingBag, UserCheck } from 'lucide-react';
 import { VeiculosSection } from './sections/VeiculosSection';
 import { BlinadorasSection } from './sections/BlinadorasSection';
 import { VendedoresSection } from './sections/VendedoresSection';
@@ -10,8 +10,10 @@ import { PeliculasVeiculosSection } from './sections/PeliculasVeiculosSection';
 import { PeliculasVendedoresSection } from './sections/PeliculasVendedoresSection';
 import { PeliculasRevendasSection } from './sections/PeliculasRevendasSection';
 import { PeliculasRegrasSection } from './sections/PeliculasRegrasSection';
+import { PeliculasProdutosSection } from './sections/PeliculasProdutosSection';
+import { PeliculasVendedoresAcessoriosSection } from './sections/PeliculasVendedoresAcessoriosSection';
 
-type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'revendas' | 'regras';
+type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos';
 
 interface MenuItem {
   id: SectionId;
@@ -29,11 +31,13 @@ const MENU_BLINDAGEM: MenuItem[] = [
 ];
 
 const MENU_PELICULAS: MenuItem[] = [
-  { id: 'veiculos',     label: 'Veículos',               description: 'Marcas e modelos',               icon: <Car className="w-5 h-5" /> },
-  { id: 'prestadores',  label: 'Prestadores de Serviço', description: 'Empresas prestadoras',           icon: <Wrench className="w-5 h-5" /> },
-  { id: 'revendas',     label: 'Revendas',               description: 'Concessionárias e revendas',     icon: <Store className="w-5 h-5" /> },
-  { id: 'vendedores',   label: 'Vendedores',             description: 'Equipe de vendas e cargos',      icon: <Users className="w-5 h-5" /> },
-  { id: 'regras',       label: 'Regras de Remuneração',  description: 'Percentuais e bases de cálculo', icon: <Percent className="w-5 h-5" /> },
+  { id: 'veiculos',              label: 'Veículos',                  description: 'Marcas e modelos',               icon: <Car className="w-5 h-5" /> },
+  { id: 'prestadores',           label: 'Prestadores de Serviço',    description: 'Empresas prestadoras',           icon: <Wrench className="w-5 h-5" /> },
+  { id: 'produtos',              label: 'Produtos / Serviços',       description: 'Catálogo de produtos e serviços', icon: <ShoppingBag className="w-5 h-5" /> },
+  { id: 'revendas',              label: 'Revendas',                  description: 'Concessionárias e revendas',     icon: <Store className="w-5 h-5" /> },
+  { id: 'vendedores',            label: 'Vendedores',                description: 'Equipe de vendas e cargos',      icon: <Users className="w-5 h-5" /> },
+  { id: 'vendedoresAcessorios',  label: 'Vendedores de Acessórios',  description: 'Equipe de vendedores de acessórios', icon: <UserCheck className="w-5 h-5" /> },
+  { id: 'regras',                label: 'Regras de Remuneração',     description: 'Percentuais e bases de cálculo', icon: <Percent className="w-5 h-5" /> },
 ];
 
 interface CadastrosPageProps {
@@ -120,11 +124,13 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
             {!isPeliculas && activeSection === 'revendas'    && <RevendasSection />}
             {!isPeliculas && activeSection === 'vendedores'  && <VendedoresSection />}
             {!isPeliculas && activeSection === 'regras'      && <RegrasSection />}
-            {isPeliculas  && activeSection === 'veiculos'    && <PeliculasVeiculosSection />}
-            {isPeliculas  && activeSection === 'prestadores' && <PrestadoresSection />}
-            {isPeliculas  && activeSection === 'revendas'    && <PeliculasRevendasSection />}
-            {isPeliculas  && activeSection === 'vendedores'  && <PeliculasVendedoresSection />}
-            {isPeliculas  && activeSection === 'regras'      && <PeliculasRegrasSection />}
+            {isPeliculas  && activeSection === 'veiculos'             && <PeliculasVeiculosSection />}
+            {isPeliculas  && activeSection === 'prestadores'          && <PrestadoresSection />}
+            {isPeliculas  && activeSection === 'produtos'             && <PeliculasProdutosSection />}
+            {isPeliculas  && activeSection === 'revendas'             && <PeliculasRevendasSection />}
+            {isPeliculas  && activeSection === 'vendedores'           && <PeliculasVendedoresSection />}
+            {isPeliculas  && activeSection === 'vendedoresAcessorios' && <PeliculasVendedoresAcessoriosSection />}
+            {isPeliculas  && activeSection === 'regras'               && <PeliculasRegrasSection />}
           </div>
         </main>
       </div>

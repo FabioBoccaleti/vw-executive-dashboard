@@ -22,9 +22,11 @@ export interface PeliculasRow {
 }
 
 export function createEmptyPeliculasRow(): PeliculasRow {
+  const today = new Date();
+  const dataRegistro = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   return {
     id: crypto.randomUUID(),
-    dataRegistro: '',
+    dataRegistro,
     numeroOS: '',
     codigoCliente: '',
     nomeCliente: '',

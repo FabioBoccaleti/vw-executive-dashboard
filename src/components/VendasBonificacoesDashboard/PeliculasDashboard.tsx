@@ -9,14 +9,31 @@ import {
   loadPeliculasRows, savePeliculasRows, createEmptyPeliculasRow,
   recalcPeliculasRow, type PeliculasRow,
 } from './peliculasStorage';
+import {
+  loadPeliculasVendedores, loadPeliculasVendedoresAcessorios, loadPeliculasProdutos,
+} from '@/components/CadastrosPage/cadastrosStorage';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 
 // ─── Campos calculados (somente leitura no modo edição) ──────────────────────
 const CALC_READONLY_KEYS = new Set<string>(['receitaLiquida', 'lucroBruto']);
+const DATE_READONLY_KEYS  = new Set<string>(['dataRegistro']);
 const RESULTADO_KEYS     = new Set<string>(['lucroBruto']);
 const RL_KEY             = 'receitaLiquida';
+
+// Campos obrigatórios — bloqueia salvar se vazios
+const REQUIRED_KEYS: (keyof PeliculasRow)[] = [
+  'numeroOS', 'codigoCliente', 'nomeCliente', 'valorVenda', 'vendedor', 'vendedorAcessorios',
+];
+const REQUIRED_LABELS: Record<string, string> = {
+  numeroOS: 'Nº Ordem de Serviço',
+  codigoCliente: 'Código do Cliente',
+  nomeCliente: 'Nome do Cliente',
+  valorVenda: 'Valor da Venda',
+  vendedor: 'Vendedor',
+  vendedorAcessorios: 'Vendedor de Acessórios',
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function fmtCurrency(raw: string): string {
@@ -260,8 +277,16 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const importInputRef = useRef<HTMLInputElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
+  // Listas de cadastro para selectors
+  const [cadastroVendedores, setCadastroVendedores] = useState<string[]>([]);
+  const [cadastroVendedoresAcessorios, setCadastroVendedoresAcessorios] = useState<string[]>([]);
+  const [cadastroProdutos, setCadastroProdutos] = useState<string[]>([]);
+
   useEffect(() => {
     loadPeliculasRows().then(r => { setRows(r); setLoading(false); });
+    loadPeliculasVendedores().then(list => setCadastroVendedores(list.map(v => v.nome)));
+    loadPeliculasVendedoresAcessorios().then(list => setCadastroVendedoresAcessorios(list.map(v => v.nome)));
+    loadPeliculasProdutos().then(list => setCadastroProdutos(list.map(p => p.nome)));
   }, []);
 
   useEffect(() => {
@@ -293,6 +318,12 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
 
   const saveEdit = async () => {
     if (!editDraft) return;
+    // Validação de campos obrigatórios
+    const missing = REQUIRED_KEYS.filter(k => !editDraft[k]?.toString().trim());
+    if (missing.length > 0) {
+      toast.error(`Preencha os campos obrigatórios: ${missing.map(k => REQUIRED_LABELS[k]).join(', ')}`);
+      return;
+    }
     const updated = rows.map(r => r.id === editDraft.id ? editDraft : r);
     setRows(updated);
     setEditingId(null);
@@ -645,6 +676,14 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                             const val = (draft as PeliculasRow)[col.key] as string;
                             const isRight = col.type === 'currency';
                             const isCalc = CALC_READONLY_KEYS.has(col.key);
+                            const isDateRO = DATE_READONLY_KEYS.has(col.key);
+                            const isRequired = REQUIRED_KEYS.includes(col.key as keyof PeliculasRow);
+                            const isMissing = isEditing && isRequired && !val?.trim();
+                            const isSelector = col.key === 'produto' || col.key === 'vendedor' || col.key === 'vendedorAcessorios';
+                            const selectorOptions =
+                              col.key === 'produto' ? cadastroProdutos :
+                              col.key === 'vendedor' ? cadastroVendedores :
+                              col.key === 'vendedorAcessorios' ? cadastroVendedoresAcessorios : [];
                             const cellHighlight = val && RESULTADO_KEYS.has(col.key)
                               ? 'bg-emerald-50 text-emerald-800 font-semibold'
                               : val && col.key === RL_KEY
@@ -654,18 +693,32 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                             return (
                               <td
                                 key={`${col.key}-${ci}`}
-                                className={`border-r border-slate-100 px-2 py-2.5 text-sm ${isRight ? 'text-right' : 'text-left'} ${cellHighlight}`}
+                                className={`border-r border-slate-100 px-2 py-2.5 text-sm ${isRight ? 'text-right' : 'text-left'} ${cellHighlight} ${isMissing ? 'bg-red-50 ring-1 ring-inset ring-red-300' : ''}`}
                                 style={{ verticalAlign: 'middle' }}
                               >
                                 {isEditing ? (
-                                  isCalc ? (
+                                  isCalc || isDateRO ? (
                                     <span className={`italic text-sm font-mono tabular-nums ${
                                       val && RESULTADO_KEYS.has(col.key) ? 'text-emerald-700 font-semibold' :
                                       val && col.key === RL_KEY          ? 'text-sky-700 font-semibold' :
+                                      isDateRO ? 'text-slate-600' :
                                       'text-slate-400'
                                     }`}>
-                                      {col.type === 'currency' ? fmtCurrency(val) : val || '—'}
+                                      {col.type === 'currency' ? fmtCurrency(val) : col.type === 'date' ? fmtDate(val) : val || '—'}
                                     </span>
+                                  ) : isSelector ? (
+                                    <select
+                                      value={val}
+                                      onChange={e => changeField(col.key, e.target.value)}
+                                      className={`w-full bg-white border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
+                                        isMissing ? 'border-red-400' : 'border-indigo-300'
+                                      }`}
+                                    >
+                                      <option value="">— selecione —</option>
+                                      {selectorOptions.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
                                   ) : col.type === 'currency' ? (
                                     <CurrencyCell value={val} onChange={v => changeField(col.key, v)} />
                                   ) : col.type === 'date' ? (
@@ -680,8 +733,8 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                                       type="text"
                                       value={val}
                                       onChange={e => changeField(col.key, e.target.value)}
-                                      className="w-full bg-white border border-indigo-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                                      placeholder="—"
+                                      className={`w-full bg-white border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 ${isMissing ? 'border-red-400' : 'border-indigo-300'}`}
+                                      placeholder={isRequired ? '* obrigatório' : '—'}
                                     />
                                   )
                                 ) : (

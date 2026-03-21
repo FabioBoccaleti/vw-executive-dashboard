@@ -157,3 +157,35 @@ export async function loadPeliculasRegras(): Promise<RegraRemuneracao[]> {
 export async function savePeliculasRegras(items: RegraRemuneracao[]): Promise<boolean> {
   return kvSet(KEY_PELICULAS_REGRAS, items);
 }
+
+// ── Películas: Produtos / Serviços ─────────────────────────────────────────────
+const KEY_PELICULAS_PRODUTOS = 'peliculas_cadastro_produtos';
+
+export interface ProdutoServico {
+  id: string;
+  nome: string;
+}
+
+export async function loadPeliculasProdutos(): Promise<ProdutoServico[]> {
+  return (await kvGet<ProdutoServico[]>(KEY_PELICULAS_PRODUTOS)) ?? [];
+}
+
+export async function savePeliculasProdutos(items: ProdutoServico[]): Promise<boolean> {
+  return kvSet(KEY_PELICULAS_PRODUTOS, items);
+}
+
+// ── Películas: Vendedores de Acessórios ────────────────────────────────────────
+const KEY_PELICULAS_VENDEDORES_ACESSORIOS = 'peliculas_cadastro_vendedores_acessorios';
+
+export interface VendedorAcessorios {
+  id: string;
+  nome: string;
+}
+
+export async function loadPeliculasVendedoresAcessorios(): Promise<VendedorAcessorios[]> {
+  return (await kvGet<VendedorAcessorios[]>(KEY_PELICULAS_VENDEDORES_ACESSORIOS)) ?? [];
+}
+
+export async function savePeliculasVendedoresAcessorios(items: VendedorAcessorios[]): Promise<boolean> {
+  return kvSet(KEY_PELICULAS_VENDEDORES_ACESSORIOS, items);
+}
