@@ -703,8 +703,8 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                               : 'text-slate-700';
 
                             return (
+                              <Fragment key={`d-${col.key}-${ci}`}>
                               <td
-                                key={`${col.key}-${ci}`}
                                 className={`border-r border-slate-100 px-2 py-2.5 text-sm ${isRight ? 'text-right' : 'text-left'} ${cellHighlight} ${isMissing ? 'bg-red-50 ring-1 ring-inset ring-red-300' : ''}`}
                                 style={{ verticalAlign: 'middle' }}
                               >
@@ -766,8 +766,9 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                                   {pctDisplay}
                                 </td>
                               )}
+                              </Fragment>
                             );
-                          }}
+                          })}
 
                           {/* Actions */}
                           <td className="sticky right-0 z-20 border-l border-slate-200 px-2 py-1.5" style={{ background: rowBg, minWidth: 110 }}>
