@@ -154,11 +154,21 @@ function normalizeVeiculos(
     const hasBrand = allBrandNames.some(b => vLower === b || vLower.startsWith(b + ' '));
     if (hasBrand) return row;
 
-    // Tenta casar com algum modelo VW (case-insensitive)
-    const match = vwModelos.find(m => {
+    // 1ª tentativa: o campo contém o modelo completo ou começa pelo modelo
+    //   ex: "Taos High" casa com modelo "Taos"
+    let match = vwModelos.find(m => {
       const mLower = m.modelo.toLowerCase();
       return vLower === mLower || vLower.startsWith(mLower + ' ') || vLower.startsWith(mLower);
     });
+
+    // 2ª tentativa (reversa): o campo é prefixo do modelo do catálogo
+    //   ex: "Jetta" casa com modelo "Jetta GLI" quando não existe "Jetta" isolado
+    if (!match) {
+      match = vwModelos.find(m => {
+        const mLower = m.modelo.toLowerCase();
+        return mLower.startsWith(vLower + ' ');
+      });
+    }
 
     if (match) {
       changed = true;
