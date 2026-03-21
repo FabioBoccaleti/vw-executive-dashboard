@@ -7,6 +7,7 @@ export interface PeliculasRow {
   dataRegistro: string;
   dataEncerramento: string;
   numeroOS: string;
+  chassi: string;
   codigoCliente: string;
   nomeCliente: string;
   produto: string;
@@ -30,6 +31,7 @@ export function createEmptyPeliculasRow(): PeliculasRow {
     dataRegistro,
     dataEncerramento: '',
     numeroOS: '',
+    chassi: '',
     codigoCliente: '',
     nomeCliente: '',
     produto: '',

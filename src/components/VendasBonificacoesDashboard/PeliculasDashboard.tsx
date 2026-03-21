@@ -24,10 +24,11 @@ const RL_KEY             = 'receitaLiquida';
 
 // Campos obrigatórios — bloqueia salvar se vazios
 const REQUIRED_KEYS: (keyof PeliculasRow)[] = [
-  'numeroOS', 'codigoCliente', 'nomeCliente', 'produto', 'valorVenda', 'vendedor', 'vendedorAcessorios',
+  'numeroOS', 'chassi', 'codigoCliente', 'nomeCliente', 'produto', 'valorVenda', 'vendedor', 'vendedorAcessorios',
 ];
 const REQUIRED_LABELS: Record<string, string> = {
   numeroOS: 'Nº Ordem de Serviço',
+  chassi: 'Chassi',
   codigoCliente: 'Código do Cliente',
   nomeCliente: 'Nome do Cliente',
   produto: 'Produto',
@@ -87,6 +88,7 @@ const COLUMNS: ColDef[] = [
   { key: 'dataRegistro',      label: 'Data de Registro',         type: 'date',     width: 130 },
   { key: 'dataEncerramento', label: 'Data de Encerramento',     type: 'date',     width: 155 },
   { key: 'numeroOS',         label: 'Nº Ordem de Serviço',      type: 'text',     width: 160 },
+  { key: 'chassi',           label: 'Chassi',                   type: 'text',     width: 150 },
   { key: 'codigoCliente',  label: 'Código do Cliente',        type: 'text',     width: 130 },
   { key: 'nomeCliente',    label: 'Nome do Cliente',          type: 'text',     width: 185 },
   { key: 'produto',        label: 'Produto',                  type: 'text',     width: 165 },
