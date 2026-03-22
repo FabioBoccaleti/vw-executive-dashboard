@@ -238,13 +238,14 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
 
   // Por vendedor
   const vendedorData = useMemo(() => {
-    const map = new Map<string, { qtd: number; totalVenda: number; lucro: number; comissao: number }>();
+    const map = new Map<string, { qtd: number; totalVenda: number; totalRL: number; lucro: number; comissao: number }>();
     filteredRows.forEach(r => {
       const key = r.vendedor || 'Não informado';
-      const cur = map.get(key) || { qtd: 0, totalVenda: 0, lucro: 0, comissao: 0 };
+      const cur = map.get(key) || { qtd: 0, totalVenda: 0, totalRL: 0, lucro: 0, comissao: 0 };
       map.set(key, {
         qtd: cur.qtd + 1,
         totalVenda: cur.totalVenda + n(r.valorVenda),
+        totalRL: cur.totalRL + n(r.receitaLiquida),
         lucro: cur.lucro + n(r.lucroBruto),
         comissao: cur.comissao + n(r.comissaoVendedor),
       });
@@ -254,9 +255,9 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
         name,
         ...v,
         ticketMedio: v.qtd > 0 ? v.totalVenda / v.qtd : 0,
-        pctLucro: v.totalVenda > 0 ? (v.lucro / v.totalVenda) * 100 : 0,
+        pctLucro: v.totalRL > 0 ? (v.lucro / v.totalRL) * 100 : 0,
       }))
-      .sort((a, b) => b.qtd - a.qtd || b.totalVenda - a.totalVenda);
+      .sort((a, b) => b.qtd - a.qtd || b.totalRL - a.totalRL);
   }, [filteredRows]);
 
   // Por vendedor de acessórios
@@ -553,8 +554,8 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                         </div>
                         <div className="space-y-2">
                           <div>
-                            <p className="text-xs text-slate-400 mb-0.5">Comissão</p>
-                            <p className={`text-lg font-bold font-mono ${textAccent[i]}`}>{fmtBRL(v.comissao)}</p>
+                            <p className="text-xs text-slate-400 mb-0.5">Receita Líquida</p>
+                            <p className={`text-lg font-bold font-mono ${textAccent[i]}`}>{fmtBRL(v.totalRL)}</p>
                           </div>
                           <div className="w-full bg-white/70 rounded-full h-1.5">
                             <div className={`h-1.5 rounded-full bg-gradient-to-r ${gradients[i]} transition-all`} style={{ width: `${barPct}%` }} />
@@ -568,6 +569,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                           <div className="pt-1.5 border-t border-white/60 space-y-1">
                             <p className="text-xs text-slate-400">Lucro Bruto: <span className={`font-semibold font-mono ${textAccent[i]}`}>{fmtBRL(v.lucro)}</span></p>
                             <p className="text-xs text-slate-400">% Lucro: <span className="font-semibold font-mono text-emerald-600">{fmtPct(v.pctLucro)}</span></p>
+                            <p className="text-xs text-slate-400">Comissão: <span className="font-semibold font-mono text-violet-600">{fmtBRL(v.comissao)}</span></p>
                           </div>
                         </div>
                       </div>
@@ -587,7 +589,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                       <th className="text-left py-2 px-2 text-slate-400 font-semibold w-8">#</th>
                       <th className="text-left py-2 px-2 text-slate-400 font-semibold">Vendedor</th>
                       <th className="text-right py-2 px-2 text-slate-400 font-semibold">Qtd</th>
-                      <th className="text-right py-2 px-2 text-slate-400 font-semibold">Valor da Venda</th>
+                      <th className="text-right py-2 px-2 text-slate-400 font-semibold">Receita Líquida</th>
                       <th className="text-right py-2 px-2 text-slate-400 font-semibold">Lucro Bruto</th>
                       <th className="text-right py-2 px-2 text-slate-400 font-semibold">% Lucro</th>
                       <th className="text-right py-2 px-2 text-slate-400 font-semibold">Comissão</th>
@@ -599,7 +601,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                         <td className="py-2 px-2 text-slate-400 font-bold">#{i + 1}</td>
                         <td className="py-2 px-2 text-slate-700">{v.name}</td>
                         <td className="py-2 px-2 text-right tabular-nums text-slate-600">{v.qtd}</td>
-                        <td className="py-2 px-2 text-right tabular-nums font-mono text-indigo-600">{fmtBRL(v.totalVenda)}</td>
+                        <td className="py-2 px-2 text-right tabular-nums font-mono text-indigo-600">{fmtBRL(v.totalRL)}</td>
                         <td className="py-2 px-2 text-right tabular-nums font-mono text-emerald-600">{fmtBRL(v.lucro)}</td>
                         <td className="py-2 px-2 text-right tabular-nums font-mono text-amber-600">{fmtPct(v.pctLucro)}</td>
                         <td className="py-2 px-2 text-right tabular-nums font-mono text-violet-600">{fmtBRL(v.comissao)}</td>
