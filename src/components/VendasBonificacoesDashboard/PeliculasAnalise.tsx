@@ -733,6 +733,48 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
         </div>
       </div>
 
+      {/* ── Receita Líquida por Produto (ano todo) ── */}
+      {monthChip === null && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <SectionTitle>Receita Líquida por Produto — {selectedYear === 'Todos' ? 'Todos os Anos' : selectedYear}</SectionTitle>
+          {produtoReceitaData.length > 0 && produtoReceitaData.some(d => d.rl > 0) ? (
+            <ResponsiveContainer width="100%" height={Math.max(220, produtoReceitaData.length * 52)}>
+              <BarChart
+                data={produtoReceitaData}
+                layout="vertical"
+                margin={{ left: 8, right: 80, top: 4, bottom: 4 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
+                <Tooltip
+                  formatter={(value: number, name: string) => [fmtBRLFull(value), name]}
+                  labelFormatter={label => `Produto: ${label}`}
+                />
+                <Bar
+                  dataKey="rl"
+                  name="Receita Líquida"
+                  radius={[0, 4, 4, 0]}
+                  label={({ x, y, width, height, index }: { x: number; y: number; width: number; height: number; index: number }) => {
+                    const entry = produtoReceitaData[index];
+                    if (!entry) return null;
+                    return (
+                      <text x={x + width + 8} y={y + height / 2} dy={4} fontSize={11} fill="#64748b" fontWeight={600}>
+                        {entry.qtd}x
+                      </text>
+                    );
+                  }}
+                >
+                  {produtoReceitaData.map((entry, i) => (
+                    <Cell key={i} fill={produtoColorMap.get(entry.name) ?? PALETTE[i % PALETTE.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : <EmptyChart />}
+        </div>
+      )}
+
       {/* ── Performance Vendedores ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <div className="flex items-center justify-between mb-5">
