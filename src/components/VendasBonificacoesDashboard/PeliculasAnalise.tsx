@@ -63,6 +63,7 @@ interface Metrics {
   comissaoAcessoriosComDSR: number;
   totalProvisoes: number;
   totalEncargos: number;
+  resultado: number;
 }
 
 function calcMetrics(rows: PeliculasRow[]): Metrics {
@@ -82,7 +83,8 @@ function calcMetrics(rows: PeliculasRow[]): Metrics {
   const comissaoAcessoriosComDSR = totalComissaoAcessorios; // + DSR quando fórmula estiver disponível
   const totalProvisoes           = 0; // fórmula a definir
   const totalEncargos            = 0; // fórmula a definir
-  return { qtd, totalVenda, totalImpostos, totalRL, totalCusto, totalLucro, pctLucroMedio, ticketMedio, totalComissaoVendedor, totalComissaoAcessorios, totalComissoes, comissaoVendedorComDSR, comissaoAcessoriosComDSR, totalProvisoes, totalEncargos };
+  const resultado                = totalLucro - comissaoVendedorComDSR - comissaoAcessoriosComDSR - totalProvisoes - totalEncargos;
+  return { qtd, totalVenda, totalImpostos, totalRL, totalCusto, totalLucro, pctLucroMedio, ticketMedio, totalComissaoVendedor, totalComissaoAcessorios, totalComissoes, comissaoVendedorComDSR, comissaoAcessoriosComDSR, totalProvisoes, totalEncargos, resultado };
 }
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
@@ -423,7 +425,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
   const updatePeriod = (i: number, patch: Partial<PeriodSlot>) =>
     setPeriods(p => p.map((s, idx) => idx === i ? { ...s, ...patch } : s));
 
-  const comparativoRows: { label: string; key: keyof Metrics; fmt: (v: number) => string }[] = [
+  const comparativoRows: { label: string; key: keyof Metrics; fmt: (v: number) => string; highlight?: boolean }[] = [
     { label: 'Qtd de Vendas',           key: 'qtd',                    fmt: v => String(v) },
     { label: 'Valor da Venda',          key: 'totalVenda',             fmt: fmtBRLFull },
     { label: 'Impostos',                key: 'totalImpostos',          fmt: fmtBRLFull },
@@ -434,9 +436,9 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
     { label: 'Ticket Médio',            key: 'ticketMedio',            fmt: fmtBRLFull },
     { label: 'Com. + DSR Vendedor',      key: 'comissaoVendedorComDSR',   fmt: fmtBRLFull },
     { label: 'Com. + DSR Acessórios',    key: 'comissaoAcessoriosComDSR', fmt: fmtBRLFull },
-    { label: 'Total Comissões',          key: 'totalComissoes',           fmt: fmtBRLFull },
     { label: 'Provisões',                key: 'totalProvisoes',           fmt: fmtBRLFull },
     { label: 'Encargos',                 key: 'totalEncargos',            fmt: fmtBRLFull },
+    { label: 'Resultado',                key: 'resultado',                fmt: fmtBRLFull, highlight: true },
   ];
 
   const PERIOD_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#8b5cf6'];
@@ -1103,10 +1105,16 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
             </thead>
             <tbody>
               {comparativoRows.map(row => (
-                <tr key={row.key} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                  <td className="py-2 px-3 text-slate-600 font-medium">{row.label}</td>
+                <tr
+                  key={row.key}
+                  className={row.highlight
+                    ? 'border-t-2 border-indigo-200 bg-indigo-50'
+                    : 'border-b border-slate-50 hover:bg-slate-50 transition-colors'
+                  }
+                >
+                  <td className={`py-2 px-3 font-semibold ${row.highlight ? 'text-indigo-700' : 'text-slate-600'}`}>{row.label}</td>
                   {periodMetrics.map(({ metrics: m }, i) => (
-                    <td key={i} className="py-2 px-3 text-right font-mono tabular-nums text-slate-700">
+                    <td key={i} className={`py-2 px-3 text-right font-mono tabular-nums ${row.highlight ? 'text-indigo-700 font-bold' : 'text-slate-700'}`}>
                       {row.fmt(m[row.key] as number)}
                     </td>
                   ))}
