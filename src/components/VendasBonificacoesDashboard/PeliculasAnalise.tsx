@@ -216,6 +216,26 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
     return [...map.entries()].map(([name, qtd]) => ({ name, qtd })).sort((a, b) => b.qtd - a.qtd);
   }, [filteredRows]);
 
+  // Mapa de cores consistente entre gráficos (produto → cor)
+  const produtoColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    produtoData.forEach((p, i) => map.set(p.name, PALETTE[i % PALETTE.length]));
+    return map;
+  }, [produtoData]);
+
+  // Receita Líquida por produto (para gráfico de barras no modo mês)
+  const produtoReceitaData = useMemo(() => {
+    const map = new Map<string, { rl: number; qtd: number }>();
+    filteredRows.forEach(r => {
+      const key = r.produto || 'Não informado';
+      const cur = map.get(key) || { rl: 0, qtd: 0 };
+      map.set(key, { rl: cur.rl + n(r.receitaLiquida), qtd: cur.qtd + 1 });
+    });
+    return [...map.entries()]
+      .map(([name, v]) => ({ name, rl: v.rl, qtd: v.qtd }))
+      .sort((a, b) => b.rl - a.rl);
+  }, [filteredRows]);
+
   // Por vendedor
   const vendedorData = useMemo(() => {
     const map = new Map<string, { qtd: number; totalVenda: number; lucro: number; comissao: number }>();
@@ -418,25 +438,75 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
           ) : <EmptyChart />}
         </div>
 
-        {/* Evolução mensal — abrange 2/3 da grid */}
+        {/* Painel direito: Receita Líquida por Produto (mês selecionado) ou Evolução Mensal (ano todo) */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <SectionTitle>Evolução Mensal — {selectedYear === 'Todos' ? 'Todos os Anos' : selectedYear}</SectionTitle>
-          {monthlyData.some(d => d.totalVenda > 0) ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <ComposedChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="left"  tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={90} />
-                <YAxis yAxisId="right" orientation="right" tickFormatter={v => `${v.toFixed(0)}%`} tick={{ fontSize: 10 }} width={45} />
-                <Tooltip content={<CustomTooltipBRL />} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar yAxisId="left"  dataKey="totalVenda" name="Valor da Venda"  fill="#6366f1" radius={[3, 3, 0, 0]} />
-                <Bar yAxisId="left"  dataKey="lucro"      name="Lucro Bruto"     fill="#10b981" radius={[3, 3, 0, 0]} />
-                <Bar yAxisId="left"  dataKey="comissoes"  name="Total Comissões" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
-                <Line yAxisId="right" type="monotone" dataKey="pctLucro" name="% Lucro" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          ) : <EmptyChart />}
+          {monthChip !== null ? (
+            <>
+              <SectionTitle>Receita Líquida por Produto — {periodoLabel}</SectionTitle>
+              {produtoReceitaData.length > 0 && produtoReceitaData.some(d => d.rl > 0) ? (
+                <ResponsiveContainer width="100%" height={Math.max(220, produtoReceitaData.length * 58)}>
+                  <BarChart
+                    data={produtoReceitaData}
+                    layout="vertical"
+                    margin={{ left: 8, right: 72, top: 4, bottom: 4 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                    <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
+                    <Tooltip
+                      formatter={(value: number, name: string) => [fmtBRLFull(value), name]}
+                      labelFormatter={label => `Produto: ${label}`}
+                    />
+                    <Bar
+                      dataKey="rl"
+                      name="Receita Líquida"
+                      radius={[0, 4, 4, 0]}
+                      label={({ x, y, width, height, index }: { x: number; y: number; width: number; height: number; index: number }) => {
+                        const entry = produtoReceitaData[index];
+                        if (!entry) return null;
+                        return (
+                          <text
+                            x={x + width + 8}
+                            y={y + height / 2}
+                            dy={4}
+                            fontSize={11}
+                            fill="#64748b"
+                            fontWeight={600}
+                          >
+                            {entry.qtd}x
+                          </text>
+                        );
+                      }}
+                    >
+                      {produtoReceitaData.map((entry, i) => (
+                        <Cell key={i} fill={produtoColorMap.get(entry.name) ?? PALETTE[i % PALETTE.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <EmptyChart />}
+            </>
+          ) : (
+            <>
+              <SectionTitle>Evolução Mensal — {selectedYear === 'Todos' ? 'Todos os Anos' : selectedYear}</SectionTitle>
+              {monthlyData.some(d => d.totalVenda > 0) ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <ComposedChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                    <YAxis yAxisId="left"  tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={90} />
+                    <YAxis yAxisId="right" orientation="right" tickFormatter={v => `${v.toFixed(0)}%`} tick={{ fontSize: 10 }} width={45} />
+                    <Tooltip content={<CustomTooltipBRL />} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Bar yAxisId="left"  dataKey="totalVenda" name="Valor da Venda"  fill="#6366f1" radius={[3, 3, 0, 0]} />
+                    <Bar yAxisId="left"  dataKey="lucro"      name="Lucro Bruto"     fill="#10b981" radius={[3, 3, 0, 0]} />
+                    <Bar yAxisId="left"  dataKey="comissoes"  name="Total Comissões" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="pctLucro" name="% Lucro" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              ) : <EmptyChart />}
+            </>
+          )}
         </div>
       </div>
 
