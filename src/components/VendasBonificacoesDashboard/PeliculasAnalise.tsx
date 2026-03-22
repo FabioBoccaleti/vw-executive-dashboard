@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, ComposedChart, Line,
+  PieChart, Pie, Cell, BarChart as ReBarChart,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { type PeliculasRow } from './peliculasStorage';
@@ -226,12 +226,11 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
       const mRows = baseRows.filter(r =>
         (selectedYear === 'Todos' || getRowYear(r) === selectedYear) && getRowMonth(r) === m
       );
-      const totalVenda = mRows.reduce((a, r) => a + n(r.valorVenda), 0);
-      const lucro      = mRows.reduce((a, r) => a + n(r.lucroBruto), 0);
-      const rl         = mRows.reduce((a, r) => a + n(r.receitaLiquida), 0);
-      const comissoes  = mRows.reduce((a, r) => a + n(r.comissaoVendedor) + n(r.comissaoVendedorAcessorios), 0);
-      const pctLucro   = rl > 0 ? (lucro / rl) * 100 : 0;
-      return { label, totalVenda, lucro, comissoes, pctLucro, qtd: mRows.length };
+      const rl        = mRows.reduce((a, r) => a + n(r.receitaLiquida), 0);
+      const lucro     = mRows.reduce((a, r) => a + n(r.lucroBruto), 0);
+      const comissoes = mRows.reduce((a, r) => a + n(r.comissaoVendedor) + n(r.comissaoVendedorAcessorios), 0);
+      const resultado = lucro - comissoes;
+      return { label, rl, lucro, comissoes, resultado, qtd: mRows.length };
     });
   }, [baseRows, selectedYear, monthChip]);
 
@@ -683,20 +682,19 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
           ) : (
             <>
               <SectionTitle>Evolução Mensal — {selectedYear === 'Todos' ? 'Todos os Anos' : selectedYear}</SectionTitle>
-              {monthlyData.some(d => d.totalVenda > 0) ? (
+              {monthlyData.some(d => d.rl > 0) ? (
                 <ResponsiveContainer width="100%" height={260}>
-                  <ComposedChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                  <ReBarChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                    <YAxis yAxisId="left"  tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={90} />
-                    <YAxis yAxisId="right" orientation="right" tickFormatter={v => `${v.toFixed(0)}%`} tick={{ fontSize: 10 }} width={45} />
+                    <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={90} />
                     <Tooltip content={<CustomTooltipBRL />} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar yAxisId="left"  dataKey="totalVenda" name="Valor da Venda"  fill="#6366f1" radius={[3, 3, 0, 0]} />
-                    <Bar yAxisId="left"  dataKey="lucro"      name="Lucro Bruto"     fill="#10b981" radius={[3, 3, 0, 0]} />
-                    <Bar yAxisId="left"  dataKey="comissoes"  name="Total Comissões" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
-                    <Line yAxisId="right" type="monotone" dataKey="pctLucro" name="% Lucro" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
-                  </ComposedChart>
+                    <Bar dataKey="rl"        name="Receita Líquida"  fill="#06b6d4" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="lucro"     name="Lucro Bruto"      fill="#10b981" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="comissoes" name="Comissões"         fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="resultado" name="Resultado"         fill="#6366f1" radius={[3, 3, 0, 0]} />
+                  </ReBarChart>
                 </ResponsiveContainer>
               ) : <EmptyChart />}
             </>
