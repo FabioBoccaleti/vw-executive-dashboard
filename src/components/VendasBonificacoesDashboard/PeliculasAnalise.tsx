@@ -892,6 +892,30 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
         {custoComissoesData.totalGeral > 0 ? (
           <div className="space-y-6">
 
+            {/* KPI Cards de Custo Folha */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 flex flex-col gap-0.5" style={{ borderLeft: '4px solid #6366f1' }}>
+                <span className="text-[10px] text-indigo-400 font-semibold uppercase tracking-wide">Custo Folha — Vendedor</span>
+                <span className="text-xl font-bold font-mono text-indigo-700 leading-tight">{fmtBRL(custoComissoesData.totalVendedor)}</span>
+                <span className="text-xs text-indigo-400">{custoComissoesData.grupoVendedor.length} vendedor{custoComissoesData.grupoVendedor.length !== 1 ? 'es' : ''}</span>
+              </div>
+              <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50 px-4 py-3 flex flex-col gap-0.5" style={{ borderLeft: '4px solid #d946ef' }}>
+                <span className="text-[10px] text-fuchsia-400 font-semibold uppercase tracking-wide">Custo Folha — Acessórios</span>
+                <span className="text-xl font-bold font-mono text-fuchsia-700 leading-tight">{fmtBRL(custoComissoesData.totalAcessorios)}</span>
+                <span className="text-xs text-fuchsia-400">{custoComissoesData.grupoAcessorios.length} vendedor{custoComissoesData.grupoAcessorios.length !== 1 ? 'es' : ''}</span>
+              </div>
+              <div className="rounded-xl border border-slate-300 bg-slate-800 px-4 py-3 flex flex-col gap-0.5" style={{ borderLeft: '4px solid #334155' }}>
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">Total Geral — Custo Folha</span>
+                <span className="text-xl font-bold font-mono text-white leading-tight">{fmtBRL(custoComissoesData.totalGeral)}</span>
+                <span className="text-xs text-slate-400">
+                  {new Set([
+                    ...custoComissoesData.grupoVendedor.map(v => v.nome),
+                    ...custoComissoesData.grupoAcessorios.map(v => v.nome),
+                  ]).size} vínculos
+                </span>
+              </div>
+            </div>
+
             {/* Gráfico de barras empilhadas */}
             {(() => {
               const todosVendedores = [
