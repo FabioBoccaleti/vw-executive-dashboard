@@ -547,6 +547,50 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
             sub={metrics.totalLucro > 0 ? `${fmtPct(metrics.totalComissoes / metrics.totalLucro * 100)} do lucro` : undefined} />
         </div>
 
+        {/* Cards bottom-line: Custo Folha + Resultado */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+          {/* Custo Folha */}
+          <div className="bg-white rounded-xl border border-amber-200 shadow-sm px-4 py-3 flex items-center gap-4"
+               style={{ borderLeft: '4px solid #f59e0b' }}>
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide leading-tight block">Custo Folha</span>
+              <span className="text-xl font-bold text-amber-600 leading-tight font-mono">{fmtBRL(metrics.totalComissoes)}</span>
+              <span className="text-xs text-slate-400 block mt-0.5">
+                {metrics.totalLucro > 0 ? `${fmtPct(metrics.totalComissoes / metrics.totalLucro * 100)} do Lucro Bruto` : 'Comissões + DSR + Encargos'}
+              </span>
+            </div>
+            <div className="text-right flex-shrink-0 text-xs text-slate-400 space-y-0.5">
+              <p>Vendedor: <span className="font-semibold text-violet-600 font-mono">{fmtBRL(metrics.totalComissaoVendedor)}</span></p>
+              <p>Acessórios: <span className="font-semibold text-fuchsia-600 font-mono">{fmtBRL(metrics.totalComissaoAcessorios)}</span></p>
+            </div>
+          </div>
+
+          {/* Resultado */}
+          {(() => {
+            const isPositive = metrics.resultado >= 0;
+            const borderColor = isPositive ? '#10b981' : '#ef4444';
+            const valueColor  = isPositive ? 'text-emerald-600' : 'text-red-500';
+            const bgStripe    = isPositive ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200';
+            const pctRL       = metrics.totalRL > 0 ? (metrics.resultado / metrics.totalRL) * 100 : 0;
+            return (
+              <div className={`rounded-xl border shadow-sm px-4 py-3 flex items-center gap-4 ${bgStripe}`}
+                   style={{ borderLeft: `4px solid ${borderColor}` }}>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide leading-tight block">Resultado</span>
+                  <span className={`text-xl font-bold leading-tight font-mono ${valueColor}`}>{fmtBRL(metrics.resultado)}</span>
+                  <span className="text-xs text-slate-400 block mt-0.5">
+                    {metrics.totalRL > 0 ? `${fmtPct(pctRL)} da Receita Líquida` : 'Lucro Bruto − Custo Folha'}
+                  </span>
+                </div>
+                <div className="text-right flex-shrink-0 text-xs text-slate-400 space-y-0.5">
+                  <p>Lucro Bruto: <span className="font-semibold text-emerald-600 font-mono">{fmtBRL(metrics.totalLucro)}</span></p>
+                  <p>Custo Folha: <span className="font-semibold text-amber-600 font-mono">− {fmtBRL(metrics.totalComissoes)}</span></p>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
         {/* Delta vs mês anterior */}
         {prevMonthMetrics && metrics.qtd > 0 && (
           <div className="mt-3 flex items-center gap-3 flex-wrap">
