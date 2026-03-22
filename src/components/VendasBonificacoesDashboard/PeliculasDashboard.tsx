@@ -1053,7 +1053,17 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                   Modo: Processos em Andamento — {filteredRows.length} {filteredRows.length === 1 ? 'registro' : 'registros'}
                 </span>
-                <button onClick={() => setProcessosAndamento(false)} className="text-xs text-amber-700 underline hover:text-amber-900">Ver todos</button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => exportExcel(filteredRows)}
+                    disabled={filteredRows.length === 0}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 border border-amber-400 bg-white hover:bg-amber-100 disabled:opacity-40 disabled:cursor-not-allowed px-2.5 py-1 rounded-md transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Exportar Excel
+                  </button>
+                  <button onClick={() => setProcessosAndamento(false)} className="text-xs text-amber-700 underline hover:text-amber-900">Ver todos</button>
+                </div>
               </div>
             )}
             {aguardandoFinalizado && (
