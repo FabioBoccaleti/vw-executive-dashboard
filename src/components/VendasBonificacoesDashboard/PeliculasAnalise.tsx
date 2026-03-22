@@ -585,10 +585,6 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                     {metrics.totalRL > 0 ? `${fmtPct(pctRL)} da Receita Líquida` : 'Lucro Bruto − Custo Folha'}
                   </span>
                 </div>
-                <div className="text-right flex-shrink-0 text-xs text-slate-400 space-y-0.5">
-                  <p>Lucro Bruto: <span className="font-semibold text-emerald-600 font-mono">{fmtBRL(metrics.totalLucro)}</span></p>
-                  <p>Custo Folha: <span className="font-semibold text-amber-600 font-mono">− {fmtBRL(metrics.totalComissoes)}</span></p>
-                </div>
               </div>
             );
           })()}
