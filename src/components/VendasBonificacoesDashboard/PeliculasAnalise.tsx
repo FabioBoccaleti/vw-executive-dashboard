@@ -360,6 +360,36 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
     [filteredForProduto]
   );
 
+  // Custo de Comissões
+  const custoComissoesData = useMemo(() => {
+    // Grupo Vendedor
+    const mapV = new Map<string, number>();
+    filteredRows.forEach(r => {
+      const key = r.vendedor?.trim() || 'Não informado';
+      mapV.set(key, (mapV.get(key) ?? 0) + n(r.comissaoVendedor));
+    });
+    const grupoVendedor = [...mapV.entries()]
+      .map(([nome, comissao]) => ({ nome, comissao }))
+      .sort((a, b) => b.comissao - a.comissao);
+
+    // Grupo Vendedor de Acessórios
+    const mapA = new Map<string, number>();
+    filteredRows.forEach(r => {
+      if (!r.vendedorAcessorios?.trim()) return;
+      const key = r.vendedorAcessorios.trim();
+      mapA.set(key, (mapA.get(key) ?? 0) + n(r.comissaoVendedorAcessorios));
+    });
+    const grupoAcessorios = [...mapA.entries()]
+      .map(([nome, comissao]) => ({ nome, comissao }))
+      .sort((a, b) => b.comissao - a.comissao);
+
+    const totalVendedor   = grupoVendedor.reduce((s, v) => s + v.comissao, 0);
+    const totalAcessorios = grupoAcessorios.reduce((s, v) => s + v.comissao, 0);
+    const totalGeral      = totalVendedor + totalAcessorios;
+
+    return { grupoVendedor, grupoAcessorios, totalVendedor, totalAcessorios, totalGeral };
+  }, [filteredRows]);
+
   // Comparativo de períodos
   const periodoOptions: { tipo: PeriodType; label: string; count: number }[] = [
     { tipo: 'mes', label: 'Mês', count: 12 },
@@ -849,6 +879,153 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                 </div>
               );
             })}
+          </div>
+        ) : <EmptyChart />}
+      </div>
+
+      {/* ── Custo de Comissões ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <div className="flex items-center gap-3 mb-5">
+          <SectionTitle>Custo de Comissões por Vendedor</SectionTitle>
+        </div>
+
+        {custoComissoesData.totalGeral > 0 ? (
+          <div className="space-y-6">
+
+            {/* Gráfico de barras empilhadas */}
+            {(() => {
+              const todosVendedores = [
+                ...custoComissoesData.grupoVendedor.map(v => ({ nome: v.nome, comissaoV: v.comissao, comissaoA: 0 })),
+              ];
+              custoComissoesData.grupoAcessorios.forEach(a => {
+                const existing = todosVendedores.find(v => v.nome === a.nome);
+                if (existing) { existing.comissaoA += a.comissao; }
+                else { todosVendedores.push({ nome: a.nome, comissaoV: 0, comissaoA: a.comissao }); }
+              });
+              todosVendedores.sort((a, b) => (b.comissaoV + b.comissaoA) - (a.comissaoV + a.comissaoA));
+              return (
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Distribuição de Comissões</p>
+                  <ResponsiveContainer width="100%" height={Math.max(120, todosVendedores.length * 40)}>
+                    <BarChart data={todosVendedores} layout="vertical" margin={{ left: 8, right: 80, top: 2, bottom: 2 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                      <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
+                      <YAxis type="category" dataKey="nome" tick={{ fontSize: 11 }} width={130} />
+                      <Tooltip
+                        formatter={(value: number, name: string) => [fmtBRLFull(value), name]}
+                        labelFormatter={l => `Vendedor: ${l}`}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="comissaoV" name="Comissão Vendedor"    stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="comissaoA" name="Comissão Acessórios" stackId="a" fill="#d946ef" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              );
+            })()}
+
+            {/* Tabela agrupada */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b-2 border-slate-200">
+                    <th className="text-left py-2 px-3 text-slate-400 font-semibold">Vendedor</th>
+                    <th className="text-right py-2 px-3 text-slate-400 font-semibold">Comissão</th>
+                    <th className="text-right py-2 px-3 text-slate-400 font-semibold">DSR</th>
+                    <th className="text-right py-2 px-3 text-slate-400 font-semibold">Total Com. + DSR</th>
+                    <th className="text-right py-2 px-3 text-slate-400 font-semibold">Provisões</th>
+                    <th className="text-right py-2 px-3 text-slate-400 font-semibold">Encargos</th>
+                    <th className="text-right py-2 px-3 text-slate-400 font-semibold bg-slate-50">Custo Folha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Grupo Vendedor */}
+                  <tr className="bg-indigo-50">
+                    <td colSpan={7} className="py-1.5 px-3 text-[11px] font-bold text-indigo-600 uppercase tracking-widest">Vendedor</td>
+                  </tr>
+                  {custoComissoesData.grupoVendedor.map(v => {
+                    const dsr = 0; // fórmula a definir
+                    const totalComDsr = v.comissao + dsr;
+                    const provisoes = 0; // fórmula a definir
+                    const encargos = 0;  // fórmula a definir
+                    const custoFolha = totalComDsr + provisoes + encargos;
+                    return (
+                      <tr key={`v-${v.nome}`} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <td className="py-2 px-3 text-slate-700 font-medium">{v.nome}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-indigo-600">{fmtBRL(v.comissao)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(dsr)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(totalComDsr)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(provisoes)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(encargos)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono font-bold text-slate-800 bg-slate-50">{fmtBRL(custoFolha)}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-indigo-50/60 font-semibold border-t border-indigo-100">
+                    <td className="py-2 px-3 text-indigo-700 text-[11px] font-bold uppercase">Subtotal Vendedor</td>
+                    <td className="py-2 px-3 text-right tabular-nums font-mono text-indigo-700">{fmtBRL(custoComissoesData.totalVendedor)}</td>
+                    <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
+                    <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(custoComissoesData.totalVendedor)}</td>
+                    <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
+                    <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
+                    <td className="py-2 px-3 text-right tabular-nums font-mono font-bold text-indigo-700 bg-slate-50">{fmtBRL(custoComissoesData.totalVendedor)}</td>
+                  </tr>
+
+                  {/* Grupo Vendedor de Acessórios */}
+                  {custoComissoesData.grupoAcessorios.length > 0 && (
+                    <>
+                      <tr className="bg-fuchsia-50">
+                        <td colSpan={7} className="py-1.5 px-3 text-[11px] font-bold text-fuchsia-600 uppercase tracking-widest">Vendedor de Acessórios</td>
+                      </tr>
+                      {custoComissoesData.grupoAcessorios.map(v => {
+                        const dsr = 0;
+                        const totalComDsr = v.comissao + dsr;
+                        const provisoes = 0;
+                        const encargos = 0;
+                        const custoFolha = totalComDsr + provisoes + encargos;
+                        return (
+                          <tr key={`a-${v.nome}`} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                            <td className="py-2 px-3 text-slate-700 font-medium">{v.nome}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-fuchsia-600">{fmtBRL(v.comissao)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(dsr)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(totalComDsr)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(provisoes)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(encargos)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono font-bold text-slate-800 bg-slate-50">{fmtBRL(custoFolha)}</td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="bg-fuchsia-50/60 font-semibold border-t border-fuchsia-100">
+                        <td className="py-2 px-3 text-fuchsia-700 text-[11px] font-bold uppercase">Subtotal Acessórios</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-fuchsia-700">{fmtBRL(custoComissoesData.totalAcessorios)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(custoComissoesData.totalAcessorios)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono font-bold text-fuchsia-700 bg-slate-50">{fmtBRL(custoComissoesData.totalAcessorios)}</td>
+                      </tr>
+                    </>
+                  )}
+
+                  {/* Total Geral */}
+                  <tr className="bg-slate-800 text-white">
+                    <td className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-widest">Total Geral</td>
+                    <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(custoComissoesData.totalGeral)}</td>
+                    <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(0)}</td>
+                    <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(custoComissoesData.totalGeral)}</td>
+                    <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(0)}</td>
+                    <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(0)}</td>
+                    <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(custoComissoesData.totalGeral)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Nota sobre fórmulas pendentes */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+              <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+              Fórmulas de DSR, Provisões e Encargos serão configuradas em breve.
+            </div>
           </div>
         ) : <EmptyChart />}
       </div>
