@@ -944,6 +944,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
             <input
               type="password"
               autoFocus
+              autoComplete="new-password"
               value={deletePassword}
               onChange={e => setDeletePassword(e.target.value)}
               onKeyDown={e => {
