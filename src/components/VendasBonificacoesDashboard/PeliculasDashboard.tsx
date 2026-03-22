@@ -285,6 +285,8 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
   const [lockPromptId, setLockPromptId] = useState<string | null>(null);
   const [lockPassword, setLockPassword] = useState('');
+  const [deletePasswordPromptId, setDeletePasswordPromptId] = useState<string | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
 
   // Listas de cadastro para selectors
   const [cadastroVendedores, setCadastroVendedores] = useState<string[]>([]);
@@ -384,9 +386,19 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
     const updated = rows.filter(r => r.id !== id);
     setRows(updated);
     setDeleteId(null);
+    setDeletePasswordPromptId(null);
+    setDeletePassword('');
     if (editingId === id) { setEditingId(null); setEditDraft(null); }
     await persist(updated);
     toast.success('Registro removido com sucesso');
+  };
+
+  const anularRow = async (id: string) => {
+    const updated = rows.map(r => r.id === id ? { ...r, situacao: 'Cancelada' } : r);
+    setRows(updated);
+    setDeleteId(null);
+    await persist(updated);
+    toast.success('Registro anulado');
   };
 
   const setFilter = (key: keyof PeliculasRow, value: string) =>
@@ -806,9 +818,10 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                           <td className="sticky right-0 z-20 border-l border-slate-200 px-2 py-1.5" style={{ background: rowBg, minWidth: 110 }}>
                             {isDelete ? (
                               <div className="flex flex-col items-center gap-1.5 py-0.5">
-                                <p className="text-xs text-red-600 font-semibold text-center leading-tight">Remover?</p>
-                                <div className="flex gap-1">
-                                  <button onClick={() => deleteRow(row.id)} className="px-2.5 py-1 bg-red-600 text-white text-xs rounded-md hover:bg-red-700 font-semibold transition-colors">Excluir</button>
+                                <p className="text-xs text-red-600 font-semibold text-center leading-tight">Remover este<br />registro?</p>
+                                <div className="flex gap-1 flex-wrap justify-center">
+                                  <button onClick={() => { setDeletePasswordPromptId(row.id); setDeletePassword(''); setDeleteId(null); }} className="px-2.5 py-1 bg-red-600 text-white text-xs rounded-md hover:bg-red-700 font-semibold transition-colors">Excluir</button>
+                                  <button onClick={() => anularRow(row.id)} className="px-2.5 py-1 bg-orange-500 text-white text-xs rounded-md hover:bg-orange-600 font-semibold transition-colors">Anular</button>
                                   <button onClick={() => setDeleteId(null)} className="px-2.5 py-1 bg-slate-200 text-slate-600 text-xs rounded-md hover:bg-slate-300 font-semibold transition-colors">Cancelar</button>
                                 </div>
                               </div>
@@ -914,6 +927,56 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
           </div>
         )}
       </div>
+
+      {/* ── Modal senha exclusão ── */}
+      {deletePasswordPromptId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-5">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-red-100 rounded-xl flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-red-700" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">Confirmar Exclusão</h3>
+                <p className="text-sm text-slate-500 mt-1">Digite a senha para excluir permanentemente este registro.</p>
+              </div>
+            </div>
+            <input
+              type="password"
+              autoFocus
+              value={deletePassword}
+              onChange={e => setDeletePassword(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  if (deletePassword === '1985') {
+                    deleteRow(deletePasswordPromptId!);
+                  } else {
+                    toast.error('Senha incorreta');
+                    setDeletePassword('');
+                  }
+                }
+                if (e.key === 'Escape') { setDeletePasswordPromptId(null); setDeletePassword(''); }
+              }}
+              placeholder="Senha"
+              className="border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-red-400"
+            />
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" size="sm" onClick={() => { setDeletePasswordPromptId(null); setDeletePassword(''); }} className="border-slate-300 text-slate-600">Cancelar</Button>
+              <Button size="sm" onClick={() => {
+                if (deletePassword === '1985') {
+                  deleteRow(deletePasswordPromptId!);
+                } else {
+                  toast.error('Senha incorreta');
+                  setDeletePassword('');
+                }
+              }} className="bg-red-600 hover:bg-red-700 text-white gap-1.5">
+                <Trash2 className="w-4 h-4" />
+                Excluir
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal senha desbloqueio ── */}
       {lockPromptId && (
