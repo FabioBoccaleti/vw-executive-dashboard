@@ -13,8 +13,11 @@ export function PeliculasVendedoresAcessoriosSection() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNome, setEditNome] = useState('');
 
+  const sortAlpha = (list: VendedorAcessorios[]) =>
+    [...list].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
+
   useEffect(() => {
-    loadPeliculasVendedoresAcessorios().then(d => { setItems(d); setLoading(false); });
+    loadPeliculasVendedoresAcessorios().then(d => { setItems(sortAlpha(d)); setLoading(false); });
   }, []);
 
   const persist = async (updated: VendedorAcessorios[]) => {
@@ -31,7 +34,7 @@ export function PeliculasVendedoresAcessoriosSection() {
   const add = async () => {
     const nome = novoNome.trim();
     if (!nome) return;
-    await persist([...items, { id: crypto.randomUUID(), nome }]);
+    await persist(sortAlpha([...items, { id: crypto.randomUUID(), nome }]));
     setNovoNome('');
     toast.success('Vendedor de Acessórios cadastrado');
   };
@@ -39,7 +42,7 @@ export function PeliculasVendedoresAcessoriosSection() {
   const saveEdit = async () => {
     const nome = editNome.trim();
     if (!nome || !editingId) return;
-    await persist(items.map(i => i.id === editingId ? { ...i, nome } : i));
+    await persist(sortAlpha(items.map(i => i.id === editingId ? { ...i, nome } : i)));
     setEditingId(null);
     toast.success('Vendedor de Acessórios atualizado');
   };
