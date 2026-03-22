@@ -2,7 +2,7 @@ import { Fragment, useState, useEffect, useRef, useMemo, type ChangeEvent } from
 import { Button } from '@/components/ui/button';
 import {
   LogOut, Layers, Pencil, Trash2, Check, X, Plus, Search,
-  FilterX, BarChart2, TableProperties, Download, Upload, BookOpen, Lock, LockOpen,
+  FilterX, BarChart2, TableProperties, Download, Upload, BookOpen, Lock, LockOpen, FilePlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -36,6 +36,16 @@ const REQUIRED_LABELS: Record<string, string> = {
   valorVenda: 'Valor da Venda',
   vendedor: 'Vendedor',
   vendedorAcessorios: 'Vendedor de Acessórios',
+};
+
+type RegisterDraft = {
+  numeroOS: string; chassi: string; codigoCliente: string; nomeCliente: string;
+  produto: string; valorVenda: string; custoPrestador: string;
+  vendedor: string; vendedorAcessorios: string;
+};
+const EMPTY_REGISTER_DRAFT: RegisterDraft = {
+  numeroOS: '', chassi: '', codigoCliente: '', nomeCliente: '',
+  produto: '', valorVenda: '', custoPrestador: '', vendedor: '', vendedorAcessorios: '',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -287,6 +297,8 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [lockPassword, setLockPassword] = useState('');
   const [deletePasswordPromptId, setDeletePasswordPromptId] = useState<string | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [registerDraft, setRegisterDraft] = useState<RegisterDraft>(EMPTY_REGISTER_DRAFT);
 
   // Listas de cadastro para selectors
   const [cadastroVendedores, setCadastroVendedores] = useState<string[]>([]);
@@ -399,6 +411,37 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
     setDeleteId(null);
     await persist(updated);
     toast.success('Registro anulado');
+  };
+
+  const registerVenda = async () => {
+    const requiredFields: (keyof RegisterDraft)[] = ['numeroOS', 'chassi', 'codigoCliente', 'nomeCliente', 'produto', 'valorVenda', 'vendedor', 'vendedorAcessorios'];
+    const missing = requiredFields.filter(k => !registerDraft[k]?.trim());
+    if (missing.length > 0) {
+      toast.error(`Preencha os campos obrigatórios: ${missing.map(k => REQUIRED_LABELS[k]).join(', ')}`);
+      return;
+    }
+    const parsedValor = parseBrazilianNumber(registerDraft.valorVenda);
+    const parsedCusto = parseBrazilianNumber(registerDraft.custoPrestador);
+    const base = createEmptyPeliculasRow();
+    const newRow = recalcPeliculasRow({
+      ...base,
+      dataRegistro: todayISO(),
+      numeroOS: registerDraft.numeroOS.trim(),
+      chassi: registerDraft.chassi.trim(),
+      codigoCliente: registerDraft.codigoCliente.trim(),
+      nomeCliente: registerDraft.nomeCliente.trim(),
+      produto: registerDraft.produto,
+      valorVenda: parsedValor,
+      custoPrestador: parsedCusto,
+      vendedor: registerDraft.vendedor,
+      vendedorAcessorios: registerDraft.vendedorAcessorios,
+    }, aliquotaTotal, comissaoCtx);
+    const updated = [...rows, newRow];
+    setRows(updated);
+    await persist(updated);
+    setShowRegisterModal(false);
+    setRegisterDraft(EMPTY_REGISTER_DRAFT);
+    toast.success('Venda registrada com sucesso');
   };
 
   const setFilter = (key: keyof PeliculasRow, value: string) =>
@@ -879,6 +922,14 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
             <div className="flex items-center justify-between flex-shrink-0 px-1">
               <div className="flex items-center gap-3">
                 <Button
+                  size="sm"
+                  onClick={() => { setRegisterDraft(EMPTY_REGISTER_DRAFT); setShowRegisterModal(true); }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 font-medium"
+                >
+                  <FilePlus className="w-4 h-4" />
+                  Registrar Venda
+                </Button>
+                <Button
                   variant="outline"
                   size="sm"
                   onClick={() => insertAt(rows.length)}
@@ -927,6 +978,96 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
           </div>
         )}
       </div>
+
+      {/* ── Modal Registrar Venda ── */}
+      {showRegisterModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 flex flex-col gap-5">
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 bg-indigo-100 rounded-xl flex-shrink-0">
+                  <FilePlus className="w-5 h-5 text-indigo-700" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">Registrar Venda</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">Preencha os dados da venda. A data de registro será definida automaticamente.</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowRegisterModal(false); setRegisterDraft(EMPTY_REGISTER_DRAFT); }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Fields grid */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              {/* Nº OS */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Nº Ordem de Serviço <span className="text-red-500">*</span></label>
+                <input type="text" value={registerDraft.numeroOS} onChange={e => setRegisterDraft(p => ({ ...p, numeroOS: e.target.value }))} placeholder="Ex: 1234" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              {/* Chassi */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Chassi <span className="text-red-500">*</span></label>
+                <input type="text" value={registerDraft.chassi} onChange={e => setRegisterDraft(p => ({ ...p, chassi: e.target.value }))} placeholder="Ex: 9BWZZZ377VT004251" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              {/* Código do Cliente */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Código do Cliente <span className="text-red-500">*</span></label>
+                <input type="text" value={registerDraft.codigoCliente} onChange={e => setRegisterDraft(p => ({ ...p, codigoCliente: e.target.value }))} placeholder="Ex: 00123" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              {/* Nome do Cliente */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Nome do Cliente <span className="text-red-500">*</span></label>
+                <input type="text" value={registerDraft.nomeCliente} onChange={e => setRegisterDraft(p => ({ ...p, nomeCliente: e.target.value }))} placeholder="Nome completo" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              {/* Produto */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Produto <span className="text-red-500">*</span></label>
+                <select value={registerDraft.produto} onChange={e => setRegisterDraft(p => ({ ...p, produto: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+                  <option value="">Selecione...</option>
+                  {cadastroProdutos.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              {/* Valor da Venda */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Valor da Venda <span className="text-red-500">*</span></label>
+                <input type="text" value={registerDraft.valorVenda} onChange={e => setRegisterDraft(p => ({ ...p, valorVenda: e.target.value }))} placeholder="Ex: 1.500,00" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              {/* Vendedor */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Vendedor <span className="text-red-500">*</span></label>
+                <select value={registerDraft.vendedor} onChange={e => setRegisterDraft(p => ({ ...p, vendedor: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+                  <option value="">Selecione...</option>
+                  {cadastroVendedores.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              {/* Vendedor de Acessórios */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Vendedor de Acessórios <span className="text-red-500">*</span></label>
+                <select value={registerDraft.vendedorAcessorios} onChange={e => setRegisterDraft(p => ({ ...p, vendedorAcessorios: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+                  <option value="">Selecione...</option>
+                  {cadastroVendedoresAcessorios.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              {/* Custo Prestador */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Custo do Prestador</label>
+                <input type="text" value={registerDraft.custoPrestador} onChange={e => setRegisterDraft(p => ({ ...p, custoPrestador: e.target.value }))} placeholder="Ex: 800,00" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+            </div>
+
+            {/* Footer buttons */}
+            <div className="flex gap-3 justify-end pt-1 border-t border-slate-100">
+              <Button variant="outline" size="sm" onClick={() => { setShowRegisterModal(false); setRegisterDraft(EMPTY_REGISTER_DRAFT); }} className="border-slate-300 text-slate-600">Cancelar</Button>
+              <Button size="sm" onClick={registerVenda} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5">
+                <FilePlus className="w-4 h-4" />
+                Registrar Venda
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal senha exclusão ── */}
       {deletePasswordPromptId && (
