@@ -135,7 +135,7 @@ function CustomTooltipBRL({ active, payload, label }: { active?: boolean; payloa
 }
 
 type PeriodType = 'mes' | 'bimestre' | 'trimestre' | 'semestre' | 'anual';
-interface PeriodSlot { year: number; tipo: PeriodType; value: number; }
+interface PeriodSlot { year: number; tipo: PeriodType; value: number; vendedor: string; }
 
 function periodMonths(tipo: PeriodType, value: number): number[] {
   if (tipo === 'mes') return [value];
@@ -178,13 +178,20 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
   const [selectedYear, setSelectedYear] = useState<number | 'Todos'>(currentYear);
   const [monthChip, setMonthChip]       = useState<number | null>(null);
   const [periods, setPeriods] = useState<PeriodSlot[]>([
-    { year: currentYear, tipo: 'mes', value: currentMonth },
+    { year: currentYear, tipo: 'mes', value: currentMonth, vendedor: 'Todos' },
   ]);
   const [sortAcess, setSortAcess] = useState<'totalRL' | 'lucro' | 'qtd'>('totalRL');
   const [selectedProduto, setSelectedProduto] = useState<string>('Todos');
 
   // Apenas linhas com situação válida
   const baseRows = useMemo(() => validRows(rows), [rows]);
+
+  // Vendedores disponíveis (para o comparativo de períodos)
+  const availableVendedores = useMemo(() => {
+    const set = new Set<string>();
+    baseRows.forEach(r => { const v = r.vendedor?.trim(); if (v) set.add(v); });
+    return ['Todos', ...[...set].sort()];
+  }, [baseRows]);
 
   // Anos disponíveis
   const availableYears = useMemo(() => {
@@ -424,14 +431,20 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
     anual: ['Ano Completo'],
   };
   const periodMetrics = useMemo(
-    () => periods.map(slot => ({
-      slot,
-      metrics: calcMetrics(filterByPeriod(baseRows, slot)),
-      prevMetrics: calcMetrics(filterByPeriod(baseRows, prevPeriodSlot(slot))),
-    })),
+    () => periods.map(slot => {
+      const byVendedor = (r: PeliculasRow) =>
+        slot.vendedor === 'Todos' || (r.vendedor?.trim() || '') === slot.vendedor;
+      const slotRows     = filterByPeriod(baseRows, slot).filter(byVendedor);
+      const prevSlotRows = filterByPeriod(baseRows, prevPeriodSlot(slot)).filter(byVendedor);
+      return {
+        slot,
+        metrics: calcMetrics(slotRows),
+        prevMetrics: calcMetrics(prevSlotRows),
+      };
+    }),
     [periods, baseRows]
   );
-  const addPeriod = () => { if (periods.length < 4) setPeriods(p => [...p, { year: currentYear, tipo: 'mes', value: currentMonth }]); };
+  const addPeriod = () => { if (periods.length < 4) setPeriods(p => [...p, { year: currentYear, tipo: 'mes', value: currentMonth, vendedor: 'Todos' }]); };
   const removePeriod = (i: number) => setPeriods(p => p.filter((_, idx) => idx !== i));
   const updatePeriod = (i: number, patch: Partial<PeriodSlot>) =>
     setPeriods(p => p.map((s, idx) => idx === i ? { ...s, ...patch } : s));
@@ -1090,6 +1103,19 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                   <option key={vi} value={vi + 1}>{lbl}</option>
                 ))}
               </select>
+              {availableVendedores.length > 1 && (
+                <select
+                  value={p.vendedor}
+                  onChange={e => updatePeriod(i, { vendedor: e.target.value })}
+                  className="border-0 bg-transparent text-xs font-semibold focus:outline-none max-w-[120px] truncate"
+                  style={{ color: p.vendedor === 'Todos' ? '#94a3b8' : PERIOD_COLORS[i] }}
+                  title={p.vendedor === 'Todos' ? 'Todos os vendedores' : p.vendedor}
+                >
+                  {availableVendedores.map(v => (
+                    <option key={v} value={v}>{v === 'Todos' ? 'Todos vendedores' : v}</option>
+                  ))}
+                </select>
+              )}
               <span className="text-xs text-slate-400 font-medium">{periodLabel(p.tipo, p.value, p.year)}</span>
               {periods.length > 1 && (
                 <button onClick={() => removePeriod(i)} className="text-slate-300 hover:text-red-400 transition-colors ml-1">✕</button>
