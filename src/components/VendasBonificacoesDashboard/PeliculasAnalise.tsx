@@ -892,25 +892,27 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
         {custoComissoesData.totalGeral > 0 ? (
           <div className="space-y-6">
 
-            {/* Gráfico de barras verticais — Grupo Vendedor vs Acessórios */}
+            {/* Gráfico de barras horizontais — Grupo Vendedor vs Acessórios */}
             <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Custo de Comissões por Grupo</p>
-              <ResponsiveContainer width="100%" height={220}>
+              <ResponsiveContainer width="100%" height={120}>
                 <BarChart
+                  layout="vertical"
                   data={[
-                    { grupo: 'Vendedor',    valor: custoComissoesData.totalVendedor,   fill: '#6366f1' },
-                    { grupo: 'Acessórios',  valor: custoComissoesData.totalAcessorios, fill: '#d946ef' },
+                    { grupo: 'Vendedor',   comissao: custoComissoesData.totalVendedor },
+                    { grupo: 'Acessórios', comissao: custoComissoesData.totalAcessorios },
                   ]}
-                  margin={{ top: 16, right: 24, left: 8, bottom: 4 }}
+                  margin={{ left: 8, right: 80, top: 4, bottom: 4 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="grupo" tick={{ fontSize: 12, fontWeight: 600 }} />
-                  <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={90} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="grupo" tick={{ fontSize: 12, fontWeight: 600 }} width={100} />
                   <Tooltip formatter={(v: number) => [fmtBRLFull(v), 'Comissão']} />
-                  <Bar dataKey="valor" name="Comissão" radius={[6, 6, 0, 0]} maxBarSize={100}>
-                    {[custoComissoesData.totalVendedor, custoComissoesData.totalAcessorios].map((_, i) => (
-                      <Cell key={i} fill={i === 0 ? '#6366f1' : '#d946ef'} />
-                    ))}
+                  <Bar dataKey="comissao" name="Comissão" radius={[0, 6, 6, 0]} maxBarSize={32}
+                    label={{ position: 'right', formatter: (v: number) => fmtBRL(v), fontSize: 11, fill: '#64748b', fontWeight: 600 }}
+                  >
+                    <Cell fill="#6366f1" />
+                    <Cell fill="#d946ef" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
