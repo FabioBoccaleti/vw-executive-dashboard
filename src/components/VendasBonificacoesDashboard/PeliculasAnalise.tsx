@@ -162,6 +162,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
   const [periods, setPeriods] = useState<PeriodSlot[]>([
     { year: currentYear, tipo: 'mes', value: currentMonth },
   ]);
+  const [sortAcess, setSortAcess] = useState<'totalRL' | 'lucro' | 'qtd'>('totalRL');
 
   // Apenas linhas com situação válida
   const baseRows = useMemo(() => validRows(rows), [rows]);
@@ -262,20 +263,69 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
 
   // Por vendedor de acessórios
   const vendedorAcessoriosData = useMemo(() => {
-    const map = new Map<string, { qtd: number; totalVenda: number; comissao: number }>();
+    const map = new Map<string, {
+      qtd: number; totalVenda: number; totalRL: number; lucro: number; comissao: number;
+      produtos: Map<string, { qtd: number; rl: number; lucro: number }>;
+    }>();
     filteredRows.forEach(r => {
       const key = r.vendedorAcessorios || 'Não informado';
-      const cur = map.get(key) || { qtd: 0, totalVenda: 0, comissao: 0 };
-      map.set(key, {
-        qtd: cur.qtd + 1,
-        totalVenda: cur.totalVenda + n(r.valorVenda),
-        comissao: cur.comissao + n(r.comissaoVendedorAcessorios),
-      });
+      if (!map.has(key)) map.set(key, { qtd: 0, totalVenda: 0, totalRL: 0, lucro: 0, comissao: 0, produtos: new Map() });
+      const cur = map.get(key)!;
+      cur.qtd += 1;
+      cur.totalVenda += n(r.valorVenda);
+      cur.totalRL += n(r.receitaLiquida);
+      cur.lucro += n(r.lucroBruto);
+      cur.comissao += n(r.comissaoVendedorAcessorios);
+      const prod = r.produto || 'Não informado';
+      if (!cur.produtos.has(prod)) cur.produtos.set(prod, { qtd: 0, rl: 0, lucro: 0 });
+      const cp = cur.produtos.get(prod)!;
+      cp.qtd += 1;
+      cp.rl += n(r.receitaLiquida);
+      cp.lucro += n(r.lucroBruto);
     });
     return [...map.entries()]
-      .map(([name, v]) => ({ name, ...v, ticketMedio: v.qtd > 0 ? v.totalVenda / v.qtd : 0 }))
-      .sort((a, b) => b.qtd - a.qtd || b.totalVenda - a.totalVenda);
+      .map(([name, v]) => {
+        const TOP_N = 8;
+        const prodArr = [...v.produtos.entries()]
+          .map(([nome, p]) => ({ nome, ...p, pctLucro: p.rl > 0 ? (p.lucro / p.rl) * 100 : 0 }))
+          .sort((a, b) => b.rl - a.rl);
+        let produtos = prodArr;
+        if (prodArr.length > TOP_N) {
+          const top = prodArr.slice(0, TOP_N);
+          const rest = prodArr.slice(TOP_N);
+          top.push({
+            nome: 'Outros',
+            qtd: rest.reduce((s, p) => s + p.qtd, 0),
+            rl: rest.reduce((s, p) => s + p.rl, 0),
+            lucro: rest.reduce((s, p) => s + p.lucro, 0),
+            pctLucro: rest.reduce((s, p) => s + p.rl, 0) > 0
+              ? (rest.reduce((s, p) => s + p.lucro, 0) / rest.reduce((s, p) => s + p.rl, 0)) * 100 : 0,
+          });
+          produtos = top;
+        }
+        return {
+          name,
+          qtd: v.qtd,
+          totalVenda: v.totalVenda,
+          totalRL: v.totalRL,
+          lucro: v.lucro,
+          comissao: v.comissao,
+          pctLucro: v.totalRL > 0 ? (v.lucro / v.totalRL) * 100 : 0,
+          produtos,
+        };
+      })
+      .sort((a, b) => b.totalRL - a.totalRL);
   }, [filteredRows]);
+
+  const sortedVendedorAcess = useMemo(
+    () => [...vendedorAcessoriosData].sort((a, b) => b[sortAcess] - a[sortAcess]),
+    [vendedorAcessoriosData, sortAcess]
+  );
+
+  const teamRLAcess = useMemo(
+    () => vendedorAcessoriosData.reduce((s, v) => s + v.totalRL, 0),
+    [vendedorAcessoriosData]
+  );
 
   // Comparativo de períodos
   const periodoOptions: { tipo: PeriodType; label: string; count: number }[] = [
@@ -617,58 +667,121 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
 
       {/* ── Performance Vendedores de Acessórios ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-5">
-          <SectionTitle>Performance por Vendedor de Acessórios</SectionTitle>
-          {vendedorAcessoriosData.length > 0 && (
-            <span className="text-xs text-slate-400 font-medium px-2.5 py-1 bg-slate-100 rounded-full">
-              {vendedorAcessoriosData.length} vendedor{vendedorAcessoriosData.length !== 1 ? 'es' : ''}
-            </span>
+        <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <SectionTitle>Performance por Vendedor de Acessórios</SectionTitle>
+            {sortedVendedorAcess.length > 0 && (
+              <span className="text-xs text-slate-400 font-medium px-2.5 py-1 bg-slate-100 rounded-full -mt-3">
+                {sortedVendedorAcess.length} vendedor{sortedVendedorAcess.length !== 1 ? 'es' : ''}
+              </span>
+            )}
+          </div>
+          {sortedVendedorAcess.length > 0 && (
+            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5 -mt-3">
+              {(['totalRL', 'lucro', 'qtd'] as const).map(key => (
+                <button
+                  key={key}
+                  onClick={() => setSortAcess(key)}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                    sortAcess === key ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {key === 'totalRL' ? 'Receita' : key === 'lucro' ? 'Lucro' : 'Volume'}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
-        {vendedorAcessoriosData.length > 0 ? (
-          <>
-            {/* Barras horizontais */}
-            <ResponsiveContainer width="100%" height={Math.max(180, vendedorAcessoriosData.length * 44)}>
-              <BarChart data={vendedorAcessoriosData} layout="vertical" margin={{ left: 8, right: 24 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
-                <Tooltip content={<CustomTooltipBRL />} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="totalVenda" name="Valor da Venda"  fill="#6366f1" radius={[0, 3, 3, 0]} />
-                <Bar dataKey="comissao"   name="Comissão Acess." fill="#d946ef" radius={[0, 3, 3, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+        {sortedVendedorAcess.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {sortedVendedorAcess.map((v, i) => {
+              const initials = v.name.split(' ').filter(Boolean).slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
+              const shareRL = teamRLAcess > 0 ? (v.totalRL / teamRLAcess) * 100 : 0;
+              const maxProdRL = v.produtos[0]?.rl ?? 1;
+              const pctBg = v.pctLucro >= 40 ? 'bg-emerald-50 text-emerald-700' : v.pctLucro >= 20 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600';
+              const gradients = [
+                'from-fuchsia-400 to-violet-600',
+                'from-indigo-400 to-indigo-600',
+                'from-sky-400 to-cyan-600',
+                'from-emerald-400 to-teal-600',
+                'from-amber-400 to-orange-500',
+              ];
+              const grad = gradients[i % gradients.length];
+              return (
+                <div key={v.name} className="rounded-xl border border-slate-200 overflow-hidden flex flex-col bg-white hover:shadow-md transition-shadow">
+                  {/* Header */}
+                  <div className="px-4 pt-4 pb-3 border-b border-slate-100">
+                    <div className="flex items-start gap-3">
+                      <div className="relative flex-shrink-0">
+                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${grad} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
+                          {initials}
+                        </div>
+                        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-slate-700 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                          {i + 1}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate leading-tight">{v.name}</p>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="text-xs text-slate-500">{v.qtd} venda{v.qtd !== 1 ? 's' : ''}</span>
+                          <span className="text-slate-300 text-xs">·</span>
+                          <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-md ${pctBg}`}>{fmtPct(v.pctLucro)} lucro</span>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-base font-bold font-mono text-fuchsia-600">{fmtBRL(v.totalRL)}</p>
+                        <p className="text-[10px] text-slate-400 leading-tight">Receita Líquida</p>
+                      </div>
+                    </div>
+                    {/* Barra de participação na equipe */}
+                    <div className="mt-3">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] text-slate-400">Participação na equipe</span>
+                        <span className="text-[10px] font-bold text-slate-500">{fmtPct(shareRL)}</span>
+                      </div>
+                      <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                        <div className={`h-1 rounded-full bg-gradient-to-r ${grad} transition-all`} style={{ width: `${Math.min(shareRL, 100)}%` }} />
+                      </div>
+                    </div>
+                  </div>
 
-            {/* Tabela */}
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="text-left py-2 px-2 text-slate-400 font-semibold w-8">#</th>
-                    <th className="text-left py-2 px-2 text-slate-400 font-semibold">Vendedor de Acessórios</th>
-                    <th className="text-right py-2 px-2 text-slate-400 font-semibold">Qtd</th>
-                    <th className="text-right py-2 px-2 text-slate-400 font-semibold">Valor da Venda</th>
-                    <th className="text-right py-2 px-2 text-slate-400 font-semibold">Ticket Médio</th>
-                    <th className="text-right py-2 px-2 text-slate-400 font-semibold">Comissão</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendedorAcessoriosData.map((v, i) => (
-                    <tr key={v.name} className={`border-b border-slate-50 hover:bg-slate-50 transition-colors ${i < 3 ? 'font-semibold' : ''}`}>
-                      <td className="py-2 px-2 text-slate-400 font-bold">#{i + 1}</td>
-                      <td className="py-2 px-2 text-slate-700">{v.name}</td>
-                      <td className="py-2 px-2 text-right tabular-nums text-slate-600">{v.qtd}</td>
-                      <td className="py-2 px-2 text-right tabular-nums font-mono text-indigo-600">{fmtBRL(v.totalVenda)}</td>
-                      <td className="py-2 px-2 text-right tabular-nums font-mono text-sky-600">{fmtBRL(v.ticketMedio)}</td>
-                      <td className="py-2 px-2 text-right tabular-nums font-mono text-fuchsia-600">{fmtBRL(v.comissao)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+                  {/* Breakdown por produto */}
+                  <div className="px-4 py-3 flex-1 space-y-2.5">
+                    {v.produtos.map((p: { nome: string; qtd: number; rl: number; lucro: number; pctLucro: number }, pi: number) => {
+                      const barW = maxProdRL > 0 ? Math.max((p.rl / maxProdRL) * 100, 2) : 0;
+                      const prodColor = PALETTE[pi % PALETTE.length];
+                      const prodPctText = p.pctLucro >= 40 ? 'text-emerald-600' : p.pctLucro >= 20 ? 'text-amber-600' : 'text-red-500';
+                      return (
+                        <div key={p.nome}>
+                          <div className="flex items-center justify-between mb-1 gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: prodColor }} />
+                              <span className="text-xs text-slate-600 truncate font-medium">{p.nome}</span>
+                              <span className="text-[10px] text-slate-400 flex-shrink-0 bg-slate-100 px-1 rounded">{p.qtd}x</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className={`text-[10px] font-bold ${prodPctText}`}>{fmtPct(p.pctLucro)}</span>
+                              <span className="text-xs font-mono font-semibold text-slate-700">{fmtBRL(p.rl)}</span>
+                            </div>
+                          </div>
+                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 rounded-full transition-all" style={{ width: `${barW}%`, background: prodColor }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs text-slate-400">Lucro Bruto: <span className="font-semibold text-emerald-600 font-mono">{fmtBRL(v.lucro)}</span></span>
+                    <span className="text-xs text-slate-400">Comissão: <span className="font-semibold text-violet-600 font-mono">{fmtBRL(v.comissao)}</span></span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : <EmptyChart />}
       </div>
 
