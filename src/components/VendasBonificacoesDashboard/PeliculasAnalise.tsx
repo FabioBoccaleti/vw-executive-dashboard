@@ -1,0 +1,694 @@
+import { useMemo, useState } from 'react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, ComposedChart, Line,
+} from 'recharts';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { type PeliculasRow } from './peliculasStorage';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+function fmtBRL(v: number): string {
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+}
+function fmtBRLFull(v: number): string {
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+function fmtPct(v: number): string {
+  return v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+}
+function n(s: string | undefined): number { return parseFloat(s || '') || 0; }
+
+const SITUACOES_VALIDAS = new Set(['Processo Finalizado', 'Encerrada']);
+
+function getRowYear(row: PeliculasRow): number {
+  const date = row.dataEncerramento || row.dataRegistro;
+  if (!date) return 0;
+  return parseInt(date.split('-')[0]) || 0;
+}
+function getRowMonth(row: PeliculasRow): number {
+  const date = row.dataEncerramento || row.dataRegistro;
+  if (!date) return 0;
+  return parseInt(date.split('-')[1]) || 0;
+}
+
+// Apenas linhas válidas para análise (Processo Finalizado ou Encerrada)
+function validRows(rows: PeliculasRow[]): PeliculasRow[] {
+  return rows.filter(r => SITUACOES_VALIDAS.has(r.situacao));
+}
+
+function filterRows(rows: PeliculasRow[], year: number | 'Todos', monthChip: number | null): PeliculasRow[] {
+  return rows.filter(r => {
+    if (year !== 'Todos' && getRowYear(r) !== year) return false;
+    if (monthChip !== null && getRowMonth(r) !== monthChip) return false;
+    return true;
+  });
+}
+
+// ─── Métricas ─────────────────────────────────────────────────────────────────
+interface Metrics {
+  qtd: number;
+  totalVenda: number;
+  totalImpostos: number;
+  totalRL: number;
+  totalCusto: number;
+  totalLucro: number;
+  pctLucroMedio: number;
+  ticketMedio: number;
+  totalComissaoVendedor: number;
+  totalComissaoAcessorios: number;
+  totalComissoes: number;
+}
+
+function calcMetrics(rows: PeliculasRow[]): Metrics {
+  const qtd               = rows.length;
+  const totalVenda        = rows.reduce((a, r) => a + n(r.valorVenda), 0);
+  const totalImpostos     = rows.reduce((a, r) => a + n(r.impostos), 0);
+  const totalRL           = rows.reduce((a, r) => a + n(r.receitaLiquida), 0);
+  const totalCusto        = rows.reduce((a, r) => a + n(r.custoPrestador), 0);
+  const totalLucro        = rows.reduce((a, r) => a + n(r.lucroBruto), 0);
+  const pctLucroMedio     = totalRL > 0 ? (totalLucro / totalRL) * 100 : 0;
+  const ticketMedio       = qtd > 0 ? totalVenda / qtd : 0;
+  const totalComissaoVendedor   = rows.reduce((a, r) => a + n(r.comissaoVendedor), 0);
+  const totalComissaoAcessorios = rows.reduce((a, r) => a + n(r.comissaoVendedorAcessorios), 0);
+  const totalComissoes          = totalComissaoVendedor + totalComissaoAcessorios;
+  return { qtd, totalVenda, totalImpostos, totalRL, totalCusto, totalLucro, pctLucroMedio, ticketMedio, totalComissaoVendedor, totalComissaoAcessorios, totalComissoes };
+}
+
+// ─── Palette ──────────────────────────────────────────────────────────────────
+const PALETTE = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#f97316', '#84cc16'];
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+function KpiCard({ label, value, sub, color = 'text-slate-800', accentColor }: { label: string; value: string; sub?: string; color?: string; accentColor?: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-3 py-3 flex flex-col gap-0.5 min-w-0" style={accentColor ? { borderLeft: `4px solid ${accentColor}` } : undefined}>
+      <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide leading-tight">{label}</span>
+      <span className={`text-lg font-bold leading-tight ${color} truncate`}>{value}</span>
+      {sub && <span className="text-xs text-slate-400">{sub}</span>}
+    </div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 mt-1">{children}</h2>;
+}
+
+function EmptyChart() {
+  return (
+    <div className="flex flex-col items-center justify-center h-40 gap-2 text-slate-300">
+      <span className="text-3xl">📊</span>
+      <p className="text-sm">Sem dados para o período selecionado</p>
+    </div>
+  );
+}
+
+function DeltaBadge({ base, current }: { base: number; current: number }) {
+  if (base === 0) return <span className="text-slate-300 text-xs">—</span>;
+  const delta = ((current - base) / Math.abs(base)) * 100;
+  if (Math.abs(delta) < 0.05) return <span className="text-slate-400 text-xs flex items-center gap-0.5"><Minus className="w-3 h-3" />0%</span>;
+  if (delta > 0) return <span className="text-emerald-600 text-xs font-semibold flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />+{fmtPct(delta)}</span>;
+  return <span className="text-red-500 text-xs font-semibold flex items-center gap-0.5"><TrendingDown className="w-3 h-3" />{fmtPct(delta)}</span>;
+}
+
+function CustomTooltipBRL({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm">
+      <p className="font-semibold text-slate-700 mb-2">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color }} className="font-mono">{p.name}: {fmtBRLFull(p.value)}</p>
+      ))}
+    </div>
+  );
+}
+
+type PeriodType = 'mes' | 'bimestre' | 'trimestre' | 'semestre' | 'anual';
+interface PeriodSlot { year: number; tipo: PeriodType; value: number; }
+
+function periodMonths(tipo: PeriodType, value: number): number[] {
+  if (tipo === 'mes') return [value];
+  if (tipo === 'bimestre') { const s = (value - 1) * 2 + 1; return [s, s + 1]; }
+  if (tipo === 'trimestre') { const s = (value - 1) * 3 + 1; return [s, s + 1, s + 2]; }
+  if (tipo === 'semestre') { const s = (value - 1) * 6 + 1; return [s, s + 1, s + 2, s + 3, s + 4, s + 5]; }
+  return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+}
+
+function periodLabel(tipo: PeriodType, value: number, year: number): string {
+  if (tipo === 'mes') return `${MONTHS[value - 1]}/${String(year).slice(2)}`;
+  if (tipo === 'bimestre') { const s = (value - 1) * 2 + 1; return `${MONTHS[s - 1]}-${MONTHS[s]}/${String(year).slice(2)}`; }
+  if (tipo === 'trimestre') { const s = (value - 1) * 3 + 1; return `${MONTHS[s - 1]}-${MONTHS[s + 1]}/${String(year).slice(2)}`; }
+  if (tipo === 'semestre') return value === 1 ? `1º Sem/${String(year).slice(2)}` : `2º Sem/${String(year).slice(2)}`;
+  return String(year);
+}
+
+function filterByPeriod(rows: PeliculasRow[], slot: PeriodSlot): PeliculasRow[] {
+  const months = periodMonths(slot.tipo, slot.value);
+  return rows.filter(r => getRowYear(r) === slot.year && months.includes(getRowMonth(r)));
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+interface PeliculasAnaliseProps {
+  rows: PeliculasRow[];
+}
+
+export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
+  const currentYear  = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+  const ACCENT = '#6366f1';
+
+  const [selectedYear, setSelectedYear] = useState<number | 'Todos'>(currentYear);
+  const [monthChip, setMonthChip]       = useState<number | null>(null);
+  const [periods, setPeriods] = useState<PeriodSlot[]>([
+    { year: currentYear, tipo: 'mes', value: currentMonth },
+  ]);
+
+  // Apenas linhas com situação válida
+  const baseRows = useMemo(() => validRows(rows), [rows]);
+
+  // Anos disponíveis
+  const availableYears = useMemo(() => {
+    const years = [...new Set(baseRows.map(getRowYear).filter(y => y > 2000))].sort();
+    if (!years.includes(currentYear)) years.push(currentYear);
+    return years.sort();
+  }, [baseRows, currentYear]);
+
+  // Linhas filtradas
+  const filteredRows = useMemo(
+    () => filterRows(baseRows, selectedYear, monthChip),
+    [baseRows, selectedYear, monthChip]
+  );
+
+  const metrics = useMemo(() => calcMetrics(filteredRows), [filteredRows]);
+
+  // Métricas mês anterior (para deltas)
+  const prevMonthMetrics = useMemo(() => {
+    if (monthChip === null || selectedYear === 'Todos') return null;
+    const prevM = monthChip === 1 ? 12 : monthChip - 1;
+    const prevY = monthChip === 1 ? (selectedYear as number) - 1 : selectedYear as number;
+    return calcMetrics(filterRows(baseRows, prevY, prevM));
+  }, [baseRows, selectedYear, monthChip]);
+
+  // Dados mensais
+  const monthlyData = useMemo(() => {
+    const maxMonth = monthChip !== null ? monthChip : 12;
+    return MONTHS.slice(0, maxMonth).map((label, mi) => {
+      const m = mi + 1;
+      const mRows = baseRows.filter(r =>
+        (selectedYear === 'Todos' || getRowYear(r) === selectedYear) && getRowMonth(r) === m
+      );
+      const totalVenda = mRows.reduce((a, r) => a + n(r.valorVenda), 0);
+      const lucro      = mRows.reduce((a, r) => a + n(r.lucroBruto), 0);
+      const rl         = mRows.reduce((a, r) => a + n(r.receitaLiquida), 0);
+      const comissoes  = mRows.reduce((a, r) => a + n(r.comissaoVendedor) + n(r.comissaoVendedorAcessorios), 0);
+      const pctLucro   = rl > 0 ? (lucro / rl) * 100 : 0;
+      return { label, totalVenda, lucro, comissoes, pctLucro, qtd: mRows.length };
+    });
+  }, [baseRows, selectedYear, monthChip]);
+
+  // Por produto
+  const produtoData = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredRows.forEach(r => {
+      const key = r.produto || 'Não informado';
+      map.set(key, (map.get(key) || 0) + 1);
+    });
+    return [...map.entries()].map(([name, qtd]) => ({ name, qtd })).sort((a, b) => b.qtd - a.qtd);
+  }, [filteredRows]);
+
+  // Por vendedor
+  const vendedorData = useMemo(() => {
+    const map = new Map<string, { qtd: number; totalVenda: number; lucro: number; comissao: number }>();
+    filteredRows.forEach(r => {
+      const key = r.vendedor || 'Não informado';
+      const cur = map.get(key) || { qtd: 0, totalVenda: 0, lucro: 0, comissao: 0 };
+      map.set(key, {
+        qtd: cur.qtd + 1,
+        totalVenda: cur.totalVenda + n(r.valorVenda),
+        lucro: cur.lucro + n(r.lucroBruto),
+        comissao: cur.comissao + n(r.comissaoVendedor),
+      });
+    });
+    return [...map.entries()]
+      .map(([name, v]) => ({
+        name,
+        ...v,
+        ticketMedio: v.qtd > 0 ? v.totalVenda / v.qtd : 0,
+        pctLucro: v.totalVenda > 0 ? (v.lucro / v.totalVenda) * 100 : 0,
+      }))
+      .sort((a, b) => b.qtd - a.qtd || b.totalVenda - a.totalVenda);
+  }, [filteredRows]);
+
+  // Por vendedor de acessórios
+  const vendedorAcessoriosData = useMemo(() => {
+    const map = new Map<string, { qtd: number; totalVenda: number; comissao: number }>();
+    filteredRows.forEach(r => {
+      const key = r.vendedorAcessorios || 'Não informado';
+      const cur = map.get(key) || { qtd: 0, totalVenda: 0, comissao: 0 };
+      map.set(key, {
+        qtd: cur.qtd + 1,
+        totalVenda: cur.totalVenda + n(r.valorVenda),
+        comissao: cur.comissao + n(r.comissaoVendedorAcessorios),
+      });
+    });
+    return [...map.entries()]
+      .map(([name, v]) => ({ name, ...v, ticketMedio: v.qtd > 0 ? v.totalVenda / v.qtd : 0 }))
+      .sort((a, b) => b.qtd - a.qtd || b.totalVenda - a.totalVenda);
+  }, [filteredRows]);
+
+  // Comparativo de períodos
+  const periodoOptions: { tipo: PeriodType; label: string; count: number }[] = [
+    { tipo: 'mes', label: 'Mês', count: 12 },
+    { tipo: 'bimestre', label: 'Bimestre', count: 6 },
+    { tipo: 'trimestre', label: 'Trimestre', count: 4 },
+    { tipo: 'semestre', label: 'Semestre', count: 2 },
+    { tipo: 'anual', label: 'Anual', count: 1 },
+  ];
+  const periodoValueLabels: Record<PeriodType, string[]> = {
+    mes: MONTHS,
+    bimestre: ['1º Bim (Jan-Fev)', '2º Bim (Mar-Abr)', '3º Bim (Mai-Jun)', '4º Bim (Jul-Ago)', '5º Bim (Set-Out)', '6º Bim (Nov-Dez)'],
+    trimestre: ['1º Trim (Jan-Mar)', '2º Trim (Abr-Jun)', '3º Trim (Jul-Set)', '4º Trim (Out-Dez)'],
+    semestre: ['1º Sem (Jan-Jun)', '2º Sem (Jul-Dez)'],
+    anual: ['Ano Completo'],
+  };
+  const periodMetrics = useMemo(
+    () => periods.map(slot => ({ slot, metrics: calcMetrics(filterByPeriod(baseRows, slot)) })),
+    [periods, baseRows]
+  );
+  const addPeriod = () => { if (periods.length < 4) setPeriods(p => [...p, { year: currentYear, tipo: 'mes', value: currentMonth }]); };
+  const removePeriod = (i: number) => setPeriods(p => p.filter((_, idx) => idx !== i));
+  const updatePeriod = (i: number, patch: Partial<PeriodSlot>) =>
+    setPeriods(p => p.map((s, idx) => idx === i ? { ...s, ...patch } : s));
+
+  const comparativoRows: { label: string; key: keyof Metrics; fmt: (v: number) => string }[] = [
+    { label: 'Qtd de Vendas',           key: 'qtd',                    fmt: v => String(v) },
+    { label: 'Valor da Venda',          key: 'totalVenda',             fmt: fmtBRLFull },
+    { label: 'Impostos',                key: 'totalImpostos',          fmt: fmtBRLFull },
+    { label: 'Receita Líquida',         key: 'totalRL',                fmt: fmtBRLFull },
+    { label: 'Custo Prestador',         key: 'totalCusto',             fmt: fmtBRLFull },
+    { label: 'Lucro Bruto',             key: 'totalLucro',             fmt: fmtBRLFull },
+    { label: '% Lucro Bruto',           key: 'pctLucroMedio',          fmt: fmtPct },
+    { label: 'Ticket Médio',            key: 'ticketMedio',            fmt: fmtBRLFull },
+    { label: 'Comissão Vendedor',       key: 'totalComissaoVendedor',  fmt: fmtBRLFull },
+    { label: 'Comissão Acessórios',     key: 'totalComissaoAcessorios',fmt: fmtBRLFull },
+    { label: 'Total Comissões',         key: 'totalComissoes',         fmt: fmtBRLFull },
+  ];
+
+  const PERIOD_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#8b5cf6'];
+  const periodoLabel = `${monthChip ? `${MONTHS[monthChip - 1]}/` : ''}${selectedYear === 'Todos' ? 'Todos os Anos' : selectedYear}`;
+
+  return (
+    <div className="p-4 space-y-6 bg-slate-50 min-h-full">
+
+      {/* ── INFO situações consideradas ── */}
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-700 font-medium">
+        <span className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />
+        Análise considera apenas registros com situação <strong className="mx-1">Encerrada</strong> ou <strong className="mx-1">Processo Finalizado</strong> — total de <strong className="ml-1">{baseRows.length} registro{baseRows.length !== 1 ? 's' : ''}</strong>
+      </div>
+
+      {/* ── FILTROS GLOBAIS ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ano</span>
+            <select
+              value={selectedYear}
+              onChange={e => setSelectedYear(e.target.value === 'Todos' ? 'Todos' : Number(e.target.value))}
+              className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            >
+              <option value="Todos">Todos</option>
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-1">Mês</span>
+            <button
+              onClick={() => setMonthChip(null)}
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${monthChip === null ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+            >
+              Ano todo
+            </button>
+            {MONTHS.map((m, mi) => {
+              const month = mi + 1;
+              const isCurrent = month === currentMonth && selectedYear === currentYear;
+              return (
+                <button
+                  key={month}
+                  onClick={() => setMonthChip(monthChip === month ? null : month)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+                    monthChip === month ? 'bg-indigo-500 text-white'
+                    : isCurrent ? 'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-400 hover:bg-indigo-200'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  }`}
+                >
+                  {m}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ── KPI CARDS ── */}
+      <div>
+        <SectionTitle>Visão Geral — {periodoLabel}</SectionTitle>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          <KpiCard label="Total de Vendas"   value={String(metrics.qtd)}             color="text-slate-800"   accentColor={ACCENT} />
+          <KpiCard label="Valor da Venda"    value={fmtBRL(metrics.totalVenda)}      color="text-indigo-600"  accentColor={ACCENT} />
+          <KpiCard label="Receita Líquida"   value={fmtBRL(metrics.totalRL)}         color="text-sky-600"     accentColor={ACCENT}
+            sub={metrics.totalVenda > 0 ? `Impostos: ${fmtBRL(metrics.totalImpostos)}` : undefined} />
+          <KpiCard label="Custo Prestador"   value={fmtBRL(metrics.totalCusto)}      color="text-red-500"     accentColor={ACCENT} />
+          <KpiCard label="Lucro Bruto"       value={fmtBRL(metrics.totalLucro)}      color="text-emerald-600" accentColor={ACCENT}
+            sub={metrics.totalRL > 0 ? `${fmtPct(metrics.pctLucroMedio)} da RL` : undefined} />
+          <KpiCard label="% Lucro Bruto Médio" value={fmtPct(metrics.pctLucroMedio)}
+            color={metrics.pctLucroMedio >= 30 ? 'text-emerald-600' : metrics.pctLucroMedio >= 15 ? 'text-amber-600' : 'text-red-500'}
+            accentColor={ACCENT}
+            sub={metrics.qtd > 0 ? `Ticket médio: ${fmtBRL(metrics.ticketMedio)}` : undefined} />
+        </div>
+
+        {/* Cards de comissões */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+          <KpiCard label="Comissão Vendedor"          value={fmtBRL(metrics.totalComissaoVendedor)}   color="text-violet-600" accentColor="#8b5cf6"
+            sub={metrics.totalRL > 0 ? `${fmtPct(metrics.totalComissaoVendedor / metrics.totalRL * 100)} da RL` : undefined} />
+          <KpiCard label="Comissão Vendedor Acessórios" value={fmtBRL(metrics.totalComissaoAcessorios)} color="text-fuchsia-600" accentColor="#d946ef"
+            sub={metrics.totalRL > 0 ? `${fmtPct(metrics.totalComissaoAcessorios / metrics.totalRL * 100)} da RL` : undefined} />
+          <KpiCard label="Total de Comissões"         value={fmtBRL(metrics.totalComissoes)}          color="text-slate-800"  accentColor="#475569"
+            sub={metrics.totalLucro > 0 ? `${fmtPct(metrics.totalComissoes / metrics.totalLucro * 100)} do lucro` : undefined} />
+        </div>
+
+        {/* Delta vs mês anterior */}
+        {prevMonthMetrics && metrics.qtd > 0 && (
+          <div className="mt-3 flex items-center gap-3 flex-wrap">
+            <span className="text-xs text-slate-400 font-medium">vs. mês anterior:</span>
+            <span className="text-xs text-slate-500">Qtd: <DeltaBadge base={prevMonthMetrics.qtd} current={metrics.qtd} /></span>
+            <span className="text-xs text-slate-500">Receita RL: <DeltaBadge base={prevMonthMetrics.totalRL} current={metrics.totalRL} /></span>
+            <span className="text-xs text-slate-500">Lucro: <DeltaBadge base={prevMonthMetrics.totalLucro} current={metrics.totalLucro} /></span>
+            <span className="text-xs text-slate-500">Comissões: <DeltaBadge base={prevMonthMetrics.totalComissoes} current={metrics.totalComissoes} /></span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Produto + Evolução Mensal ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* Pizza produtos */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <SectionTitle>Distribuição por Produto</SectionTitle>
+          {produtoData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie
+                  data={produtoData}
+                  dataKey="qtd"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={90}
+                  innerRadius={45}
+                  paddingAngle={2}
+                  label={({ name, percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ''}
+                  labelLine={false}
+                >
+                  {produtoData.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                </Pie>
+                <Tooltip formatter={(v, name) => [`${v} venda(s)`, name]} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : <EmptyChart />}
+        </div>
+
+        {/* Evolução mensal — abrange 2/3 da grid */}
+        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <SectionTitle>Evolução Mensal — {selectedYear === 'Todos' ? 'Todos os Anos' : selectedYear}</SectionTitle>
+          {monthlyData.some(d => d.totalVenda > 0) ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={monthlyData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                <YAxis yAxisId="left"  tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={90} />
+                <YAxis yAxisId="right" orientation="right" tickFormatter={v => `${v.toFixed(0)}%`} tick={{ fontSize: 10 }} width={45} />
+                <Tooltip content={<CustomTooltipBRL />} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar yAxisId="left"  dataKey="totalVenda" name="Valor da Venda"  fill="#6366f1" radius={[3, 3, 0, 0]} />
+                <Bar yAxisId="left"  dataKey="lucro"      name="Lucro Bruto"     fill="#10b981" radius={[3, 3, 0, 0]} />
+                <Bar yAxisId="left"  dataKey="comissoes"  name="Total Comissões" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+                <Line yAxisId="right" type="monotone" dataKey="pctLucro" name="% Lucro" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : <EmptyChart />}
+        </div>
+      </div>
+
+      {/* ── Performance Vendedores ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-5">
+          <SectionTitle>Performance por Vendedor</SectionTitle>
+          {vendedorData.length > 0 && (
+            <span className="text-xs text-slate-400 font-medium px-2.5 py-1 bg-slate-100 rounded-full">
+              {vendedorData.length} vendedor{vendedorData.length !== 1 ? 'es' : ''}
+            </span>
+          )}
+        </div>
+
+        {vendedorData.length > 0 ? (
+          <div className="space-y-6">
+            {/* Pódio Top 3 */}
+            {(() => {
+              const totalQtd  = vendedorData.reduce((s, v) => s + v.qtd, 0);
+              const medals    = ['🥇', '🥈', '🥉'];
+              const gradients = ['from-indigo-400 to-indigo-600', 'from-slate-400 to-slate-500', 'from-violet-400 to-violet-500'];
+              const bgBorder  = ['bg-indigo-50 border-indigo-200', 'bg-slate-50 border-slate-200', 'bg-violet-50 border-violet-200'];
+              const textAccent = ['text-indigo-600', 'text-slate-600', 'text-violet-600'];
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {vendedorData.slice(0, 3).map((v, i) => {
+                    const topQtd  = vendedorData[0].qtd;
+                    const barPct  = topQtd > 0 ? (v.qtd / topQtd) * 100 : 0;
+                    const volPct  = totalQtd > 0 ? (v.qtd / totalQtd) * 100 : 0;
+                    const initials = v.name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                    return (
+                      <div key={v.name} className={`rounded-xl border p-4 ${bgBorder[i]} relative overflow-hidden`}>
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${gradients[i]} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm`}>
+                            {initials}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="text-base leading-none">{medals[i]}</span>
+                              <span className="text-xs font-bold text-slate-400">#{i + 1}</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-800 leading-tight truncate">{v.name}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div>
+                            <p className="text-xs text-slate-400 mb-0.5">Comissão</p>
+                            <p className={`text-lg font-bold font-mono ${textAccent[i]}`}>{fmtBRL(v.comissao)}</p>
+                          </div>
+                          <div className="w-full bg-white/70 rounded-full h-1.5">
+                            <div className={`h-1.5 rounded-full bg-gradient-to-r ${gradients[i]} transition-all`} style={{ width: `${barPct}%` }} />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-slate-500">
+                              <span className="font-semibold">{v.qtd}</span> venda{v.qtd !== 1 ? 's' : ''}
+                              <span className="ml-1 text-slate-400">({fmtPct(volPct)} do volume)</span>
+                            </span>
+                          </div>
+                          <div className="pt-1.5 border-t border-white/60 space-y-1">
+                            <p className="text-xs text-slate-400">Lucro Bruto: <span className={`font-semibold font-mono ${textAccent[i]}`}>{fmtBRL(v.lucro)}</span></p>
+                            <p className="text-xs text-slate-400">% Lucro: <span className="font-semibold font-mono text-emerald-600">{fmtPct(v.pctLucro)}</span></p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* Tabela todos os vendedores */}
+            <div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Todos os Vendedores</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="text-left py-2 px-2 text-slate-400 font-semibold w-8">#</th>
+                      <th className="text-left py-2 px-2 text-slate-400 font-semibold">Vendedor</th>
+                      <th className="text-right py-2 px-2 text-slate-400 font-semibold">Qtd</th>
+                      <th className="text-right py-2 px-2 text-slate-400 font-semibold">Valor da Venda</th>
+                      <th className="text-right py-2 px-2 text-slate-400 font-semibold">Lucro Bruto</th>
+                      <th className="text-right py-2 px-2 text-slate-400 font-semibold">% Lucro</th>
+                      <th className="text-right py-2 px-2 text-slate-400 font-semibold">Comissão</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vendedorData.map((v, i) => (
+                      <tr key={v.name} className={`border-b border-slate-50 hover:bg-slate-50 transition-colors ${i < 3 ? 'font-semibold' : ''}`}>
+                        <td className="py-2 px-2 text-slate-400 font-bold">#{i + 1}</td>
+                        <td className="py-2 px-2 text-slate-700">{v.name}</td>
+                        <td className="py-2 px-2 text-right tabular-nums text-slate-600">{v.qtd}</td>
+                        <td className="py-2 px-2 text-right tabular-nums font-mono text-indigo-600">{fmtBRL(v.totalVenda)}</td>
+                        <td className="py-2 px-2 text-right tabular-nums font-mono text-emerald-600">{fmtBRL(v.lucro)}</td>
+                        <td className="py-2 px-2 text-right tabular-nums font-mono text-amber-600">{fmtPct(v.pctLucro)}</td>
+                        <td className="py-2 px-2 text-right tabular-nums font-mono text-violet-600">{fmtBRL(v.comissao)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : <EmptyChart />}
+      </div>
+
+      {/* ── Performance Vendedores de Acessórios ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-5">
+          <SectionTitle>Performance por Vendedor de Acessórios</SectionTitle>
+          {vendedorAcessoriosData.length > 0 && (
+            <span className="text-xs text-slate-400 font-medium px-2.5 py-1 bg-slate-100 rounded-full">
+              {vendedorAcessoriosData.length} vendedor{vendedorAcessoriosData.length !== 1 ? 'es' : ''}
+            </span>
+          )}
+        </div>
+
+        {vendedorAcessoriosData.length > 0 ? (
+          <>
+            {/* Barras horizontais */}
+            <ResponsiveContainer width="100%" height={Math.max(180, vendedorAcessoriosData.length * 44)}>
+              <BarChart data={vendedorAcessoriosData} layout="vertical" margin={{ left: 8, right: 24 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
+                <Tooltip content={<CustomTooltipBRL />} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="totalVenda" name="Valor da Venda"  fill="#6366f1" radius={[0, 3, 3, 0]} />
+                <Bar dataKey="comissao"   name="Comissão Acess." fill="#d946ef" radius={[0, 3, 3, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+
+            {/* Tabela */}
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="text-left py-2 px-2 text-slate-400 font-semibold w-8">#</th>
+                    <th className="text-left py-2 px-2 text-slate-400 font-semibold">Vendedor de Acessórios</th>
+                    <th className="text-right py-2 px-2 text-slate-400 font-semibold">Qtd</th>
+                    <th className="text-right py-2 px-2 text-slate-400 font-semibold">Valor da Venda</th>
+                    <th className="text-right py-2 px-2 text-slate-400 font-semibold">Ticket Médio</th>
+                    <th className="text-right py-2 px-2 text-slate-400 font-semibold">Comissão</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vendedorAcessoriosData.map((v, i) => (
+                    <tr key={v.name} className={`border-b border-slate-50 hover:bg-slate-50 transition-colors ${i < 3 ? 'font-semibold' : ''}`}>
+                      <td className="py-2 px-2 text-slate-400 font-bold">#{i + 1}</td>
+                      <td className="py-2 px-2 text-slate-700">{v.name}</td>
+                      <td className="py-2 px-2 text-right tabular-nums text-slate-600">{v.qtd}</td>
+                      <td className="py-2 px-2 text-right tabular-nums font-mono text-indigo-600">{fmtBRL(v.totalVenda)}</td>
+                      <td className="py-2 px-2 text-right tabular-nums font-mono text-sky-600">{fmtBRL(v.ticketMedio)}</td>
+                      <td className="py-2 px-2 text-right tabular-nums font-mono text-fuchsia-600">{fmtBRL(v.comissao)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : <EmptyChart />}
+      </div>
+
+      {/* ── Comparativo de Períodos ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <SectionTitle>Comparativo de Períodos</SectionTitle>
+          {periods.length < 4 && (
+            <button
+              onClick={addPeriod}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+            >
+              + Adicionar período
+            </button>
+          )}
+        </div>
+
+        {/* Seletores de período */}
+        <div className="flex flex-wrap gap-3 mb-5">
+          {periods.map((p, i) => (
+            <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-xl border border-slate-200 px-3 py-2">
+              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: PERIOD_COLORS[i] }} />
+              <select
+                value={p.year}
+                onChange={e => updatePeriod(i, { year: Number(e.target.value) })}
+                className="border-0 bg-transparent text-xs font-semibold text-slate-700 focus:outline-none"
+              >
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <select
+                value={p.tipo}
+                onChange={e => updatePeriod(i, { tipo: e.target.value as PeriodType, value: 1 })}
+                className="border-0 bg-transparent text-xs font-semibold text-slate-700 focus:outline-none"
+              >
+                {periodoOptions.map(o => <option key={o.tipo} value={o.tipo}>{o.label}</option>)}
+              </select>
+              <select
+                value={p.value}
+                onChange={e => updatePeriod(i, { value: Number(e.target.value) })}
+                className="border-0 bg-transparent text-xs font-semibold text-slate-700 focus:outline-none"
+              >
+                {periodoValueLabels[p.tipo].map((lbl, vi) => (
+                  <option key={vi} value={vi + 1}>{lbl}</option>
+                ))}
+              </select>
+              <span className="text-xs text-slate-400 font-medium">{periodLabel(p.tipo, p.value, p.year)}</span>
+              {periods.length > 1 && (
+                <button onClick={() => removePeriod(i)} className="text-slate-300 hover:text-red-400 transition-colors ml-1">✕</button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Tabela comparativa */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b-2 border-slate-200">
+                <th className="text-left py-2 px-3 text-slate-500 font-semibold">Métrica</th>
+                {periodMetrics.map(({ slot }, i) => (
+                  <th key={i} className="text-right py-2 px-3 font-bold" style={{ color: PERIOD_COLORS[i] }}>
+                    {periodLabel(slot.tipo, slot.value, slot.year)}
+                  </th>
+                ))}
+                {periodMetrics.length === 2 && (
+                  <th className="text-right py-2 px-3 text-slate-400 font-semibold">Δ %</th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {comparativoRows.map(row => (
+                <tr key={row.key} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                  <td className="py-2 px-3 text-slate-600 font-medium">{row.label}</td>
+                  {periodMetrics.map(({ metrics: m }, i) => (
+                    <td key={i} className="py-2 px-3 text-right font-mono tabular-nums text-slate-700">
+                      {row.fmt(m[row.key] as number)}
+                    </td>
+                  ))}
+                  {periodMetrics.length === 2 && (
+                    <td className="py-2 px-3 text-right">
+                      <DeltaBadge
+                        base={periodMetrics[0].metrics[row.key] as number}
+                        current={periodMetrics[1].metrics[row.key] as number}
+                      />
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}

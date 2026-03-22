@@ -16,6 +16,7 @@ import {
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
+import { PeliculasAnalise } from './PeliculasAnalise';
 
 // ─── Campos calculados (somente leitura no modo edição) ──────────────────────
 const CALC_READONLY_KEYS = new Set<string>(['receitaLiquida', 'lucroBruto', 'impostos', 'comissaoVendedor', 'comissaoVendedorAcessorios', 'situacao']);
@@ -651,53 +652,8 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
 
         {/* ── ABA ANÁLISE ── */}
         {activeTab === 'analise' && (
-          <div className="flex-1 overflow-auto p-6 space-y-6">
-            {/* KPIs */}
-            <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Visão Geral</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-                <KpiCard label="Total Registros" value={String(analytics.qtd)} color="border-indigo-400" />
-                <KpiCard
-                  label="Valor da Venda"
-                  value={analytics.totalVenda.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  color="border-sky-400"
-                />
-                <KpiCard
-                  label="Total Impostos"
-                  value={analytics.totalImp.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  color="border-orange-400"
-                />
-                <KpiCard
-                  label="Receita Líquida"
-                  value={analytics.totalRL.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  color="border-blue-400"
-                />
-                <KpiCard
-                  label="Custo Prestador"
-                  value={analytics.totalCusto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  color="border-red-400"
-                />
-                <KpiCard
-                  label="Lucro Bruto"
-                  value={analytics.totalLucro.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  color="border-emerald-400"
-                />
-                <KpiCard
-                  label="% Lucro Bruto Médio"
-                  value={analytics.pctMedio.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'}
-                  color="border-violet-400"
-                />
-              </div>
-            </div>
-
-            {/* Placeholder gráficos */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-10 flex flex-col items-center justify-center gap-3 text-center">
-              <div className="p-4 rounded-full bg-indigo-50">
-                <BarChart2 className="w-10 h-10 text-indigo-300" />
-              </div>
-              <p className="text-base font-semibold text-slate-400">Análises Gráficas</p>
-              <p className="text-sm text-slate-400">Em desenvolvimento — os gráficos serão adicionados em breve.</p>
-            </div>
+          <div className="flex-1 overflow-auto" style={{ maxHeight: 'calc(100vh - 72px)' }}>
+            <PeliculasAnalise rows={rows} />
           </div>
         )}
 
