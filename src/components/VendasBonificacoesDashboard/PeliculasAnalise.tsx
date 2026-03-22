@@ -608,7 +608,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
 
         {/* Pizza produtos */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <SectionTitle>Distribuição por Produto</SectionTitle>
+          <SectionTitle>Distribuição do Produto por Volume</SectionTitle>
           {produtoData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
