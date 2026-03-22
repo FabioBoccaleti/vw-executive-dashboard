@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import {
   LogOut, Layers, Pencil, Trash2, Check, X, Plus, Search,
   FilterX, BarChart2, TableProperties, Download, Upload, BookOpen, Lock, LockOpen, FilePlus,
-  Banknote, CheckCircle2, AlertCircle,
+  Banknote, CheckCircle2, AlertCircle, Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -312,6 +312,9 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [liberarNFNotFound, setLiberarNFNotFound] = useState(false);
   const [liberarNFValorInformado, setLiberarNFValorInformado] = useState('');
   const [liberarNFLiberado, setLiberarNFLiberado] = useState(false);
+  const [liberarNFValidador, setLiberarNFValidador] = useState('');
+  const [liberarNFAssinatura, setLiberarNFAssinatura] = useState('');
+  const [liberarNFDataHora, setLiberarNFDataHora] = useState('');
 
   // Listas de cadastro para selectors
   const [cadastroVendedores, setCadastroVendedores] = useState<string[]>([]);
@@ -439,6 +442,123 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
     setLiberarNFNotFound(false);
     setLiberarNFValorInformado('');
     setLiberarNFLiberado(false);
+    setLiberarNFValidador('');
+    setLiberarNFAssinatura('');
+    setLiberarNFDataHora('');
+  };
+
+  const abrirPDF = () => {
+    const fmt = (v: string) => {
+      const n = parseFloat(v);
+      return isNaN(n) ? '—' : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    };
+    const totalCustoNF  = liberarNFRows.reduce((s, r) => s + (parseFloat(r.custoPrestador) || 0), 0);
+    const totalVendaNF  = liberarNFRows.reduce((s, r) => s + (parseFloat(r.valorVenda) || 0), 0);
+    const totalLucroNF  = liberarNFRows.reduce((s, r) => s + (parseFloat(r.lucroBruto) || 0), 0);
+    const rowsHTML = liberarNFRows.map((r, i) => {
+      const rl  = parseFloat(r.receitaLiquida) || 0;
+      const lb  = parseFloat(r.lucroBruto) || 0;
+      const pct = rl > 0 ? (lb / rl * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%' : '—';
+      return `<tr style="background:${i % 2 === 0 ? '#ffffff' : '#f0fdf4'}">
+        <td>${r.numeroOS || '—'}</td>
+        <td>${r.nomeCliente || '—'}</td>
+        <td>${r.produto || '—'}</td>
+        <td class="money">${fmt(r.valorVenda)}</td>
+        <td class="money red">${fmt(r.custoPrestador)}</td>
+        <td class="money green">${fmt(r.lucroBruto)}</td>
+        <td class="money amber">${pct}</td>
+        <td class="center"><span class="nf-badge">${r.nfPrestador || '—'}</span></td>
+      </tr>`;
+    }).join('');
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Comprovante de Liberação — NF ${liberarNFInput}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;color:#1e293b;background:#fff;padding:28px 32px}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:16px;margin-bottom:18px;border-bottom:3px solid #059669}
+    .header h1{font-size:20px;font-weight:900;color:#065f46;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+    .header p{font-size:10.5px;color:#64748b;margin-top:3px}
+    .nf-tag{background:#d1fae5;border:1.5px solid #6ee7b7;border-radius:999px;padding:5px 16px;font-size:12px;font-weight:800;color:#065f46;white-space:nowrap}
+    .meta-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+    .meta-box{border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;background:#f8fafc}
+    .meta-box label{font-size:8.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:3px}
+    .meta-box span{font-size:13px;font-weight:700;color:#1e293b}
+    .meta-box .green{color:#059669}
+    table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:10.5px}
+    thead tr{background:#064e3b;color:#fff}
+    thead th{padding:8px 10px;font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.05em}
+    thead th.r{text-align:right}
+    thead th.c{text-align:center}
+    tbody td{padding:7px 10px;border-bottom:1px solid #e2e8f0}
+    tfoot tr{background:#ecfdf5;border-top:2px solid #6ee7b7}
+    tfoot td{padding:8px 10px;font-weight:800;font-size:11px}
+    .money{text-align:right;font-family:monospace}
+    .red{color:#dc2626}.green{color:#059669}.amber{color:#d97706}
+    .center{text-align:center}
+    .nf-badge{background:#d1fae5;border:1px solid #6ee7b7;border-radius:999px;padding:2px 10px;font-weight:700;color:#065f46;font-size:10px}
+    .validation{display:flex;align-items:center;gap:12px;background:#d1fae5;border:1.5px solid #6ee7b7;border-radius:10px;padding:12px 18px;margin-bottom:18px}
+    .validation .check{font-size:22px}
+    .validation div p:first-child{font-size:13px;font-weight:800;color:#065f46}
+    .validation div p:last-child{font-size:11px;color:#047857;font-family:monospace;margin-top:2px}
+    .sig-section{margin-top:8px}
+    .sig-section label{font-size:9px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px}
+    .sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+    .sig-box{border-top:2px solid #1e293b;padding-top:10px}
+    .sig-box .value{font-size:13px;font-weight:700;color:#1e293b;min-height:22px}
+    .footer{margin-top:20px;text-align:center;font-size:8.5px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+    @media print{body{padding:14px 18px}}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div><h1>✓ PAGAMENTO LIBERADO</h1><p>Análise e Controle de Vendas de Películas na Audi — Comprovante de Liberação de Pagamento</p></div>
+    <span class="nf-tag">NF Nº ${liberarNFInput}</span>
+  </div>
+  <div class="meta-grid">
+    <div class="meta-box"><label>Data e Hora da Liberação</label><span>${liberarNFDataHora}</span></div>
+    <div class="meta-box"><label>Nº NF Prestador</label><span class="green">${liberarNFInput}</span></div>
+    <div class="meta-box"><label>Qtd de Registros</label><span>${liberarNFRows.length}</span></div>
+    <div class="meta-box"><label>Total Custo Prestador</label><span class="green">${totalCustoNF.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Nº OS</th><th>Nome do Cliente</th><th>Produto</th>
+      <th class="r">Valor da Venda</th><th class="r">Custo Prestador</th>
+      <th class="r">Lucro Bruto</th><th class="r">% LB</th><th class="c">NF Prestador</th>
+    </tr></thead>
+    <tbody>${rowsHTML}</tbody>
+    <tfoot><tr>
+      <td colspan="3">Total (${liberarNFRows.length} registro${liberarNFRows.length !== 1 ? 's' : ''})</td>
+      <td class="money">${totalVendaNF.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+      <td class="money red">${totalCustoNF.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+      <td class="money green">${totalLucroNF.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+      <td colspan="2"></td>
+    </tr></tfoot>
+  </table>
+  <div class="validation">
+    <span class="check">✓</span>
+    <div>
+      <p>Valores conferem — pagamento autorizado</p>
+      <p>Total validado: ${totalCustoNF.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+    </div>
+  </div>
+  <div class="sig-section">
+    <div class="sig-grid">
+      <div class="sig-box"><label>Validado por</label><div class="value">${liberarNFValidador || ''}</div></div>
+      <div class="sig-box"><label>Assinatura</label><div class="value">${liberarNFAssinatura || ''}</div></div>
+    </div>
+  </div>
+  <div class="footer">Documento gerado em ${new Date().toLocaleString('pt-BR')} — Sistema Executive Dashboard · Análise e Controle de Vendas de Películas na Audi</div>
+</body></html>`;
+    const win = window.open('', '_blank', 'width=960,height=760');
+    if (!win) { toast.error('Permita popups no navegador para abrir o PDF'); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 500);
   };
 
   const buscarNFPrestador = () => {
@@ -1317,29 +1437,114 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
 
                 {/* SUCCESS */}
                 {liberarNFLiberado ? (
-                  <div className="flex flex-col items-center justify-center py-12 gap-6 text-center">
-                    <div className="w-24 h-24 rounded-full bg-emerald-100 flex items-center justify-center">
-                      <CheckCircle2 className="w-12 h-12 text-emerald-500" />
+                  <div className="flex flex-col gap-5">
+                    {/* Banner */}
+                    <div className="flex items-center gap-4 px-5 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-2xl shadow-sm">
+                      <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="w-7 h-7 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-lg font-black text-white tracking-tight">PAGAMENTO LIBERADO</p>
+                        <p className="text-emerald-100 text-xs mt-0.5">
+                          NF Nº <span className="font-bold">{liberarNFInput}</span>
+                          {' — '}{liberarNFRows.length} venda{liberarNFRows.length !== 1 ? 's' : ''} validada{liberarNFRows.length !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-[10px] text-emerald-200 uppercase tracking-wide font-semibold">Liberado em</p>
+                        <p className="text-xs text-white font-bold mt-0.5">{liberarNFDataHora}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-2xl font-black text-slate-800 tracking-tight">PAGAMENTO LIBERADO</p>
-                      <p className="text-sm text-slate-500 mt-2">
-                        NF Nº <span className="font-bold text-emerald-600">{liberarNFInput}</span>
-                        {' — '}<span className="font-semibold">{liberarNFRows.length}</span> venda{liberarNFRows.length !== 1 ? 's' : ''} validada{liberarNFRows.length !== 1 ? 's' : ''}
-                      </p>
+
+                    {/* Tabela de registros */}
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-emerald-800">
+                            <th className="text-left py-2.5 px-3 text-emerald-100 font-semibold text-[10px] uppercase tracking-wide">Nº OS</th>
+                            <th className="text-left py-2.5 px-3 text-emerald-100 font-semibold text-[10px] uppercase tracking-wide">Nome do Cliente</th>
+                            <th className="text-left py-2.5 px-3 text-emerald-100 font-semibold text-[10px] uppercase tracking-wide">Produto</th>
+                            <th className="text-right py-2.5 px-3 text-emerald-100 font-semibold text-[10px] uppercase tracking-wide">Valor da Venda</th>
+                            <th className="text-right py-2.5 px-3 text-emerald-100 font-semibold text-[10px] uppercase tracking-wide">Custo Prestador</th>
+                            <th className="text-right py-2.5 px-3 text-emerald-100 font-semibold text-[10px] uppercase tracking-wide">Lucro Bruto</th>
+                            <th className="text-right py-2.5 px-3 text-emerald-100 font-semibold text-[10px] uppercase tracking-wide">% LB</th>
+                            <th className="text-center py-2.5 px-3 text-emerald-100 font-semibold text-[10px] uppercase tracking-wide">NF Prestador</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {liberarNFRows.map((r, i) => {
+                            const rl = parseFloat(r.receitaLiquida) || 0;
+                            const lb = parseFloat(r.lucroBruto) || 0;
+                            const pct = rl > 0
+                              ? (lb / rl * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'
+                              : '—';
+                            return (
+                              <tr key={r.id} className={`border-b border-slate-50 ${i % 2 === 0 ? 'bg-white' : 'bg-emerald-50/30'}`}>
+                                <td className="py-2.5 px-3 font-semibold text-indigo-700">{r.numeroOS || '—'}</td>
+                                <td className="py-2.5 px-3 text-slate-700">{r.nomeCliente || '—'}</td>
+                                <td className="py-2.5 px-3 text-slate-600">{r.produto || '—'}</td>
+                                <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700">{fmtCurrency(r.valorVenda)}</td>
+                                <td className="py-2.5 px-3 text-right font-mono tabular-nums text-red-600">{fmtCurrency(r.custoPrestador)}</td>
+                                <td className="py-2.5 px-3 text-right font-mono tabular-nums text-emerald-600">{fmtCurrency(r.lucroBruto)}</td>
+                                <td className="py-2.5 px-3 text-right font-mono tabular-nums text-amber-600">{pct}</td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <span className="inline-flex items-center px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[11px] font-semibold">{r.nfPrestador}</span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-emerald-200 bg-emerald-50">
+                            <td colSpan={4} className="py-2.5 px-3 font-bold text-slate-600 text-xs">
+                              Total ({liberarNFRows.length} registro{liberarNFRows.length !== 1 ? 's' : ''})
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-bold font-mono text-red-700 text-xs">
+                              {liberarNFRows.reduce((s, r) => s + (parseFloat(r.custoPrestador) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-bold font-mono text-emerald-700 text-xs">
+                              {liberarNFRows.reduce((s, r) => s + (parseFloat(r.lucroBruto) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </td>
+                            <td colSpan={2} />
+                          </tr>
+                        </tfoot>
+                      </table>
                     </div>
-                    <div className="flex items-center gap-2 px-8 py-3 bg-emerald-50 border border-emerald-200 rounded-2xl">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                      <span className="text-sm text-emerald-700 font-semibold font-mono">
-                        Total validado: {totalCusto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </span>
+
+                    {/* Resumo validação */}
+                    <div className="flex items-center gap-3 px-5 py-3.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-emerald-800">Valores conferem — pagamento autorizado</p>
+                        <p className="text-xs text-emerald-600 font-mono mt-0.5">
+                          Total validado: <span className="font-bold">{liberarNFRows.reduce((s, r) => s + (parseFloat(r.custoPrestador) || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </p>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => setShowLiberarNFModal(false)}
-                      className="px-8 py-2.5 bg-slate-800 text-white text-sm font-semibold rounded-xl hover:bg-slate-700 transition-colors"
-                    >
-                      Fechar
-                    </button>
+
+                    {/* Campos validador e assinatura */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Nome do Validador</label>
+                        <input
+                          type="text"
+                          value={liberarNFValidador}
+                          onChange={e => setLiberarNFValidador(e.target.value)}
+                          placeholder="Digite o nome de quem validou"
+                          className="border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Assinatura</label>
+                        <input
+                          type="text"
+                          value={liberarNFAssinatura}
+                          onChange={e => setLiberarNFAssinatura(e.target.value)}
+                          placeholder="Assinatura (texto)"
+                          className="border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold italic focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                 ) : liberarNFStep === 1 ? (
@@ -1515,35 +1720,52 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
               </div>
 
               {/* Footer */}
-              {!liberarNFLiberado && (
-                <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 flex-shrink-0 bg-slate-50/50">
-                  {liberarNFStep === 2 ? (
-                    <>
-                      <button
-                        onClick={() => {
-                          setLiberarNFStep(1);
-                          setLiberarNFValorInformado('');
-                          setLiberarNFRows([]);
-                          setLiberarNFNotFound(false);
-                        }}
-                        className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-                      >
-                        ← Voltar
-                      </button>
-                      <button
-                        onClick={() => setLiberarNFLiberado(true)}
-                        disabled={!valoresOK}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:cursor-not-allowed disabled:text-slate-400 text-white font-semibold rounded-xl text-sm transition-all active:scale-[0.98] shadow-sm"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        Confirmar Liberação
-                      </button>
-                    </>
-                  ) : (
-                    <div />
-                  )}
-                </div>
-              )}
+              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 flex-shrink-0 bg-slate-50/50">
+                {liberarNFLiberado ? (
+                  <>
+                    <button
+                      onClick={() => setShowLiberarNFModal(false)}
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      Fechar
+                    </button>
+                    <button
+                      onClick={abrirPDF}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-sm transition-all active:scale-[0.98] shadow-sm"
+                    >
+                      <Printer className="w-4 h-4" />
+                      Abrir em PDF
+                    </button>
+                  </>
+                ) : liberarNFStep === 2 ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        setLiberarNFStep(1);
+                        setLiberarNFValorInformado('');
+                        setLiberarNFRows([]);
+                        setLiberarNFNotFound(false);
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      ← Voltar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setLiberarNFDataHora(new Date().toLocaleString('pt-BR', { dateStyle: 'full', timeStyle: 'medium' }));
+                        setLiberarNFLiberado(true);
+                      }}
+                      disabled={!valoresOK}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:cursor-not-allowed disabled:text-slate-400 text-white font-semibold rounded-xl text-sm transition-all active:scale-[0.98] shadow-sm"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Confirmar Liberação
+                    </button>
+                  </>
+                ) : (
+                  <div />
+                )}
+              </div>
             </div>
           </div>
         );
