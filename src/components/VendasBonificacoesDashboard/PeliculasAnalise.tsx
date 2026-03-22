@@ -136,6 +136,27 @@ function CustomTooltipBRL({ active, payload, label }: { active?: boolean; payloa
   );
 }
 
+interface MonthlyEntry { label: string; rl: number; lucro: number; comissoes: number; resultado: number; pctLucro: number; pctResultado: number; qtd: number; }
+function CustomTooltipMensal({ active, payload, label }: { active?: boolean; payload?: ({ name: string; value: number; color: string; payload: MonthlyEntry })[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm min-w-[220px]">
+      <p className="font-semibold text-slate-700 mb-2">{label}</p>
+      {payload.map((p, i) => {
+        const isPct = p.name === 'Lucro Bruto' || p.name === 'Resultado';
+        const pct   = p.name === 'Lucro Bruto' ? d.pctLucro : p.name === 'Resultado' ? d.pctResultado : null;
+        return (
+          <p key={i} style={{ color: p.color }} className="font-mono flex justify-between gap-4">
+            <span>{p.name}:</span>
+            <span>{fmtBRLFull(p.value)}{isPct && pct !== null ? <span className="text-slate-400 text-xs ml-1">({fmtPct(pct)})</span> : null}</span>
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 type PeriodType = 'mes' | 'bimestre' | 'trimestre' | 'semestre' | 'anual';
 interface PeriodSlot { year: number; tipo: PeriodType; value: number; vendedor: string; }
 
@@ -230,7 +251,9 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
       const lucro     = mRows.reduce((a, r) => a + n(r.lucroBruto), 0);
       const comissoes = mRows.reduce((a, r) => a + n(r.comissaoVendedor) + n(r.comissaoVendedorAcessorios), 0);
       const resultado = lucro - comissoes;
-      return { label, rl, lucro, comissoes, resultado, qtd: mRows.length };
+      const pctLucro     = rl > 0 ? (lucro / rl) * 100 : 0;
+      const pctResultado = rl > 0 ? (resultado / rl) * 100 : 0;
+      return { label, rl, lucro, comissoes, resultado, pctLucro, pctResultado, qtd: mRows.length };
     });
   }, [baseRows, selectedYear, monthChip]);
 
@@ -688,7 +711,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                     <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={90} />
-                    <Tooltip content={<CustomTooltipBRL />} />
+                    <Tooltip content={<CustomTooltipMensal />} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                     <Bar dataKey="rl"        name="Receita Líquida"  fill="#06b6d4" radius={[3, 3, 0, 0]} />
                     <Bar dataKey="lucro"     name="Lucro Bruto"      fill="#10b981" radius={[3, 3, 0, 0]} />
