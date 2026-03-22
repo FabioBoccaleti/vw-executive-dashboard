@@ -59,6 +59,10 @@ interface Metrics {
   totalComissaoVendedor: number;
   totalComissaoAcessorios: number;
   totalComissoes: number;
+  comissaoVendedorComDSR: number;
+  comissaoAcessoriosComDSR: number;
+  totalProvisoes: number;
+  totalEncargos: number;
 }
 
 function calcMetrics(rows: PeliculasRow[]): Metrics {
@@ -73,7 +77,12 @@ function calcMetrics(rows: PeliculasRow[]): Metrics {
   const totalComissaoVendedor   = rows.reduce((a, r) => a + n(r.comissaoVendedor), 0);
   const totalComissaoAcessorios = rows.reduce((a, r) => a + n(r.comissaoVendedorAcessorios), 0);
   const totalComissoes          = totalComissaoVendedor + totalComissaoAcessorios;
-  return { qtd, totalVenda, totalImpostos, totalRL, totalCusto, totalLucro, pctLucroMedio, ticketMedio, totalComissaoVendedor, totalComissaoAcessorios, totalComissoes };
+  // DSR, Provisões e Encargos: fórmulas a definir (atualmente = 0)
+  const comissaoVendedorComDSR   = totalComissaoVendedor;   // + DSR quando fórmula estiver disponível
+  const comissaoAcessoriosComDSR = totalComissaoAcessorios; // + DSR quando fórmula estiver disponível
+  const totalProvisoes           = 0; // fórmula a definir
+  const totalEncargos            = 0; // fórmula a definir
+  return { qtd, totalVenda, totalImpostos, totalRL, totalCusto, totalLucro, pctLucroMedio, ticketMedio, totalComissaoVendedor, totalComissaoAcessorios, totalComissoes, comissaoVendedorComDSR, comissaoAcessoriosComDSR, totalProvisoes, totalEncargos };
 }
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
@@ -423,9 +432,11 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
     { label: 'Lucro Bruto',             key: 'totalLucro',             fmt: fmtBRLFull },
     { label: '% Lucro Bruto',           key: 'pctLucroMedio',          fmt: fmtPct },
     { label: 'Ticket Médio',            key: 'ticketMedio',            fmt: fmtBRLFull },
-    { label: 'Comissão Vendedor',       key: 'totalComissaoVendedor',  fmt: fmtBRLFull },
-    { label: 'Comissão Acessórios',     key: 'totalComissaoAcessorios',fmt: fmtBRLFull },
-    { label: 'Total Comissões',         key: 'totalComissoes',         fmt: fmtBRLFull },
+    { label: 'Com. + DSR Vendedor',      key: 'comissaoVendedorComDSR',   fmt: fmtBRLFull },
+    { label: 'Com. + DSR Acessórios',    key: 'comissaoAcessoriosComDSR', fmt: fmtBRLFull },
+    { label: 'Total Comissões',          key: 'totalComissoes',           fmt: fmtBRLFull },
+    { label: 'Provisões',                key: 'totalProvisoes',           fmt: fmtBRLFull },
+    { label: 'Encargos',                 key: 'totalEncargos',            fmt: fmtBRLFull },
   ];
 
   const PERIOD_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#8b5cf6'];
