@@ -1037,7 +1037,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
               {/* Valor da Venda */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Valor da Venda <span className="text-red-500">*</span></label>
-                <input type="text" value={registerDraft.valorVenda} onChange={e => setRegisterDraft(p => ({ ...p, valorVenda: e.target.value }))} placeholder="Ex: 1.500,00" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                <input type="text" value={registerDraft.valorVenda} onChange={e => setRegisterDraft(p => ({ ...p, valorVenda: e.target.value }))} onBlur={e => { const v = parseBrazilianNumber(e.target.value); if (v) setRegisterDraft(p => ({ ...p, valorVenda: toDisplayNumber(v) })); }} placeholder="Ex: 1.500,00" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
               {/* Vendedor */}
               <div className="flex flex-col gap-1">
@@ -1058,7 +1058,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
               {/* Custo Prestador */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Custo do Prestador</label>
-                <input type="text" value={registerDraft.custoPrestador} onChange={e => setRegisterDraft(p => ({ ...p, custoPrestador: e.target.value }))} placeholder="Ex: 800,00" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                <input type="text" value={registerDraft.custoPrestador} onChange={e => setRegisterDraft(p => ({ ...p, custoPrestador: e.target.value }))} onBlur={e => { const v = parseBrazilianNumber(e.target.value); if (v) setRegisterDraft(p => ({ ...p, custoPrestador: toDisplayNumber(v) })); }} placeholder="Ex: 800,00" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
               </div>
             </div>
 
