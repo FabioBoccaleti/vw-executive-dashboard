@@ -299,6 +299,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [deletePassword, setDeletePassword] = useState('');
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [registerDraft, setRegisterDraft] = useState<RegisterDraft>(EMPTY_REGISTER_DRAFT);
+  const [processosAndamento, setProcessosAndamento] = useState(false);
 
   // Listas de cadastro para selectors
   const [cadastroVendedores, setCadastroVendedores] = useState<string[]>([]);
@@ -454,9 +455,18 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const clearFilters = () => setFilters({});
   const hasActiveFilters = Object.values(filters).some(v => !!v);
 
+  const HIDDEN_IN_ANDAMENTO = new Set(['comissaoVendedor', 'comissaoVendedorAcessorios']);
+  const visibleColumns = processosAndamento
+    ? COLUMNS.filter(c => !HIDDEN_IN_ANDAMENTO.has(c.key))
+    : COLUMNS;
+
   const filteredRows = useMemo(
-    () => hasActiveFilters ? rows.filter(r => rowMatchesFilters(r, filters)) : rows,
-    [rows, filters, hasActiveFilters]
+    () => {
+      let result = hasActiveFilters ? rows.filter(r => rowMatchesFilters(r, filters)) : rows;
+      if (processosAndamento) result = result.filter(r => r.situacao === 'Em Andamento');
+      return result;
+    },
+    [rows, filters, hasActiveFilters, processosAndamento]
   );
 
   // ── Analytics ──────────────────────────────────────────────────────────────
@@ -551,7 +561,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
     );
   }
 
-  const totalCols = COLUMNS.length + 3; // # + colunas + % Lucro + Ações
+  const totalCols = visibleColumns.length + 3; // # + colunas + % Lucro + Ações
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -700,7 +710,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
               <table className="border-collapse text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
                 <colgroup>
                   <col style={{ width: 56, minWidth: 56 }} />
-                  {COLUMNS.map(c => (
+                  {visibleColumns.map(c => (
                     <Fragment key={c.key}>
                       <col style={{ width: c.width, minWidth: c.width }} />
                       {c.key === 'lucroBruto' && <col style={{ width: 115, minWidth: 115 }} />}
@@ -713,7 +723,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                 <thead>
                   <tr>
                     <th className="sticky left-0 top-0 z-40 text-white text-center text-xs font-semibold px-2 py-3 border-r border-indigo-700" style={{ background: '#312e81' }}>#</th>
-                    {COLUMNS.map((col, ci) => (
+                    {visibleColumns.map((col, ci) => (
                       <Fragment key={`h-${col.key}-${ci}`}>
                         <th className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-indigo-600 align-top leading-snug text-center" style={{ background: '#4338ca' }}>
                           {col.label}
@@ -729,7 +739,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                   {/* Filter row */}
                   <tr>
                     <th className="sticky left-0 z-40 bg-slate-50 border-r border-b border-slate-200 px-1 py-1.5" style={{ top: 'var(--header-height, 44px)' }} />
-                    {COLUMNS.map((col, ci) => (
+                    {visibleColumns.map((col, ci) => (
                       <Fragment key={`f-${col.key}-${ci}`}>
                         <th className="sticky z-30 bg-slate-50 border-r border-b border-slate-200 px-1.5 py-1.5" style={{ top: 'var(--header-height, 44px)' }}>
                           <div className="relative flex items-center">
@@ -776,7 +786,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                           </td>
 
                           {/* Data cells */}
-                          {COLUMNS.map((col, ci) => {
+                          {visibleColumns.map((col, ci) => {
                             const val = (draft as PeliculasRow)[col.key] as string;
                             const isRight = col.type === 'currency';
                             const isCalc = CALC_READONLY_KEYS.has(col.key);
@@ -923,6 +933,17 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
               </table>
             </div>
 
+            {/* ── Banner modo Processos em Andamento ── */}
+            {processosAndamento && (
+              <div className="flex items-center justify-between px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+                <span className="text-amber-800 font-semibold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  Modo: Processos em Andamento — {filteredRows.length} {filteredRows.length === 1 ? 'registro' : 'registros'}
+                </span>
+                <button onClick={() => setProcessosAndamento(false)} className="text-xs text-amber-700 underline hover:text-amber-900">Ver todos</button>
+              </div>
+            )}
+
             {/* ── Footer bar ── */}
             <div className="flex items-center justify-between flex-shrink-0 px-1">
               <div className="flex items-center gap-3">
@@ -933,6 +954,15 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                 >
                   <FilePlus className="w-4 h-4" />
                   Registrar Venda
+                </Button>
+                <Button
+                  size="sm"
+                  variant={processosAndamento ? 'outline' : 'outline'}
+                  onClick={() => { setProcessosAndamento(v => !v); clearFilters(); }}
+                  className={processosAndamento ? 'border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100 gap-1.5 font-medium' : 'border-amber-400 text-amber-700 hover:bg-amber-50 gap-1.5 font-medium'}
+                >
+                  <Search className="w-4 h-4" />
+                  {processosAndamento ? 'Ver Todos' : 'Processos em Andamento'}
                 </Button>
                 <Button
                   variant="outline"
