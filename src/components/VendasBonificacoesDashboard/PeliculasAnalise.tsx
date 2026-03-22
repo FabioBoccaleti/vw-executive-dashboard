@@ -268,14 +268,14 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
       produtos: Map<string, { qtd: number; rl: number; lucro: number }>;
     }>();
     filteredRows.forEach(r => {
-      const key = r.vendedorAcessorios || 'Não informado';
+      const key = r.vendedor || 'Não informado';
       if (!map.has(key)) map.set(key, { qtd: 0, totalVenda: 0, totalRL: 0, lucro: 0, comissao: 0, produtos: new Map() });
       const cur = map.get(key)!;
       cur.qtd += 1;
       cur.totalVenda += n(r.valorVenda);
       cur.totalRL += n(r.receitaLiquida);
       cur.lucro += n(r.lucroBruto);
-      cur.comissao += n(r.comissaoVendedorAcessorios);
+      cur.comissao += n(r.comissaoVendedor);
       const prod = r.produto || 'Não informado';
       if (!cur.produtos.has(prod)) cur.produtos.set(prod, { qtd: 0, rl: 0, lucro: 0 });
       const cp = cur.produtos.get(prod)!;
@@ -665,11 +665,11 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
         ) : <EmptyChart />}
       </div>
 
-      {/* ── Performance Vendedores de Acessórios ── */}
+      {/* ── Performance Vendedor por Produto ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <SectionTitle>Performance por Vendedor de Acessórios</SectionTitle>
+            <SectionTitle>Performance Vendedor por Produto</SectionTitle>
             {sortedVendedorAcess.length > 0 && (
               <span className="text-xs text-slate-400 font-medium px-2.5 py-1 bg-slate-100 rounded-full -mt-3">
                 {sortedVendedorAcess.length} vendedor{sortedVendedorAcess.length !== 1 ? 'es' : ''}
