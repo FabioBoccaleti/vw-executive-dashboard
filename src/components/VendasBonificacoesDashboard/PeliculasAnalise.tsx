@@ -158,6 +158,13 @@ function filterByPeriod(rows: PeliculasRow[], slot: PeriodSlot): PeliculasRow[] 
   return rows.filter(r => getRowYear(r) === slot.year && months.includes(getRowMonth(r)));
 }
 
+function prevPeriodSlot(slot: PeriodSlot): PeriodSlot {
+  const maxValues: Record<PeriodType, number> = { mes: 12, bimestre: 6, trimestre: 4, semestre: 2, anual: 1 };
+  if (slot.tipo === 'anual') return { ...slot, year: slot.year - 1 };
+  if (slot.value > 1) return { ...slot, value: slot.value - 1 };
+  return { ...slot, year: slot.year - 1, value: maxValues[slot.tipo] };
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 interface PeliculasAnaliseProps {
   rows: PeliculasRow[];
@@ -417,7 +424,11 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
     anual: ['Ano Completo'],
   };
   const periodMetrics = useMemo(
-    () => periods.map(slot => ({ slot, metrics: calcMetrics(filterByPeriod(baseRows, slot)) })),
+    () => periods.map(slot => ({
+      slot,
+      metrics: calcMetrics(filterByPeriod(baseRows, slot)),
+      prevMetrics: calcMetrics(filterByPeriod(baseRows, prevPeriodSlot(slot))),
+    })),
     [periods, baseRows]
   );
   const addPeriod = () => { if (periods.length < 4) setPeriods(p => [...p, { year: currentYear, tipo: 'mes', value: currentMonth }]); };
@@ -425,20 +436,20 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
   const updatePeriod = (i: number, patch: Partial<PeriodSlot>) =>
     setPeriods(p => p.map((s, idx) => idx === i ? { ...s, ...patch } : s));
 
-  const comparativoRows: { label: string; key: keyof Metrics; fmt: (v: number) => string; highlight?: boolean }[] = [
-    { label: 'Qtd de Vendas',           key: 'qtd',                    fmt: v => String(v) },
+  const comparativoRows: { label: string; key: keyof Metrics; fmt: (v: number) => string; highlight?: boolean; trend?: boolean }[] = [
+    { label: 'Qtd de Vendas',           key: 'qtd',                    fmt: v => String(v),  trend: true },
     { label: 'Valor da Venda',          key: 'totalVenda',             fmt: fmtBRLFull },
     { label: 'Impostos',                key: 'totalImpostos',          fmt: fmtBRLFull },
-    { label: 'Receita Líquida',         key: 'totalRL',                fmt: fmtBRLFull },
+    { label: 'Receita Líquida',         key: 'totalRL',                fmt: fmtBRLFull,      trend: true },
     { label: 'Custo Prestador',         key: 'totalCusto',             fmt: fmtBRLFull },
-    { label: 'Lucro Bruto',             key: 'totalLucro',             fmt: fmtBRLFull },
-    { label: '% Lucro Bruto',           key: 'pctLucroMedio',          fmt: fmtPct },
+    { label: 'Lucro Bruto',             key: 'totalLucro',             fmt: fmtBRLFull,      trend: true },
+    { label: '% Lucro Bruto',           key: 'pctLucroMedio',          fmt: fmtPct,          trend: true },
     { label: 'Ticket Médio',            key: 'ticketMedio',            fmt: fmtBRLFull },
     { label: 'Com. + DSR Vendedor',      key: 'comissaoVendedorComDSR',   fmt: fmtBRLFull },
     { label: 'Com. + DSR Acessórios',    key: 'comissaoAcessoriosComDSR', fmt: fmtBRLFull },
     { label: 'Provisões',                key: 'totalProvisoes',           fmt: fmtBRLFull },
     { label: 'Encargos',                 key: 'totalEncargos',            fmt: fmtBRLFull },
-    { label: 'Resultado',                key: 'resultado',                fmt: fmtBRLFull, highlight: true },
+    { label: 'Resultado',                key: 'resultado',                fmt: fmtBRLFull,     highlight: true, trend: true },
   ];
 
   const PERIOD_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#8b5cf6'];
@@ -1113,9 +1124,16 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                   }
                 >
                   <td className={`py-2 px-3 font-semibold ${row.highlight ? 'text-indigo-700' : 'text-slate-600'}`}>{row.label}</td>
-                  {periodMetrics.map(({ metrics: m }, i) => (
-                    <td key={i} className={`py-2 px-3 text-right font-mono tabular-nums ${row.highlight ? 'text-indigo-700 font-bold' : 'text-slate-700'}`}>
-                      {row.fmt(m[row.key] as number)}
+                  {periodMetrics.map(({ metrics: m, prevMetrics: prev }, i) => (
+                    <td key={i} className={`py-2 px-3 text-right ${row.highlight ? 'text-indigo-700 font-bold' : 'text-slate-700'}`}>
+                      {row.trend ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="font-mono tabular-nums">{row.fmt(m[row.key] as number)}</span>
+                          <DeltaBadge base={prev[row.key] as number} current={m[row.key] as number} />
+                        </div>
+                      ) : (
+                        <span className="font-mono tabular-nums">{row.fmt(m[row.key] as number)}</span>
+                      )}
                     </td>
                   ))}
                   {periodMetrics.length === 2 && (
