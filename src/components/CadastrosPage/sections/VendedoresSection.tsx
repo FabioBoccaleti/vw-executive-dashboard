@@ -17,8 +17,11 @@ export function VendedoresSection() {
   const [editCodigo, setEditCodigo] = useState('');
   const [editCargo, setEditCargo] = useState<CargoVendedor>('Vendedor');
 
+  const sortAlpha = (list: Vendedor[]) =>
+    [...list].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
+
   useEffect(() => {
-    loadVendedores().then(d => { setItems(d); setLoading(false); });
+    loadVendedores().then(d => { setItems(sortAlpha(d)); setLoading(false); });
   }, []);
 
   const persist = async (updated: Vendedor[]) => {
@@ -40,7 +43,7 @@ export function VendedoresSection() {
       toast.error('Já existe um vendedor com esse código.');
       return;
     }
-    await persist([...items, { id: crypto.randomUUID(), codigo, nome, cargo: novoCargo }]);
+    await persist(sortAlpha([...items, { id: crypto.randomUUID(), codigo, nome, cargo: novoCargo }]));
     setNovoNome('');
     setNovoCodigo('');
     toast.success('Vendedor cadastrado');
@@ -54,7 +57,7 @@ export function VendedoresSection() {
       toast.error('Já existe um vendedor com esse código.');
       return;
     }
-    await persist(items.map(i => i.id === editingId ? { ...i, codigo, nome, cargo: editCargo } : i));
+    await persist(sortAlpha(items.map(i => i.id === editingId ? { ...i, codigo, nome, cargo: editCargo } : i)));
     setEditingId(null);
     toast.success('Vendedor atualizado');
   };
