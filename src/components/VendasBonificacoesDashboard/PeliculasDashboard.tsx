@@ -300,6 +300,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [registerDraft, setRegisterDraft] = useState<RegisterDraft>(EMPTY_REGISTER_DRAFT);
   const [processosAndamento, setProcessosAndamento] = useState(false);
+  const [aguardandoFinalizado, setAguardandoFinalizado] = useState(false);
 
   // Listas de cadastro para selectors
   const [cadastroVendedores, setCadastroVendedores] = useState<string[]>([]);
@@ -456,7 +457,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const hasActiveFilters = Object.values(filters).some(v => !!v);
 
   const HIDDEN_IN_ANDAMENTO = new Set(['comissaoVendedor', 'comissaoVendedorAcessorios']);
-  const visibleColumns = processosAndamento
+  const visibleColumns = (processosAndamento || aguardandoFinalizado)
     ? COLUMNS.filter(c => !HIDDEN_IN_ANDAMENTO.has(c.key))
     : COLUMNS;
 
@@ -464,9 +465,10 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
     () => {
       let result = hasActiveFilters ? rows.filter(r => rowMatchesFilters(r, filters)) : rows;
       if (processosAndamento) result = result.filter(r => r.situacao === 'Em Andamento');
+      if (aguardandoFinalizado) result = result.filter(r => r.situacao === 'Encerrada');
       return result;
     },
-    [rows, filters, hasActiveFilters, processosAndamento]
+    [rows, filters, hasActiveFilters, processosAndamento, aguardandoFinalizado]
   );
 
   // ── Analytics ──────────────────────────────────────────────────────────────
@@ -791,6 +793,8 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                             const isRight = col.type === 'currency';
                             const isCalc = CALC_READONLY_KEYS.has(col.key);
                             const isDateRO = DATE_READONLY_KEYS.has(col.key);
+                            // No modo "Aguardando ser Finalizado" só nfPrestador é editável
+                            const isLockedInFinalizado = aguardandoFinalizado && col.key !== 'nfPrestador';
                             const isRequired = REQUIRED_KEYS.includes(col.key as keyof PeliculasRow);
                             const isMissing = isEditing && isRequired && !val?.trim();
                             const isSelector = col.key === 'produto' || col.key === 'vendedor' || col.key === 'vendedorAcessorios';
@@ -811,7 +815,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                                 style={{ verticalAlign: 'middle' }}
                               >
                                 {isEditing ? (
-                                  isCalc || isDateRO ? (
+                                  isCalc || isDateRO || isLockedInFinalizado ? (
                                     <span className={`italic text-sm font-mono tabular-nums ${
                                       val && RESULTADO_KEYS.has(col.key) ? 'text-emerald-700 font-semibold' :
                                       val && col.key === RL_KEY          ? 'text-sky-700 font-semibold' :
@@ -943,6 +947,15 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                 <button onClick={() => setProcessosAndamento(false)} className="text-xs text-amber-700 underline hover:text-amber-900">Ver todos</button>
               </div>
             )}
+            {aguardandoFinalizado && (
+              <div className="flex items-center justify-between px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                <span className="text-blue-800 font-semibold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                  Modo: Aguardando ser Finalizado — {filteredRows.length} {filteredRows.length === 1 ? 'registro' : 'registros'} — somente Nº NF Prestador editável
+                </span>
+                <button onClick={() => setAguardandoFinalizado(false)} className="text-xs text-blue-700 underline hover:text-blue-900">Ver todos</button>
+              </div>
+            )}
 
             {/* ── Footer bar ── */}
             <div className="flex items-center justify-between flex-shrink-0 px-1">
@@ -957,12 +970,21 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                 </Button>
                 <Button
                   size="sm"
-                  variant={processosAndamento ? 'outline' : 'outline'}
-                  onClick={() => { setProcessosAndamento(v => !v); clearFilters(); }}
+                  variant='outline'
+                  onClick={() => { setProcessosAndamento(v => !v); setAguardandoFinalizado(false); clearFilters(); }}
                   className={processosAndamento ? 'border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100 gap-1.5 font-medium' : 'border-amber-400 text-amber-700 hover:bg-amber-50 gap-1.5 font-medium'}
                 >
                   <Search className="w-4 h-4" />
                   {processosAndamento ? 'Ver Todos' : 'Processos em Andamento'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant='outline'
+                  onClick={() => { setAguardandoFinalizado(v => !v); setProcessosAndamento(false); clearFilters(); }}
+                  className={aguardandoFinalizado ? 'border-blue-400 text-blue-700 bg-blue-50 hover:bg-blue-100 gap-1.5 font-medium' : 'border-blue-400 text-blue-700 hover:bg-blue-50 gap-1.5 font-medium'}
+                >
+                  <Search className="w-4 h-4" />
+                  {aguardandoFinalizado ? 'Ver Todos' : 'Aguardando ser Finalizado'}
                 </Button>
                 <Button
                   variant="outline"
