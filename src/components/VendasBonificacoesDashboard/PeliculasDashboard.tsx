@@ -370,6 +370,11 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
       toast.error(`Preencha os campos obrigatórios: ${missing.map(k => REQUIRED_LABELS[k]).join(', ')}`);
       return;
     }
+    // Se Data de Encerramento preenchida, Custo Prestador é obrigatório
+    if (editDraft.dataEncerramento?.trim() && !editDraft.custoPrestador?.trim()) {
+      toast.error('Preencha o Custo do Prestador antes de encerrar a OS.');
+      return;
+    }
     const updated = rows.map(r => r.id === editDraft.id ? editDraft : r);
     setRows(updated);
     setEditingId(null);
