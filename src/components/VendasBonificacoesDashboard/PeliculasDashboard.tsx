@@ -289,7 +289,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [saving, setSaving]       = useState(false);
   const [loading, setLoading]     = useState(true);
   const [filters, setFilters]     = useState<FilterValues>({});
-  const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('tabela');
+  const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('analise');
   const [importPreview, setImportPreview] = useState<PeliculasRow[] | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);

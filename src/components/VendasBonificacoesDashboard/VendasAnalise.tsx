@@ -404,7 +404,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
 
   // ── Filtros globais ──
   const [selectedYear, setSelectedYear]         = useState<number | 'Todos'>(currentYear);
-  const [monthChip, setMonthChip]               = useState<number | null>(null);
+  const [monthChip, setMonthChip]               = useState<number | null>(currentMonth);
   const [selectedBlindadora, setSelectedBlindadora] = useState('Todas');
   const [selectedBrand, setSelectedBrand]       = useState<BrandFilter>('Todas');
 

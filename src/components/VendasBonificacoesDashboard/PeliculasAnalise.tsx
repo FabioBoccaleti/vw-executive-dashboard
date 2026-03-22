@@ -199,7 +199,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
   const ACCENT = '#6366f1';
 
   const [selectedYear, setSelectedYear] = useState<number | 'Todos'>(currentYear);
-  const [monthChip, setMonthChip]       = useState<number | null>(null);
+  const [monthChip, setMonthChip]       = useState<number | null>(currentMonth);
   const [periods, setPeriods] = useState<PeriodSlot[]>([
     { year: currentYear, tipo: 'mes', value: currentMonth, vendedor: 'Todos' },
   ]);
