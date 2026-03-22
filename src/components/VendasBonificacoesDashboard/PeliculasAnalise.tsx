@@ -163,6 +163,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
     { year: currentYear, tipo: 'mes', value: currentMonth },
   ]);
   const [sortAcess, setSortAcess] = useState<'totalRL' | 'lucro' | 'qtd'>('totalRL');
+  const [selectedProduto, setSelectedProduto] = useState<string>('Todos');
 
   // Apenas linhas com situação válida
   const baseRows = useMemo(() => validRows(rows), [rows]);
@@ -317,14 +318,46 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
       .sort((a, b) => b.totalRL - a.totalRL);
   }, [filteredRows]);
 
+  const produtoList = useMemo(() => {
+    const set = new Set<string>();
+    filteredRows.forEach(r => { if (r.produto) set.add(r.produto); });
+    return ['Todos', ...[...set].sort()];
+  }, [filteredRows]);
+
+  const filteredForProduto = useMemo(() => {
+    if (selectedProduto === 'Todos' || !produtoList.includes(selectedProduto)) return vendedorAcessoriosData;
+    return vendedorAcessoriosData
+      .map(v => {
+        const prodData = v.produtos.find((p: { nome: string }) => p.nome === selectedProduto);
+        if (!prodData) return null;
+        return {
+          ...v,
+          qtd: prodData.qtd,
+          totalRL: prodData.rl,
+          lucro: prodData.lucro,
+          pctLucro: prodData.rl > 0 ? (prodData.lucro / prodData.rl) * 100 : 0,
+          produtos: [prodData],
+        };
+      })
+      .filter((v): v is NonNullable<typeof v> => v !== null);
+  }, [vendedorAcessoriosData, selectedProduto, produtoList]);
+
+  const produtoSummary = useMemo(() => {
+    if (selectedProduto === 'Todos') return null;
+    const rl = filteredForProduto.reduce((s, v) => s + v.totalRL, 0);
+    const lucro = filteredForProduto.reduce((s, v) => s + v.lucro, 0);
+    const qtd = filteredForProduto.reduce((s, v) => s + v.qtd, 0);
+    return { qtd, rl, lucro, pctLucro: rl > 0 ? (lucro / rl) * 100 : 0 };
+  }, [filteredForProduto, selectedProduto]);
+
   const sortedVendedorAcess = useMemo(
-    () => [...vendedorAcessoriosData].sort((a, b) => b[sortAcess] - a[sortAcess]),
-    [vendedorAcessoriosData, sortAcess]
+    () => [...filteredForProduto].sort((a, b) => b[sortAcess] - a[sortAcess]),
+    [filteredForProduto, sortAcess]
   );
 
   const teamRLAcess = useMemo(
-    () => vendedorAcessoriosData.reduce((s, v) => s + v.totalRL, 0),
-    [vendedorAcessoriosData]
+    () => filteredForProduto.reduce((s, v) => s + v.totalRL, 0),
+    [filteredForProduto]
   );
 
   // Comparativo de períodos
@@ -692,6 +725,41 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
             </div>
           )}
         </div>
+
+        {/* Filtro por Produto */}
+        {produtoList.length > 1 && (
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Produto</span>
+              <select
+                value={selectedProduto}
+                onChange={e => setSelectedProduto(e.target.value)}
+                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-fuchsia-400 text-slate-700"
+              >
+                {produtoList.map(p => (
+                  <option key={p} value={p}>{p === 'Todos' ? 'Todos os produtos' : p}</option>
+                ))}
+              </select>
+            </div>
+            {produtoSummary && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-fuchsia-50 border border-fuchsia-200 rounded-lg flex-wrap">
+                <span className="text-xs font-bold text-fuchsia-700">{selectedProduto}</span>
+                <span className="text-slate-300 text-xs">·</span>
+                <span className="text-xs text-slate-500">{produtoSummary.qtd} venda{produtoSummary.qtd !== 1 ? 's' : ''}</span>
+                <span className="text-slate-300 text-xs">·</span>
+                <span className="text-xs font-mono font-semibold text-fuchsia-600">{fmtBRL(produtoSummary.rl)}</span>
+                <span className="text-xs text-slate-400">RL total</span>
+                <span className="text-slate-300 text-xs">·</span>
+                <span className="text-xs font-mono font-semibold text-emerald-600">{fmtBRL(produtoSummary.lucro)}</span>
+                <span className="text-xs text-slate-400">Lucro</span>
+                <span className="text-slate-300 text-xs">·</span>
+                <span className={`text-xs font-bold ${produtoSummary.pctLucro >= 40 ? 'text-emerald-600' : produtoSummary.pctLucro >= 20 ? 'text-amber-600' : 'text-red-500'}`}>
+                  {fmtPct(produtoSummary.pctLucro)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {sortedVendedorAcess.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
