@@ -144,13 +144,21 @@ function CustomTooltipMensal({ active, payload, label }: { active?: boolean; pay
     <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm min-w-[220px]">
       <p className="font-semibold text-slate-700 mb-2">{label}</p>
       {payload.map((p, i) => {
-        const isPct = p.name === 'Lucro Bruto' || p.name === 'Resultado';
-        const pct   = p.name === 'Lucro Bruto' ? d.pctLucro : p.name === 'Resultado' ? d.pctResultado : null;
+        const pct      = p.name === 'Lucro Bruto' ? d.pctLucro : p.name === 'Resultado' ? d.pctResultado : null;
+        const pctLabel = p.name === 'Lucro Bruto' ? '% LB' : p.name === 'Resultado' ? '% Resul.' : null;
         return (
-          <p key={i} style={{ color: p.color }} className="font-mono flex justify-between gap-4">
-            <span>{p.name}:</span>
-            <span>{fmtBRLFull(p.value)}{isPct && pct !== null ? <span className="text-slate-400 text-xs ml-1">({fmtPct(pct)})</span> : null}</span>
-          </p>
+          <React.Fragment key={i}>
+            <p style={{ color: p.color }} className="font-mono flex justify-between gap-4">
+              <span>{p.name}:</span>
+              <span>{fmtBRLFull(p.value)}</span>
+            </p>
+            {pct !== null && pctLabel !== null && (
+              <p style={{ color: p.color }} className="font-mono flex justify-between gap-4 text-xs opacity-80 mb-0.5">
+                <span>{pctLabel}:</span>
+                <span>{fmtPct(pct)}</span>
+              </p>
+            )}
+          </React.Fragment>
         );
       })}
     </div>
