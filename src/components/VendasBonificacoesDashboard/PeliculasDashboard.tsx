@@ -1525,14 +1525,23 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                     {/* Campos validador e assinatura */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Nome do Validador</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                          Nome do Validador <span className="text-red-500">*</span>
+                        </label>
                         <input
                           type="text"
                           value={liberarNFValidador}
                           onChange={e => setLiberarNFValidador(e.target.value)}
                           placeholder="Digite o nome de quem validou"
-                          className="border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all"
+                          className={`border-2 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-4 transition-all ${
+                            !liberarNFValidador.trim()
+                              ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                              : 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100'
+                          }`}
                         />
+                        {!liberarNFValidador.trim() && (
+                          <p className="text-[11px] text-red-500 font-medium">Obrigatório para gerar o PDF</p>
+                        )}
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Assinatura</label>
@@ -1731,7 +1740,9 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                     </button>
                     <button
                       onClick={abrirPDF}
-                      className="flex items-center gap-2 px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-sm transition-all active:scale-[0.98] shadow-sm"
+                      disabled={!liberarNFValidador.trim()}
+                      title={!liberarNFValidador.trim() ? 'Preencha o nome do validador para gerar o PDF' : ''}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-200 disabled:cursor-not-allowed disabled:text-slate-400 text-white font-semibold rounded-xl text-sm transition-all active:scale-[0.98] shadow-sm"
                     >
                       <Printer className="w-4 h-4" />
                       Abrir em PDF
