@@ -64,6 +64,7 @@ interface Metrics {
   totalProvisoes: number;
   totalEncargos: number;
   resultado: number;
+  pctResultado: number;
 }
 
 function calcMetrics(rows: PeliculasRow[]): Metrics {
@@ -84,7 +85,8 @@ function calcMetrics(rows: PeliculasRow[]): Metrics {
   const totalProvisoes           = 0; // fórmula a definir
   const totalEncargos            = 0; // fórmula a definir
   const resultado                = totalLucro - comissaoVendedorComDSR - comissaoAcessoriosComDSR - totalProvisoes - totalEncargos;
-  return { qtd, totalVenda, totalImpostos, totalRL, totalCusto, totalLucro, pctLucroMedio, ticketMedio, totalComissaoVendedor, totalComissaoAcessorios, totalComissoes, comissaoVendedorComDSR, comissaoAcessoriosComDSR, totalProvisoes, totalEncargos, resultado };
+  const pctResultado             = totalRL > 0 ? (resultado / totalRL) * 100 : 0;
+  return { qtd, totalVenda, totalImpostos, totalRL, totalCusto, totalLucro, pctLucroMedio, ticketMedio, totalComissaoVendedor, totalComissaoAcessorios, totalComissoes, comissaoVendedorComDSR, comissaoAcessoriosComDSR, totalProvisoes, totalEncargos, resultado, pctResultado };
 }
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
@@ -463,6 +465,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
     { label: 'Provisões',                key: 'totalProvisoes',           fmt: fmtBRLFull },
     { label: 'Encargos',                 key: 'totalEncargos',            fmt: fmtBRLFull },
     { label: 'Resultado',                key: 'resultado',                fmt: fmtBRLFull,     highlight: true, trend: true },
+    { label: '% Resultado',               key: 'pctResultado',             fmt: fmtPct,         highlight: true, trend: true },
   ];
 
   const PERIOD_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#8b5cf6'];
