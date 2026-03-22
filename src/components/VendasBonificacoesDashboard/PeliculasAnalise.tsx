@@ -892,61 +892,29 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
         {custoComissoesData.totalGeral > 0 ? (
           <div className="space-y-6">
 
-            {/* KPI Cards de Custo Folha */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 flex flex-col gap-0.5" style={{ borderLeft: '4px solid #6366f1' }}>
-                <span className="text-[10px] text-indigo-400 font-semibold uppercase tracking-wide">Custo Folha — Vendedor</span>
-                <span className="text-xl font-bold font-mono text-indigo-700 leading-tight">{fmtBRL(custoComissoesData.totalVendedor)}</span>
-                <span className="text-xs text-indigo-400">{custoComissoesData.grupoVendedor.length} vendedor{custoComissoesData.grupoVendedor.length !== 1 ? 'es' : ''}</span>
-              </div>
-              <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50 px-4 py-3 flex flex-col gap-0.5" style={{ borderLeft: '4px solid #d946ef' }}>
-                <span className="text-[10px] text-fuchsia-400 font-semibold uppercase tracking-wide">Custo Folha — Acessórios</span>
-                <span className="text-xl font-bold font-mono text-fuchsia-700 leading-tight">{fmtBRL(custoComissoesData.totalAcessorios)}</span>
-                <span className="text-xs text-fuchsia-400">{custoComissoesData.grupoAcessorios.length} vendedor{custoComissoesData.grupoAcessorios.length !== 1 ? 'es' : ''}</span>
-              </div>
-              <div className="rounded-xl border border-slate-300 bg-slate-800 px-4 py-3 flex flex-col gap-0.5" style={{ borderLeft: '4px solid #334155' }}>
-                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">Total Geral — Custo Folha</span>
-                <span className="text-xl font-bold font-mono text-white leading-tight">{fmtBRL(custoComissoesData.totalGeral)}</span>
-                <span className="text-xs text-slate-400">
-                  {new Set([
-                    ...custoComissoesData.grupoVendedor.map(v => v.nome),
-                    ...custoComissoesData.grupoAcessorios.map(v => v.nome),
-                  ]).size} vínculos
-                </span>
-              </div>
+            {/* Gráfico de barras verticais — Grupo Vendedor vs Acessórios */}
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Custo de Comissões por Grupo</p>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart
+                  data={[
+                    { grupo: 'Vendedor',    valor: custoComissoesData.totalVendedor,   fill: '#6366f1' },
+                    { grupo: 'Acessórios',  valor: custoComissoesData.totalAcessorios, fill: '#d946ef' },
+                  ]}
+                  margin={{ top: 16, right: 24, left: 8, bottom: 4 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="grupo" tick={{ fontSize: 12, fontWeight: 600 }} />
+                  <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} width={90} />
+                  <Tooltip formatter={(v: number) => [fmtBRLFull(v), 'Comissão']} />
+                  <Bar dataKey="valor" name="Comissão" radius={[6, 6, 0, 0]} maxBarSize={100}>
+                    {[custoComissoesData.totalVendedor, custoComissoesData.totalAcessorios].map((_, i) => (
+                      <Cell key={i} fill={i === 0 ? '#6366f1' : '#d946ef'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-
-            {/* Gráfico de barras empilhadas */}
-            {(() => {
-              const todosVendedores = [
-                ...custoComissoesData.grupoVendedor.map(v => ({ nome: v.nome, comissaoV: v.comissao, comissaoA: 0 })),
-              ];
-              custoComissoesData.grupoAcessorios.forEach(a => {
-                const existing = todosVendedores.find(v => v.nome === a.nome);
-                if (existing) { existing.comissaoA += a.comissao; }
-                else { todosVendedores.push({ nome: a.nome, comissaoV: 0, comissaoA: a.comissao }); }
-              });
-              todosVendedores.sort((a, b) => (b.comissaoV + b.comissaoA) - (a.comissaoV + a.comissaoA));
-              return (
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Distribuição de Comissões</p>
-                  <ResponsiveContainer width="100%" height={Math.max(120, todosVendedores.length * 40)}>
-                    <BarChart data={todosVendedores} layout="vertical" margin={{ left: 8, right: 80, top: 2, bottom: 2 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                      <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
-                      <YAxis type="category" dataKey="nome" tick={{ fontSize: 11 }} width={130} />
-                      <Tooltip
-                        formatter={(value: number, name: string) => [fmtBRLFull(value), name]}
-                        labelFormatter={l => `Vendedor: ${l}`}
-                      />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="comissaoV" name="Comissão Vendedor"    stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} />
-                      <Bar dataKey="comissaoA" name="Comissão Acessórios" stackId="a" fill="#d946ef" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              );
-            })()}
 
             {/* Tabela agrupada */}
             <div className="overflow-x-auto">
