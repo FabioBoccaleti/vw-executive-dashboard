@@ -207,3 +207,21 @@ export async function loadPeliculasAliquotas(): Promise<AliquotaImposto[]> {
 export async function savePeliculasAliquotas(items: AliquotaImposto[]): Promise<boolean> {
   return kvSet(KEY_PELICULAS_ALIQUOTAS, items);
 }
+
+// ── DSR ──
+const KEY_PELICULAS_DSR = 'peliculas_cadastro_dsr';
+
+export interface DsrConfig {
+  id: string;
+  ano: number;
+  mes: number;   // 1–12
+  percentual: string; // % DSR (ex: "16.67")
+}
+
+export async function loadPeliculasDsr(): Promise<DsrConfig[]> {
+  return (await kvGet<DsrConfig[]>(KEY_PELICULAS_DSR)) ?? [];
+}
+
+export async function savePeliculasDsr(items: DsrConfig[]): Promise<boolean> {
+  return kvSet(KEY_PELICULAS_DSR, items);
+}

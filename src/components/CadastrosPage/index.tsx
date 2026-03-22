@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Car, Shield, Users, Percent, Store, Wrench, ShoppingBag, UserCheck, Receipt } from 'lucide-react';
+import { ArrowLeft, Car, Shield, Users, Percent, Store, Wrench, ShoppingBag, UserCheck, Receipt, CalendarCog } from 'lucide-react';
 import { VeiculosSection } from './sections/VeiculosSection';
 import { BlinadorasSection } from './sections/BlinadorasSection';
 import { VendedoresSection } from './sections/VendedoresSection';
@@ -13,8 +13,9 @@ import { PeliculasRegrasSection } from './sections/PeliculasRegrasSection';
 import { PeliculasProdutosSection } from './sections/PeliculasProdutosSection';
 import { PeliculasVendedoresAcessoriosSection } from './sections/PeliculasVendedoresAcessoriosSection';
 import { PeliculasAliquotasSection } from './sections/PeliculasAliquotasSection';
+import { PeliculasDsrSection } from './sections/PeliculasDsrSection';
 
-type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos' | 'aliquotas';
+type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos' | 'aliquotas' | 'dsr';
 
 interface MenuItem {
   id: SectionId;
@@ -39,6 +40,7 @@ const MENU_PELICULAS: MenuItem[] = [
   { id: 'vendedores',            label: 'Vendedores',                description: 'Equipe de vendas e cargos',      icon: <Users className="w-5 h-5" /> },
   { id: 'vendedoresAcessorios',  label: 'Vendedores de Acessórios',  description: 'Equipe de vendedores de acessórios', icon: <UserCheck className="w-5 h-5" /> },
   { id: 'aliquotas',             label: 'Alíquotas de Imposto',       description: 'Tipos de imposto, alíquotas e encargos', icon: <Receipt className="w-5 h-5" /> },
+  { id: 'dsr',                   label: 'DSR',                        description: 'Percentual de DSR por Ano e Mês',   icon: <CalendarCog className="w-5 h-5" /> },
   { id: 'regras',                label: 'Regras de Remuneração',     description: 'Percentuais e bases de cálculo', icon: <Percent className="w-5 h-5" /> },
 ];
 
@@ -133,6 +135,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
             {isPeliculas  && activeSection === 'vendedores'           && <PeliculasVendedoresSection />}
             {isPeliculas  && activeSection === 'vendedoresAcessorios' && <PeliculasVendedoresAcessoriosSection />}
             {isPeliculas  && activeSection === 'aliquotas'             && <PeliculasAliquotasSection />}
+            {isPeliculas  && activeSection === 'dsr'                   && <PeliculasDsrSection />}
             {isPeliculas  && activeSection === 'regras'               && <PeliculasRegrasSection />}
           </div>
         </main>
