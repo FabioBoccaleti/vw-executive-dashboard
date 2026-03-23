@@ -360,6 +360,15 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
     }
   }, [activeTab]);
 
+  // Scroll automático para a linha em edição
+  useEffect(() => {
+    if (!editingId || !tableContainerRef.current) return;
+    requestAnimationFrame(() => {
+      const el = tableContainerRef.current?.querySelector(`tr[data-row-id="${editingId}"]`) as HTMLElement | null;
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }, [editingId]);
+
   const persist = async (updated: PeliculasRow[]) => {
     setSaving(true);
     try {
@@ -887,17 +896,18 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                   )}
 
                   {filteredRows.map((row, idx) => {
-                    const isEditing = editingId === row.id;
-                    const isDelete  = deleteId === row.id;
-                    const isEven    = idx % 2 === 0;
-                    const rowBg     = isEditing ? '#eef2ff' : isEven ? '#ffffff' : '#f8fafc';
+                    const isEditing  = editingId === row.id;
+                    const isDelete   = deleteId === row.id;
+                    const isLocking  = lockPromptId === row.id;
+                    const isEven     = idx % 2 === 0;
+                    const rowBg      = isEditing ? '#eef2ff' : isLocking ? '#fffbeb' : isEven ? '#ffffff' : '#f8fafc';
                     const draft     = isEditing ? editDraft! : row;
                     const realIdx   = rows.indexOf(row);
                     const pctDisplay = fmtPct(draft.lucroBruto, draft.receitaLiquida);
 
                     return (
                       <Fragment key={row.id}>
-                        <tr style={{ background: rowBg }} className="transition-colors group/row">
+                        <tr data-row-id={row.id} style={{ background: rowBg }} className="transition-colors group/row">
 
                           {/* Row number */}
                           <td className="sticky left-0 z-20 text-center border-r border-slate-200 px-1 py-1" style={{ background: rowBg, minWidth: '52px' }}>
