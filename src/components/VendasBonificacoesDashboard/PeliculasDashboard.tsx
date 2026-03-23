@@ -1031,9 +1031,11 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                                   </>
                                 ) : (
                                   <>
-                                    <button onClick={() => startEdit(row)} title="Editar linha" className="p-1.5 rounded-md text-indigo-600 hover:bg-indigo-50 transition-colors">
-                                      <Pencil className="w-3.5 h-3.5" />
-                                    </button>
+                                    {row.situacao !== 'Cancelada' && (
+                                      <button onClick={() => startEdit(row)} title="Editar linha" className="p-1.5 rounded-md text-indigo-600 hover:bg-indigo-50 transition-colors">
+                                        <Pencil className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
                                     <button onClick={() => { setEditingId(null); setEditDraft(null); setDeleteId(row.id); }} title="Excluir linha" className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
