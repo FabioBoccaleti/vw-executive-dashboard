@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import {
   LogOut, Layers, Pencil, Trash2, Check, X, Plus, Search,
   FilterX, BarChart2, TableProperties, Download, Upload, BookOpen, Lock, LockOpen, FilePlus,
-  Banknote, CheckCircle2, AlertCircle, Printer,
+  Banknote, CheckCircle2, AlertCircle, Printer, Calculator,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -310,6 +310,11 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [aguardandoFinalizado, setAguardandoFinalizado] = useState(false);
 
   // ── Liberar PGTO NF Prestador ───────────────────────────────────────────────
+  // ── Simulador ─────────────────────────────────────────────────────────────
+  const [showSimulador, setShowSimulador] = useState(false);
+  const [simVenda, setSimVenda] = useState('');
+  const [simCusto, setSimCusto] = useState('');
+
   const [showLiberarNFModal, setShowLiberarNFModal] = useState(false);
   const [liberarNFStep, setLiberarNFStep] = useState<1 | 2>(1);
   const [liberarNFInput, setLiberarNFInput] = useState('');
@@ -1162,6 +1167,15 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                 </Button>
                 <Button
                   size="sm"
+                  variant="outline"
+                  onClick={() => { setSimVenda(''); setSimCusto(''); setShowSimulador(true); }}
+                  className="border-violet-400 text-violet-700 hover:bg-violet-50 gap-1.5 font-medium"
+                >
+                  <Calculator className="w-4 h-4" />
+                  Simulador
+                </Button>
+                <Button
+                  size="sm"
                   variant='outline'
                   onClick={() => { setProcessosAndamento(v => !v); setAguardandoFinalizado(false); clearFilters(); }}
                   className={processosAndamento ? 'border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100 gap-1.5 font-medium' : 'border-amber-400 text-amber-700 hover:bg-amber-50 gap-1.5 font-medium'}
@@ -1379,6 +1393,116 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
       )}
 
 
+
+      {/* ── Modal Simulador ── */}
+      {showSimulador && (() => {
+        const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const fmtPctSim = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+        const venda = parseFloat(simVenda.replace(/\./g, '').replace(',', '.')) || 0;
+        const custo = parseFloat(simCusto.replace(/\./g, '').replace(',', '.')) || 0;
+        const impostos = venda * aliquotaTotal / 100;
+        const rl = venda - impostos;
+        const lb = rl - custo;
+        const pctLB = rl > 0 ? (lb / rl) * 100 : 0;
+        const pctLBStr = rl > 0 ? (lb / rl * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '0';
+        const comissaoVendedor = parseFloat(
+          (() => {
+            if (lb <= 0) return '0';
+            const matched = regras.filter(r => r.cargo === 'Vendedor' && r.tipoPremio === 'faixas');
+            if (!matched.length) return '0';
+            const faixa = matched[0].faixas.find(f => {
+              const de = parseFloat(f.de.replace(/\./g, '').replace(',', '.'));
+              const ate = f.ate?.trim() ? parseFloat(f.ate.replace(/\./g, '').replace(',', '.')) : Infinity;
+              return !isNaN(de) && pctLB >= de && pctLB <= ate;
+            });
+            if (!faixa) return '0';
+            const pct = parseFloat(faixa.premio.replace(/\./g, '').replace(',', '.'));
+            return isNaN(pct) ? '0' : String(lb * pct / 100);
+          })()
+        ) || 0;
+        const comissaoAcessorios = parseFloat(
+          (() => {
+            if (lb <= 0) return '0';
+            const matched = regras.filter(r => r.cargo === 'Vendedor de Acessórios' && r.tipoPremio === 'faixas');
+            if (!matched.length) return '0';
+            const faixa = matched[0].faixas.find(f => {
+              const de = parseFloat(f.de.replace(/\./g, '').replace(',', '.'));
+              const ate = f.ate?.trim() ? parseFloat(f.ate.replace(/\./g, '').replace(',', '.')) : Infinity;
+              return !isNaN(de) && pctLB >= de && pctLB <= ate;
+            });
+            if (!faixa) return '0';
+            const pct = parseFloat(faixa.premio.replace(/\./g, '').replace(',', '.'));
+            return isNaN(pct) ? '0' : String(lb * pct / 100);
+          })()
+        ) || 0;
+
+        const Row = ({ label, value, highlight }: { label: string; value: string; highlight?: string }) => (
+          <div className={`flex items-center justify-between px-3 py-2 rounded-lg ${highlight ?? 'bg-slate-50'}`}>
+            <span className="text-sm text-slate-600">{label}</span>
+            <span className={`text-sm font-semibold tabular-nums ${highlight ? 'text-white' : 'text-slate-800'}`}>{value}</span>
+          </div>
+        );
+
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-5">
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-violet-100 rounded-xl flex-shrink-0">
+                    <Calculator className="w-5 h-5 text-violet-700" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800">Simulador de Venda</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Calcule o resultado antes de registrar</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowSimulador(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Inputs */}
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Valor da Venda (R$)</label>
+                  <input
+                    type="text"
+                    value={simVenda}
+                    onChange={e => setSimVenda(e.target.value)}
+                    placeholder="0,00"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Custo Prestador (R$)</label>
+                  <input
+                    type="text"
+                    value={simCusto}
+                    onChange={e => setSimCusto(e.target.value)}
+                    placeholder="0,00"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  />
+                </div>
+              </div>
+
+              {/* Resultados */}
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">Resultados calculados</p>
+                <Row label={`Impostos (${aliquotaTotal.toLocaleString('pt-BR', { minimumFractionDigits: 1 })}%)`} value={fmtBRL(impostos)} />
+                <Row label="Receita Líquida" value={fmtBRL(rl)} />
+                <Row label="Lucro Bruto" value={fmtBRL(lb)} />
+                <Row label="% Lucro Bruto" value={venda > 0 ? fmtPctSim(pctLB) : '—'} highlight={lb > 0 ? 'bg-emerald-600' : lb < 0 ? 'bg-red-500' : undefined} />
+                <div className="border-t border-slate-100 my-1" />
+                <Row label="Comissão Vendedor" value={venda > 0 ? fmtBRL(comissaoVendedor) : '—'} />
+                <Row label="Comissão Vend. Acessórios" value={venda > 0 ? fmtBRL(comissaoAcessorios) : '—'} />
+              </div>
+
+              <Button onClick={() => setShowSimulador(false)} variant="outline" className="border-slate-300 text-slate-600 w-full">Fechar</Button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Modal confirmação importação ── */}
       {importPreview && (
