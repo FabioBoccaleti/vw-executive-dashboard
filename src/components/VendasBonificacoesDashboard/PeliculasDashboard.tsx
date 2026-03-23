@@ -1000,7 +1000,9 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                                 <p className="text-xs text-red-600 font-semibold text-center leading-tight">Remover este<br />registro?</p>
                                 <div className="flex gap-1 flex-wrap justify-center">
                                   <button onClick={() => { setDeletePasswordPromptId(row.id); setDeletePassword(''); setDeleteId(null); }} className="px-2.5 py-1 bg-red-600 text-white text-xs rounded-md hover:bg-red-700 font-semibold transition-colors">Excluir</button>
-                                  <button onClick={() => anularRow(row.id)} className="px-2.5 py-1 bg-orange-500 text-white text-xs rounded-md hover:bg-orange-600 font-semibold transition-colors">Anular</button>
+                                  {row.situacao !== 'Processo Finalizado' && (
+                                    <button onClick={() => anularRow(row.id)} className="px-2.5 py-1 bg-orange-500 text-white text-xs rounded-md hover:bg-orange-600 font-semibold transition-colors">Anular</button>
+                                  )}
                                   <button onClick={() => setDeleteId(null)} className="px-2.5 py-1 bg-slate-200 text-slate-600 text-xs rounded-md hover:bg-slate-300 font-semibold transition-colors">Cancelar</button>
                                 </div>
                               </div>
@@ -1016,7 +1018,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                               </div>
                             ) : (
                               <div className="flex items-center justify-center gap-0.5">
-                                {row.situacao === 'Processo Finalizado' ? (
+                                {row.situacao === 'Processo Finalizado' && !unlockedIds.has(row.id) ? (
                                   <>
                                     <button
                                       onClick={() => { setLockPromptId(row.id); setLockPassword(''); }}
