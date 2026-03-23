@@ -413,10 +413,8 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
       return;
     }
     const updated = rows.map(r => r.id === editDraft.id ? editDraft : r);
-    // Preservar desbloqueio se a situação continua como Processo Finalizado
-    if (editDraft.situacao === 'Processo Finalizado') {
-      setUnlockedIds(prev => new Set([...prev, editDraft.id]));
-    }
+    // Remover desbloqueio ao salvar (cadeado volta)
+    setUnlockedIds(prev => { const s = new Set(prev); s.delete(editDraft.id); return s; });
     setRows(updated);
     setEditingId(null);
     setEditDraft(null);
