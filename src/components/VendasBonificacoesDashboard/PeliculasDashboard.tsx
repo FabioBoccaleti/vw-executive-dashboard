@@ -1016,6 +1016,36 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                                   <button onClick={() => setDeleteId(null)} className="px-2.5 py-1 bg-slate-200 text-slate-600 text-xs rounded-md hover:bg-slate-300 font-semibold transition-colors">Cancelar</button>
                                 </div>
                               </div>
+                            ) : lockPromptId === row.id ? (
+                              <div className="flex flex-col items-center gap-1.5 py-0.5">
+                                <p className="text-xs text-amber-700 font-semibold text-center leading-tight"><LockOpen className="w-3 h-3 inline-block mb-0.5" /> Senha</p>
+                                <input
+                                  type="password"
+                                  autoFocus
+                                  value={lockPassword}
+                                  onChange={e => setLockPassword(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                      if (lockPassword === '1985') {
+                                        setUnlockedIds(prev => new Set([...prev, row.id])); startEdit(row);
+                                        setLockPromptId(null); setLockPassword('');
+                                      } else { toast.error('Senha incorreta'); setLockPassword(''); }
+                                    }
+                                    if (e.key === 'Escape') { setLockPromptId(null); setLockPassword(''); }
+                                  }}
+                                  placeholder="Senha"
+                                  className="w-full border border-amber-300 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                />
+                                <div className="flex gap-1">
+                                  <button onClick={() => {
+                                    if (lockPassword === '1985') {
+                                      setUnlockedIds(prev => new Set([...prev, row.id])); startEdit(row);
+                                      setLockPromptId(null); setLockPassword('');
+                                    } else { toast.error('Senha incorreta'); setLockPassword(''); }
+                                  }} className="px-2 py-0.5 bg-amber-600 text-white text-xs rounded-md hover:bg-amber-700 font-semibold transition-colors">OK</button>
+                                  <button onClick={() => { setLockPromptId(null); setLockPassword(''); }} className="px-2 py-0.5 bg-slate-200 text-slate-600 text-xs rounded-md hover:bg-slate-300 font-semibold transition-colors">Cancelar</button>
+                                </div>
+                              </div>
                             ) : isEditing ? (
                               <div className="flex items-center justify-center gap-1.5">
                                 <button onClick={saveEdit} title="Salvar linha" className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white text-xs rounded-md hover:bg-indigo-700 font-semibold transition-colors">
@@ -1337,59 +1367,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
         </div>
       )}
 
-      {/* ── Modal senha desbloqueio ── */}
-      {lockPromptId && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-5">
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 bg-amber-100 rounded-xl flex-shrink-0">
-                <LockOpen className="w-5 h-5 text-amber-700" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-800">Desbloquear Edição</h3>
-                <p className="text-sm text-slate-500 mt-1">Digite a senha para editar este registro finalizado.</p>
-              </div>
-            </div>
-            <input
-              type="password"
-              autoFocus
-              value={lockPassword}
-              onChange={e => setLockPassword(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  if (lockPassword === '1985') {
-                    const row = rows.find(r => r.id === lockPromptId);
-                    if (row) { setUnlockedIds(prev => new Set([...prev, lockPromptId!])); startEdit(row); }
-                    setLockPromptId(null); setLockPassword('');
-                  } else {
-                    toast.error('Senha incorreta');
-                    setLockPassword('');
-                  }
-                }
-                if (e.key === 'Escape') { setLockPromptId(null); setLockPassword(''); }
-              }}
-              placeholder="Senha"
-              className="border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-amber-400"
-            />
-            <div className="flex gap-3 justify-end">
-              <Button variant="outline" size="sm" onClick={() => { setLockPromptId(null); setLockPassword(''); }} className="border-slate-300 text-slate-600">Cancelar</Button>
-              <Button size="sm" onClick={() => {
-                if (lockPassword === '1985') {
-                  const row = rows.find(r => r.id === lockPromptId);
-                  if (row) { setUnlockedIds(prev => new Set([...prev, lockPromptId!])); startEdit(row); }
-                  setLockPromptId(null); setLockPassword('');
-                } else {
-                  toast.error('Senha incorreta');
-                  setLockPassword('');
-                }
-              }} className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5">
-                <LockOpen className="w-4 h-4" />
-                Desbloquear
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* ── Modal confirmação importação ── */}
       {importPreview && (
