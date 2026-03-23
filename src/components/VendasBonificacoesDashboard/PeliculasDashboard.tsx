@@ -301,6 +301,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
   const [lockPromptId, setLockPromptId] = useState<string | null>(null);
   const [lockPassword, setLockPassword] = useState('');
+  const lockInputRef = useRef<HTMLInputElement>(null);
   const [deletePasswordPromptId, setDeletePasswordPromptId] = useState<string | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
   const [showRegisterModal, setShowRegisterModal] = useState(false);
@@ -368,6 +369,13 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   }, [editingId]);
+
+  // Focar input de senha sem causar scroll horizontal
+  useEffect(() => {
+    if (lockPromptId && lockInputRef.current) {
+      lockInputRef.current.focus({ preventScroll: true });
+    }
+  }, [lockPromptId]);
 
   const persist = async (updated: PeliculasRow[]) => {
     setSaving(true);
@@ -1020,8 +1028,8 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                               <div className="flex flex-col items-center gap-1.5 py-0.5">
                                 <p className="text-xs text-amber-700 font-semibold text-center leading-tight"><LockOpen className="w-3 h-3 inline-block mb-0.5" /> Senha</p>
                                 <input
+                                  ref={lockInputRef}
                                   type="password"
-                                  autoFocus
                                   value={lockPassword}
                                   onChange={e => setLockPassword(e.target.value)}
                                   onKeyDown={e => {
