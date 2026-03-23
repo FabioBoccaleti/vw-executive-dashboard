@@ -1848,7 +1848,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                 Ver Todos
               </Button>
             )}
-            {/* Filtro Revenda */
+            {/* Filtro Revenda */}
             {(() => {
               const canTodas      = isAdmin() || canAccessVendasSub('blindagem.todas');
               const canRevendaVW   = isAdmin() || canAccessVendasSub('blindagem.revenda_vw');
