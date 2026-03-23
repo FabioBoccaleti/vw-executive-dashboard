@@ -29,12 +29,18 @@ export const BRAND_LABELS: Record<BrandId, string> = {
 export type VendasSubModuleId =
   | 'blindagem.tabela'
   | 'blindagem.analise'
+  | 'blindagem.todas'
+  | 'blindagem.revenda_vw'
+  | 'blindagem.revenda_audi'
   | 'peliculas.tabela'
   | 'peliculas.analise';
 
 export const VENDAS_SUB_MODULE_LABELS: Record<VendasSubModuleId, string> = {
   'blindagem.tabela': 'Tabela',
   'blindagem.analise': 'Análise',
+  'blindagem.todas': 'Todas',
+  'blindagem.revenda_vw': 'Revenda VW',
+  'blindagem.revenda_audi': 'Revenda Audi',
   'peliculas.tabela': 'Tabela',
   'peliculas.analise': 'Análise',
 };

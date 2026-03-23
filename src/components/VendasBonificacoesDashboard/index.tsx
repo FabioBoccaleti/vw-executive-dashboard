@@ -1802,16 +1802,21 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
             </Button>
             {/* Filtro Revenda */}
             {(() => {
+              const canTodas      = isAdmin() || canAccessVendasSub('blindagem.todas');
+              const canRevendaVW   = isAdmin() || canAccessVendasSub('blindagem.revenda_vw');
+              const canRevendaAudi = isAdmin() || canAccessVendasSub('blindagem.revenda_audi');
               const revendaCounts = {
                 todas: rows.length,
                 vw: rows.filter(r => r.revenda.toLowerCase().includes('vw')).length,
                 audi: rows.filter(r => r.revenda.toLowerCase().includes('audi')).length,
               };
-              const opts: { value: RevendaFilter; label: string; color: string; count: number }[] = [
-                { value: 'Todas', label: 'Todas',       color: '#f59e0b', count: revendaCounts.todas },
-                { value: 'VW',    label: 'Revenda VW',  color: '#001E50', count: revendaCounts.vw   },
-                { value: 'Audi',  label: 'Revenda Audi',color: '#BB0A21', count: revendaCounts.audi },
+              const allOpts: { value: RevendaFilter; label: string; color: string; count: number; allowed: boolean }[] = [
+                { value: 'Todas', label: 'Todas',       color: '#f59e0b', count: revendaCounts.todas, allowed: canTodas },
+                { value: 'VW',    label: 'Revenda VW',  color: '#001E50', count: revendaCounts.vw,   allowed: canRevendaVW },
+                { value: 'Audi',  label: 'Revenda Audi',color: '#BB0A21', count: revendaCounts.audi, allowed: canRevendaAudi },
               ];
+              const opts = allOpts.filter(o => o.allowed);
+              if (opts.length === 0) return null;
               return (
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-bold text-white/50 uppercase tracking-widest">Visualizar por</span>

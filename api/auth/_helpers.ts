@@ -9,6 +9,9 @@ export type BrandId = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros
 export type VendasSubModuleId =
   | 'blindagem.tabela'
   | 'blindagem.analise'
+  | 'blindagem.todas'
+  | 'blindagem.revenda_vw'
+  | 'blindagem.revenda_audi'
   | 'peliculas.tabela'
   | 'peliculas.analise';
 export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes'];
