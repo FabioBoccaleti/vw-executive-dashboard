@@ -1,4 +1,5 @@
 import { Fragment, useState, useEffect, useRef, useMemo } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download, Upload, RefreshCw, Package, ListRestart, FileText, Lock, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
@@ -741,6 +742,11 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [inlineAcertoId, setInlineAcertoId] = useState<string | null>(null);
   const [inlineAcertoValue, setInlineAcertoValue] = useState('');
   const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('analise');
+  const { canAccessVendasSub, isAdmin } = useAuth();
+  const canTabela = isAdmin() || canAccessVendasSub('blindagem.tabela');
+  const canAnalise = isAdmin() || canAccessVendasSub('blindagem.analise');
+  const canEstoque = isAdmin() || canAccessVendasSub('blindagem.estoque');
+  const canNotasAEmitir = isAdmin() || canAccessVendasSub('blindagem.notas_a_emitir');
   const [importPreview, setImportPreview] = useState<VendasRow[] | null>(null);
   const [recalcConfirm, setRecalcConfirm] = useState(false);
   const [estoqueMode, setEstoqueMode] = useState(false);
@@ -1257,6 +1263,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
             )}
             {/* Abas */}
             <div className="flex items-center bg-white/10 rounded-lg p-0.5 gap-0.5">
+              {canTabela && (
               <button
                 onClick={() => setActiveTab('tabela')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -1268,6 +1275,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                 <TableProperties className="w-3.5 h-3.5" />
                 Tabela
               </button>
+              )}
+              {canAnalise && (
               <button
                 onClick={() => setActiveTab('analise')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -1279,6 +1288,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                 <BarChart2 className="w-3.5 h-3.5" />
                 Análise
               </button>
+              )}
             </div>
             <Button
               variant="ghost"
@@ -1306,7 +1316,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
       <div className="flex-1 flex flex-col min-h-0">
 
         {/* ── ABA ANÁLISE ── */}
-        {activeTab === 'analise' && (
+        {activeTab === 'analise' && canAnalise && (
           <div className="flex-1 overflow-auto" style={{ maxHeight: 'calc(100vh - 72px)' }}>
             <VendasAnalise
               rows={rows}
@@ -1320,7 +1330,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         )}
 
         {/* ── ABA TABELA ── */}
-        {activeTab === 'tabela' && (
+        {activeTab === 'tabela' && canTabela && (
         <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
         {/* Table card */}
         <div
@@ -1794,6 +1804,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
             </Button>
             {!estoqueMode && !notasAEmitirMode ? (
               <>
+                {canEstoque && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1804,6 +1815,8 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                   <Package className="w-4 h-4" />
                   Em Estoque
                 </Button>
+                )}
+                {canNotasAEmitir && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1814,6 +1827,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                   <FileText className="w-4 h-4" />
                   Notas a Emitir
                 </Button>
+                )}
               </>
             ) : (
               <Button

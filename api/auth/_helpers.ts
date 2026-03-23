@@ -4,9 +4,16 @@ import { randomUUID } from 'crypto';
 
 // Tipos inline (evita importação cross-directory que pode falhar no bundler Vercel)
 export type UserRole = 'admin' | 'gestor' | 'leitura';
-export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa';
+export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes';
 export type BrandId = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros';
-export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa'];
+export type VendasSubModuleId =
+  | 'blindagem.tabela'
+  | 'blindagem.analise'
+  | 'blindagem.estoque'
+  | 'blindagem.notas_a_emitir'
+  | 'peliculas.tabela'
+  | 'peliculas.analise';
+export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes'];
 export const ALL_BRANDS: BrandId[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
 
 export interface UserRecord {
@@ -17,6 +24,7 @@ export interface UserRecord {
   role: UserRole;
   modules: ModuleId[];
   brands: BrandId[];
+  vendasSubModules?: VendasSubModuleId[];
   active: boolean;
   createdAt: number;
   updatedAt: number;
@@ -28,6 +36,7 @@ export interface SessionPayload {
   role: UserRole;
   modules: ModuleId[];
   brands: BrandId[];
+  vendasSubModules?: VendasSubModuleId[];
   expiresAt: number;
 }
 
@@ -55,6 +64,7 @@ export async function createSession(user: UserRecord): Promise<string> {
     role: user.role,
     modules: user.modules,
     brands: user.brands,
+    vendasSubModules: user.vendasSubModules,
     expiresAt: Date.now() + SESSION_TTL * 1000,
   };
   await redis.setex(KEYS.session(token), SESSION_TTL, JSON.stringify(payload));

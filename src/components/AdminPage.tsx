@@ -9,8 +9,8 @@ import {
   ChevronLeft, Eye, EyeOff, Check, AlertCircle, RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { PublicUser, AccessLogEntry, ModuleId, BrandId, UserRole } from '@/lib/authTypes';
-import { ALL_MODULES, ALL_BRANDS, MODULE_LABELS, BRAND_LABELS } from '@/lib/authTypes';
+import type { PublicUser, AccessLogEntry, ModuleId, BrandId, UserRole, VendasSubModuleId } from '@/lib/authTypes';
+import { ALL_MODULES, ALL_BRANDS, MODULE_LABELS, BRAND_LABELS, VENDAS_SUB_MODULE_LABELS } from '@/lib/authTypes';
 import {
   apiListUsers, apiCreateUser, apiUpdateUser, apiDeleteUser, apiGetLogs,
 } from '@/lib/authClient';
@@ -45,12 +45,13 @@ interface UserFormData {
   role: UserRole;
   modules: ModuleId[];
   brands: BrandId[];
+  vendasSubModules: VendasSubModuleId[];
   active: boolean;
 }
 
 const defaultForm = (): UserFormData => ({
   name: '', username: '', password: '', role: 'leitura',
-  modules: [], brands: [], active: true,
+  modules: [], brands: [], vendasSubModules: [], active: true,
 });
 
 interface UserFormProps {
@@ -76,6 +77,14 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
     setForm(f => ({
       ...f,
       brands: f.brands.includes(b) ? f.brands.filter(x => x !== b) : [...f.brands, b],
+    }));
+
+  const toggleVendasSub = (s: VendasSubModuleId) =>
+    setForm(f => ({
+      ...f,
+      vendasSubModules: f.vendasSubModules.includes(s)
+        ? f.vendasSubModules.filter(x => x !== s)
+        : [...f.vendasSubModules, s],
     }));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -189,6 +198,59 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
                 {BRAND_LABELS[b]}
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Subpermissões Vendas e Bonificações */}
+      {!isAdmin && form.modules.includes('vendas_bonificacoes') && (
+        <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/50 dark:bg-amber-950/10 dark:border-amber-800 p-4">
+          <Label className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            Permissões — Demonstrativo de Vendas e Bonificações
+          </Label>
+
+          {/* Blindagem */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Análise e Controle das Vendas de Blindagem</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {(['blindagem.tabela', 'blindagem.analise', 'blindagem.estoque', 'blindagem.notas_a_emitir'] as VendasSubModuleId[]).map(s => (
+                <button
+                  key={s} type="button"
+                  onClick={() => toggleVendasSub(s)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                    form.vendasSubModules.includes(s)
+                      ? 'border-amber-500 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 font-medium'
+                      : 'border-border bg-background text-muted-foreground hover:border-input',
+                  )}
+                >
+                  {form.vendasSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                  {VENDAS_SUB_MODULE_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Películas */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Análise e Controle de Vendas de Películas</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {(['peliculas.tabela', 'peliculas.analise'] as VendasSubModuleId[]).map(s => (
+                <button
+                  key={s} type="button"
+                  onClick={() => toggleVendasSub(s)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                    form.vendasSubModules.includes(s)
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 font-medium'
+                      : 'border-border bg-background text-muted-foreground hover:border-input',
+                  )}
+                >
+                  {form.vendasSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                  {VENDAS_SUB_MODULE_LABELS[s]}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -378,6 +440,7 @@ export function AdminPage({ onBack }: AdminPageProps) {
                       role: editingUser.role,
                       modules: editingUser.modules,
                       brands: editingUser.brands,
+                      vendasSubModules: (editingUser as any).vendasSubModules ?? [],
                       active: editingUser.active,
                     } : undefined}
                     onSave={formMode === 'create' ? handleCreate : handleEdit}

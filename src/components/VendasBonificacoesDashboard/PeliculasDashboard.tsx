@@ -1,4 +1,5 @@
 import { Fragment, useState, useEffect, useRef, useMemo, type ChangeEvent } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
   LogOut, Layers, Pencil, Trash2, Check, X, Plus, Search,
@@ -291,6 +292,9 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [loading, setLoading]     = useState(true);
   const [filters, setFilters]     = useState<FilterValues>({});
   const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('analise');
+  const { canAccessVendasSub, isAdmin } = useAuth();
+  const canTabela = isAdmin() || canAccessVendasSub('peliculas.tabela');
+  const canAnalise = isAdmin() || canAccessVendasSub('peliculas.analise');
   const [importPreview, setImportPreview] = useState<PeliculasRow[] | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -761,6 +765,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
             )}
             {/* Abas */}
             <div className="flex items-center bg-white/10 rounded-lg p-0.5 gap-0.5">
+              {canTabela && (
               <button
                 onClick={() => setActiveTab('tabela')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeTab === 'tabela' ? 'bg-indigo-500 text-white shadow-sm' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
@@ -768,6 +773,8 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                 <TableProperties className="w-3.5 h-3.5" />
                 Tabela
               </button>
+              )}
+              {canAnalise && (
               <button
                 onClick={() => setActiveTab('analise')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeTab === 'analise' ? 'bg-indigo-500 text-white shadow-sm' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
@@ -775,6 +782,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                 <BarChart2 className="w-3.5 h-3.5" />
                 Análise
               </button>
+              )}
             </div>
             {onOpenCadastros && (
               <Button
@@ -804,14 +812,14 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
       <div className="flex-1 flex flex-col min-h-0">
 
         {/* ── ABA ANÁLISE ── */}
-        {activeTab === 'analise' && (
+        {activeTab === 'analise' && canAnalise && (
           <div className="flex-1 overflow-auto" style={{ maxHeight: 'calc(100vh - 72px)' }}>
             <PeliculasAnalise rows={rows} />
           </div>
         )}
 
         {/* ── ABA TABELA ── */}
-        {activeTab === 'tabela' && (
+        {activeTab === 'tabela' && canTabela && (
           <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
             <div
               ref={tableContainerRef}

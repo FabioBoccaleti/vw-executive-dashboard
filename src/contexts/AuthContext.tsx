@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { SessionPayload, ModuleId, BrandId } from '@/lib/authTypes';
+import type { SessionPayload, ModuleId, BrandId, VendasSubModuleId } from '@/lib/authTypes';
 import { getSessionToken, saveSession, clearSession, apiLogin, apiLogout } from '@/lib/authClient';
 
 interface AuthContextValue {
@@ -9,6 +9,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   canAccessModule: (module: ModuleId) => boolean;
   canAccessBrand: (brand: BrandId) => boolean;
+  canAccessVendasSub: (sub: VendasSubModuleId) => boolean;
   isAdmin: () => boolean;
 }
 
@@ -77,12 +78,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return session.brands.includes(brand);
   }, [session]);
 
+  const canAccessVendasSub = useCallback((sub: VendasSubModuleId): boolean => {
+    if (!session) return false;
+    if (session.role === 'admin') return true;
+    return (session.vendasSubModules ?? []).includes(sub);
+  }, [session]);
+
   const isAdmin = useCallback((): boolean => {
     return session?.role === 'admin';
   }, [session]);
 
   return (
-    <AuthContext.Provider value={{ session, isLoading, login, logout, canAccessModule, canAccessBrand, isAdmin }}>
+    <AuthContext.Provider value={{ session, isLoading, login, logout, canAccessModule, canAccessBrand, canAccessVendasSub, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );
