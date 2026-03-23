@@ -745,12 +745,10 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const { canAccessVendasSub, isAdmin } = useAuth();
   const canTabela = isAdmin() || canAccessVendasSub('blindagem.tabela');
   const canAnalise = isAdmin() || canAccessVendasSub('blindagem.analise');
-  const canEstoque = isAdmin() || canAccessVendasSub('blindagem.estoque');
-  const canNotasAEmitir = isAdmin() || canAccessVendasSub('blindagem.notas_a_emitir');
   const [importPreview, setImportPreview] = useState<VendasRow[] | null>(null);
   const [recalcConfirm, setRecalcConfirm] = useState(false);
-  const [estoqueMode, setEstoqueMode] = useState(false);
-  const [notasAEmitirMode, setNotasAEmitirMode] = useState(false);
+  type RevendaFilter = 'Todas' | 'VW' | 'Audi';
+  const [revendaFilter, setRevendaFilter] = useState<RevendaFilter>('Todas');
   const [modalDraft, setModalDraft] = useState<VendasRow | null>(null);
   const [unlockedRowId, setUnlockedRowId] = useState<string | null>(null);
   const [lockPendingRow, setLockPendingRow] = useState<VendasRow | null>(null);
@@ -1181,13 +1179,13 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const availableYears              = useMemo(() => [...new Set(rows.map(r => r.dataVenda?.split('-')[0]).filter(Boolean))].map(Number).sort((a,b)=>b-a), [rows]);
 
   const hasActiveFilters = Object.values(filters).some(v => v && v.length > 0) || filterYear != null || filterMonth != null || !!filterBlindagemMode;
-  const estoqueBaseRows = estoqueMode
-    ? rows.filter(r => !r.dataVenda)
-    : notasAEmitirMode
-      ? rows.filter(r => !!r.dataVenda && !r.numeroNFComissao)
+  const revendaBaseRows = revendaFilter === 'VW'
+    ? rows.filter(r => r.revenda.toLowerCase().includes('vw'))
+    : revendaFilter === 'Audi'
+      ? rows.filter(r => r.revenda.toLowerCase().includes('audi'))
       : rows;
   const filteredRows     = hasActiveFilters
-    ? estoqueBaseRows.filter(r => {
+    ? revendaBaseRows.filter(r => {
         if (!rowMatchesFilters(r, filters)) return false;
         if (filterYear != null) {
           const y = r.dataVenda ? parseInt(r.dataVenda.split('-')[0]) : 0;
@@ -1205,7 +1203,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         }
         return true;
       })
-    : estoqueBaseRows;
+    : revendaBaseRows;
 
   if (loading) {
     return (
@@ -1802,44 +1800,45 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
               <RefreshCw className="w-4 h-4" />
               Recalcular Remunerações
             </Button>
-            {!estoqueMode && !notasAEmitirMode ? (
-              <>
-                {canEstoque && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEstoqueMode(true)}
-                  className="text-sky-700 border-sky-300 hover:bg-sky-50 gap-1.5 font-medium"
-                  title="Exibe apenas veículos sem Data da Venda (em estoque)"
-                >
-                  <Package className="w-4 h-4" />
-                  Em Estoque
-                </Button>
-                )}
-                {canNotasAEmitir && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setNotasAEmitirMode(true)}
-                  className="text-orange-700 border-orange-300 hover:bg-orange-50 gap-1.5 font-medium"
-                  title="Exibe apenas linhas com Data da Venda preenchida e sem Nº NF de Comissão"
-                >
-                  <FileText className="w-4 h-4" />
-                  Notas a Emitir
-                </Button>
-                )}
-              </>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { setEstoqueMode(false); setNotasAEmitirMode(false); }}
-                className="bg-gray-500 text-white border-gray-500 hover:bg-gray-600 gap-1.5 font-medium"
-              >
-                <ListRestart className="w-4 h-4" />
-                Ver Todos
-              </Button>
-            )}
+            {/* Filtro Revenda */}
+            {(() => {
+              const revendaCounts = {
+                todas: rows.length,
+                vw: rows.filter(r => r.revenda.toLowerCase().includes('vw')).length,
+                audi: rows.filter(r => r.revenda.toLowerCase().includes('audi')).length,
+              };
+              const opts: { value: RevendaFilter; label: string; color: string; count: number }[] = [
+                { value: 'Todas', label: 'Todas',       color: '#f59e0b', count: revendaCounts.todas },
+                { value: 'VW',    label: 'Revenda VW',  color: '#001E50', count: revendaCounts.vw   },
+                { value: 'Audi',  label: 'Revenda Audi',color: '#BB0A21', count: revendaCounts.audi },
+              ];
+              return (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-white/50 uppercase tracking-widest">Visualizar por</span>
+                  <div className="inline-flex bg-white/10 rounded-xl p-0.5 gap-0.5">
+                    {opts.map(opt => {
+                      const active = revendaFilter === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => setRevendaFilter(opt.value)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200"
+                          style={active ? { background: opt.color, color: '#fff', boxShadow: `0 2px 8px ${opt.color}66` } : { color: 'rgba(255,255,255,0.7)' }}
+                        >
+                          <span>{opt.label}</span>
+                          <span
+                            className="text-xs px-1.5 py-0.5 rounded-full font-bold tabular-nums"
+                            style={active ? { backgroundColor: 'rgba(255,255,255,0.25)', color: '#fff' } : { backgroundColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)' }}
+                          >
+                            {opt.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
             <input
               ref={importInputRef}
               type="file"
