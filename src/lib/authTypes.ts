@@ -32,6 +32,8 @@ export type VendasSubModuleId =
   | 'blindagem.todas'
   | 'blindagem.revenda_vw'
   | 'blindagem.revenda_audi'
+  | 'blindagem.estoque'
+  | 'blindagem.notas_a_emitir'
   | 'peliculas.tabela'
   | 'peliculas.analise';
 
@@ -41,6 +43,8 @@ export const VENDAS_SUB_MODULE_LABELS: Record<VendasSubModuleId, string> = {
   'blindagem.todas': 'Todas',
   'blindagem.revenda_vw': 'Revenda VW',
   'blindagem.revenda_audi': 'Revenda Audi',
+  'blindagem.estoque': 'Em Estoque',
+  'blindagem.notas_a_emitir': 'Notas a Emitir',
   'peliculas.tabela': 'Tabela',
   'peliculas.analise': 'Análise',
 };

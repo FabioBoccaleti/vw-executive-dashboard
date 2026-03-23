@@ -213,7 +213,7 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Análise e Controle das Vendas de Blindagem</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {(['blindagem.tabela', 'blindagem.analise', 'blindagem.todas', 'blindagem.revenda_vw', 'blindagem.revenda_audi'] as VendasSubModuleId[]).map(s => (
+              {(['blindagem.tabela', 'blindagem.analise', 'blindagem.todas', 'blindagem.revenda_vw', 'blindagem.revenda_audi', 'blindagem.estoque', 'blindagem.notas_a_emitir'] as VendasSubModuleId[]).map(s => (
                 <button
                   key={s} type="button"
                   onClick={() => toggleVendasSub(s)}

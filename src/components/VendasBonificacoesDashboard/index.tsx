@@ -745,8 +745,12 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const { canAccessVendasSub, isAdmin } = useAuth();
   const canTabela = isAdmin() || canAccessVendasSub('blindagem.tabela');
   const canAnalise = isAdmin() || canAccessVendasSub('blindagem.analise');
+  const canEstoque = isAdmin() || canAccessVendasSub('blindagem.estoque');
+  const canNotasAEmitir = isAdmin() || canAccessVendasSub('blindagem.notas_a_emitir');
   const [importPreview, setImportPreview] = useState<VendasRow[] | null>(null);
   const [recalcConfirm, setRecalcConfirm] = useState(false);
+  const [estoqueMode, setEstoqueMode] = useState(false);
+  const [notasAEmitirMode, setNotasAEmitirMode] = useState(false);
   type RevendaFilter = 'Todas' | 'VW' | 'Audi';
   const [revendaFilter, setRevendaFilter] = useState<RevendaFilter>('Todas');
   const [modalDraft, setModalDraft] = useState<VendasRow | null>(null);
@@ -1184,8 +1188,13 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
     : revendaFilter === 'Audi'
       ? rows.filter(r => r.revenda.toLowerCase().includes('audi'))
       : rows;
+  const modeBaseRows = estoqueMode
+    ? revendaBaseRows.filter(r => !r.dataVenda)
+    : notasAEmitirMode
+      ? revendaBaseRows.filter(r => !!r.dataVenda && !r.numeroNFComissao)
+      : revendaBaseRows;
   const filteredRows     = hasActiveFilters
-    ? revendaBaseRows.filter(r => {
+    ? modeBaseRows.filter(r => {
         if (!rowMatchesFilters(r, filters)) return false;
         if (filterYear != null) {
           const y = r.dataVenda ? parseInt(r.dataVenda.split('-')[0]) : 0;
@@ -1203,7 +1212,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
         }
         return true;
       })
-    : revendaBaseRows;
+    : modeBaseRows;
 
   if (loading) {
     return (
@@ -1800,7 +1809,46 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
               <RefreshCw className="w-4 h-4" />
               Recalcular Remunerações
             </Button>
-            {/* Filtro Revenda */}
+            {/* Botões Em Estoque / Notas a Emitir */}
+            {!estoqueMode && !notasAEmitirMode ? (
+              <>
+                {canEstoque && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEstoqueMode(true)}
+                    className="text-sky-700 border-sky-300 hover:bg-sky-50 gap-1.5 font-medium"
+                    title="Exibe apenas veículos sem Data da Venda (em estoque)"
+                  >
+                    <Package className="w-4 h-4" />
+                    Em Estoque
+                  </Button>
+                )}
+                {canNotasAEmitir && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setNotasAEmitirMode(true)}
+                    className="text-orange-700 border-orange-300 hover:bg-orange-50 gap-1.5 font-medium"
+                    title="Exibe apenas linhas com Data da Venda preenchida e sem Nº NF de Comissão"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Notas a Emitir
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setEstoqueMode(false); setNotasAEmitirMode(false); }}
+                className="bg-gray-500 text-white border-gray-500 hover:bg-gray-600 gap-1.5 font-medium"
+              >
+                <ListRestart className="w-4 h-4" />
+                Ver Todos
+              </Button>
+            )}
+            {/* Filtro Revenda */
             {(() => {
               const canTodas      = isAdmin() || canAccessVendasSub('blindagem.todas');
               const canRevendaVW   = isAdmin() || canAccessVendasSub('blindagem.revenda_vw');

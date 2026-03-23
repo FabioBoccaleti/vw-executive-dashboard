@@ -12,6 +12,8 @@ export type VendasSubModuleId =
   | 'blindagem.todas'
   | 'blindagem.revenda_vw'
   | 'blindagem.revenda_audi'
+  | 'blindagem.estoque'
+  | 'blindagem.notas_a_emitir'
   | 'peliculas.tabela'
   | 'peliculas.analise';
 export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes'];
