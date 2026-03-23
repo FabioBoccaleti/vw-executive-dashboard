@@ -1397,7 +1397,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
       {/* ── Modal Simulador ── */}
       {showSimulador && (() => {
         const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        const fmtPctSim = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+        const fmtPctSim = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
         const venda = parseFloat(simVenda.replace(/\./g, '').replace(',', '.')) || 0;
         const custo = parseFloat(simCusto.replace(/\./g, '').replace(',', '.')) || 0;
         const impostos = venda * aliquotaTotal / 100;
@@ -1470,8 +1470,10 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                     type="text"
                     value={simVenda}
                     onChange={e => setSimVenda(e.target.value)}
+                    onBlur={e => { const v = parseBrazilianNumber(e.target.value); if (v) setSimVenda(toDisplayNumber(v)); }}
+                    onFocus={e => e.target.select()}
                     placeholder="0,00"
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 font-mono tabular-nums text-right"
                   />
                 </div>
                 <div>
@@ -1480,8 +1482,10 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                     type="text"
                     value={simCusto}
                     onChange={e => setSimCusto(e.target.value)}
+                    onBlur={e => { const v = parseBrazilianNumber(e.target.value); if (v) setSimCusto(toDisplayNumber(v)); }}
+                    onFocus={e => e.target.select()}
                     placeholder="0,00"
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 font-mono tabular-nums text-right"
                   />
                 </div>
               </div>
