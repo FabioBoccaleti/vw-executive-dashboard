@@ -1030,6 +1030,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                                 <input
                                   ref={lockInputRef}
                                   type="password"
+                                  autoComplete="new-password"
                                   value={lockPassword}
                                   onChange={e => setLockPassword(e.target.value)}
                                   onKeyDown={e => {
