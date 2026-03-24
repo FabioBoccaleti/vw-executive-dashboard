@@ -1,4 +1,4 @@
-import { Shield, Layers } from 'lucide-react';
+import { Shield, Layers, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { VendasSubModuleId } from '@/lib/authTypes';
 
@@ -71,6 +71,21 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
             </div>
           </button>
           )}
+
+          {/* Card — Em desenvolvimento */}
+          <div className="flex-1 bg-white rounded-2xl border-2 border-emerald-300 shadow-md p-8 flex flex-col items-center gap-4 text-center opacity-70 cursor-not-allowed">
+            <div className="p-4 rounded-full bg-emerald-50">
+              <Clock className="w-10 h-10 text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug mb-2">
+                Em desenvolvimento
+              </h2>
+              <span className="inline-block text-[11px] font-semibold text-emerald-700 bg-emerald-100 border border-emerald-300 rounded-full px-3 py-0.5">
+                Em breve
+              </span>
+            </div>
+          </div>
 
         </div>
       </div>
