@@ -480,7 +480,17 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
     const totalDsrAcessorios = grupoAcessorios.reduce((s, v) => s + v.dsr, 0);
     const totalGeral         = totalVendedor + totalAcessorios;
 
-    return { grupoVendedor, grupoAcessorios, totalVendedor, totalDsrVendedor, totalAcessorios, totalDsrAcessorios, totalGeral };
+    const _calcCustoFolha = (comissao: number, dsr: number) => {
+      const totalComDsr = comissao + dsr;
+      const provisoes   = (totalComDsr / 12) + (totalComDsr / 12 / 3) + (totalComDsr / 12);
+      const baseEnc     = totalComDsr + provisoes;
+      const encargos    = baseEnc * 0.08 + baseEnc * 0.278;
+      return totalComDsr + provisoes + encargos;
+    };
+    const custoFolhaVendedor   = _calcCustoFolha(totalVendedor, totalDsrVendedor);
+    const custoFolhaAcessorios = _calcCustoFolha(totalAcessorios, totalDsrAcessorios);
+
+    return { grupoVendedor, grupoAcessorios, totalVendedor, totalDsrVendedor, totalAcessorios, totalDsrAcessorios, totalGeral, custoFolhaVendedor, custoFolhaAcessorios };
   }, [filteredRows, dsrList]);
 
   // Comparativo de períodos
@@ -627,20 +637,25 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
         {/* Cards bottom-line: Custo Folha + Resultado */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
           {/* Custo Folha */}
-          <div className="bg-white rounded-xl border border-amber-200 shadow-sm px-4 py-3 flex items-center gap-4"
-               style={{ borderLeft: '4px solid #f59e0b' }}>
-            <div className="flex-1 min-w-0">
-              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide leading-tight block">Custo Folha</span>
-              <span className="text-xl font-bold text-amber-600 leading-tight font-mono">{fmtBRL(metrics.totalComissoes)}</span>
-              <span className="text-xs text-slate-400 block mt-0.5">
-                {metrics.totalLucro > 0 ? `${fmtPct(metrics.totalComissoes / metrics.totalLucro * 100)} do Lucro Bruto` : 'Comissões + DSR + Encargos'}
-              </span>
-            </div>
-            <div className="text-right flex-shrink-0 text-xs text-slate-400 space-y-0.5">
-              <p>Vendedor: <span className="font-semibold text-violet-600 font-mono">{fmtBRL(metrics.totalComissaoVendedor)}</span></p>
-              <p>Acessórios: <span className="font-semibold text-fuchsia-600 font-mono">{fmtBRL(metrics.totalComissaoAcessorios)}</span></p>
-            </div>
-          </div>
+          {(() => {
+            const totalCustoFolha = custoComissoesData.custoFolhaVendedor + custoComissoesData.custoFolhaAcessorios;
+            return (
+              <div className="bg-white rounded-xl border border-amber-200 shadow-sm px-4 py-3 flex items-center gap-4"
+                   style={{ borderLeft: '4px solid #f59e0b' }}>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide leading-tight block">Custo Folha</span>
+                  <span className="text-xl font-bold text-amber-600 leading-tight font-mono">{fmtBRL(totalCustoFolha)}</span>
+                  <span className="text-xs text-slate-400 block mt-0.5">
+                    {metrics.totalLucro > 0 ? `${fmtPct(totalCustoFolha / metrics.totalLucro * 100)} do Lucro Bruto` : 'Comissões + DSR + Provisões + Encargos'}
+                  </span>
+                </div>
+                <div className="text-right flex-shrink-0 text-xs text-slate-400 space-y-0.5">
+                  <p>Vendedor: <span className="font-semibold text-violet-600 font-mono">{fmtBRL(custoComissoesData.custoFolhaVendedor)}</span></p>
+                  <p>Acessórios: <span className="font-semibold text-fuchsia-600 font-mono">{fmtBRL(custoComissoesData.custoFolhaAcessorios)}</span></p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Resultado */}
           {(() => {
@@ -1094,16 +1109,16 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                 <BarChart
                   layout="vertical"
                   data={[
-                    { grupo: 'Vendedor',   comissao: custoComissoesData.totalVendedor },
-                    { grupo: 'Acessórios', comissao: custoComissoesData.totalAcessorios },
+                    { grupo: 'Vendedor',   custoFolha: custoComissoesData.custoFolhaVendedor },
+                    { grupo: 'Acessórios', custoFolha: custoComissoesData.custoFolhaAcessorios },
                   ]}
                   margin={{ left: 8, right: 80, top: 4, bottom: 4 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                   <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
                   <YAxis type="category" dataKey="grupo" tick={{ fontSize: 12, fontWeight: 600 }} width={100} />
-                  <Tooltip formatter={(v: number) => [fmtBRLFull(v), 'Comissão']} />
-                  <Bar dataKey="comissao" name="Comissão" radius={[0, 6, 6, 0]} maxBarSize={32}
+                  <Tooltip formatter={(v: number) => [fmtBRLFull(v), 'Custo Folha']} />
+                  <Bar dataKey="custoFolha" name="Custo Folha" radius={[0, 6, 6, 0]} maxBarSize={32}
                     label={{ position: 'right', formatter: (v: number) => fmtBRL(v), fontSize: 11, fill: '#64748b', fontWeight: 600 }}
                   >
                     <Cell fill="#6366f1" />
