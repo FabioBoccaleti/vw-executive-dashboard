@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart as ReBarChart,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { type PeliculasRow } from './peliculasStorage';
+import { loadPeliculasDsr, type DsrConfig } from '@/components/CadastrosPage/cadastrosStorage';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -67,7 +68,7 @@ interface Metrics {
   pctResultado: number;
 }
 
-function calcMetrics(rows: PeliculasRow[]): Metrics {
+function calcMetrics(rows: PeliculasRow[], dsrList: DsrConfig[]): Metrics {
   const qtd               = rows.length;
   const totalVenda        = rows.reduce((a, r) => a + n(r.valorVenda), 0);
   const totalImpostos     = rows.reduce((a, r) => a + n(r.impostos), 0);
@@ -79,9 +80,21 @@ function calcMetrics(rows: PeliculasRow[]): Metrics {
   const totalComissaoVendedor   = rows.reduce((a, r) => a + n(r.comissaoVendedor), 0);
   const totalComissaoAcessorios = rows.reduce((a, r) => a + n(r.comissaoVendedorAcessorios), 0);
   const totalComissoes          = totalComissaoVendedor + totalComissaoAcessorios;
-  // DSR, Provisões e Encargos: fórmulas a definir (atualmente = 0)
-  const comissaoVendedorComDSR   = totalComissaoVendedor;   // + DSR quando fórmula estiver disponível
-  const comissaoAcessoriosComDSR = totalComissaoAcessorios; // + DSR quando fórmula estiver disponível
+  // DSR por linha: usa o percentual do mês/ano da venda (dataEncerramento ou dataRegistro)
+  const dsrVendedor = rows.reduce((a, r) => {
+    const yr = getRowYear(r); const mo = getRowMonth(r);
+    if (!yr || !mo) return a;
+    const pct = parseFloat(dsrList.find(d => d.ano === yr && d.mes === mo)?.percentual || '0') / 100;
+    return a + n(r.comissaoVendedor) * pct;
+  }, 0);
+  const dsrAcessorios = rows.reduce((a, r) => {
+    const yr = getRowYear(r); const mo = getRowMonth(r);
+    if (!yr || !mo) return a;
+    const pct = parseFloat(dsrList.find(d => d.ano === yr && d.mes === mo)?.percentual || '0') / 100;
+    return a + n(r.comissaoVendedorAcessorios) * pct;
+  }, 0);
+  const comissaoVendedorComDSR   = totalComissaoVendedor + dsrVendedor;
+  const comissaoAcessoriosComDSR = totalComissaoAcessorios + dsrAcessorios;
   // Provisões: Férias + 1/3 Férias + 13º Salário, calculados sobre Total Com. + DSR
   const totalComDSR       = comissaoVendedorComDSR + comissaoAcessoriosComDSR;
   const provisaoFerias    = totalComDSR / 12;
@@ -222,6 +235,9 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
   ]);
   const [sortAcess, setSortAcess] = useState<'totalRL' | 'lucro' | 'qtd'>('totalRL');
   const [selectedProduto, setSelectedProduto] = useState<string>('Todos');
+  const [dsrList, setDsrList] = useState<DsrConfig[]>([]);
+
+  useEffect(() => { loadPeliculasDsr().then(setDsrList); }, []);
 
   // Apenas linhas com situação válida
   const baseRows = useMemo(() => validRows(rows), [rows]);
@@ -249,15 +265,15 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
     [baseRows, selectedYear, monthChip]
   );
 
-  const metrics = useMemo(() => calcMetrics(filteredRows), [filteredRows]);
+  const metrics = useMemo(() => calcMetrics(filteredRows, dsrList), [filteredRows, dsrList]);
 
   // Métricas mês anterior (para deltas)
   const prevMonthMetrics = useMemo(() => {
     if (monthChip === null || selectedYear === 'Todos') return null;
     const prevM = monthChip === 1 ? 12 : monthChip - 1;
     const prevY = monthChip === 1 ? (selectedYear as number) - 1 : selectedYear as number;
-    return calcMetrics(filterRows(baseRows, prevY, prevM));
-  }, [baseRows, selectedYear, monthChip]);
+    return calcMetrics(filterRows(baseRows, prevY, prevM), dsrList);
+  }, [baseRows, selectedYear, monthChip, dsrList]);
 
   // Dados mensais
   const monthlyData = useMemo(() => {
@@ -431,33 +447,41 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
 
   // Custo de Comissões
   const custoComissoesData = useMemo(() => {
-    // Grupo Vendedor
-    const mapV = new Map<string, number>();
+    // Grupo Vendedor — acumula comissão e DSR por nome
+    const mapV = new Map<string, { comissao: number; dsr: number }>();
     filteredRows.forEach(r => {
       const key = r.vendedor?.trim() || 'Não informado';
-      mapV.set(key, (mapV.get(key) ?? 0) + n(r.comissaoVendedor));
+      const yr = getRowYear(r); const mo = getRowMonth(r);
+      const pct = (!yr || !mo) ? 0 : parseFloat(dsrList.find(d => d.ano === yr && d.mes === mo)?.percentual || '0') / 100;
+      const prev = mapV.get(key) ?? { comissao: 0, dsr: 0 };
+      mapV.set(key, { comissao: prev.comissao + n(r.comissaoVendedor), dsr: prev.dsr + n(r.comissaoVendedor) * pct });
     });
     const grupoVendedor = [...mapV.entries()]
-      .map(([nome, comissao]) => ({ nome, comissao }))
-      .sort((a, b) => b.comissao - a.comissao);
+      .map(([nome, v]) => ({ nome, comissao: v.comissao, dsr: v.dsr }))
+      .sort((a, b) => (b.comissao + b.dsr) - (a.comissao + a.dsr));
 
-    // Grupo Vendedor de Acessórios
-    const mapA = new Map<string, number>();
+    // Grupo Vendedor de Acessórios — acumula comissão e DSR por nome
+    const mapA = new Map<string, { comissao: number; dsr: number }>();
     filteredRows.forEach(r => {
       if (!r.vendedorAcessorios?.trim()) return;
       const key = r.vendedorAcessorios.trim();
-      mapA.set(key, (mapA.get(key) ?? 0) + n(r.comissaoVendedorAcessorios));
+      const yr = getRowYear(r); const mo = getRowMonth(r);
+      const pct = (!yr || !mo) ? 0 : parseFloat(dsrList.find(d => d.ano === yr && d.mes === mo)?.percentual || '0') / 100;
+      const prev = mapA.get(key) ?? { comissao: 0, dsr: 0 };
+      mapA.set(key, { comissao: prev.comissao + n(r.comissaoVendedorAcessorios), dsr: prev.dsr + n(r.comissaoVendedorAcessorios) * pct });
     });
     const grupoAcessorios = [...mapA.entries()]
-      .map(([nome, comissao]) => ({ nome, comissao }))
-      .sort((a, b) => b.comissao - a.comissao);
+      .map(([nome, v]) => ({ nome, comissao: v.comissao, dsr: v.dsr }))
+      .sort((a, b) => (b.comissao + b.dsr) - (a.comissao + a.dsr));
 
-    const totalVendedor   = grupoVendedor.reduce((s, v) => s + v.comissao, 0);
-    const totalAcessorios = grupoAcessorios.reduce((s, v) => s + v.comissao, 0);
-    const totalGeral      = totalVendedor + totalAcessorios;
+    const totalVendedor      = grupoVendedor.reduce((s, v) => s + v.comissao, 0);
+    const totalDsrVendedor   = grupoVendedor.reduce((s, v) => s + v.dsr, 0);
+    const totalAcessorios    = grupoAcessorios.reduce((s, v) => s + v.comissao, 0);
+    const totalDsrAcessorios = grupoAcessorios.reduce((s, v) => s + v.dsr, 0);
+    const totalGeral         = totalVendedor + totalAcessorios;
 
-    return { grupoVendedor, grupoAcessorios, totalVendedor, totalAcessorios, totalGeral };
-  }, [filteredRows]);
+    return { grupoVendedor, grupoAcessorios, totalVendedor, totalDsrVendedor, totalAcessorios, totalDsrAcessorios, totalGeral };
+  }, [filteredRows, dsrList]);
 
   // Comparativo de períodos
   const periodoOptions: { tipo: PeriodType; label: string; count: number }[] = [
@@ -482,11 +506,11 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
       const prevSlotRows = filterByPeriod(baseRows, prevPeriodSlot(slot)).filter(byVendedor);
       return {
         slot,
-        metrics: calcMetrics(slotRows),
-        prevMetrics: calcMetrics(prevSlotRows),
+        metrics: calcMetrics(slotRows, dsrList),
+        prevMetrics: calcMetrics(prevSlotRows, dsrList),
       };
     }),
-    [periods, baseRows]
+    [periods, baseRows, dsrList]
   );
   const addPeriod = () => { if (periods.length < 4) setPeriods(p => [...p, { year: currentYear, tipo: 'mes', value: currentMonth, vendedor: 'Todos' }]); };
   const removePeriod = (i: number) => setPeriods(p => p.filter((_, idx) => idx !== i));
@@ -1109,7 +1133,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                     <td colSpan={7} className="py-1.5 px-3 text-[11px] font-bold text-indigo-600 uppercase tracking-widest">Vendedor</td>
                   </tr>
                   {custoComissoesData.grupoVendedor.map(v => {
-                    const dsr = 0; // fórmula a definir
+                    const dsr = v.dsr;
                     const totalComDsr = v.comissao + dsr;
                     const provFerias    = totalComDsr / 12;
                     const provTerco     = provFerias / 3;
@@ -1132,14 +1156,15 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                   })}
                   <tr className="bg-indigo-50/60 font-semibold border-t border-indigo-100">
                     {(() => {
-                      const totalComDsrV = custoComissoesData.totalVendedor;
+                      const dsrV = custoComissoesData.totalDsrVendedor;
+                      const totalComDsrV = custoComissoesData.totalVendedor + dsrV;
                       const provV = (totalComDsrV / 12) + (totalComDsrV / 12 / 3) + (totalComDsrV / 12);
                       const baseEncV = totalComDsrV + provV;
                       const encV = baseEncV * 0.08 + baseEncV * 0.278;
                       return (<>
                         <td className="py-2 px-3 text-indigo-700 text-[11px] font-bold uppercase">Subtotal Vendedor</td>
-                        <td className="py-2 px-3 text-right tabular-nums font-mono text-indigo-700">{fmtBRL(totalComDsrV)}</td>
-                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-indigo-700">{fmtBRL(custoComissoesData.totalVendedor)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(dsrV)}</td>
                         <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(totalComDsrV)}</td>
                         <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(provV)}</td>
                         <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(encV)}</td>
@@ -1155,7 +1180,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                         <td colSpan={7} className="py-1.5 px-3 text-[11px] font-bold text-fuchsia-600 uppercase tracking-widest">Vendedor de Acessórios</td>
                       </tr>
                       {custoComissoesData.grupoAcessorios.map(v => {
-                        const dsr = 0;
+                        const dsr = v.dsr;
                         const totalComDsr = v.comissao + dsr;
                         const provFerias    = totalComDsr / 12;
                         const provTerco     = provFerias / 3;
@@ -1178,14 +1203,15 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                       })}
                       <tr className="bg-fuchsia-50/60 font-semibold border-t border-fuchsia-100">
                         {(() => {
-                          const totalComDsrA = custoComissoesData.totalAcessorios;
+                          const dsrA = custoComissoesData.totalDsrAcessorios;
+                          const totalComDsrA = custoComissoesData.totalAcessorios + dsrA;
                           const provA = (totalComDsrA / 12) + (totalComDsrA / 12 / 3) + (totalComDsrA / 12);
                           const baseEncA = totalComDsrA + provA;
                           const encA = baseEncA * 0.08 + baseEncA * 0.278;
                           return (<>
                             <td className="py-2 px-3 text-fuchsia-700 text-[11px] font-bold uppercase">Subtotal Acessórios</td>
-                            <td className="py-2 px-3 text-right tabular-nums font-mono text-fuchsia-700">{fmtBRL(totalComDsrA)}</td>
-                            <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-fuchsia-700">{fmtBRL(custoComissoesData.totalAcessorios)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(dsrA)}</td>
                             <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(totalComDsrA)}</td>
                             <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(provA)}</td>
                             <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(encA)}</td>
@@ -1199,18 +1225,19 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                   {/* Total Geral */}
                   <tr className="bg-slate-800 text-white">
                     {(() => {
-                      const totalGeral = custoComissoesData.totalGeral;
-                      const provTotal = (totalGeral / 12) + (totalGeral / 12 / 3) + (totalGeral / 12);
-                      const baseEncTotal = totalGeral + provTotal;
+                      const dsrGeral = custoComissoesData.totalDsrVendedor + custoComissoesData.totalDsrAcessorios;
+                      const totalGeralComDsr = custoComissoesData.totalGeral + dsrGeral;
+                      const provTotal = (totalGeralComDsr / 12) + (totalGeralComDsr / 12 / 3) + (totalGeralComDsr / 12);
+                      const baseEncTotal = totalGeralComDsr + provTotal;
                       const encTotal = baseEncTotal * 0.08 + baseEncTotal * 0.278;
                       return (<>
                         <td className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-widest">Total Geral</td>
-                        <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(totalGeral)}</td>
-                        <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(0)}</td>
-                        <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(totalGeral)}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(custoComissoesData.totalGeral)}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(dsrGeral)}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(totalGeralComDsr)}</td>
                         <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(provTotal)}</td>
                         <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(encTotal)}</td>
-                        <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(totalGeral + provTotal + encTotal)}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(totalGeralComDsr + provTotal + encTotal)}</td>
                       </>);
                     })()}
                   </tr>
@@ -1218,11 +1245,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
               </table>
             </div>
 
-            {/* Nota sobre fórmulas pendentes */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-              <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
-              Fórmula de DSR será configurada em breve.
-            </div>
+
           </div>
         ) : <EmptyChart />}
       </div>
