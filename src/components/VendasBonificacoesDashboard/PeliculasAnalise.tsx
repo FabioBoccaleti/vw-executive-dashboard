@@ -217,8 +217,8 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
   // Apenas linhas com situação válida
   const baseRows = useMemo(() => validRows(rows), [rows]);
 
-  // Registros "Em andamento" (total geral, sem filtro)
-  const emAndamentoCount = useMemo(() => rows.filter(r => r.situacao === 'Em andamento').length, [rows]);
+  // Registros "Em Andamento" (total geral, sem filtro)
+  const emAndamentoCount = useMemo(() => rows.filter(r => r.situacao === 'Em Andamento').length, [rows]);
 
   // Vendedores disponíveis (para o comparativo de períodos)
   const availableVendedores = useMemo(() => {
