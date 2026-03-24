@@ -111,9 +111,9 @@ export function recalcPeliculasRow(row: PeliculasRow, totalAliquotaPct = 0, comi
 export async function loadPeliculasRows(): Promise<PeliculasRow[]> {
   try {
     const data = await kvGet<PeliculasRow[]>(KEY);
-    if (data && data.length > 0) return data;
+    if (data) return data;
   } catch { /* fallback */ }
-  return Array.from({ length: 10 }, createEmptyPeliculasRow);
+  return [];
 }
 
 export async function savePeliculasRows(rows: PeliculasRow[]): Promise<boolean> {
