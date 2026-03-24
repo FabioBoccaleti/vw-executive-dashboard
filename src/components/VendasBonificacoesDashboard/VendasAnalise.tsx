@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LabelList, ComposedChart, Line,
@@ -411,6 +412,23 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
   const [monthChip, setMonthChip]               = useState<number | null>(currentMonth);
   const [selectedBlindadora, setSelectedBlindadora] = useState('Todas');
   const [selectedBrand, setSelectedBrand]       = useState<BrandFilter>('Todas');
+  const { canAccessVendasSub, isAdmin } = useAuth();
+  const canTodas      = isAdmin() || canAccessVendasSub('blindagem.todas');
+  const canRevendaVW   = isAdmin() || canAccessVendasSub('blindagem.revenda_vw');
+  const canRevendaAudi = isAdmin() || canAccessVendasSub('blindagem.revenda_audi');
+
+  useEffect(() => {
+    if (selectedBrand === 'Todas' && !canTodas) {
+      if (canRevendaVW) setSelectedBrand('VW');
+      else if (canRevendaAudi) setSelectedBrand('Audi');
+    } else if (selectedBrand === 'VW' && !canRevendaVW) {
+      if (canTodas) setSelectedBrand('Todas');
+      else if (canRevendaAudi) setSelectedBrand('Audi');
+    } else if (selectedBrand === 'Audi' && !canRevendaAudi) {
+      if (canTodas) setSelectedBrand('Todas');
+      else if (canRevendaVW) setSelectedBrand('VW');
+    }
+  }, [canTodas, canRevendaVW, canRevendaAudi]);
 
   // ── Comparativo ──
   const [periods, setPeriods] = useState<PeriodSlot[]>([
@@ -681,7 +699,11 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
     { value: 'Todas', label: 'Todas as Revendas', shortLabel: 'Todas',       color: '#f59e0b', textColor: '#ffffff', count: brandCounts.todas },
     { value: 'VW',    label: 'Revenda VW',        shortLabel: 'Revenda VW',  color: '#001E50', textColor: '#ffffff', count: brandCounts.vw   },
     { value: 'Audi',  label: 'Revenda Audi',      shortLabel: 'Revenda Audi',color: '#BB0A21', textColor: '#ffffff', count: brandCounts.audi },
-  ];
+  ].filter(opt =>
+    (opt.value === 'Todas' && canTodas) ||
+    (opt.value === 'VW'    && canRevendaVW) ||
+    (opt.value === 'Audi'  && canRevendaAudi)
+  );
 
   return (
     <div className="p-4 space-y-6 bg-slate-50 min-h-full">
