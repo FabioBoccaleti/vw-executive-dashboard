@@ -292,7 +292,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [loading, setLoading]     = useState(true);
   const [filters, setFilters]     = useState<FilterValues>({});
   const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('analise');
-  const { canAccessVendasSub, isAdmin } = useAuth();
+  const { canAccessVendasSub, isAdmin, session } = useAuth();
   const canTabela = isAdmin() || canAccessVendasSub('peliculas.tabela');
   const canAnalise = isAdmin() || canAccessVendasSub('peliculas.analise');
   const [importPreview, setImportPreview] = useState<PeliculasRow[] | null>(null);
@@ -322,7 +322,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
   const [liberarNFNotFound, setLiberarNFNotFound] = useState(false);
   const [liberarNFValorInformado, setLiberarNFValorInformado] = useState('');
   const [liberarNFLiberado, setLiberarNFLiberado] = useState(false);
-  const [liberarNFValidador, setLiberarNFValidador] = useState('');
+  const [liberarNFValidador, setLiberarNFValidador] = useState(() => session?.username ?? '');
   const [liberarNFAssinatura, setLiberarNFAssinatura] = useState('');
   const [liberarNFDataHora, setLiberarNFDataHora] = useState('');
 
@@ -470,7 +470,7 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
     setLiberarNFNotFound(false);
     setLiberarNFValorInformado('');
     setLiberarNFLiberado(false);
-    setLiberarNFValidador('');
+    setLiberarNFValidador(session?.username ?? '');
     setLiberarNFAssinatura('');
     setLiberarNFDataHora('');
   };
@@ -1690,12 +1690,12 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
                         <input
                           type="text"
                           value={liberarNFValidador}
-                          onChange={e => setLiberarNFValidador(e.target.value)}
-                          placeholder="Digite o nome de quem validou"
-                          className={`border-2 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-4 transition-all ${
+                          readOnly
+                          placeholder="Usuário logado"
+                          className={`border-2 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none transition-all bg-slate-50 cursor-default ${
                             !liberarNFValidador.trim()
-                              ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-                              : 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-100'
+                              ? 'border-red-300'
+                              : 'border-emerald-400'
                           }`}
                         />
                         {!liberarNFValidador.trim() && (
