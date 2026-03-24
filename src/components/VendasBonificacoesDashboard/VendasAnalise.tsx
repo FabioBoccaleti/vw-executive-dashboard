@@ -107,7 +107,7 @@ function calcMetrics(rows: VendasRow[]): Metrics {
   const custo     = rows.reduce((a, r) => a + n(r.custoBlindagem), 0);
   const lucro     = rows.reduce((a, r) => a + n(r.lucroOperacao), 0);
   const margem    = receita > 0 ? (lucro / receita) * 100 : 0;
-  const sorana    = rows.reduce((a, r) => a + n(r.comissaoBrutaSorana), 0);
+  const sorana    = rows.reduce((a, r) => a + n(r.comissaoBrutaSorana), 0) * (1 - TAXA_IMPOSTOS_SORANA);
   const ticketMedio = qtd > 0 ? receita / qtd : 0;
   const remVendedor  = rows.reduce((a, r) => a + n(r.remuneracaoVendedor), 0);
   const remGerencia  = rows.reduce((a, r) => a + n(r.remuneracaoGerencia), 0);
@@ -121,6 +121,9 @@ function calcMetrics(rows: VendasRow[]): Metrics {
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const PALETTE = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#f97316', '#84cc16'];
 const PERIOD_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6'];
+
+// Alíquota composta PIS + Cofins + ISS aplicada sobre a Comissão Sorana
+const TAXA_IMPOSTOS_SORANA = 0.1425;
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 interface KpiCardProps { label: string; value: string; sub?: string; color?: string; accentColor?: string; }
@@ -173,7 +176,7 @@ function MonthlyTooltip({ active, payload, label }: { active?: boolean; payload?
       ))}
       {soranaPct !== undefined && (
         <p className="font-mono mt-1 pt-1 border-t border-slate-100" style={{ color: '#8b5cf6' }}>
-          % Rentabilidade Sorana: {fmtPct(soranaPct)}
+          % Rent. Sorana Líq.: {fmtPct(soranaPct)}
         </p>
       )}
     </div>
@@ -190,9 +193,9 @@ function BlindadoraTooltip({ active, payload, label }: { active?: boolean; paylo
       <p className="font-mono" style={{ color: '#64748b' }}>Total de Vendas: {d.qtd}</p>
       <p className="font-mono" style={{ color: '#f59e0b' }}>Receita: {fmtBRLFull(d.receita)}</p>
       <p className="font-mono" style={{ color: '#10b981' }}>Lucro Bruto: {fmtBRLFull(d.lucro)}</p>
-      <p className="font-mono" style={{ color: '#8b5cf6' }}>Comissão Sorana: {fmtBRLFull(d.sorana)}</p>
+      <p className="font-mono" style={{ color: '#8b5cf6' }}>Com. Sorana Líquida: {fmtBRLFull(d.sorana)}</p>
       <p className="font-mono mt-1 pt-1 border-t border-slate-100" style={{ color: '#8b5cf6' }}>
-        % Rentabilidade Sorana: {fmtPct(d.soranaPct)}
+        % Rent. Sorana Líq.: {fmtPct(d.soranaPct)}
       </p>
     </div>
   );
@@ -489,7 +492,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
       );
       const receita = mRows.reduce((a, r) => a + n(r.valorVendaBlindagem), 0);
       const lucro   = mRows.reduce((a, r) => a + n(r.lucroOperacao), 0);
-      const sorana  = mRows.reduce((a, r) => a + n(r.comissaoBrutaSorana), 0);
+      const sorana  = mRows.reduce((a, r) => a + n(r.comissaoBrutaSorana), 0) * (1 - TAXA_IMPOSTOS_SORANA);
       const soranaPct = receita > 0 ? (sorana / receita) * 100 : 0;
       return { label, receita, lucro, sorana, soranaPct, qtd: mRows.length };
     });
@@ -518,9 +521,9 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
         name,
         qtd: v.qtd,
         receita: v.receita,
-        sorana: v.sorana,
+        sorana: v.sorana * (1 - TAXA_IMPOSTOS_SORANA),
         ticketMedio: v.qtd > 0 ? v.receita / v.qtd : 0,
-        tmComissao: v.qtd > 0 ? v.sorana / v.qtd : 0,
+        tmComissao: v.qtd > 0 ? v.sorana * (1 - TAXA_IMPOSTOS_SORANA) / v.qtd : 0,
       }))
       .sort((a, b) => b.receita - a.receita);
   }, [filteredRows]);
@@ -547,8 +550,8 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
         lucro: v.lucro,
         margem: v.receita > 0 ? (v.lucro / v.receita) * 100 : 0,
         remVendedor: v.remVendedor,
-        sorana: v.sorana,
-        soranaPct: v.receita > 0 ? (v.sorana / v.receita) * 100 : 0,
+        sorana: v.sorana * (1 - TAXA_IMPOSTOS_SORANA),
+        soranaPct: v.receita > 0 ? (v.sorana * (1 - TAXA_IMPOSTOS_SORANA) / v.receita) * 100 : 0,
       }))
       .sort((a, b) => b.qtd - a.qtd || b.sorana - a.sorana);
   }, [filteredRows]);
@@ -574,8 +577,8 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
         custoMedio: v.qtd > 0 ? v.custo / v.qtd : 0,
         lucro: v.lucro,
         receita: v.receita,
-        sorana: v.sorana,
-        soranaPct: v.receita > 0 ? (v.sorana / v.receita) * 100 : 0,
+        sorana: v.sorana * (1 - TAXA_IMPOSTOS_SORANA),
+        soranaPct: v.receita > 0 ? (v.sorana * (1 - TAXA_IMPOSTOS_SORANA) / v.receita) * 100 : 0,
       }))
       .sort((a, b) => b.receita - a.receita);
   }, [brandRows, selectedYear, monthChip]);
@@ -586,7 +589,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
     { name: 'Gerência',    value: metrics.remGerencia,  color: '#3b82f6' },
     { name: 'Diretoria Comercial', value: metrics.remDiretoria, color: '#8b5cf6' },
     { name: 'Sup. Usados', value: metrics.remSupervisor,color: '#10b981' },
-    { name: 'Sorana',      value: metrics.sorana,       color: '#ef4444' },
+    { name: 'Sorana Líq.',      value: metrics.sorana,       color: '#ef4444' },
   ].filter(d => d.value > 0), [metrics]);
 
   // ── Comparativo de períodos ──
@@ -626,8 +629,8 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
     { label: 'Lucro Bruto',  key: 'lucro',      fmt: fmtBRLFull },
     { label: 'Margem Bruta %',      key: 'margem',     fmt: fmtPct },
     { label: 'Ticket Médio',       key: 'ticketMedio',fmt: fmtBRLFull },
-    { label: 'Comissão Sorana',    key: 'sorana',     fmt: fmtBRLFull },
-    { label: '% Rentabilidade Sorana', key: 'soranaPct', fmt: fmtPct },
+    { label: 'Com. Sorana Líquida',    key: 'sorana',     fmt: fmtBRLFull },
+    { label: '% Rent. Sorana Líq.', key: 'soranaPct', fmt: fmtPct },
     { label: 'Rem. Vendedores',    key: 'remVendedor',fmt: fmtBRLFull },
     { label: 'Rem. Gerência',      key: 'remGerencia',fmt: fmtBRLFull },
     { label: 'Rem. Diretoria Comercial', key: 'remDiretoria',fmt: fmtBRLFull },
@@ -805,8 +808,8 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
               <KpiCard label="Lucro Bruto" value={fmtBRL(metrics.lucro)} color="text-emerald-600" accentColor={accent} />
               <KpiCard label="Margem Bruta%" value={fmtPct(metrics.margem)} color={metrics.margem >= 20 ? 'text-emerald-600' : metrics.margem >= 10 ? 'text-amber-600' : 'text-red-500'} accentColor={accent} />
               <KpiCard label="Ticket Médio" value={fmtBRL(metrics.ticketMedio)} color="text-sky-600" sub={metrics.qtd > 0 ? `TM Comissão: ${fmtBRL(metrics.sorana / metrics.qtd)}` : undefined} accentColor={accent} />
-              <KpiCard label="Comissão Sorana" value={fmtBRL(metrics.sorana)} color="text-violet-600" sub={metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) + ' da receita' : undefined} accentColor={accent} />
-              <KpiCard label="% Rentabilidade Sorana" value={metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) : '—'} color="text-fuchsia-600" accentColor={accent} />
+              <KpiCard label="Com. Sorana Líquida" value={fmtBRL(metrics.sorana)} color="text-violet-600" sub={metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) + ' da receita' : undefined} accentColor={accent} />
+              <KpiCard label="% Rent. Sorana Líq." value={metrics.receita > 0 ? fmtPct(metrics.sorana / metrics.receita * 100) : '—'} color="text-fuchsia-600" accentColor={accent} />
             </div>
           );
         })()}
@@ -931,7 +934,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
                   <LabelList dataKey="qtd" position="right" formatter={(v: number) => `${v}x`} style={{ fontSize: 11, fill: '#64748b' }} />
                 </Bar>
                 <Bar dataKey="lucro" name="Lucro Bruto" fill="#10b981" radius={[0, 3, 3, 0]} />
-                <Bar dataKey="sorana" name="Comissão Sorana" fill="#8b5cf6" radius={[0, 3, 3, 0]} />
+                <Bar dataKey="sorana" name="Com. Sorana Líquida" fill="#8b5cf6" radius={[0, 3, 3, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : <EmptyChart />}
@@ -953,7 +956,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Bar yAxisId="left" dataKey="receita" name="Receita" fill="#f59e0b" radius={[3, 3, 0, 0]} />
             <Bar yAxisId="left" dataKey="lucro" name="Lucro Bruto" fill="#10b981" radius={[3, 3, 0, 0]} />
-            <Bar yAxisId="left" dataKey="sorana" name="Comissão Sorana" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
+            <Bar yAxisId="left" dataKey="sorana" name="Com. Sorana Líquida" fill="#8b5cf6" radius={[3, 3, 0, 0]} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -1003,7 +1006,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
                         </div>
                         <div className="space-y-2">
                           <div>
-                            <p className="text-xs text-slate-400 mb-0.5">Comissão Sorana</p>
+                            <p className="text-xs text-slate-400 mb-0.5">Com. Sorana Líquida</p>
                             <p className={`text-lg font-bold font-mono ${textAccent[i]}`}>{fmtBRL(v.sorana)}</p>
                           </div>
                           <div className="w-full bg-white/70 rounded-full h-1.5">
@@ -1041,8 +1044,8 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
                           <th className="text-left py-2 px-2 text-slate-400 font-semibold">Vendedor</th>
                           <th className="text-right py-2 px-2 text-slate-400 font-semibold">Qtd</th>
                           <th className="text-right py-2 px-2 text-slate-400 font-semibold">% Volume</th>
-                          <th className="text-right py-2 px-2 text-slate-400 font-semibold">Comissão Sorana</th>
-                          <th className="text-right py-2 px-2 text-slate-400 font-semibold">% Rent. Sorana</th>
+                          <th className="text-right py-2 px-2 text-slate-400 font-semibold">Com. Sorana Líquida</th>
+                          <th className="text-right py-2 px-2 text-slate-400 font-semibold">% Rent. Sorana Líq.</th>
                           <th className="text-right py-2 px-2 text-slate-400 font-semibold">Remuneração Vendedor</th>
                         </tr>
                       </thead>
@@ -1086,7 +1089,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
                 { label: 'Gerência',      value: metrics.remGerencia,  color: 'text-blue-600' },
                 { label: 'Diretoria Comercial', value: metrics.remDiretoria, color: 'text-violet-600' },
                 { label: 'Sup. Usados',   value: metrics.remSupervisor,color: 'text-emerald-600' },
-                { label: 'Sorana',        value: metrics.sorana,       color: 'text-red-600' },
+                { label: 'Sorana Líq.',        value: metrics.sorana,       color: 'text-red-600' },
                 { label: 'Total',         value: metrics.remTotal + metrics.sorana, color: 'text-slate-800' },
               ].map(c => (
                 <div key={c.label} className="bg-slate-50 rounded-lg p-3">
@@ -1285,7 +1288,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
             <ResponsiveContainer width="100%" height={220}>
               <BarChart
                 data={['receita', 'lucro', 'sorana'].map(key => ({
-                  name: key === 'receita' ? 'Receita' : key === 'lucro' ? 'Lucro' : 'Sorana',
+                  name: key === 'receita' ? 'Receita' : key === 'lucro' ? 'Lucro' : 'Sorana Líq.',
                   ...Object.fromEntries(periodMetrics.map(({ slot, metrics: m }, i) => [
                     periodLabel(slot.tipo, slot.value, slot.year),
                     m[key as keyof Metrics],
