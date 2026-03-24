@@ -22,6 +22,7 @@ export interface PeliculasRow {
   comissaoVendedorAcessorios: string;
   nfPrestador: string;
   situacao: string;
+  observacao: string;
 }
 
 export function createEmptyPeliculasRow(): PeliculasRow {
@@ -47,6 +48,7 @@ export function createEmptyPeliculasRow(): PeliculasRow {
     comissaoVendedorAcessorios: '',
     nfPrestador: '',
     situacao: '',
+    observacao: '',
   };
 }
 
