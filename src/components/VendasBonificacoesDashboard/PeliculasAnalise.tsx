@@ -88,7 +88,11 @@ function calcMetrics(rows: PeliculasRow[]): Metrics {
   const provisaoTercoFerias = provisaoFerias / 3;
   const provisao13Salario = totalComDSR / 12;
   const totalProvisoes    = provisaoFerias + provisaoTercoFerias + provisao13Salario;
-  const totalEncargos            = 0; // fórmula a definir
+  // Encargos: FGTS (8%) + INSS (27,8%) sobre (Total Com. + DSR + Provisões)
+  const baseEncargos   = totalComDSR + totalProvisoes;
+  const fgts           = baseEncargos * 0.08;
+  const inss           = baseEncargos * 0.278;
+  const totalEncargos  = fgts + inss;
   const resultado                = totalLucro - comissaoVendedorComDSR - comissaoAcessoriosComDSR - totalProvisoes - totalEncargos;
   const pctResultado             = totalRL > 0 ? (resultado / totalRL) * 100 : 0;
   return { qtd, totalVenda, totalImpostos, totalRL, totalCusto, totalLucro, pctLucroMedio, ticketMedio, totalComissaoVendedor, totalComissaoAcessorios, totalComissoes, comissaoVendedorComDSR, comissaoAcessoriosComDSR, totalProvisoes, totalEncargos, resultado, pctResultado };
@@ -1111,7 +1115,8 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                     const provTerco     = provFerias / 3;
                     const prov13        = totalComDsr / 12;
                     const provisoes     = provFerias + provTerco + prov13;
-                    const encargos = 0;  // fórmula a definir
+                    const baseEnc  = totalComDsr + provisoes;
+                    const encargos = baseEnc * 0.08 + baseEnc * 0.278;
                     const custoFolha = totalComDsr + provisoes + encargos;
                     return (
                       <tr key={`v-${v.nome}`} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
@@ -1129,14 +1134,16 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                     {(() => {
                       const totalComDsrV = custoComissoesData.totalVendedor;
                       const provV = (totalComDsrV / 12) + (totalComDsrV / 12 / 3) + (totalComDsrV / 12);
+                      const baseEncV = totalComDsrV + provV;
+                      const encV = baseEncV * 0.08 + baseEncV * 0.278;
                       return (<>
                         <td className="py-2 px-3 text-indigo-700 text-[11px] font-bold uppercase">Subtotal Vendedor</td>
                         <td className="py-2 px-3 text-right tabular-nums font-mono text-indigo-700">{fmtBRL(totalComDsrV)}</td>
                         <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
                         <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(totalComDsrV)}</td>
                         <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(provV)}</td>
-                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
-                        <td className="py-2 px-3 text-right tabular-nums font-mono font-bold text-indigo-700 bg-slate-50">{fmtBRL(totalComDsrV + provV)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(encV)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono font-bold text-indigo-700 bg-slate-50">{fmtBRL(totalComDsrV + provV + encV)}</td>
                       </>);
                     })()}
                   </tr>
@@ -1154,7 +1161,8 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                         const provTerco     = provFerias / 3;
                         const prov13        = totalComDsr / 12;
                         const provisoes     = provFerias + provTerco + prov13;
-                        const encargos = 0;
+                        const baseEnc  = totalComDsr + provisoes;
+                        const encargos = baseEnc * 0.08 + baseEnc * 0.278;
                         const custoFolha = totalComDsr + provisoes + encargos;
                         return (
                           <tr key={`a-${v.nome}`} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
@@ -1172,14 +1180,16 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                         {(() => {
                           const totalComDsrA = custoComissoesData.totalAcessorios;
                           const provA = (totalComDsrA / 12) + (totalComDsrA / 12 / 3) + (totalComDsrA / 12);
+                          const baseEncA = totalComDsrA + provA;
+                          const encA = baseEncA * 0.08 + baseEncA * 0.278;
                           return (<>
                             <td className="py-2 px-3 text-fuchsia-700 text-[11px] font-bold uppercase">Subtotal Acessórios</td>
                             <td className="py-2 px-3 text-right tabular-nums font-mono text-fuchsia-700">{fmtBRL(totalComDsrA)}</td>
                             <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
                             <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(totalComDsrA)}</td>
                             <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(provA)}</td>
-                            <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
-                            <td className="py-2 px-3 text-right tabular-nums font-mono font-bold text-fuchsia-700 bg-slate-50">{fmtBRL(totalComDsrA + provA)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(encA)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono font-bold text-fuchsia-700 bg-slate-50">{fmtBRL(totalComDsrA + provA + encA)}</td>
                           </>);
                         })()}
                       </tr>
@@ -1191,14 +1201,16 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                     {(() => {
                       const totalGeral = custoComissoesData.totalGeral;
                       const provTotal = (totalGeral / 12) + (totalGeral / 12 / 3) + (totalGeral / 12);
+                      const baseEncTotal = totalGeral + provTotal;
+                      const encTotal = baseEncTotal * 0.08 + baseEncTotal * 0.278;
                       return (<>
                         <td className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-widest">Total Geral</td>
                         <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(totalGeral)}</td>
                         <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(0)}</td>
                         <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(totalGeral)}</td>
                         <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(provTotal)}</td>
-                        <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(0)}</td>
-                        <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(totalGeral + provTotal)}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(encTotal)}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(totalGeral + provTotal + encTotal)}</td>
                       </>);
                     })()}
                   </tr>
@@ -1209,7 +1221,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
             {/* Nota sobre fórmulas pendentes */}
             <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
               <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
-              Fórmulas de DSR e Encargos serão configuradas em breve.
+              Fórmula de DSR será configurada em breve.
             </div>
           </div>
         ) : <EmptyChart />}
