@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Upload, X, TrendingUp, TrendingDown, DollarSign, Package, Building2, BarChart3, Target, LogOut, Menu, Activity, Landmark, Users, Receipt, HandCoins, Layers, Download, Sparkles } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { cn } from "@/lib/utils";
-import { loadFluxoCaixaRaw, saveFluxoCaixaData } from "./fluxoCaixaStorage";
+import { loadFluxoCaixaRaw, saveFluxoCaixaData, loadFluxoCaixaIndex } from "./fluxoCaixaStorage";
 import { ComparativosTab } from "./ComparativosTab";
 import { DespesasTab } from "./DespesasTab";
 import { ValoresReceberCharts } from "./ValoresReceberCharts";
@@ -544,6 +544,24 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
   const [savedFileNames, setSavedFileNames] = useState<Record<string, string | undefined>>({});
   const savedFileKey = `${selectedYear}_${selectedMonth}`;
   const savedFileName = savedFileNames[savedFileKey];
+
+  // Ao montar, navega automaticamente para o período mais recente com balancete importado
+  useEffect(() => {
+    loadFluxoCaixaIndex().then(index => {
+      const keys = Object.keys(index); // "YYYY_MM"
+      if (keys.length === 0) return;
+      // Ordena decrescente e pega o mais recente
+      keys.sort((a, b) => b.localeCompare(a));
+      const [yearStr, monthStr] = keys[0].split('_');
+      const year = parseInt(yearStr, 10);
+      const month = parseInt(monthStr, 10);
+      if (!isNaN(year) && !isNaN(month)) {
+        setSelectedYear(year);
+        setSelectedMonth(month);
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     async function loadInitialData() {
