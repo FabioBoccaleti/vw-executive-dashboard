@@ -46,12 +46,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Retorna sessão com permissões ATUAIS do usuário (não as do momento do login)
     const freshSession = {
-      userId:    user.id,
-      username:  user.username,
-      role:      user.role,
-      modules:   user.modules,
-      brands:    user.brands,
-      expiresAt: session.expiresAt,
+      userId:           user.id,
+      username:         user.username,
+      role:             user.role,
+      modules:          user.modules,
+      brands:           user.brands,
+      vendasSubModules: user.vendasSubModules ?? [],
+      expiresAt:        session.expiresAt,
     };
 
     return res.status(200).json({ session: freshSession });

@@ -89,6 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const session = {
       userId: foundUser.id, username: foundUser.username, role: foundUser.role,
       modules: foundUser.modules, brands: foundUser.brands,
+      vendasSubModules: foundUser.vendasSubModules ?? [],
       expiresAt: Date.now() + SESSION_TTL * 1000,
     };
     await redis.setex(sessionKey(token), SESSION_TTL, JSON.stringify(session));
