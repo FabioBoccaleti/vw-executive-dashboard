@@ -61,7 +61,7 @@ function periodLabel(tipo: PeriodType, value: number, year: number): string {
 type PeriodType = 'mes' | 'bimestre' | 'trimestre' | 'semestre' | 'anual';
 type BrandFilter = 'Todas' | 'VW' | 'Audi';
 
-interface PeriodSlot { year: number; tipo: PeriodType; value: number; }
+interface PeriodSlot { year: number; tipo: PeriodType; value: number; vendedor: string; }
 
 function filterRows(rows: VendasRow[], year: number | 'Todos', monthChip: number | null, blindadora: string): VendasRow[] {
   return rows.filter(r => {
@@ -80,6 +80,7 @@ function filterByPeriod(rows: VendasRow[], slot: PeriodSlot, blindadora: string)
     if (getRowYear(r) !== slot.year) return false;
     if (!months.includes(getRowMonth(r))) return false;
     if (blindadora !== 'Todas' && r.blindadora !== blindadora) return false;
+    if (slot.vendedor !== 'Todos' && (r.nomeVendedor?.trim() || '') !== slot.vendedor) return false;
     return true;
   });
 }
@@ -413,7 +414,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
 
   // ── Comparativo ──
   const [periods, setPeriods] = useState<PeriodSlot[]>([
-    { year: currentYear, tipo: 'mes', value: currentMonth },
+    { year: currentYear, tipo: 'mes', value: currentMonth, vendedor: 'Todos' },
   ]);
 
   const [showAllVendedores, setShowAllVendedores] = useState(false);
@@ -461,6 +462,13 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
   // Blindadoras disponíveis (restritas à marca selecionada)
   const availableBlindadoras = useMemo(() => {
     return ['Todas', ...[...new Set(brandRows.map(r => r.blindadora).filter(Boolean))].sort()];
+  }, [brandRows]);
+
+  // Vendedores disponíveis para o comparativo de períodos (todos os registros da marca)
+  const availableVendedores = useMemo(() => {
+    const set = new Set<string>();
+    brandRows.forEach(r => { const v = r.nomeVendedor?.trim(); if (v) set.add(v); });
+    return ['Todos', ...[...set].sort()];
   }, [brandRows]);
 
   // Linhas filtradas para análise principal
@@ -600,7 +608,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
 
   const addPeriod = () => {
     if (periods.length >= 4) return;
-    setPeriods(prev => [...prev, { year: currentYear, tipo: 'mes', value: currentMonth }]);
+    setPeriods(prev => [...prev, { year: currentYear, tipo: 'mes', value: currentMonth, vendedor: 'Todos' }]);
   };
   const removePeriod = (i: number) => setPeriods(prev => prev.filter((_, idx) => idx !== i));
   const updatePeriod = (i: number, patch: Partial<PeriodSlot>) =>
@@ -1231,6 +1239,18 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
                 </select>
               )}
 
+              {/* Vendedor */}
+              <select
+                value={slot.vendedor}
+                onChange={e => updatePeriod(i, { vendedor: e.target.value })}
+                className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-400 max-w-[140px] truncate"
+                title={slot.vendedor}
+              >
+                {availableVendedores.map(v => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+
               {periods.length > 1 && (
                 <button
                   onClick={() => removePeriod(i)}
@@ -1252,6 +1272,9 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
                 {periodMetrics.map(({ slot }, i) => (
                   <th key={i} className="text-right py-2.5 px-3 text-xs font-semibold uppercase tracking-wide" style={{ color: PERIOD_COLORS[i] }}>
                     {i === 0 ? '🔵 Base — ' : `P${i + 1} — `}{periodLabel(slot.tipo, slot.value, slot.year)}
+                    {slot.vendedor !== 'Todos' && (
+                      <span className="block text-[10px] font-normal normal-case tracking-normal mt-0.5 opacity-80">{slot.vendedor}</span>
+                    )}
                   </th>
                 ))}
                 {periodMetrics.slice(1).map((_, i) => (
