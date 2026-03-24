@@ -217,6 +217,9 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
   // Apenas linhas com situação válida
   const baseRows = useMemo(() => validRows(rows), [rows]);
 
+  // Registros "Em andamento" (total geral, sem filtro)
+  const emAndamentoCount = useMemo(() => rows.filter(r => r.situacao === 'Em andamento').length, [rows]);
+
   // Vendedores disponíveis (para o comparativo de períodos)
   const availableVendedores = useMemo(() => {
     const set = new Set<string>();
@@ -509,6 +512,14 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
         <span className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />
         Análise considera apenas registros com situação <strong className="mx-1">Encerrada</strong> ou <strong className="mx-1">Processo Finalizado</strong> — total de <strong className="ml-1">{baseRows.length} registro{baseRows.length !== 1 ? 's' : ''}</strong>
       </div>
+
+      {/* ── ALERTA Em andamento ── */}
+      {emAndamentoCount > 0 && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-300 rounded-xl text-xs text-red-700 font-medium">
+          <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+          Existem <strong className="mx-1">{emAndamentoCount} venda{emAndamentoCount !== 1 ? 's' : ''}</strong> com situação <strong className="mx-1">Em andamento</strong> para serem encerradas.
+        </div>
+      )}
 
       {/* ── FILTROS GLOBAIS ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
