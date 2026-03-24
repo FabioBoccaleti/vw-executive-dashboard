@@ -118,8 +118,7 @@ export async function loadPeliculasRows(): Promise<PeliculasRow[]> {
 
 export async function savePeliculasRows(rows: PeliculasRow[]): Promise<boolean> {
   try {
-    await kvSet(KEY, rows);
-    return true;
+    return await kvSet(KEY, rows);
   } catch {
     return false;
   }

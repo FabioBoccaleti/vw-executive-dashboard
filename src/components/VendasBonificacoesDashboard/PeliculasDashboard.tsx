@@ -382,11 +382,12 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
     }
   }, [lockPromptId]);
 
-  const persist = async (updated: PeliculasRow[]) => {
+  const persist = async (updated: PeliculasRow[]): Promise<boolean> => {
     setSaving(true);
     try {
       const ok = await savePeliculasRows(updated);
       if (!ok) toast.error('Erro ao salvar. Verifique sua conexão.');
+      return ok;
     } finally {
       setSaving(false);
     }
@@ -450,8 +451,8 @@ export function PeliculasDashboard({ onBack, onOpenCadastros }: PeliculasDashboa
     setDeletePasswordPromptId(null);
     setDeletePassword('');
     if (editingId === id) { setEditingId(null); setEditDraft(null); }
-    await persist(updated);
-    toast.success('Registro removido com sucesso');
+    const ok = await persist(updated);
+    if (ok) toast.success('Registro removido com sucesso');
   };
 
   const anularRow = async (id: string) => {
