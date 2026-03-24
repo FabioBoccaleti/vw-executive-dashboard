@@ -82,7 +82,12 @@ function calcMetrics(rows: PeliculasRow[]): Metrics {
   // DSR, Provisões e Encargos: fórmulas a definir (atualmente = 0)
   const comissaoVendedorComDSR   = totalComissaoVendedor;   // + DSR quando fórmula estiver disponível
   const comissaoAcessoriosComDSR = totalComissaoAcessorios; // + DSR quando fórmula estiver disponível
-  const totalProvisoes           = 0; // fórmula a definir
+  // Provisões: Férias + 1/3 Férias + 13º Salário, calculados sobre Total Com. + DSR
+  const totalComDSR       = comissaoVendedorComDSR + comissaoAcessoriosComDSR;
+  const provisaoFerias    = totalComDSR / 12;
+  const provisaoTercoFerias = provisaoFerias / 3;
+  const provisao13Salario = totalComDSR / 12;
+  const totalProvisoes    = provisaoFerias + provisaoTercoFerias + provisao13Salario;
   const totalEncargos            = 0; // fórmula a definir
   const resultado                = totalLucro - comissaoVendedorComDSR - comissaoAcessoriosComDSR - totalProvisoes - totalEncargos;
   const pctResultado             = totalRL > 0 ? (resultado / totalRL) * 100 : 0;
@@ -1102,7 +1107,10 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                   {custoComissoesData.grupoVendedor.map(v => {
                     const dsr = 0; // fórmula a definir
                     const totalComDsr = v.comissao + dsr;
-                    const provisoes = 0; // fórmula a definir
+                    const provFerias    = totalComDsr / 12;
+                    const provTerco     = provFerias / 3;
+                    const prov13        = totalComDsr / 12;
+                    const provisoes     = provFerias + provTerco + prov13;
                     const encargos = 0;  // fórmula a definir
                     const custoFolha = totalComDsr + provisoes + encargos;
                     return (
@@ -1118,13 +1126,19 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                     );
                   })}
                   <tr className="bg-indigo-50/60 font-semibold border-t border-indigo-100">
-                    <td className="py-2 px-3 text-indigo-700 text-[11px] font-bold uppercase">Subtotal Vendedor</td>
-                    <td className="py-2 px-3 text-right tabular-nums font-mono text-indigo-700">{fmtBRL(custoComissoesData.totalVendedor)}</td>
-                    <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
-                    <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(custoComissoesData.totalVendedor)}</td>
-                    <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
-                    <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
-                    <td className="py-2 px-3 text-right tabular-nums font-mono font-bold text-indigo-700 bg-slate-50">{fmtBRL(custoComissoesData.totalVendedor)}</td>
+                    {(() => {
+                      const totalComDsrV = custoComissoesData.totalVendedor;
+                      const provV = (totalComDsrV / 12) + (totalComDsrV / 12 / 3) + (totalComDsrV / 12);
+                      return (<>
+                        <td className="py-2 px-3 text-indigo-700 text-[11px] font-bold uppercase">Subtotal Vendedor</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-indigo-700">{fmtBRL(totalComDsrV)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(totalComDsrV)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(provV)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums font-mono font-bold text-indigo-700 bg-slate-50">{fmtBRL(totalComDsrV + provV)}</td>
+                      </>);
+                    })()}
                   </tr>
 
                   {/* Grupo Vendedor de Acessórios */}
@@ -1136,7 +1150,10 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                       {custoComissoesData.grupoAcessorios.map(v => {
                         const dsr = 0;
                         const totalComDsr = v.comissao + dsr;
-                        const provisoes = 0;
+                        const provFerias    = totalComDsr / 12;
+                        const provTerco     = provFerias / 3;
+                        const prov13        = totalComDsr / 12;
+                        const provisoes     = provFerias + provTerco + prov13;
                         const encargos = 0;
                         const custoFolha = totalComDsr + provisoes + encargos;
                         return (
@@ -1152,26 +1169,38 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                         );
                       })}
                       <tr className="bg-fuchsia-50/60 font-semibold border-t border-fuchsia-100">
-                        <td className="py-2 px-3 text-fuchsia-700 text-[11px] font-bold uppercase">Subtotal Acessórios</td>
-                        <td className="py-2 px-3 text-right tabular-nums font-mono text-fuchsia-700">{fmtBRL(custoComissoesData.totalAcessorios)}</td>
-                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
-                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(custoComissoesData.totalAcessorios)}</td>
-                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
-                        <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
-                        <td className="py-2 px-3 text-right tabular-nums font-mono font-bold text-fuchsia-700 bg-slate-50">{fmtBRL(custoComissoesData.totalAcessorios)}</td>
+                        {(() => {
+                          const totalComDsrA = custoComissoesData.totalAcessorios;
+                          const provA = (totalComDsrA / 12) + (totalComDsrA / 12 / 3) + (totalComDsrA / 12);
+                          return (<>
+                            <td className="py-2 px-3 text-fuchsia-700 text-[11px] font-bold uppercase">Subtotal Acessórios</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-fuchsia-700">{fmtBRL(totalComDsrA)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(totalComDsrA)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(provA)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(0)}</td>
+                            <td className="py-2 px-3 text-right tabular-nums font-mono font-bold text-fuchsia-700 bg-slate-50">{fmtBRL(totalComDsrA + provA)}</td>
+                          </>);
+                        })()}
                       </tr>
                     </>
                   )}
 
                   {/* Total Geral */}
                   <tr className="bg-slate-800 text-white">
-                    <td className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-widest">Total Geral</td>
-                    <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(custoComissoesData.totalGeral)}</td>
-                    <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(0)}</td>
-                    <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(custoComissoesData.totalGeral)}</td>
-                    <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(0)}</td>
-                    <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(0)}</td>
-                    <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(custoComissoesData.totalGeral)}</td>
+                    {(() => {
+                      const totalGeral = custoComissoesData.totalGeral;
+                      const provTotal = (totalGeral / 12) + (totalGeral / 12 / 3) + (totalGeral / 12);
+                      return (<>
+                        <td className="py-2.5 px-3 text-[11px] font-bold uppercase tracking-widest">Total Geral</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(totalGeral)}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(0)}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(totalGeral)}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(provTotal)}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums font-mono">{fmtBRL(0)}</td>
+                        <td className="py-2.5 px-3 text-right tabular-nums font-mono font-bold">{fmtBRL(totalGeral + provTotal)}</td>
+                      </>);
+                    })()}
                   </tr>
                 </tbody>
               </table>
@@ -1180,7 +1209,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
             {/* Nota sobre fórmulas pendentes */}
             <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
               <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
-              Fórmulas de DSR, Provisões e Encargos serão configuradas em breve.
+              Fórmulas de DSR e Encargos serão configuradas em breve.
             </div>
           </div>
         ) : <EmptyChart />}
