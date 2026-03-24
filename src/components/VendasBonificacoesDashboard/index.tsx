@@ -747,6 +747,9 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const canAnalise = isAdmin() || canAccessVendasSub('blindagem.analise');
   const canEstoque = isAdmin() || canAccessVendasSub('blindagem.estoque');
   const canNotasAEmitir = isAdmin() || canAccessVendasSub('blindagem.notas_a_emitir');
+  const canTodas = isAdmin() || canAccessVendasSub('blindagem.todas');
+  const canRevendaVW = isAdmin() || canAccessVendasSub('blindagem.revenda_vw');
+  const canRevendaAudi = isAdmin() || canAccessVendasSub('blindagem.revenda_audi');
   const [importPreview, setImportPreview] = useState<VendasRow[] | null>(null);
   const [recalcConfirm, setRecalcConfirm] = useState(false);
   const [estoqueMode, setEstoqueMode] = useState(false);
@@ -769,6 +772,19 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
       });
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (revendaFilter === 'Todas' && !canTodas) {
+      if (canRevendaVW) setRevendaFilter('VW');
+      else if (canRevendaAudi) setRevendaFilter('Audi');
+    } else if (revendaFilter === 'VW' && !canRevendaVW) {
+      if (canTodas) setRevendaFilter('Todas');
+      else if (canRevendaAudi) setRevendaFilter('Audi');
+    } else if (revendaFilter === 'Audi' && !canRevendaAudi) {
+      if (canTodas) setRevendaFilter('Todas');
+      else if (canRevendaVW) setRevendaFilter('VW');
+    }
+  }, [canTodas, canRevendaVW, canRevendaAudi]);
 
   useEffect(() => {
     Promise.all([loadVendasRows(), loadCatalogo(), loadRevendas(), loadBlinadadoras(), loadRegras(), loadVendedores()]).then(([r, c, rv, bl, rg, vd]) => {
@@ -1850,9 +1866,6 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
             )}
             {/* Filtro Revenda */}
             {(() => {
-              const canTodas      = isAdmin() || canAccessVendasSub('blindagem.todas');
-              const canRevendaVW   = isAdmin() || canAccessVendasSub('blindagem.revenda_vw');
-              const canRevendaAudi = isAdmin() || canAccessVendasSub('blindagem.revenda_audi');
               const revendaCounts = {
                 todas: rows.length,
                 vw: rows.filter(r => r.revenda.toLowerCase().includes('vw')).length,
