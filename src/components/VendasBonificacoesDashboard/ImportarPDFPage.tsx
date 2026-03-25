@@ -3,6 +3,7 @@ import { Upload, FileText, X, AlertCircle, Table2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
+import { createWorker as createTesseractWorker } from 'tesseract.js';
 
 // Vite resolve este path para a URL correta do worker (dev e build)
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -23,9 +24,13 @@ interface ImportarPDFPageProps {
 type RawItem = { x: number; y: number; str: string };
 
 // ─── Coleta itens de texto de todas as páginas ───────────────────────────────
-async function collectItems(file: File): Promise<RawItem[]> {
+// Se o PDF for baseado em imagem (0 itens de texto), usa OCR via Tesseract.js
+async function collectItems(
+  file: File,
+  onProgress?: (msg: string) => void,
+): Promise<RawItem[]> {
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
   const items: RawItem[] = [];
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
@@ -39,7 +44,45 @@ async function collectItems(file: File): Promise<RawItem[]> {
       items.push({ x: t[4], y: viewport.height - t[5], str });
     }
   }
-  return items;
+
+  // PDF tem texto nativo — retorna direto
+  if (items.length > 0) return items;
+
+  // ─── Fallback OCR para PDFs baseados em imagem ─────────────────────────────
+  onProgress?.('PDF baseado em imagem — iniciando OCR (aguarde)...');
+  const ocrItems: RawItem[] = [];
+  const scale = 2;
+  const worker = await createTesseractWorker('por');
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    onProgress?.(`Reconhecendo texto — página ${pageNum} de ${pdf.numPages}...`);
+    const page = await pdf.getPage(pageNum);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d')!;
+    await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+
+    const { data } = await worker.recognize(canvas);
+    // data.lines pode não estar nos tipos de tesseract.js, usar cast
+    const lines = (data as unknown as { lines: Array<{ words: Array<{ text: string; bbox: { x0: number; y0: number } }> }> }).lines ?? [];
+    for (const line of lines) {
+      for (const word of line.words) {
+        const text = word.text.trim();
+        if (text) {
+          ocrItems.push({
+            x: word.bbox.x0 / scale,
+            y: word.bbox.y0 / scale,
+            str: text,
+          });
+        }
+      }
+    }
+  }
+
+  await worker.terminate();
+  return ocrItems;
 }
 
 // ─── Agrupa items em faixas horizontais por Y ────────────────────────────────
@@ -107,7 +150,8 @@ function extractAsTable(items: RawItem[]): TableData {
 
 // ─── MODO FORMULÁRIO: extrai pares "Campo: Valor" em ordem de leitura ────────
 function extractAsForm(items: RawItem[]): TableData {
-  const bands = groupIntoLineBands(items, 6);
+  const lineSep = detectLineThreshold(items);
+  const bands = groupIntoLineBands(items, lineSep);
   const pairs: { campo: string; valor: string }[] = [];
   for (const band of bands) {
     const sorted = [...band].sort((a, b) => a.x - b.x);
@@ -142,8 +186,12 @@ function detectMode(items: RawItem[]): 'tabela' | 'formulario' {
   return 'tabela';
 }
 
-async function extractFromPDF(file: File, forceMode?: 'tabela' | 'formulario'): Promise<TableData> {
-  const items = await collectItems(file);
+async function extractFromPDF(
+  file: File,
+  forceMode?: 'tabela' | 'formulario',
+  onProgress?: (msg: string) => void,
+): Promise<TableData> {
+  const items = await collectItems(file, onProgress);
   if (items.length === 0) return { headers: [], rows: [], mode: forceMode ?? 'tabela' };
   const mode = forceMode ?? detectMode(items);
   return mode === 'formulario' ? extractAsForm(items) : extractAsTable(items);
@@ -153,16 +201,18 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [tableData, setTableData] = useState<TableData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState<string>('Lendo o PDF...');
   const [fileName, setFileName] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastFile, setLastFile] = useState<File | null>(null);
 
   async function processFile(file: File, forceMode?: 'tabela' | 'formulario') {
     setLoading(true);
+    setLoadingMsg('Lendo o PDF...');
     setErrorMsg(null);
     setTableData(null);
     try {
-      const data = await extractFromPDF(file, forceMode);
+      const data = await extractFromPDF(file, forceMode, (msg) => setLoadingMsg(msg));
       if (data.headers.length === 0 && data.rows.length === 0) {
         toast.warning('Nenhum texto encontrado no PDF.');
       } else {
@@ -296,7 +346,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           <div className="flex items-center justify-center py-20">
             <div className="flex flex-col items-center gap-3 text-slate-400">
               <div className="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm">Lendo o PDF...</span>
+              <span className="text-sm text-center max-w-xs">{loadingMsg}</span>
             </div>
           </div>
         )}
