@@ -1,7 +1,14 @@
 import { useRef, useState } from 'react';
-import { Upload, FileText, X } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Vite resolve este path para a URL correta do worker (dev e build)
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).href;
 
 interface TableData {
   headers: string[];
@@ -13,11 +20,6 @@ interface ImportarPDFPageProps {
 }
 
 async function extractTableFromPDF(file: File): Promise<TableData> {
-  // Importação dinâmica para evitar problemas de SSR
-  const pdfjsLib = await import('pdfjs-dist');
-  // Worker servido localmente (copiado de node_modules para public/)
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
@@ -73,15 +75,19 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const [tableData, setTableData] = useState<TableData | null>(null);
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.type !== 'application/pdf') {
+    // Aceita por extensão também, pois alguns sistemas retornam MIME vazio
+    const isLikelyPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (!isLikelyPdf) {
       toast.error('Selecione um arquivo PDF válido.');
       return;
     }
     setLoading(true);
+    setErrorMsg(null);
     setFileName(file.name);
     setTableData(null);
     try {
@@ -94,7 +100,9 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
       setTableData(data);
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao processar o PDF. Verifique o arquivo e tente novamente.');
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMsg(msg);
+      toast.error('Erro ao processar o PDF.');
     } finally {
       setLoading(false);
       // Limpa o input para permitir reimportar o mesmo arquivo
@@ -105,6 +113,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   function handleClear() {
     setTableData(null);
     setFileName(null);
+    setErrorMsg(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -162,12 +171,23 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           />
         </div>
 
-        {/* Tabela de resultado */}
+        {/* Spinner */}
         {loading && (
           <div className="flex items-center justify-center py-20">
             <div className="flex flex-col items-center gap-3 text-slate-400">
               <div className="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
               <span className="text-sm">Lendo o PDF...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Erro detalhado */}
+        {!loading && errorMsg && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-5 flex gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-700 mb-1">Erro ao processar o PDF</p>
+              <p className="text-xs text-red-600 font-mono break-all">{errorMsg}</p>
             </div>
           </div>
         )}
