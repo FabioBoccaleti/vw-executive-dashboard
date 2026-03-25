@@ -9,7 +9,7 @@ const BLINDAGEM_SUBS: VendasSubModuleId[] = [
 const PELICULAS_SUBS: VendasSubModuleId[] = ['peliculas.tabela', 'peliculas.analise'];
 
 interface VendasSelectionPageProps {
-  onSelect: (option: 'blindagem' | 'peliculas') => void;
+  onSelect: (option: 'blindagem' | 'peliculas' | 'importar-pdf') => void;
   onChangeBrand: () => void;
 }
 
@@ -72,20 +72,20 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
           </button>
           )}
 
-          {/* Card — Em desenvolvimento */}
-          <div className="flex-1 bg-white rounded-2xl border-2 border-emerald-300 shadow-md p-8 flex flex-col items-center gap-4 text-center opacity-70 cursor-not-allowed">
-            <div className="p-4 rounded-full bg-emerald-50">
-              <Clock className="w-10 h-10 text-emerald-400" />
+          {/* Card — Importação de PDF */}
+          <button
+            onClick={() => onSelect('importar-pdf')}
+            className="flex-1 bg-white rounded-2xl border-2 border-emerald-400 shadow-md hover:shadow-xl hover:border-emerald-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-emerald-50 group-hover:bg-emerald-100 transition-colors">
+              <Clock className="w-10 h-10 text-emerald-500" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-800 leading-snug mb-2">
-                Em desenvolvimento
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Importação de PDF
               </h2>
-              <span className="inline-block text-[11px] font-semibold text-emerald-700 bg-emerald-100 border border-emerald-300 rounded-full px-3 py-0.5">
-                Em breve
-              </span>
             </div>
-          </div>
+          </button>
 
         </div>
       </div>
