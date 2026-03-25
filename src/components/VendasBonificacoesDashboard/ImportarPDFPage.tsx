@@ -93,14 +93,43 @@ function extractFieldSmart(
       // exact: garante que antes da chave não há texto alfanumérico (evita "Base ICMS...")
       if (exact && keyIdx > 0 && /[a-zà-üa-z0-9]/i.test(textLower[keyIdx - 1])) continue;
       const afterKey = text.slice(keyIdx + key.length).replace(/^\s*:\s*/, '').trim();
-      if (afterKey) return applyTransform(afterKey.split(/\s{2,}/)[0].trim());
+      if (afterKey) {
+        // Também captura itens à direita no mesmo campo (ex: "B4B4" + "- BRANCO CRISTAL")
+        const Y_THRESH2 = 6;
+        const rightClose = sorted
+          .filter(i => Math.abs(i.y - item.y) <= Y_THRESH2 && i.x > item.x)
+          .sort((a, b) => a.x - b.x);
+        let combined = afterKey.split(/\s{2,}/)[0].trim();
+        for (let ri = 0; ri < rightClose.length; ri++) {
+          const curr = rightClose[ri];
+          const prev = ri === 0 ? item : rightClose[ri - 1];
+          const approxPrevWidth = prev.str.length * 5;
+          const gap = curr.x - (prev.x + approxPrevWidth);
+          if (gap > 50) break;
+          combined = (combined + ' ' + curr.str).trim();
+        }
+        return applyTransform(combined);
+      }
       // Label-only item: valor está no(s) próximo(s) item(s) à direita na mesma linha
       const Y_THRESH = 6;
       const rightItems = sorted
         .filter(i => Math.abs(i.y - item.y) <= Y_THRESH && i.x > item.x)
         .sort((a, b) => a.x - b.x);
       if (rightItems.length > 0) {
-        const val = rightItems[0].str.replace(/^:\s*/, '').trim();
+        // Junta itens consecutivos com gap pequeno (mesmo campo, ex: "B4B4 - BRANCO CRISTAL")
+        const parts: string[] = [];
+        for (let ri = 0; ri < rightItems.length; ri++) {
+          const curr = rightItems[ri];
+          if (ri > 0) {
+            const prev = rightItems[ri - 1];
+            const approxPrevWidth = prev.str.length * 5;
+            const gap = curr.x - (prev.x + approxPrevWidth);
+            if (gap > 50) break; // gap grande = novo campo
+          }
+          const s = curr.str.replace(/^:\s*/, '').trim();
+          if (s) parts.push(s);
+        }
+        const val = parts.join(' ').trim();
         if (val) return applyTransform(val);
       }
     }
