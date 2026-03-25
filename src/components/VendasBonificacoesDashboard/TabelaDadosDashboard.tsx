@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect, useRef, useMemo } from 'react';
 import {
-  Pencil, Trash2, Check, X, Plus, Search, FilterX, Download, TableProperties,
+  Pencil, Trash2, Check, X, Plus, Search, FilterX, Download, TableProperties, ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -41,11 +41,30 @@ function parseBrazilianNumber(input: string): string {
   return isNaN(n) ? '' : String(n);
 }
 
+type SourceTab = 'estoque' | 'frotista';
+
+function isSorana(fp: string): boolean {
+  return fp.toLowerCase().includes('sorana');
+}
+
+function parseRowDate(row: TabelaDadosRow): { year: number; month: number } | null {
+  const v = row.dataFaturamento;
+  if (!v) return null;
+  const parts = v.split('-');
+  if (parts.length < 2) return null;
+  const year = parseInt(parts[0]);
+  const month = parseInt(parts[1]);
+  if (isNaN(year) || isNaN(month)) return null;
+  return { year, month };
+}
+
+const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
 // ─── Column definitions ────────────────────────────────────────────────────────
 type ColType = 'text' | 'currency' | 'date';
 interface ColDef { key: keyof TabelaDadosRow; label: string; type: ColType; width: number; }
 
-const COLUMNS: ColDef[] = [
+const COLUMNS_ALL: ColDef[] = [
   { key: 'dataFaturamento',  label: 'Data Faturamento',   type: 'date',     width: 140 },
   { key: 'nota',             label: 'Nota',               type: 'text',     width: 100 },
   { key: 'idVenda',          label: 'ID Venda',           type: 'text',     width: 180 },
@@ -60,19 +79,24 @@ const COLUMNS: ColDef[] = [
   { key: 'descricaoVeiculo', label: 'Descrição Veículo',  type: 'text',     width: 220 },
 ];
 
+// Estoque (Sorana): sem ID Venda e sem Arrendatário
+const COLUMNS_ESTOQUE: ColDef[] = COLUMNS_ALL.filter(
+  c => c.key !== 'idVenda' && c.key !== 'arrendatario',
+);
+
 // ─── Export Excel ─────────────────────────────────────────────────────────────
-async function exportExcel(rows: TabelaDadosRow[]): Promise<void> {
+async function exportExcel(rows: TabelaDadosRow[], columns: ColDef[], sheetName: string): Promise<void> {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Sorana Executive Dashboard';
   wb.created = new Date();
-  const ws = wb.addWorksheet('Tabela de Dados', {
+  const ws = wb.addWorksheet(sheetName, {
     views: [{ state: 'frozen', xSplit: 0, ySplit: 2 }],
     properties: { tabColor: { argb: 'FF10B981' } },
   });
-  const labels = COLUMNS.map(c => c.label);
+  const labels = columns.map(c => c.label);
   ws.columns = labels.map(() => ({ width: 20 }));
   const today = new Date().toLocaleDateString('pt-BR');
-  const titleRow = ws.addRow([`Tabela de Dados — Faturamentos — ${today}`]);
+  const titleRow = ws.addRow([`${sheetName} — Faturamentos — ${today}`]);
   ws.mergeCells(1, 1, 1, labels.length);
   titleRow.height = 30;
   titleRow.eachCell(cell => {
@@ -92,7 +116,7 @@ async function exportExcel(rows: TabelaDadosRow[]): Promise<void> {
   const BRL_FMT = '"R$"\\ #,##0.00';
   rows.forEach((row, ri) => {
     const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF0FDF4';
-    const values = COLUMNS.map(col => {
+    const values = columns.map(col => {
       if (col.type === 'currency') return parseFloat(row[col.key] as string) || null;
       if (col.type === 'date') {
         const v = row[col.key] as string;
@@ -105,7 +129,7 @@ async function exportExcel(rows: TabelaDadosRow[]): Promise<void> {
     const dr = ws.addRow(values);
     dr.height = 17;
     dr.eachCell({ includeEmpty: true }, (cell, ci) => {
-      const col = COLUMNS[ci - 1];
+      const col = columns[ci - 1];
       cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
       cell.border = { top: BTHIN, bottom: BTHIN, left: BTHIN, right: BTHIN };
       if (!col) return;
@@ -124,7 +148,7 @@ async function exportExcel(rows: TabelaDadosRow[]): Promise<void> {
     });
   });
   // Linha de totais
-  const totals = COLUMNS.map((col, i) => {
+  const totals = columns.map((col, i) => {
     if (i === 0) return 'TOTAL';
     if (col.type === 'currency') return rows.reduce((s, r) => s + (parseFloat(r[col.key] as string) || 0), 0);
     return null;
@@ -132,7 +156,7 @@ async function exportExcel(rows: TabelaDadosRow[]): Promise<void> {
   const totalRow = ws.addRow(totals);
   totalRow.height = 22;
   totalRow.eachCell({ includeEmpty: true }, (cell, ci) => {
-    const col = COLUMNS[ci - 1];
+    const col = columns[ci - 1];
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF065F46' } };
     if (col?.type === 'currency') {
       cell.numFmt = BRL_FMT;
@@ -147,7 +171,7 @@ async function exportExcel(rows: TabelaDadosRow[]): Promise<void> {
   const dateStr = new Date().toISOString().split('T')[0];
   saveAs(
     new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-    `tabela-dados-faturamentos-${dateStr}.xlsx`,
+    `tabela-dados-${sheetName.toLowerCase().replace(/[\s/]+/g, '-')}-${dateStr}.xlsx`,
   );
 }
 
@@ -205,14 +229,18 @@ interface TabelaDadosDashboardProps {
 }
 
 export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDashboardProps) {
-  const [rows, setRows]           = useState<TabelaDadosRow[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<TabelaDadosRow | null>(null);
-  const [deleteId, setDeleteId]   = useState<string | null>(null);
-  const [saving, setSaving]       = useState(false);
-  const [loading, setLoading]     = useState(true);
-  const [filters, setFilters]     = useState<FilterValues>({});
-  const [showSearch, setShowSearch] = useState(false);
+  const now = new Date();
+  const [rows, setRows]                   = useState<TabelaDadosRow[]>([]);
+  const [activeSource, setActiveSource]   = useState<SourceTab>('estoque');
+  const [filterYear, setFilterYear]       = useState<number>(now.getFullYear());
+  const [filterMonth, setFilterMonth]     = useState<number | null>(now.getMonth() + 1);
+  const [editingId, setEditingId]         = useState<string | null>(null);
+  const [editDraft, setEditDraft]         = useState<TabelaDadosRow | null>(null);
+  const [deleteId, setDeleteId]           = useState<string | null>(null);
+  const [saving, setSaving]               = useState(false);
+  const [loading, setLoading]             = useState(true);
+  const [filters, setFilters]             = useState<FilterValues>({});
+  const [showSearch, setShowSearch]       = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -227,6 +255,57 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   }, [editingId]);
+
+  // Colunas ativas conforme aba de origem
+  const activeColumns = activeSource === 'estoque' ? COLUMNS_ESTOQUE : COLUMNS_ALL;
+
+  // Anos disponíveis (extraídos de todas as linhas)
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    rows.forEach(r => { const d = parseRowDate(r); if (d) years.add(d.year); });
+    if (years.size === 0) years.add(now.getFullYear());
+    return [...years].sort((a, b) => b - a);
+  }, [rows]);
+
+  // Garante que filterYear é válido quando availableYears muda
+  useEffect(() => {
+    if (availableYears.length > 0 && !availableYears.includes(filterYear)) {
+      setFilterYear(availableYears[0]);
+    }
+  }, [availableYears]);
+
+  // Linhas separadas por aba (Estoque = sorana / VD Frotista = demais)
+  const sourceRows = useMemo(
+    () => rows.filter(r => activeSource === 'estoque' ? isSorana(r.fontePagadora) : !isSorana(r.fontePagadora)),
+    [rows, activeSource],
+  );
+
+  // Totais por aba (para badges)
+  const estoqueCount  = useMemo(() => rows.filter(r => isSorana(r.fontePagadora)).length, [rows]);
+  const frotistaCount = useMemo(() => rows.filter(r => !isSorana(r.fontePagadora)).length, [rows]);
+
+  // Contagem por mês (para exibir badge e desabilitar meses sem dados)
+  const monthCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    for (let m = 1; m <= 12; m++) counts[m] = 0;
+    sourceRows.forEach(r => {
+      const d = parseRowDate(r);
+      if (d && d.year === filterYear) counts[d.month]++;
+    });
+    return counts;
+  }, [sourceRows, filterYear]);
+
+  // Linhas filtradas por período
+  const periodRows = useMemo(
+    () => sourceRows.filter(r => {
+      const d = parseRowDate(r);
+      if (!d) return filterMonth === null;
+      if (d.year !== filterYear) return false;
+      if (filterMonth !== null && d.month !== filterMonth) return false;
+      return true;
+    }),
+    [sourceRows, filterYear, filterMonth],
+  );
 
   const persist = async (updated: TabelaDadosRow[]): Promise<boolean> => {
     setSaving(true);
@@ -296,20 +375,20 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
   const hasActiveFilters = Object.values(filters).some(v => !!v);
 
   const filteredRows = useMemo(
-    () => hasActiveFilters ? rows.filter(r => rowMatchesFilters(r, filters)) : rows,
-    [rows, filters, hasActiveFilters],
+    () => hasActiveFilters ? periodRows.filter(r => rowMatchesFilters(r, filters)) : periodRows,
+    [periodRows, filters, hasActiveFilters],
   );
 
   // Totais das colunas currency
   const totals = useMemo(() => {
-    return COLUMNS.reduce<Record<string, number>>((acc, col) => {
+    return activeColumns.reduce<Record<string, number>>((acc, col) => {
       if (col.type === 'currency')
         acc[col.key] = filteredRows.reduce((s, r) => s + (parseFloat(r[col.key] as string) || 0), 0);
       return acc;
     }, {});
-  }, [filteredRows]);
+  }, [filteredRows, activeColumns]);
 
-  const COL_SPAN = COLUMNS.length + 1; // +1 para a coluna de ações
+  const COL_SPAN = activeColumns.length + 1;
 
   if (loading) {
     return (
@@ -334,7 +413,7 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
         </button>
       )}
       <button
-        onClick={() => exportExcel(filteredRows)}
+        onClick={() => exportExcel(filteredRows, activeColumns, activeSource === 'estoque' ? 'Estoque' : 'VD Frotista')}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
       >
         <Download className="w-3.5 h-3.5" /> Excel
@@ -370,12 +449,90 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
         </header>
       )}
 
-      {/* Toolbar embutida — visível apenas no modo embedded */}
-      {embedded && (
-        <div className="px-4 py-2 border-b border-slate-200 bg-white flex items-center gap-2 flex-shrink-0 flex-wrap">
-          {toolbar}
+      {/* Abas de origem: Estoque | VD / Frotista */}
+      <div className="bg-white border-b border-slate-200 px-4 flex items-center justify-between flex-shrink-0">
+        <div className="flex gap-0">
+          {([
+            ['estoque',  'Estoque',       estoqueCount],
+            ['frotista', 'VD / Frotista', frotistaCount],
+          ] as [SourceTab, string, number][]).map(([id, label, count]) => (
+            <button
+              key={id}
+              onClick={() => { setActiveSource(id); setFilters({}); }}
+              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeSource === id
+                  ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              {label}
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                activeSource === id ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {count}
+              </span>
+            </button>
+          ))}
         </div>
-      )}
+        {/* Toolbar no modo embedded fica à direita das abas */}
+        {embedded && <div className="py-1.5">{toolbar}</div>}
+      </div>
+
+      {/* Seletor Ano / Mês */}
+      <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
+        <div className="relative mr-2">
+          <select
+            value={filterYear}
+            onChange={e => setFilterYear(Number(e.target.value))}
+            className="appearance-none text-sm font-bold text-slate-700 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
+          >
+            {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+        </div>
+        <div className="w-px h-5 bg-slate-200 mr-1" />
+        <button
+          onClick={() => setFilterMonth(null)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            filterMonth === null
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+          }`}
+        >
+          Ano todo
+        </button>
+        {MONTHS.map((name, idx) => {
+          const m = idx + 1;
+          const count = monthCounts[m] ?? 0;
+          const isActive = filterMonth === m;
+          const hasData = count > 0;
+          return (
+            <button
+              key={m}
+              onClick={() => hasData ? setFilterMonth(m) : undefined}
+              className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                isActive
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : hasData
+                  ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                  : 'text-slate-300 cursor-default'
+              }`}
+            >
+              {name}
+              {hasData && (
+                <span className={`absolute -top-1.5 -right-1.5 text-[9px] font-bold px-1 rounded-full leading-none py-0.5 ${
+                  isActive ? 'bg-white text-emerald-700' : 'bg-emerald-100 text-emerald-600'
+                }`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      
+
+      </div>
 
       {/* KPI bar */}
       <div className="bg-white border-b border-slate-100 px-6 py-2 flex items-center gap-6 flex-shrink-0">
@@ -384,7 +541,7 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
           {hasActiveFilters && <span className="ml-1 text-amber-600">(filtrado{filteredRows.length !== 1 ? 's' : ''})</span>}
         </span>
         {Object.entries(totals).map(([key, val]) => {
-          const col = COLUMNS.find(c => c.key === key);
+          const col = activeColumns.find(c => c.key === key);
           return (
             <span key={key} className="text-xs text-slate-500">
               {col?.label}: <span className="font-semibold text-slate-700 font-mono">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
@@ -395,7 +552,7 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
 
       {/* Table */}
       <div ref={tableContainerRef} className="flex-1 overflow-auto" style={{ minHeight: 0 }}>
-        <table className="w-full border-collapse text-xs" style={{ minWidth: COLUMNS.reduce((s, c) => s + c.width, 0) + 80 }}>
+        <table className="w-full border-collapse text-xs" style={{ minWidth: activeColumns.reduce((s, c) => s + c.width, 0) + 80 }}>
           <thead className="sticky top-0 z-20">
             {/* Filter row */}
             {showSearch && (
@@ -403,7 +560,7 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
                 <th className="px-2 py-1.5 text-left font-medium text-amber-700 whitespace-nowrap bg-amber-50" style={{ minWidth: 72 }}>
                   <span className="text-[10px] uppercase tracking-wide">Filtros</span>
                 </th>
-                {COLUMNS.map(col => (
+                {activeColumns.map(col => (
                   <th key={col.key} className="px-1 py-1 bg-amber-50" style={{ minWidth: col.width }}>
                     <input
                       type="text"
@@ -419,7 +576,7 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
             {/* Column headers */}
             <tr className="bg-emerald-700 text-white">
               <th className="px-3 py-2.5 text-left font-semibold text-[10px] uppercase tracking-wide whitespace-nowrap" style={{ minWidth: 72 }}>Ações</th>
-              {COLUMNS.map(col => (
+              {activeColumns.map(col => (
                 <th key={col.key} className="px-3 py-2.5 font-semibold text-[10px] uppercase tracking-wide whitespace-nowrap text-left" style={{ minWidth: col.width }}>
                   {col.label}
                 </th>
@@ -430,7 +587,7 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
             {filteredRows.length === 0 && (
               <tr>
                 <td colSpan={COL_SPAN} className="text-center py-16 text-slate-400">
-                  {hasActiveFilters ? 'Nenhum registro encontrado com os filtros aplicados.' : 'Nenhum registro. Clique em "Nova linha" para adicionar.'}
+                  {hasActiveFilters ? 'Nenhum registro encontrado com os filtros aplicados.' : 'Nenhum registro para o período selecionado.'}
                 </td>
               </tr>
             )}
@@ -468,7 +625,7 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
                     </td>
 
                     {/* Cells */}
-                    {COLUMNS.map(col => {
+                    {activeColumns.map(col => {
                       const rawVal = (isEditing ? editDraft : row)?.[col.key] as string ?? '';
                       if (isEditing) {
                         if (col.type === 'currency') {
@@ -536,7 +693,7 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
                 <td className="px-3 py-2 text-xs whitespace-nowrap">
                   TOTAL ({filteredRows.length})
                 </td>
-                {COLUMNS.map(col => (
+                {activeColumns.map(col => (
                   <td
                     key={col.key}
                     className={`px-3 py-2 text-xs whitespace-nowrap ${col.type === 'currency' ? 'text-right font-mono tabular-nums' : ''}`}

@@ -54,3 +54,34 @@ export async function saveTabelaDadosRows(rows: TabelaDadosRow[]): Promise<boole
     return false;
   }
 }
+
+/**
+ * Adiciona linhas à tabela, ignorando duplicatas pelo campo chassi.
+ * Retorna quantas foram adicionadas e quais chassi foram duplicatas.
+ */
+export async function appendTabelaDadosRows(
+  newRows: Omit<TabelaDadosRow, 'id'>[],
+): Promise<{ added: number; duplicates: string[] }> {
+  const existing = await loadTabelaDadosRows();
+  const existingChassis = new Set(
+    existing.map(r => r.chassi.trim().toLowerCase()).filter(Boolean),
+  );
+  const toAdd: TabelaDadosRow[] = [];
+  const duplicates: string[] = [];
+
+  for (const row of newRows) {
+    const chassiKey = row.chassi.trim().toLowerCase();
+    if (chassiKey && existingChassis.has(chassiKey)) {
+      duplicates.push(row.chassi);
+    } else {
+      if (chassiKey) existingChassis.add(chassiKey);
+      toAdd.push({ ...row, id: crypto.randomUUID() });
+    }
+  }
+
+  if (toAdd.length > 0) {
+    await saveTabelaDadosRows([...existing, ...toAdd]);
+  }
+
+  return { added: toAdd.length, duplicates };
+}

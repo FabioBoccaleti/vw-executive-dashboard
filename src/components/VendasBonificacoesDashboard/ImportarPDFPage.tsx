@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker as createTesseractWorker } from 'tesseract.js';
 import { TabelaDadosDashboard } from './TabelaDadosDashboard';
+import { appendTabelaDadosRows } from './tabelaDadosStorage';
+import type { TabelaDadosRow } from './tabelaDadosStorage';
 
 // Vite resolve este path para a URL correta do worker (dev e build)
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -382,6 +384,51 @@ async function extractFromPDF(
   return extractViaOCR(pdf, forceMode, onProgress);
 }
 
+// ─── Conversão de data PDF (DD/MM/YYYY) → ISO (YYYY-MM-DD) ───────────────────
+function pdfDateToISO(v: string): string {
+  if (!v) return '';
+  let m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (m) return `20${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  return '';
+}
+
+// ─── Conversão de valor monetário PDF → número raw ────────────────────────────
+function pdfCurrencyToRaw(v: string): string {
+  if (!v) return '';
+  const s = v.replace(/R\$\s*/g, '').trim();
+  if (!s) return '';
+  const lastComma  = s.lastIndexOf(',');
+  const lastPeriod = s.lastIndexOf('.');
+  const normalized = lastComma > lastPeriod
+    ? s.replace(/\./g, '').replace(',', '.')
+    : s.replace(/,/g, '');
+  const n = parseFloat(normalized);
+  return isNaN(n) ? '' : String(n);
+}
+
+// ─── Converte resultados consolidados do PDF → TabelaDadosRow[] ───────────────
+function pdfResultsToTableRows(pages: PageResult[]): Omit<TabelaDadosRow, 'id'>[] {
+  const { headers, rows } = buildConsolidated(pages);
+  const idx = (label: string) => headers.indexOf(label);
+  return rows.map(row => ({
+    dataFaturamento:  pdfDateToISO(row[idx('Data Faturamento')]  ?? ''),
+    nota:             row[idx('Nota')]              ?? '',
+    idVenda:          row[idx('ID Venda')]          ?? '',
+    pedido:           row[idx('Pedido')]            ?? '',
+    arrendatario:     row[idx('Arrendatário')]      ?? '',
+    fontePagadora:    row[idx('Fonte Pagadora')]    ?? '',
+    vencimento:       pdfDateToISO(row[idx('Vencimento')]       ?? ''),
+    valorNF:          pdfCurrencyToRaw(row[idx('Valor NF')]     ?? ''),
+    icmsSubstitutivo: pdfCurrencyToRaw(row[idx('ICMS Substitutivo')] ?? ''),
+    corExterna:       row[idx('Cor Externa')]       ?? '',
+    chassi:           row[idx('Chassi')]            ?? '',
+    descricaoVeiculo: row[idx('Descrição Veículo')] ?? '',
+  }));
+}
+
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'importar' | 'tabela'>('importar');
@@ -420,6 +467,17 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
       }
       setPages(results);
       setOpenPages(new Set(results.map(r => r.page)));
+
+      // ─── Auto-salvar na Tabela de Dados ────────────────────────────────────
+      const tableRows = pdfResultsToTableRows(results).filter(r => r.chassi.trim());
+      if (tableRows.length > 0) {
+        const { added, duplicates } = await appendTabelaDadosRows(tableRows);
+        if (added > 0) toast.success(`${added} linha(s) salvas na Tabela de Dados.`);
+        if (duplicates.length > 0)
+          toast.warning(
+            `${duplicates.length} chassi(s) já existiam e foram ignorados: ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? '…' : ''}`,
+          );
+      }
     } catch (err) {
       console.error(err);
       setErrorMsg(err instanceof Error ? err.message : String(err));
