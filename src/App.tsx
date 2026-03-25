@@ -7,6 +7,7 @@ import { VendasBonificacoesDashboard } from '@/components/VendasBonificacoesDash
 import { VendasSelectionPage } from '@/components/VendasBonificacoesDashboard/VendasSelectionPage'
 import { PeliculasDashboard } from '@/components/VendasBonificacoesDashboard/PeliculasDashboard'
 import { ImportarPDFPage } from '@/components/VendasBonificacoesDashboard/ImportarPDFPage'
+import { TabelaDadosDashboard } from '@/components/VendasBonificacoesDashboard/TabelaDadosDashboard'
 import { CadastrosPage } from '@/components/CadastrosPage'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
@@ -25,7 +26,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<'app' | 'admin' | 'cadastros'>(() =>
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
-  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'importar-pdf'>('selection')
+  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'importar-pdf' | 'tabela-dados'>('selection')
   const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas'>('blindagem')
   
   // Inicializa o banco de dados em produção
@@ -215,6 +216,10 @@ function AppContent() {
           />
         ) : vendasSubPage === 'importar-pdf' ? (
           <ImportarPDFPage
+            onBack={() => setVendasSubPage('selection')}
+          />
+        ) : vendasSubPage === 'tabela-dados' ? (
+          <TabelaDadosDashboard
             onBack={() => setVendasSubPage('selection')}
           />
         ) : vendasSubPage === 'peliculas' ? (
