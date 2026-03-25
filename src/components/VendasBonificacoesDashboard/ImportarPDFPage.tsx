@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Upload, FileText, X, AlertCircle, Table2 } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -17,26 +17,30 @@ interface TableData {
   mode: 'tabela' | 'formulario';
 }
 
+interface PageResult {
+  page: number;
+  total: number;
+  data: TableData;
+}
+
 interface ImportarPDFPageProps {
   onBack: () => void;
 }
 
 type RawItem = { x: number; y: number; str: string };
 
-// ─── Extrai texto nativo do pdfjs ────────────────────────────────────────────
-async function collectNativeItems(pdf: pdfjsLib.PDFDocumentProxy): Promise<RawItem[]> {
+// ─── Extrai itens de texto nativo de UMA página ─────────────────────────────
+async function collectNativeItemsPage(pdf: pdfjsLib.PDFDocumentProxy, pageNum: number): Promise<RawItem[]> {
+  const page = await pdf.getPage(pageNum);
+  const viewport = page.getViewport({ scale: 1 });
+  const content = await page.getTextContent();
   const items: RawItem[] = [];
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1 });
-    const content = await page.getTextContent();
-    for (const item of content.items) {
-      if (!('str' in item)) continue;
-      const str = (item as { str: string }).str.trim();
-      if (!str) continue;
-      const t = (item as { transform: number[] }).transform;
-      items.push({ x: t[4], y: viewport.height - t[5], str });
-    }
+  for (const item of content.items) {
+    if (!('str' in item)) continue;
+    const str = (item as { str: string }).str.trim();
+    if (!str) continue;
+    const t = (item as { transform: number[] }).transform;
+    items.push({ x: t[4], y: viewport.height - t[5], str });
   }
   return items;
 }
@@ -72,12 +76,11 @@ async function extractViaOCR(
   pdf: pdfjsLib.PDFDocumentProxy,
   forceMode: 'tabela' | 'formulario' | undefined,
   onProgress?: (msg: string) => void,
-): Promise<TableData> {
+): Promise<PageResult[]> {
   onProgress?.('PDF baseado em imagem — iniciando OCR...');
   const scale = 2;
-  // usa 'eng' como idioma base (mais estável que 'por' para CDN); lê bem números e pontuação
   const worker = await createTesseractWorker('eng');
-  const allLines: string[] = [];
+  const results: PageResult[] = [];
   try {
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       onProgress?.(`Reconhecendo texto — página ${pageNum} de ${pdf.numPages}...`);
@@ -91,17 +94,19 @@ async function extractViaOCR(
       const { data: { text } } = await worker.recognize(canvas);
       console.log('[OCR] página', pageNum, '— chars reconhecidos:', text.length);
       const pageLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
-      allLines.push(...pageLines);
+      if (pageLines.length === 0) {
+        results.push({ page: pageNum, total: pdf.numPages, data: { headers: [], rows: [], mode: forceMode ?? 'formulario' } });
+        continue;
+      }
+      const hasColons = pageLines.some(l => l.includes(':'));
+      const mode = forceMode ?? (hasColons ? 'formulario' : 'tabela');
+      const data = mode === 'formulario' ? parseOCRLinesAsForm(pageLines) : parseOCRLinesAsTable(pageLines);
+      results.push({ page: pageNum, total: pdf.numPages, data });
     }
   } finally {
     await worker.terminate();
   }
-  console.log('[OCR] total de linhas:', allLines.length);
-  if (allLines.length === 0) return { headers: [], rows: [], mode: forceMode ?? 'formulario' };
-  // Para este tipo de relatório (ficha de veículo), formulário é o modo mais adequado
-  const hasColons = allLines.some(l => l.includes(':'));
-  const mode = forceMode ?? (hasColons ? 'formulario' : 'tabela');
-  return mode === 'formulario' ? parseOCRLinesAsForm(allLines) : parseOCRLinesAsTable(allLines);
+  return results;
 }
 
 // ─── Agrupa items em faixas horizontais por Y ────────────────────────────────
@@ -209,41 +214,68 @@ async function extractFromPDF(
   file: File,
   forceMode?: 'tabela' | 'formulario',
   onProgress?: (msg: string) => void,
-): Promise<TableData> {
+): Promise<PageResult[]> {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  const items = await collectNativeItems(pdf);
-  console.log('[pdfjs] itens de texto extraídos:', items.length);
-  if (items.length > 0) {
-    const mode = forceMode ?? detectMode(items);
-    return mode === 'formulario' ? extractAsForm(items) : extractAsTable(items);
+  // Testa se a primeira página tem texto nativo
+  const firstPageItems = await collectNativeItemsPage(pdf, 1);
+  console.log('[pdfjs] itens texto pág 1:', firstPageItems.length);
+  if (firstPageItems.length > 0) {
+    // PDF com texto nativo: processa cada página individualmente
+    const results: PageResult[] = [];
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      onProgress?.(`Processando página ${pageNum} de ${pdf.numPages}...`);
+      const items = await collectNativeItemsPage(pdf, pageNum);
+      if (items.length === 0) {
+        results.push({ page: pageNum, total: pdf.numPages, data: { headers: [], rows: [], mode: forceMode ?? 'tabela' } });
+        continue;
+      }
+      const mode = forceMode ?? detectMode(items);
+      const data = mode === 'formulario' ? extractAsForm(items) : extractAsTable(items);
+      results.push({ page: pageNum, total: pdf.numPages, data });
+    }
+    return results;
   }
-  // PDF sem texto nativo → OCR
+  // PDF sem texto nativo → OCR página a página
   return extractViaOCR(pdf, forceMode, onProgress);
 }
 
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [tableData, setTableData] = useState<TableData | null>(null);
+  const [pages, setPages] = useState<PageResult[] | null>(null);
+  const [openPages, setOpenPages] = useState<Set<number>>(new Set([1]));
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState<string>('Lendo o PDF...');
   const [fileName, setFileName] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastFile, setLastFile] = useState<File | null>(null);
+  const [mode, setMode] = useState<'tabela' | 'formulario' | undefined>(undefined);
+
+  function togglePage(pageNum: number) {
+    setOpenPages(prev => {
+      const next = new Set(prev);
+      if (next.has(pageNum)) next.delete(pageNum);
+      else next.add(pageNum);
+      return next;
+    });
+  }
 
   async function processFile(file: File, forceMode?: 'tabela' | 'formulario') {
     setLoading(true);
     setLoadingMsg('Lendo o PDF...');
     setErrorMsg(null);
-    setTableData(null);
+    setPages(null);
     try {
-      const data = await extractFromPDF(file, forceMode, (msg) => setLoadingMsg(msg));
-      if (data.headers.length === 0 && data.rows.length === 0) {
+      const results = await extractFromPDF(file, forceMode, (msg) => setLoadingMsg(msg));
+      const totalWithData = results.filter(r => r.data.rows.length > 0).length;
+      if (totalWithData === 0) {
         toast.warning('Nenhum texto encontrado no PDF.');
       } else {
-        toast.success(`PDF importado em modo ${data.mode === 'formulario' ? 'Formulário' : 'Tabela'}!`);
+        const modeLabel = results[0]?.data.mode === 'formulario' ? 'Formulário' : 'Tabela';
+        toast.success(`${results.length} página(s) importada(s) em modo ${modeLabel}!`);
       }
-      setTableData(data);
+      setPages(results);
+      setOpenPages(new Set(results.map(r => r.page)));
     } catch (err) {
       console.error(err);
       setErrorMsg(err instanceof Error ? err.message : String(err));
@@ -261,21 +293,26 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
     if (!isLikelyPdf) { toast.error('Selecione um arquivo PDF válido.'); return; }
     setFileName(file.name);
     setLastFile(file);
+    setMode(undefined);
     await processFile(file, undefined);
   }
 
-  async function handleSwitchMode(mode: 'tabela' | 'formulario') {
+  async function handleSwitchMode(m: 'tabela' | 'formulario') {
     if (!lastFile) return;
-    await processFile(lastFile, mode);
+    setMode(m);
+    await processFile(lastFile, m);
   }
 
   function handleClear() {
-    setTableData(null);
+    setPages(null);
     setFileName(null);
     setErrorMsg(null);
     setLastFile(null);
+    setMode(undefined);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
+
+  const currentMode = pages?.[0]?.data.mode;
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -326,7 +363,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
                 <button
                   onClick={() => handleSwitchMode('tabela')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${
-                    tableData?.mode === 'tabela'
+                    currentMode === 'tabela'
                       ? 'bg-emerald-600 text-white'
                       : 'bg-white text-slate-600 hover:bg-slate-50'
                   }`}
@@ -337,7 +374,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
                 <button
                   onClick={() => handleSwitchMode('formulario')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 border-l border-slate-200 transition-colors ${
-                    tableData?.mode === 'formulario'
+                    currentMode === 'formulario'
                       ? 'bg-emerald-600 text-white'
                       : 'bg-white text-slate-600 hover:bg-slate-50'
                   }`}
@@ -387,72 +424,91 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           </div>
         )}
 
-        {/* Resultado */}
-        {!loading && tableData && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
-              <h2 className="text-sm font-semibold text-slate-700">Dados extraídos</h2>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                tableData.mode === 'formulario' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
-              }`}>
-                {tableData.mode === 'formulario' ? 'Formulário' : 'Tabela'}
-              </span>
-              {tableData.rows.length > 0 && (
-                <span className="text-xs text-slate-400">
-                  {tableData.rows.length} {tableData.mode === 'formulario' ? 'campo(s)' : `linha${tableData.rows.length !== 1 ? 's' : ''}`}
-                </span>
-              )}
-            </div>
+        {/* Resultado — uma seção colapsável por página */}
+        {!loading && pages && pages.length > 0 && (
+          <div className="flex flex-col gap-4">
+            {pages.map(({ page, total, data }) => {
+              const isOpen = openPages.has(page);
+              const hasData = data.headers.length > 0;
+              return (
+                <div key={page} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                  {/* Cabeçalho da página */}
+                  <button
+                    onClick={() => togglePage(page)}
+                    className="w-full px-5 py-3 border-b border-slate-100 flex items-center gap-3 hover:bg-slate-50 transition-colors text-left"
+                  >
+                    {isOpen
+                      ? <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                      : <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    }
+                    <span className="text-sm font-semibold text-slate-700">
+                      Página {page}{total > 1 ? ` de ${total}` : ''}
+                    </span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      data.mode === 'formulario' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
+                    }`}>
+                      {data.mode === 'formulario' ? 'Formulário' : 'Tabela'}
+                    </span>
+                    {hasData && (
+                      <span className="text-xs text-slate-400">
+                        {data.rows.length} {data.mode === 'formulario' ? 'campo(s)' : `linha${data.rows.length !== 1 ? 's' : ''}`}
+                      </span>
+                    )}
+                  </button>
 
-            {tableData.headers.length === 0 ? (
-              <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
-                Nenhum dado encontrado no PDF.
-              </div>
-            ) : tableData.mode === 'formulario' ? (
-              /* ── Layout formulário: Campo / Valor ── */
-              <div className="divide-y divide-slate-100">
-                {tableData.rows.map((row, idx) => (
-                  <div key={idx} className={`flex text-sm ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}>
-                    <div className="w-64 shrink-0 px-5 py-2.5 font-medium text-slate-600 border-r border-slate-100">
-                      {row[0]}
-                    </div>
-                    <div className="flex-1 px-5 py-2.5 text-slate-800">
-                      {row[1] ?? ''}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              /* ── Layout tabela: scroll horizontal ── */
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50">
-                      {tableData.headers.map((h, i) => (
-                        <th key={i} className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100 whitespace-nowrap">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableData.rows.map((row, rowIdx) => (
-                      <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                        {tableData.headers.map((_, colIdx) => (
-                          <td key={colIdx} className="px-4 py-2 text-slate-700 border-b border-slate-100 whitespace-nowrap">
-                            {row[colIdx] ?? ''}
-                          </td>
+                  {/* Conteúdo colapsável */}
+                  {isOpen && (
+                    !hasData ? (
+                      <div className="flex items-center justify-center py-10 text-slate-400 text-sm">
+                        Nenhum dado encontrado nesta página.
+                      </div>
+                    ) : data.mode === 'formulario' ? (
+                      <div className="divide-y divide-slate-100">
+                        {data.rows.map((row, idx) => (
+                          <div key={idx} className={`flex text-sm ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}>
+                            <div className="w-64 shrink-0 px-5 py-2.5 font-medium text-slate-600 border-r border-slate-100">
+                              {row[0]}
+                            </div>
+                            <div className="flex-1 px-5 py-2.5 text-slate-800">
+                              {row[1] ?? ''}
+                            </div>
+                          </div>
                         ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-slate-50">
+                              {data.headers.map((h, i) => (
+                                <th key={i} className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100 whitespace-nowrap">
+                                  {h}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {data.rows.map((row, rowIdx) => (
+                              <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                                {data.headers.map((_, colIdx) => (
+                                  <td key={colIdx} className="px-4 py-2 text-slate-700 border-b border-slate-100 whitespace-nowrap">
+                                    {row[colIdx] ?? ''}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {!loading && !tableData && !errorMsg && (
+        {!loading && !pages && !errorMsg && (
           <div className="flex flex-col items-center justify-center py-20 text-slate-300 gap-3">
             <FileText className="w-12 h-12" />
             <span className="text-sm">Nenhum PDF importado ainda</span>
