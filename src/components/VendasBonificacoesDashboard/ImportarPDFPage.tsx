@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -28,6 +28,51 @@ interface ImportarPDFPageProps {
 }
 
 type RawItem = { x: number; y: number; str: string };
+
+// ─── Mapeamento fixo: coluna → chaves de busca no PDF ────────────────────────
+const FIELD_MAP: { label: string; keys: string[] }[] = [
+  { label: 'Data Faturamento', keys: ['data faturamento', 'data fat'] },
+  { label: 'Nota',             keys: ['nota'] },
+  { label: 'ID Venda',         keys: ['id. venda', 'id venda', 'id.venda'] },
+  { label: 'Pedido',           keys: ['pedido'] },
+  { label: 'Arrendatário',     keys: ['arrendatário', 'arrendatario'] },
+  { label: 'Fonte Pagadora',   keys: ['fonte pagadora'] },
+  { label: 'Vencimento',       keys: ['vencimento'] },
+  { label: 'Valor NF',         keys: ['valor n.f.', 'valor nf', 'valor n.f'] },
+  { label: 'ICMS Substitutivo',keys: ['icms substitutivo', 'icms subst'] },
+  { label: 'Cor Externa',      keys: ['cor externa', 'cor ext'] },
+  { label: 'Chassi',           keys: ['chassi'] },
+  { label: 'Descrição Veículo',keys: ['descrição do veículo', 'descricao do veiculo', 'descrição veículo'] },
+];
+
+function extractField(data: TableData, keys: string[]): string {
+  for (const row of data.rows) {
+    const campo = (row[0] ?? '').toLowerCase().trim();
+    if (keys.some(k => campo.includes(k.toLowerCase()))) return row[1] ?? '';
+  }
+  return '';
+}
+
+function buildConsolidated(pages: PageResult[]): { headers: string[]; rows: string[][] } {
+  const headers = ['Pág.', ...FIELD_MAP.map(f => f.label)];
+  const rows = pages.map(({ page, data }) => [
+    String(page),
+    ...FIELD_MAP.map(f => extractField(data, f.keys)),
+  ]);
+  return { headers, rows };
+}
+
+function exportCSV(headers: string[], rows: string[][], filename: string) {
+  const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const lines = [headers.map(esc).join(';'), ...rows.map(r => r.map(esc).join(';'))];
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 // ─── Extrai itens de texto nativo de UMA página ─────────────────────────────
 async function collectNativeItemsPage(pdf: pdfjsLib.PDFDocumentProxy, pageNum: number): Promise<RawItem[]> {
@@ -250,6 +295,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastFile, setLastFile] = useState<File | null>(null);
   const [mode, setMode] = useState<'tabela' | 'formulario' | undefined>(undefined);
+  const [viewMode, setViewMode] = useState<'paginas' | 'consolidada'>('paginas');
 
   function togglePage(pageNum: number) {
     setOpenPages(prev => {
@@ -309,10 +355,12 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
     setErrorMsg(null);
     setLastFile(null);
     setMode(undefined);
+    setViewMode('paginas');
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   const currentMode = pages?.[0]?.data.mode;
+  const consolidated = pages ? buildConsolidated(pages) : null;
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -394,6 +442,38 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
             <strong>Formulário</strong>: relatórios/fichas com campos "Label: Valor".
           </p>
 
+          {/* Toggle de visualização — aparece após importar */}
+          {pages && pages.length > 0 && !loading && (
+            <div className="flex items-center gap-3 pt-1 border-t border-slate-100">
+              <span className="text-xs text-slate-500">Visualização:</span>
+              <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-medium">
+                <button
+                  onClick={() => setViewMode('paginas')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 transition-colors ${viewMode === 'paginas' ? 'bg-slate-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <LayoutList className="w-3.5 h-3.5" />
+                  Por Página
+                </button>
+                <button
+                  onClick={() => setViewMode('consolidada')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 border-l border-slate-200 transition-colors ${viewMode === 'consolidada' ? 'bg-slate-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <Table2 className="w-3.5 h-3.5" />
+                  Tabela Consolidada
+                </button>
+              </div>
+              {viewMode === 'consolidada' && consolidated && (
+                <button
+                  onClick={() => exportCSV(consolidated.headers, consolidated.rows, `fvw_consolidado_${fileName ?? 'export'}.csv`)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Exportar CSV
+                </button>
+              )}
+            </div>
+          )}
+
           <input
             ref={fileInputRef}
             type="file"
@@ -424,8 +504,42 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           </div>
         )}
 
+        {/* Resultado — por página OU tabela consolidada */}
+        {!loading && pages && pages.length > 0 && viewMode === 'consolidada' && consolidated && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-slate-700">Tabela Consolidada</h2>
+              <span className="text-xs text-slate-400">{consolidated.rows.length} veículo(s)</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50">
+                    {consolidated.headers.map((h, i) => (
+                      <th key={i} className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100 whitespace-nowrap">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {consolidated.rows.map((row, rowIdx) => (
+                    <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                      {row.map((cell, colIdx) => (
+                        <td key={colIdx} className="px-4 py-2 text-slate-700 border-b border-slate-100 whitespace-nowrap">
+                          {cell || <span className="text-slate-300">—</span>}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Resultado — uma seção colapsável por página */}
-        {!loading && pages && pages.length > 0 && (
+        {!loading && pages && pages.length > 0 && viewMode === 'paginas' && (
           <div className="flex flex-col gap-4">
             {pages.map(({ page, total, data }) => {
               const isOpen = openPages.has(page);
