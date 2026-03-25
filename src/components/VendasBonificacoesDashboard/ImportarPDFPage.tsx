@@ -146,7 +146,7 @@ function buildConsolidated(pages: PageResult[]): { headers: string[]; rows: stri
     return [
       String(page),
       ...FIELD_MAP.map(f => {
-        if (f.label === 'ID Venda' && isSorana) return '';
+        if ((f.label === 'ID Venda' || f.label === 'Arrendatário') && isSorana) return '';
         return extractFieldSmart(formData, rawItems, f.keys, f.exact, f.transform, f.joinNeighbors);
       }),
     ];
