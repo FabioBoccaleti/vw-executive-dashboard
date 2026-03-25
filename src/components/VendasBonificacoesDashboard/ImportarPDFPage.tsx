@@ -15,8 +15,8 @@ interface ImportarPDFPageProps {
 async function extractTableFromPDF(file: File): Promise<TableData> {
   // Importação dinâmica para evitar problemas de SSR
   const pdfjsLib = await import('pdfjs-dist');
-  // Worker via CDN (necessário para o navegador)
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+  // Worker servido localmente (copiado de node_modules para public/)
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
