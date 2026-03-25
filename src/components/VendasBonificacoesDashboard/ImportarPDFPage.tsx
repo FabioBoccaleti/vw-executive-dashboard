@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
-import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker as createTesseractWorker } from 'tesseract.js';
+import { TabelaDadosDashboard } from './TabelaDadosDashboard';
 
 // Vite resolve este path para a URL correta do worker (dev e build)
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -383,6 +384,7 @@ async function extractFromPDF(
 
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<'importar' | 'tabela'>('importar');
   const [pages, setPages] = useState<PageResult[] | null>(null);
   const [openPages, setOpenPages] = useState<Set<number>>(new Set([1]));
   const [loading, setLoading] = useState(false);
@@ -463,8 +465,8 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Importação de PDF</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Importe um PDF para visualizar os dados</p>
+          <h1 className="text-lg font-bold text-slate-800">Importação de PDF / Tabela de Dados</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Importe um PDF ou gerencie a tabela de faturamentos</p>
         </div>
         <button
           onClick={onBack}
@@ -474,9 +476,42 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
         </button>
       </header>
 
-      {/* Conteúdo */}
-      <div className="flex-1 p-6 flex flex-col gap-6">
-        {/* Área de importação */}
+      {/* Abas */}
+      <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0">
+        <button
+          onClick={() => setActiveTab('importar')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'importar'
+              ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <Upload className="w-4 h-4" />
+          Importar PDF
+        </button>
+        <button
+          onClick={() => setActiveTab('tabela')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'tabela'
+              ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <TableProperties className="w-4 h-4" />
+          Tabela de Dados
+        </button>
+      </div>
+
+      {/* Aba: Tabela de Dados */}
+      {activeTab === 'tabela' && (
+        <div className="flex-1" style={{ minHeight: 0 }}>
+          <TabelaDadosDashboard onBack={onBack} embedded />
+        </div>
+      )}
+
+      {/* Aba: Importar PDF */}
+      {activeTab === 'importar' && (
+        <div className="flex-1 p-6 flex flex-col gap-6">
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-3">
             <Button
@@ -725,6 +760,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

@@ -201,9 +201,10 @@ function InsertZoneTr({ colSpan, onInsert }: { colSpan: number; onInsert: () => 
 // ─── Main Component ───────────────────────────────────────────────────────────
 interface TabelaDadosDashboardProps {
   onBack: () => void;
+  embedded?: boolean;
 }
 
-export function TabelaDadosDashboard({ onBack }: TabelaDadosDashboardProps) {
+export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDashboardProps) {
   const [rows, setRows]           = useState<TabelaDadosRow[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<TabelaDadosRow | null>(null);
@@ -318,51 +319,63 @@ export function TabelaDadosDashboard({ onBack }: TabelaDadosDashboardProps) {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50 mr-1"
-          >
-            ← Voltar
-          </button>
-          <TableProperties className="w-5 h-5 text-emerald-600" />
-          <div>
-            <h1 className="text-base font-bold text-slate-800 leading-tight">Tabela de Dados</h1>
-            <p className="text-xs text-slate-400">Faturamentos — Demonstrativo de Vendas e Bonificações</p>
-          </div>
-        </div>
+  const toolbar = (
+    <div className="flex items-center gap-2 flex-wrap">
+      {saving && <span className="text-xs text-slate-400 animate-pulse">Salvando…</span>}
+      <button
+        onClick={() => { setShowSearch(v => !v); if (showSearch) clearFilters(); }}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${showSearch ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+      >
+        <Search className="w-3.5 h-3.5" />{showSearch ? 'Fechar filtros' : 'Filtrar'}
+      </button>
+      {hasActiveFilters && (
+        <button onClick={clearFilters} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
+          <FilterX className="w-3.5 h-3.5" /> Limpar
+        </button>
+      )}
+      <button
+        onClick={() => exportExcel(filteredRows)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+      >
+        <Download className="w-3.5 h-3.5" /> Excel
+      </button>
+      <button
+        onClick={addRow}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
+      >
+        <Plus className="w-3.5 h-3.5" /> Nova linha
+      </button>
+    </div>
+  );
 
-        <div className="flex items-center gap-2">
-          {saving && <span className="text-xs text-slate-400 animate-pulse">Salvando…</span>}
-          <button
-            onClick={() => { setShowSearch(v => !v); if (showSearch) clearFilters(); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${showSearch ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-          >
-            <Search className="w-3.5 h-3.5" />{showSearch ? 'Fechar filtros' : 'Filtrar'}
-          </button>
-          {hasActiveFilters && (
-            <button onClick={clearFilters} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
-              <FilterX className="w-3.5 h-3.5" /> Limpar
+  return (
+    <div className={embedded ? 'flex flex-col h-full' : 'min-h-screen bg-slate-100 flex flex-col'}>
+      {/* Header — apenas na versão standalone */}
+      {!embedded && (
+        <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBack}
+              className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50 mr-1"
+            >
+              ← Voltar
             </button>
-          )}
-          <button
-            onClick={() => exportExcel(filteredRows)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            <Download className="w-3.5 h-3.5" /> Excel
-          </button>
-          <button
-            onClick={addRow}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-3.5 h-3.5" /> Nova linha
-          </button>
+            <TableProperties className="w-5 h-5 text-emerald-600" />
+            <div>
+              <h1 className="text-base font-bold text-slate-800 leading-tight">Tabela de Dados</h1>
+              <p className="text-xs text-slate-400">Faturamentos — Demonstrativo de Vendas e Bonificações</p>
+            </div>
+          </div>
+          {toolbar}
+        </header>
+      )}
+
+      {/* Toolbar embutida — visível apenas no modo embedded */}
+      {embedded && (
+        <div className="px-4 py-2 border-b border-slate-200 bg-white flex items-center gap-2 flex-shrink-0 flex-wrap">
+          {toolbar}
         </div>
-      </header>
+      )}
 
       {/* KPI bar */}
       <div className="bg-white border-b border-slate-100 px-6 py-2 flex items-center gap-6 flex-shrink-0">

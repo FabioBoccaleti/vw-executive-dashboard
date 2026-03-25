@@ -1,4 +1,4 @@
-import { Shield, Layers, Clock, TableProperties } from 'lucide-react';
+import { Shield, Layers, Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { VendasSubModuleId } from '@/lib/authTypes';
 
@@ -9,7 +9,7 @@ const BLINDAGEM_SUBS: VendasSubModuleId[] = [
 const PELICULAS_SUBS: VendasSubModuleId[] = ['peliculas.tabela', 'peliculas.analise'];
 
 interface VendasSelectionPageProps {
-  onSelect: (option: 'blindagem' | 'peliculas' | 'importar-pdf' | 'tabela-dados') => void;
+  onSelect: (option: 'blindagem' | 'peliculas' | 'importar-pdf') => void;
   onChangeBrand: () => void;
 }
 
@@ -72,9 +72,12 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
           </button>
           )}
 
-          {/* Card — Importação de PDF + Tabela de Dados */}
-          <div className="flex-1 bg-white rounded-2xl border-2 border-emerald-400 shadow-md hover:shadow-xl hover:border-emerald-500 transition-all duration-200 p-6 flex flex-col items-center gap-4 text-center">
-            <div className="p-4 rounded-full bg-emerald-50">
+          {/* Card — Importação de PDF / Tabela de Dados */}
+          <button
+            onClick={() => onSelect('importar-pdf')}
+            className="flex-1 bg-white rounded-2xl border-2 border-emerald-400 shadow-md hover:shadow-xl hover:border-emerald-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-emerald-50 group-hover:bg-emerald-100 transition-colors">
               <Clock className="w-10 h-10 text-emerald-500" />
             </div>
             <div>
@@ -82,22 +85,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
                 Importação de PDF /<br />Tabela de Dados
               </h2>
             </div>
-            <div className="flex flex-col gap-2 w-full mt-1">
-              <button
-                onClick={() => onSelect('importar-pdf')}
-                className="w-full py-2 px-4 rounded-xl bg-emerald-500 text-white text-sm font-semibold hover:bg-emerald-600 active:scale-95 transition-all shadow-sm"
-              >
-                Importar PDF
-              </button>
-              <button
-                onClick={() => onSelect('tabela-dados')}
-                className="w-full py-2 px-4 rounded-xl border-2 border-emerald-400 text-emerald-700 text-sm font-semibold hover:bg-emerald-50 active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                <TableProperties className="w-4 h-4" />
-                Tabela de Dados
-              </button>
-            </div>
-          </div>
+          </button>
 
         </div>
       </div>
