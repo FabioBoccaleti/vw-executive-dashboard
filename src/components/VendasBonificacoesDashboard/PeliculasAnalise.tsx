@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart as ReBarChart,
@@ -746,7 +746,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                       radius={[0, 4, 4, 0]}
                       label={({ x, y, width, height, index }: { x: number; y: number; width: number; height: number; index: number }) => {
                         const entry = produtoReceitaData[index];
-                        if (!entry) return null;
+                        if (!entry) return <></>;  
                         return (
                           <text
                             x={x + width + 8}
@@ -816,7 +816,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                   radius={[0, 4, 4, 0]}
                   label={({ x, y, width, height, index }: { x: number; y: number; width: number; height: number; index: number }) => {
                     const entry = produtoReceitaData[index];
-                    if (!entry) return null;
+                    if (!entry) return <></>;  
                     return (
                       <text x={x + width + 8} y={y + height / 2} dy={4} fontSize={11} fill="#64748b" fontWeight={600}>
                         {entry.qtd}x
