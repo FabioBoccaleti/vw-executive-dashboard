@@ -34,7 +34,7 @@ type RawItem = { x: number; y: number; str: string };
 // ─── Mapeamento fixo: coluna → chaves de busca no PDF ────────────────────────
 // exact: true → campo deve começar com a chave (não apenas conter)
 // transform: função para pós-processar o valor extraído
-const FIELD_MAP: { label: string; keys: string[]; exact?: boolean; transform?: (v: string) => string }[] = [
+const FIELD_MAP: { label: string; keys: string[]; exact?: boolean; joinNeighbors?: boolean; transform?: (v: string) => string }[] = [
   { label: 'Data Faturamento', keys: ['data faturamento', 'data fat'] },
   { label: 'Nota',             keys: ['nota'] },
   { label: 'ID Venda',         keys: ['id. venda', 'id venda', 'id.venda'] },
@@ -45,8 +45,8 @@ const FIELD_MAP: { label: string; keys: string[]; exact?: boolean; transform?: (
   { label: 'Valor NF',         keys: ['valor n.f.', 'valor nf', 'valor n.f'] },
   // exact: true evita capturar "Base ICMS Substitutivo"
   { label: 'ICMS Substitutivo', keys: ['icms substitutivo'], exact: true },
-  // transform: descarta o código (ex: "B4B4") e mantém só o nome da cor
-  { label: 'Cor Externa', keys: ['cor externa', 'cor ext'],
+  // joinNeighbors: junta itens consecutivos (ex: "B4B4" + "- BRANCO CRISTAL"); transform mantém só o nome após o traço
+  { label: 'Cor Externa', keys: ['cor externa', 'cor ext'], joinNeighbors: true,
     transform: (v) => { const m = v.match(/-\s*(.+)$/); return m ? m[1].trim() : v; } },
   { label: 'Chassi',           keys: ['chassi'] },
   { label: 'Descrição Veículo', keys: ['descrição do veículo', 'descricao do veiculo', 'descrição veículo'] },
@@ -60,6 +60,7 @@ function extractFieldSmart(
   keys: string[],
   exact = false,
   transform?: (v: string) => string,
+  joinNeighbors = false,
 ): string {
   const applyTransform = (v: string) => (transform ? transform(v) : v);
   const matchKey = (campo: string) =>
@@ -100,7 +101,24 @@ function extractFieldSmart(
         .filter(i => Math.abs(i.y - item.y) <= Y_THRESH && i.x > item.x)
         .sort((a, b) => a.x - b.x);
       if (rightItems.length > 0) {
-        const val = rightItems[0].str.replace(/^:\s*/, '').trim();
+        let val: string;
+        if (joinNeighbors) {
+          // Junta itens consecutivos com gap pequeno (ex: "B4B4" + "- BRANCO CRISTAL")
+          const parts: string[] = [];
+          for (let ri = 0; ri < rightItems.length; ri++) {
+            const curr = rightItems[ri];
+            if (ri > 0) {
+              const prev = rightItems[ri - 1];
+              const gap = curr.x - (prev.x + prev.str.length * 5);
+              if (gap > 50) break;
+            }
+            const s = curr.str.replace(/^:\s*/, '').trim();
+            if (s) parts.push(s);
+          }
+          val = parts.join(' ').trim();
+        } else {
+          val = rightItems[0].str.replace(/^:\s*/, '').trim();
+        }
         if (val) return applyTransform(val);
       }
     }
@@ -129,7 +147,7 @@ function buildConsolidated(pages: PageResult[]): { headers: string[]; rows: stri
       String(page),
       ...FIELD_MAP.map(f => {
         if (f.label === 'ID Venda' && isSorana) return '';
-        return extractFieldSmart(formData, rawItems, f.keys, f.exact, f.transform);
+        return extractFieldSmart(formData, rawItems, f.keys, f.exact, f.transform, f.joinNeighbors);
       }),
     ];
   });
