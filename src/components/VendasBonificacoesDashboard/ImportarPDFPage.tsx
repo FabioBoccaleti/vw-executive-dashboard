@@ -23,50 +23,86 @@ async function extractTableFromPDF(file: File): Promise<TableData> {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-  // Coleta todos os itens de texto de todas as páginas
-  type TextItem = { str: string; transform: number[]; width: number; height: number };
-  const allItems: TextItem[] = [];
+  type RawItem = { x: number; y: number; str: string };
+  const allItems: RawItem[] = [];
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 1 });
     const content = await page.getTextContent();
     for (const item of content.items) {
-      if ('str' in item && (item as TextItem).str.trim()) {
-        allItems.push(item as TextItem);
-      }
+      if (!('str' in item)) continue;
+      const str = (item as { str: string }).str.trim();
+      if (!str) continue;
+      const transform = (item as { transform: number[] }).transform;
+      // Converte Y do PDF (cresce para cima) para Y de tela (cresce para baixo)
+      allItems.push({
+        x: transform[4],
+        y: viewport.height - transform[5],
+        str,
+      });
     }
   }
 
-  if (allItems.length === 0) {
-    return { headers: [], rows: [] };
+  if (allItems.length === 0) return { headers: [], rows: [] };
+
+  // ── 1. Agrupa itens em linhas pela coordenada Y (tolerância ±4px) ──────────
+  const Y_TOL = 4;
+  const rowGroups: RawItem[][] = [];
+
+  const sortedByY = [...allItems].sort((a, b) => a.y - b.y || a.x - b.x);
+  for (const item of sortedByY) {
+    const existing = rowGroups.find(g => Math.abs(g[0].y - item.y) <= Y_TOL);
+    if (existing) {
+      existing.push(item);
+    } else {
+      rowGroups.push([item]);
+    }
   }
+  rowGroups.sort((a, b) => a[0].y - b[0].y);
+  for (const row of rowGroups) row.sort((a, b) => a.x - b.x);
 
-  // Agrupa itens por linha (coordenada Y arredondada)
-  const lineMap = new Map<number, { x: number; str: string }[]>();
-  for (const item of allItems) {
-    const y = Math.round(item.transform[5]);
-    if (!lineMap.has(y)) lineMap.set(y, []);
-    lineMap.get(y)!.push({ x: item.transform[4], str: item.str });
+  // ── 2. Detecta âncoras de colunas clusterizando posições X de todos os items ─
+  const X_GAP = 12; // itens dentro desse gap pertencem à mesma coluna
+  const allXs = [...allItems].map(i => i.x).sort((a, b) => a - b);
+  const colAnchors: number[] = [];
+  for (const x of allXs) {
+    if (!colAnchors.some(cx => Math.abs(cx - x) <= X_GAP)) {
+      colAnchors.push(x);
+    }
   }
+  colAnchors.sort((a, b) => a - b);
 
-  // Ordena linhas de cima para baixo (Y maior = mais alto em PDF)
-  const sortedYs = Array.from(lineMap.keys()).sort((a, b) => b - a);
-
-  // Para cada linha, ordena itens da esquerda para direita e une
-  const lines: string[][] = sortedYs.map((y) => {
-    const cells = lineMap.get(y)!.sort((a, b) => a.x - b.x);
-    return cells.map((c) => c.str.trim()).filter(Boolean);
+  // ── 3. Monta matriz: cada item vai para a coluna mais próxima ──────────────
+  const matrix: string[][] = rowGroups.map(row => {
+    const cells = new Array<string>(colAnchors.length).fill('');
+    for (const item of row) {
+      let nearestIdx = 0;
+      let nearestDist = Infinity;
+      for (let i = 0; i < colAnchors.length; i++) {
+        const d = Math.abs(colAnchors[i] - item.x);
+        if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+      }
+      // Múltiplos runs na mesma célula são concatenados
+      cells[nearestIdx] = cells[nearestIdx]
+        ? cells[nearestIdx] + ' ' + item.str
+        : item.str;
+    }
+    return cells;
   });
 
-  // Filter out empty lines
-  const nonEmptyLines = lines.filter((l) => l.length > 0);
+  // ── 4. Remove colunas e linhas inteiramente vazias ─────────────────────────
+  const usedCols = colAnchors
+    .map((_, i) => i)
+    .filter(i => matrix.some(r => r[i].trim()));
 
-  if (nonEmptyLines.length === 0) {
-    return { headers: [], rows: [] };
-  }
+  const trimmed = matrix
+    .map(row => usedCols.map(i => row[i]))
+    .filter(row => row.some(c => c.trim()));
 
-  // A primeira linha vira cabeçalho; o resto são linhas de dados
-  const [headers, ...rows] = nonEmptyLines;
+  if (trimmed.length === 0) return { headers: [], rows: [] };
+
+  const [headers, ...rows] = trimmed;
   return { headers, rows };
 }
 
