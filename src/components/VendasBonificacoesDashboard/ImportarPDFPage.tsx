@@ -119,10 +119,20 @@ function extractFieldSmart(
 
 function buildConsolidated(pages: PageResult[]): { headers: string[]; rows: string[][] } {
   const headers = ['Pág.', ...FIELD_MAP.map(f => f.label)];
-  const rows = pages.map(({ page, formData, rawItems }) => [
-    String(page),
-    ...FIELD_MAP.map(f => extractFieldSmart(formData, rawItems, f.keys, f.exact, f.transform)),
-  ]);
+  const rows = pages.map(({ page, formData, rawItems }) => {
+    const fontePagadoraField = FIELD_MAP.find(f => f.label === 'Fonte Pagadora');
+    const fontePagadora = fontePagadoraField
+      ? extractFieldSmart(formData, rawItems, fontePagadoraField.keys).toLowerCase()
+      : '';
+    const isSorana = fontePagadora.includes('sorana');
+    return [
+      String(page),
+      ...FIELD_MAP.map(f => {
+        if (f.label === 'ID Venda' && isSorana) return '';
+        return extractFieldSmart(formData, rawItems, f.keys, f.exact, f.transform);
+      }),
+    ];
+  });
   return { headers, rows };
 }
 
