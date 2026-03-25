@@ -47,7 +47,7 @@ const FIELD_MAP: { label: string; keys: string[]; exact?: boolean; joinNeighbors
   { label: 'ICMS Substitutivo', keys: ['icms substitutivo'], exact: true },
   // joinNeighbors: junta itens consecutivos (ex: "B4B4" + "- BRANCO CRISTAL"); transform mantém só o nome após o traço
   { label: 'Cor Externa', keys: ['cor externa', 'cor ext'], joinNeighbors: true,
-    transform: (v) => { const m = v.match(/-\s*(.+)$/); return m ? m[1].trim() : v; } },
+    transform: (v) => { const m = v.match(/-\s*(.+)$/); if (!m) return v; return m[1].replace(/\s+Ano\s.*/i, '').trim(); } },
   { label: 'Chassi',           keys: ['chassi'] },
   { label: 'Descrição Veículo', keys: ['descrição do veículo', 'descricao do veiculo', 'descrição veículo'] },
 ];
