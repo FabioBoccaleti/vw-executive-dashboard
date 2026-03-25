@@ -20,8 +20,9 @@ interface TableData {
 interface PageResult {
   page: number;
   total: number;
-  data: TableData;     // modo selecionado pelo usuário (exibição por página)
-  formData: TableData; // sempre formulário — usado para tabela consolidada
+  data: TableData;      // modo selecionado pelo usuário (exibição por página)
+  formData: TableData;  // sempre formulário — usado para tabela consolidada
+  rawItems: RawItem[];  // itens brutos do pdfjs para busca espacial
 }
 
 interface ImportarPDFPageProps {
@@ -46,19 +47,61 @@ const FIELD_MAP: { label: string; keys: string[] }[] = [
   { label: 'Descrição Veículo',keys: ['descrição do veículo', 'descricao do veiculo', 'descrição veículo'] },
 ];
 
-function extractField(data: TableData, keys: string[]): string {
-  for (const row of data.rows) {
+// Estratégia 1: busca nos pares do formData
+// Estratégia 2: busca direta no texto bruto dos itens (mais robusta para campos não parseados)
+function extractFieldSmart(formData: TableData, rawItems: RawItem[], keys: string[]): string {
+  // Estratégia 1: pares do formulário
+  for (const row of formData.rows) {
     const campo = (row[0] ?? '').toLowerCase().trim();
-    if (keys.some(k => campo.includes(k.toLowerCase()))) return row[1] ?? '';
+    if (keys.some(k => campo.includes(k.toLowerCase()))) {
+      const val = (row[1] ?? '').trim();
+      if (val) return val;
+    }
   }
+
+  if (rawItems.length === 0) return '';
+
+  // Estratégia 2: busca espacial nos itens brutos
+  // Para cada chave, procura o item que contém a chave e extrai o valor à direita
+  const sorted = [...rawItems].sort((a, b) => a.y - b.y || a.x - b.x);
+
+  for (const key of keys) {
+    const keyLower = key.toLowerCase();
+    // Caso A: label e valor podem estar no mesmo item: "Data Faturamento: 23/03/2026"
+    for (const item of sorted) {
+      const text = item.str;
+      const textLower = text.toLowerCase();
+      const keyIdx = textLower.indexOf(keyLower);
+      if (keyIdx === -1) continue;
+      const afterKey = text.slice(keyIdx + key.length).replace(/^\s*:\s*/, '').trim();
+      if (afterKey) return afterKey.split(/\s{2,}/)[0].trim();
+      // Label-only item: valor está no(s) próximo(s) item(s) à direita na mesma linha
+      const Y_THRESH = 6;
+      const rightItems = sorted
+        .filter(i => Math.abs(i.y - item.y) <= Y_THRESH && i.x > item.x)
+        .sort((a, b) => a.x - b.x);
+      if (rightItems.length > 0) {
+        const val = rightItems[0].str.replace(/^:\s*/, '').trim();
+        if (val) return val;
+      }
+    }
+
+    // Caso B: busca no texto completo da página por "key: value"
+    const fullText = sorted.map(i => i.str).join(' ');
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(escaped + '\\s*:?\\s*([^\\n]{1,80}?)(?=\\s{2,}[A-ZÀ-Úa-zà-ú]|$)', 'i');
+    const m = re.exec(fullText);
+    if (m && m[1].trim()) return m[1].trim();
+  }
+
   return '';
 }
 
 function buildConsolidated(pages: PageResult[]): { headers: string[]; rows: string[][] } {
   const headers = ['Pág.', ...FIELD_MAP.map(f => f.label)];
-  const rows = pages.map(({ page, formData }) => [
+  const rows = pages.map(({ page, formData, rawItems }) => [
     String(page),
-    ...FIELD_MAP.map(f => extractField(formData, f.keys)),
+    ...FIELD_MAP.map(f => extractFieldSmart(formData, rawItems, f.keys)),
   ]);
   return { headers, rows };
 }
@@ -142,14 +185,14 @@ async function extractViaOCR(
       const pageLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
       const empty: TableData = { headers: [], rows: [], mode: forceMode ?? 'formulario' };
       if (pageLines.length === 0) {
-        results.push({ page: pageNum, total: pdf.numPages, data: empty, formData: empty });
+        results.push({ page: pageNum, total: pdf.numPages, data: empty, formData: empty, rawItems: [] });
         continue;
       }
       const hasColons = pageLines.some(l => l.includes(':'));
       const mode = forceMode ?? (hasColons ? 'formulario' : 'tabela');
       const data = mode === 'formulario' ? parseOCRLinesAsForm(pageLines) : parseOCRLinesAsTable(pageLines);
       const formData = parseOCRLinesAsForm(pageLines); // sempre formulário para consolidação
-      results.push({ page: pageNum, total: pdf.numPages, data, formData });
+      results.push({ page: pageNum, total: pdf.numPages, data, formData, rawItems: [] });
     }
   } finally {
     await worker.terminate();
@@ -276,13 +319,13 @@ async function extractFromPDF(
       const items = await collectNativeItemsPage(pdf, pageNum);
       const empty: TableData = { headers: [], rows: [], mode: forceMode ?? 'tabela' };
       if (items.length === 0) {
-        results.push({ page: pageNum, total: pdf.numPages, data: empty, formData: empty });
+        results.push({ page: pageNum, total: pdf.numPages, data: empty, formData: empty, rawItems: [] });
         continue;
       }
       const mode = forceMode ?? detectMode(items);
       const data = mode === 'formulario' ? extractAsForm(items) : extractAsTable(items);
       const formData = extractAsForm(items); // sempre formulário para tabela consolidada
-      results.push({ page: pageNum, total: pdf.numPages, data, formData });
+      results.push({ page: pageNum, total: pdf.numPages, data, formData, rawItems: items });
     }
     return results;
   }
