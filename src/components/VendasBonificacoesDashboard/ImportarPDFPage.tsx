@@ -32,7 +32,9 @@ interface ImportarPDFPageProps {
 type RawItem = { x: number; y: number; str: string };
 
 // ─── Mapeamento fixo: coluna → chaves de busca no PDF ────────────────────────
-const FIELD_MAP: { label: string; keys: string[] }[] = [
+// exact: true → campo deve começar com a chave (não apenas conter)
+// transform: função para pós-processar o valor extraído
+const FIELD_MAP: { label: string; keys: string[]; exact?: boolean; transform?: (v: string) => string }[] = [
   { label: 'Data Faturamento', keys: ['data faturamento', 'data fat'] },
   { label: 'Nota',             keys: ['nota'] },
   { label: 'ID Venda',         keys: ['id. venda', 'id venda', 'id.venda'] },
@@ -41,21 +43,36 @@ const FIELD_MAP: { label: string; keys: string[] }[] = [
   { label: 'Fonte Pagadora',   keys: ['fonte pagadora'] },
   { label: 'Vencimento',       keys: ['vencimento'] },
   { label: 'Valor NF',         keys: ['valor n.f.', 'valor nf', 'valor n.f'] },
-  { label: 'ICMS Substitutivo',keys: ['icms substitutivo', 'icms subst'] },
-  { label: 'Cor Externa',      keys: ['cor externa', 'cor ext'] },
+  // exact: true evita capturar "Base ICMS Substitutivo"
+  { label: 'ICMS Substitutivo', keys: ['icms substitutivo'], exact: true },
+  // transform: descarta o código (ex: "B4B4") e mantém só o nome da cor
+  { label: 'Cor Externa', keys: ['cor externa', 'cor ext'],
+    transform: (v) => { const m = v.match(/-\s*(.+)$/); return m ? m[1].trim() : v; } },
   { label: 'Chassi',           keys: ['chassi'] },
-  { label: 'Descrição Veículo',keys: ['descrição do veículo', 'descricao do veiculo', 'descrição veículo'] },
+  { label: 'Descrição Veículo', keys: ['descrição do veículo', 'descricao do veiculo', 'descrição veículo'] },
 ];
 
 // Estratégia 1: busca nos pares do formData
 // Estratégia 2: busca direta no texto bruto dos itens (mais robusta para campos não parseados)
-function extractFieldSmart(formData: TableData, rawItems: RawItem[], keys: string[]): string {
+function extractFieldSmart(
+  formData: TableData,
+  rawItems: RawItem[],
+  keys: string[],
+  exact = false,
+  transform?: (v: string) => string,
+): string {
+  const applyTransform = (v: string) => (transform ? transform(v) : v);
+  const matchKey = (campo: string) =>
+    exact
+      ? keys.some(k => campo.startsWith(k.toLowerCase()))
+      : keys.some(k => campo.includes(k.toLowerCase()));
+
   // Estratégia 1: pares do formulário
   for (const row of formData.rows) {
     const campo = (row[0] ?? '').toLowerCase().trim();
-    if (keys.some(k => campo.includes(k.toLowerCase()))) {
+    if (matchKey(campo)) {
       const val = (row[1] ?? '').trim();
-      if (val) return val;
+      if (val) return applyTransform(val);
     }
   }
 
@@ -73,8 +90,10 @@ function extractFieldSmart(formData: TableData, rawItems: RawItem[], keys: strin
       const textLower = text.toLowerCase();
       const keyIdx = textLower.indexOf(keyLower);
       if (keyIdx === -1) continue;
+      // exact: garante que antes da chave não há texto alfanumérico (evita "Base ICMS...")
+      if (exact && keyIdx > 0 && /[a-zà-üa-z0-9]/i.test(textLower[keyIdx - 1])) continue;
       const afterKey = text.slice(keyIdx + key.length).replace(/^\s*:\s*/, '').trim();
-      if (afterKey) return afterKey.split(/\s{2,}/)[0].trim();
+      if (afterKey) return applyTransform(afterKey.split(/\s{2,}/)[0].trim());
       // Label-only item: valor está no(s) próximo(s) item(s) à direita na mesma linha
       const Y_THRESH = 6;
       const rightItems = sorted
@@ -82,16 +101,17 @@ function extractFieldSmart(formData: TableData, rawItems: RawItem[], keys: strin
         .sort((a, b) => a.x - b.x);
       if (rightItems.length > 0) {
         const val = rightItems[0].str.replace(/^:\s*/, '').trim();
-        if (val) return val;
+        if (val) return applyTransform(val);
       }
     }
 
     // Caso B: busca no texto completo da página por "key: value"
     const fullText = sorted.map(i => i.str).join(' ');
     const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(escaped + '\\s*:?\\s*([^\\n]{1,80}?)(?=\\s{2,}[A-ZÀ-Úa-zà-ú]|$)', 'i');
+    const boundary = exact ? '(?<![a-zà-ú])' : '';
+    const re = new RegExp(boundary + escaped + '\\s*:?\\s*([^\\n]{1,80}?)(?=\\s{2,}[A-ZÀ-Úa-zà-ú]|$)', 'i');
     const m = re.exec(fullText);
-    if (m && m[1].trim()) return m[1].trim();
+    if (m && m[1].trim()) return applyTransform(m[1].trim());
   }
 
   return '';
@@ -101,7 +121,7 @@ function buildConsolidated(pages: PageResult[]): { headers: string[]; rows: stri
   const headers = ['Pág.', ...FIELD_MAP.map(f => f.label)];
   const rows = pages.map(({ page, formData, rawItems }) => [
     String(page),
-    ...FIELD_MAP.map(f => extractFieldSmart(formData, rawItems, f.keys)),
+    ...FIELD_MAP.map(f => extractFieldSmart(formData, rawItems, f.keys, f.exact, f.transform)),
   ]);
   return { headers, rows };
 }
