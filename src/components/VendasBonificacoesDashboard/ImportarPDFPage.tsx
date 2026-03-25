@@ -23,14 +23,8 @@ interface ImportarPDFPageProps {
 
 type RawItem = { x: number; y: number; str: string };
 
-// ─── Coleta itens de texto de todas as páginas ───────────────────────────────
-// Se o PDF for baseado em imagem (0 itens de texto), usa OCR via Tesseract.js
-async function collectItems(
-  file: File,
-  onProgress?: (msg: string) => void,
-): Promise<RawItem[]> {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+// ─── Extrai texto nativo do pdfjs ────────────────────────────────────────────
+async function collectNativeItems(pdf: pdfjsLib.PDFDocumentProxy): Promise<RawItem[]> {
   const items: RawItem[] = [];
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
@@ -44,45 +38,70 @@ async function collectItems(
       items.push({ x: t[4], y: viewport.height - t[5], str });
     }
   }
+  return items;
+}
 
-  // PDF tem texto nativo — retorna direto
-  if (items.length > 0) return items;
-
-  // ─── Fallback OCR para PDFs baseados em imagem ─────────────────────────────
-  onProgress?.('PDF baseado em imagem — iniciando OCR (aguarde)...');
-  const ocrItems: RawItem[] = [];
-  const scale = 2;
-  const worker = await createTesseractWorker('por');
-
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    onProgress?.(`Reconhecendo texto — página ${pageNum} de ${pdf.numPages}...`);
-    const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    const ctx = canvas.getContext('2d')!;
-    await page.render({ canvas, canvasContext: ctx, viewport }).promise;
-
-    const { data } = await worker.recognize(canvas);
-    // data.lines pode não estar nos tipos de tesseract.js, usar cast
-    const lines = (data as unknown as { lines: Array<{ words: Array<{ text: string; bbox: { x0: number; y0: number } }> }> }).lines ?? [];
-    for (const line of lines) {
-      for (const word of line.words) {
-        const text = word.text.trim();
-        if (text) {
-          ocrItems.push({
-            x: word.bbox.x0 / scale,
-            y: word.bbox.y0 / scale,
-            str: text,
-          });
-        }
+// ─── OCR: processa texto linha a linha a partir de data.text ─────────────────
+function parseOCRLinesAsForm(lines: string[]): TableData {
+  const pairs: string[][] = [];
+  for (const line of lines) {
+    // cada linha pode ter múltiplos pares separados por espaços largos
+    const parts = line.split(/\s{3,}/);
+    for (const part of parts) {
+      const ci = part.indexOf(':');
+      if (ci > 0) {
+        pairs.push([part.slice(0, ci).trim(), part.slice(ci + 1).trim()]);
+      } else if (part.trim().length > 1) {
+        pairs.push([part.trim(), '']);
       }
     }
   }
+  if (pairs.length === 0) return { headers: [], rows: [], mode: 'formulario' };
+  return { headers: ['Campo', 'Valor'], rows: pairs, mode: 'formulario' };
+}
 
-  await worker.terminate();
-  return ocrItems;
+function parseOCRLinesAsTable(lines: string[]): TableData {
+  const rows = lines.map(l => l.split(/\s{2,}/).filter(c => c.trim()));
+  const filtered = rows.filter(r => r.length > 0);
+  if (filtered.length === 0) return { headers: [], rows: [], mode: 'tabela' };
+  const [headers, ...dataRows] = filtered;
+  return { headers, rows: dataRows, mode: 'tabela' };
+}
+
+async function extractViaOCR(
+  pdf: pdfjsLib.PDFDocumentProxy,
+  forceMode: 'tabela' | 'formulario' | undefined,
+  onProgress?: (msg: string) => void,
+): Promise<TableData> {
+  onProgress?.('PDF baseado em imagem — iniciando OCR...');
+  const scale = 2;
+  // usa 'eng' como idioma base (mais estável que 'por' para CDN); lê bem números e pontuação
+  const worker = await createTesseractWorker('eng');
+  const allLines: string[] = [];
+  try {
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      onProgress?.(`Reconhecendo texto — página ${pageNum} de ${pdf.numPages}...`);
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d')!;
+      await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+      const { data: { text } } = await worker.recognize(canvas);
+      console.log('[OCR] página', pageNum, '— chars reconhecidos:', text.length);
+      const pageLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
+      allLines.push(...pageLines);
+    }
+  } finally {
+    await worker.terminate();
+  }
+  console.log('[OCR] total de linhas:', allLines.length);
+  if (allLines.length === 0) return { headers: [], rows: [], mode: forceMode ?? 'formulario' };
+  // Para este tipo de relatório (ficha de veículo), formulário é o modo mais adequado
+  const hasColons = allLines.some(l => l.includes(':'));
+  const mode = forceMode ?? (hasColons ? 'formulario' : 'tabela');
+  return mode === 'formulario' ? parseOCRLinesAsForm(allLines) : parseOCRLinesAsTable(allLines);
 }
 
 // ─── Agrupa items em faixas horizontais por Y ────────────────────────────────
@@ -191,10 +210,16 @@ async function extractFromPDF(
   forceMode?: 'tabela' | 'formulario',
   onProgress?: (msg: string) => void,
 ): Promise<TableData> {
-  const items = await collectItems(file, onProgress);
-  if (items.length === 0) return { headers: [], rows: [], mode: forceMode ?? 'tabela' };
-  const mode = forceMode ?? detectMode(items);
-  return mode === 'formulario' ? extractAsForm(items) : extractAsTable(items);
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const items = await collectNativeItems(pdf);
+  console.log('[pdfjs] itens de texto extraídos:', items.length);
+  if (items.length > 0) {
+    const mode = forceMode ?? detectMode(items);
+    return mode === 'formulario' ? extractAsForm(items) : extractAsTable(items);
+  }
+  // PDF sem texto nativo → OCR
+  return extractViaOCR(pdf, forceMode, onProgress);
 }
 
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
