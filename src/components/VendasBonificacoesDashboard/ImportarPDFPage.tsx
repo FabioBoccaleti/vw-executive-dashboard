@@ -34,68 +34,88 @@ async function extractTableFromPDF(file: File): Promise<TableData> {
       if (!('str' in item)) continue;
       const str = (item as { str: string }).str.trim();
       if (!str) continue;
-      const transform = (item as { transform: number[] }).transform;
-      // Converte Y do PDF (cresce para cima) para Y de tela (cresce para baixo)
-      allItems.push({
-        x: transform[4],
-        y: viewport.height - transform[5],
-        str,
-      });
+      const t = (item as { transform: number[] }).transform;
+      allItems.push({ x: t[4], y: viewport.height - t[5], str });
     }
   }
 
   if (allItems.length === 0) return { headers: [], rows: [] };
 
-  // ── 1. Agrupa itens em linhas pela coordenada Y (tolerância ±4px) ──────────
-  const Y_TOL = 4;
-  const rowGroups: RawItem[][] = [];
+  // ── 1. Detecta threshold de separação de linhas pela moda dos gaps de Y ───
+  // PDFs com cabeçalhos multi-linha têm dois grupos de gaps:
+  //   • gaps pequenos  = salto de linha dentro da mesma célula (ex: 10pt)
+  //   • gaps maiores   = separação entre linhas de dados        (ex: 20pt)
+  // A moda corresponde ao gap mais frequente (linhas de dados).
+  // Usamos 70% da moda: gaps abaixo disso → mesma linha lógica (multi-linha).
+  const uniqueYs = [...new Set(allItems.map(i => Math.round(i.y)))].sort((a, b) => a - b);
+  let rowSepThresh = 8;
+  if (uniqueYs.length > 2) {
+    const gaps = uniqueYs.slice(1).map((y, i) => y - uniqueYs[i]);
+    const cnt = new Map<number, number>();
+    for (const g of gaps) {
+      const r = Math.round(g / 2) * 2;
+      cnt.set(r, (cnt.get(r) ?? 0) + 1);
+    }
+    let modeGap = 0, modeCount = 0;
+    for (const [g, c] of cnt) if (c > modeCount) { modeGap = g; modeCount = c; }
+    rowSepThresh = Math.max(4, modeGap * 0.7);
+  }
 
-  const sortedByY = [...allItems].sort((a, b) => a.y - b.y || a.x - b.x);
-  for (const item of sortedByY) {
-    const existing = rowGroups.find(g => Math.abs(g[0].y - item.y) <= Y_TOL);
-    if (existing) {
-      existing.push(item);
+  // ── 2. Agrupa Y em faixas lógicas ────────────────────────────────────────
+  // Gaps < threshold → mesma faixa (linhas do cabeçalho multi-linha)
+  // Gaps ≥ threshold → nova faixa (próxima linha de dados)
+  const bands: number[][] = [[uniqueYs[0]]];
+  for (let i = 1; i < uniqueYs.length; i++) {
+    const gap = uniqueYs[i] - uniqueYs[i - 1];
+    if (gap < rowSepThresh) {
+      bands[bands.length - 1].push(uniqueYs[i]);
     } else {
-      rowGroups.push([item]);
+      bands.push([uniqueYs[i]]);
     }
   }
-  rowGroups.sort((a, b) => a[0].y - b[0].y);
-  for (const row of rowGroups) row.sort((a, b) => a.x - b.x);
 
-  // ── 2. Detecta âncoras de colunas clusterizando posições X de todos os items ─
-  const X_GAP = 12; // itens dentro desse gap pertencem à mesma coluna
-  const allXs = [...allItems].map(i => i.x).sort((a, b) => a - b);
+  const yToBand = new Map<number, number>();
+  bands.forEach((band, idx) => band.forEach(y => yToBand.set(y, idx)));
+
+  // ── 3. Agrupa itens por faixa ─────────────────────────────────────────────
+  const bandItems = new Map<number, RawItem[]>();
+  for (const item of allItems) {
+    const ry = Math.round(item.y);
+    const band = yToBand.get(ry);
+    if (band === undefined) continue;
+    if (!bandItems.has(band)) bandItems.set(band, []);
+    bandItems.get(band)!.push(item);
+  }
+
+  // ── 4. Detecta âncoras de colunas agrupando posições X ───────────────────
+  const X_GAP = 10;
+  const allXsSorted = allItems.map(i => i.x).sort((a, b) => a - b);
   const colAnchors: number[] = [];
-  for (const x of allXs) {
-    if (!colAnchors.some(cx => Math.abs(cx - x) <= X_GAP)) {
-      colAnchors.push(x);
-    }
+  for (const x of allXsSorted) {
+    if (!colAnchors.some(cx => Math.abs(cx - x) <= X_GAP)) colAnchors.push(x);
   }
   colAnchors.sort((a, b) => a - b);
 
-  // ── 3. Monta matriz: cada item vai para a coluna mais próxima ──────────────
-  const matrix: string[][] = rowGroups.map(row => {
+  // ── 5. Monta matriz: cada item vai para a coluna mais próxima ─────────────
+  // Dentro de uma faixa, ordena por (X asc, Y asc) para que texto multi-linha
+  // seja concatenado na ordem correta: linha 1 antes da linha 2 da célula.
+  const sortedBandIdxs = [...bandItems.keys()].sort((a, b) => a - b);
+  const matrix: string[][] = sortedBandIdxs.map(bandIdx => {
     const cells = new Array<string>(colAnchors.length).fill('');
-    for (const item of row) {
-      let nearestIdx = 0;
-      let nearestDist = Infinity;
+    const items = bandItems.get(bandIdx)!.sort((a, b) => a.x - b.x || a.y - b.y);
+    for (const item of items) {
+      let nearest = 0, nearestD = Infinity;
       for (let i = 0; i < colAnchors.length; i++) {
         const d = Math.abs(colAnchors[i] - item.x);
-        if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+        if (d < nearestD) { nearestD = d; nearest = i; }
       }
-      // Múltiplos runs na mesma célula são concatenados
-      cells[nearestIdx] = cells[nearestIdx]
-        ? cells[nearestIdx] + ' ' + item.str
-        : item.str;
+      cells[nearest] = cells[nearest] ? cells[nearest] + ' ' + item.str : item.str;
     }
     return cells;
   });
 
-  // ── 4. Remove colunas e linhas inteiramente vazias ─────────────────────────
-  const usedCols = colAnchors
-    .map((_, i) => i)
-    .filter(i => matrix.some(r => r[i].trim()));
-
+  // ── 6. Remove colunas e linhas completamente vazias ───────────────────────
+  const usedCols = colAnchors.map((_, i) => i).filter(i => matrix.some(r => r[i].trim()));
   const trimmed = matrix
     .map(row => usedCols.map(i => row[i]))
     .filter(row => row.some(c => c.trim()));
