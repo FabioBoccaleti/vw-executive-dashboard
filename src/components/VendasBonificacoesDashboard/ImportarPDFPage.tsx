@@ -20,7 +20,8 @@ interface TableData {
 interface PageResult {
   page: number;
   total: number;
-  data: TableData;
+  data: TableData;     // modo selecionado pelo usuário (exibição por página)
+  formData: TableData; // sempre formulário — usado para tabela consolidada
 }
 
 interface ImportarPDFPageProps {
@@ -55,9 +56,9 @@ function extractField(data: TableData, keys: string[]): string {
 
 function buildConsolidated(pages: PageResult[]): { headers: string[]; rows: string[][] } {
   const headers = ['Pág.', ...FIELD_MAP.map(f => f.label)];
-  const rows = pages.map(({ page, data }) => [
+  const rows = pages.map(({ page, formData }) => [
     String(page),
-    ...FIELD_MAP.map(f => extractField(data, f.keys)),
+    ...FIELD_MAP.map(f => extractField(formData, f.keys)),
   ]);
   return { headers, rows };
 }
@@ -139,14 +140,16 @@ async function extractViaOCR(
       const { data: { text } } = await worker.recognize(canvas);
       console.log('[OCR] página', pageNum, '— chars reconhecidos:', text.length);
       const pageLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
+      const empty: TableData = { headers: [], rows: [], mode: forceMode ?? 'formulario' };
       if (pageLines.length === 0) {
-        results.push({ page: pageNum, total: pdf.numPages, data: { headers: [], rows: [], mode: forceMode ?? 'formulario' } });
+        results.push({ page: pageNum, total: pdf.numPages, data: empty, formData: empty });
         continue;
       }
       const hasColons = pageLines.some(l => l.includes(':'));
       const mode = forceMode ?? (hasColons ? 'formulario' : 'tabela');
       const data = mode === 'formulario' ? parseOCRLinesAsForm(pageLines) : parseOCRLinesAsTable(pageLines);
-      results.push({ page: pageNum, total: pdf.numPages, data });
+      const formData = parseOCRLinesAsForm(pageLines); // sempre formulário para consolidação
+      results.push({ page: pageNum, total: pdf.numPages, data, formData });
     }
   } finally {
     await worker.terminate();
@@ -271,13 +274,15 @@ async function extractFromPDF(
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       onProgress?.(`Processando página ${pageNum} de ${pdf.numPages}...`);
       const items = await collectNativeItemsPage(pdf, pageNum);
+      const empty: TableData = { headers: [], rows: [], mode: forceMode ?? 'tabela' };
       if (items.length === 0) {
-        results.push({ page: pageNum, total: pdf.numPages, data: { headers: [], rows: [], mode: forceMode ?? 'tabela' } });
+        results.push({ page: pageNum, total: pdf.numPages, data: empty, formData: empty });
         continue;
       }
       const mode = forceMode ?? detectMode(items);
       const data = mode === 'formulario' ? extractAsForm(items) : extractAsTable(items);
-      results.push({ page: pageNum, total: pdf.numPages, data });
+      const formData = extractAsForm(items); // sempre formulário para tabela consolidada
+      results.push({ page: pageNum, total: pdf.numPages, data, formData });
     }
     return results;
   }
