@@ -26,6 +26,8 @@ export interface RegistroVendasRow {
   nomeCor: string;
   nomeVendedor: string;
   transacao: string;
+  highlight?: boolean;
+  annotation?: string;
 }
 
 function keyFor(tab: RegistroSubTab): string {

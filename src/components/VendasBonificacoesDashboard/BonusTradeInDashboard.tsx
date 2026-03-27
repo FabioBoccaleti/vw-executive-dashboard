@@ -1,12 +1,14 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { Download, FileSpreadsheet, ChevronDown, AlertTriangle } from 'lucide-react';
+﻿import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
+import { Download, FileSpreadsheet, ChevronDown, AlertTriangle, Pencil, Trash2, Highlighter, StickyNote, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import {
   type BonusTradeInRow,
   loadBonusTradeInRows,
+  saveBonusTradeInRows,
   replaceBonusTradeInRows,
+  createEmptyBonusTradeInRow,
 } from './bonusTradeInStorage';
 
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -30,34 +32,32 @@ function fmtCurrency(raw: string): string {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function sumField(rows: BonusTradeInRow[], field: 'valorTradeIn'): number {
+function sumField(rows: BonusTradeInRow[]): number {
   return rows.reduce((acc, r) => {
-    const n = parseFloat(String(r[field]).replace(',', '.'));
+    const n = parseFloat(String(r.valorTradeIn).replace(',', '.'));
     return acc + (isNaN(n) ? 0 : n);
   }, 0);
 }
 
-// ─── Exporta para Excel ────────────────────────────────────────────────────────
 function exportToExcel(rows: BonusTradeInRow[], filename: string) {
   const data = rows.map(r => ({
-    'Data da Venda':      r.dataVenda,
-    Cliente:              r.cliente,
-    Chassi:               r.chassi,
-    Modelo:               r.modelo,
-    Vendedor:             r.vendedor,
-    'Nº Titulo':          r.nTitulo,
-    'Valor do Trade IN':  r.valorTradeIn,
-    Recebido:             r.recebido,
+    'Data da Venda':       r.dataVenda,
+    Cliente:               r.cliente,
+    Chassi:                r.chassi,
+    Modelo:                r.modelo,
+    Vendedor:              r.vendedor,
+    'N Titulo':            r.nTitulo,
+    'Valor do Trade IN':   r.valorTradeIn,
+    Recebido:              r.recebido,
     'Data do Recebimento': r.dataRecebimento,
   }));
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Bônus Trade IN');
+  XLSX.utils.book_append_sheet(wb, ws, 'Bonus Trade IN');
   XLSX.writeFile(wb, filename);
 }
 
-// ─── Lê Excel e converte para rows ────────────────────────────────────────────
-function parseExcelFile(buffer: ArrayBuffer): Omit<BonusTradeInRow, 'id'>[] {
+function parseExcelFile(buffer: ArrayBuffer): Omit<BonusTradeInRow, 'id' | 'highlight' | 'annotation'>[] {
   const wb = XLSX.read(buffer, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const raw: Record<string, string>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
@@ -67,43 +67,51 @@ function parseExcelFile(buffer: ArrayBuffer): Omit<BonusTradeInRow, 'id'>[] {
     chassi:          String(r['Chassi']              ?? r['CHASSI']            ?? ''),
     modelo:          String(r['Modelo']              ?? r['MODELO']            ?? ''),
     vendedor:        String(r['Vendedor']            ?? r['VENDEDOR']          ?? ''),
-    nTitulo:         String(r['Nº Titulo']           ?? r['N_TITULO']          ?? r['NUM_TITULO'] ?? ''),
+    nTitulo:         String(r['N Titulo']            ?? r['N_TITULO']          ?? r['NUM_TITULO'] ?? ''),
     valorTradeIn:    String(r['Valor do Trade IN']   ?? r['VALOR_TRADE_IN']    ?? ''),
     recebido:        String(r['Recebido']            ?? r['RECEBIDO']          ?? ''),
     dataRecebimento: String(r['Data do Recebimento'] ?? r['DATA_RECEBIMENTO']  ?? ''),
   }));
 }
 
-// ─── Componente principal ──────────────────────────────────────────────────────
+const EMPTY_EDIT: BonusTradeInRow = { id: '', dataVenda: '', cliente: '', chassi: '', modelo: '', vendedor: '', nTitulo: '', valorTradeIn: '', recebido: '', dataRecebimento: '', highlight: false, annotation: '' };
+
+const COLUMNS = ['Data da Venda','Cliente','Chassi','Modelo','Vendedor','N Titulo','Valor do Trade IN','Recebido','Data do Recebimento'];
+
 export function BonusTradeInDashboard() {
   const [rows, setRows]               = useState<BonusTradeInRow[]>([]);
   const [loading, setLoading]         = useState(true);
   const [filterYear, setFilterYear]   = useState<number>(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
-  const [confirmImport, setConfirmImport] = useState(false);
+  const [confirmImport, setConfirmImport]     = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editingId, setEditingId]     = useState<string | null>(null);
+  const [editValues, setEditValues]   = useState<BonusTradeInRow>(EMPTY_EDIT);
+  const [expandedAnnotations, setExpandedAnnotations] = useState<Set<string>>(new Set());
 
   const xlsxInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLoading(true);
-    loadBonusTradeInRows().then(data => {
-      setRows(data);
+    loadBonusTradeInRows().then(async data => {
+      if (data.length === 0) {
+        const empty = Array.from({ length: 10 }, () => createEmptyBonusTradeInRow());
+        await saveBonusTradeInRows(empty);
+        setRows(empty);
+      } else {
+        setRows(data);
+      }
       setLoading(false);
     });
   }, []);
 
-  // Anos disponíveis
   const availableYears = useMemo(() => {
     const years = new Set<number>();
-    rows.forEach(r => {
-      const d = parseDate(r.dataVenda);
-      if (d) years.add(d.year);
-    });
+    rows.forEach(r => { const d = parseDate(r.dataVenda); if (d) years.add(d.year); });
     const sorted = Array.from(years).sort((a, b) => b - a);
     return sorted.length ? sorted : [new Date().getFullYear()];
   }, [rows]);
 
-  // Contagem por mês para o filtro
   const monthCounts = useMemo(() => {
     const counts: Record<number, number> = {};
     rows.forEach(r => {
@@ -113,209 +121,212 @@ export function BonusTradeInDashboard() {
     return counts;
   }, [rows, filterYear]);
 
-  // Linhas filtradas
   const filteredRows = useMemo(() => {
     return rows.filter(r => {
       const d = parseDate(r.dataVenda);
-      if (!d) return false;
+      if (!d) return true;
       if (d.year !== filterYear) return false;
       if (filterMonth !== null && d.month !== filterMonth) return false;
       return true;
     });
   }, [rows, filterYear, filterMonth]);
 
-  const totalValor = useMemo(() => sumField(filteredRows, 'valorTradeIn'), [filteredRows]);
+  const totalValor = useMemo(() => sumField(filteredRows), [filteredRows]);
 
-  // ─── Importar Excel ──────────────────────────────────────────────────────────
-  function handleXlsxClick() {
-    setConfirmImport(true);
+  async function persistRows(updated: BonusTradeInRow[]) {
+    setRows(updated);
+    await saveBonusTradeInRows(updated);
   }
 
-  function handleConfirmImport() {
-    setConfirmImport(false);
-    xlsxInputRef.current?.click();
+  async function handleToggleHighlight(row: BonusTradeInRow) {
+    await persistRows(rows.map(r => r.id === row.id ? { ...r, highlight: !r.highlight } : r));
   }
+
+  function handleEdit(row: BonusTradeInRow) { setEditingId(row.id); setEditValues({ ...row }); }
+  function handleEditChange(field: keyof BonusTradeInRow, value: string) { setEditValues(prev => ({ ...prev, [field]: value })); }
+
+  async function handleSaveEdit() {
+    await persistRows(rows.map(r => r.id === editValues.id ? editValues : r));
+    setEditingId(null);
+    toast.success('Linha salva.');
+  }
+
+  function handleCancelEdit() { setEditingId(null); }
+
+  async function handleConfirmDelete() {
+    if (!confirmDeleteId) return;
+    await persistRows(rows.filter(r => r.id !== confirmDeleteId));
+    setConfirmDeleteId(null);
+    toast.success('Linha excluida.');
+  }
+
+  function handleToggleAnnotation(id: string) {
+    setExpandedAnnotations(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  }
+
+  async function handleAnnotationChange(id: string, text: string) {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, annotation: text } : r));
+  }
+
+  async function handleAnnotationBlur() { await saveBonusTradeInRows(rows); }
+
+  function handleXlsxClick() { setConfirmImport(true); }
+  function handleConfirmImport() { setConfirmImport(false); xlsxInputRef.current?.click(); }
 
   async function handleXlsxImport(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const file = e.target.files?.[0]; if (!file) return;
     const buffer = await file.arrayBuffer();
     const parsed = parseExcelFile(buffer);
-    if (parsed.length === 0) {
-      toast.warning('Nenhum registro encontrado no Excel.');
-      if (xlsxInputRef.current) xlsxInputRef.current.value = '';
-      return;
-    }
+    if (parsed.length === 0) { toast.warning('Nenhum registro encontrado.'); if (xlsxInputRef.current) xlsxInputRef.current.value = ''; return; }
     const { total } = await replaceBonusTradeInRows(parsed);
-    const updated = await loadBonusTradeInRows();
-    setRows(updated);
-    toast.success(`${total} registro(s) importado(s) (dados anteriores substituídos).`);
+    setRows(await loadBonusTradeInRows());
+    setEditingId(null);
+    toast.success(`${total} registro(s) importado(s).`);
     if (xlsxInputRef.current) xlsxInputRef.current.value = '';
   }
 
-  // ─── Exportar Excel ──────────────────────────────────────────────────────────
   function handleExport() {
-    if (filteredRows.length === 0) { toast.warning('Nenhum dado para exportar.'); return; }
+    const toExport = filteredRows.filter(r => r.chassi || r.dataVenda || r.cliente);
+    if (toExport.length === 0) { toast.warning('Nenhum dado para exportar.'); return; }
     const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
-    exportToExcel(filteredRows, `bonus_trade_in_${filterYear}_${monthLabel}.xlsx`);
+    exportToExcel(toExport, `bonus_trade_in_${filterYear}_${monthLabel}.xlsx`);
     toast.success('Arquivo Excel gerado!');
+  }
+
+  function cell(row: BonusTradeInRow, field: keyof BonusTradeInRow, w = 'w-24', currency = false) {
+    const isEditing = editingId === row.id;
+    const val = String(row[field]);
+    if (isEditing) {
+      return <input className={`${w} border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300`} value={String(editValues[field])} onChange={e => handleEditChange(field, e.target.value)} />;
+    }
+    if (currency) return <span className="font-mono text-emerald-700">{fmtCurrency(val)}</span>;
+    return val ? <span>{val}</span> : <span className="text-slate-300">-</span>;
   }
 
   return (
     <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
-      {/* Input oculto */}
       <input ref={xlsxInputRef} type="file" accept=".xlsx,.xls,.ods" className="hidden" onChange={handleXlsxImport} />
 
-      {/* Dialog de confirmação de importação */}
       {confirmImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
             <div className="flex items-start gap-3 mb-4">
               <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-semibold text-slate-800 text-sm">Importar Excel — Bônus Trade IN</p>
-                <p className="text-slate-500 text-xs mt-1">
-                  Os dados atuais de <strong>Bônus Trade IN</strong> serão <strong>substituídos</strong> pelo conteúdo do arquivo.
-                </p>
-              </div>
+              <div><p className="font-semibold text-slate-800 text-sm">Importar Excel — Bonus Trade IN</p><p className="text-slate-500 text-xs mt-1">Os dados atuais serao <strong>substituidos</strong>.</p></div>
             </div>
             <div className="flex justify-end gap-2">
               <Button size="sm" variant="outline" onClick={() => setConfirmImport(false)}>Cancelar</Button>
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleConfirmImport}>
-                Confirmar importação
-              </Button>
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleConfirmImport}>Confirmar</Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Barra de ações */}
-      <div className="bg-white border-b border-slate-200 px-6 flex items-center justify-between flex-shrink-0">
-        <div className="flex gap-0">
-          <span className="px-5 py-3 text-sm font-medium border-b-2 border-emerald-500 text-emerald-700 bg-emerald-50/50">
-            Bônus Trade IN
-          </span>
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-start gap-3 mb-4">
+              <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div><p className="font-semibold text-slate-800 text-sm">Excluir linha</p><p className="text-slate-500 text-xs mt-1">Esta acao nao pode ser desfeita.</p></div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancelar</Button>
+              <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={handleConfirmDelete}>Excluir</Button>
+            </div>
+          </div>
         </div>
+      )}
+
+      <div className="bg-white border-b border-slate-200 px-6 flex items-center justify-between flex-shrink-0">
+        <span className="px-5 py-3 text-sm font-medium border-b-2 border-emerald-500 text-emerald-700 bg-emerald-50/50">Bonus Trade IN</span>
         <div className="flex items-center gap-2 py-1.5">
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex items-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 h-8 text-xs"
-            onClick={handleXlsxClick}
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            Importar · Bônus Trade IN
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 h-8 text-xs"
-            onClick={handleExport}
-          >
-            <Download className="w-3.5 h-3.5" />
-            Exportar · Bônus Trade IN
-          </Button>
+          <Button size="sm" variant="outline" className="flex items-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 h-8 text-xs" onClick={handleXlsxClick}><FileSpreadsheet className="w-3.5 h-3.5" />Importar</Button>
+          <Button size="sm" variant="outline" className="flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 h-8 text-xs" onClick={handleExport}><Download className="w-3.5 h-3.5" />Exportar</Button>
         </div>
       </div>
 
-      {/* Filtro Ano / Mês */}
       <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
         <div className="relative mr-2">
-          <select
-            value={filterYear}
-            onChange={e => setFilterYear(Number(e.target.value))}
-            className="appearance-none text-sm font-bold text-slate-700 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
-          >
+          <select value={filterYear} onChange={e => setFilterYear(Number(e.target.value))} className="appearance-none text-sm font-bold text-slate-700 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer">
             {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
         </div>
         <div className="w-px h-5 bg-slate-200 mr-1" />
-        <button
-          onClick={() => setFilterMonth(null)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            filterMonth === null
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-          }`}
-        >
-          Ano todo
-        </button>
+        <button onClick={() => setFilterMonth(null)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterMonth === null ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}>Ano todo</button>
         {MONTHS.map((name, idx) => {
-          const m = idx + 1;
-          const count = monthCounts[m] ?? 0;
-          const isActive = filterMonth === m;
-          const hasData = count > 0;
+          const m = idx + 1; const count = monthCounts[m] ?? 0; const isActive = filterMonth === m; const hasData = count > 0;
           return (
-            <button
-              key={m}
-              onClick={() => hasData ? setFilterMonth(m) : undefined}
-              className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isActive
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : hasData
-                  ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
-                  : 'text-slate-300 cursor-default'
-              }`}
-            >
+            <button key={m} onClick={() => hasData ? setFilterMonth(m) : undefined} className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isActive ? 'bg-emerald-600 text-white shadow-sm' : hasData ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-800' : 'text-slate-300 cursor-default'}`}>
               {name}
-              {hasData && (
-                <span className={`absolute -top-1.5 -right-1.5 text-[9px] font-bold px-1 rounded-full leading-none py-0.5 ${
-                  isActive ? 'bg-white text-emerald-700' : 'bg-emerald-100 text-emerald-600'
-                }`}>
-                  {count}
-                </span>
-              )}
+              {hasData && <span className={`absolute -top-1.5 -right-1.5 text-[9px] font-bold px-1 rounded-full leading-none py-0.5 ${isActive ? 'bg-white text-emerald-700' : 'bg-emerald-100 text-emerald-600'}`}>{count}</span>}
             </button>
           );
         })}
       </div>
 
-      {/* KPIs */}
       <div className="bg-white border-b border-slate-100 px-6 py-2 flex items-center gap-6 flex-shrink-0">
-        <span className="text-xs text-slate-500">
-          <span className="font-semibold text-slate-700">{filteredRows.length}</span> registro{filteredRows.length !== 1 ? 's' : ''}
-        </span>
-        <span className="text-xs text-slate-500">
-          Total Trade IN: <span className="font-semibold text-slate-700 font-mono">{totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-        </span>
+        <span className="text-xs text-slate-500"><span className="font-semibold text-slate-700">{filteredRows.length}</span> registro{filteredRows.length !== 1 ? 's' : ''}</span>
+        <span className="text-xs text-slate-500">Total Trade IN: <span className="font-semibold text-slate-700 font-mono">{totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></span>
       </div>
 
-      {/* Tabela */}
       <div className="flex-1 overflow-auto" style={{ minHeight: 0 }}>
         {loading ? (
           <div className="flex items-center justify-center h-40 text-slate-400 text-sm">Carregando...</div>
-        ) : filteredRows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-slate-300 gap-2">
-            <FileSpreadsheet className="w-10 h-10" />
-            <span className="text-sm">Nenhum registro — importe um arquivo Excel</span>
-          </div>
         ) : (
           <table className="w-full border-collapse text-xs">
-            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200">
-              <tr>
-                {['Data da Venda','Cliente','Chassi','Modelo','Vendedor','Nº Titulo','Valor do Trade IN','Recebido','Data do Recebimento'].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-600 whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-emerald-700 text-white">
+                {COLUMNS.map(h => <th key={h} className="px-3 py-2.5 text-left font-semibold text-[10px] uppercase tracking-wide whitespace-nowrap">{h}</th>)}
+                <th className="px-3 py-2.5 text-center font-semibold text-[10px] uppercase tracking-wide whitespace-nowrap w-28">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredRows.map((row, i) => (
-                <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{row.dataVenda || '-'}</td>
-                  <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{row.cliente || '-'}</td>
-                  <td className="px-3 py-2 font-mono text-slate-700 whitespace-nowrap">{row.chassi || '-'}</td>
-                  <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{row.modelo || '-'}</td>
-                  <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{row.vendedor || '-'}</td>
-                  <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{row.nTitulo || '-'}</td>
-                  <td className="px-3 py-2 font-mono text-emerald-700 whitespace-nowrap">{fmtCurrency(row.valorTradeIn)}</td>
-                  <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{row.recebido || '-'}</td>
-                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{row.dataRecebimento || '-'}</td>
-                </tr>
-              ))}
+              {filteredRows.map((row, i) => {
+                const isEditing = editingId === row.id;
+                const ev = editValues;
+                const rowBg = row.highlight ? 'bg-amber-50 border-l-4 border-l-amber-400' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
+                return (
+                  <Fragment key={row.id}>
+                    <tr className={`${rowBg} border-b border-slate-100 hover:bg-emerald-50/40 transition-colors`}>
+                      <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{isEditing ? <input className="w-24 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" placeholder="DD/MM/AAAA" value={ev.dataVenda} onChange={e => handleEditChange('dataVenda', e.target.value)} /> : row.dataVenda || <span className="text-slate-300">-</span>}</td>
+                      <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{isEditing ? <input className="w-32 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" value={ev.cliente} onChange={e => handleEditChange('cliente', e.target.value)} /> : row.cliente || <span className="text-slate-300">-</span>}</td>
+                      <td className="px-3 py-2 font-mono text-slate-700 whitespace-nowrap">{isEditing ? <input className="w-36 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" value={ev.chassi} onChange={e => handleEditChange('chassi', e.target.value)} /> : row.chassi || <span className="text-slate-300">-</span>}</td>
+                      <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{isEditing ? <input className="w-32 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" value={ev.modelo} onChange={e => handleEditChange('modelo', e.target.value)} /> : row.modelo || <span className="text-slate-300">-</span>}</td>
+                      <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{isEditing ? <input className="w-28 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" value={ev.vendedor} onChange={e => handleEditChange('vendedor', e.target.value)} /> : row.vendedor || <span className="text-slate-300">-</span>}</td>
+                      <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{isEditing ? <input className="w-24 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" value={ev.nTitulo} onChange={e => handleEditChange('nTitulo', e.target.value)} /> : row.nTitulo || <span className="text-slate-300">-</span>}</td>
+                      <td className="px-3 py-2 font-mono text-emerald-700 whitespace-nowrap">{isEditing ? <input className="w-28 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" value={ev.valorTradeIn} onChange={e => handleEditChange('valorTradeIn', e.target.value)} /> : fmtCurrency(row.valorTradeIn)}</td>
+                      <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{isEditing ? <input className="w-24 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" value={ev.recebido} onChange={e => handleEditChange('recebido', e.target.value)} /> : row.recebido || <span className="text-slate-300">-</span>}</td>
+                      <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{isEditing ? <input className="w-24 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" placeholder="DD/MM/AAAA" value={ev.dataRecebimento} onChange={e => handleEditChange('dataRecebimento', e.target.value)} /> : row.dataRecebimento || <span className="text-slate-300">-</span>}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {isEditing ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={handleSaveEdit} title="Salvar" className="p-1.5 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"><Check className="w-4 h-4" /></button>
+                            <button onClick={handleCancelEdit} title="Cancelar" className="p-1.5 rounded text-slate-400 hover:bg-slate-100 transition-colors"><X className="w-4 h-4" /></button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-0.5">
+                            <button onClick={() => handleToggleHighlight(row)} title="Evidenciar linha" className={`p-1.5 rounded transition-colors ${row.highlight ? 'text-amber-500 bg-amber-50' : 'text-slate-300 hover:text-amber-400 hover:bg-amber-50'}`}><Highlighter className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleEdit(row)} title="Editar" className="p-1.5 rounded text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => setConfirmDeleteId(row.id)} title="Excluir" className="p-1.5 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleToggleAnnotation(row.id)} title="Anotacao" className={`p-1.5 rounded transition-colors ${expandedAnnotations.has(row.id) || row.annotation ? 'text-indigo-500 bg-indigo-50' : 'text-slate-300 hover:text-indigo-400 hover:bg-indigo-50'}`}><StickyNote className="w-3.5 h-3.5" /></button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                    {expandedAnnotations.has(row.id) && (
+                      <tr className={row.highlight ? 'bg-amber-50/60' : 'bg-slate-50/40'}>
+                        <td colSpan={10} className="px-4 pb-2 pt-1">
+                          <textarea value={row.annotation} onChange={e => handleAnnotationChange(row.id, e.target.value)} onBlur={handleAnnotationBlur}
+                            placeholder="Escreva uma anotacao..."
+                            className="w-full text-xs text-slate-600 bg-white border border-indigo-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200" rows={2} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         )}

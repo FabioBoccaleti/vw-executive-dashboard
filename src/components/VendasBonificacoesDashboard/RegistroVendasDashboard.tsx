@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { Upload, Download, FileSpreadsheet, ChevronDown, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
+import { Upload, Download, FileSpreadsheet, ChevronDown, AlertTriangle, Pencil, Trash2, Highlighter, StickyNote, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -9,6 +9,7 @@ import {
   loadRegistroRows,
   appendRegistroRows,
   replaceRegistroRows,
+  saveRegistroRows,
   parseTxtLines,
   TRANSACAO_MAP,
 } from './registroVendasStorage';
@@ -103,6 +104,10 @@ export function RegistroVendasDashboard() {
   const txtInputRef   = useRef<HTMLInputElement>(null);
   const xlsxInputRef  = useRef<HTMLInputElement>(null);
   const [confirmImport, setConfirmImport] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editModal, setEditModal]     = useState<RegistroVendasRow | null>(null);
+  const [editValues, setEditValues]   = useState<RegistroVendasRow | null>(null);
+  const [expandedAnnotations, setExpandedAnnotations] = useState<Set<string>>(new Set());
 
   // Carrega dados ao trocar de aba
   useEffect(() => {
@@ -149,7 +154,49 @@ export function RegistroVendasDashboard() {
   const totalVenda = useMemo(() => sumField(filteredRows, 'valVenda'), [filteredRows]);
   const totalCusto = useMemo(() => sumField(filteredRows, 'valCusto'), [filteredRows]);
 
-  // ─── Importar TXT (alimenta as 3 abas simultaneamente) ─────────────────────
+  // ─── Ações por linha ──────────────────────────────────────────────────────────
+  async function handleToggleHighlight(row: RegistroVendasRow) {
+    const updated = rows.map(r => r.id === row.id ? { ...r, highlight: !r.highlight } : r);
+    setRows(updated);
+    await saveRegistroRows(activeTab, updated);
+  }
+
+  async function handleConfirmDelete() {
+    if (!confirmDeleteId) return;
+    const updated = rows.filter(r => r.id !== confirmDeleteId);
+    setRows(updated);
+    await saveRegistroRows(activeTab, updated);
+    setConfirmDeleteId(null);
+    toast.success('Linha excluída.');
+  }
+
+  function handleToggleAnnotation(id: string) {
+    setExpandedAnnotations(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleAnnotationChange(id: string, text: string) {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, annotation: text } : r));
+  }
+
+  async function handleAnnotationBlur() {
+    await saveRegistroRows(activeTab, rows);
+  }
+
+  async function handleSaveEditModal() {
+    if (!editValues) return;
+    const updated = rows.map(r => r.id === editValues.id ? editValues : r);
+    setRows(updated);
+    await saveRegistroRows(activeTab, updated);
+    setEditModal(null);
+    setEditValues(null);
+    toast.success('Linha salva.');
+  }
+
+  // ─── Importar TXT ─────────────────────────────────────────────────
   async function handleTxtImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -216,9 +263,60 @@ export function RegistroVendasDashboard() {
 
   return (
     <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
-      {/* Inputs ocultos */}
+      {/* Input ocultos */}
       <input ref={txtInputRef}  type="file" accept=".txt"            className="hidden" onChange={handleTxtImport} />
       <input ref={xlsxInputRef} type="file" accept=".xlsx,.xls,.ods" className="hidden" onChange={handleXlsxImport} />
+
+      {/* Dialog: confirmar exclusão */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-start gap-3 mb-4">
+              <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-slate-800 text-sm">Excluir linha</p>
+                <p className="text-slate-500 text-xs mt-1">Esta ação não pode ser desfeita.</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button className="text-xs border border-slate-200 rounded px-3 py-1.5 hover:bg-slate-50" onClick={() => setConfirmDeleteId(null)}>Cancelar</button>
+              <button className="text-xs bg-red-600 hover:bg-red-700 text-white rounded px-3 py-1.5" onClick={handleConfirmDelete}>Excluir</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: edição de linha */}
+      {editModal && editValues && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-semibold text-slate-800 text-sm">Editar registro</p>
+              <button onClick={() => { setEditModal(null); setEditValues(null); }} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              {([
+                ['chassi','Chassi'],['modelo','Modelo'],['valVenda','Val. Venda'],['nfVenda','NF Venda'],
+                ['nfEntrada','NF Entrada'],['valCusto','Val. Custo'],['dtaEntrada','Dt. Entrada'],
+                ['dtaVenda','Dt. Venda'],['nomeCor','Cor'],['nomeVendedor','Vendedor'],['transacao','Transação'],
+              ] as [keyof RegistroVendasRow, string][]).map(([field, label]) => (
+                <div key={field}>
+                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</label>
+                  <input
+                    className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    value={String(editValues[field] ?? '')}
+                    onChange={e => setEditValues(prev => prev ? { ...prev, [field]: e.target.value } : prev)}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button className="text-xs border border-slate-200 rounded px-3 py-1.5 hover:bg-slate-50" onClick={() => { setEditModal(null); setEditValues(null); }}>Cancelar</button>
+              <button className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded px-3 py-1.5 flex items-center gap-1.5" onClick={handleSaveEditModal}><Check className="w-3.5 h-3.5" />Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dialog de confirmação de importação Excel */}
       {confirmImport && (
@@ -369,18 +467,20 @@ export function RegistroVendasDashboard() {
           </div>
         ) : (
           <table className="w-full border-collapse text-xs">
-            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200">
-              <tr>
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-emerald-700 text-white">
                 {['Chassi','Modelo','Val. Venda','NF Venda','NF Entrada','Val. Custo','Dt. Entrada','Dt. Venda','Cor','Vendedor','Transação'].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-600 whitespace-nowrap">
+                  <th key={h} className="px-3 py-2.5 text-left font-semibold text-[10px] uppercase tracking-wide whitespace-nowrap">
                     {h}
                   </th>
                 ))}
+                <th className="px-3 py-2.5 text-center font-semibold text-[10px] uppercase tracking-wide whitespace-nowrap w-28">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredRows.map((row, i) => (
-                <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                <Fragment key={row.id}>
+                  <tr className={`${row.highlight ? 'bg-amber-50 border-l-4 border-l-amber-400' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} border-b border-slate-100 hover:bg-emerald-50/40 transition-colors`}>
                   <td className="px-3 py-2 font-mono text-slate-700 whitespace-nowrap">{row.chassi || '-'}</td>
                   <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{row.modelo || '-'}</td>
                   <td className="px-3 py-2 font-mono text-emerald-700 whitespace-nowrap">{fmtCurrency(row.valVenda)}</td>
@@ -396,7 +496,37 @@ export function RegistroVendasDashboard() {
                       {row.transacao || '-'}
                     </span>
                   </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-0.5">
+                      <button onClick={() => handleToggleHighlight(row)} title="Evidenciar linha"
+                        className={`p-1.5 rounded transition-colors ${row.highlight ? 'text-amber-500 bg-amber-50' : 'text-slate-300 hover:text-amber-400 hover:bg-amber-50'}`}>
+                        <Highlighter className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => { setEditModal(row); setEditValues({ ...row }); }} title="Editar"
+                        className="p-1.5 rounded text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => setConfirmDeleteId(row.id)} title="Excluir"
+                        className="p-1.5 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => handleToggleAnnotation(row.id)} title="Anotação"
+                        className={`p-1.5 rounded transition-colors ${expandedAnnotations.has(row.id) || row.annotation ? 'text-indigo-500 bg-indigo-50' : 'text-slate-300 hover:text-indigo-400 hover:bg-indigo-50'}`}>
+                        <StickyNote className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
+                {expandedAnnotations.has(row.id) && (
+                  <tr className={row.highlight ? 'bg-amber-50/60' : 'bg-slate-50/40'}>
+                    <td colSpan={12} className="px-4 pb-2 pt-1">
+                      <textarea value={row.annotation ?? ''} onChange={e => handleAnnotationChange(row.id, e.target.value)} onBlur={handleAnnotationBlur}
+                        placeholder="Escreva uma anotação..."
+                        className="w-full text-xs text-slate-600 bg-white border border-indigo-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200" rows={2} />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>

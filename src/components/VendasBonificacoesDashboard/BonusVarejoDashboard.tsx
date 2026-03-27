@@ -1,12 +1,14 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { Upload, Download, FileSpreadsheet, ChevronDown, AlertTriangle } from 'lucide-react';
+﻿import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
+import { Download, FileSpreadsheet, ChevronDown, AlertTriangle, Pencil, Trash2, Highlighter, StickyNote, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import {
   type BonusVarejoRow,
   loadBonusVarejoRows,
+  saveBonusVarejoRows,
   replaceBonusVarejoRows,
+  createEmptyBonusVarejoRow,
 } from './bonusVarejoStorage';
 
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -37,63 +39,69 @@ function sumValor(rows: BonusVarejoRow[]): number {
   }, 0);
 }
 
-// ─── Exporta para Excel ────────────────────────────────────────────────────────
 function exportToExcel(rows: BonusVarejoRow[], filename: string) {
   const data = rows.map(r => ({
-    Chassi:           r.chassi,
-    'Data da Venda':   r.data,
-    'Nota Fiscal':     r.notaFiscal,
-    Valor:         r.valor,    Vendedor:          r.vendedor,  }));
+    Chassi:          r.chassi,
+    'Data da Venda': r.data,
+    'Nota Fiscal':   r.notaFiscal,
+    Valor:           r.valor,
+    Vendedor:        r.vendedor,
+  }));
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Bônus Varejo');
+  XLSX.utils.book_append_sheet(wb, ws, 'Bonus Varejo');
   XLSX.writeFile(wb, filename);
 }
 
-// ─── Lê Excel e converte para rows ────────────────────────────────────────────
-function parseExcelFile(buffer: ArrayBuffer): Omit<BonusVarejoRow, 'id'>[] {
+function parseExcelFile(buffer: ArrayBuffer): Omit<BonusVarejoRow, 'id' | 'highlight' | 'annotation'>[] {
   const wb = XLSX.read(buffer, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const raw: Record<string, string>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
   return raw.map(r => ({
-    chassi:     String(r['Chassi']      ?? r['CHASSI']       ?? ''),
-    data:       String(r['Data da Venda'] ?? r['Data']        ?? r['DATA']         ?? ''),
-    notaFiscal: String(r['Nota Fiscal'] ?? r['NOTA_FISCAL']  ?? r['NF'] ?? ''),
-    valor:      String(r['Valor']       ?? r['VALOR']        ?? ''),
-    vendedor:   String(r['Vendedor']    ?? r['VENDEDOR']     ?? ''),
+    chassi:     String(r['Chassi']        ?? r['CHASSI']      ?? ''),
+    data:       String(r['Data da Venda'] ?? r['Data']        ?? r['DATA']  ?? ''),
+    notaFiscal: String(r['Nota Fiscal']   ?? r['NOTA_FISCAL'] ?? r['NF']   ?? ''),
+    valor:      String(r['Valor']         ?? r['VALOR']       ?? ''),
+    vendedor:   String(r['Vendedor']      ?? r['VENDEDOR']    ?? ''),
   }));
 }
 
-// ─── Componente principal ──────────────────────────────────────────────────────
+const EMPTY_EDIT: BonusVarejoRow = { id: '', chassi: '', data: '', notaFiscal: '', valor: '', vendedor: '', highlight: false, annotation: '' };
+
 export function BonusVarejoDashboard() {
   const [rows, setRows]               = useState<BonusVarejoRow[]>([]);
   const [loading, setLoading]         = useState(true);
   const [filterYear, setFilterYear]   = useState<number>(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
-  const [confirmImport, setConfirmImport] = useState(false);
+  const [confirmImport, setConfirmImport]     = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editingId, setEditingId]     = useState<string | null>(null);
+  const [editValues, setEditValues]   = useState<BonusVarejoRow>(EMPTY_EDIT);
+  const [expandedAnnotations, setExpandedAnnotations] = useState<Set<string>>(new Set());
 
   const xlsxInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLoading(true);
-    loadBonusVarejoRows().then(data => {
-      setRows(data);
+    loadBonusVarejoRows().then(async data => {
+      if (data.length === 0) {
+        const empty = Array.from({ length: 10 }, () => createEmptyBonusVarejoRow());
+        await saveBonusVarejoRows(empty);
+        setRows(empty);
+      } else {
+        setRows(data);
+      }
       setLoading(false);
     });
   }, []);
 
-  // Anos disponíveis
   const availableYears = useMemo(() => {
     const years = new Set<number>();
-    rows.forEach(r => {
-      const d = parseDate(r.data);
-      if (d) years.add(d.year);
-    });
+    rows.forEach(r => { const d = parseDate(r.data); if (d) years.add(d.year); });
     const sorted = Array.from(years).sort((a, b) => b - a);
     return sorted.length ? sorted : [new Date().getFullYear()];
   }, [rows]);
 
-  // Contagem por mês para o filtro
   const monthCounts = useMemo(() => {
     const counts: Record<number, number> = {};
     rows.forEach(r => {
@@ -103,11 +111,10 @@ export function BonusVarejoDashboard() {
     return counts;
   }, [rows, filterYear]);
 
-  // Linhas filtradas
   const filteredRows = useMemo(() => {
     return rows.filter(r => {
       const d = parseDate(r.data);
-      if (!d) return false;
+      if (!d) return true;
       if (d.year !== filterYear) return false;
       if (filterMonth !== null && d.month !== filterMonth) return false;
       return true;
@@ -116,15 +123,58 @@ export function BonusVarejoDashboard() {
 
   const totalValor = useMemo(() => sumValor(filteredRows), [filteredRows]);
 
-  // ─── Importar Excel ──────────────────────────────────────────────────────────
-  function handleXlsxClick() {
-    setConfirmImport(true);
+  async function persistRows(updated: BonusVarejoRow[]) {
+    setRows(updated);
+    await saveBonusVarejoRows(updated);
   }
 
-  function handleConfirmImport() {
-    setConfirmImport(false);
-    xlsxInputRef.current?.click();
+  async function handleToggleHighlight(row: BonusVarejoRow) {
+    await persistRows(rows.map(r => r.id === row.id ? { ...r, highlight: !r.highlight } : r));
   }
+
+  function handleEdit(row: BonusVarejoRow) {
+    setEditingId(row.id);
+    setEditValues({ ...row });
+  }
+
+  function handleEditChange(field: keyof BonusVarejoRow, value: string) {
+    setEditValues(prev => ({ ...prev, [field]: value }));
+  }
+
+  async function handleSaveEdit() {
+    const updated = rows.map(r => r.id === editValues.id ? editValues : r);
+    await persistRows(updated);
+    setEditingId(null);
+    toast.success('Linha salva.');
+  }
+
+  function handleCancelEdit() { setEditingId(null); }
+
+  async function handleConfirmDelete() {
+    if (!confirmDeleteId) return;
+    await persistRows(rows.filter(r => r.id !== confirmDeleteId));
+    setConfirmDeleteId(null);
+    toast.success('Linha excluida.');
+  }
+
+  function handleToggleAnnotation(id: string) {
+    setExpandedAnnotations(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleAnnotationChange(id: string, text: string) {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, annotation: text } : r));
+  }
+
+  async function handleAnnotationBlur() {
+    await saveBonusVarejoRows(rows);
+  }
+
+  function handleXlsxClick() { setConfirmImport(true); }
+  function handleConfirmImport() { setConfirmImport(false); xlsxInputRef.current?.click(); }
 
   async function handleXlsxImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -139,169 +189,168 @@ export function BonusVarejoDashboard() {
     const { total } = await replaceBonusVarejoRows(parsed);
     const updated = await loadBonusVarejoRows();
     setRows(updated);
-    toast.success(`${total} registro(s) importado(s) (dados anteriores substituídos).`);
+    setEditingId(null);
+    toast.success(`${total} registro(s) importado(s) (dados anteriores substituidos).`);
     if (xlsxInputRef.current) xlsxInputRef.current.value = '';
   }
 
-  // ─── Exportar Excel ──────────────────────────────────────────────────────────
   function handleExport() {
-    if (filteredRows.length === 0) { toast.warning('Nenhum dado para exportar.'); return; }
+    const toExport = filteredRows.filter(r => r.chassi || r.data || r.notaFiscal || r.valor);
+    if (toExport.length === 0) { toast.warning('Nenhum dado para exportar.'); return; }
     const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
-    exportToExcel(filteredRows, `bonus_varejo_${filterYear}_${monthLabel}.xlsx`);
+    exportToExcel(toExport, `bonus_varejo_${filterYear}_${monthLabel}.xlsx`);
     toast.success('Arquivo Excel gerado!');
   }
 
   return (
     <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
-      {/* Input oculto */}
       <input ref={xlsxInputRef} type="file" accept=".xlsx,.xls,.ods" className="hidden" onChange={handleXlsxImport} />
 
-      {/* Dialog de confirmação de importação */}
       {confirmImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
             <div className="flex items-start gap-3 mb-4">
               <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-slate-800 text-sm">Importar Excel — Bônus Varejo</p>
-                <p className="text-slate-500 text-xs mt-1">
-                  Os dados atuais de <strong>Bônus Varejo</strong> serão <strong>substituídos</strong> pelo conteúdo do arquivo.
-                </p>
+                <p className="font-semibold text-slate-800 text-sm">Importar Excel — Bonus Varejo</p>
+                <p className="text-slate-500 text-xs mt-1">Os dados atuais serao <strong>substituidos</strong> pelo conteudo do arquivo.</p>
               </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button size="sm" variant="outline" onClick={() => setConfirmImport(false)}>Cancelar</Button>
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleConfirmImport}>
-                Confirmar importação
-              </Button>
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleConfirmImport}>Confirmar importacao</Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Barra de ações */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-start gap-3 mb-4">
+              <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-slate-800 text-sm">Excluir linha</p>
+                <p className="text-slate-500 text-xs mt-1">Esta acao nao pode ser desfeita.</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancelar</Button>
+              <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={handleConfirmDelete}>Excluir</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white border-b border-slate-200 px-6 flex items-center justify-between flex-shrink-0">
         <div className="flex gap-0">
-          <span className="px-5 py-3 text-sm font-medium border-b-2 border-emerald-500 text-emerald-700 bg-emerald-50/50">
-            Bônus Varejo
-          </span>
+          <span className="px-5 py-3 text-sm font-medium border-b-2 border-emerald-500 text-emerald-700 bg-emerald-50/50">Bonus Varejo</span>
         </div>
         <div className="flex items-center gap-2 py-1.5">
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex items-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 h-8 text-xs"
-            onClick={handleXlsxClick}
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            Importar · Bônus Varejo
+          <Button size="sm" variant="outline" className="flex items-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 h-8 text-xs" onClick={handleXlsxClick}>
+            <FileSpreadsheet className="w-3.5 h-3.5" />Importar
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 h-8 text-xs"
-            onClick={handleExport}
-          >
-            <Download className="w-3.5 h-3.5" />
-            Exportar · Bônus Varejo
+          <Button size="sm" variant="outline" className="flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 h-8 text-xs" onClick={handleExport}>
+            <Download className="w-3.5 h-3.5" />Exportar
           </Button>
         </div>
       </div>
 
-      {/* Filtro Ano / Mês */}
       <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
         <div className="relative mr-2">
-          <select
-            value={filterYear}
-            onChange={e => setFilterYear(Number(e.target.value))}
-            className="appearance-none text-sm font-bold text-slate-700 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
-          >
+          <select value={filterYear} onChange={e => setFilterYear(Number(e.target.value))}
+            className="appearance-none text-sm font-bold text-slate-700 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer">
             {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
         </div>
         <div className="w-px h-5 bg-slate-200 mr-1" />
-        <button
-          onClick={() => setFilterMonth(null)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            filterMonth === null
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-          }`}
-        >
+        <button onClick={() => setFilterMonth(null)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterMonth === null ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}>
           Ano todo
         </button>
         {MONTHS.map((name, idx) => {
-          const m = idx + 1;
-          const count = monthCounts[m] ?? 0;
-          const isActive = filterMonth === m;
-          const hasData = count > 0;
+          const m = idx + 1; const count = monthCounts[m] ?? 0; const isActive = filterMonth === m; const hasData = count > 0;
           return (
-            <button
-              key={m}
-              onClick={() => hasData ? setFilterMonth(m) : undefined}
-              className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isActive
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : hasData
-                  ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
-                  : 'text-slate-300 cursor-default'
-              }`}
-            >
+            <button key={m} onClick={() => hasData ? setFilterMonth(m) : undefined}
+              className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isActive ? 'bg-emerald-600 text-white shadow-sm' : hasData ? 'text-slate-600 hover:bg-slate-100 hover:text-slate-800' : 'text-slate-300 cursor-default'}`}>
               {name}
-              {hasData && (
-                <span className={`absolute -top-1.5 -right-1.5 text-[9px] font-bold px-1 rounded-full leading-none py-0.5 ${
-                  isActive ? 'bg-white text-emerald-700' : 'bg-emerald-100 text-emerald-600'
-                }`}>
-                  {count}
-                </span>
-              )}
+              {hasData && <span className={`absolute -top-1.5 -right-1.5 text-[9px] font-bold px-1 rounded-full leading-none py-0.5 ${isActive ? 'bg-white text-emerald-700' : 'bg-emerald-100 text-emerald-600'}`}>{count}</span>}
             </button>
           );
         })}
       </div>
 
-      {/* KPIs */}
       <div className="bg-white border-b border-slate-100 px-6 py-2 flex items-center gap-6 flex-shrink-0">
-        <span className="text-xs text-slate-500">
-          <span className="font-semibold text-slate-700">{filteredRows.length}</span> registro{filteredRows.length !== 1 ? 's' : ''}
-        </span>
-        <span className="text-xs text-slate-500">
-          Total Valor: <span className="font-semibold text-slate-700 font-mono">{totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-        </span>
+        <span className="text-xs text-slate-500"><span className="font-semibold text-slate-700">{filteredRows.length}</span> registro{filteredRows.length !== 1 ? 's' : ''}</span>
+        <span className="text-xs text-slate-500">Total Valor: <span className="font-semibold text-slate-700 font-mono">{totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></span>
       </div>
 
-      {/* Tabela */}
       <div className="flex-1 overflow-auto" style={{ minHeight: 0 }}>
         {loading ? (
           <div className="flex items-center justify-center h-40 text-slate-400 text-sm">Carregando...</div>
-        ) : filteredRows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-slate-300 gap-2">
-            <FileSpreadsheet className="w-10 h-10" />
-            <span className="text-sm">Nenhum registro — importe um arquivo Excel</span>
-          </div>
         ) : (
           <table className="w-full border-collapse text-xs">
-            <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200">
-              <tr>
-                {['Chassi', 'Data da Venda', 'Nota Fiscal', 'Valor', 'Vendedor'].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-600 whitespace-nowrap">
-                    {h}
-                  </th>
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-emerald-700 text-white">
+                {['Chassi','Data da Venda','Nota Fiscal','Valor','Vendedor'].map(h => (
+                  <th key={h} className="px-3 py-2.5 text-left font-semibold text-[10px] uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
+                <th className="px-3 py-2.5 text-center font-semibold text-[10px] uppercase tracking-wide whitespace-nowrap w-28">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredRows.map((row, i) => (
-                <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                  <td className="px-3 py-2 font-mono text-slate-700 whitespace-nowrap">{row.chassi || '-'}</td>
-                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{row.data || '-'}</td>
-                  <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{row.notaFiscal || '-'}</td>
-                  <td className="px-3 py-2 font-mono text-emerald-700 whitespace-nowrap">{fmtCurrency(row.valor)}</td>
-                  <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{row.vendedor || '-'}</td>
-                </tr>
-              ))}
+              {filteredRows.map((row, i) => {
+                const isEditing = editingId === row.id;
+                const ev = editValues;
+                const rowBg = row.highlight ? 'bg-amber-50 border-l-4 border-l-amber-400' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
+                return (
+                  <Fragment key={row.id}>
+                    <tr className={`${rowBg} border-b border-slate-100 hover:bg-emerald-50/40 transition-colors`}>
+                      <td className="px-3 py-2 font-mono text-slate-700 whitespace-nowrap">
+                        {isEditing ? <input className="w-36 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" value={ev.chassi} onChange={e => handleEditChange('chassi', e.target.value)} /> : row.chassi || <span className="text-slate-300">-</span>}
+                      </td>
+                      <td className="px-3 py-2 text-slate-500 whitespace-nowrap">
+                        {isEditing ? <input className="w-28 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" placeholder="DD/MM/AAAA" value={ev.data} onChange={e => handleEditChange('data', e.target.value)} /> : row.data || <span className="text-slate-300">-</span>}
+                      </td>
+                      <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                        {isEditing ? <input className="w-28 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" value={ev.notaFiscal} onChange={e => handleEditChange('notaFiscal', e.target.value)} /> : row.notaFiscal || <span className="text-slate-300">-</span>}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-emerald-700 whitespace-nowrap">
+                        {isEditing ? <input className="w-28 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" value={ev.valor} onChange={e => handleEditChange('valor', e.target.value)} /> : fmtCurrency(row.valor)}
+                      </td>
+                      <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
+                        {isEditing ? <input className="w-32 border border-slate-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300" value={ev.vendedor} onChange={e => handleEditChange('vendedor', e.target.value)} /> : row.vendedor || <span className="text-slate-300">-</span>}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {isEditing ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={handleSaveEdit} title="Salvar" className="p-1.5 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"><Check className="w-4 h-4" /></button>
+                            <button onClick={handleCancelEdit} title="Cancelar" className="p-1.5 rounded text-slate-400 hover:bg-slate-100 transition-colors"><X className="w-4 h-4" /></button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-0.5">
+                            <button onClick={() => handleToggleHighlight(row)} title="Evidenciar linha" className={`p-1.5 rounded transition-colors ${row.highlight ? 'text-amber-500 bg-amber-50' : 'text-slate-300 hover:text-amber-400 hover:bg-amber-50'}`}><Highlighter className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleEdit(row)} title="Editar" className="p-1.5 rounded text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => setConfirmDeleteId(row.id)} title="Excluir" className="p-1.5 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => handleToggleAnnotation(row.id)} title="Anotacao" className={`p-1.5 rounded transition-colors ${expandedAnnotations.has(row.id) || row.annotation ? 'text-indigo-500 bg-indigo-50' : 'text-slate-300 hover:text-indigo-400 hover:bg-indigo-50'}`}><StickyNote className="w-3.5 h-3.5" /></button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                    {expandedAnnotations.has(row.id) && (
+                      <tr className={row.highlight ? 'bg-amber-50/60' : 'bg-slate-50/40'}>
+                        <td colSpan={6} className="px-4 pb-2 pt-1">
+                          <textarea value={row.annotation} onChange={e => handleAnnotationChange(row.id, e.target.value)} onBlur={handleAnnotationBlur}
+                            placeholder="Escreva uma anotacao..."
+                            className="w-full text-xs text-slate-600 bg-white border border-indigo-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-200" rows={2} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         )}
