@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -8,6 +8,7 @@ import { TabelaDadosDashboard } from './TabelaDadosDashboard';
 import { RegistroVendasDashboard } from './RegistroVendasDashboard';
 import { BonusVarejoDashboard } from './BonusVarejoDashboard';
 import { BonusTradeInDashboard } from './BonusTradeInDashboard';
+import VendasResultadoDashboard from './VendasResultadoDashboard';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
 import type { TabelaDadosRow } from './tabelaDadosStorage';
 
@@ -434,7 +435,7 @@ function pdfResultsToTableRows(pages: PageResult[]): Omit<TabelaDadosRow, 'id'>[
 
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mainView, setMainView] = useState<'registros' | 'financeiro'>('registros');
+  const [mainView, setMainView] = useState<'registros' | 'financeiro' | 'vendas'>('registros');
   const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein'>('importar');
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
   const [registroFilterYear, setRegistroFilterYear] = useState<number>(new Date().getFullYear());
@@ -554,6 +555,15 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
               <Banknote className="w-3.5 h-3.5" />
               Financeiro
             </button>
+            <button
+              onClick={() => setMainView('vendas')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainView === 'vendas' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              Vendas
+            </button>
           </div>
           <button
             onClick={onBack}
@@ -634,6 +644,9 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           </div>
         </div>
       )}
+
+      {/* Visão Vendas */}
+      {mainView === 'vendas' && <VendasResultadoDashboard />}
 
       {/* Aba: Registro de Vendas */}
       {mainView === 'registros' && activeTab === 'registro' && <RegistroVendasDashboard />}
