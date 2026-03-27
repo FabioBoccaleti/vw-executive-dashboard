@@ -241,6 +241,7 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
   const [loading, setLoading]             = useState(true);
   const [filters, setFilters]             = useState<FilterValues>({});
   const [showSearch, setShowSearch]       = useState(false);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -369,6 +370,16 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
     if (ok) toast.success('Registro removido');
   };
 
+  const deleteAllRows = async () => {
+    setRows([]);
+    setConfirmDeleteAll(false);
+    setEditingId(null);
+    setEditDraft(null);
+    setDeleteId(null);
+    await persist([]);
+    toast.success('Todas as linhas foram excluídas.');
+  };
+
   const setFilter = (key: keyof TabelaDadosRow, value: string) =>
     setFilters(prev => ({ ...prev, [key]: value }));
   const clearFilters = () => setFilters({});
@@ -424,11 +435,34 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
       >
         <Plus className="w-3.5 h-3.5" /> Nova linha
       </button>
+      <button
+        onClick={() => setConfirmDeleteAll(true)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+      >
+        <Trash2 className="w-3.5 h-3.5" /> Limpar Tudo
+      </button>
     </div>
   );
 
   return (
     <div className={embedded ? 'flex flex-col h-full' : 'min-h-screen bg-slate-100 flex flex-col'}>
+      {confirmDeleteAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-start gap-3 mb-4">
+              <Trash2 className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-slate-800 text-sm">Excluir todas as linhas</p>
+                <p className="text-slate-500 text-xs mt-1">Deseja excluir todas as linhas? Esta ação não pode ser desfeita.</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button className="text-xs border border-slate-200 rounded px-3 py-1.5 hover:bg-slate-50" onClick={() => setConfirmDeleteAll(false)}>Não</button>
+              <button className="text-xs bg-red-600 hover:bg-red-700 text-white rounded px-3 py-1.5" onClick={deleteAllRows}>Sim, excluir tudo</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header — apenas na versão standalone */}
       {!embedded && (
         <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm flex-shrink-0">

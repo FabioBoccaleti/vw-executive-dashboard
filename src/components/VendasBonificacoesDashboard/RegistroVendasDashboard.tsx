@@ -108,6 +108,7 @@ export function RegistroVendasDashboard() {
   const [editModal, setEditModal]     = useState<RegistroVendasRow | null>(null);
   const [editValues, setEditValues]   = useState<RegistroVendasRow | null>(null);
   const [expandedAnnotations, setExpandedAnnotations] = useState<Set<string>>(new Set());
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   // Carrega dados ao trocar de aba
   useEffect(() => {
@@ -194,6 +195,13 @@ export function RegistroVendasDashboard() {
     setEditModal(null);
     setEditValues(null);
     toast.success('Linha salva.');
+  }
+
+  async function handleDeleteAll() {
+    setRows([]);
+    await saveRegistroRows(activeTab, []);
+    setConfirmDeleteAll(false);
+    toast.success('Todas as linhas foram excluídas.');
   }
 
   // ─── Importar TXT ─────────────────────────────────────────────────
@@ -319,6 +327,25 @@ export function RegistroVendasDashboard() {
       )}
 
       {/* Dialog de confirmação de importação Excel */}
+      {confirmDeleteAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-start gap-3 mb-4">
+              <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-slate-800 text-sm">Excluir todas as linhas</p>
+                <p className="text-slate-500 text-xs mt-1">Deseja excluir todas as linhas de <strong>{SUB_TABS.find(t => t.id === activeTab)?.label}</strong>? Esta ação não pode ser desfeita.</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setConfirmDeleteAll(false)}>Não</Button>
+              <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={handleDeleteAll}>Sim, excluir tudo</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dialog de confirmação de importação Excel */}
       {confirmImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
@@ -385,6 +412,15 @@ export function RegistroVendasDashboard() {
           >
             <Download className="w-3.5 h-3.5" />
             Exportar · {SUB_TABS.find(t => t.id === activeTab)?.label}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex items-center gap-2 border-red-300 text-red-600 hover:bg-red-50 h-8 text-xs"
+            onClick={() => setConfirmDeleteAll(true)}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Limpar Tudo
           </Button>
         </div>
       </div>
