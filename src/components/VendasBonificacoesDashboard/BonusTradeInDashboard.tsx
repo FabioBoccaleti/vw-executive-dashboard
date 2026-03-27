@@ -260,10 +260,15 @@ export function BonusTradeInDashboard() {
   }
 
   async function handleExport() {
-    const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
-    const sheetName  = `Bônus Trade IN — ${monthLabel}/${filterYear}`;
-    await exportToExcel(filteredRows, sheetName, `bonus_trade_in_${filterYear}_${monthLabel}.xlsx`);
-    toast.success('Arquivo Excel gerado!');
+    try {
+      const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
+      const sheetName  = `Bônus Trade IN — ${monthLabel}-${filterYear}`;
+      await exportToExcel(filteredRows, sheetName, `bonus_trade_in_${filterYear}_${monthLabel}.xlsx`);
+      toast.success('Arquivo Excel gerado!');
+    } catch (err) {
+      console.error('Erro ao gerar Excel:', err);
+      toast.error(`Erro ao gerar Excel: ${String(err)}`);
+    }
   }
 
   function cell(row: BonusTradeInRow, field: keyof BonusTradeInRow, w = 'w-24', currency = false) {

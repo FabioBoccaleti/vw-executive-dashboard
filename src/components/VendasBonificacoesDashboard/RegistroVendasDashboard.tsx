@@ -351,11 +351,16 @@ export function RegistroVendasDashboard() {
 
   // ─── Exportar Excel ───────────────────────────────────────────────────────────
   async function handleExport() {
-    const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
-    const tabLabel   = SUB_TABS.find(t => t.id === activeTab)?.label ?? activeTab;
-    const sheetName  = `Reg. Vendas — ${tabLabel} — ${monthLabel}/${filterYear}`;
-    await exportToExcel(filteredRows, sheetName, `registro_${activeTab}_${filterYear}_${monthLabel}.xlsx`);
-    toast.success('Arquivo Excel gerado!');
+    try {
+      const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
+      const tabLabel   = (SUB_TABS.find(t => t.id === activeTab)?.label ?? activeTab).replace(/[*?:\\/\[\]]/g, '-');
+      const sheetName  = `Reg. Vendas - ${tabLabel} - ${monthLabel}-${filterYear}`.slice(0, 31);
+      await exportToExcel(filteredRows, sheetName, `registro_${activeTab}_${filterYear}_${monthLabel}.xlsx`);
+      toast.success('Arquivo Excel gerado!');
+    } catch (err) {
+      console.error('Erro ao gerar Excel:', err);
+      toast.error(`Erro ao gerar Excel: ${String(err)}`);
+    }
   }
 
   return (

@@ -93,7 +93,19 @@ function col(fields: string[], name: string): string {
  * e distribui por sub-aba conforme TIPO_TRANSACAO.
  */
 export function parseTxtLines(content: string): Record<RegistroSubTab, Omit<RegistroVendasRow, 'id'>[]> {
-  const lines = content.split(/\r?\n/).filter(l => l.trim());
+  // Um novo registro (ou o cabeçalho) começa sempre com letra ou dígito.
+  // Linhas iniciando com espaço, tab ou ';' são continuação do registro anterior
+  // (campo de descrição multi-linha do ERP ou colunas extras na mesma linha lógica).
+  const rawLines = content.split(/\r?\n/);
+  const lines: string[] = [];
+  for (const raw of rawLines) {
+    if (!raw.trim()) continue;
+    if (lines.length === 0 || /^[A-Za-z\d]/.test(raw)) {
+      lines.push(raw);
+    } else {
+      lines[lines.length - 1] += raw;
+    }
+  }
   if (lines.length < 2) return { novos: [], frotista: [], usados: [] };
 
   initColMap(lines[0].split(';'));
@@ -104,7 +116,7 @@ export function parseTxtLines(content: string): Record<RegistroSubTab, Omit<Regi
 
   for (let i = 1; i < lines.length; i++) {
     const fields = lines[i].split(';');
-    const transacao = col(fields, 'TIPO_TRANSACAO');
+    const transacao = col(fields, 'TIPO_TRANSACAO').toUpperCase().trim();
 
     let tab: RegistroSubTab | null = null;
     for (const [key, values] of Object.entries(TRANSACAO_MAP) as [RegistroSubTab, string[]][]) {
