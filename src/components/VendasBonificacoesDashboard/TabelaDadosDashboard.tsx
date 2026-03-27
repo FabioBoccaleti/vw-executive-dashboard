@@ -371,13 +371,17 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
   };
 
   const deleteAllRows = async () => {
-    setRows([]);
+    const kept = rows.filter(r => {
+      const d = parseRowDate(r);
+      if (!d) return true;
+      return !(d.year === filterYear && d.month === filterMonth!);
+    });
+    setRows(kept);
     setConfirmDeleteAll(false);
-    setEditingId(null);
-    setEditDraft(null);
+    if (editingId && !kept.find(r => r.id === editingId)) { setEditingId(null); setEditDraft(null); }
     setDeleteId(null);
-    await persist([]);
-    toast.success('Todas as linhas foram excluídas.');
+    await persist(kept);
+    toast.success(`Linhas de ${MONTHS[filterMonth! - 1]}/${filterYear} excluídas.`);
   };
 
   const setFilter = (key: keyof TabelaDadosRow, value: string) =>
@@ -437,7 +441,8 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
       </button>
       <button
         onClick={() => setConfirmDeleteAll(true)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+        disabled={filterMonth === null}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         <Trash2 className="w-3.5 h-3.5" /> Limpar Tudo
       </button>
@@ -453,7 +458,7 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
               <Trash2 className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="font-semibold text-slate-800 text-sm">Excluir todas as linhas</p>
-                <p className="text-slate-500 text-xs mt-1">Deseja excluir todas as linhas? Esta ação não pode ser desfeita.</p>
+                <p className="text-slate-500 text-xs mt-1">Deseja excluir todas as linhas de <strong>{MONTHS[filterMonth! - 1]}/{filterYear}</strong>? Esta ação não pode ser desfeita.</p>
               </div>
             </div>
             <div className="flex justify-end gap-2">

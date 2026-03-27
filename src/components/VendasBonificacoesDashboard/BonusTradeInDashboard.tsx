@@ -140,10 +140,14 @@ export function BonusTradeInDashboard() {
   }
 
   async function handleDeleteAll() {
-    const empty = Array.from({ length: 10 }, () => createEmptyBonusTradeInRow());
-    await persistRows(empty);
+    const kept = rows.filter(r => {
+      const d = parseDate(r.dataVenda);
+      if (!d) return true;
+      return !(d.year === filterYear && d.month === filterMonth!);
+    });
+    await persistRows(kept);
     setConfirmDeleteAll(false);
-    toast.success('Todas as linhas foram excluídas.');
+    toast.success(`Linhas de ${MONTHS[filterMonth! - 1]}/${filterYear} excluídas.`);
   }
 
   async function handleToggleHighlight(row: BonusTradeInRow) {
@@ -222,7 +226,7 @@ export function BonusTradeInDashboard() {
               <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="font-semibold text-slate-800 text-sm">Excluir todas as linhas</p>
-                <p className="text-slate-500 text-xs mt-1">Deseja excluir todas as linhas? Esta ação não pode ser desfeita.</p>
+                <p className="text-slate-500 text-xs mt-1">Deseja excluir todas as linhas de <strong>{MONTHS[filterMonth! - 1]}/{filterYear}</strong>? Esta ação não pode ser desfeita.</p>
               </div>
             </div>
             <div className="flex justify-end gap-2">
@@ -268,7 +272,7 @@ export function BonusTradeInDashboard() {
         <div className="flex items-center gap-2 py-1.5">
           <Button size="sm" variant="outline" className="flex items-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 h-8 text-xs" onClick={handleXlsxClick}><FileSpreadsheet className="w-3.5 h-3.5" />Importar</Button>
           <Button size="sm" variant="outline" className="flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 h-8 text-xs" onClick={handleExport}><Download className="w-3.5 h-3.5" />Exportar</Button>
-          <Button size="sm" variant="outline" className="flex items-center gap-2 border-red-300 text-red-600 hover:bg-red-50 h-8 text-xs" onClick={() => setConfirmDeleteAll(true)}><Trash2 className="w-3.5 h-3.5" />Limpar Tudo</Button>
+          <Button size="sm" variant="outline" className="flex items-center gap-2 border-red-300 text-red-600 hover:bg-red-50 h-8 text-xs disabled:opacity-40 disabled:cursor-not-allowed" onClick={() => setConfirmDeleteAll(true)} disabled={filterMonth === null}><Trash2 className="w-3.5 h-3.5" />Limpar Tudo</Button>
         </div>
       </div>
 

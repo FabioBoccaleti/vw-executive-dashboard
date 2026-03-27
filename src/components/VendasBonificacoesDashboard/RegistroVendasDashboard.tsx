@@ -198,10 +198,15 @@ export function RegistroVendasDashboard() {
   }
 
   async function handleDeleteAll() {
-    setRows([]);
-    await saveRegistroRows(activeTab, []);
+    const kept = rows.filter(r => {
+      const d = parseDate(r.dtaVenda);
+      if (!d) return true;
+      return !(d.year === filterYear && d.month === filterMonth!);
+    });
+    setRows(kept);
+    await saveRegistroRows(activeTab, kept);
     setConfirmDeleteAll(false);
-    toast.success('Todas as linhas foram excluídas.');
+    toast.success(`Linhas de ${MONTHS[filterMonth! - 1]}/${filterYear} excluídas.`);
   }
 
   // ─── Importar TXT ─────────────────────────────────────────────────
@@ -334,7 +339,7 @@ export function RegistroVendasDashboard() {
               <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="font-semibold text-slate-800 text-sm">Excluir todas as linhas</p>
-                <p className="text-slate-500 text-xs mt-1">Deseja excluir todas as linhas de <strong>{SUB_TABS.find(t => t.id === activeTab)?.label}</strong>? Esta ação não pode ser desfeita.</p>
+                <p className="text-slate-500 text-xs mt-1">Deseja excluir todas as linhas de <strong>{SUB_TABS.find(t => t.id === activeTab)?.label}</strong> de <strong>{MONTHS[filterMonth! - 1]}/{filterYear}</strong>? Esta ação não pode ser desfeita.</p>
               </div>
             </div>
             <div className="flex justify-end gap-2">
@@ -416,8 +421,9 @@ export function RegistroVendasDashboard() {
           <Button
             size="sm"
             variant="outline"
-            className="flex items-center gap-2 border-red-300 text-red-600 hover:bg-red-50 h-8 text-xs"
+            className="flex items-center gap-2 border-red-300 text-red-600 hover:bg-red-50 h-8 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
             onClick={() => setConfirmDeleteAll(true)}
+            disabled={filterMonth === null}
           >
             <Trash2 className="w-3.5 h-3.5" />
             Limpar Tudo
