@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -432,6 +432,7 @@ function pdfResultsToTableRows(pages: PageResult[]): Omit<TabelaDadosRow, 'id'>[
 
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [mainView, setMainView] = useState<'registros' | 'financeiro'>('registros');
   const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro'>('importar');
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
   const [registroFilterYear, setRegistroFilterYear] = useState<number>(new Date().getFullYear());
@@ -527,18 +528,42 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Importação de PDF / Tabela de Dados</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Importe um PDF ou gerencie a tabela de faturamentos</p>
+          <h1 className="text-lg font-bold text-slate-800">Central de Vendas VW</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Gerencie registros, importações e financeiro de vendas</p>
         </div>
-        <button
-          onClick={onBack}
-          className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
-        >
-          ← Voltar
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Seletor de visão principal */}
+          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
+            <button
+              onClick={() => setMainView('registros')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainView === 'registros' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Archive className="w-3.5 h-3.5" />
+              Registros
+            </button>
+            <button
+              onClick={() => setMainView('financeiro')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainView === 'financeiro' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Banknote className="w-3.5 h-3.5" />
+              Financeiro
+            </button>
+          </div>
+          <button
+            onClick={onBack}
+            className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
+          >
+            ← Voltar
+          </button>
+        </div>
       </header>
 
-      {/* Abas */}
+      {/* Sub-abas — apenas na visão Registros */}
+      {mainView === 'registros' && (
       <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0">
         <button
           onClick={() => setActiveTab('importar')}
@@ -574,19 +599,30 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           Registro de Vendas
         </button>
       </div>
+      )}
+
+      {/* Visão Financeiro — placeholder */}
+      {mainView === 'financeiro' && (
+        <div className="flex-1 flex items-center justify-center text-slate-300">
+          <div className="flex flex-col items-center gap-3">
+            <Banknote className="w-12 h-12" />
+            <span className="text-sm">Em desenvolvimento</span>
+          </div>
+        </div>
+      )}
 
       {/* Aba: Registro de Vendas */}
-      {activeTab === 'registro' && <RegistroVendasDashboard />}
+      {mainView === 'registros' && activeTab === 'registro' && <RegistroVendasDashboard />}
 
       {/* Aba: Tabela de Dados */}
-      {activeTab === 'tabela' && (
+      {mainView === 'registros' && activeTab === 'tabela' && (
         <div className="flex-1" style={{ minHeight: 0 }}>
           <TabelaDadosDashboard onBack={onBack} embedded />
         </div>
       )}
 
       {/* Aba: Importar PDF */}
-      {activeTab === 'importar' && (
+      {mainView === 'registros' && activeTab === 'importar' && (
         <div className="flex-1 p-6 flex flex-col gap-6">
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-3">
