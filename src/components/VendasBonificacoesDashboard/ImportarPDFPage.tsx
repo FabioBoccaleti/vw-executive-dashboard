@@ -1,11 +1,13 @@
 import { useRef, useState } from 'react';
-import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker as createTesseractWorker } from 'tesseract.js';
 import { TabelaDadosDashboard } from './TabelaDadosDashboard';
 import { RegistroVendasDashboard } from './RegistroVendasDashboard';
+import { BonusVarejoDashboard } from './BonusVarejoDashboard';
+import { BonusTradeInDashboard } from './BonusTradeInDashboard';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
 import type { TabelaDadosRow } from './tabelaDadosStorage';
 
@@ -433,7 +435,7 @@ function pdfResultsToTableRows(pages: PageResult[]): Omit<TabelaDadosRow, 'id'>[
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mainView, setMainView] = useState<'registros' | 'financeiro'>('registros');
-  const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro'>('importar');
+  const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein'>('importar');
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
   const [registroFilterYear, setRegistroFilterYear] = useState<number>(new Date().getFullYear());
   const [registroFilterMonth, setRegistroFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
@@ -598,6 +600,28 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           <ClipboardList className="w-4 h-4" />
           Registro de Vendas
         </button>
+        <button
+          onClick={() => setActiveTab('bonus')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'bonus'
+              ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <Tag className="w-4 h-4" />
+          Bônus Varejo
+        </button>
+        <button
+          onClick={() => setActiveTab('tradein')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'tradein'
+              ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <Tag className="w-4 h-4" />
+          Bônus Trade IN
+        </button>
       </div>
       )}
 
@@ -613,6 +637,8 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
 
       {/* Aba: Registro de Vendas */}
       {mainView === 'registros' && activeTab === 'registro' && <RegistroVendasDashboard />}
+      {mainView === 'registros' && activeTab === 'bonus' && <BonusVarejoDashboard />}
+      {mainView === 'registros' && activeTab === 'tradein' && <BonusTradeInDashboard />}
 
       {/* Aba: Tabela de Dados */}
       {mainView === 'registros' && activeTab === 'tabela' && (

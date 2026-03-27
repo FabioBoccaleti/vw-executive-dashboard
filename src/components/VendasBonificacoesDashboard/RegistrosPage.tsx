@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Upload, TableProperties, ClipboardList } from 'lucide-react';
+import { Upload, TableProperties, ClipboardList, Tag } from 'lucide-react';
 import { ImportarPDFPage } from './ImportarPDFPage';
 import { TabelaDadosDashboard } from './TabelaDadosDashboard';
 import { RegistroVendasDashboard } from './RegistroVendasDashboard';
+import { BonusVarejoDashboard } from './BonusVarejoDashboard';
+import { BonusTradeInDashboard } from './BonusTradeInDashboard';
 
 export function RegistrosPage({ onBack }: { onBack?: () => void }) {
-  const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro'>('importar');
+  const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein'>('importar');
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -59,12 +61,36 @@ export function RegistrosPage({ onBack }: { onBack?: () => void }) {
           <ClipboardList className="w-4 h-4" />
           Registro de Vendas
         </button>
+        <button
+          onClick={() => setActiveTab('bonus')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'bonus'
+              ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <Tag className="w-4 h-4" />
+          Bônus Varejo
+        </button>
+        <button
+          onClick={() => setActiveTab('tradein')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'tradein'
+              ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <Tag className="w-4 h-4" />
+          Bônus Trade IN
+        </button>
       </div>
 
       {/* Conteúdo da aba */}
       {activeTab === 'importar' && <ImportarPDFPage onBack={() => {}} />}
       {activeTab === 'tabela' && <div className="flex-1" style={{ minHeight: 0 }}><TabelaDadosDashboard onBack={() => {}} embedded /></div>}
       {activeTab === 'registro' && <RegistroVendasDashboard />}
+      {activeTab === 'bonus' && <BonusVarejoDashboard />}
+      {activeTab === 'tradein' && <BonusTradeInDashboard />}
     </div>
   );
 }
