@@ -3,6 +3,8 @@ import { Upload, Download, FileSpreadsheet, ChevronDown, AlertTriangle, Pencil, 
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import {
   type RegistroSubTab,
   type RegistroVendasRow,
@@ -36,6 +38,15 @@ function parseDate(raw: string): { year: number; month: number } | null {
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
 
+// Retorna o período de classificação da linha: usa periodoImport quando disponível
+function getRowPeriod(r: RegistroVendasRow): { year: number; month: number } | null {
+  if (r.periodoImport) {
+    const [y, m] = r.periodoImport.split('-').map(Number);
+    if (y && m) return { year: y, month: m };
+  }
+  return parseDate(r.dtaVenda);
+}
+
 function fmtCurrency(raw: string): string {
   const n = parseFloat(raw.replace(',', '.'));
   if (isNaN(n)) return raw || '-';
@@ -49,25 +60,85 @@ function sumField(rows: RegistroVendasRow[], field: 'valVenda' | 'valCusto'): nu
   }, 0);
 }
 
-// ─── Exporta para Excel ────────────────────────────────────────────────────────
-function exportToExcel(rows: RegistroVendasRow[], filename: string) {
-  const data = rows.map(r => ({
-    Chassi:        r.chassi,
-    Modelo:        r.modelo,
-    'Val. Venda':  r.valVenda,
-    'NF Venda':    r.nfVenda,
-    'NF Entrada':  r.nfEntrada,
-    'Val. Custo':  r.valCusto,
-    'Dt. Entrada': r.dtaEntrada,
-    'Dt. Venda':   r.dtaVenda,
-    Cor:           r.nomeCor,
-    Vendedor:      r.nomeVendedor,
-    Transação:     r.transacao,
-  }));
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Registro');
-  XLSX.writeFile(wb, filename);
+// ─── Exporta para Excel (estilizado) ───────────────────────────────────────────────
+const COLS_REGISTRO = [
+  { key: 'chassi',       label: 'Chassi',       type: 'text' },
+  { key: 'modelo',       label: 'Modelo',       type: 'text' },
+  { key: 'valVenda',     label: 'Val. Venda',   type: 'currency' },
+  { key: 'nfVenda',      label: 'NF Venda',     type: 'text' },
+  { key: 'nfEntrada',    label: 'NF Entrada',   type: 'text' },
+  { key: 'valCusto',     label: 'Val. Custo',   type: 'currency' },
+  { key: 'dtaEntrada',   label: 'Dt. Entrada',  type: 'date' },
+  { key: 'dtaVenda',     label: 'Dt. Venda',    type: 'date' },
+  { key: 'nomeCor',      label: 'Cor',          type: 'text' },
+  { key: 'nomeVendedor', label: 'Vendedor',     type: 'text' },
+  { key: 'transacao',    label: 'Transação',   type: 'text' },
+] as const;
+
+async function exportToExcel(rows: RegistroVendasRow[], sheetName: string, filename: string): Promise<void> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Sorana Executive Dashboard';
+  wb.created = new Date();
+  const ws = wb.addWorksheet(sheetName, {
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 2 }],
+    properties: { tabColor: { argb: 'FF10B981' } },
+  });
+  const labels = COLS_REGISTRO.map(c => c.label);
+  ws.columns = labels.map(() => ({ width: 20 }));
+  const today = new Date().toLocaleDateString('pt-BR');
+  const titleRow = ws.addRow([`${sheetName} — ${today}`]);
+  ws.mergeCells(1, 1, 1, labels.length);
+  titleRow.height = 30;
+  titleRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF065F46' } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 13 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+  });
+  const headerRow = ws.addRow(labels);
+  headerRow.height = 36;
+  headerRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 9.5 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  });
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: labels.length } };
+  const BTHIN = { style: 'thin' as const, color: { argb: 'FFE2E8F0' } };
+  const BRL_FMT = '"R$"\ #,##0.00';
+  rows.forEach((row, ri) => {
+    const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF0FDF4';
+    const values = COLS_REGISTRO.map(col => {
+      const v = (row as Record<string, string>)[col.key] ?? '';
+      if (col.type === 'currency') return parseFloat(String(v).replace(',', '.')) || null;
+      if (col.type === 'date') {
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(v)) { const [d, m, y] = v.split('/'); return new Date(+y, +m - 1, +d); }
+        if (/^\d{4}-\d{2}-\d{2}/.test(v)) { const [y, m, d] = v.split('-'); return new Date(+y, +m - 1, +d); }
+        return v;
+      }
+      return v || '';
+    });
+    const dr = ws.addRow(values);
+    dr.height = 17;
+    dr.eachCell({ includeEmpty: true }, (cell, ci) => {
+      const col = COLS_REGISTRO[ci - 1];
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.border = { top: BTHIN, bottom: BTHIN, left: BTHIN, right: BTHIN };
+      if (!col) return;
+      if (col.type === 'currency') {
+        cell.numFmt = BRL_FMT;
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.font = { size: 9.5, name: 'Courier New' };
+      } else if (col.type === 'date') {
+        if (cell.value instanceof Date) cell.numFmt = 'DD/MM/YYYY';
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.font = { size: 9.5 };
+      } else {
+        cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        cell.font = { size: 9.5 };
+      }
+    });
+  });
+  const buf = await wb.xlsx.writeBuffer();
+  saveAs(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
 }
 
 // ─── Lê Excel e converte para rows ────────────────────────────────────────────
@@ -109,6 +180,9 @@ export function RegistroVendasDashboard() {
   const [editValues, setEditValues]   = useState<RegistroVendasRow | null>(null);
   const [expandedAnnotations, setExpandedAnnotations] = useState<Set<string>>(new Set());
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [importPeriodModal, setImportPeriodModal] = useState(false);
+  const [importPeriodYear, setImportPeriodYear]   = useState<number>(new Date().getFullYear());
+  const [importPeriodMonth, setImportPeriodMonth] = useState<number>(new Date().getMonth() + 1);
 
   // Carrega dados ao trocar de aba
   useEffect(() => {
@@ -123,7 +197,7 @@ export function RegistroVendasDashboard() {
   const availableYears = useMemo(() => {
     const years = new Set<number>();
     rows.forEach(r => {
-      const d = parseDate(r.dtaVenda);
+      const d = getRowPeriod(r);
       if (d) years.add(d.year);
     });
     const sorted = Array.from(years).sort((a, b) => b - a);
@@ -134,7 +208,7 @@ export function RegistroVendasDashboard() {
   const monthCounts = useMemo(() => {
     const counts: Record<number, number> = {};
     rows.forEach(r => {
-      const d = parseDate(r.dtaVenda);
+      const d = getRowPeriod(r);
       if (d && d.year === filterYear) counts[d.month] = (counts[d.month] ?? 0) + 1;
     });
     return counts;
@@ -143,7 +217,7 @@ export function RegistroVendasDashboard() {
   // Linhas filtradas
   const filteredRows = useMemo(() => {
     return rows.filter(r => {
-      const d = parseDate(r.dtaVenda);
+      const d = getRowPeriod(r);
       if (!d) return false;
       if (d.year !== filterYear) return false;
       if (filterMonth !== null && d.month !== filterMonth) return false;
@@ -199,7 +273,7 @@ export function RegistroVendasDashboard() {
 
   async function handleDeleteAll() {
     const kept = rows.filter(r => {
-      const d = parseDate(r.dtaVenda);
+      const d = getRowPeriod(r);
       if (!d) return true;
       return !(d.year === filterYear && d.month === filterMonth!);
     });
@@ -223,8 +297,17 @@ export function RegistroVendasDashboard() {
       return;
     }
 
+    // Aplica o período declarado em todos os registros
+    const periodo = `${importPeriodYear}-${String(importPeriodMonth).padStart(2, '0')}`;
+    const applyPeriod = <T extends object>(items: T[]) =>
+      items.map(r => ({ ...r, periodoImport: periodo }));
+
     const tabs: RegistroSubTab[] = ['novos', 'frotista', 'usados'];
-    await Promise.all(tabs.map(t => parsed[t].length > 0 ? appendRegistroRows(t, parsed[t]) : Promise.resolve({ added: 0 })));
+    await Promise.all(tabs.map(t =>
+      parsed[t].length > 0
+        ? appendRegistroRows(t, applyPeriod(parsed[t]))
+        : Promise.resolve({ added: 0 })
+    ));
 
     // Recarrega a aba atual
     const updated = await loadRegistroRows(activeTab);
@@ -235,7 +318,7 @@ export function RegistroVendasDashboard() {
       parsed.frotista.length > 0 ? `${parsed.frotista.length} VD/Frotista` : null,
       parsed.usados.length   > 0 ? `${parsed.usados.length} Usados`     : null,
     ].filter(Boolean);
-    toast.success(`Importado: ${parts.join(' · ')}`);
+    toast.success(`Importado (${MONTHS[importPeriodMonth - 1]}/${importPeriodYear}): ${parts.join(' · ')}`);
     if (txtInputRef.current) txtInputRef.current.value = '';
   }
 
@@ -267,10 +350,11 @@ export function RegistroVendasDashboard() {
   }
 
   // ─── Exportar Excel ───────────────────────────────────────────────────────────
-  function handleExport() {
-    if (filteredRows.length === 0) { toast.warning('Nenhum dado para exportar.'); return; }
+  async function handleExport() {
     const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
-    exportToExcel(filteredRows, `registro_${activeTab}_${filterYear}_${monthLabel}.xlsx`);
+    const tabLabel   = SUB_TABS.find(t => t.id === activeTab)?.label ?? activeTab;
+    const sheetName  = `Reg. Vendas — ${tabLabel} — ${monthLabel}/${filterYear}`;
+    await exportToExcel(filteredRows, sheetName, `registro_${activeTab}_${filterYear}_${monthLabel}.xlsx`);
     toast.success('Arquivo Excel gerado!');
   }
 
@@ -279,6 +363,51 @@ export function RegistroVendasDashboard() {
       {/* Input ocultos */}
       <input ref={txtInputRef}  type="file" accept=".txt"            className="hidden" onChange={handleTxtImport} />
       <input ref={xlsxInputRef} type="file" accept=".xlsx,.xls,.ods" className="hidden" onChange={handleXlsxImport} />
+
+      {/* Modal: selecionar período do TXT */}
+      {importPeriodModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-start gap-3 mb-5">
+              <Upload className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-slate-800 text-sm">Importar TXT — Qual é o período deste relatório?</p>
+                <p className="text-slate-500 text-xs mt-1">Os registros serão classificados no mês/ano que você informar, independente da data de venda do ERP.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex-1">
+                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Mês</label>
+                <select
+                  value={importPeriodMonth}
+                  onChange={e => setImportPeriodMonth(Number(e.target.value))}
+                  className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                >
+                  {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Ano</label>
+                <select
+                  value={importPeriodYear}
+                  onChange={e => setImportPeriodYear(Number(e.target.value))}
+                  className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                >
+                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setImportPeriodModal(false)}>Cancelar</Button>
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => { setImportPeriodModal(false); txtInputRef.current?.click(); }}>
+                Confirmar e selecionar arquivo
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dialog: confirmar exclusão */}
       {confirmDeleteId && (
@@ -374,7 +503,7 @@ export function RegistroVendasDashboard() {
         <Button
           size="sm"
           className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-          onClick={() => txtInputRef.current?.click()}
+          onClick={() => setImportPeriodModal(true)}
         >
           <Upload className="w-4 h-4" />
           Importar TXT

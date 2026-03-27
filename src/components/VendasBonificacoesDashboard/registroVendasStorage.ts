@@ -28,6 +28,7 @@ export interface RegistroVendasRow {
   transacao: string;
   highlight?: boolean;
   annotation?: string;
+  periodoImport?: string; // "YYYY-MM" — período declarado na importação, tem prioridade sobre dtaVenda
 }
 
 function keyFor(tab: RegistroSubTab): string {

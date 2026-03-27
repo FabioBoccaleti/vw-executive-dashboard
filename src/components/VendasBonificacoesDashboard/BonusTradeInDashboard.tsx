@@ -3,6 +3,8 @@ import { Download, FileSpreadsheet, ChevronDown, AlertTriangle, Pencil, Trash2, 
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import {
   type BonusTradeInRow,
   loadBonusTradeInRows,
@@ -39,22 +41,82 @@ function sumField(rows: BonusTradeInRow[]): number {
   }, 0);
 }
 
-function exportToExcel(rows: BonusTradeInRow[], filename: string) {
-  const data = rows.map(r => ({
-    'Data da Venda':       r.dataVenda,
-    Cliente:               r.cliente,
-    Chassi:                r.chassi,
-    Modelo:                r.modelo,
-    Vendedor:              r.vendedor,
-    'N Titulo':            r.nTitulo,
-    'Valor do Trade IN':   r.valorTradeIn,
-    Recebido:              r.recebido,
-    'Data do Recebimento': r.dataRecebimento,
-  }));
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Bonus Trade IN');
-  XLSX.writeFile(wb, filename);
+const COLS_TRADEIN = [
+  { key: 'dataVenda',        label: 'Data da Venda',        type: 'date' },
+  { key: 'cliente',          label: 'Cliente',              type: 'text' },
+  { key: 'chassi',           label: 'Chassi',               type: 'text' },
+  { key: 'modelo',           label: 'Modelo',               type: 'text' },
+  { key: 'vendedor',         label: 'Vendedor',             type: 'text' },
+  { key: 'nTitulo',          label: 'Nº Título',            type: 'text' },
+  { key: 'valorTradeIn',     label: 'Valor do Trade IN',    type: 'currency' },
+  { key: 'recebido',         label: 'Recebido',             type: 'currency' },
+  { key: 'dataRecebimento',  label: 'Data do Recebimento',  type: 'date' },
+] as const;
+
+async function exportToExcel(rows: BonusTradeInRow[], sheetName: string, filename: string): Promise<void> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Sorana Executive Dashboard';
+  wb.created = new Date();
+  const ws = wb.addWorksheet(sheetName, {
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 2 }],
+    properties: { tabColor: { argb: 'FF10B981' } },
+  });
+  const labels = COLS_TRADEIN.map(c => c.label);
+  ws.columns = labels.map(() => ({ width: 22 }));
+  const today = new Date().toLocaleDateString('pt-BR');
+  const titleRow = ws.addRow([`${sheetName} — ${today}`]);
+  ws.mergeCells(1, 1, 1, labels.length);
+  titleRow.height = 30;
+  titleRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF065F46' } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 13 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+  });
+  const headerRow = ws.addRow(labels);
+  headerRow.height = 36;
+  headerRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 9.5 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  });
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: labels.length } };
+  const BTHIN = { style: 'thin' as const, color: { argb: 'FFE2E8F0' } };
+  const BRL_FMT = '"R$"\ #,##0.00';
+  rows.forEach((row, ri) => {
+    const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF0FDF4';
+    const values = COLS_TRADEIN.map(col => {
+      const v = String((row as unknown as Record<string, unknown>)[col.key] ?? '');
+      if (col.type === 'currency') return parseFloat(v.replace(',', '.')) || null;
+      if (col.type === 'date') {
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(v)) { const [d, m, y] = v.split('/'); return new Date(+y, +m - 1, +d); }
+        if (/^\d{4}-\d{2}-\d{2}/.test(v)) { const [y, m, d] = v.split('-'); return new Date(+y, +m - 1, +d); }
+        return v;
+      }
+      return v || '';
+    });
+    const dr = ws.addRow(values);
+    dr.height = 17;
+    dr.eachCell({ includeEmpty: true }, (cell, ci) => {
+      const col = COLS_TRADEIN[ci - 1];
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.border = { top: BTHIN, bottom: BTHIN, left: BTHIN, right: BTHIN };
+      if (!col) return;
+      if (col.type === 'currency') {
+        cell.numFmt = BRL_FMT;
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.font = { size: 9.5, name: 'Courier New' };
+      } else if (col.type === 'date') {
+        if (cell.value instanceof Date) cell.numFmt = 'DD/MM/YYYY';
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.font = { size: 9.5 };
+      } else {
+        cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        cell.font = { size: 9.5 };
+      }
+    });
+  });
+  const buf = await wb.xlsx.writeBuffer();
+  saveAs(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
 }
 
 function parseExcelFile(buffer: ArrayBuffer): Omit<BonusTradeInRow, 'id' | 'highlight' | 'annotation'>[] {
@@ -197,11 +259,10 @@ export function BonusTradeInDashboard() {
     if (xlsxInputRef.current) xlsxInputRef.current.value = '';
   }
 
-  function handleExport() {
-    const toExport = filteredRows.filter(r => r.chassi || r.dataVenda || r.cliente);
-    if (toExport.length === 0) { toast.warning('Nenhum dado para exportar.'); return; }
+  async function handleExport() {
     const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
-    exportToExcel(toExport, `bonus_trade_in_${filterYear}_${monthLabel}.xlsx`);
+    const sheetName  = `Bônus Trade IN — ${monthLabel}/${filterYear}`;
+    await exportToExcel(filteredRows, sheetName, `bonus_trade_in_${filterYear}_${monthLabel}.xlsx`);
     toast.success('Arquivo Excel gerado!');
   }
 
