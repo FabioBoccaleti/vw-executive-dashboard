@@ -27,6 +27,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
         return;
       }
+      // Em dev local, confia no sessionStorage diretamente sem chamar a API
+      if (window.location.hostname === 'localhost') {
+        const { getSessionData } = await import('@/lib/authClient');
+        setSession(getSessionData());
+        setIsLoading(false);
+        return;
+      }
       try {
         const res = await fetch('/api/auth/me', {
           headers: { Authorization: `Bearer ${token}` },

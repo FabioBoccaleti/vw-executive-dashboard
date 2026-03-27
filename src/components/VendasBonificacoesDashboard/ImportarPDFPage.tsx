@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker as createTesseractWorker } from 'tesseract.js';
 import { TabelaDadosDashboard } from './TabelaDadosDashboard';
+import { RegistroVendasDashboard } from './RegistroVendasDashboard';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
 import type { TabelaDadosRow } from './tabelaDadosStorage';
 
@@ -575,81 +576,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
       </div>
 
       {/* Aba: Registro de Vendas */}
-      {activeTab === 'registro' && (
-        <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
-          {/* Sub-abas */}
-          <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0">
-            {([
-              ['novos',    'Veículos Novos'],
-              ['frotista', 'Veículos VD / Frotista'],
-              ['usados',   'Veículos Usados'],
-            ] as [typeof registroSubTab, string][]).map(([id, label]) => (
-              <button
-                key={id}
-                onClick={() => setRegistroSubTab(id)}
-                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  registroSubTab === id
-                    ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Seletor Ano / Mês */}
-          <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
-            <div className="relative mr-2">
-              <select
-                value={registroFilterYear}
-                onChange={e => setRegistroFilterYear(Number(e.target.value))}
-                className="appearance-none text-sm font-bold text-slate-700 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
-              >
-                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-            </div>
-            <div className="w-px h-5 bg-slate-200 mr-1" />
-            <button
-              onClick={() => setRegistroFilterMonth(null)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                registroFilterMonth === null
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-              }`}
-            >
-              Ano todo
-            </button>
-            {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((name, idx) => {
-              const m = idx + 1;
-              const isActive = registroFilterMonth === m;
-              return (
-                <button
-                  key={m}
-                  onClick={() => setRegistroFilterMonth(m)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    isActive
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
-                  }`}
-                >
-                  {name}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Conteúdo — a ser implementado */}
-          <div className="flex-1 flex items-center justify-center text-slate-300">
-            <div className="flex flex-col items-center gap-3">
-              <ClipboardList className="w-12 h-12" />
-              <span className="text-sm">Em breve</span>
-            </div>
-          </div>
-        </div>
-      )}
+      {activeTab === 'registro' && <RegistroVendasDashboard />}
 
       {/* Aba: Tabela de Dados */}
       {activeTab === 'tabela' && (

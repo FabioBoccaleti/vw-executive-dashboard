@@ -43,7 +43,23 @@ export function isLoggedIn(): boolean {
 
 // ─── Chamadas de API ──────────────────────────────────────────────────────────
 
+const IS_DEV = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+
 export async function apiLogin(username: string, password: string): Promise<{ token: string; session: SessionPayload } | { error: string }> {
+  // Bypass local: em desenvolvimento não há API — entra direto como admin
+  if (IS_DEV) {
+    const session: SessionPayload = {
+      userId: 'dev',
+      username: username || 'dev',
+      role: 'admin',
+      modules: ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes'],
+      brands: ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'],
+      vendasSubModules: [],
+      expiresAt: Date.now() + 1000 * 60 * 60 * 24,
+    };
+    return { token: 'dev-token', session };
+  }
+
   let res: Response;
   try {
     res = await fetch('/api/auth/login', {
