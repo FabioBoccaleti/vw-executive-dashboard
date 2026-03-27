@@ -22,7 +22,7 @@ function fmtPct(v: number): string {
 }
 
 // ─── Cálculos derivados ───────────────────────────────────────────────────────
-function calcRow(r: VendasResultadoRow, isDireta = false) {
+function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false) {
   const comissaoBruta      = isDireta ? n(r.valorVenda) * n(r.pctComissao) / 100 : 0;
   const recLiq             = isDireta ? comissaoBruta - n(r.impostos) : n(r.valorVenda) - n(r.impostos);
   const comissaoLiquidaPct = n(r.valorVenda) !== 0 ? (recLiq / n(r.valorVenda)) * 100 : 0;
@@ -32,7 +32,7 @@ function calcRow(r: VendasResultadoRow, isDireta = false) {
                            + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3);
   const lucroComBon        = (isDireta ? recLiq : lucroBruto) + bonuses;
   const lucroComBonPct     = recLiq !== 0 ? (lucroComBon / recLiq) * 100 : 0;
-  const resultado          = lucroComBon + n(r.recBlindagem) + n(r.recFinanciamento) + n(r.recDespachante)
+  const resultado          = (isUsados ? lucroBruto : lucroComBon) + n(r.recBlindagem) + n(r.recFinanciamento) + n(r.recDespachante)
                            - (isDireta ? 0 : n(r.jurosEstoque)) - n(r.comissaoVenda) - n(r.dsr)
                            - n(r.provisoes) - n(r.encargos) - n(r.outrasDespesas);
   const resultadoPct       = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
@@ -149,7 +149,7 @@ function CalcCell({ value, pct, negative }: { value: number; pct?: boolean; nega
 }
 
 // ─── Export Excel ─────────────────────────────────────────────────────────────
-async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, filename: string, isDireta: boolean) {
+async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, filename: string, isDireta: boolean, isUsados: boolean) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Sorana Executive Dashboard'; wb.created = new Date();
   const ws = wb.addWorksheet(sheetName, {
@@ -164,6 +164,13 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
     'Lucro c/ Bon.','% Lucro c/ Bon.',
     'Rec. Blindagem','Rec. Financiamento','Rec. Despachante',
     'Comissão Venda','DSR','Provisões','Encargos','Outras Despesas',
+    'Resultado da Venda','% Resultado da Venda',
+  ] : isUsados ? [
+    'Chassi','Modelo','Cor','Data da Venda','Dias Estoque','Dias Carência',
+    'Vendedor','Transação','Valor de Venda','Impostos','Receita Líquida',
+    'Valor de Custo','Trade IN','Lucro Bruto','Lucro Bruto %',
+    'Rec. Blindagem','Rec. Financiamento','Rec. Despachante',
+    'Juros s/ Estoque','Comissão Venda','DSR','Provisões','Encargos','Outras Despesas',
     'Resultado da Venda','% Resultado da Venda',
   ] : [
     'Chassi','Modelo','Cor','Data da Venda','Dias Estoque','Dias Carência',
@@ -202,7 +209,7 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
   const PCT = '#,##0.00"%"';
 
   rows.forEach((row, ri) => {
-    const c = calcRow(row, isDireta);
+    const c = calcRow(row, isDireta, isUsados);
     const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF0FDF4';
     const vals = isDireta ? [
       row.chassi, row.modelo, row.cor, row.dataVenda, row.vendedor, row.transacao,
@@ -212,6 +219,16 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
       c.lucroComBon, c.lucroComBonPct,
       n(row.recBlindagem), n(row.recFinanciamento), n(row.recDespachante),
       n(row.comissaoVenda), n(row.dsr),
+      n(row.provisoes), n(row.encargos), n(row.outrasDespesas),
+      c.resultado, c.resultadoPct,
+    ] : isUsados ? [
+      row.chassi, row.modelo, row.cor, row.dataVenda,
+      n(row.diasEstoque),
+      row.vendedor, row.transacao,
+      n(row.valorVenda), n(row.impostos), c.recLiq,
+      n(row.valorCusto), n(row.bonusVarejo), c.lucroBruto, c.lucroBrutoPct,
+      n(row.recBlindagem), n(row.recFinanciamento), n(row.recDespachante),
+      n(row.jurosEstoque), n(row.comissaoVenda), n(row.dsr),
       n(row.provisoes), n(row.encargos), n(row.outrasDespesas),
       c.resultado, c.resultadoPct,
     ] : [
@@ -233,8 +250,10 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
     // índices 1-based das colunas de moeda/percentual
     const currencyCols = isDireta
       ? [7,9,10,11,13,14,15,16,17,18,19,21,22,23,24,25,26,27,28,29]
-      : [9,10,11,12,13,14,16,17,18,19,20,21,22,24,25,26,27,28,29,30,31,32,33];
-    const pctCols = isDireta ? [8,12,20,30] : [15,23,34];
+      : isUsados
+        ? [9,10,11,12,13,14,16,17,18,19,20,21,22,23,24,25]
+        : [9,10,11,12,13,14,16,17,18,19,20,21,22,24,25,26,27,28,29,30,31,32,33];
+    const pctCols = isDireta ? [8,12,20,30] : isUsados ? [15,26] : [15,23,34];
     dr.eachCell({ includeEmpty: true }, (cell, ci) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
       cell.border = { top: BTHIN, bottom: BTHIN, left: BTHIN, right: BTHIN };
@@ -346,7 +365,7 @@ export default function VendasResultadoDashboard() {
       const tabLabel = SUB_TABS.find(t => t.id === activeTab)?.label ?? activeTab;
       const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
       const sheetName = `${tabLabel.slice(0, 20)} - ${monthLabel}-${filterYear}`.slice(0, 31);
-      await exportToExcel(filteredRows, sheetName, `${activeTab}_resultado_${filterYear}_${monthLabel}.xlsx`, isDireta);
+      await exportToExcel(filteredRows, sheetName, `${activeTab}_resultado_${filterYear}_${monthLabel}.xlsx`, isDireta, isUsados);
       toast.success('Arquivo Excel gerado!');
     } catch (err) {
       console.error(err);
@@ -357,6 +376,7 @@ export default function VendasResultadoDashboard() {
   // Totais do período filtrado
   const totals = useMemo(() => {
     const isDireta = activeTab === 'direta';
+    const isUsados = activeTab === 'usados';
     const sum = (key: EditableKey) => filteredRows.reduce((a, r) => a + n((r as unknown as Record<string, string>)[key] ?? ''), 0);
     const valorVenda       = sum('valorVenda');
     const impostos         = sum('impostos');
@@ -374,7 +394,7 @@ export default function VendasResultadoDashboard() {
                      + sum('bonusAdic1') + sum('bonusAdic2') + sum('bonusAdic3');
     const lcb        = (isDireta ? recLiq : lb) + bonuses;
     const lcbPct     = recLiq !== 0 ? (lcb / recLiq) * 100 : 0;
-    const resultado  = lcb + sum('recBlindagem') + sum('recFinanciamento') + sum('recDespachante')
+    const resultado  = (isUsados ? lb : lcb) + sum('recBlindagem') + sum('recFinanciamento') + sum('recDespachante')
                      - (isDireta ? 0 : sum('jurosEstoque')) - sum('comissaoVenda') - sum('dsr')
                      - sum('provisoes') - sum('encargos') - sum('outrasDespesas');
     const resPct     = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
@@ -382,6 +402,7 @@ export default function VendasResultadoDashboard() {
   }, [filteredRows, activeTab]);
 
   const isDireta = activeTab === 'direta';
+  const isUsados = activeTab === 'usados';
   const tabLabel = SUB_TABS.find(t => t.id === activeTab)?.label ?? '';
 
   return (
@@ -458,10 +479,10 @@ export default function VendasResultadoDashboard() {
           <thead className="sticky top-0 z-10">
             {/* Grupo de cabeçalho */}
             <tr>
-              <th colSpan={isDireta ? 6 : 8} className="bg-slate-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-600">IDENTIFICAÇÃO</th>
+              <th colSpan={isDireta ? 6 : isUsados ? 7 : 8} className="bg-slate-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-600">IDENTIFICAÇÃO</th>
               <th colSpan={isDireta ? 6 : 3} className="bg-emerald-800 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-emerald-700">FINANCEIRO BASE</th>
               {!isDireta && <th colSpan={4} className="bg-teal-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-teal-600">LUCRO BRUTO</th>}
-              <th colSpan={8} className="bg-cyan-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-cyan-600">BONIFICAÇÕES</th>
+              {!isDireta && !isUsados && <th colSpan={8} className="bg-cyan-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-cyan-600">BONIFICAÇÕES</th>}
               <th colSpan={3} className="bg-blue-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-blue-600">RECEITAS EXTRAS</th>
               <th colSpan={isDireta ? 5 : 6} className="bg-orange-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-orange-600">DESPESAS</th>
               <th colSpan={2} className="bg-slate-800 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-700">RESULTADO</th>
@@ -472,7 +493,9 @@ export default function VendasResultadoDashboard() {
               {/* Identificação */}
               {(isDireta
                 ? ['Chassi','Modelo','Cor','Data Venda','Vendedor','Transação']
-                : ['Chassi','Modelo','Cor','Data Venda','Dias Est.','Dias Car.','Vendedor','Transação']
+                : isUsados
+                  ? ['Chassi','Modelo','Cor','Data Venda','Dias Est.','Vendedor','Transação']
+                  : ['Chassi','Modelo','Cor','Data Venda','Dias Est.','Dias Car.','Vendedor','Transação']
               ).map((h,i) => (
                 <th key={i} className="bg-slate-700 px-3 py-2 text-left whitespace-nowrap border-b border-slate-600 border-r border-slate-600">{h}</th>
               ))}
@@ -484,11 +507,11 @@ export default function VendasResultadoDashboard() {
                 <th key={i} className="bg-emerald-800 px-3 py-2 text-right whitespace-nowrap border-b border-emerald-700 border-r border-emerald-700">{h}</th>
               ))}
               {/* Lucro bruto */}
-              {!isDireta && ['Valor Custo','Bônus Varejo','Lucro Bruto','LB %'].map((h,i) => (
+              {!isDireta && ['Valor Custo', isUsados ? 'Trade IN' : 'Bônus Varejo', 'Lucro Bruto', 'LB %'].map((h,i) => (
                 <th key={i} className="bg-teal-700 px-3 py-2 text-right whitespace-nowrap border-b border-teal-600 border-r border-teal-600">{h}</th>
               ))}
               {/* Bonificações */}
-              {['PIV','SIQ','PIVE','Adic 1','Adic 2','Adic 3','Lucro c/ Bon.','% c/ Bon.'].map((h,i) => (
+              {!isDireta && !isUsados && ['PIV','SIQ','PIVE','Adic 1','Adic 2','Adic 3','Lucro c/ Bon.','% c/ Bon.'].map((h,i) => (
                 <th key={i} className="bg-cyan-700 px-3 py-2 text-right whitespace-nowrap border-b border-cyan-600 border-r border-cyan-600">{h}</th>
               ))}
               {/* Receitas extras */}
@@ -512,13 +535,13 @@ export default function VendasResultadoDashboard() {
           <tbody>
             {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={isDireta ? 31 : 35} className="text-center py-16 text-slate-300 text-sm">
+                <td colSpan={isDireta ? 31 : isUsados ? 26 : 35} className="text-center py-16 text-slate-300 text-sm">
                   Nenhum registro — clique em "Nova linha" para adicionar
                 </td>
               </tr>
             )}
             {filteredRows.map((row, ri) => {
-              const c = calcRow(row, isDireta);
+              const c = calcRow(row, isDireta, isUsados);
               const bg = row.highlight ? 'bg-yellow-50' : ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
               const td = `${bg} border-b border-slate-100 align-middle`;
               const tdR = `${td} text-right`;
@@ -536,7 +559,7 @@ export default function VendasResultadoDashboard() {
                   <td className={`${td} px-2 min-w-[90px]`}>{EC('cor')}</td>
                   <td className={`${td} px-2 min-w-[100px]`}>{EC('dataVenda', 'date')}</td>
                   {!isDireta && <td className={`${tdR} px-2 min-w-[80px]`}>{EC('diasEstoque', 'number')}</td>}
-                  {!isDireta && <td className={`${tdR} px-2 min-w-[80px]`}>{EC('diasCarencia', 'number')}</td>}
+                  {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[80px]`}>{EC('diasCarencia', 'number')}</td>}
                   <td className={`${td} px-2 min-w-[120px]`}>{EC('vendedor')}</td>
                   <td className={`${td} px-2 min-w-[80px]`}>{EC('transacao')}</td>
                   {/* Financeiro base */}
@@ -552,14 +575,14 @@ export default function VendasResultadoDashboard() {
                   {!isDireta && <td className={`${tdR} px-2 min-w-[110px]`}><CalcCell value={c.lucroBruto} negative /></td>}
                   {!isDireta && <td className={`${tdR} px-2 min-w-[80px]`}><CalcCell value={c.lucroBrutoPct} pct negative /></td>}
                   {/* Bonificações */}
-                  <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusPIV', 'currency')}</td>
-                  <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusSIQ', 'currency')}</td>
-                  <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusPIVE', 'currency')}</td>
-                  <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusAdic1', 'currency')}</td>
-                  <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusAdic2', 'currency')}</td>
-                  <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusAdic3', 'currency')}</td>
-                  <td className={`${tdR} px-2 min-w-[110px]`}><CalcCell value={c.lucroComBon} negative /></td>
-                  <td className={`${tdR} px-2 min-w-[80px]`}><CalcCell value={c.lucroComBonPct} pct negative /></td>
+                  {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusPIV', 'currency')}</td>}
+                  {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusSIQ', 'currency')}</td>}
+                  {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusPIVE', 'currency')}</td>}
+                  {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusAdic1', 'currency')}</td>}
+                  {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusAdic2', 'currency')}</td>}
+                  {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusAdic3', 'currency')}</td>}
+                  {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[110px]`}><CalcCell value={c.lucroComBon} negative /></td>}
+                  {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[80px]`}><CalcCell value={c.lucroComBonPct} pct negative /></td>}
                   {/* Receitas extras */}
                   <td className={`${tdR} px-2 min-w-[100px]`}>{EC('recBlindagem', 'currency')}</td>
                   <td className={`${tdR} px-2 min-w-[120px]`}>{EC('recFinanciamento', 'currency')}</td>
@@ -599,7 +622,7 @@ export default function VendasResultadoDashboard() {
           {filteredRows.length > 0 && (
             <tfoot>
               <tr className="bg-slate-800 text-white text-xs font-bold">
-                <td colSpan={isDireta ? 6 : 8} className="px-3 py-2 text-left">TOTAIS ({filteredRows.length} registros)</td>
+                <td colSpan={isDireta ? 6 : isUsados ? 7 : 8} className="px-3 py-2 text-left">TOTAIS ({filteredRows.length} registros)</td>
                 <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.valorVenda)}</td>
                 {isDireta ? (
                   <>
@@ -619,9 +642,13 @@ export default function VendasResultadoDashboard() {
                     <td className={`px-2 py-2 text-right font-mono ${totals.lbPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{fmtPct(totals.lbPct)}</td>
                   </>
                 )}
-                <td colSpan={6} className="px-2 py-2 text-center text-slate-400 text-[10px]">—</td>
-                <td className={`px-2 py-2 text-right font-mono ${totals.lcb >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.lcb)}</td>
-                <td className={`px-2 py-2 text-right font-mono ${totals.lcbPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{fmtPct(totals.lcbPct)}</td>
+                {!isDireta && !isUsados && (
+                  <>
+                    <td colSpan={6} className="px-2 py-2 text-center text-slate-400 text-[10px]">—</td>
+                    <td className={`px-2 py-2 text-right font-mono ${totals.lcb >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.lcb)}</td>
+                    <td className={`px-2 py-2 text-right font-mono ${totals.lcbPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{fmtPct(totals.lcbPct)}</td>
+                  </>
+                )}
                 <td colSpan={isDireta ? 8 : 9} className="px-2 py-2 text-center text-slate-400 text-[10px]">—</td>
                 <td className={`px-2 py-2 text-right font-mono ${totals.resultado >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.resultado)}</td>
                 <td className={`px-2 py-2 text-right font-mono ${totals.resPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{fmtPct(totals.resPct)}</td>
