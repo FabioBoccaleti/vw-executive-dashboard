@@ -142,7 +142,18 @@ export function BonusVarejoDashboard() {
   const [expandedAnnotations, setExpandedAnnotations] = useState<Set<string>>(new Set());
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
-  const xlsxInputRef = useRef<HTMLInputElement>(null);
+  const xlsxInputRef   = useRef<HTMLInputElement>(null);
+  const tableRef        = useRef<HTMLDivElement>(null);
+  const scrollbarRef    = useRef<HTMLDivElement>(null);
+  const scrollDummyRef  = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (scrollDummyRef.current && tableRef.current)
+        scrollDummyRef.current.style.width = tableRef.current.scrollWidth + 'px';
+    }, 50);
+    return () => clearTimeout(t);
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -386,7 +397,8 @@ export function BonusVarejoDashboard() {
         <span className="text-xs text-slate-500">Total Valor: <span className="font-semibold text-slate-700 font-mono">{totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></span>
       </div>
 
-      <div className="flex-1 overflow-auto" style={{ minHeight: 0 }}>
+      <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
+        <div ref={tableRef} onScroll={() => { if (scrollbarRef.current && tableRef.current) scrollbarRef.current.scrollLeft = tableRef.current.scrollLeft; }} className="flex-1 overflow-auto" style={{ minHeight: 0 }}>
         {loading ? (
           <div className="flex items-center justify-center h-40 text-slate-400 text-sm">Carregando...</div>
         ) : (
@@ -453,6 +465,11 @@ export function BonusVarejoDashboard() {
             </tbody>
           </table>
         )}
+        </div>
+        <div ref={scrollbarRef} onScroll={() => { if (tableRef.current && scrollbarRef.current) tableRef.current.scrollLeft = scrollbarRef.current.scrollLeft; }}
+          className="overflow-x-auto overflow-y-hidden shrink-0 border-t border-slate-100 bg-white" style={{ height: 14 }}>
+          <div ref={scrollDummyRef} style={{ height: 1 }} />
+        </div>
       </div>
     </div>
   );

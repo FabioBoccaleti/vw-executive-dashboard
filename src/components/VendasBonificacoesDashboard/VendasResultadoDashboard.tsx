@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { Plus, Trash2, Download, Pencil, Check, X, MessageSquare, Highlighter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -411,6 +411,19 @@ export default function VendasResultadoDashboard() {
   const isUsados = activeTab === 'usados';
   const tabLabel = SUB_TABS.find(t => t.id === activeTab)?.label ?? '';
 
+  // ─── Scroll sync (barra horizontal fixa) ─────────────────────────────────────────
+  const tableRef       = useRef<HTMLDivElement>(null);
+  const scrollbarRef   = useRef<HTMLDivElement>(null);
+  const scrollDummyRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (scrollDummyRef.current && tableRef.current)
+        scrollDummyRef.current.style.width = tableRef.current.scrollWidth + 'px';
+    }, 50);
+    return () => clearTimeout(t);
+  });
+
   return (
     <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
       {/* Sub-abas */}
@@ -480,7 +493,8 @@ export default function VendasResultadoDashboard() {
       </div>
 
       {/* Tabela */}
-      <div className="flex-1 overflow-auto" style={{ minHeight: 0 }}>
+      <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
+        <div ref={tableRef} onScroll={() => { if (scrollbarRef.current && tableRef.current) scrollbarRef.current.scrollLeft = tableRef.current.scrollLeft; }} className="flex-1 overflow-auto" style={{ minHeight: 0 }}>
         <table className="w-full border-collapse text-xs" style={{ minWidth: 2800 }}>
           <thead className="sticky top-0 z-10">
             {/* Grupo de cabeçalho */}
@@ -502,9 +516,13 @@ export default function VendasResultadoDashboard() {
                 : isUsados
                   ? ['Nota Compra','Chassi','Modelo','Cor','NF Venda','Data Venda','Dias Est.','Vendedor','Transação']
                   : ['Nota Compra','Chassi','Modelo','Cor','NF Venda','Data Venda','Dias Est.','Dias Car.','Vendedor','Transação']
-              ).map((h,i) => (
-                <th key={i} className="bg-slate-700 px-3 py-2 text-left whitespace-nowrap border-b border-slate-600 border-r border-slate-600">{h}</th>
-              ))}
+              ).map((h,i) => {
+                const frozenStyle = i === 0
+                  ? { position: 'sticky' as const, left: 0, zIndex: 21 }
+                  : (!isDireta && i === 1) ? { position: 'sticky' as const, left: 110, zIndex: 21 }
+                  : undefined;
+                return <th key={i} style={frozenStyle} className="bg-slate-700 px-3 py-2 text-left whitespace-nowrap border-b border-slate-600 border-r border-slate-600">{h}</th>;
+              })}
               {/* Financeiro base */}
               {(isDireta
                 ? ['Valor Venda','% Comissão','Com. Bruta','Impostos','Com. Líquida','% Com. Líq.']
@@ -562,8 +580,16 @@ export default function VendasResultadoDashboard() {
               return (
                 <tr key={row.id} className={`group transition-colors hover:bg-emerald-50/30`}>
                   {/* Identificação */}
-                  {!isDireta && <td className={`${td} px-2 min-w-[110px]`}>{EC('notaCompra')}</td>}
-                  <td className={`${td} px-2 min-w-[130px]`}>{EC('chassi')}</td>
+                  {!isDireta && (
+                    <td className={`${td} px-2 min-w-[110px]`} style={{ position: 'sticky', left: 0, zIndex: 4, background: row.highlight ? '#fef9c3' : ri % 2 === 0 ? '#ffffff' : '#f1f5f9' }}>
+                      {EC('notaCompra')}
+                    </td>
+                  )}
+                  <td
+                    className={`${td} px-2 min-w-[130px]`}
+                    style={{ position: 'sticky', left: isDireta ? 0 : 110, zIndex: 4, background: row.highlight ? '#fef9c3' : ri % 2 === 0 ? '#ffffff' : '#f1f5f9' }}>
+                    {EC('chassi')}
+                  </td>
                   <td className={`${td} px-2 min-w-[150px]`}>{EC('modelo')}</td>
                   <td className={`${td} px-2 min-w-[90px]`}>{EC('cor')}</td>
                   {!isDireta && <td className={`${td} px-2 min-w-[110px]`}>{EC('nfVenda')}</td>}
@@ -670,6 +696,11 @@ export default function VendasResultadoDashboard() {
             </tfoot>
           )}
         </table>
+        </div>
+        <div ref={scrollbarRef} onScroll={() => { if (tableRef.current && scrollbarRef.current) tableRef.current.scrollLeft = scrollbarRef.current.scrollLeft; }}
+          className="overflow-x-auto overflow-y-hidden shrink-0 border-t border-slate-100 bg-white" style={{ height: 14 }}>
+          <div ref={scrollDummyRef} style={{ height: 1 }} />
+        </div>
       </div>
 
       {/* Modal de anotação */}

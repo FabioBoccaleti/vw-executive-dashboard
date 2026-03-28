@@ -243,6 +243,16 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
   const [showSearch, setShowSearch]       = useState(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const scrollbarRef      = useRef<HTMLDivElement>(null);
+  const scrollDummyRef    = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (scrollDummyRef.current && tableContainerRef.current)
+        scrollDummyRef.current.style.width = tableContainerRef.current.scrollWidth + 'px';
+    }, 50);
+    return () => clearTimeout(t);
+  });
 
   useEffect(() => {
     loadTabelaDadosRows().then(r => { setRows(r); setLoading(false); });
@@ -590,7 +600,8 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
       </div>
 
       {/* Table */}
-      <div ref={tableContainerRef} className="flex-1 overflow-auto" style={{ minHeight: 0 }}>
+      <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
+        <div ref={tableContainerRef} onScroll={() => { if (scrollbarRef.current && tableContainerRef.current) scrollbarRef.current.scrollLeft = tableContainerRef.current.scrollLeft; }} className="flex-1 overflow-auto" style={{ minHeight: 0 }}>
         <table className="w-full border-collapse text-xs" style={{ minWidth: activeColumns.reduce((s, c) => s + c.width, 0) + 80 }}>
           <thead className="sticky top-0 z-20">
             {/* Filter row */}
@@ -747,6 +758,11 @@ export function TabelaDadosDashboard({ onBack, embedded = false }: TabelaDadosDa
             </tfoot>
           )}
         </table>
+        </div>
+        <div ref={scrollbarRef} onScroll={() => { if (tableContainerRef.current && scrollbarRef.current) tableContainerRef.current.scrollLeft = scrollbarRef.current.scrollLeft; }}
+          className="overflow-x-auto overflow-y-hidden shrink-0 border-t border-slate-100 bg-white" style={{ height: 14 }}>
+          <div ref={scrollDummyRef} style={{ height: 1 }} />
+        </div>
       </div>
     </div>
   );
