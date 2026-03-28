@@ -33,7 +33,10 @@ function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false) {
   const lucroComBon        = (isDireta ? recLiq : lucroBruto) + bonuses;
   const lucroComBonPct     = recLiq !== 0 ? (lucroComBon / recLiq) * 100 : 0;
   const resultado          = (isUsados ? lucroBruto : lucroComBon) + n(r.recBlindagem) + n(r.recFinanciamento) + n(r.recDespachante)
-                           - (isDireta ? 0 : n(r.jurosEstoque)) - n(r.comissaoVenda) - n(r.dsr)
+                           - (isDireta ? 0 : n(r.jurosEstoque))
+                           - (!isUsados ? n(r.ciDesconto) + n(r.cortesiaEmplacamento) : 0)
+                           - (isUsados ? n(r.cortesiaTransferencia) : 0)
+                           - n(r.comissaoVenda) - n(r.dsr)
                            - n(r.provisoes) - n(r.encargos) - n(r.outrasDespesas);
   const resultadoPct       = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
   return { comissaoBruta, recLiq, comissaoLiquidaPct, lucroBruto, lucroBrutoPct, lucroComBon, lucroComBonPct, resultado, resultadoPct };
@@ -46,7 +49,7 @@ const MONTH_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
 
 const SUB_TABS: { id: VendasResultadoSubTab; label: string }[] = [
   { id: 'novos',  label: 'Vendas Veículos Novos' },
-  { id: 'direta', label: 'Vendas Venda Direta' },
+  { id: 'direta', label: 'Vendas Venda Direta / Frotista' },
   { id: 'usados', label: 'Vendas Veículos Usados' },
 ];
 
@@ -163,23 +166,23 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
     'Bônus PIV','Bônus SIQ','Bônus PIVE','Bônus Adic 1','Bônus Adic 2','Bônus Adic 3',
     'Lucro c/ Bon.','% Lucro c/ Bon.',
     'Rec. Blindagem','Rec. Financiamento','Rec. Despachante',
-    'Comissão Venda','DSR','Provisões','Encargos','Outras Despesas',
+    'CI de Desconto','Cortesia Emplacamento/IPVA','Comissão Venda','DSR','Provisões','Encargos','Outras Despesas',
     'Resultado da Venda','% Resultado da Venda',
   ] : isUsados ? [
-    'Chassi','Modelo','Cor','Data da Venda','Dias Estoque','Dias Carência',
+    'Nota de Compra','Chassi','Modelo','Cor','NF de Venda','Data da Venda','Dias Estoque',
     'Vendedor','Transação','Valor de Venda','Impostos','Receita Líquida',
     'Valor de Custo','Trade IN','Lucro Bruto','Lucro Bruto %',
     'Rec. Blindagem','Rec. Financiamento','Rec. Despachante',
-    'Juros s/ Estoque','Comissão Venda','DSR','Provisões','Encargos','Outras Despesas',
+    'Juros s/ Estoque','Cortesia Transferência','Comissão Venda','DSR','Provisões','Encargos','Outras Despesas',
     'Resultado da Venda','% Resultado da Venda',
   ] : [
-    'Chassi','Modelo','Cor','Data da Venda','Dias Estoque','Dias Carência',
+    'Nota de Compra','Chassi','Modelo','Cor','NF de Venda','Data da Venda','Dias Estoque','Dias Carência',
     'Vendedor','Transação','Valor de Venda','Impostos','Receita Líquida',
     'Valor de Custo','Bônus Varejo','Lucro Bruto','Lucro Bruto %',
     'Bônus PIV','Bônus SIQ','Bônus PIVE','Bônus Adic 1','Bônus Adic 2','Bônus Adic 3',
     'Lucro c/ Bon.','% Lucro c/ Bon.',
     'Rec. Blindagem','Rec. Financiamento','Rec. Despachante',
-    'Juros s/ Estoque','Comissão Venda','DSR','Provisões','Encargos','Outras Despesas',
+    'Juros s/ Estoque','CI de Desconto','Cortesia Emplacamento/IPVA','Comissão Venda','DSR','Provisões','Encargos','Outras Despesas',
     'Resultado da Venda','% Resultado da Venda',
   ];
 
@@ -218,21 +221,21 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
       n(row.bonusAdic1), n(row.bonusAdic2), n(row.bonusAdic3),
       c.lucroComBon, c.lucroComBonPct,
       n(row.recBlindagem), n(row.recFinanciamento), n(row.recDespachante),
-      n(row.comissaoVenda), n(row.dsr),
+      n(row.ciDesconto), n(row.cortesiaEmplacamento), n(row.comissaoVenda), n(row.dsr),
       n(row.provisoes), n(row.encargos), n(row.outrasDespesas),
       c.resultado, c.resultadoPct,
     ] : isUsados ? [
-      row.chassi, row.modelo, row.cor, row.dataVenda,
+      row.notaCompra, row.chassi, row.modelo, row.cor, row.nfVenda, row.dataVenda,
       n(row.diasEstoque),
       row.vendedor, row.transacao,
       n(row.valorVenda), n(row.impostos), c.recLiq,
       n(row.valorCusto), n(row.bonusVarejo), c.lucroBruto, c.lucroBrutoPct,
       n(row.recBlindagem), n(row.recFinanciamento), n(row.recDespachante),
-      n(row.jurosEstoque), n(row.comissaoVenda), n(row.dsr),
+      n(row.jurosEstoque), n(row.cortesiaTransferencia), n(row.comissaoVenda), n(row.dsr),
       n(row.provisoes), n(row.encargos), n(row.outrasDespesas),
       c.resultado, c.resultadoPct,
     ] : [
-      row.chassi, row.modelo, row.cor, row.dataVenda,
+      row.notaCompra, row.chassi, row.modelo, row.cor, row.nfVenda, row.dataVenda,
       n(row.diasEstoque), n(row.diasCarencia),
       row.vendedor, row.transacao,
       n(row.valorVenda), n(row.impostos), c.recLiq,
@@ -241,7 +244,7 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
       n(row.bonusAdic1), n(row.bonusAdic2), n(row.bonusAdic3),
       c.lucroComBon, c.lucroComBonPct,
       n(row.recBlindagem), n(row.recFinanciamento), n(row.recDespachante),
-      n(row.jurosEstoque), n(row.comissaoVenda), n(row.dsr),
+      n(row.jurosEstoque), n(row.ciDesconto), n(row.cortesiaEmplacamento), n(row.comissaoVenda), n(row.dsr),
       n(row.provisoes), n(row.encargos), n(row.outrasDespesas),
       c.resultado, c.resultadoPct,
     ];
@@ -249,11 +252,11 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
     dr.height = 17;
     // índices 1-based das colunas de moeda/percentual
     const currencyCols = isDireta
-      ? [7,9,10,11,13,14,15,16,17,18,19,21,22,23,24,25,26,27,28,29]
+      ? [7,9,10,11,13,14,15,16,17,18,19,21,22,23,24,25,26,27,28,29,30,31]
       : isUsados
-        ? [9,10,11,12,13,14,16,17,18,19,20,21,22,23,24,25]
-        : [9,10,11,12,13,14,16,17,18,19,20,21,22,24,25,26,27,28,29,30,31,32,33];
-    const pctCols = isDireta ? [8,12,20,30] : isUsados ? [15,26] : [15,23,34];
+        ? [10,11,12,13,14,15,17,18,19,20,21,22,23,24,25,26,27]
+        : [11,12,13,14,15,16,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,34,35,36,37];
+    const pctCols = isDireta ? [8,12,20,32] : isUsados ? [16,28] : [17,25,38];
     dr.eachCell({ includeEmpty: true }, (cell, ci) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
       cell.border = { top: BTHIN, bottom: BTHIN, left: BTHIN, right: BTHIN };
@@ -395,7 +398,10 @@ export default function VendasResultadoDashboard() {
     const lcb        = (isDireta ? recLiq : lb) + bonuses;
     const lcbPct     = recLiq !== 0 ? (lcb / recLiq) * 100 : 0;
     const resultado  = (isUsados ? lb : lcb) + sum('recBlindagem') + sum('recFinanciamento') + sum('recDespachante')
-                     - (isDireta ? 0 : sum('jurosEstoque')) - sum('comissaoVenda') - sum('dsr')
+                     - (isDireta ? 0 : sum('jurosEstoque'))
+                     - (!isUsados ? sum('ciDesconto') + sum('cortesiaEmplacamento') : 0)
+                     - (isUsados ? sum('cortesiaTransferencia') : 0)
+                     - sum('comissaoVenda') - sum('dsr')
                      - sum('provisoes') - sum('encargos') - sum('outrasDespesas');
     const resPct     = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
     return { valorVenda, impostos, comissaoBruta, pctComissaoMedia, recLiq, comissaoLiquidaPct, custo, bVarejo, lb, lbPct, lcb, lcbPct, resultado, resPct };
@@ -479,12 +485,12 @@ export default function VendasResultadoDashboard() {
           <thead className="sticky top-0 z-10">
             {/* Grupo de cabeçalho */}
             <tr>
-              <th colSpan={isDireta ? 6 : isUsados ? 7 : 8} className="bg-slate-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-600">IDENTIFICAÇÃO</th>
+              <th colSpan={isDireta ? 6 : isUsados ? 9 : 10} className="bg-slate-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-600">IDENTIFICAÇÃO</th>
               <th colSpan={isDireta ? 6 : 3} className="bg-emerald-800 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-emerald-700">FINANCEIRO BASE</th>
               {!isDireta && <th colSpan={4} className="bg-teal-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-teal-600">LUCRO BRUTO</th>}
               {!isDireta && !isUsados && <th colSpan={8} className="bg-cyan-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-cyan-600">BONIFICAÇÕES</th>}
               <th colSpan={3} className="bg-blue-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-blue-600">RECEITAS EXTRAS</th>
-              <th colSpan={isDireta ? 5 : 6} className="bg-orange-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-orange-600">DESPESAS</th>
+              <th colSpan={isDireta ? 7 : isUsados ? 7 : 8} className="bg-orange-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-orange-600">DESPESAS</th>
               <th colSpan={2} className="bg-slate-800 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-700">RESULTADO</th>
               <th className="bg-slate-600 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide">AÇÕES</th>
             </tr>
@@ -494,8 +500,8 @@ export default function VendasResultadoDashboard() {
               {(isDireta
                 ? ['Chassi','Modelo','Cor','Data Venda','Vendedor','Transação']
                 : isUsados
-                  ? ['Chassi','Modelo','Cor','Data Venda','Dias Est.','Vendedor','Transação']
-                  : ['Chassi','Modelo','Cor','Data Venda','Dias Est.','Dias Car.','Vendedor','Transação']
+                  ? ['Nota Compra','Chassi','Modelo','Cor','NF Venda','Data Venda','Dias Est.','Vendedor','Transação']
+                  : ['Nota Compra','Chassi','Modelo','Cor','NF Venda','Data Venda','Dias Est.','Dias Car.','Vendedor','Transação']
               ).map((h,i) => (
                 <th key={i} className="bg-slate-700 px-3 py-2 text-left whitespace-nowrap border-b border-slate-600 border-r border-slate-600">{h}</th>
               ))}
@@ -520,8 +526,10 @@ export default function VendasResultadoDashboard() {
               ))}
               {/* Despesas */}
               {(isDireta
-                ? ['Comissão','DSR','Provisões','Encargos','Outras Desp.']
-                : ['Juros Est.','Comissão','DSR','Provisões','Encargos','Outras Desp.']
+                ? ['CI Desconto','Cort. Emplacamento','Comissão','DSR','Provisões','Encargos','Outras Desp.']
+                : isUsados
+                  ? ['Juros Est.','Cort. Transferência','Comissão','DSR','Provisões','Encargos','Outras Desp.']
+                  : ['Juros Est.','CI Desconto','Cort. Emplacamento','Comissão','DSR','Provisões','Encargos','Outras Desp.']
               ).map((h,i) => (
                 <th key={i} className="bg-orange-700 px-3 py-2 text-right whitespace-nowrap border-b border-orange-600 border-r border-orange-600">{h}</th>
               ))}
@@ -535,7 +543,7 @@ export default function VendasResultadoDashboard() {
           <tbody>
             {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={isDireta ? 31 : isUsados ? 26 : 35} className="text-center py-16 text-slate-300 text-sm">
+                <td colSpan={isDireta ? 25 : isUsados ? 29 : 39} className="text-center py-16 text-slate-300 text-sm">
                   Nenhum registro — clique em "Nova linha" para adicionar
                 </td>
               </tr>
@@ -554,9 +562,11 @@ export default function VendasResultadoDashboard() {
               return (
                 <tr key={row.id} className={`group transition-colors hover:bg-emerald-50/30`}>
                   {/* Identificação */}
+                  {!isDireta && <td className={`${td} px-2 min-w-[110px]`}>{EC('notaCompra')}</td>}
                   <td className={`${td} px-2 min-w-[130px]`}>{EC('chassi')}</td>
                   <td className={`${td} px-2 min-w-[150px]`}>{EC('modelo')}</td>
                   <td className={`${td} px-2 min-w-[90px]`}>{EC('cor')}</td>
+                  {!isDireta && <td className={`${td} px-2 min-w-[110px]`}>{EC('nfVenda')}</td>}
                   <td className={`${td} px-2 min-w-[100px]`}>{EC('dataVenda', 'date')}</td>
                   {!isDireta && <td className={`${tdR} px-2 min-w-[80px]`}>{EC('diasEstoque', 'number')}</td>}
                   {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[80px]`}>{EC('diasCarencia', 'number')}</td>}
@@ -589,6 +599,9 @@ export default function VendasResultadoDashboard() {
                   <td className={`${tdR} px-2 min-w-[110px]`}>{EC('recDespachante', 'currency')}</td>
                   {/* Despesas */}
                   {!isDireta && <td className={`${tdR} px-2 min-w-[100px]`}>{EC('jurosEstoque', 'currency')}</td>}
+                  {!isUsados && <td className={`${tdR} px-2 min-w-[110px]`}>{EC('ciDesconto', 'currency')}</td>}
+                  {!isUsados && <td className={`${tdR} px-2 min-w-[130px]`}>{EC('cortesiaEmplacamento', 'currency')}</td>}
+                  {isUsados && <td className={`${tdR} px-2 min-w-[130px]`}>{EC('cortesiaTransferencia', 'currency')}</td>}
                   <td className={`${tdR} px-2 min-w-[110px]`}>{EC('comissaoVenda', 'currency')}</td>
                   <td className={`${tdR} px-2 min-w-[80px]`}>{EC('dsr', 'currency')}</td>
                   <td className={`${tdR} px-2 min-w-[90px]`}>{EC('provisoes', 'currency')}</td>
@@ -622,7 +635,7 @@ export default function VendasResultadoDashboard() {
           {filteredRows.length > 0 && (
             <tfoot>
               <tr className="bg-slate-800 text-white text-xs font-bold">
-                <td colSpan={isDireta ? 6 : isUsados ? 7 : 8} className="px-3 py-2 text-left">TOTAIS ({filteredRows.length} registros)</td>
+                <td colSpan={isDireta ? 6 : isUsados ? 9 : 10} className="px-3 py-2 text-left">TOTAIS ({filteredRows.length} registros)</td>
                 <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.valorVenda)}</td>
                 {isDireta ? (
                   <>
@@ -649,7 +662,7 @@ export default function VendasResultadoDashboard() {
                     <td className={`px-2 py-2 text-right font-mono ${totals.lcbPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{fmtPct(totals.lcbPct)}</td>
                   </>
                 )}
-                <td colSpan={isDireta ? 8 : 9} className="px-2 py-2 text-center text-slate-400 text-[10px]">—</td>
+                <td colSpan={isDireta ? 10 : isUsados ? 10 : 11} className="px-2 py-2 text-center text-slate-400 text-[10px]">—</td>
                 <td className={`px-2 py-2 text-right font-mono ${totals.resultado >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.resultado)}</td>
                 <td className={`px-2 py-2 text-right font-mono ${totals.resPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{fmtPct(totals.resPct)}</td>
                 <td className="px-2 py-2" />

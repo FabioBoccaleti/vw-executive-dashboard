@@ -11,9 +11,11 @@ const KEY: Record<VendasResultadoSubTab, string> = {
 export interface VendasResultadoRow {
   id: string;
   // Identificação
+  notaCompra:       string;
   chassi:           string;
   modelo:           string;
   cor:              string;
+  nfVenda:          string;
   dataVenda:        string;
   diasEstoque:      string;
   diasCarencia:     string;
@@ -43,8 +45,11 @@ export interface VendasResultadoRow {
   recFinanciamento: string;
   recDespachante:   string;
   // Despesas
-  jurosEstoque:     string;
-  comissaoVenda:    string;
+  jurosEstoque:          string;
+  ciDesconto:            string;
+  cortesiaEmplacamento:  string;
+  cortesiaTransferencia: string;
+  comissaoVenda:         string;
   dsr:              string;
   provisoes:        string;
   encargos:         string;
@@ -70,11 +75,12 @@ export async function saveVendasResultadoRows(tab: VendasResultadoSubTab, rows: 
 
 export function emptyVendasResultadoRow(): Omit<VendasResultadoRow, 'id'> {
   return {
-    chassi: '', modelo: '', cor: '', dataVenda: '', diasEstoque: '', diasCarencia: '',
+    notaCompra: '', chassi: '', modelo: '', cor: '', nfVenda: '', dataVenda: '', diasEstoque: '', diasCarencia: '',
     vendedor: '', transacao: '', valorVenda: '', pctComissao: '', impostos: '', valorCusto: '',
     bonusVarejo: '', bonusPIV: '', bonusSIQ: '', bonusPIVE: '',
     bonusAdic1: '', bonusAdic2: '', bonusAdic3: '',
     recBlindagem: '', recFinanciamento: '', recDespachante: '',
-    jurosEstoque: '', comissaoVenda: '', dsr: '', provisoes: '', encargos: '', outrasDespesas: '',
+    jurosEstoque: '', ciDesconto: '', cortesiaEmplacamento: '', cortesiaTransferencia: '',
+    comissaoVenda: '', dsr: '', provisoes: '', encargos: '', outrasDespesas: '',
   };
 }
