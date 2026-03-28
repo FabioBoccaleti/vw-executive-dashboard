@@ -1,4 +1,5 @@
 import { kvGet, kvSet } from '@/lib/kvClient';
+import { syncVendasFromRegistro } from './vendasResultadoStorage';
 
 const KEY_NOVOS    = 'registro_vendas_novos';
 const KEY_FROTISTA = 'registro_vendas_frotista';
@@ -48,6 +49,8 @@ export async function loadRegistroRows(tab: RegistroSubTab): Promise<RegistroVen
 export async function saveRegistroRows(tab: RegistroSubTab, rows: RegistroVendasRow[]): Promise<boolean> {
   try {
     await kvSet(keyFor(tab), rows);
+    // Sincroniza automaticamente com a aba de Vendas correspondente
+    syncVendasFromRegistro(tab, rows).catch(() => { /* não bloqueia o save */ });
     return true;
   } catch {
     return false;
