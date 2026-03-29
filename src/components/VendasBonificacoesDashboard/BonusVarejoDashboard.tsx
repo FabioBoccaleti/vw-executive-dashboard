@@ -12,6 +12,7 @@ import {
   replaceBonusVarejoRows,
   createEmptyBonusVarejoRow,
 } from './bonusVarejoStorage';
+import { syncBonusVarejoToNovos } from './vendasResultadoStorage';
 
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -200,6 +201,7 @@ export function BonusVarejoDashboard() {
   async function persistRows(updated: BonusVarejoRow[]) {
     setRows(updated);
     await saveBonusVarejoRows(updated);
+    await syncBonusVarejoToNovos(updated);
   }
 
   async function handleDeleteAll() {
@@ -275,6 +277,7 @@ export function BonusVarejoDashboard() {
     const updated = await loadBonusVarejoRows();
     setRows(updated);
     setEditingId(null);
+    await syncBonusVarejoToNovos(updated);
     toast.success(`${total} registro(s) importado(s) (dados anteriores substituidos).`);
     if (xlsxInputRef.current) xlsxInputRef.current.value = '';
   }

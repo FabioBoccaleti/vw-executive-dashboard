@@ -26,7 +26,7 @@ function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false) {
   const comissaoBruta      = isDireta ? n(r.valorVenda) * n(r.pctComissao) / 100 : 0;
   const recLiq             = isDireta ? comissaoBruta - n(r.impostos) : n(r.valorVenda) - n(r.impostos);
   const comissaoLiquidaPct = n(r.valorVenda) !== 0 ? (recLiq / n(r.valorVenda)) * 100 : 0;
-  const lucroBruto         = recLiq - n(r.valorCusto) + n(r.bonusVarejo);
+  const lucroBruto         = recLiq - n(r.valorCusto) + n(r.bonusVarejo) + (!isDireta && !isUsados ? n(r.bonusTradeIn ?? '') : 0);
   const lucroBrutoPct      = recLiq !== 0 ? (lucroBruto / recLiq) * 100 : 0;
   const bonuses            = n(r.bonusPIV) + n(r.bonusSIQ) + n(r.bonusPIVE)
                            + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3);
@@ -78,6 +78,7 @@ const COLS: ColDef[] = [
   // calculada: Receita Líquida
   { key: 'valorCusto',       label: 'Valor de Custo',          type: 'currency', w: 'min-w-[120px]' },
   { key: 'bonusVarejo',      label: 'Bônus Varejo',            type: 'currency', w: 'min-w-[110px]' },
+  { key: 'bonusTradeIn',     label: 'Bônus Trade IN',          type: 'currency', w: 'min-w-[110px]' },
   // calculadas: Lucro Bruto, Lucro Bruto %
   { key: 'bonusPIV',         label: 'Bônus PIV',               type: 'currency', w: 'min-w-[100px]' },
   { key: 'bonusSIQ',         label: 'Bônus SIQ',               type: 'currency', w: 'min-w-[100px]' },
@@ -178,7 +179,7 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
   ] : [
     'Nota de Compra','Chassi','Modelo','Cor','NF de Venda','Data da Venda','Dias Estoque','Dias Carência',
     'Vendedor','Transação','Valor de Venda','Impostos','Receita Líquida',
-    'Valor de Custo','Bônus Varejo','Lucro Bruto','Lucro Bruto %',
+    'Valor de Custo','Bônus Varejo','Bônus Trade IN','Lucro Bruto','Lucro Bruto %',
     'Bônus PIV','Bônus SIQ','Bônus PIVE','Bônus Adic 1','Bônus Adic 2','Bônus Adic 3',
     'Lucro c/ Bon.','% Lucro c/ Bon.',
     'Rec. Blindagem','Rec. Financiamento','Rec. Despachante',
@@ -239,7 +240,7 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
       n(row.diasEstoque), n(row.diasCarencia),
       row.vendedor, row.transacao,
       n(row.valorVenda), n(row.impostos), c.recLiq,
-      n(row.valorCusto), n(row.bonusVarejo), c.lucroBruto, c.lucroBrutoPct,
+      n(row.valorCusto), n(row.bonusVarejo), n(row.bonusTradeIn ?? ''), c.lucroBruto, c.lucroBrutoPct,
       n(row.bonusPIV), n(row.bonusSIQ), n(row.bonusPIVE),
       n(row.bonusAdic1), n(row.bonusAdic2), n(row.bonusAdic3),
       c.lucroComBon, c.lucroComBonPct,
@@ -255,8 +256,8 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
       ? [7,9,10,11,13,14,15,16,17,18,19,21,22,23,24,25,26,27,28,29,30,31]
       : isUsados
         ? [10,11,12,13,14,15,17,18,19,20,21,22,23,24,25,26,27]
-        : [11,12,13,14,15,16,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,34,35,36,37];
-    const pctCols = isDireta ? [8,12,20,32] : isUsados ? [16,28] : [17,25,38];
+        : [11,12,13,14,15,16,17,19,20,21,22,23,24,25,27,28,29,30,31,32,33,34,35,36,37,38];
+    const pctCols = isDireta ? [8,12,20,32] : isUsados ? [16,28] : [18,26,39];
     dr.eachCell({ includeEmpty: true }, (cell, ci) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
       cell.border = { top: BTHIN, bottom: BTHIN, left: BTHIN, right: BTHIN };
@@ -391,7 +392,8 @@ export default function VendasResultadoDashboard() {
     const comissaoLiquidaPct = valorVenda !== 0 ? (recLiq / valorVenda) * 100 : 0;
     const custo      = sum('valorCusto');
     const bVarejo    = sum('bonusVarejo');
-    const lb         = recLiq - custo + bVarejo;
+    const bTradeIn   = sum('bonusTradeIn');
+    const lb         = recLiq - custo + bVarejo + (!isDireta && !isUsados ? bTradeIn : 0);
     const lbPct      = recLiq !== 0 ? (lb / recLiq) * 100 : 0;
     const bonuses    = sum('bonusPIV') + sum('bonusSIQ') + sum('bonusPIVE')
                      + sum('bonusAdic1') + sum('bonusAdic2') + sum('bonusAdic3');
@@ -404,7 +406,7 @@ export default function VendasResultadoDashboard() {
                      - sum('comissaoVenda') - sum('dsr')
                      - sum('provisoes') - sum('encargos') - sum('outrasDespesas');
     const resPct     = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
-    return { valorVenda, impostos, comissaoBruta, pctComissaoMedia, recLiq, comissaoLiquidaPct, custo, bVarejo, lb, lbPct, lcb, lcbPct, resultado, resPct };
+    return { valorVenda, impostos, comissaoBruta, pctComissaoMedia, recLiq, comissaoLiquidaPct, custo, bVarejo, bTradeIn, lb, lbPct, lcb, lcbPct, resultado, resPct };
   }, [filteredRows, activeTab]);
 
   const isDireta = activeTab === 'direta';
@@ -501,7 +503,7 @@ export default function VendasResultadoDashboard() {
             <tr>
               <th colSpan={isDireta ? 6 : isUsados ? 9 : 10} className="bg-slate-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-600">IDENTIFICAÇÃO</th>
               <th colSpan={isDireta ? 6 : 3} className="bg-emerald-800 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-emerald-700">FINANCEIRO BASE</th>
-              {!isDireta && <th colSpan={4} className="bg-teal-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-teal-600">LUCRO BRUTO</th>}
+              {!isDireta && <th colSpan={isUsados ? 4 : 5} className="bg-teal-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-teal-600">LUCRO BRUTO</th>}
               {!isDireta && !isUsados && <th colSpan={8} className="bg-cyan-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-cyan-600">BONIFICAÇÕES</th>}
               <th colSpan={3} className="bg-blue-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-blue-600">RECEITAS EXTRAS</th>
               <th colSpan={isDireta ? 7 : isUsados ? 7 : 8} className="bg-orange-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-orange-600">DESPESAS</th>
@@ -531,7 +533,10 @@ export default function VendasResultadoDashboard() {
                 <th key={i} className="bg-emerald-800 px-3 py-2 text-right whitespace-nowrap border-b border-emerald-700 border-r border-emerald-700">{h}</th>
               ))}
               {/* Lucro bruto */}
-              {!isDireta && ['Valor Custo', isUsados ? 'Trade IN' : 'Bônus Varejo', 'Lucro Bruto', 'LB %'].map((h,i) => (
+              {!isDireta && (isUsados
+                ? ['Valor Custo', 'Trade IN', 'Lucro Bruto', 'LB %']
+                : ['Valor Custo', 'Bônus Varejo', 'Bônus Trade IN', 'Lucro Bruto', 'LB %']
+              ).map((h,i) => (
                 <th key={i} className="bg-teal-700 px-3 py-2 text-right whitespace-nowrap border-b border-teal-600 border-r border-teal-600">{h}</th>
               ))}
               {/* Bonificações */}
@@ -561,7 +566,7 @@ export default function VendasResultadoDashboard() {
           <tbody>
             {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={isDireta ? 25 : isUsados ? 29 : 39} className="text-center py-16 text-slate-300 text-sm">
+                <td colSpan={isDireta ? 25 : isUsados ? 29 : 40} className="text-center py-16 text-slate-300 text-sm">
                   Nenhum registro — clique em "Nova linha" para adicionar
                 </td>
               </tr>
@@ -608,6 +613,7 @@ export default function VendasResultadoDashboard() {
                   {/* Lucro bruto */}
                   {!isDireta && <td className={`${tdR} px-2 min-w-[110px]`}>{EC('valorCusto', 'currency')}</td>}
                   {!isDireta && <td className={`${tdR} px-2 min-w-[100px]`}>{EC('bonusVarejo', 'currency')}</td>}
+                  {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[110px]`}>{EC('bonusTradeIn', 'currency')}</td>}
                   {!isDireta && <td className={`${tdR} px-2 min-w-[110px]`}><CalcCell value={c.lucroBruto} negative /></td>}
                   {!isDireta && <td className={`${tdR} px-2 min-w-[80px]`}><CalcCell value={c.lucroBrutoPct} pct negative /></td>}
                   {/* Bonificações */}
@@ -677,6 +683,7 @@ export default function VendasResultadoDashboard() {
                     <td className="px-2 py-2 text-right font-mono text-emerald-300">R$ {fmt(totals.recLiq)}</td>
                     <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.custo)}</td>
                     <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.bVarejo)}</td>
+                    {!isUsados && <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.bTradeIn)}</td>}
                     <td className={`px-2 py-2 text-right font-mono ${totals.lb >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.lb)}</td>
                     <td className={`px-2 py-2 text-right font-mono ${totals.lbPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{fmtPct(totals.lbPct)}</td>
                   </>

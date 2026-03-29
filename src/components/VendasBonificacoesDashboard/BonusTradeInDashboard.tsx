@@ -12,6 +12,7 @@ import {
   replaceBonusTradeInRows,
   createEmptyBonusTradeInRow,
 } from './bonusTradeInStorage';
+import { syncBonusTradeInToNovos } from './vendasResultadoStorage';
 
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -210,6 +211,7 @@ export function BonusTradeInDashboard() {
   async function persistRows(updated: BonusTradeInRow[]) {
     setRows(updated);
     await saveBonusTradeInRows(updated);
+    await syncBonusTradeInToNovos(updated);
   }
 
   async function handleDeleteAll() {
@@ -264,8 +266,10 @@ export function BonusTradeInDashboard() {
     const parsed = parseExcelFile(buffer);
     if (parsed.length === 0) { toast.warning('Nenhum registro encontrado.'); if (xlsxInputRef.current) xlsxInputRef.current.value = ''; return; }
     const { total } = await replaceBonusTradeInRows(parsed);
-    setRows(await loadBonusTradeInRows());
+    const updated = await loadBonusTradeInRows();
+    setRows(updated);
     setEditingId(null);
+    await syncBonusTradeInToNovos(updated);
     toast.success(`${total} registro(s) importado(s).`);
     if (xlsxInputRef.current) xlsxInputRef.current.value = '';
   }
