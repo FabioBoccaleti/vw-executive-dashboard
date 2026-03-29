@@ -34,3 +34,6 @@ pids
 .spark-workbench-id
 .vercel
 .env*.local
+
+scripts/redis-snapshot.json
+scripts/import-to-localstorage.js
