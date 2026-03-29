@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag, TrendingUp } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag, TrendingUp, BarChart2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -9,6 +9,7 @@ import { RegistroVendasDashboard } from './RegistroVendasDashboard';
 import { BonusVarejoDashboard } from './BonusVarejoDashboard';
 import { BonusTradeInDashboard } from './BonusTradeInDashboard';
 import VendasResultadoDashboard from './VendasResultadoDashboard';
+import { CadastrosVWPage } from './CadastrosVWPage';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
 import type { TabelaDadosRow } from './tabelaDadosStorage';
 
@@ -435,7 +436,7 @@ function pdfResultsToTableRows(pages: PageResult[]): Omit<TabelaDadosRow, 'id'>[
 
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mainView, setMainView] = useState<'registros' | 'financeiro' | 'vendas'>('registros');
+  const [mainView, setMainView] = useState<'cadastros' | 'registros' | 'financeiro' | 'vendas' | 'analises'>('registros');
   const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein'>('importar');
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
   const [registroFilterYear, setRegistroFilterYear] = useState<number>(new Date().getFullYear());
@@ -538,6 +539,15 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           {/* Seletor de visão principal */}
           <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
             <button
+              onClick={() => setMainView('cadastros')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainView === 'cadastros' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              Cadastros
+            </button>
+            <button
               onClick={() => setMainView('registros')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
                 mainView === 'registros' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
@@ -563,6 +573,15 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
             >
               <TrendingUp className="w-3.5 h-3.5" />
               Vendas
+            </button>
+            <button
+              onClick={() => setMainView('analises')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainView === 'analises' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+              Análises
             </button>
           </div>
           <button
@@ -635,11 +654,24 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
       </div>
       )}
 
+      {/* Visão Cadastros */}
+      {mainView === 'cadastros' && <CadastrosVWPage />}
+
       {/* Visão Financeiro — placeholder */}
       {mainView === 'financeiro' && (
         <div className="flex-1 flex items-center justify-center text-slate-300">
           <div className="flex flex-col items-center gap-3">
             <Banknote className="w-12 h-12" />
+            <span className="text-sm">Em desenvolvimento</span>
+          </div>
+        </div>
+      )}
+
+      {/* Visão Análises — placeholder */}
+      {mainView === 'analises' && (
+        <div className="flex-1 flex items-center justify-center text-slate-300">
+          <div className="flex flex-col items-center gap-3">
+            <BarChart2 className="w-12 h-12" />
             <span className="text-sm">Em desenvolvimento</span>
           </div>
         </div>
