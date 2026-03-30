@@ -9,7 +9,7 @@ import {
   type BonusTradeInRow,
   loadBonusTradeInRows,
   saveBonusTradeInRows,
-  replaceBonusTradeInRows,
+  mergeBonusTradeInByPeriod,
   createEmptyBonusTradeInRow,
 } from './bonusTradeInStorage';
 import { syncBonusTradeInToNovos } from './vendasResultadoStorage';
@@ -120,12 +120,30 @@ async function exportToExcel(rows: BonusTradeInRow[], sheetName: string, filenam
   saveAs(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
 }
 
+function parseDateValue(raw: unknown): string {
+  if (raw instanceof Date) {
+    const dd = String(raw.getDate()).padStart(2, '0');
+    const mm = String(raw.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${raw.getFullYear()}`;
+  }
+  const s = String(raw ?? '');
+  if (/^\d{5}$/.test(s)) {
+    const d = new Date(Math.round((Number(s) - 25569) * 86400 * 1000));
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      return `${dd}/${mm}/${d.getUTCFullYear()}`;
+    }
+  }
+  return s;
+}
+
 function parseExcelFile(buffer: ArrayBuffer): Omit<BonusTradeInRow, 'id' | 'highlight' | 'annotation'>[] {
-  const wb = XLSX.read(buffer, { type: 'array' });
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const raw: Record<string, string>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  const raw: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
   return raw.map(r => ({
-    dataVenda:       String(r['Data da Venda']       ?? r['DATA_VENDA']        ?? ''),
+    dataVenda:       parseDateValue(r['Data da Venda']       ?? r['DATA_VENDA']        ?? ''),
     cliente:         String(r['Cliente']             ?? r['CLIENTE']           ?? ''),
     chassi:          String(r['Chassi']              ?? r['CHASSI']            ?? ''),
     modelo:          String(r['Modelo']              ?? r['MODELO']            ?? ''),
@@ -133,7 +151,7 @@ function parseExcelFile(buffer: ArrayBuffer): Omit<BonusTradeInRow, 'id' | 'high
     nTitulo:         String(r['N Titulo']            ?? r['N_TITULO']          ?? r['NUM_TITULO'] ?? ''),
     valorTradeIn:    String(r['Valor do Trade IN']   ?? r['VALOR_TRADE_IN']    ?? ''),
     recebido:        String(r['Recebido']            ?? r['RECEBIDO']          ?? ''),
-    dataRecebimento: String(r['Data do Recebimento'] ?? r['DATA_RECEBIMENTO']  ?? ''),
+    dataRecebimento: parseDateValue(r['Data do Recebimento'] ?? r['DATA_RECEBIMENTO']  ?? ''),
   }));
 }
 
@@ -265,12 +283,17 @@ export function BonusTradeInDashboard() {
     const buffer = await file.arrayBuffer();
     const parsed = parseExcelFile(buffer);
     if (parsed.length === 0) { toast.warning('Nenhum registro encontrado.'); if (xlsxInputRef.current) xlsxInputRef.current.value = ''; return; }
-    const { total } = await replaceBonusTradeInRows(parsed);
+    const { total, period } = await mergeBonusTradeInByPeriod(parsed);
     const updated = await loadBonusTradeInRows();
     setRows(updated);
     setEditingId(null);
+    if (period) {
+      const [y, m] = period.split('-').map(Number);
+      setFilterYear(y); setFilterMonth(m);
+    }
     await syncBonusTradeInToNovos(updated);
-    toast.success(`${total} registro(s) importado(s).`);
+    const periodoLabel = period ? ` — ${MONTHS[parseInt(period.split('-')[1]) - 1]}/${period.split('-')[0]}` : '';
+    toast.success(`${total} registro(s) importado(s)${periodoLabel}.`);
     if (xlsxInputRef.current) xlsxInputRef.current.value = '';
   }
 

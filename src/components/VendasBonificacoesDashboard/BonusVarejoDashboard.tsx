@@ -9,7 +9,7 @@ import {
   type BonusVarejoRow,
   loadBonusVarejoRows,
   saveBonusVarejoRows,
-  replaceBonusVarejoRows,
+  mergeBonusVarejoByPeriod,
   createEmptyBonusVarejoRow,
 } from './bonusVarejoStorage';
 import { syncBonusVarejoToNovos } from './vendasResultadoStorage';
@@ -116,13 +116,32 @@ async function exportToExcel(rows: BonusVarejoRow[], sheetName: string, filename
   saveAs(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
 }
 
+function parseDateValue(raw: unknown): string {
+  if (raw instanceof Date) {
+    const dd = String(raw.getDate()).padStart(2, '0');
+    const mm = String(raw.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${raw.getFullYear()}`;
+  }
+  const s = String(raw ?? '');
+  // Excel serial number (número inteiro)
+  if (/^\d{5}$/.test(s)) {
+    const d = new Date(Math.round((Number(s) - 25569) * 86400 * 1000));
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      return `${dd}/${mm}/${d.getUTCFullYear()}`;
+    }
+  }
+  return s;
+}
+
 function parseExcelFile(buffer: ArrayBuffer): Omit<BonusVarejoRow, 'id' | 'highlight' | 'annotation'>[] {
-  const wb = XLSX.read(buffer, { type: 'array' });
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const raw: Record<string, string>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  const raw: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
   return raw.map(r => ({
     chassi:     String(r['Chassi']        ?? r['CHASSI']      ?? ''),
-    data:       String(r['Data da Venda'] ?? r['Data']        ?? r['DATA']  ?? ''),
+    data:       parseDateValue(r['Data da Venda'] ?? r['Data'] ?? r['DATA'] ?? ''),
     notaFiscal: String(r['Nota Fiscal']   ?? r['NOTA_FISCAL'] ?? r['NF']   ?? ''),
     valor:      String(r['Valor']         ?? r['VALOR']       ?? ''),
     vendedor:   String(r['Vendedor']      ?? r['VENDEDOR']    ?? ''),
@@ -273,12 +292,17 @@ export function BonusVarejoDashboard() {
       if (xlsxInputRef.current) xlsxInputRef.current.value = '';
       return;
     }
-    const { total } = await replaceBonusVarejoRows(parsed);
+    const { total, period } = await mergeBonusVarejoByPeriod(parsed);
     const updated = await loadBonusVarejoRows();
     setRows(updated);
     setEditingId(null);
+    if (period) {
+      const [y, m] = period.split('-').map(Number);
+      setFilterYear(y); setFilterMonth(m);
+    }
     await syncBonusVarejoToNovos(updated);
-    toast.success(`${total} registro(s) importado(s) (dados anteriores substituidos).`);
+    const periodoLabel = period ? ` — ${MONTHS[parseInt(period.split('-')[1]) - 1]}/${period.split('-')[0]}` : '';
+    toast.success(`${total} registro(s) importado(s)${periodoLabel}.`);
     if (xlsxInputRef.current) xlsxInputRef.current.value = '';
   }
 

@@ -71,3 +71,60 @@ export async function replaceBonusVarejoRows(
   await saveBonusVarejoRows(withIds);
   return { total: withIds.length };
 }
+
+function extractPeriod(dateStr: string): { year: number; month: number } | null {
+  if (!dateStr) return null;
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+    const [, mm, yyyy] = dateStr.split('/');
+    return { year: Number(yyyy), month: Number(mm) };
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+    const [yyyy, mm] = dateStr.split('-');
+    return { year: Number(yyyy), month: Number(mm) };
+  }
+  return null;
+}
+
+/**
+ * Mescla novos dados preservando linhas de outros períodos.
+ * Remove apenas as linhas do mesmo ano/mês dos dados importados.
+ */
+export async function mergeBonusVarejoByPeriod(
+  newRows: Omit<BonusVarejoRow, 'id' | 'highlight' | 'annotation'>[],
+): Promise<{ total: number; period: string | null }> {
+  if (newRows.length === 0) return { total: 0, period: null };
+
+  // Detecta período predominante
+  const counts = new Map<string, { year: number; month: number; count: number }>();
+  for (const r of newRows) {
+    const d = extractPeriod(r.data);
+    if (!d) continue;
+    const key = `${d.year}-${String(d.month).padStart(2, '0')}`;
+    const cur = counts.get(key);
+    counts.set(key, cur ? { ...cur, count: cur.count + 1 } : { year: d.year, month: d.month, count: 1 });
+  }
+  const dominant = Array.from(counts.values()).sort((a, b) => b.count - a.count)[0];
+
+  // Preserva linhas de outros períodos
+  const existing = await loadBonusVarejoRows();
+  const kept = dominant
+    ? existing.filter(r => {
+        const d = extractPeriod(r.data);
+        if (!d) return true;
+        return !(d.year === dominant.year && d.month === dominant.month);
+      })
+    : existing;
+
+  const toAdd: BonusVarejoRow[] = newRows.map(r => ({
+    ...r,
+    id: crypto.randomUUID(),
+    highlight: false,
+    annotation: '',
+  }));
+
+  await saveBonusVarejoRows([...kept, ...toAdd]);
+  return {
+    total: toAdd.length,
+    period: dominant ? `${dominant.year}-${String(dominant.month).padStart(2, '0')}` : null,
+  };
+}
