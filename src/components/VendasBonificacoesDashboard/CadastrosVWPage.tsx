@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Users, Car, CalendarCog } from 'lucide-react';
 import { VeiculosRegrasPage } from './VeiculosRegrasPage';
+import { VendedoresRemuneracaoPage } from './VendedoresRemuneracaoPage';
+import { VendasDsrSection } from './VendasDsrSection';
 
 type SectionId = 'vendedores' | 'veiculos' | 'dsr';
 
@@ -14,8 +16,8 @@ interface MenuItem {
 const MENU_ITEMS: MenuItem[] = [
   {
     id: 'vendedores',
-    label: 'Vendedores e Regra de Remuneração',
-    description: 'Equipe de vendas e percentuais de remuneração',
+    label: 'Vendedores e Regra de Remuneração de Venda de Veículos',
+    description: 'Percentuais de comissão e bônus de produtividade por modalidade de venda',
     icon: <Users className="w-5 h-5" />,
   },
   {
@@ -78,25 +80,11 @@ export function CadastrosVWPage() {
           </div>
 
           {/* Placeholders — conteúdo será implementado futuramente */}
-          {activeSection === 'vendedores' && (
-            <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-slate-200 text-slate-300">
-              <div className="flex flex-col items-center gap-3">
-                <Users className="w-10 h-10" />
-                <span className="text-sm">Em desenvolvimento</span>
-              </div>
-            </div>
-          )}
+          {activeSection === 'vendedores' && <VendedoresRemuneracaoPage />}
 
           {activeSection === 'veiculos' && <VeiculosRegrasPage />}
 
-          {activeSection === 'dsr' && (
-            <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-slate-200 text-slate-300">
-              <div className="flex flex-col items-center gap-3">
-                <CalendarCog className="w-10 h-10" />
-                <span className="text-sm">Em desenvolvimento</span>
-              </div>
-            </div>
-          )}
+          {activeSection === 'dsr' && <VendasDsrSection />}
         </div>
       </main>
     </div>
