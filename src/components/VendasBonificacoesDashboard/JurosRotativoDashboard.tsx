@@ -9,7 +9,7 @@ import {
   type JurosRotativoRow,
   loadJurosRotativoRows,
   saveJurosRotativoRows,
-  replaceJurosRotativoRows,
+  mergeJurosRotativoByPeriod,
   createEmptyJurosRotativoRow,
   parseTxtJurosRotativo,
 } from './jurosRotativoStorage';
@@ -299,14 +299,15 @@ export function JurosRotativoDashboard() {
       if (txtInputRef.current) txtInputRef.current.value = '';
       return;
     }
-    const { total } = await replaceJurosRotativoRows(parsed);
+    const { total, period } = await mergeJurosRotativoByPeriod(parsed);
     const updated = await loadJurosRotativoRows();
     setRows(updated);
     setEditingId(null);
-    // detecta período predominante para pular o filtro automaticamente
-    const periodo = detectPeriodo(parsed);
-    if (periodo) { setFilterYear(periodo.year); setFilterMonth(periodo.month); }
-    const periodoLabel = periodo ? ` — ${MONTHS[periodo.month - 1]}/${periodo.year}` : '';
+    if (period) {
+      const [y, m] = period.split('-').map(Number);
+      setFilterYear(y); setFilterMonth(m);
+    }
+    const periodoLabel = period ? ` — ${MONTHS[parseInt(period.split('-')[1]) - 1]}/${period.split('-')[0]}` : '';
     toast.success(`${total} registro(s) importado(s)${periodoLabel}.`);
     if (txtInputRef.current) txtInputRef.current.value = '';
   }
@@ -325,13 +326,15 @@ export function JurosRotativoDashboard() {
       if (xlsxInputRef.current) xlsxInputRef.current.value = '';
       return;
     }
-    const { total } = await replaceJurosRotativoRows(parsed);
+    const { total, period } = await mergeJurosRotativoByPeriod(parsed);
     const updated = await loadJurosRotativoRows();
     setRows(updated);
     setEditingId(null);
-    const periodo = detectPeriodo(parsed);
-    if (periodo) { setFilterYear(periodo.year); setFilterMonth(periodo.month); }
-    const periodoLabel = periodo ? ` — ${MONTHS[periodo.month - 1]}/${periodo.year}` : '';
+    if (period) {
+      const [y, m] = period.split('-').map(Number);
+      setFilterYear(y); setFilterMonth(m);
+    }
+    const periodoLabel = period ? ` — ${MONTHS[parseInt(period.split('-')[1]) - 1]}/${period.split('-')[0]}` : '';
     toast.success(`${total} registro(s) importado(s)${periodoLabel}.`);
     if (xlsxInputRef.current) xlsxInputRef.current.value = '';
   }

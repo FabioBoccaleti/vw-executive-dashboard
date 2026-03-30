@@ -70,6 +70,54 @@ export async function replaceJurosRotativoRows(
   return { total: withIds.length };
 }
 
+/**
+ * Mescla novos dados no storage, substituindo APENAS as linhas do mesmo
+ * período (ano/mês) detectado nos dados novos. Linhas de outros períodos
+ * são preservadas intactas.
+ */
+export async function mergeJurosRotativoByPeriod(
+  newRows: Omit<JurosRotativoRow, 'id' | 'highlight' | 'annotation'>[],
+): Promise<{ total: number; period: string | null }> {
+  if (newRows.length === 0) return { total: 0, period: null };
+
+  // Detecta período predominante dos novos dados
+  const periodCounts = new Map<string, { year: number; month: number; count: number }>();
+  for (const r of newRows) {
+    const d = extractDate(r.dataPagamento);
+    if (!d) continue;
+    const key = `${d.year}-${String(d.month).padStart(2, '0')}`;
+    const cur = periodCounts.get(key);
+    periodCounts.set(key, cur ? { ...cur, count: cur.count + 1 } : { year: d.year, month: d.month, count: 1 });
+  }
+  const dominant = Array.from(periodCounts.values()).sort((a, b) => b.count - a.count)[0];
+
+  // Carrega dados existentes e remove apenas as linhas do mesmo período
+  const existing = await loadJurosRotativoRows();
+  const kept = dominant
+    ? existing.filter(r => {
+        const d = extractDate(r.dataPagamento);
+        if (!d) return true; // sem data: preserva
+        return !(d.year === dominant.year && d.month === dominant.month);
+      })
+    : existing;
+
+  const toAdd: JurosRotativoRow[] = newRows.map(r => ({
+    ...r,
+    id: crypto.randomUUID(),
+    highlight: false,
+    annotation: '',
+    periodoImport: dominant
+      ? `${dominant.year}-${String(dominant.month).padStart(2, '0')}`
+      : undefined,
+  }));
+
+  await saveJurosRotativoRows([...kept, ...toAdd]);
+  return {
+    total: toAdd.length,
+    period: dominant ? `${dominant.year}-${String(dominant.month).padStart(2, '0')}` : null,
+  };
+}
+
 // ─── Parser TXT ───────────────────────────────────────────────────────────────
 // Separador: `;`
 // Colunas usadas:
