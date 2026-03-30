@@ -91,15 +91,16 @@ export async function mergeJurosRotativoByPeriod(
   }
   const dominant = Array.from(periodCounts.values()).sort((a, b) => b.count - a.count)[0];
 
-  // Carrega dados existentes e remove apenas as linhas do mesmo período
+  // Carrega dados existentes e remove apenas as linhas do mesmo período (descarta linhas completamente vazias)
   const existing = await loadJurosRotativoRows();
   const kept = dominant
     ? existing.filter(r => {
+        if (!r.dataPagamento && !r.notaFiscal && !r.jurosPagos) return false; // linha vazia
         const d = extractDate(r.dataPagamento);
-        if (!d) return true; // sem data: preserva
+        if (!d) return true; // sem data mas tem algum dado: preserva
         return !(d.year === dominant.year && d.month === dominant.month);
       })
-    : existing;
+    : existing.filter(r => !(!r.dataPagamento && !r.notaFiscal && !r.jurosPagos));
 
   const toAdd: JurosRotativoRow[] = newRows.map(r => ({
     ...r,

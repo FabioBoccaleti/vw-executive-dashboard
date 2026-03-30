@@ -449,8 +449,12 @@ export default function VendasResultadoDashboard() {
 
   // Aplica auto-preenchimento de PIV/SIQ/PIVE e Juros Estoque quando cadastros são carregados
   useEffect(() => {
-    if (activeTab !== 'novos' || modelos.length === 0) return;
-    setRows(prev => applyJurosAutoFill(applyAutoFill(prev, modelos, regras), jurosMap));
+    if (activeTab !== 'novos') return;
+    setRows(prev => {
+      const withJuros = applyJurosAutoFill(prev, jurosMap);
+      if (modelos.length === 0) return withJuros;
+      return applyAutoFill(withJuros, modelos, regras);
+    });
   }, [modelos, regras, jurosMap, activeTab]);
 
   useEffect(() => {

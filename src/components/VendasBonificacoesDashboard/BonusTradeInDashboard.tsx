@@ -142,10 +142,10 @@ function parseDateValue(raw: unknown): string {
 // tenha sido exportado pelo próprio sistema, que gera 2 linhas iniciais)
 function detectHeaderRow(rows: unknown[][]): number {
   const knownCols = ['data da venda', 'chassi', 'modelo', 'vendedor', 'valor do trade in', 'cliente',
-                     'vin', 'veiculo', 'veículo', 'razao social', 'n titulo', 'acrescimos'];
+                     'vin', 'veiculo', 'veículo', 'n titulo', 'acrescimos', 'recebido'];
   for (let i = 0; i < Math.min(3, rows.length); i++) {
     const cells = (rows[i] as unknown[]).map(c => String(c ?? '').toLowerCase().trim());
-    if (knownCols.some(col => cells.some(cell => cell.includes(col) || col.includes(cell) && cell.length > 3))) return i;
+    if (knownCols.some(col => cells.includes(col))) return i;
   }
   return 0;
 }
@@ -159,30 +159,23 @@ function parseExcelFile(buffer: ArrayBuffer): Omit<BonusTradeInRow, 'id' | 'high
   const dataRows = allRows.slice(headerIdx + 1).filter(r =>
     (r as unknown[]).some(c => c !== '' && c !== null && c !== undefined)
   );
-  // Busca exata (case-insensitive) depois parcial
+  // Busca exata case-insensitive
   const idx = (names: string[]) => {
     const lowerHeaders = headers.map(h => h.toLowerCase());
-    // Passo 1: match exato
     for (const n of names) {
       const i = lowerHeaders.findIndex(h => h === n.toLowerCase());
-      if (i !== -1) return i;
-    }
-    // Passo 2: match parcial (header contém o nome ou nome contém o header)
-    for (const n of names) {
-      const nl = n.toLowerCase();
-      const i = lowerHeaders.findIndex(h => h.includes(nl) || nl.includes(h) && h.length > 3);
       if (i !== -1) return i;
     }
     return -1;
   };
   const iDataVenda       = idx(['Data da Venda', 'DATA_VENDA', 'Data Venda', 'DTA_VENDA', 'Dt. Venda']);
-  const iCliente         = idx(['Cliente', 'CLIENTE', 'Razão Social', 'Razao Social', 'RAZAO_SOCIAL', 'Nome Cliente', 'NOME_CLIENTE', 'Nome', 'Comprador', 'COMPRADOR']);
+  const iCliente         = idx(['Cliente', 'CLIENTE', 'Razão Social', 'Razao Social', 'RAZAO_SOCIAL', 'Nome Cliente', 'NOME_CLIENTE', 'Comprador', 'COMPRADOR']);
   const iChassi          = idx(['Chassi', 'CHASSI', 'VIN', 'Chassis', 'Nº Chassi', 'Numero Chassi', 'NUMERO_CHASSI', 'Nro Chassi']);
-  const iModelo          = idx(['Modelo', 'MODELO', 'Veículo', 'Veiculo', 'VEICULO', 'DES_MODELO', 'Descrição', 'Descricao', 'DESCRICAO']);
+  const iModelo          = idx(['Modelo', 'MODELO', 'Veículo', 'Veiculo', 'VEICULO', 'DES_MODELO']);
   const iVendedor        = idx(['Vendedor', 'VENDEDOR', 'NOME_VENDEDOR', 'Nome Vendedor']);
   const iNTitulo         = idx(['Nº Título', 'N Titulo', 'Nº Titulo', 'N_TITULO', 'NUM_TITULO', 'Numero Titulo', 'Número Titulo', 'Titulo', 'TITULO', 'Título']);
-  const iValorTradeIn    = idx(['Valor do Trade IN', 'VALOR_TRADE_IN', 'Valor Trade IN', 'Val. Trade IN', 'Acréscimos', 'Acrescimos', 'ACRESCIMOS', 'Valor Trade', 'VALOR_TRADE', 'Valor Acréscimo']);
-  const iRecebido        = idx(['Recebido', 'RECEBIDO', 'Status', 'STATUS', 'Pago', 'PAGO', 'Situação', 'Situacao', 'SITUACAO']);
+  const iValorTradeIn    = idx(['Valor do Trade IN', 'VALOR_TRADE_IN', 'Valor Trade IN', 'Val. Trade IN', 'Acréscimos', 'Acrescimos', 'ACRESCIMOS', 'Valor Trade', 'VALOR_TRADE']);
+  const iRecebido        = idx(['Recebido', 'RECEBIDO']);
   const iDataRecebimento = idx(['Data do Recebimento', 'DATA_RECEBIMENTO', 'Data Recebimento', 'DTA_RECEBIMENTO', 'Data Pagamento', 'Data do Pgto', 'Dt. Recebimento']);
   return dataRows.map(r => ({
     dataVenda:       parseDateValue(iDataVenda       >= 0 ? (r as unknown[])[iDataVenda]       : ''),
