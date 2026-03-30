@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Users, Car, CalendarCog } from 'lucide-react';
+import { VeiculosRegrasPage } from './VeiculosRegrasPage';
 
 type SectionId = 'vendedores' | 'veiculos' | 'dsr';
 
@@ -86,14 +87,7 @@ export function CadastrosVWPage() {
             </div>
           )}
 
-          {activeSection === 'veiculos' && (
-            <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-slate-200 text-slate-300">
-              <div className="flex flex-col items-center gap-3">
-                <Car className="w-10 h-10" />
-                <span className="text-sm">Em desenvolvimento</span>
-              </div>
-            </div>
-          )}
+          {activeSection === 'veiculos' && <VeiculosRegrasPage />}
 
           {activeSection === 'dsr' && (
             <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-slate-200 text-slate-300">
