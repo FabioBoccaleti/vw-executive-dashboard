@@ -11,6 +11,7 @@ import {
   saveVendasResultadoRows,
   emptyVendasResultadoRow,
 } from './vendasResultadoStorage';
+import { loadAliquotas } from './vendedoresRemuneracaoStorage';
 
 // ─── Helpers numéricos ────────────────────────────────────────────────────────
 function n(v: string): number { return parseFloat(String(v).replace(',', '.')) || 0; }
@@ -22,15 +23,18 @@ function fmtPct(v: number): string {
 }
 
 // ─── Cálculos derivados ───────────────────────────────────────────────────────
-function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false) {
+function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false, aliquotaBonPct = 0) {
   const comissaoBruta      = isDireta ? n(r.valorVenda) * n(r.pctComissao) / 100 : 0;
   const recLiq             = isDireta ? comissaoBruta - n(r.impostos) : n(r.valorVenda) - n(r.impostos);
   const comissaoLiquidaPct = n(r.valorVenda) !== 0 ? (recLiq / n(r.valorVenda)) * 100 : 0;
-  const lucroBruto         = recLiq - n(r.valorCusto) + n(r.bonusVarejo) + (!isDireta && !isUsados ? n(r.bonusTradeIn ?? '') : 0);
+  const impostosBonus      = !isDireta && !isUsados ? (n(r.bonusVarejo) + n(r.bonusTradeIn ?? '')) * (aliquotaBonPct / 100) : 0;
+  const impostosTradeIn    = isUsados ? n(r.bonusVarejo) * (aliquotaBonPct / 100) : 0;
+  const lucroBruto         = recLiq - n(r.valorCusto) + n(r.bonusVarejo) + (!isDireta && !isUsados ? n(r.bonusTradeIn ?? '') : 0) - (!isDireta && !isUsados ? impostosBonus : 0) - (isUsados ? impostosTradeIn : 0);
   const lucroBrutoPct      = recLiq !== 0 ? (lucroBruto / recLiq) * 100 : 0;
   const bonuses            = n(r.bonusPIV) + n(r.bonusSIQ) + n(r.bonusPIVE)
                            + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3);
-  const lucroComBon        = (isDireta ? recLiq : lucroBruto) + bonuses;
+  const impostosBonificacoes = !isDireta && !isUsados ? bonuses * (aliquotaBonPct / 100) : 0;
+  const lucroComBon        = (isDireta ? recLiq : lucroBruto) + bonuses - (!isDireta && !isUsados ? impostosBonificacoes : 0);
   const lucroComBonPct     = recLiq !== 0 ? (lucroComBon / recLiq) * 100 : 0;
   const resultado          = (isUsados ? lucroBruto : lucroComBon) + n(r.recBlindagem) + n(r.recFinanciamento) + n(r.recDespachante)
                            - (isDireta ? 0 : n(r.jurosEstoque))
@@ -39,7 +43,7 @@ function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false) {
                            - n(r.comissaoVenda) - n(r.dsr)
                            - n(r.provisoes) - n(r.encargos) - n(r.outrasDespesas);
   const resultadoPct       = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
-  return { comissaoBruta, recLiq, comissaoLiquidaPct, lucroBruto, lucroBrutoPct, lucroComBon, lucroComBonPct, resultado, resultadoPct };
+  return { comissaoBruta, recLiq, comissaoLiquidaPct, impostosBonus, impostosTradeIn, lucroBruto, lucroBrutoPct, impostosBonificacoes, lucroComBon, lucroComBonPct, resultado, resultadoPct };
 }
 
 // ─── Meses ────────────────────────────────────────────────────────────────────
@@ -153,7 +157,7 @@ function CalcCell({ value, pct, negative }: { value: number; pct?: boolean; nega
 }
 
 // ─── Export Excel ─────────────────────────────────────────────────────────────
-async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, filename: string, isDireta: boolean, isUsados: boolean) {
+async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, filename: string, isDireta: boolean, isUsados: boolean, aliquotaBonPct = 0) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Sorana Executive Dashboard'; wb.created = new Date();
   const ws = wb.addWorksheet(sheetName, {
@@ -213,7 +217,7 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
   const PCT = '#,##0.00"%"';
 
   rows.forEach((row, ri) => {
-    const c = calcRow(row, isDireta, isUsados);
+    const c = calcRow(row, isDireta, isUsados, aliquotaBonPct);
     const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF0FDF4';
     const vals = isDireta ? [
       row.chassi, row.modelo, row.cor, row.dataVenda, row.vendedor, row.transacao,
@@ -288,10 +292,20 @@ export default function VendasResultadoDashboard() {
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [editingAnnotation, setEditingAnnotation] = useState<string | null>(null);
   const [annotationDraft, setAnnotationDraft]     = useState('');
+  const [aliquotaBonPct, setAliquotaBonPct] = useState(0);
 
   useEffect(() => {
     loadVendasResultadoRows(activeTab).then(setRows);
   }, [activeTab]);
+
+  useEffect(() => {
+    loadAliquotas().then(items => {
+      const soma = items
+        .filter(i => i.tipo.toLowerCase().includes('bonificações'))
+        .reduce((acc, i) => acc + (parseFloat(i.aliquota) || 0), 0);
+      setAliquotaBonPct(soma);
+    });
+  }, []);
 
   const save = useCallback(async (updated: VendasResultadoRow[]) => {
     setRows(updated);
@@ -369,7 +383,7 @@ export default function VendasResultadoDashboard() {
       const tabLabel = SUB_TABS.find(t => t.id === activeTab)?.label ?? activeTab;
       const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
       const sheetName = `${tabLabel.slice(0, 20)} - ${monthLabel}-${filterYear}`.slice(0, 31);
-      await exportToExcel(filteredRows, sheetName, `${activeTab}_resultado_${filterYear}_${monthLabel}.xlsx`, isDireta, isUsados);
+      await exportToExcel(filteredRows, sheetName, `${activeTab}_resultado_${filterYear}_${monthLabel}.xlsx`, isDireta, isUsados, aliquotaBonPct);
       toast.success('Arquivo Excel gerado!');
     } catch (err) {
       console.error(err);
@@ -534,13 +548,13 @@ export default function VendasResultadoDashboard() {
               ))}
               {/* Lucro bruto */}
               {!isDireta && (isUsados
-                ? ['Valor Custo', 'Trade IN', 'Lucro Bruto', 'LB %']
-                : ['Valor Custo', 'Bônus Varejo', 'Bônus Trade IN', 'Lucro Bruto', 'LB %']
+                ? ['Valor Custo', 'Trade IN', '(-) Imp. s/ Trade IN', 'Lucro Bruto', 'LB %']
+                : ['Valor Custo', 'Bônus Varejo', 'Bônus Trade IN', '(-) Imp. s/ Bônus', 'Lucro Bruto', 'LB %']
               ).map((h,i) => (
                 <th key={i} className="bg-teal-700 px-3 py-2 text-right whitespace-nowrap border-b border-teal-600 border-r border-teal-600">{h}</th>
               ))}
               {/* Bonificações */}
-              {!isDireta && !isUsados && ['PIV','SIQ','PIVE','Adic 1','Adic 2','Adic 3','Lucro c/ Bon.','% c/ Bon.'].map((h,i) => (
+              {!isDireta && !isUsados && ['PIV','SIQ','PIVE','Adic 1','Adic 2','Adic 3','(-) Imp. s/ Bon.','Lucro c/ Bon.','% c/ Bon.'].map((h,i) => (
                 <th key={i} className="bg-cyan-700 px-3 py-2 text-right whitespace-nowrap border-b border-cyan-600 border-r border-cyan-600">{h}</th>
               ))}
               {/* Receitas extras */}
@@ -566,13 +580,13 @@ export default function VendasResultadoDashboard() {
           <tbody>
             {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={isDireta ? 25 : isUsados ? 29 : 40} className="text-center py-16 text-slate-300 text-sm">
+                <td colSpan={isDireta ? 25 : isUsados ? 30 : 42} className="text-center py-16 text-slate-300 text-sm">
                   Nenhum registro — clique em "Nova linha" para adicionar
                 </td>
               </tr>
             )}
             {filteredRows.map((row, ri) => {
-              const c = calcRow(row, isDireta, isUsados);
+              const c = calcRow(row, isDireta, isUsados, aliquotaBonPct);
               const bg = row.highlight ? 'bg-yellow-50' : ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
               const td = `${bg} border-b border-slate-100 align-middle`;
               const tdR = `${td} text-right`;
@@ -614,6 +628,8 @@ export default function VendasResultadoDashboard() {
                   {!isDireta && <td className={`${tdR} px-2 min-w-[110px]`}>{EC('valorCusto', 'currency')}</td>}
                   {!isDireta && <td className={`${tdR} px-2 min-w-[100px]`}>{EC('bonusVarejo', 'currency')}</td>}
                   {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[110px]`}>{EC('bonusTradeIn', 'currency')}</td>}
+                  {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[120px]`}><CalcCell value={c.impostosBonus} negative /></td>}
+                  {isUsados && <td className={`${tdR} px-2 min-w-[130px]`}><CalcCell value={c.impostosTradeIn} negative /></td>}
                   {!isDireta && <td className={`${tdR} px-2 min-w-[110px]`}><CalcCell value={c.lucroBruto} negative /></td>}
                   {!isDireta && <td className={`${tdR} px-2 min-w-[80px]`}><CalcCell value={c.lucroBrutoPct} pct negative /></td>}
                   {/* Bonificações */}
@@ -623,6 +639,7 @@ export default function VendasResultadoDashboard() {
                   {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusAdic1', 'currency')}</td>}
                   {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusAdic2', 'currency')}</td>}
                   {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[90px]`}>{EC('bonusAdic3', 'currency')}</td>}
+                  {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[140px]`}><CalcCell value={c.impostosBonificacoes} negative /></td>}
                   {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[110px]`}><CalcCell value={c.lucroComBon} negative /></td>}
                   {!isDireta && !isUsados && <td className={`${tdR} px-2 min-w-[80px]`}><CalcCell value={c.lucroComBonPct} pct negative /></td>}
                   {/* Receitas extras */}

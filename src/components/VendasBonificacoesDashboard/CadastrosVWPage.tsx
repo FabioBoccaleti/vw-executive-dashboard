@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Users, Car, CalendarCog } from 'lucide-react';
+import { Users, Car, CalendarCog, Receipt } from 'lucide-react';
 import { VeiculosRegrasPage } from './VeiculosRegrasPage';
 import { VendedoresRemuneracaoPage } from './VendedoresRemuneracaoPage';
 import { VendasDsrSection } from './VendasDsrSection';
+import { AliquotasImpostoSection } from './AliquotasImpostoSection';
 
-type SectionId = 'vendedores' | 'veiculos' | 'dsr';
+type SectionId = 'vendedores' | 'veiculos' | 'dsr' | 'aliquotas';
 
 interface MenuItem {
   id: SectionId;
@@ -31,6 +32,12 @@ const MENU_ITEMS: MenuItem[] = [
     label: 'DSR',
     description: 'Percentual de DSR por ano e mês',
     icon: <CalendarCog className="w-5 h-5" />,
+  },
+  {
+    id: 'aliquotas',
+    label: 'Alíquotas de Imposto',
+    description: 'Tipos de imposto, alíquotas e encargos',
+    icon: <Receipt className="w-5 h-5" />,
   },
 ];
 
@@ -85,6 +92,8 @@ export function CadastrosVWPage() {
           {activeSection === 'veiculos' && <VeiculosRegrasPage />}
 
           {activeSection === 'dsr' && <VendasDsrSection />}
+
+          {activeSection === 'aliquotas' && <AliquotasImpostoSection />}
         </div>
       </main>
     </div>

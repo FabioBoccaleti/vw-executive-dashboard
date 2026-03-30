@@ -78,3 +78,25 @@ export async function loadVendasDsr(): Promise<VendasDsrConfig[]> {
 export async function saveVendasDsr(items: VendasDsrConfig[]): Promise<void> {
   await kvSet(KEY_DSR, items);
 }
+
+// ─── Alíquotas de Imposto ─────────────────────────────────────────────────────
+const KEY_ALIQUOTAS = 'vendas_aliquotas_imposto';
+
+export interface AliquotaImposto {
+  id: string;
+  tipo: string;       // ex: "ISS", "PIS", "COFINS"
+  aliquota: string;   // % ex: "5.00"
+  encargos: string;   // % opcional, ex: "1.50"
+}
+
+export async function loadAliquotas(): Promise<AliquotaImposto[]> {
+  try {
+    const data = await kvGet(KEY_ALIQUOTAS);
+    if (Array.isArray(data)) return data as AliquotaImposto[];
+    return [];
+  } catch { return []; }
+}
+
+export async function saveAliquotas(items: AliquotaImposto[]): Promise<void> {
+  await kvSet(KEY_ALIQUOTAS, items);
+}
