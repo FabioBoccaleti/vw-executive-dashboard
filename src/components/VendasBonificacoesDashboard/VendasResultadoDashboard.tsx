@@ -12,6 +12,7 @@ import {
   emptyVendasResultadoRow,
 } from './vendasResultadoStorage';
 import { loadAliquotas } from './vendedoresRemuneracaoStorage';
+import { loadModelos, loadRegras, getRegra, type VeiculoModelo, type VeiculoRegra } from './veiculosRegrasStorage';
 
 // ─── Helpers numéricos ────────────────────────────────────────────────────────
 function n(v: string): number { return parseFloat(String(v).replace(',', '.')) || 0; }
@@ -44,6 +45,34 @@ function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false, aliq
                            - n(r.provisoes) - n(r.encargos) - n(r.outrasDespesas);
   const resultadoPct       = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
   return { comissaoBruta, recLiq, comissaoLiquidaPct, impostosBonus, impostosTradeIn, lucroBruto, lucroBrutoPct, impostosBonificacoes, lucroComBon, lucroComBonPct, resultado, resultadoPct };
+}
+
+// ─── Auto-preenchimento PIV/SIQ/PIVE ────────────────────────────────────────
+function applyAutoFill(
+  rows: VendasResultadoRow[],
+  modelos: VeiculoModelo[],
+  regras: VeiculoRegra[],
+): VendasResultadoRow[] {
+  return rows.map(row => {
+    // Só aplica se pelo menos um campo estiver vazio
+    if (row.bonusPIV !== '' && row.bonusSIQ !== '' && row.bonusPIVE !== '') return row;
+    const d = row.dataVenda;
+    let ano: number | null = null, mes: number | null = null;
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) { ano = parseInt(d.split('/')[2]); mes = parseInt(d.split('/')[1]); }
+    else if (/^\d{4}-\d{2}-\d{2}/.test(d)) { ano = parseInt(d.split('-')[0]); mes = parseInt(d.split('-')[1]); }
+    if (!ano || !mes) return row;
+    const modelo = modelos.find(m => m.modelo.trim().toLowerCase() === (row.modelo ?? '').trim().toLowerCase());
+    if (!modelo) return row;
+    const regra = getRegra(regras, modelo.id, ano, mes);
+    if (!regra) return row;
+    const preco = parseFloat(String(regra.precoPublico).replace(',', '.')) || 0;
+    return {
+      ...row,
+      bonusPIV:  row.bonusPIV  === '' ? (preco * (parseFloat(String(regra.piv).replace(',',  '.')) || 0) / 100).toFixed(2) : row.bonusPIV,
+      bonusSIQ:  row.bonusSIQ  === '' ? (preco * (parseFloat(String(regra.siq).replace(',',  '.')) || 0) / 100).toFixed(2) : row.bonusSIQ,
+      bonusPIVE: row.bonusPIVE === '' ? (preco * (parseFloat(String(regra.pive).replace(',', '.')) || 0) / 100).toFixed(2) : row.bonusPIVE,
+    };
+  });
 }
 
 // ─── Meses ────────────────────────────────────────────────────────────────────
@@ -293,10 +322,27 @@ export default function VendasResultadoDashboard() {
   const [editingAnnotation, setEditingAnnotation] = useState<string | null>(null);
   const [annotationDraft, setAnnotationDraft]     = useState('');
   const [aliquotaBonPct, setAliquotaBonPct] = useState(0);
+  const [modelos, setModelos] = useState<VeiculoModelo[]>([]);
+  const [regras,  setRegras]  = useState<VeiculoRegra[]>([]);
 
   useEffect(() => {
     loadVendasResultadoRows(activeTab).then(setRows);
   }, [activeTab]);
+
+  // Carrega modelos/regras apenas para a aba Novos
+  useEffect(() => {
+    if (activeTab !== 'novos') { setModelos([]); setRegras([]); return; }
+    Promise.all([loadModelos(), loadRegras()]).then(([m, r]) => {
+      setModelos(m);
+      setRegras(r);
+    });
+  }, [activeTab]);
+
+  // Aplica auto-preenchimento de PIV/SIQ/PIVE quando modelos/regras são carregados
+  useEffect(() => {
+    if (activeTab !== 'novos' || modelos.length === 0) return;
+    setRows(prev => applyAutoFill(prev, modelos, regras));
+  }, [modelos, regras, activeTab]);
 
   useEffect(() => {
     loadAliquotas().then(items => {
@@ -356,7 +402,11 @@ export default function VendasResultadoDashboard() {
   }, [rows, filterYear]);
 
   function updateField(id: string, key: EditableKey, value: string) {
-    const updated = rows.map(r => r.id === id ? { ...r, [key]: value } : r);
+    let updated = rows.map(r => r.id === id ? { ...r, [key]: value } : r);
+    // Se o modelo foi alterado, tenta auto-preencher PIV/SIQ/PIVE que ainda estejam vazios
+    if (key === 'modelo' && activeTab === 'novos' && modelos.length > 0) {
+      updated = applyAutoFill(updated, modelos, regras);
+    }
     save(updated);
   }
 
