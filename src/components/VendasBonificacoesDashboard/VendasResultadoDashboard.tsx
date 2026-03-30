@@ -13,6 +13,7 @@ import {
 } from './vendasResultadoStorage';
 import { loadAliquotas } from './vendedoresRemuneracaoStorage';
 import { loadModelos, loadRegras, getRegra, type VeiculoModelo, type VeiculoRegra } from './veiculosRegrasStorage';
+import { loadJurosRotativoRows, type JurosRotativoRow } from './jurosRotativoStorage';
 
 // ─── Helpers numéricos ────────────────────────────────────────────────────────
 function n(v: string): number { return parseFloat(String(v).replace(',', '.')) || 0; }
@@ -72,6 +73,32 @@ function applyAutoFill(
       bonusSIQ:  row.bonusSIQ  === '' ? (preco * (parseFloat(String(regra.siq).replace(',',  '.')) || 0) / 100).toFixed(2) : row.bonusSIQ,
       bonusPIVE: row.bonusPIVE === '' ? (preco * (parseFloat(String(regra.pive).replace(',', '.')) || 0) / 100).toFixed(2) : row.bonusPIVE,
     };
+  });
+}
+
+// ─── Auto-preenchimento Juros Estoque ─────────────────────────────────────────
+function buildJurosMap(jurosRows: JurosRotativoRow[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const jr of jurosRows) {
+    const nota = jr.notaFiscal.trim();
+    if (!nota) continue;
+    const val = parseFloat(String(jr.jurosPagos).replace(',', '.')) || 0;
+    map.set(nota, (map.get(nota) ?? 0) + val);
+  }
+  return map;
+}
+
+function applyJurosAutoFill(
+  rows: VendasResultadoRow[],
+  jurosMap: Map<string, number>,
+): VendasResultadoRow[] {
+  return rows.map(row => {
+    if (row.jurosEstoque !== '') return row;
+    const nota = (row.notaCompra ?? '').trim();
+    if (!nota) return row;
+    const total = jurosMap.get(nota);
+    if (total === undefined) return row;
+    return { ...row, jurosEstoque: total.toFixed(2) };
   });
 }
 
@@ -324,25 +351,27 @@ export default function VendasResultadoDashboard() {
   const [aliquotaBonPct, setAliquotaBonPct] = useState(0);
   const [modelos, setModelos] = useState<VeiculoModelo[]>([]);
   const [regras,  setRegras]  = useState<VeiculoRegra[]>([]);
+  const [jurosMap, setJurosMap] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     loadVendasResultadoRows(activeTab).then(setRows);
   }, [activeTab]);
 
-  // Carrega modelos/regras apenas para a aba Novos
+  // Carrega modelos/regras/juros apenas para a aba Novos
   useEffect(() => {
-    if (activeTab !== 'novos') { setModelos([]); setRegras([]); return; }
-    Promise.all([loadModelos(), loadRegras()]).then(([m, r]) => {
+    if (activeTab !== 'novos') { setModelos([]); setRegras([]); setJurosMap(new Map()); return; }
+    Promise.all([loadModelos(), loadRegras(), loadJurosRotativoRows()]).then(([m, r, jr]) => {
       setModelos(m);
       setRegras(r);
+      setJurosMap(buildJurosMap(jr));
     });
   }, [activeTab]);
 
-  // Aplica auto-preenchimento de PIV/SIQ/PIVE quando modelos/regras são carregados
+  // Aplica auto-preenchimento de PIV/SIQ/PIVE e Juros Estoque quando cadastros são carregados
   useEffect(() => {
     if (activeTab !== 'novos' || modelos.length === 0) return;
-    setRows(prev => applyAutoFill(prev, modelos, regras));
-  }, [modelos, regras, activeTab]);
+    setRows(prev => applyJurosAutoFill(applyAutoFill(prev, modelos, regras), jurosMap));
+  }, [modelos, regras, jurosMap, activeTab]);
 
   useEffect(() => {
     loadAliquotas().then(items => {
@@ -403,9 +432,15 @@ export default function VendasResultadoDashboard() {
 
   function updateField(id: string, key: EditableKey, value: string) {
     let updated = rows.map(r => r.id === id ? { ...r, [key]: value } : r);
-    // Se o modelo foi alterado, tenta auto-preencher PIV/SIQ/PIVE que ainda estejam vazios
-    if (key === 'modelo' && activeTab === 'novos' && modelos.length > 0) {
-      updated = applyAutoFill(updated, modelos, regras);
+    if (activeTab === 'novos') {
+      // Se o modelo foi alterado, tenta auto-preencher PIV/SIQ/PIVE que ainda estejam vazios
+      if (key === 'modelo' && modelos.length > 0) {
+        updated = applyAutoFill(updated, modelos, regras);
+      }
+      // Se a nota de compra foi alterada, tenta auto-preencher Juros Estoque vazio
+      if (key === 'notaCompra') {
+        updated = applyJurosAutoFill(updated, jurosMap);
+      }
     }
     save(updated);
   }
