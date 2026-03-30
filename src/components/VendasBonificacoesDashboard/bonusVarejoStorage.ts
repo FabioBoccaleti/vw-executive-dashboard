@@ -105,15 +105,16 @@ export async function mergeBonusVarejoByPeriod(
   }
   const dominant = Array.from(counts.values()).sort((a, b) => b.count - a.count)[0];
 
-  // Preserva linhas de outros períodos
+  // Preserva linhas de outros períodos (descarta linhas completamente vazias)
   const existing = await loadBonusVarejoRows();
   const kept = dominant
     ? existing.filter(r => {
+        if (!r.chassi && !r.data && !r.notaFiscal && !r.valor) return false; // placeholder vazio
         const d = extractPeriod(r.data);
         if (!d) return true;
         return !(d.year === dominant.year && d.month === dominant.month);
       })
-    : existing;
+    : existing.filter(r => !(!r.chassi && !r.data && !r.notaFiscal && !r.valor));
 
   const toAdd: BonusVarejoRow[] = newRows.map(r => ({
     ...r,

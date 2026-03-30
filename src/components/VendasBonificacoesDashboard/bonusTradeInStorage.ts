@@ -117,15 +117,16 @@ export async function mergeBonusTradeInByPeriod(
   }
   const dominant = Array.from(counts.values()).sort((a, b) => b.count - a.count)[0];
 
-  // Preserva linhas de outros períodos
+  // Preserva linhas de outros períodos (descarta linhas completamente vazias)
   const existing = await loadBonusTradeInRows();
   const kept = dominant
     ? existing.filter(r => {
+        if (!r.chassi && !r.dataVenda && !r.cliente && !r.valorTradeIn) return false; // placeholder vazio
         const d = extractPeriod(r.dataVenda);
         if (!d) return true;
         return !(d.year === dominant.year && d.month === dominant.month);
       })
-    : existing;
+    : existing.filter(r => !(!r.chassi && !r.dataVenda && !r.cliente && !r.valorTradeIn));
 
   const toAdd: BonusTradeInRow[] = newRows.map(r => ({
     ...r,
