@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Upload, TableProperties, ClipboardList, Tag } from 'lucide-react';
+import { Upload, TableProperties, ClipboardList, Tag, TrendingDown } from 'lucide-react';
 import { ImportarPDFPage } from './ImportarPDFPage';
 import { TabelaDadosDashboard } from './TabelaDadosDashboard';
 import { RegistroVendasDashboard } from './RegistroVendasDashboard';
 import { BonusVarejoDashboard } from './BonusVarejoDashboard';
 import { BonusTradeInDashboard } from './BonusTradeInDashboard';
+import { JurosRotativoDashboard } from './JurosRotativoDashboard';
 
 export function RegistrosPage({ onBack }: { onBack?: () => void }) {
-  const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein'>('importar');
+  const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros'>('importar');
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -27,7 +28,7 @@ export function RegistrosPage({ onBack }: { onBack?: () => void }) {
       </header>
 
       {/* Abas internas */}
-      <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0">
+      <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
         <button
           onClick={() => setActiveTab('importar')}
           className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -83,6 +84,17 @@ export function RegistrosPage({ onBack }: { onBack?: () => void }) {
           <Tag className="w-4 h-4" />
           Bônus Trade IN
         </button>
+        <button
+          onClick={() => setActiveTab('juros')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'juros'
+              ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <TrendingDown className="w-4 h-4" />
+          Juros Rotativo
+        </button>
       </div>
 
       {/* Conteúdo da aba */}
@@ -91,6 +103,7 @@ export function RegistrosPage({ onBack }: { onBack?: () => void }) {
       {activeTab === 'registro' && <RegistroVendasDashboard />}
       {activeTab === 'bonus' && <BonusVarejoDashboard />}
       {activeTab === 'tradein' && <BonusTradeInDashboard />}
+      {activeTab === 'juros' && <JurosRotativoDashboard />}
     </div>
   );
 }

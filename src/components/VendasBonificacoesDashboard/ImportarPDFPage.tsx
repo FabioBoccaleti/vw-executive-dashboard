@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag, TrendingUp, BarChart2 } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag, TrendingUp, BarChart2, TrendingDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -8,6 +8,7 @@ import { TabelaDadosDashboard } from './TabelaDadosDashboard';
 import { RegistroVendasDashboard } from './RegistroVendasDashboard';
 import { BonusVarejoDashboard } from './BonusVarejoDashboard';
 import { BonusTradeInDashboard } from './BonusTradeInDashboard';
+import { JurosRotativoDashboard } from './JurosRotativoDashboard';
 import VendasResultadoDashboard from './VendasResultadoDashboard';
 import { CadastrosVWPage } from './CadastrosVWPage';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
@@ -437,7 +438,7 @@ function pdfResultsToTableRows(pages: PageResult[]): Omit<TabelaDadosRow, 'id'>[
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mainView, setMainView] = useState<'cadastros' | 'registros' | 'financeiro' | 'vendas' | 'analises'>('registros');
-  const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein'>('importar');
+  const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros'>('importar');
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
   const [registroFilterYear, setRegistroFilterYear] = useState<number>(new Date().getFullYear());
   const [registroFilterMonth, setRegistroFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
@@ -651,6 +652,17 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           <Tag className="w-4 h-4" />
           Bônus Trade IN
         </button>
+        <button
+          onClick={() => setActiveTab('juros')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'juros'
+              ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <TrendingDown className="w-4 h-4" />
+          Juros Rotativo
+        </button>
       </div>
       )}
 
@@ -684,6 +696,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
       {mainView === 'registros' && activeTab === 'registro' && <RegistroVendasDashboard />}
       {mainView === 'registros' && activeTab === 'bonus' && <BonusVarejoDashboard />}
       {mainView === 'registros' && activeTab === 'tradein' && <BonusTradeInDashboard />}
+      {mainView === 'registros' && activeTab === 'juros' && <JurosRotativoDashboard />}
 
       {/* Aba: Tabela de Dados */}
       {mainView === 'registros' && activeTab === 'tabela' && (
