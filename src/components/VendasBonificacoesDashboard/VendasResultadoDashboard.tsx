@@ -492,11 +492,14 @@ export default function VendasResultadoDashboard() {
     const custo      = sum('valorCusto');
     const bVarejo    = sum('bonusVarejo');
     const bTradeIn   = sum('bonusTradeIn');
-    const lb         = recLiq - custo + bVarejo + (!isDireta && !isUsados ? bTradeIn : 0);
+    const impostosBonus    = !isDireta && !isUsados ? (bVarejo + bTradeIn) * aliquotaBonPct / 100 : 0;
+    const impostosTradeIn  = isUsados ? bVarejo * aliquotaBonPct / 100 : 0;
+    const lb         = recLiq - custo + bVarejo + (!isDireta && !isUsados ? bTradeIn : 0) - impostosBonus - impostosTradeIn;
     const lbPct      = recLiq !== 0 ? (lb / recLiq) * 100 : 0;
     const bonuses    = sum('bonusPIV') + sum('bonusSIQ') + sum('bonusPIVE')
                      + sum('bonusAdic1') + sum('bonusAdic2') + sum('bonusAdic3');
-    const lcb        = (isDireta ? recLiq : lb) + bonuses;
+    const impostosBonificacoes = !isDireta && !isUsados ? bonuses * aliquotaBonPct / 100 : 0;
+    const lcb        = (isDireta ? recLiq : lb) + bonuses - impostosBonificacoes;
     const lcbPct     = recLiq !== 0 ? (lcb / recLiq) * 100 : 0;
     const resultado  = (isUsados ? lb : lcb) + sum('recBlindagem') + sum('recFinanciamento') + sum('recDespachante')
                      - (isDireta ? 0 : sum('jurosEstoque'))
@@ -505,8 +508,8 @@ export default function VendasResultadoDashboard() {
                      - sum('comissaoVenda') - sum('dsr')
                      - sum('provisoes') - sum('encargos') - sum('outrasDespesas');
     const resPct     = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
-    return { valorVenda, impostos, comissaoBruta, pctComissaoMedia, recLiq, comissaoLiquidaPct, custo, bVarejo, bTradeIn, lb, lbPct, lcb, lcbPct, resultado, resPct };
-  }, [filteredRows, activeTab]);
+    return { valorVenda, impostos, comissaoBruta, pctComissaoMedia, recLiq, comissaoLiquidaPct, custo, bVarejo, bTradeIn, impostosBonus, impostosTradeIn, lb, lbPct, lcb, lcbPct, resultado, resPct };
+  }, [filteredRows, activeTab, aliquotaBonPct]);
 
   const isDireta = activeTab === 'direta';
   const isUsados = activeTab === 'usados';
@@ -602,8 +605,8 @@ export default function VendasResultadoDashboard() {
             <tr>
               <th colSpan={isDireta ? 6 : isUsados ? 9 : 10} className="bg-slate-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-600">IDENTIFICAÇÃO</th>
               <th colSpan={isDireta ? 6 : 3} className="bg-emerald-800 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-emerald-700">FINANCEIRO BASE</th>
-              {!isDireta && <th colSpan={isUsados ? 4 : 5} className="bg-teal-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-teal-600">LUCRO BRUTO</th>}
-              {!isDireta && !isUsados && <th colSpan={8} className="bg-cyan-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-cyan-600">BONIFICAÇÕES</th>}
+              {!isDireta && <th colSpan={isUsados ? 5 : 6} className="bg-teal-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-teal-600">LUCRO BRUTO</th>}
+              {!isDireta && !isUsados && <th colSpan={9} className="bg-cyan-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-cyan-600">BONIFICAÇÕES</th>}
               <th colSpan={3} className="bg-blue-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-blue-600">RECEITAS EXTRAS</th>
               <th colSpan={isDireta ? 7 : isUsados ? 7 : 8} className="bg-orange-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-orange-600">DESPESAS</th>
               <th colSpan={2} className="bg-slate-800 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-700">RESULTADO</th>
@@ -786,13 +789,15 @@ export default function VendasResultadoDashboard() {
                     <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.custo)}</td>
                     <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.bVarejo)}</td>
                     {!isUsados && <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.bTradeIn)}</td>}
+                    {!isDireta && !isUsados && <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.impostosBonus)}</td>}
+                    {isUsados && <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.impostosTradeIn)}</td>}
                     <td className={`px-2 py-2 text-right font-mono ${totals.lb >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.lb)}</td>
                     <td className={`px-2 py-2 text-right font-mono ${totals.lbPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{fmtPct(totals.lbPct)}</td>
                   </>
                 )}
                 {!isDireta && !isUsados && (
                   <>
-                    <td colSpan={6} className="px-2 py-2 text-center text-slate-400 text-[10px]">—</td>
+                    <td colSpan={7} className="px-2 py-2 text-center text-slate-400 text-[10px]">—</td>
                     <td className={`px-2 py-2 text-right font-mono ${totals.lcb >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.lcb)}</td>
                     <td className={`px-2 py-2 text-right font-mono ${totals.lcbPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{fmtPct(totals.lcbPct)}</td>
                   </>
