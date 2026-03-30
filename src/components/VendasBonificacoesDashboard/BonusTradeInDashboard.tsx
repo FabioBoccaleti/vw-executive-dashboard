@@ -138,20 +138,52 @@ function parseDateValue(raw: unknown): string {
   return s;
 }
 
+// Detecta a linha de header real (pula linha de título caso o arquivo
+// tenha sido exportado pelo próprio sistema, que gera 2 linhas iniciais)
+function detectHeaderRow(rows: unknown[][]): number {
+  const knownCols = ['data da venda', 'chassi', 'modelo', 'vendedor', 'valor do trade in', 'cliente'];
+  for (let i = 0; i < Math.min(3, rows.length); i++) {
+    const cells = (rows[i] as unknown[]).map(c => String(c ?? '').toLowerCase().trim());
+    if (knownCols.some(col => cells.includes(col))) return i;
+  }
+  return 0;
+}
+
 function parseExcelFile(buffer: ArrayBuffer): Omit<BonusTradeInRow, 'id' | 'highlight' | 'annotation'>[] {
   const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const raw: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
-  return raw.map(r => ({
-    dataVenda:       parseDateValue(r['Data da Venda']       ?? r['DATA_VENDA']        ?? ''),
-    cliente:         String(r['Cliente']             ?? r['CLIENTE']           ?? ''),
-    chassi:          String(r['Chassi']              ?? r['CHASSI']            ?? ''),
-    modelo:          String(r['Modelo']              ?? r['MODELO']            ?? ''),
-    vendedor:        String(r['Vendedor']            ?? r['VENDEDOR']          ?? ''),
-    nTitulo:         String(r['N Titulo']            ?? r['N_TITULO']          ?? r['NUM_TITULO'] ?? ''),
-    valorTradeIn:    String(r['Valor do Trade IN']   ?? r['VALOR_TRADE_IN']    ?? ''),
-    recebido:        String(r['Recebido']            ?? r['RECEBIDO']          ?? ''),
-    dataRecebimento: parseDateValue(r['Data do Recebimento'] ?? r['DATA_RECEBIMENTO']  ?? ''),
+  const allRows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  const headerIdx = detectHeaderRow(allRows);
+  const headers = (allRows[headerIdx] as unknown[]).map(c => String(c ?? '').trim());
+  const dataRows = allRows.slice(headerIdx + 1).filter(r =>
+    (r as unknown[]).some(c => c !== '' && c !== null && c !== undefined)
+  );
+  const idx = (names: string[]) => {
+    for (const n of names) {
+      const i = headers.findIndex(h => h.toLowerCase() === n.toLowerCase());
+      if (i !== -1) return i;
+    }
+    return -1;
+  };
+  const iDataVenda       = idx(['Data da Venda', 'DATA_VENDA']);
+  const iCliente         = idx(['Cliente', 'CLIENTE']);
+  const iChassi          = idx(['Chassi', 'CHASSI']);
+  const iModelo          = idx(['Modelo', 'MODELO']);
+  const iVendedor        = idx(['Vendedor', 'VENDEDOR']);
+  const iNTitulo         = idx(['Nº Título', 'N Titulo', 'N_TITULO', 'NUM_TITULO']);
+  const iValorTradeIn    = idx(['Valor do Trade IN', 'VALOR_TRADE_IN']);
+  const iRecebido        = idx(['Recebido', 'RECEBIDO']);
+  const iDataRecebimento = idx(['Data do Recebimento', 'DATA_RECEBIMENTO']);
+  return dataRows.map(r => ({
+    dataVenda:       parseDateValue(iDataVenda       >= 0 ? (r as unknown[])[iDataVenda]       : ''),
+    cliente:         String(iCliente         >= 0 ? (r as unknown[])[iCliente]         : ''),
+    chassi:          String(iChassi          >= 0 ? (r as unknown[])[iChassi]          : ''),
+    modelo:          String(iModelo          >= 0 ? (r as unknown[])[iModelo]          : ''),
+    vendedor:        String(iVendedor        >= 0 ? (r as unknown[])[iVendedor]        : ''),
+    nTitulo:         String(iNTitulo         >= 0 ? (r as unknown[])[iNTitulo]         : ''),
+    valorTradeIn:    String(iValorTradeIn    >= 0 ? (r as unknown[])[iValorTradeIn]    : ''),
+    recebido:        String(iRecebido        >= 0 ? (r as unknown[])[iRecebido]        : ''),
+    dataRecebimento: parseDateValue(iDataRecebimento >= 0 ? (r as unknown[])[iDataRecebimento] : ''),
   }));
 }
 

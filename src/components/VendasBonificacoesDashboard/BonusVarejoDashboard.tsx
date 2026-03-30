@@ -123,7 +123,6 @@ function parseDateValue(raw: unknown): string {
     return `${dd}/${mm}/${raw.getFullYear()}`;
   }
   const s = String(raw ?? '');
-  // Excel serial number (número inteiro)
   if (/^\d{5}$/.test(s)) {
     const d = new Date(Math.round((Number(s) - 25569) * 86400 * 1000));
     if (!isNaN(d.getTime())) {
@@ -135,16 +134,43 @@ function parseDateValue(raw: unknown): string {
   return s;
 }
 
+// Detecta a linha de header real, pulando linha de título gerada pelo export
+function detectHeaderRow(rows: unknown[][]): number {
+  const knownCols = ['chassi', 'data da venda', 'nota fiscal', 'valor', 'vendedor'];
+  for (let i = 0; i < Math.min(3, rows.length); i++) {
+    const cells = (rows[i] as unknown[]).map(c => String(c ?? '').toLowerCase().trim());
+    if (knownCols.some(col => cells.includes(col))) return i;
+  }
+  return 0;
+}
+
 function parseExcelFile(buffer: ArrayBuffer): Omit<BonusVarejoRow, 'id' | 'highlight' | 'annotation'>[] {
   const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const raw: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
-  return raw.map(r => ({
-    chassi:     String(r['Chassi']        ?? r['CHASSI']      ?? ''),
-    data:       parseDateValue(r['Data da Venda'] ?? r['Data'] ?? r['DATA'] ?? ''),
-    notaFiscal: String(r['Nota Fiscal']   ?? r['NOTA_FISCAL'] ?? r['NF']   ?? ''),
-    valor:      String(r['Valor']         ?? r['VALOR']       ?? ''),
-    vendedor:   String(r['Vendedor']      ?? r['VENDEDOR']    ?? ''),
+  const allRows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  const headerIdx = detectHeaderRow(allRows);
+  const headers = (allRows[headerIdx] as unknown[]).map(c => String(c ?? '').trim());
+  const dataRows = allRows.slice(headerIdx + 1).filter(r =>
+    (r as unknown[]).some(c => c !== '' && c !== null && c !== undefined)
+  );
+  const idx = (names: string[]) => {
+    for (const n of names) {
+      const i = headers.findIndex(h => h.toLowerCase() === n.toLowerCase());
+      if (i !== -1) return i;
+    }
+    return -1;
+  };
+  const iChassi     = idx(['Chassi', 'CHASSI']);
+  const iData       = idx(['Data da Venda', 'Data', 'DATA']);
+  const iNotaFiscal = idx(['Nota Fiscal', 'NOTA_FISCAL', 'NF']);
+  const iValor      = idx(['Valor', 'VALOR']);
+  const iVendedor   = idx(['Vendedor', 'VENDEDOR']);
+  return dataRows.map(r => ({
+    chassi:     String(iChassi     >= 0 ? (r as unknown[])[iChassi]     : ''),
+    data:       parseDateValue(iData >= 0 ? (r as unknown[])[iData] : ''),
+    notaFiscal: String(iNotaFiscal >= 0 ? (r as unknown[])[iNotaFiscal] : ''),
+    valor:      String(iValor      >= 0 ? (r as unknown[])[iValor]      : ''),
+    vendedor:   String(iVendedor   >= 0 ? (r as unknown[])[iVendedor]   : ''),
   }));
 }
 
