@@ -11,7 +11,7 @@ import {
   saveVendasResultadoRows,
   emptyVendasResultadoRow,
 } from './vendasResultadoStorage';
-import { loadAliquotas } from './vendedoresRemuneracaoStorage';
+import { loadAliquotas, loadRemuneracao, type RemuneracaoData, type RemuneracaoModalidade, type FaixaBonus } from './vendedoresRemuneracaoStorage';
 import { loadModelos, loadRegras, getRegra, type VeiculoModelo, type VeiculoRegra } from './veiculosRegrasStorage';
 import { loadJurosRotativoRows, type JurosRotativoRow } from './jurosRotativoStorage';
 
@@ -99,6 +99,76 @@ function applyJurosAutoFill(
     const total = jurosMap.get(nota);
     if (total === undefined) return row;
     return { ...row, jurosEstoque: total.toFixed(2) };
+  });
+}
+
+// ─── Auto-preenchimento Comissão de Venda ────────────────────────────────────
+function getDateParts(dateStr: string): { year: number; month: number } | null {
+  if (!dateStr) return null;
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(dateStr)) {
+    return { year: parseInt(dateStr.split('/')[2]), month: parseInt(dateStr.split('/')[1]) };
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+    return { year: parseInt(dateStr.split('-')[0]), month: parseInt(dateStr.split('-')[1]) };
+  }
+  return null;
+}
+
+function findFaixaBonus(faixas: FaixaBonus[], qtd: number): FaixaBonus | null {
+  for (const f of faixas) {
+    const de = parseInt(f.de) || 0;
+    const ate = f.ate ? parseInt(f.ate) : Infinity;
+    if (qtd >= de && qtd <= ate) return f;
+  }
+  return null;
+}
+
+function buildVendorMonthCounts(rows: VendasResultadoRow[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    const vendedor = (row.vendedor ?? '').trim().toLowerCase();
+    if (!vendedor) continue;
+    const period = getDateParts(row.dataVenda);
+    if (!period) continue;
+    const key = `${vendedor}|${period.year}|${period.month}`;
+    map.set(key, (map.get(key) ?? 0) + 1);
+  }
+  return map;
+}
+
+function applyComissaoAutoFill(
+  rows: VendasResultadoRow[],
+  modalidade: RemuneracaoModalidade,
+  isUsados: boolean,
+): VendasResultadoRow[] {
+  const vendorMonthCounts = buildVendorMonthCounts(rows);
+  return rows.map(row => {
+    if (row.comissaoVenda !== '') return row;
+    const vv = n(row.valorVenda);
+    if (vv === 0) return row;
+    const recLiq = vv - n(row.impostos);
+    const lb = recLiq - n(row.valorCusto) + n(row.bonusVarejo) + (!isUsados ? n(row.bonusTradeIn ?? '') : 0);
+    // 1. Comissão s/ Venda
+    const pct1 = parseFloat(String(modalidade.comissaoVenda).replace(',', '.')) || 0;
+    const com1 = vv * pct1 / 100;
+    // 2. Bônus de Produtividade (qtd vendas do vendedor no mesmo mês/aba)
+    const vendedor = (row.vendedor ?? '').trim().toLowerCase();
+    const period = getDateParts(row.dataVenda);
+    let com2 = 0;
+    if (vendedor && period) {
+      const key = `${vendedor}|${period.year}|${period.month}`;
+      const qtd = vendorMonthCounts.get(key) ?? 0;
+      const faixa = findFaixaBonus(modalidade.faixasBonus, qtd);
+      if (faixa) {
+        com2 = vv * (parseFloat(String(faixa.percentual).replace(',', '.')) || 0) / 100;
+      }
+    }
+    // 3. Comissão s/ Lucro Bruto (sem descontar impostos sobre bônus)
+    const pct3 = parseFloat(String(modalidade.comissaoLucroBruto).replace(',', '.')) || 0;
+    const com3 = lb * pct3 / 100;
+    const total = com1 + com2 + com3;
+    if (total === 0) return row;
+    return { ...row, comissaoVenda: total.toFixed(2) };
   });
 }
 
@@ -352,9 +422,19 @@ export default function VendasResultadoDashboard() {
   const [modelos, setModelos] = useState<VeiculoModelo[]>([]);
   const [regras,  setRegras]  = useState<VeiculoRegra[]>([]);
   const [jurosMap, setJurosMap] = useState<Map<string, number>>(new Map());
+  const [remuneracao, setRemuneracao] = useState<RemuneracaoData | null>(null);
+  const remuneracaoRef = useRef<RemuneracaoData | null>(null);
 
   useEffect(() => {
-    loadVendasResultadoRows(activeTab).then(setRows);
+    loadVendasResultadoRows(activeTab).then(loaded => {
+      const rem = remuneracaoRef.current;
+      if (rem && activeTab !== 'direta') {
+        const modalidade = rem[activeTab as 'novos' | 'usados'];
+        setRows(applyComissaoAutoFill(loaded, modalidade, activeTab === 'usados'));
+      } else {
+        setRows(loaded);
+      }
+    });
   }, [activeTab]);
 
   // Carrega modelos/regras/juros apenas para a aba Novos
@@ -380,7 +460,15 @@ export default function VendasResultadoDashboard() {
         .reduce((acc, i) => acc + (parseFloat(i.aliquota) || 0), 0);
       setAliquotaBonPct(soma);
     });
+    loadRemuneracao().then(r => { remuneracaoRef.current = r; setRemuneracao(r); });
   }, []);
+
+  // Aplica auto-preenchimento de Comissão quando a remuneração é carregada
+  useEffect(() => {
+    if (!remuneracao || activeTab === 'direta') return;
+    const modalidade = remuneracao[activeTab as 'novos' | 'usados'];
+    setRows(prev => applyComissaoAutoFill(prev, modalidade, activeTab === 'usados'));
+  }, [remuneracao, activeTab]);
 
   const save = useCallback(async (updated: VendasResultadoRow[]) => {
     setRows(updated);
