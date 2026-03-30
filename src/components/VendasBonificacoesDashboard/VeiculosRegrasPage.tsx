@@ -14,6 +14,7 @@ import {
   getRegra,
   createEmptyRegra,
 } from './veiculosRegrasStorage';
+import { loadRegistroRows } from './registroVendasStorage';
 
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -31,6 +32,8 @@ function fmtPercent(val: string): string {
 }
 
 const EMPTY_MODELO: Omit<VeiculoModelo, 'id'> = { marca: 'VW', modelo: '', ativo: true };
+
+type ModeloExibir = VeiculoModelo & { fromSales?: boolean };
 
 export function VeiculosRegrasPage() {
   const [subTab, setSubTab] = useState<'modelos' | 'regras'>('modelos');
@@ -51,6 +54,7 @@ export function VeiculosRegrasPage() {
   const [editingRegraModeloId, setEditingRegraModeloId] = useState<string | null>(null);
   const [editRegraValues, setEditRegraValues]           = useState<VeiculoRegra | null>(null);
   const [confirmCopyPrev, setConfirmCopyPrev] = useState(false);
+  const [novosSales, setNovosSales] = useState<Array<{ modelo: string; dtaVenda: string; periodoImport?: string }>>([]);
 
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +66,16 @@ export function VeiculosRegrasPage() {
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    if (filterBrand === 'VW') {
+      loadRegistroRows('novos').then(rows =>
+        setNovosSales(rows.map(r => ({ modelo: r.modelo, dtaVenda: r.dtaVenda, periodoImport: r.periodoImport })))
+      );
+    } else {
+      setNovosSales([]);
+    }
+  }, [filterBrand]);
 
   // ─── Anos disponíveis ──────────────────────────────────────────────────────
   const availableYears = useMemo(() => {
@@ -83,6 +97,40 @@ export function VeiculosRegrasPage() {
     () => INDICADOR_FIELDS.filter(f => f.marcas.includes(filterBrand)),
     [filterBrand],
   );
+
+  // ─── Helpers: período de uma linha de venda ───────────────────────────────
+  function rowPeriodo(dtaVenda: string, periodoImport?: string): string | null {
+    if (periodoImport) return periodoImport;
+    if (!dtaVenda) return null;
+    const m1 = dtaVenda.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if (m1) return `${m1[3]}-${m1[2]}`;
+    const m2 = dtaVenda.match(/^(\d{4})-(\d{2})/);
+    if (m2) return `${m2[1]}-${m2[2]}`;
+    return null;
+  }
+
+  // ─── Modelos das vendas do mês selecionado (apenas VW Novos) ─────────────
+  const modelosFromSales = useMemo((): string[] => {
+    if (filterBrand !== 'VW') return [];
+    const target = `${filterYear}-${String(filterMonth).padStart(2, '0')}`;
+    const names = new Set<string>();
+    novosSales.forEach(r => {
+      if (rowPeriodo(r.dtaVenda, r.periodoImport) === target) {
+        const nome = r.modelo?.trim();
+        if (nome) names.add(nome);
+      }
+    });
+    return Array.from(names).sort();
+  }, [novosSales, filterYear, filterMonth, filterBrand]);
+
+  // ─── Modelos para exibir na grade (cadastrados + novos das vendas) ────────
+  const modelosParaExibir = useMemo((): ModeloExibir[] => {
+    const knownNames = new Set(modelosFiltrados.map(m => m.modelo.trim().toLowerCase()));
+    const extras: ModeloExibir[] = modelosFromSales
+      .filter(nome => !knownNames.has(nome.toLowerCase()))
+      .map(nome => ({ id: `__sales__${nome}`, marca: 'VW' as MarcaVeiculo, modelo: nome, ativo: true, fromSales: true }));
+    return [...modelosFiltrados, ...extras].sort((a, b) => a.modelo.localeCompare(b.modelo));
+  }, [modelosFiltrados, modelosFromSales]);
 
   // ─── Handlers: Modelos ─────────────────────────────────────────────────────
   async function handleAddModelo() {
@@ -116,7 +164,16 @@ export function VeiculosRegrasPage() {
   }
 
   // ─── Handlers: Regras ─────────────────────────────────────────────────────
-  function handleEditRegra(modeloId: string) {
+  async function handleEditRegra(m: ModeloExibir) {
+    let modeloId = m.id;
+    if (m.fromSales) {
+      const created: VeiculoModelo = { id: crypto.randomUUID(), marca: 'VW', modelo: m.modelo, ativo: true };
+      const updated = [...modelos, created];
+      setModelos(updated);
+      await saveModelos(updated);
+      modeloId = created.id;
+      toast.success(`"${created.modelo}" adicionado aos modelos cadastrados.`);
+    }
     const existing = getRegra(regras, modeloId, filterYear, filterMonth);
     setEditingRegraModeloId(modeloId);
     setEditRegraValues(existing ? { ...existing } : createEmptyRegra(modeloId, filterYear, filterMonth));
@@ -420,23 +477,30 @@ export function VeiculosRegrasPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {modelosFiltrados.length === 0 ? (
+                {modelosParaExibir.length === 0 ? (
                   <tr>
                     <td colSpan={2 + indicadoresFiltrados.length + 1} className="px-4 py-10 text-center text-slate-400">
-                      Nenhum modelo ativo para {filterBrand}. Cadastre modelos na aba "Modelos Cadastrados".
+                      Nenhum modelo ativo para {filterBrand}. Cadastre modelos na aba "Modelos Cadastrados"{filterBrand === 'VW' ? ' ou importe as vendas do mês' : ''}.
                     </td>
                   </tr>
-                ) : modelosFiltrados.map((m, i) => {
-                  const regra = getRegra(regras, m.id, filterYear, filterMonth);
+                ) : modelosParaExibir.map((m, i) => {
+                  const isVirtual = !!m.fromSales;
+                  const regra = isVirtual ? undefined : getRegra(regras, m.id, filterYear, filterMonth);
                   const isEditing = editingRegraModeloId === m.id;
                   const ev = isEditing ? editRegraValues! : regra;
-                  const rowBg = i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
+                  const rowBg = isVirtual ? 'bg-amber-50' : (i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60');
                   return (
                     <tr key={m.id} className={`${rowBg} hover:bg-yellow-50/30 transition-colors`}>
                       {/* Coluna modelo — sticky */}
                       <td className={`sticky left-0 z-10 ${rowBg} px-4 py-2 font-semibold text-slate-700 border-r border-slate-100 whitespace-nowrap`}>
                         {m.modelo}
-                        {!regra && !isEditing && (
+                        {isVirtual && !isEditing && (
+                          <span className="ml-2 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            Novo · Sem regra
+                          </span>
+                        )}
+                        {!isVirtual && !regra && !isEditing && (
                           <span className="ml-2 text-[9px] text-slate-300 font-normal">sem dados</span>
                         )}
                       </td>
@@ -484,11 +548,11 @@ export function VeiculosRegrasPage() {
                           </div>
                         ) : (
                           <button
-                            onClick={() => handleEditRegra(m.id)}
-                            title="Editar"
-                            className="p-1.5 rounded text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                            onClick={() => handleEditRegra(m)}
+                            title={isVirtual ? 'Cadastrar e definir regra' : 'Editar'}
+                            className={`p-1.5 rounded transition-colors ${isVirtual ? 'text-amber-400 hover:text-amber-600 hover:bg-amber-50' : 'text-slate-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            {isVirtual ? <Plus className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
                           </button>
                         )}
                       </td>
