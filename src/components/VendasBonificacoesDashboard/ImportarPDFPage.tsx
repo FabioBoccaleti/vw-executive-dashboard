@@ -529,7 +529,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const consolidated = pages ? buildConsolidated(pages) : null;
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
+    <div className="h-screen bg-slate-100 flex flex-col overflow-hidden">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div>
