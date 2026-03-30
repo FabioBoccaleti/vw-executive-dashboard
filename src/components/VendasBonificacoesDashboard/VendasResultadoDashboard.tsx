@@ -599,7 +599,7 @@ export default function VendasResultadoDashboard() {
       {/* Tabela */}
       <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
         <div ref={tableRef} onScroll={() => { if (scrollbarRef.current && tableRef.current) scrollbarRef.current.scrollLeft = tableRef.current.scrollLeft; }} className="flex-1 overflow-auto" style={{ minHeight: 0 }}>
-        <table className="w-full border-collapse text-xs" style={{ minWidth: 2800 }}>
+        <table className="w-full border-separate border-spacing-0 text-xs" style={{ minWidth: 2800 }}>
           <thead className="sticky top-0 z-10">
             {/* Grupo de cabeçalho */}
             <tr>
