@@ -11,7 +11,7 @@ import {
   saveVendasResultadoRows,
   emptyVendasResultadoRow,
 } from './vendasResultadoStorage';
-import { loadAliquotas, loadRemuneracao, type RemuneracaoData, type RemuneracaoModalidade, type FaixaBonus } from './vendedoresRemuneracaoStorage';
+import { loadAliquotas, loadRemuneracao, loadVendasDsr, type RemuneracaoData, type RemuneracaoModalidade, type FaixaBonus, type VendasDsrConfig } from './vendedoresRemuneracaoStorage';
 import { loadModelos, loadRegras, getRegra, type VeiculoModelo, type VeiculoRegra } from './veiculosRegrasStorage';
 import { loadJurosRotativoRows, type JurosRotativoRow } from './jurosRotativoStorage';
 
@@ -25,7 +25,22 @@ function fmtPct(v: number): string {
 }
 
 // ─── Cálculos derivados ───────────────────────────────────────────────────────
-function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false, aliquotaBonPct = 0) {
+// ─── Helper DSR ───────────────────────────────────────────────────────────────
+function getDsrPct(configs: VendasDsrConfig[], dateStr: string): number {
+  let ano: number | null = null, mes: number | null = null;
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(dateStr)) {
+    ano = parseInt(dateStr.split('/')[2]);
+    mes = parseInt(dateStr.split('/')[1]);
+  } else if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+    ano = parseInt(dateStr.split('-')[0]);
+    mes = parseInt(dateStr.split('-')[1]);
+  }
+  if (!ano || !mes) return 0;
+  const cfg = configs.find(c => c.ano === ano && c.mes === mes);
+  return cfg ? (parseFloat(cfg.percentual) || 0) : 0;
+}
+
+function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false, aliquotaBonPct = 0, dsrPct = 0) {
   const comissaoBruta      = isDireta ? n(r.valorVenda) * n(r.pctComissao) / 100 : 0;
   const recLiq             = isDireta ? comissaoBruta - n(r.impostos) : n(r.valorVenda) - n(r.impostos);
   const comissaoLiquidaPct = n(r.valorVenda) !== 0 ? (recLiq / n(r.valorVenda)) * 100 : 0;
@@ -38,14 +53,15 @@ function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false, aliq
   const impostosBonificacoes = !isDireta && !isUsados ? bonuses * (aliquotaBonPct / 100) : 0;
   const lucroComBon        = (isDireta ? recLiq : lucroBruto) + bonuses - (!isDireta && !isUsados ? impostosBonificacoes : 0);
   const lucroComBonPct     = recLiq !== 0 ? (lucroComBon / recLiq) * 100 : 0;
+  const dsr                = n(r.comissaoVenda) * dsrPct / 100;
   const resultado          = (isUsados ? lucroBruto : lucroComBon) + n(r.recBlindagem) + n(r.recFinanciamento) + n(r.recDespachante)
                            - (isDireta ? 0 : n(r.jurosEstoque))
                            - (!isUsados ? n(r.ciDesconto) + n(r.cortesiaEmplacamento) : 0)
                            - (isUsados ? n(r.cortesiaTransferencia) : 0)
-                           - n(r.comissaoVenda) - n(r.dsr)
+                           - n(r.comissaoVenda) - dsr
                            - n(r.provisoes) - n(r.encargos) - n(r.outrasDespesas);
   const resultadoPct       = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
-  return { comissaoBruta, recLiq, comissaoLiquidaPct, impostosBonus, impostosTradeIn, lucroBruto, lucroBrutoPct, impostosBonificacoes, lucroComBon, lucroComBonPct, resultado, resultadoPct };
+  return { comissaoBruta, recLiq, comissaoLiquidaPct, impostosBonus, impostosTradeIn, lucroBruto, lucroBrutoPct, impostosBonificacoes, lucroComBon, lucroComBonPct, dsr, resultado, resultadoPct };
 }
 
 // ─── Auto-preenchimento PIV/SIQ/PIVE ────────────────────────────────────────
@@ -67,11 +83,32 @@ function applyAutoFill(
     const regra = getRegra(regras, modelo.id, ano, mes);
     if (!regra) return row;
     const preco = parseFloat(String(regra.precoPublico).replace(',', '.')) || 0;
+    const sign = row.transacao === 'V07' ? -1 : 1;
     return {
       ...row,
-      bonusPIV:  row.bonusPIV  === '' ? (preco * (parseFloat(String(regra.piv).replace(',',  '.')) || 0) / 100).toFixed(2) : row.bonusPIV,
-      bonusSIQ:  row.bonusSIQ  === '' ? (preco * (parseFloat(String(regra.siq).replace(',',  '.')) || 0) / 100).toFixed(2) : row.bonusSIQ,
-      bonusPIVE: row.bonusPIVE === '' ? (preco * (parseFloat(String(regra.pive).replace(',', '.')) || 0) / 100).toFixed(2) : row.bonusPIVE,
+      bonusPIV:  row.bonusPIV  === '' ? (preco * (parseFloat(String(regra.piv).replace(',',  '.')) || 0) / 100 * sign).toFixed(2) : row.bonusPIV,
+      bonusSIQ:  row.bonusSIQ  === '' ? (preco * (parseFloat(String(regra.siq).replace(',',  '.')) || 0) / 100 * sign).toFixed(2) : row.bonusSIQ,
+      bonusPIVE: row.bonusPIVE === '' ? (preco * (parseFloat(String(regra.pive).replace(',', '.')) || 0) / 100 * sign).toFixed(2) : row.bonusPIVE,
+    };
+  });
+}
+
+// Inverte o sinal de PIV/SIQ/PIVE de uma linha ao mudar a transação
+function applyTransacaoSign(rows: VendasResultadoRow[], changedId: string, newTransacao: string): VendasResultadoRow[] {
+  return rows.map(row => {
+    if (row.id !== changedId) return row;
+    const factor = newTransacao === 'V07' ? -1 : 1;
+    const applySign = (v: string) => {
+      if (!v) return v;
+      const num = Math.abs(parseFloat(v));
+      if (isNaN(num)) return v;
+      return (num * factor).toFixed(2);
+    };
+    return {
+      ...row,
+      bonusPIV:  applySign(row.bonusPIV),
+      bonusSIQ:  applySign(row.bonusSIQ),
+      bonusPIVE: applySign(row.bonusPIVE),
     };
   });
 }
@@ -419,6 +456,7 @@ export default function VendasResultadoDashboard() {
   const [editingAnnotation, setEditingAnnotation] = useState<string | null>(null);
   const [annotationDraft, setAnnotationDraft]     = useState('');
   const [aliquotaBonPct, setAliquotaBonPct] = useState(0);
+  const [dsrConfigs, setDsrConfigs] = useState<VendasDsrConfig[]>([]);
   const [modelos, setModelos] = useState<VeiculoModelo[]>([]);
   const [regras,  setRegras]  = useState<VeiculoRegra[]>([]);
   const [jurosMap, setJurosMap] = useState<Map<string, number>>(new Map());
@@ -465,6 +503,7 @@ export default function VendasResultadoDashboard() {
       setAliquotaBonPct(soma);
     });
     loadRemuneracao().then(r => { remuneracaoRef.current = r; setRemuneracao(r); });
+    loadVendasDsr().then(setDsrConfigs);
   }, []);
 
   // Aplica auto-preenchimento de Comissão quando a remuneração é carregada
@@ -533,6 +572,10 @@ export default function VendasResultadoDashboard() {
       if (key === 'notaCompra') {
         updated = applyJurosAutoFill(updated, jurosMap);
       }
+      // Se a transação foi alterada, ajusta o sinal de PIV/SIQ/PIVE (V07 = negativo, demais = positivo)
+      if (key === 'transacao') {
+        updated = applyTransacaoSign(updated, id, value);
+      }
     }
     save(updated);
   }
@@ -588,20 +631,45 @@ export default function VendasResultadoDashboard() {
     const impostosTradeIn  = isUsados ? bVarejo * aliquotaBonPct / 100 : 0;
     const lb         = recLiq - custo + bVarejo + (!isDireta && !isUsados ? bTradeIn : 0) - impostosBonus - impostosTradeIn;
     const lbPct      = recLiq !== 0 ? (lb / recLiq) * 100 : 0;
-    const bonuses    = sum('bonusPIV') + sum('bonusSIQ') + sum('bonusPIVE')
-                     + sum('bonusAdic1') + sum('bonusAdic2') + sum('bonusAdic3');
+    const bPIV   = sum('bonusPIV');
+    const bSIQ   = sum('bonusSIQ');
+    const bPIVE  = sum('bonusPIVE');
+    const bAdic1 = sum('bonusAdic1');
+    const bAdic2 = sum('bonusAdic2');
+    const bAdic3 = sum('bonusAdic3');
+    const bonuses = bPIV + bSIQ + bPIVE + bAdic1 + bAdic2 + bAdic3;
     const impostosBonificacoes = !isDireta && !isUsados ? bonuses * aliquotaBonPct / 100 : 0;
     const lcb        = (isDireta ? recLiq : lb) + bonuses - impostosBonificacoes;
     const lcbPct     = recLiq !== 0 ? (lcb / recLiq) * 100 : 0;
-    const resultado  = (isUsados ? lb : lcb) + sum('recBlindagem') + sum('recFinanciamento') + sum('recDespachante')
-                     - (isDireta ? 0 : sum('jurosEstoque'))
-                     - (!isUsados ? sum('ciDesconto') + sum('cortesiaEmplacamento') : 0)
-                     - (isUsados ? sum('cortesiaTransferencia') : 0)
-                     - sum('comissaoVenda') - sum('dsr')
-                     - sum('provisoes') - sum('encargos') - sum('outrasDespesas');
+    const totRecBlindagem          = sum('recBlindagem');
+    const totRecFinanciamento      = sum('recFinanciamento');
+    const totRecDespachante        = sum('recDespachante');
+    const totJurosEstoque          = isDireta ? 0 : sum('jurosEstoque');
+    const totCiDesconto            = isUsados ? 0 : sum('ciDesconto');
+    const totCortesiaEmplacamento  = isUsados ? 0 : sum('cortesiaEmplacamento');
+    const totCortesiaTransferencia = isUsados ? sum('cortesiaTransferencia') : 0;
+    const totComissaoVenda         = sum('comissaoVenda');
+    const totDsr                   = filteredRows.reduce((acc, r) => {
+      const pct = getDsrPct(dsrConfigs, r.dataVenda);
+      return acc + n(r.comissaoVenda) * pct / 100;
+    }, 0);
+    const totProvisoes             = sum('provisoes');
+    const totEncargos              = sum('encargos');
+    const totOutrasDespesas        = sum('outrasDespesas');
+    const resultado  = (isUsados ? lb : lcb) + totRecBlindagem + totRecFinanciamento + totRecDespachante
+                     - totJurosEstoque - totCiDesconto - totCortesiaEmplacamento - totCortesiaTransferencia
+                     - totComissaoVenda - totDsr - totProvisoes - totEncargos - totOutrasDespesas;
     const resPct     = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
-    return { valorVenda, impostos, comissaoBruta, pctComissaoMedia, recLiq, comissaoLiquidaPct, custo, bVarejo, bTradeIn, impostosBonus, impostosTradeIn, lb, lbPct, lcb, lcbPct, resultado, resPct };
-  }, [filteredRows, activeTab, aliquotaBonPct]);
+    return {
+      valorVenda, impostos, comissaoBruta, pctComissaoMedia, recLiq, comissaoLiquidaPct,
+      custo, bVarejo, bTradeIn, impostosBonus, impostosTradeIn, lb, lbPct,
+      bPIV, bSIQ, bPIVE, bAdic1, bAdic2, bAdic3, impostosBonificacoes, lcb, lcbPct,
+      totRecBlindagem, totRecFinanciamento, totRecDespachante,
+      totJurosEstoque, totCiDesconto, totCortesiaEmplacamento, totCortesiaTransferencia,
+      totComissaoVenda, totDsr, totProvisoes, totEncargos, totOutrasDespesas,
+      resultado, resPct,
+    };
+  }, [filteredRows, activeTab, aliquotaBonPct, dsrConfigs]);
 
   const isDireta = activeTab === 'direta';
   const isUsados = activeTab === 'usados';
@@ -766,7 +834,8 @@ export default function VendasResultadoDashboard() {
               </tr>
             )}
             {filteredRows.map((row, ri) => {
-              const c = calcRow(row, isDireta, isUsados, aliquotaBonPct);
+              const dsrPct = getDsrPct(dsrConfigs, row.dataVenda);
+              const c = calcRow(row, isDireta, isUsados, aliquotaBonPct, dsrPct);
               const bg = row.highlight ? 'bg-yellow-50' : ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
               const td = `${bg} border-b border-slate-100 align-middle`;
               const tdR = `${td} text-right`;
@@ -832,7 +901,7 @@ export default function VendasResultadoDashboard() {
                   {!isUsados && <td className={`${tdR} px-2 min-w-[130px]`}>{EC('cortesiaEmplacamento', 'currency')}</td>}
                   {isUsados && <td className={`${tdR} px-2 min-w-[130px]`}>{EC('cortesiaTransferencia', 'currency')}</td>}
                   <td className={`${tdR} px-2 min-w-[110px]`}>{EC('comissaoVenda', 'currency')}</td>
-                  <td className={`${tdR} px-2 min-w-[80px]`}>{EC('dsr', 'currency')}</td>
+                  <td className={`${tdR} px-2 min-w-[80px]`}><CalcCell value={c.dsr} negative /></td>
                   <td className={`${tdR} px-2 min-w-[90px]`}>{EC('provisoes', 'currency')}</td>
                   <td className={`${tdR} px-2 min-w-[90px]`}>{EC('encargos', 'currency')}</td>
                   <td className={`${tdR} px-2 min-w-[100px]`}>{EC('outrasDespesas', 'currency')}</td>
@@ -889,12 +958,29 @@ export default function VendasResultadoDashboard() {
                 )}
                 {!isDireta && !isUsados && (
                   <>
-                    <td colSpan={7} className="px-2 py-2 text-center text-slate-400 text-[10px]">—</td>
+                    <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.bPIV)}</td>
+                    <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.bSIQ)}</td>
+                    <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.bPIVE)}</td>
+                    <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.bAdic1)}</td>
+                    <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.bAdic2)}</td>
+                    <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.bAdic3)}</td>
+                    <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.impostosBonificacoes)}</td>
                     <td className={`px-2 py-2 text-right font-mono ${totals.lcb >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.lcb)}</td>
                     <td className={`px-2 py-2 text-right font-mono ${totals.lcbPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{fmtPct(totals.lcbPct)}</td>
                   </>
                 )}
-                <td colSpan={isDireta ? 10 : isUsados ? 10 : 11} className="px-2 py-2 text-center text-slate-400 text-[10px]">—</td>
+                <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.totRecBlindagem)}</td>
+                <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.totRecFinanciamento)}</td>
+                <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.totRecDespachante)}</td>
+                {!isDireta && <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.totJurosEstoque)}</td>}
+                {!isUsados && <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.totCiDesconto)}</td>}
+                {!isUsados && <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.totCortesiaEmplacamento)}</td>}
+                {isUsados && <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.totCortesiaTransferencia)}</td>}
+                <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.totComissaoVenda)}</td>
+                <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.totDsr)}</td>
+                <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.totProvisoes)}</td>
+                <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.totEncargos)}</td>
+                <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.totOutrasDespesas)}</td>
                 <td className={`px-2 py-2 text-right font-mono ${totals.resultado >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.resultado)}</td>
                 <td className={`px-2 py-2 text-right font-mono ${totals.resPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{fmtPct(totals.resPct)}</td>
                 <td className="px-2 py-2" />
