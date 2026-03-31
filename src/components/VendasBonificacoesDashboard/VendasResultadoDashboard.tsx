@@ -54,14 +54,19 @@ function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false, aliq
   const lucroComBon        = (isDireta ? recLiq : lucroBruto) + bonuses - (!isDireta && !isUsados ? impostosBonificacoes : 0);
   const lucroComBonPct     = recLiq !== 0 ? (lucroComBon / recLiq) * 100 : 0;
   const dsr                = n(r.comissaoVenda) * dsrPct / 100;
+  // Provisões: Férias(base/12) + 13°(base/12) + 1/3 Férias(base/36) = base * 7/36
+  const baseProvEnc        = n(r.comissaoVenda) + dsr;
+  const provisoes          = baseProvEnc * (7 / 36);
+  // Encargos: (base + provisões) * 35,8%  (27,8% INSS + 8% FGTS)
+  const encargos           = (baseProvEnc + provisoes) * 0.358;
   const resultado          = (isUsados ? lucroBruto : lucroComBon) + n(r.recBlindagem) + n(r.recFinanciamento) + n(r.recDespachante)
                            - (isDireta ? 0 : n(r.jurosEstoque))
                            - (!isUsados ? n(r.ciDesconto) + n(r.cortesiaEmplacamento) : 0)
                            - (isUsados ? n(r.cortesiaTransferencia) : 0)
                            - n(r.comissaoVenda) - dsr
-                           - n(r.provisoes) - n(r.encargos) - n(r.outrasDespesas);
+                           - provisoes - encargos - n(r.outrasDespesas);
   const resultadoPct       = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
-  return { comissaoBruta, recLiq, comissaoLiquidaPct, impostosBonus, impostosTradeIn, lucroBruto, lucroBrutoPct, impostosBonificacoes, lucroComBon, lucroComBonPct, dsr, resultado, resultadoPct };
+  return { comissaoBruta, recLiq, comissaoLiquidaPct, impostosBonus, impostosTradeIn, lucroBruto, lucroBrutoPct, impostosBonificacoes, lucroComBon, lucroComBonPct, dsr, provisoes, encargos, resultado, resultadoPct };
 }
 
 // ─── Auto-preenchimento PIV/SIQ/PIVE ────────────────────────────────────────
@@ -201,6 +206,44 @@ function applyComissaoAutoFill(
       }
     }
     // 3. Comissão s/ Lucro Bruto (sem descontar impostos sobre bônus)
+    const pct3 = parseFloat(String(modalidade.comissaoLucroBruto).replace(',', '.')) || 0;
+    const com3 = lb * pct3 / 100;
+    const total = com1 + com2 + com3;
+    if (total === 0) return row;
+    return { ...row, comissaoVenda: total.toFixed(2) };
+  });
+}
+
+// ─── Auto-preenchimento Comissão Venda p/ aba Direta/Frotista ────────────────
+function applyComissaoAutoFillDireta(
+  rows: VendasResultadoRow[],
+  modalidade: RemuneracaoModalidade,
+): VendasResultadoRow[] {
+  const vendorMonthCounts = buildVendorMonthCounts(rows);
+  return rows.map(row => {
+    const vv = n(row.valorVenda);
+    if (vv === 0) return row;
+    // Lucro bruto para cálculo da comissão: Comissão Bruta - CI Desconto - Cort. Emplacamento - Outras Despesas
+    // Se % Comissão não estiver preenchido, lb = 0 e com3 = 0, mas com1 (% s/ Venda) ainda é calculado
+    const pctComissao = n(row.pctComissao);
+    const comissaoBruta = vv * pctComissao / 100;
+    const lb = comissaoBruta - n(row.ciDesconto) - n(row.cortesiaEmplacamento) - n(row.outrasDespesas);
+    // 1. Comissão s/ Venda
+    const pct1 = parseFloat(String(modalidade.comissaoVenda).replace(',', '.')) || 0;
+    const com1 = vv * pct1 / 100;
+    // 2. Bônus de Produtividade
+    const vendedor = (row.vendedor ?? '').trim().toLowerCase();
+    const period = getDateParts(row.dataVenda);
+    let com2 = 0;
+    if (vendedor && period) {
+      const key = `${vendedor}|${period.year}|${period.month}`;
+      const qtd = vendorMonthCounts.get(key) ?? 0;
+      const faixa = findFaixaBonus(modalidade.faixasBonus, qtd);
+      if (faixa) {
+        com2 = vv * (parseFloat(String(faixa.percentual).replace(',', '.')) || 0) / 100;
+      }
+    }
+    // 3. Comissão s/ Lucro Bruto
     const pct3 = parseFloat(String(modalidade.comissaoLucroBruto).replace(',', '.')) || 0;
     const com3 = lb * pct3 / 100;
     const total = com1 + com2 + com3;
@@ -390,7 +433,7 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
       c.lucroComBon, c.lucroComBonPct,
       n(row.recBlindagem), n(row.recFinanciamento), n(row.recDespachante),
       n(row.ciDesconto), n(row.cortesiaEmplacamento), n(row.comissaoVenda), n(row.dsr),
-      n(row.provisoes), n(row.encargos), n(row.outrasDespesas),
+      c.provisoes, c.encargos, n(row.outrasDespesas),
       c.resultado, c.resultadoPct,
     ] : isUsados ? [
       row.notaCompra, row.chassi, row.modelo, row.cor, row.nfVenda, row.dataVenda,
@@ -400,7 +443,7 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
       n(row.valorCusto), n(row.bonusVarejo), c.lucroBruto, c.lucroBrutoPct,
       n(row.recBlindagem), n(row.recFinanciamento), n(row.recDespachante),
       n(row.jurosEstoque), n(row.cortesiaTransferencia), n(row.comissaoVenda), n(row.dsr),
-      n(row.provisoes), n(row.encargos), n(row.outrasDespesas),
+      c.provisoes, c.encargos, n(row.outrasDespesas),
       c.resultado, c.resultadoPct,
     ] : [
       row.notaCompra, row.chassi, row.modelo, row.cor, row.nfVenda, row.dataVenda,
@@ -413,7 +456,7 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
       c.lucroComBon, c.lucroComBonPct,
       n(row.recBlindagem), n(row.recFinanciamento), n(row.recDespachante),
       n(row.jurosEstoque), n(row.ciDesconto), n(row.cortesiaEmplacamento), n(row.comissaoVenda), n(row.dsr),
-      n(row.provisoes), n(row.encargos), n(row.outrasDespesas),
+      c.provisoes, c.encargos, n(row.outrasDespesas),
       c.resultado, c.resultadoPct,
     ];
     const dr = ws.addRow(vals);
@@ -466,7 +509,9 @@ export default function VendasResultadoDashboard() {
   useEffect(() => {
     loadVendasResultadoRows(activeTab).then(loaded => {
       const rem = remuneracaoRef.current;
-      if (rem && activeTab !== 'direta') {
+      if (rem && activeTab === 'direta') {
+        setRows(applyComissaoAutoFillDireta(loaded, rem.vd_frotista));
+      } else if (rem && activeTab !== 'direta') {
         const modalidade = rem[activeTab as 'novos' | 'usados'];
         setRows(applyComissaoAutoFill(loaded, modalidade, activeTab === 'usados'));
       } else {
@@ -508,9 +553,13 @@ export default function VendasResultadoDashboard() {
 
   // Aplica auto-preenchimento de Comissão quando a remuneração é carregada
   useEffect(() => {
-    if (!remuneracao || activeTab === 'direta') return;
-    const modalidade = remuneracao[activeTab as 'novos' | 'usados'];
-    setRows(prev => applyComissaoAutoFill(prev, modalidade, activeTab === 'usados'));
+    if (!remuneracao) return;
+    if (activeTab === 'direta') {
+      setRows(prev => applyComissaoAutoFillDireta(prev, remuneracao.vd_frotista));
+    } else {
+      const modalidade = remuneracao[activeTab as 'novos' | 'usados'];
+      setRows(prev => applyComissaoAutoFill(prev, modalidade, activeTab === 'usados'));
+    }
   }, [remuneracao, activeTab]);
 
   const save = useCallback(async (updated: VendasResultadoRow[]) => {
@@ -576,6 +625,13 @@ export default function VendasResultadoDashboard() {
       if (key === 'transacao') {
         updated = applyTransacaoSign(updated, id, value);
       }
+    }
+    if (activeTab === 'direta' && remuneracao &&
+        (key === 'valorVenda' || key === 'pctComissao' || key === 'ciDesconto' ||
+         key === 'cortesiaEmplacamento' || key === 'outrasDespesas' || key === 'vendedor' || key === 'dataVenda')) {
+      // Limpa comissaoVenda da linha editada para forçar recalculo
+      updated = updated.map(r => r.id === id ? { ...r, comissaoVenda: '' } : r);
+      updated = applyComissaoAutoFillDireta(updated, remuneracao.vd_frotista);
     }
     save(updated);
   }
@@ -653,8 +709,19 @@ export default function VendasResultadoDashboard() {
       const pct = getDsrPct(dsrConfigs, r.dataVenda);
       return acc + n(r.comissaoVenda) * pct / 100;
     }, 0);
-    const totProvisoes             = sum('provisoes');
-    const totEncargos              = sum('encargos');
+    const totProvisoes             = filteredRows.reduce((acc, r) => {
+      const pct = getDsrPct(dsrConfigs, r.dataVenda);
+      const dsr = n(r.comissaoVenda) * pct / 100;
+      const base = n(r.comissaoVenda) + dsr;
+      return acc + base * (7 / 36);
+    }, 0);
+    const totEncargos              = filteredRows.reduce((acc, r) => {
+      const pct = getDsrPct(dsrConfigs, r.dataVenda);
+      const dsr = n(r.comissaoVenda) * pct / 100;
+      const base = n(r.comissaoVenda) + dsr;
+      const provisoes = base * (7 / 36);
+      return acc + (base + provisoes) * 0.358;
+    }, 0);
     const totOutrasDespesas        = sum('outrasDespesas');
     const resultado  = (isUsados ? lb : lcb) + totRecBlindagem + totRecFinanciamento + totRecDespachante
                      - totJurosEstoque - totCiDesconto - totCortesiaEmplacamento - totCortesiaTransferencia
@@ -902,8 +969,8 @@ export default function VendasResultadoDashboard() {
                   {isUsados && <td className={`${tdR} px-2 min-w-[130px]`}>{EC('cortesiaTransferencia', 'currency')}</td>}
                   <td className={`${tdR} px-2 min-w-[110px]`}>{EC('comissaoVenda', 'currency')}</td>
                   <td className={`${tdR} px-2 min-w-[80px]`}><CalcCell value={c.dsr} negative /></td>
-                  <td className={`${tdR} px-2 min-w-[90px]`}>{EC('provisoes', 'currency')}</td>
-                  <td className={`${tdR} px-2 min-w-[90px]`}>{EC('encargos', 'currency')}</td>
+                  <td className={`${tdR} px-2 min-w-[90px]`}><CalcCell value={c.provisoes} negative /></td>
+                  <td className={`${tdR} px-2 min-w-[90px]`}><CalcCell value={c.encargos} negative /></td>
                   <td className={`${tdR} px-2 min-w-[100px]`}>{EC('outrasDespesas', 'currency')}</td>
                   {/* Resultado */}
                   <td className={`${tdR} px-2 min-w-[110px]`}><CalcCell value={c.resultado} negative /></td>
