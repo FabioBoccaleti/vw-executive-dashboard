@@ -11,6 +11,7 @@ import { BonusTradeInDashboard } from './BonusTradeInDashboard';
 import { JurosRotativoDashboard } from './JurosRotativoDashboard';
 import VendasResultadoDashboard from './VendasResultadoDashboard';
 import { CadastrosVWPage } from './CadastrosVWPage';
+import { VendasNovoAnalise } from './VendasNovoAnalise';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
 import type { TabelaDadosRow } from './tabelaDadosStorage';
 
@@ -438,6 +439,7 @@ function pdfResultsToTableRows(pages: PageResult[]): Omit<TabelaDadosRow, 'id'>[
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mainView, setMainView] = useState<'cadastros' | 'registros' | 'financeiro' | 'vendas' | 'analises'>('registros');
+  const [analiseTab, setAnaliseTab] = useState<'novos' | 'usados' | 'direta' | 'pecas' | 'oficina'>('novos');
   const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros'>('importar');
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
   const [registroFilterYear, setRegistroFilterYear] = useState<number>(new Date().getFullYear());
@@ -679,13 +681,41 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
         </div>
       )}
 
-      {/* Visão Análises — placeholder */}
+      {/* Visão Análises — sub-tabs */}
       {mainView === 'analises' && (
-        <div className="flex-1 flex items-center justify-center text-slate-300">
-          <div className="flex flex-col items-center gap-3">
-            <BarChart2 className="w-12 h-12" />
-            <span className="text-sm">Em desenvolvimento</span>
+        <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+          {/* Sub-tabs */}
+          <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0">
+            {([
+              { id: 'novos',   label: 'Novos' },
+              { id: 'usados',  label: 'Usados' },
+              { id: 'direta',  label: 'VD / Frotista' },
+              { id: 'pecas',   label: 'Peças' },
+              { id: 'oficina', label: 'Oficina' },
+            ] as const).map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setAnaliseTab(tab.id)}
+                className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                  analiseTab === tab.id
+                    ? 'border-blue-600 text-blue-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
+          {/* Conteúdo */}
+          {analiseTab === 'novos' && <VendasNovoAnalise />}
+          {analiseTab !== 'novos' && (
+            <div className="flex-1 flex items-center justify-center text-slate-300">
+              <div className="flex flex-col items-center gap-3">
+                <BarChart2 className="w-12 h-12" />
+                <span className="text-sm">Em desenvolvimento</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
