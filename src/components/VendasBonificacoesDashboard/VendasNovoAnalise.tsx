@@ -1,40 +1,53 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ComposedChart, Line, Cell, PieChart, Pie, LabelList,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, ComposedChart, Line, Cell, PieChart, Pie,
+  LabelList, ReferenceLine, ScatterChart, Scatter, ZAxis,
 } from 'recharts';
-import { TrendingUp, TrendingDown, Download, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  TrendingUp, TrendingDown, Download, AlertTriangle,
+  ChevronDown, ChevronUp, Plus, Trash2, BarChart2, DollarSign,
+  Percent, ShoppingCart,
+} from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { loadVendasResultadoRows, type VendasResultadoRow } from './vendasResultadoStorage';
-import { loadAliquotas, loadVendasDsr, type VendasDsrConfig } from './vendedoresRemuneracaoStorage';
+import {
+  loadAliquotas, loadVendasDsr, loadRemuneracao,
+  type VendasDsrConfig, type RemuneracaoModalidade, type FaixaBonus,
+} from './vendedoresRemuneracaoStorage';
 
-// ─── Constantes ────────────────────────────────────────────────────────────────
-const MS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-const PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16', '#e879f9', '#34d399', '#fb7185'];
-const PIE_COLS = ['#ef4444', '#f97316', '#f59e0b', '#8b5cf6', '#3b82f6'];
+// ─── Paleta ───────────────────────────────────────────────────────────────────
+const MS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const PALETTE = ['#f59e0b','#3b82f6','#10b981','#8b5cf6','#06b6d4','#f97316','#84cc16','#e879f9','#34d399','#fb7185','#fbbf24','#a78bfa'];
+const AVATAR_BG = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','#f97316','#e879f9','#84cc16'];
+const MEDAL_COLOR = ['#f59e0b','#9ca3af','#cd7f32'];
+
+// ─── Tipos auxiliares ─────────────────────────────────────────────────────────
+type ModelMetric   = 'vol' | 'lb' | 'res' | 'ticket' | 'marg' | 'bubble';
+type VendorSort    = 'res' | 'vol' | 'lb' | 'marg';
+type ComissaoMode  = 'total' | 'com' | 'dsr' | 'provEnc';
+type JurosGrouping = 'familia' | 'modelo';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function n(v?: string | null): number { return parseFloat(String(v ?? '').replace(',', '.')) || 0; }
-function fmtBRL(v: number) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }); }
-function fmtBRLFull(v: number) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
-function fmtPct(v: number, d = 1) { return v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%'; }
+const n  = (v?: string | null) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
+const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+const fmtBRLF = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const fmtPct  = (v: number, d = 1) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%';
 
-function getYr(r: VendasResultadoRow): number {
+function getYr(r: VendasResultadoRow) {
   const d = r.dataVenda;
-  if (!d) return 0;
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[2];
-  if (/^\d{4}-\d{2}-\d{2}/.test(d)) return +d.split('-')[0];
+  if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[0];
   return 0;
 }
-function getMo(r: VendasResultadoRow): number {
+function getMo(r: VendasResultadoRow) {
   const d = r.dataVenda;
-  if (!d) return 0;
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[1];
-  if (/^\d{4}-\d{2}-\d{2}/.test(d)) return +d.split('-')[1];
+  if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[1];
   return 0;
 }
-function dsrFor(cfgs: VendasDsrConfig[], dateStr: string): number {
+function dsrFor(cfgs: VendasDsrConfig[], dateStr: string) {
   let a = 0, m = 0;
   if (/^\d{2}\/\d{2}\/\d{4}/.test(dateStr)) { a = +dateStr.split('/')[2]; m = +dateStr.split('/')[1]; }
   else if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) { a = +dateStr.split('-')[0]; m = +dateStr.split('-')[1]; }
@@ -42,240 +55,393 @@ function dsrFor(cfgs: VendasDsrConfig[], dateStr: string): number {
   return c ? parseFloat(c.percentual) || 0 : 0;
 }
 
-// ─── Cálculo por linha (aba Novos) ────────────────────────────────────────────
-interface RC {
-  recLiq: number; lucroBruto: number; bonuses: number; lucroComBon: number;
-  dsr: number; provisoes: number; encargos: number; resultado: number;
+// ─── Auto-fill comissão ───────────────────────────────────────────────────────
+function buildVendorMonthCounts(rows: VendasResultadoRow[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const r of rows) {
+    const v = (r.vendedor ?? '').trim().toLowerCase();
+    const d = r.dataVenda;
+    let a = 0, m = 0;
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) { a = +d.split('/')[2]; m = +d.split('/')[1]; }
+    else if (/^\d{4}-\d{2}-\d{2}/.test(d)) { a = +d.split('-')[0]; m = +d.split('-')[1]; }
+    if (!v || !a || !m) continue;
+    const key = `${v}|${a}|${m}`;
+    map.set(key, (map.get(key) ?? 0) + 1);
+  }
+  return map;
 }
-function calcNovos(r: VendasResultadoRow, aliqBon: number, dsrPct: number): RC {
+function findFaixaBonus(faixas: FaixaBonus[], qtd: number): FaixaBonus | null {
+  for (const f of faixas) {
+    const de = parseInt(f.de) || 0;
+    const ate = f.ate ? parseInt(f.ate) : Infinity;
+    if (qtd >= de && qtd <= ate) return f;
+  }
+  return null;
+}
+function applyComissaoAutoFill(rows: VendasResultadoRow[], modalidade: RemuneracaoModalidade): VendasResultadoRow[] {
+  const counts = buildVendorMonthCounts(rows);
+  return rows.map(row => {
+    if (row.comissaoVenda !== '') return row;
+    const vv = n(row.valorVenda);
+    if (vv === 0) return row;
+    const recLiq = vv - n(row.impostos);
+    const lb = recLiq - n(row.valorCusto) + n(row.bonusVarejo) + n(row.bonusTradeIn ?? '');
+    const pct1 = parseFloat(String(modalidade.comissaoVenda).replace(',', '.')) || 0;
+    const com1 = vv * pct1 / 100;
+    const vend = (row.vendedor ?? '').trim().toLowerCase();
+    const d = row.dataVenda;
+    let a = 0, m = 0;
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) { a = +d.split('/')[2]; m = +d.split('/')[1]; }
+    else if (/^\d{4}-\d{2}-\d{2}/.test(d)) { a = +d.split('-')[0]; m = +d.split('-')[1]; }
+    let com2 = 0;
+    if (vend && a && m) {
+      const key = `${vend}|${a}|${m}`;
+      const qtd = counts.get(key) ?? 0;
+      const faixa = findFaixaBonus(modalidade.faixasBonus, qtd);
+      if (faixa) com2 = vv * (parseFloat(String(faixa.percentual).replace(',', '.')) || 0) / 100;
+    }
+    const pct3 = parseFloat(String(modalidade.comissaoLucroBruto).replace(',', '.')) || 0;
+    const com3 = lb * pct3 / 100;
+    const total = com1 + com2 + com3;
+    if (total === 0) return row;
+    return { ...row, comissaoVenda: total.toFixed(2) };
+  });
+}
+
+// ─── Normalização modelo → família ────────────────────────────────────────────
+function normalizeModelo(raw: string): string {
+  const u = (raw || '').toUpperCase()
+    .replace(/[ÀÁÂÃÄ]/g,'A').replace(/[ÈÉÊË]/g,'E')
+    .replace(/[ÌÍÎÏ]/g,'I').replace(/[ÒÓÔÕÖ]/g,'O').replace(/[ÙÚÛÜ]/g,'U');
+  if (u.includes('NIVUS'))  return 'Nivus';
+  if (u.includes('T-CROSS') || u.includes('T CROSS') || u.includes('TCROSS')) return 'T-Cross';
+  if (u.includes('TAOS'))   return 'Taos';
+  if (u.includes('TERA'))   return 'Tera';
+  if (u.includes('TIGUAN')) return 'Tiguan';
+  if (u.includes('AMAROK')) return 'Amarok';
+  if (u.includes('POLO TRACK')) return 'Polo Track';
+  if (u.includes('POLO'))   return 'Polo';
+  if (u.includes('VIRTUS')) return 'Virtus';
+  if (u.includes('SAVEIRO')) return 'Saveiro';
+  if (u.includes('VOYAGE')) return 'Voyage';
+  if (/\bGOL\b/.test(u))   return 'Gol';
+  if (u.includes('JETTA'))  return 'Jetta';
+  if (u.includes('PASSAT')) return 'Passat';
+  if (u.includes('ARTEON')) return 'Arteon';
+  if (u.includes('ID.4') || u.includes('ID4')) return 'ID.4';
+  if (u.includes('Q5'))     return 'Audi Q5';
+  if (/\bA3\b/.test(u))    return 'Audi A3';
+  if (/\bA4\b/.test(u))    return 'Audi A4';
+  if (/\bA6\b/.test(u))    return 'Audi A6';
+  if (u.includes('Q3'))     return 'Audi Q3';
+  if (u.includes('Q7'))     return 'Audi Q7';
+  if (u.includes('Q8'))     return 'Audi Q8';
+  return raw.trim() || '(sem modelo)';
+}
+
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+function getInitials(name: string) {
+  const p = name.trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return '?';
+  if (p.length === 1) return p[0][0].toUpperCase();
+  return (p[0][0] + p[p.length - 1][0]).toUpperCase();
+}
+function avatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_BG[Math.abs(h) % AVATAR_BG.length];
+}
+
+// ─── Cálculo por linha ────────────────────────────────────────────────────────
+function calcNovos(r: VendasResultadoRow, aliqBon: number, dsrPct: number) {
   const recLiq = n(r.valorVenda) - n(r.impostos);
   const bv = n(r.bonusVarejo), bt = n(r.bonusTradeIn);
-  const impBv = (bv + bt) * aliqBon / 100;
-  const lb = recLiq - n(r.valorCusto) + bv + bt - impBv;
+  const lb  = recLiq - n(r.valorCusto) + bv + bt - (bv + bt) * aliqBon / 100;
   const bon = n(r.bonusPIV) + n(r.bonusSIQ) + n(r.bonusPIVE) + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3);
-  const impBon = bon * aliqBon / 100;
-  const lcb = lb + bon - impBon;
+  const lcb = lb + bon - bon * aliqBon / 100;
   const dsr = n(r.comissaoVenda) * dsrPct / 100;
   const base = n(r.comissaoVenda) + dsr;
   const prov = base * 7 / 36;
-  const enc = (base + prov) * 0.358;
-  const res = lcb + n(r.recBlindagem) + n(r.recFinanciamento) + n(r.recDespachante)
+  const enc  = (base + prov) * 0.358;
+  const resultado = lcb + n(r.recBlindagem) + n(r.recFinanciamento) + n(r.recDespachante)
     - n(r.jurosEstoque) - n(r.ciDesconto) - n(r.cortesiaEmplacamento)
     - n(r.comissaoVenda) - dsr - prov - enc - n(r.outrasDespesas);
-  return { recLiq, lucroBruto: lb, bonuses: bon, lucroComBon: lcb, dsr, provisoes: prov, encargos: enc, resultado: res };
+  return { recLiq, lb, bon, lcb, dsr, prov, enc, resultado, com: n(r.comissaoVenda) };
 }
 
-// ─── Aggregador ───────────────────────────────────────────────────────────────
+// ─── Agregador ────────────────────────────────────────────────────────────────
 interface Agg {
-  v07: number; netVol: number; recLiq: number; lb: number; bon: number; lcb: number;
-  dsr: number; prov: number; enc: number; res: number; marg: number; ticket: number;
+  v07: number; netVol: number; receita: number; custo: number; recLiq: number;
+  lb: number; lbPct: number; bon: number; lcb: number;
+  dsr: number; prov: number; enc: number; res: number; marg: number;
+  ticket: number; ticketReceita: number;
   juros: number; ci: number; cort: number; com: number; outras: number;
   blind: number; fin: number; desp: number; mediaDias: number;
+  remVendedor: number;
 }
 function agg(rows: VendasResultadoRow[], aliqBon: number, dsrCfg: VendasDsrConfig[]): Agg | null {
-  if (rows.length === 0) return null;
+  if (!rows.length) return null;
   const v07 = rows.filter(r => r.transacao === 'V07').length;
   const netVol = rows.length - v07;
-  let recLiq = 0, lb = 0, bon = 0, lcb = 0, dsr = 0, prov = 0, enc = 0, res = 0;
+  let receita = 0, custo = 0, recLiq = 0, lb = 0, bon = 0, lcb = 0;
+  let dsr = 0, prov = 0, enc = 0, res = 0, remV = 0;
   let juros = 0, ci = 0, cort = 0, com = 0, outras = 0, blind = 0, fin = 0, desp = 0;
-  let diasSum = 0, diasCount = 0;
+  let diasSum = 0, diasCnt = 0;
   for (const r of rows) {
     const d = dsrFor(dsrCfg, r.dataVenda);
     const c = calcNovos(r, aliqBon, d);
-    recLiq += c.recLiq; lb += c.lucroBruto; bon += c.bonuses;
-    lcb += c.lucroComBon; dsr += c.dsr; prov += c.provisoes;
-    enc += c.encargos; res += c.resultado;
+    receita += n(r.valorVenda); custo += n(r.valorCusto);
+    recLiq += c.recLiq; lb += c.lb; bon += c.bon; lcb += c.lcb;
+    dsr += c.dsr; prov += c.prov; enc += c.enc; res += c.resultado; com += c.com;
+    remV += c.com + c.dsr + c.prov + c.enc;
     juros += n(r.jurosEstoque); ci += n(r.ciDesconto); cort += n(r.cortesiaEmplacamento);
-    com += n(r.comissaoVenda); outras += n(r.outrasDespesas);
+    outras += n(r.outrasDespesas);
     blind += n(r.recBlindagem); fin += n(r.recFinanciamento); desp += n(r.recDespachante);
     const dias = n(r.diasEstoque);
-    if (dias > 0) { diasSum += dias; diasCount++; }
+    if (dias > 0) { diasSum += dias; diasCnt++; }
   }
-  const marg = recLiq !== 0 ? res / recLiq * 100 : 0;
-  const ticket = netVol > 0 ? res / netVol : 0;
-  const mediaDias = diasCount > 0 ? diasSum / diasCount : 0;
-  return { v07, netVol, recLiq, lb, bon, lcb, dsr, prov, enc, res, marg, ticket, juros, ci, cort, com, outras, blind, fin, desp, mediaDias };
+  return {
+    v07, netVol, receita, custo, recLiq,
+    lb, lbPct: recLiq ? lb / recLiq * 100 : 0,
+    bon, lcb, dsr, prov, enc, res, marg: recLiq ? res / recLiq * 100 : 0,
+    ticket: netVol ? res / netVol : 0,
+    ticketReceita: netVol ? receita / netVol : 0,
+    juros, ci, cort, com, outras, blind, fin, desp,
+    mediaDias: diasCnt ? diasSum / diasCnt : 0,
+    remVendedor: remV,
+  };
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-function ST({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">{children}</h2>;
+// ─── Período comparativo ──────────────────────────────────────────────────────
+interface PeriodCfg { id: string; year: number; gran: 'mes' | 'ano'; month: number; vendedor: string; }
+
+// ─── Sub-componentes UI ───────────────────────────────────────────────────────
+function SH({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{children}</span>
+      <div className="flex-1 h-px bg-gradient-to-r from-slate-200 to-transparent" />
+      {right}
+    </div>
+  );
 }
 
-function KpiCard({ label, value, sub, color = 'text-slate-800', accent, hero, onClick, pinned }: {
+function Pill({ label, active, onClick, icon }: { label: string; active: boolean; onClick: () => void; icon?: React.ReactNode }) {
+  return (
+    <button onClick={onClick}
+      className={`flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold transition-all border ${
+        active
+          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+          : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300 hover:text-blue-600'
+      }`}>
+      {icon}{label}
+    </button>
+  );
+}
+
+function KpiCard({ label, value, sub, color = 'text-slate-800', accent, hero, onClick, pinned, info }: {
   label: string; value: string; sub?: string; color?: string; accent?: string;
-  hero?: boolean; onClick?: () => void; pinned?: boolean;
+  hero?: boolean; onClick?: () => void; pinned?: boolean; info?: string;
 }) {
   return (
     <div
-      className={`bg-white rounded-xl border shadow-sm flex flex-col gap-1 relative group select-none ${
-        hero
-          ? 'px-5 py-5 border-slate-200'
-          : 'px-3 py-3 border-slate-200 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all duration-150'
+      className={`bg-white rounded-xl border shadow-sm flex flex-col gap-1 relative group select-none transition-all duration-150 ${
+        hero ? 'px-5 py-5 border-slate-200' : 'px-3 py-3 border-slate-200 cursor-pointer hover:border-blue-300 hover:shadow-md'
       }`}
       style={accent ? { borderLeft: `4px solid ${accent}` } : undefined}
       onClick={onClick}
       title={onClick ? (pinned ? 'Remover do destaque' : 'Fixar como destaque') : undefined}
     >
-      <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide leading-tight">{label}</span>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide leading-tight">{label}</span>
+        {info && <span className="text-[10px] text-slate-300 hover:text-slate-500 cursor-help" title={info}>ⓘ</span>}
+      </div>
       <span className={`font-bold leading-tight truncate ${color} ${hero ? 'text-2xl' : 'text-lg'}`}>{value}</span>
       {sub && <span className="text-[11px] text-slate-400 leading-tight">{sub}</span>}
       {onClick && (
-        <span className={`absolute top-2 right-2 text-sm transition-colors ${
-          pinned ? 'text-blue-500' : 'text-slate-200 group-hover:text-blue-300'
-        }`}>★</span>
+        <span className={`absolute top-2 right-2 text-sm transition-colors ${pinned ? 'text-blue-500' : 'text-slate-200 group-hover:text-blue-300'}`}>★</span>
       )}
     </div>
   );
 }
 
-function EmptyChart() {
+function Empty() {
   return (
-    <div className="flex flex-col items-center justify-center h-40 text-slate-200">
-      <TrendingUp className="w-8 h-8 mb-2" />
+    <div className="flex flex-col items-center justify-center h-32 text-slate-200 gap-2">
+      <TrendingUp className="w-6 h-6" />
       <span className="text-xs">Sem dados</span>
     </div>
   );
 }
 
-function WfTooltip({ active, payload, label }: { active?: boolean; payload?: { payload: { value: number } }[]; label?: string }) {
-  if (!active || !payload?.length) return null;
-  const v = payload[0]?.payload?.value ?? 0;
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-2 text-xs">
-      <p className="font-semibold text-slate-700 mb-1">{label}</p>
-      <p className={`font-mono font-bold ${v >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmtBRLFull(v)}</p>
-    </div>
-  );
-}
-function MthTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-xs">
-      <p className="font-semibold text-slate-700 mb-2">{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color }} className="font-mono">{p.name}: {fmtBRLFull(p.value)}</p>
-      ))}
-    </div>
-  );
-}
-function BonTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
+function TipBRL({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
   const total = payload.reduce((s, p) => s + p.value, 0);
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-xs">
-      <p className="font-semibold text-slate-700 mb-1">{label}</p>
+    <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[180px]">
+      <p className="font-bold text-slate-700 mb-1.5">{label}</p>
       {payload.map((p, i) => p.value !== 0 && (
-        <p key={i} style={{ color: p.color }} className="font-mono">{p.name}: {fmtBRLFull(p.value)}</p>
+        <div key={i} className="flex justify-between gap-4">
+          <span style={{ color: p.color }} className="font-medium">{p.name}</span>
+          <span className="font-mono text-slate-700">{fmtBRLF(p.value)}</span>
+        </div>
       ))}
-      {total !== 0 && <p className="font-mono font-bold text-slate-700 mt-1 pt-1 border-t border-slate-100">Total: {fmtBRLFull(total)}</p>}
+      {payload.length > 1 && total !== 0 && (
+        <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+          <span className="font-bold text-slate-600">Total</span>
+          <span className="font-mono font-bold text-slate-700">{fmtBRLF(total)}</span>
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Export Excel ──────────────────────────────────────────────────────────────
-async function exportAnalyticsExcel(
-  vendorData: { name: string; vol: number; res: number; marg: number; ticket: number; recLiq: number }[],
-  monthlyData: { label: string; recLiq: number; lb: number; lcb: number; res: number; marg: number; vol: number }[],
+function TipWF({ active, payload, label }: { active?: boolean; payload?: { payload: { value: number } }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const v = payload[0]?.payload?.value ?? 0;
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-2 text-xs">
+      <p className="font-semibold text-slate-700 mb-1">{label}</p>
+      <p className={`font-mono font-bold ${v >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmtBRLF(v)}</p>
+    </div>
+  );
+}
+
+function DonutLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }: {
+  cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; percent: number;
+}) {
+  if (percent < 0.05) return null;
+  const r = innerRadius + (outerRadius - innerRadius) * 0.6;
+  const x = cx + r * Math.cos(-midAngle * Math.PI / 180);
+  const y = cy + r * Math.sin(-midAngle * Math.PI / 180);
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+}
+
+// ─── Config de métricas de modelo ────────────────────────────────────────────
+const MODEL_METRIC_CFG: Record<ModelMetric, {
+  label: string; donutKey: string; barKey: string; barLabel: string;
+  fmt: (v: number) => string; icon: React.ReactNode;
+}> = {
+  vol:    { label: 'Volume',       donutKey: 'vol',    barKey: 'vol',    barLabel: 'Unidades',     fmt: v => String(v),            icon: <BarChart2 className="w-3 h-3" /> },
+  lb:     { label: 'Lucro Bruto',  donutKey: 'lb',     barKey: 'lb',     barLabel: 'Lucro Bruto',  fmt: fmtBRL,                    icon: <DollarSign className="w-3 h-3" /> },
+  res:    { label: 'Resultado',    donutKey: 'res',     barKey: 'res',    barLabel: 'Resultado',    fmt: fmtBRL,                    icon: <TrendingUp className="w-3 h-3" /> },
+  ticket: { label: 'Ticket Médio', donutKey: 'receita', barKey: 'ticket', barLabel: 'Ticket Médio', fmt: fmtBRL,                    icon: <ShoppingCart className="w-3 h-3" /> },
+  marg:   { label: 'Margem %',     donutKey: 'lb',     barKey: 'marg',   barLabel: 'Margem',       fmt: v => fmtPct(v),            icon: <Percent className="w-3 h-3" /> },
+  bubble: { label: 'Análise 2D',   donutKey: 'vol',    barKey: 'vol',    barLabel: 'Vol × Marg',   fmt: v => String(v),            icon: <span style={{ fontSize: 11, lineHeight: 1 }}>⬤</span> },
+};
+
+const VENDOR_SORT_CFG: Record<VendorSort, { label: string }> = {
+  res:  { label: 'Resultado' },
+  vol:  { label: 'Volume' },
+  lb:   { label: 'Lucro Bruto' },
+  marg: { label: 'Margem %' },
+};
+
+// ─── Export Excel ─────────────────────────────────────────────────────────────
+async function exportExcel(
+  vendorData: { name: string; vol: number; res: number; marg: number; lb: number; lbPct: number; remVendedor: number }[],
+  monthlyData: { label: string; vol: number; recLiq: number; lb: number; lcb: number; res: number; marg: number }[],
+  modelData: { name: string; vol: number; lb: number; res: number; marg: number }[],
   periodLabel: string,
 ) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Sorana Executive Dashboard';
-  wb.created = new Date();
-
-  // Sheet 1: Vendedores
-  const ws1 = wb.addWorksheet('Vendedores', { properties: { tabColor: { argb: 'FF3B82F6' } } });
-  const h1 = ws1.addRow([`Análise Novos — ${periodLabel} — Ranking de Vendedores`]);
-  ws1.mergeCells(1, 1, 1, 6);
-  h1.height = 28; h1.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }; c.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12 }; c.alignment = { vertical: 'middle', horizontal: 'center' }; });
-  const h2 = ws1.addRow(['Vendedor', 'Volume Líq.', 'Resultado (R$)', 'Margem %', 'Ticket Médio (R$)', 'Receita Líq. (R$)']);
-  h2.height = 28; h2.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } }; c.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 }; c.alignment = { vertical: 'middle', horizontal: 'center' }; });
-  ws1.columns = [{ width: 28 }, { width: 14 }, { width: 18 }, { width: 12 }, { width: 18 }, { width: 18 }];
-  vendorData.forEach((v, i) => {
-    const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F9FF';
-    const dr = ws1.addRow([v.name, v.vol, v.res, v.marg, v.ticket, v.recLiq]);
-    dr.height = 17;
-    dr.eachCell({ includeEmpty: true }, (cell, ci) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
-      if (ci === 3 || ci === 5 || ci === 6) { cell.numFmt = '"R$"\\ #,##0.00'; cell.alignment = { horizontal: 'right', vertical: 'middle' }; cell.font = { size: 9.5, name: 'Courier New' }; }
-      else if (ci === 4) { cell.numFmt = '#,##0.00"%"'; cell.alignment = { horizontal: 'right', vertical: 'middle' }; }
-      else { cell.alignment = { horizontal: ci === 1 ? 'left' : 'center', vertical: 'middle' }; cell.font = { size: 9.5 }; }
+  wb.creator = 'Sorana Executive Dashboard'; wb.created = new Date();
+  const fill = (argb: string) => ({ type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb } });
+  const addSheet = (name: string, tab: string, headers: string[], rows: (string | number)[][], widths: number[]) => {
+    const ws = wb.addWorksheet(name, { properties: { tabColor: { argb: tab } } });
+    const t = ws.addRow([`Análise Novos — ${periodLabel} — ${name}`]);
+    ws.mergeCells(1, 1, 1, headers.length);
+    t.height = 26; t.eachCell(c => { c.fill = fill('FF1E3A5F'); c.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12 }; c.alignment = { vertical: 'middle', horizontal: 'center' }; });
+    const h = ws.addRow(headers);
+    h.height = 22; h.eachCell(c => { c.fill = fill('FF2563EB'); c.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 }; c.alignment = { vertical: 'middle', horizontal: 'center' }; });
+    ws.columns = widths.map(w => ({ width: w }));
+    rows.forEach((row, i) => {
+      const dr = ws.addRow(row); dr.height = 16;
+      dr.eachCell({ includeEmpty: true }, (cell, ci) => {
+        cell.fill = fill(i % 2 === 0 ? 'FFFFFFFF' : 'FFF0F9FF');
+        if (typeof row[ci - 1] === 'number') { cell.numFmt = '"R$"\\ #,##0.00'; cell.alignment = { horizontal: 'right', vertical: 'middle' }; cell.font = { size: 9.5, name: 'Courier New' }; }
+        else { cell.alignment = { horizontal: ci === 1 ? 'left' : 'center', vertical: 'middle' }; cell.font = { size: 9.5 }; }
+      });
     });
-  });
-
-  // Sheet 2: Evolução Mensal
-  const ws2 = wb.addWorksheet('Evolução Mensal', { properties: { tabColor: { argb: 'FF10B981' } } });
-  const h3 = ws2.addRow([`Análise Novos — ${periodLabel} — Evolução Mensal`]);
-  ws2.mergeCells(1, 1, 1, 7);
-  h3.height = 28; h3.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF064E3B' } }; c.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12 }; c.alignment = { vertical: 'middle', horizontal: 'center' }; });
-  const h4 = ws2.addRow(['Mês', 'Volume Líq.', 'Receita Líq. (R$)', 'Lucro Bruto (R$)', 'Lucro c/ Bôn. (R$)', 'Resultado (R$)', 'Margem %']);
-  h4.height = 28; h4.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } }; c.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 }; c.alignment = { vertical: 'middle', horizontal: 'center' }; });
-  ws2.columns = [{ width: 10 }, { width: 12 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 12 }];
-  monthlyData.forEach((m, i) => {
-    const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF0FDF4';
-    const dr = ws2.addRow([m.label, m.vol, m.recLiq, m.lb, m.lcb, m.res, m.marg]);
-    dr.height = 17;
-    dr.eachCell({ includeEmpty: true }, (cell, ci) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
-      if ([3, 4, 5, 6].includes(ci)) { cell.numFmt = '"R$"\\ #,##0.00'; cell.alignment = { horizontal: 'right', vertical: 'middle' }; cell.font = { size: 9.5, name: 'Courier New' }; }
-      else if (ci === 7) { cell.numFmt = '#,##0.00"%"'; cell.alignment = { horizontal: 'right', vertical: 'middle' }; }
-      else { cell.alignment = { horizontal: 'center', vertical: 'middle' }; cell.font = { size: 9.5 }; }
-    });
-  });
-
+  };
+  addSheet('Vendedores', 'FF3B82F6', ['Vendedor', 'Vol. Líq.', 'Resultado (R$)', 'Margem %', 'Lucro Bruto (R$)', 'LB %', 'Rem. Vendedor (R$)'],
+    vendorData.map(v => [v.name, v.vol, v.res, v.marg, v.lb, v.lbPct, v.remVendedor]), [28, 10, 18, 12, 18, 12, 18]);
+  addSheet('Evolução Mensal', 'FF10B981', ['Mês', 'Vol. Líq.', 'Receita Líq.', 'Lucro Bruto', 'Lucro c/ Bôn.', 'Resultado', 'Margem %'],
+    monthlyData.map(m => [m.label, m.vol, m.recLiq, m.lb, m.lcb, m.res, m.marg]), [10, 10, 18, 18, 18, 18, 12]);
+  addSheet('Mix por Modelo', 'FFF59E0B', ['Modelo', 'Vol.', 'Lucro Bruto', 'Margem %', 'Resultado'],
+    modelData.map(m => [m.name, m.vol, m.lb, m.marg, m.res]), [22, 10, 18, 12, 18]);
   const buf = await wb.xlsx.writeBuffer();
-  const date = new Date().toISOString().split('T')[0];
-  saveAs(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `analise-novos-${periodLabel.toLowerCase().replace(/\//g, '-')}-${date}.xlsx`);
+  saveAs(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    `analise-novos-${periodLabel.toLowerCase().replace(/\//g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
-// ─── Main component ────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ═══════════════════════════════════════════════════════════════════════════════
 export function VendasNovoAnalise() {
-  const today = new Date();
-  const curYear = today.getFullYear();
+  const today    = new Date();
+  const curYear  = today.getFullYear();
   const curMonth = today.getMonth() + 1;
 
   const [allRows, setAllRows] = useState<VendasResultadoRow[]>([]);
   const [aliqBon, setAliqBon] = useState(0);
-  const [dsrCfg, setDsrCfg] = useState<VendasDsrConfig[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dsrCfg,  setDsrCfg]  = useState<VendasDsrConfig[]>([]);
+  const [loading, setLoading]  = useState(true);
 
   // Filtros
-  const [year, setYear] = useState(curYear);
-  const [month, setMonth] = useState<number | null>(curMonth);
+  const [year,     setYear]     = useState(curYear);
+  const [month,    setMonth]    = useState<number | null>(curMonth);
   const [vendedor, setVendedor] = useState('Todos');
-  const [modelo, setModelo] = useState('Todos');
+  const [modelo,   setModelo]   = useState('Todos');
 
   // UI
-  const [showDevol, setShowDevol] = useState(false);
-  const [pinned, setPinned] = useState<string[]>(['resultado', 'margemRes', 'volumeLiq']);
+  const [showDevol,     setShowDevol]     = useState(false);
+  const [pinned,        setPinned]        = useState<string[]>(['resultado', 'margemRes', 'volumeLiq']);
+  const [modelMetric,   setModelMetric]   = useState<ModelMetric>('vol');
+  const [vendorSort,    setVendorSort]    = useState<VendorSort>('res');
+  const [showAllVendors,   setShowAllVendors]   = useState(false);
+  const [comissaoMode,     setComissaoMode]     = useState<ComissaoMode>('total');
+  const [jurosGrouping,    setJurosGrouping]    = useState<JurosGrouping>('familia');
+  const [showAllComissoes, setShowAllComissoes] = useState(false);
 
+  // Comparativo de períodos
+  const [periods, setPeriods] = useState<PeriodCfg[]>([
+    { id: 'base', year: curYear, gran: 'mes', month: curMonth, vendedor: 'Todos' },
+  ]);
+
+  // ─── Carga ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    Promise.all([loadVendasResultadoRows('novos'), loadAliquotas(), loadVendasDsr()])
-      .then(([rows, aliq, dsr]) => {
-        setAllRows(rows);
-        setAliqBon(aliq.filter(i => i.tipo.toLowerCase().includes('bonificações')).reduce((s, i) => s + (parseFloat(i.aliquota) || 0), 0));
+    Promise.all([loadVendasResultadoRows('novos'), loadAliquotas(), loadVendasDsr(), loadRemuneracao()])
+      .then(([rows, aliq, dsr, rem]) => {
+        const filledRows = applyComissaoAutoFill(rows, rem.novos);
+        setAllRows(filledRows);
+        setAliqBon(aliq
+          .filter(i => i.tipo.toLowerCase().includes('bonificações'))
+          .reduce((s, i) => s + (parseFloat(i.aliquota) || 0), 0));
         setDsrCfg(dsr);
         setLoading(false);
       });
   }, []);
 
-  const availableYears = useMemo(() => {
+  const availYears = useMemo(() => {
     const s = new Set(allRows.map(getYr).filter(y => y > 2000));
     [curYear - 1, curYear].forEach(y => s.add(y));
     return [...s].sort();
-  }, [allRows]);
+  }, [allRows, curYear]);
 
   const yearRows = useMemo(() => allRows.filter(r => getYr(r) === year), [allRows, year]);
 
-  const availableVendedores = useMemo(() => {
-    const names = [...new Set(yearRows.map(r => r.vendedor?.trim()).filter(Boolean) as string[])].sort();
-    return ['Todos', ...names];
-  }, [yearRows]);
+  const availVendedores = useMemo(() =>
+    ['Todos', ...[...new Set(yearRows.map(r => r.vendedor?.trim()).filter(Boolean) as string[])].sort()],
+    [yearRows]);
 
-  const availableModelos = useMemo(() => {
-    const mods = [...new Set(yearRows.map(r => r.modelo?.trim()).filter(Boolean) as string[])].sort();
-    return ['Todos', ...mods];
-  }, [yearRows]);
+  const availModelos = useMemo(() =>
+    ['Todos', ...[...new Set(yearRows.map(r => r.modelo?.trim()).filter(Boolean) as string[])].sort()],
+    [yearRows]);
 
   const filteredRows = useMemo(() => yearRows.filter(r => {
     if (month !== null && getMo(r) !== month) return false;
@@ -285,240 +451,293 @@ export function VendasNovoAnalise() {
   }), [yearRows, month, vendedor, modelo]);
 
   const devolucoes = useMemo(() => filteredRows.filter(r => r.transacao === 'V07'), [filteredRows]);
+  const metrics    = useMemo(() => agg(filteredRows, aliqBon, dsrCfg), [filteredRows, aliqBon, dsrCfg]);
 
-  const metrics = useMemo(() => agg(filteredRows, aliqBon, dsrCfg), [filteredRows, aliqBon, dsrCfg]);
-
-  // MoM: métricas do mês anterior (para comparação no KPI)
   const prevMetrics = useMemo(() => {
     if (month === null) return null;
     const pm = month === 1 ? 12 : month - 1;
     const py = month === 1 ? year - 1 : year;
-    const prev = allRows.filter(r => getYr(r) === py && getMo(r) === pm);
-    return agg(prev, aliqBon, dsrCfg);
+    return agg(allRows.filter(r => getYr(r) === py && getMo(r) === pm), aliqBon, dsrCfg);
   }, [allRows, month, year, aliqBon, dsrCfg]);
 
-  // Dados mensais do ano (todos os 12 meses)
+  // Dados mensais
   const monthlyData = useMemo(() => MS.map((label, i) => {
-    const m = i + 1;
-    const mRows = yearRows.filter(r => getMo(r) === m);
-    const a = agg(mRows, aliqBon, dsrCfg);
-    return { label, recLiq: a?.recLiq ?? 0, lb: a?.lb ?? 0, lcb: a?.lcb ?? 0, res: a?.res ?? 0, marg: a?.marg ?? 0, vol: a?.netVol ?? 0 };
+    const m  = i + 1;
+    const mr = yearRows.filter(r => getMo(r) === m);
+    const a  = agg(mr, aliqBon, dsrCfg);
+    return { label, vol: a?.netVol ?? 0, recLiq: a?.recLiq ?? 0, lb: a?.lb ?? 0, lcb: a?.lcb ?? 0, res: a?.res ?? 0, marg: a?.marg ?? 0 };
   }), [yearRows, aliqBon, dsrCfg]);
 
-  // Por vendedor
-  const vendorData = useMemo(() => {
+  // Por vendedor (todas as ordenações)
+  const vendorDataRaw = useMemo(() => {
     const map = new Map<string, VendasResultadoRow[]>();
     for (const r of filteredRows) {
-      const v = r.vendedor?.trim() || '(sem nome)';
-      const arr = map.get(v) ?? [];
-      arr.push(r);
-      map.set(v, arr);
+      const k = r.vendedor?.trim() || '(sem nome)';
+      map.set(k, [...(map.get(k) ?? []), r]);
     }
-    const items: { name: string; vol: number; res: number; marg: number; ticket: number; recLiq: number }[] = [];
-    for (const [name, rows] of map.entries()) {
+    return [...map.entries()].flatMap(([name, rows]) => {
       const a = agg(rows, aliqBon, dsrCfg);
-      if (!a) continue;
-      items.push({ name, vol: a.netVol, res: a.res, marg: a.marg, ticket: a.ticket, recLiq: a.recLiq });
-    }
-    return items.sort((a, b) => b.res - a.res);
+      if (!a) return [];
+      return [{ name, vol: a.netVol, res: a.res, marg: a.marg, lb: a.lb, lbPct: a.lbPct, recLiq: a.recLiq, remVendedor: a.remVendedor, com: a.com, dsr: a.dsr, prov: a.prov, enc: a.enc }];
+    });
   }, [filteredRows, aliqBon, dsrCfg]);
 
-  // Por modelo (top 10)
-  const modelData = useMemo(() => {
+  const vendorData = useMemo(() =>
+    [...vendorDataRaw].sort((a, b) => b[vendorSort] - a[vendorSort]),
+    [vendorDataRaw, vendorSort]);
+
+  const totalVol = useMemo(() => vendorData.reduce((s, v) => s + v.vol, 0), [vendorData]);
+  const avgMarg  = useMemo(() => vendorData.length ? vendorData.reduce((s, v) => s + v.marg, 0) / vendorData.length : 0, [vendorData]);
+
+  // Por família de modelo
+  const modelFamilyData = useMemo(() => {
     const map = new Map<string, VendasResultadoRow[]>();
     for (const r of filteredRows) {
-      const k = r.modelo?.trim() || '(sem modelo)';
-      const arr = map.get(k) ?? [];
-      arr.push(r);
-      map.set(k, arr);
+      const k = normalizeModelo(r.modelo ?? '');
+      map.set(k, [...(map.get(k) ?? []), r]);
     }
-    const items: { name: string; vol: number; res: number; marg: number }[] = [];
-    for (const [rawName, rows] of map.entries()) {
+    return [...map.entries()].flatMap(([name, rows]) => {
       const a = agg(rows, aliqBon, dsrCfg);
-      if (!a) continue;
-      const name = rawName.length > 22 ? rawName.slice(0, 20) + '…' : rawName;
-      items.push({ name, vol: a.netVol, res: a.res, marg: a.marg });
-    }
-    return items.sort((a, b) => b.res - a.res).slice(0, 10);
+      if (!a) return [];
+      return [{ name, vol: a.netVol, lb: a.lb, res: a.res, marg: a.marg, receita: a.receita, ticket: a.ticketReceita }];
+    }).sort((a, b) => b.vol - a.vol);
   }, [filteredRows, aliqBon, dsrCfg]);
 
-  // Composição de bônus por mês (stacked bar — ano inteiro)
+  // Ticket médio geral para linha de referência
+  const avgTicket = useMemo(() =>
+    modelFamilyData.length ? modelFamilyData.reduce((s, d) => s + d.ticket, 0) / modelFamilyData.length : 0,
+    [modelFamilyData]);
+
+  // Bônus mensais
   const bonusMonthly = useMemo(() => MS.map((label, i) => {
-    const m = i + 1;
-    const mRows = yearRows.filter(r => getMo(r) === m);
+    const m  = i + 1;
+    const mr = yearRows.filter(r => getMo(r) === m);
+    const aliq = aliqBon / 100;
+    const gross = mr.reduce((s, r) => s + n(r.bonusPIV) + n(r.bonusSIQ) + n(r.bonusPIVE) + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3), 0);
+    const deduc = gross * aliq;
     return {
       label,
-      piv:    mRows.reduce((s, r) => s + n(r.bonusPIV), 0),
-      siq:    mRows.reduce((s, r) => s + n(r.bonusSIQ), 0),
-      pive:   mRows.reduce((s, r) => s + n(r.bonusPIVE), 0),
-      varejo: mRows.reduce((s, r) => s + n(r.bonusVarejo), 0),
-      tradein:mRows.reduce((s, r) => s + n(r.bonusTradeIn), 0),
-      adics:  mRows.reduce((s, r) => s + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3), 0),
+      piv:     mr.reduce((s, r) => s + n(r.bonusPIV), 0),
+      siq:     mr.reduce((s, r) => s + n(r.bonusSIQ), 0),
+      pive:    mr.reduce((s, r) => s + n(r.bonusPIVE), 0),
+      varejo:  mr.reduce((s, r) => s + n(r.bonusVarejo), 0),
+      tradein: mr.reduce((s, r) => s + n(r.bonusTradeIn), 0),
+      adics:   mr.reduce((s, r) => s + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3), 0),
+      gross, deduc, liq: gross - deduc,
+    };
+  }), [yearRows, aliqBon]);
+
+  // Bonificações líquidas por família
+  const bonFamilyData = useMemo(() => {
+    const map = new Map<string, VendasResultadoRow[]>();
+    for (const r of filteredRows) {
+      const k = normalizeModelo(r.modelo ?? '');
+      map.set(k, [...(map.get(k) ?? []), r]);
+    }
+    return [...map.entries()].map(([name, rows]) => {
+      const gross = rows.reduce((s, r) => s + n(r.bonusPIV) + n(r.bonusSIQ) + n(r.bonusPIVE) + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3), 0);
+      const deduc = gross * (aliqBon / 100);
+      return { name, gross, deduc, liq: gross - deduc };
+    }).filter(d => d.gross > 0).sort((a, b) => b.liq - a.liq);
+  }, [filteredRows, aliqBon]);
+
+  // Receitas por fonte por mês
+  const receitasFonteData = useMemo(() => MS.map((label, i) => {
+    const m  = i + 1;
+    const mr = yearRows.filter(r => getMo(r) === m);
+    return {
+      label,
+      blind:  mr.reduce((s, r) => s + n(r.recBlindagem), 0),
+      fin:    mr.reduce((s, r) => s + n(r.recFinanciamento), 0),
+      desp:   mr.reduce((s, r) => s + n(r.recDespachante), 0),
     };
   }), [yearRows]);
 
-  // Waterfall (decomposição do resultado)
+  // Totais de receitas extras
+  const totaisReceitas = useMemo(() => ({
+    blind: receitasFonteData.reduce((s, d) => s + d.blind, 0),
+    fin:   receitasFonteData.reduce((s, d) => s + d.fin, 0),
+    desp:  receitasFonteData.reduce((s, d) => s + d.desp, 0),
+  }), [receitasFonteData]);
+
+  // Comissões ranking
+  const comissoesData = useMemo(() =>
+    [...vendorData]
+      .sort((a, b) => (b.com + b.dsr + b.prov + b.enc) - (a.com + a.dsr + a.prov + a.enc))
+      .map(v => ({
+        name: v.name,
+        com: v.com,
+        dsr: v.dsr,
+        provEnc: v.prov + v.enc,
+        total: v.com + v.dsr + v.prov + v.enc,
+      })),
+    [vendorData]);
+
+  // Juros por Família/Modelo
+  const jurosData = useMemo(() => {
+    const map = new Map<string, { juros: number; vol: number }>();
+    for (const r of filteredRows) {
+      const k = jurosGrouping === 'familia' ? normalizeModelo(r.modelo ?? '') : (r.modelo?.trim() || '(sem modelo)');
+      const prev = map.get(k) ?? { juros: 0, vol: 0 };
+      map.set(k, { juros: prev.juros + n(r.jurosEstoque), vol: prev.vol + 1 });
+    }
+    return [...map.entries()]
+      .map(([name, d]) => ({ name, juros: d.juros, vol: d.vol, jurosPorUnidade: d.vol > 0 ? d.juros / d.vol : 0 }))
+      .filter(d => d.juros > 0)
+      .sort((a, b) => b.juros - a.juros);
+  }, [filteredRows, jurosGrouping]);
+
+  // Tendência de Margem — 12 meses rolantes
+  const tendenciaData = useMemo(() => {
+    const anchor = month ?? 12;
+    const result: { label: string; marg: number | null; vol: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(year, anchor - 1 - i, 1);
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      const mr = allRows.filter(r => getYr(r) === y && getMo(r) === m);
+      const a = mr.length ? agg(mr, aliqBon, dsrCfg) : null;
+      result.push({ label: `${MS[m - 1]}/${String(y).slice(2)}`, marg: a ? a.marg : null, vol: a ? a.netVol : 0 });
+    }
+    return result;
+  }, [allRows, year, month, aliqBon, dsrCfg]);
+
+  // Waterfall
   const waterfallData = useMemo(() => {
     if (!metrics) return [];
     const steps: { name: string; base: number; bar: number; value: number; type: 'pos' | 'neg' | 'total' }[] = [];
     let run = 0;
-    const add = (name: string, value: number, type: 'pos' | 'neg' | 'total') => {
-      const bar = Math.abs(value);
+    const push = (name: string, value: number, type: 'pos' | 'neg' | 'total') => {
+      const bar  = Math.abs(value);
       const base = type === 'total' ? 0 : (value >= 0 ? run : run + value);
       steps.push({ name, base, bar, value, type });
       if (type !== 'total') run += value;
     };
-    add('Lucro c/ Bônus', metrics.lcb, 'pos');
-    const recExt = metrics.blind + metrics.fin + metrics.desp;
-    if (recExt > 0) add('Rec. Extras', recExt, 'pos');
-    if (metrics.juros > 0) add('Juros Estoque', -metrics.juros, 'neg');
-    if (metrics.ci + metrics.cort > 0) add('CI / Cortesias', -(metrics.ci + metrics.cort), 'neg');
-    const comTotal = metrics.com + metrics.dsr + metrics.prov + metrics.enc;
-    if (comTotal > 0) add('Comissões + Enc.', -comTotal, 'neg');
-    if (metrics.outras > 0) add('Outras Desp.', -metrics.outras, 'neg');
-    add('Resultado', metrics.res, 'total');
+    push('Lucro c/ Bônus', metrics.lcb, 'pos');
+    const ext = metrics.blind + metrics.fin + metrics.desp;
+    if (ext > 0) push('Rec. Extras', ext, 'pos');
+    if (metrics.juros > 0) push('Juros Estoque', -metrics.juros, 'neg');
+    if (metrics.ci + metrics.cort > 0) push('CI / Cortesias', -(metrics.ci + metrics.cort), 'neg');
+    const comTot = metrics.com + metrics.dsr + metrics.prov + metrics.enc;
+    if (comTot > 0) push('Comissões+Enc.', -comTot, 'neg');
+    if (metrics.outras > 0) push('Outras Desp.', -metrics.outras, 'neg');
+    push('Resultado', metrics.res, 'total');
     return steps;
   }, [metrics]);
 
-  // Custos (pie)
-  const costData = useMemo(() => {
-    if (!metrics) return [];
-    return [
-      { name: 'Comissão + DSR + Enc.', value: metrics.com + metrics.dsr + metrics.prov + metrics.enc },
-      { name: 'Juros de Estoque',      value: metrics.juros },
-      { name: 'CI Desc + Cortesias',   value: metrics.ci + metrics.cort },
-      { name: 'Outras Despesas',       value: metrics.outras },
-    ].filter(d => d.value > 0);
-  }, [metrics]);
+  // Comparativo de períodos
+  const periodMetrics = useMemo(() => periods.map(p => {
+    const pr = allRows.filter(r => {
+      if (getYr(r) !== p.year) return false;
+      if (p.gran === 'mes' && getMo(r) !== p.month) return false;
+      if (p.vendedor !== 'Todos' && (r.vendedor?.trim() || '') !== p.vendedor) return false;
+      return true;
+    });
+    return agg(pr, aliqBon, dsrCfg);
+  }), [periods, allRows, aliqBon, dsrCfg]);
 
-  // KPI definitions (array completo)
+  const periodLabels = useMemo(() =>
+    periods.map(p => p.gran === 'mes' ? `${MS[p.month - 1]}/${p.year}` : String(p.year)),
+    [periods]);
+
+  function addPeriod() { setPeriods(prev => [...prev, { id: crypto.randomUUID(), year: curYear, gran: 'mes', month: curMonth, vendedor: 'Todos' }]); }
+  function removePeriod(id: string) { setPeriods(prev => prev.filter(p => p.id !== id)); }
+  function updatePeriod(id: string, patch: Partial<PeriodCfg>) { setPeriods(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p)); }
+
+  // KPIs
   const kpiDefs = useMemo(() => {
     if (!metrics) return [];
     const momRes = prevMetrics ? metrics.res - prevMetrics.res : null;
     const momVol = prevMetrics ? metrics.netVol - prevMetrics.netVol : null;
     return [
-      {
-        id: 'volumeLiq', label: 'Volume Líquido',
-        value: String(metrics.netVol),
-        sub: metrics.v07 > 0
-          ? `${metrics.v07} devolução(ões) — ${momVol !== null ? (momVol >= 0 ? `+${momVol}` : String(momVol)) + ' vs mês ant.' : ''}`
-          : momVol !== null ? `${momVol >= 0 ? '+' : ''}${momVol} vs mês ant.` : undefined,
-        color: 'text-blue-700', accent: '#3b82f6',
-      },
-      {
-        id: 'recLiq', label: 'Receita Líquida',
-        value: fmtBRL(metrics.recLiq),
+      { id: 'volumeLiq',  label: 'Volume Líquido', value: String(metrics.netVol),
+        sub: [metrics.v07 > 0 ? `${metrics.v07} devolução(ões)` : null, momVol !== null ? `${momVol >= 0 ? '+' : ''}${momVol} vs mês ant.` : null].filter(Boolean).join(' — ') || undefined,
+        color: 'text-blue-700', accent: '#3b82f6' },
+      { id: 'recLiq',     label: 'Receita Líquida', value: fmtBRL(metrics.recLiq),
         sub: metrics.netVol > 0 ? `Ticket: ${fmtBRL(metrics.recLiq / metrics.netVol)}` : undefined,
-        color: 'text-slate-800', accent: '#64748b',
-      },
-      {
-        id: 'resultado', label: 'Resultado Total',
-        value: fmtBRL(metrics.res),
+        color: 'text-slate-800', accent: '#64748b' },
+      { id: 'resultado',  label: 'Resultado Sorana', value: fmtBRL(metrics.res),
         sub: momRes !== null ? `${momRes >= 0 ? '+' : ''}${fmtBRL(momRes)} vs mês ant.` : undefined,
         color: metrics.res >= 0 ? 'text-emerald-700' : 'text-red-600',
-        accent: metrics.res >= 0 ? '#10b981' : '#ef4444',
-      },
-      {
-        id: 'margemRes', label: 'Margem Resultado %',
-        value: fmtPct(metrics.marg),
-        sub: 'sobre Receita Líquida',
+        accent: metrics.res >= 0 ? '#10b981' : '#ef4444' },
+      { id: 'margemRes',  label: 'Margem Resultado', value: fmtPct(metrics.marg), sub: 'sobre Receita Líquida',
         color: metrics.marg >= 2 ? 'text-emerald-700' : metrics.marg >= 0 ? 'text-amber-600' : 'text-red-600',
-        accent: metrics.marg >= 2 ? '#10b981' : metrics.marg >= 0 ? '#f59e0b' : '#ef4444',
-      },
-      {
-        id: 'lucroComBon', label: 'Lucro c/ Bônus',
-        value: fmtBRL(metrics.lcb),
-        sub: metrics.recLiq > 0 ? fmtPct(metrics.lcb / metrics.recLiq * 100) + ' da receita' : undefined,
-        color: 'text-indigo-700', accent: '#6366f1',
-      },
-      {
-        id: 'totalBon', label: 'Total de Bônus',
-        value: fmtBRL(metrics.bon),
+        accent: metrics.marg >= 2 ? '#10b981' : metrics.marg >= 0 ? '#f59e0b' : '#ef4444' },
+      { id: 'lucroBruto', label: 'Lucro Bruto', value: fmtBRL(metrics.lb), sub: fmtPct(metrics.lbPct) + ' da receita',
+        color: 'text-indigo-700', accent: '#6366f1' },
+      { id: 'totalBon',   label: 'Total de Bônus', value: fmtBRL(metrics.bon),
         sub: metrics.recLiq > 0 ? fmtPct(metrics.bon / metrics.recLiq * 100) + ' da receita' : undefined,
         color: 'text-amber-700', accent: '#f59e0b',
-      },
-      {
-        id: 'ticket', label: 'Ticket Médio (Resultado)',
-        value: metrics.netVol > 0 ? fmtBRL(metrics.res / metrics.netVol) : '—',
-        color: 'text-violet-700', accent: '#8b5cf6',
-      },
-      {
-        id: 'juros', label: 'Juros de Estoque',
-        value: fmtBRL(metrics.juros),
-        sub: metrics.recLiq > 0 && metrics.juros > 0 ? fmtPct(metrics.juros / metrics.recLiq * 100) + ' da receita' : undefined,
-        color: metrics.juros > metrics.recLiq * 0.02 ? 'text-red-600' : 'text-slate-500',
-        accent: '#ef4444',
-      },
-      {
-        id: 'mediaDias', label: 'Giro Médio (dias em estoque)',
-        value: metrics.mediaDias > 0 ? metrics.mediaDias.toFixed(0) + ' dias' : '—',
-        sub: 'tempo médio até a venda',
-        color: metrics.mediaDias > 60 ? 'text-red-600' : metrics.mediaDias > 30 ? 'text-amber-600' : 'text-emerald-700',
+        info: metrics.bon === 0 ? 'PIV/SIQ/PIVE não preenchidos na aba Vendas → Novos' : undefined },
+      { id: 'ticket',     label: 'Ticket (Resultado)', value: metrics.netVol > 0 ? fmtBRL(metrics.res / metrics.netVol) : '—',
+        color: 'text-violet-700', accent: '#8b5cf6' },
+      { id: 'juros',      label: 'Juros de Estoque', value: fmtBRL(metrics.juros),
+        sub: metrics.juros === 0 ? 'não preenchido na aba Vendas' : (metrics.recLiq > 0 ? fmtPct(metrics.juros / metrics.recLiq * 100) + ' da receita' : undefined),
+        color: metrics.juros > metrics.recLiq * 0.02 ? 'text-red-600' : 'text-slate-400', accent: '#ef4444',
+        info: 'Campo "Juros Estoque" — preencher manualmente em Vendas → Novos' },
+      { id: 'mediaDias',  label: 'Giro Médio (dias)', value: metrics.mediaDias > 0 ? metrics.mediaDias.toFixed(0) + ' dias' : '—',
+        sub: metrics.mediaDias === 0 ? 'não preenchido na aba Vendas' : 'tempo médio até venda',
+        color: metrics.mediaDias > 60 ? 'text-red-600' : metrics.mediaDias > 30 ? 'text-amber-600' : metrics.mediaDias > 0 ? 'text-emerald-700' : 'text-slate-400',
         accent: '#06b6d4',
-      },
+        info: 'Campo "Dias Estoque" — preencher manualmente em Vendas → Novos' },
     ];
   }, [metrics, prevMetrics]);
 
   const heroKpis = kpiDefs.filter(k => pinned.includes(k.id));
   const secKpis  = kpiDefs.filter(k => !pinned.includes(k.id));
-
   function togglePin(id: string) {
-    if (pinned.includes(id)) {
-      setPinned(p => p.filter(x => x !== id));
-    } else if (pinned.length < 3) {
-      setPinned(p => [...p, id]);
-    } else {
-      setPinned(p => [...p.slice(1), id]); // substitui o mais antigo
-    }
+    if (pinned.includes(id)) { setPinned(p => p.filter(x => x !== id)); return; }
+    setPinned(p => p.length < 3 ? [...p, id] : [...p.slice(1), id]);
   }
 
-  // Margem média do grupo (para ranking de vendedores)
-  const avgMarg = vendorData.length > 0 ? vendorData.reduce((s, v) => s + v.marg, 0) / vendorData.length : 0;
+  const periodLabel    = month !== null ? `${MS[month - 1]}/${year}` : String(year);
+  const mmCfg          = MODEL_METRIC_CFG[modelMetric];
+  const vendorsVisible = showAllVendors ? vendorData : vendorData.slice(0, 5 + 3); // top3 + 5 na tabela
+  const comissoesVisible = showAllComissoes ? comissoesData : comissoesData.slice(0, 8);
 
-  const periodLabel = month !== null ? `${MS[month - 1]}/${year}` : String(year);
+  // Projeção para o mês corrente
+  const projFactor = (() => {
+    if (month === null) return null;
+    const now = new Date();
+    if (now.getFullYear() === year && now.getMonth() + 1 === month) {
+      const day = now.getDate();
+      const daysInMonth = new Date(year, month, 0).getDate();
+      return day < daysInMonth ? daysInMonth / day : null;
+    }
+    return null;
+  })();
 
-  // ─── Render ─────────────────────────────────────────────────────────────────
+  // ─── RENDER ───────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-50 p-6 space-y-5" style={{ minHeight: 0 }}>
+    <div className="flex-1 overflow-y-auto bg-slate-50 p-6 space-y-6" style={{ minHeight: 0 }}>
 
-      {/* ── Barra de Filtros ─────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex flex-wrap gap-4 items-center">
-
-        {/* Anos */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <span className="text-xs text-slate-400 font-semibold mr-1">Ano</span>
-          {availableYears.map(y => (
-            <button
-              key={y}
-              onClick={() => { setYear(y); setMonth(null); }}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
-                year === y ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >{y}</button>
+      {/* ── Filtros ─────────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 flex flex-wrap gap-4 items-center">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-1">Ano</span>
+          {availYears.map(y => (
+            <button key={y} onClick={() => { setYear(y); setMonth(null); }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${year === y ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+              {y}
+            </button>
           ))}
         </div>
-
-        <div className="w-px h-6 bg-slate-200 flex-shrink-0" />
-
-        {/* Meses */}
+        <div className="w-px h-6 bg-slate-200" />
         <div className="flex items-center gap-1 flex-wrap">
-          <button
-            onClick={() => setMonth(null)}
-            className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
-              month === null ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-            }`}
-          >Todos</button>
+          <button onClick={() => setMonth(null)}
+            className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all ${month === null ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+            Todos
+          </button>
           {MS.map((m, i) => {
-            const mi = i + 1;
+            const mi    = i + 1;
             const count = yearRows.filter(r => getMo(r) === mi).length;
             return (
-              <button
-                key={mi}
-                onClick={() => setMonth(month === mi ? null : mi)}
-                className={`w-9 h-9 rounded-full text-[11px] font-semibold transition-colors relative ${
-                  month === mi ? 'bg-blue-600 text-white shadow-md' : count > 0 ? 'bg-slate-100 text-slate-700 hover:bg-blue-100 hover:text-blue-700' : 'bg-slate-50 text-slate-300'
-                }`}
-              >
+              <button key={mi} onClick={() => setMonth(month === mi ? null : mi)}
+                className={`w-9 h-9 rounded-full text-[11px] font-bold transition-all relative ${
+                  month === mi ? 'bg-blue-600 text-white shadow-md'
+                  : count > 0  ? 'bg-slate-100 text-slate-700 hover:bg-blue-100 hover:text-blue-700'
+                               : 'bg-slate-50 text-slate-300'
+                }`}>
                 {m}
                 {count > 0 && month !== mi && (
                   <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-blue-400 text-white text-[8px] rounded-full flex items-center justify-center font-bold">
@@ -529,63 +748,44 @@ export function VendasNovoAnalise() {
             );
           })}
         </div>
-
-        <div className="w-px h-6 bg-slate-200 flex-shrink-0" />
-
-        {/* Vendedor + Modelo */}
+        <div className="w-px h-6 bg-slate-200" />
         <div className="flex items-center gap-2">
-          <select
-            value={vendedor}
-            onChange={e => setVendedor(e.target.value)}
-            className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            {availableVendedores.map(v => <option key={v} value={v}>{v}</option>)}
+          <select value={vendedor} onChange={e => setVendedor(e.target.value)}
+            className="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            {availVendedores.map(v => <option key={v} value={v}>{v}</option>)}
           </select>
-          <select
-            value={modelo}
-            onChange={e => setModelo(e.target.value)}
-            className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            {availableModelos.map(m => <option key={m} value={m}>{m}</option>)}
+          <select value={modelo} onChange={e => setModelo(e.target.value)}
+            className="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            {availModelos.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
           {(vendedor !== 'Todos' || modelo !== 'Todos') && (
-            <button
-              onClick={() => { setVendedor('Todos'); setModelo('Todos'); }}
-              className="text-[11px] text-slate-400 hover:text-red-400 transition-colors"
-            >✕ limpar</button>
+            <button onClick={() => { setVendedor('Todos'); setModelo('Todos'); }}
+              className="text-[11px] text-slate-400 hover:text-red-400 transition-colors">✕ limpar</button>
           )}
         </div>
-
-        {/* Export */}
         <div className="ml-auto">
-          <button
-            onClick={() => exportAnalyticsExcel(vendorData, monthlyData, periodLabel)}
-            disabled={!metrics}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-40"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Exportar Excel
+          <button onClick={() => exportExcel(vendorData, monthlyData, modelFamilyData, periodLabel)} disabled={!metrics}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors disabled:opacity-40">
+            <Download className="w-3.5 h-3.5" /> Exportar Excel
           </button>
         </div>
       </div>
 
-      {/* ── Loading ─────────────────────────────────────────────────────────── */}
+      {/* ── Loading / sem dados ──────────────────────────────────────────────── */}
       {loading && (
-        <div className="flex items-center justify-center h-64 text-slate-300">
+        <div className="flex items-center justify-center h-56 text-slate-300">
           <div className="flex flex-col items-center gap-3">
             <TrendingUp className="w-10 h-10 animate-pulse" />
             <span className="text-sm">Carregando dados...</span>
           </div>
         </div>
       )}
-
-      {/* ── Sem dados ────────────────────────────────────────────────────────── */}
       {!loading && !metrics && (
-        <div className="flex items-center justify-center h-64 text-slate-300">
+        <div className="flex items-center justify-center h-56 text-slate-300">
           <div className="flex flex-col items-center gap-3">
             <TrendingUp className="w-10 h-10" />
-            <span className="text-sm font-medium">Sem dados para {periodLabel}</span>
-            <span className="text-xs text-slate-400">Registros aparecerão aqui ao serem cadastrados na aba Vendas → Vendas Veículos Novos</span>
+            <p className="text-sm font-semibold">Sem dados para {periodLabel}</p>
+            <p className="text-xs text-slate-400">Registros aparecem após cadastramento em Vendas → Veículos Novos</p>
           </div>
         </div>
       )}
@@ -595,73 +795,236 @@ export function VendasNovoAnalise() {
           {/* ── KPIs Hero ──────────────────────────────────────────────────── */}
           {heroKpis.length > 0 && (
             <div className={`grid gap-4 ${heroKpis.length === 1 ? 'grid-cols-1' : heroKpis.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-              {heroKpis.map(k => (
-                <KpiCard key={k.id} {...k} hero pinned onClick={() => togglePin(k.id)} />
-              ))}
+              {heroKpis.map(k => <KpiCard key={k.id} {...k} hero pinned onClick={() => togglePin(k.id)} />)}
             </div>
           )}
 
-          {/* ── KPIs Secundários ───────────────────────────────────────────── */}
+          {/* ── KPIs Secundários ────────────────────────────────────────────── */}
           {secKpis.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {secKpis.map(k => (
-                <KpiCard key={k.id} {...k} onClick={() => togglePin(k.id)} />
-              ))}
+              {secKpis.map(k => <KpiCard key={k.id} {...k} onClick={() => togglePin(k.id)} />)}
             </div>
           )}
-          <p className="text-[10px] text-slate-400 text-right -mt-3">★ clique em qualquer card para fixar como destaque</p>
+          <p className="text-[10px] text-slate-400 text-right -mt-4">
+            ★ clique em qualquer card para fixar como destaque (máx. 3) — ⓘ = campo não preenchido
+          </p>
 
-          {/* ── Waterfall + Evolução Mensal ────────────────────────────────── */}
+          {/* ── Vendas por Modelo (família) — botões dinâmicos ──────────────── */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <SH right={
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {(Object.entries(MODEL_METRIC_CFG) as [ModelMetric, (typeof MODEL_METRIC_CFG)[ModelMetric]][]).map(([k, cfg]) => (
+                  <Pill key={k} label={cfg.label} active={modelMetric === k} onClick={() => setModelMetric(k)} icon={cfg.icon} />
+                ))}
+              </div>
+            }>
+              Vendas por Modelo (Família) — {periodLabel}
+            </SH>
+            {modelFamilyData.length === 0 ? <Empty /> : modelMetric === 'bubble' ? (
+              /* ── Bubble: Volume × Margem × Resultado ── */
+              <div>
+                <p className="text-[10px] text-slate-400 text-center mb-3">
+                  Eixo X = Volume · Eixo Y = Margem % · 🔵 Tamanho = Resultado absoluto
+                </p>
+                <ResponsiveContainer width="100%" height={340}>
+                  <ScatterChart margin={{ top: 24, right: 40, left: 20, bottom: 28 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis type="number" dataKey="vol" name="Volume"
+                      label={{ value: 'Volume (unidades)', position: 'insideBottom', offset: -12, fontSize: 10, fill: '#94a3b8' }}
+                      tick={{ fontSize: 9 }} />
+                    <YAxis type="number" dataKey="marg" name="Margem %"
+                      label={{ value: 'Margem %', angle: -90, position: 'insideLeft', fontSize: 10, fill: '#94a3b8' }}
+                      tick={{ fontSize: 9 }} tickFormatter={v => v.toFixed(1) + '%'} />
+                    <ZAxis type="number" dataKey="res" range={[80, 1400]} name="Resultado" />
+                    <Tooltip content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0]?.payload as typeof modelFamilyData[0];
+                      return (
+                        <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[190px]">
+                          <p className="font-bold text-slate-700 mb-2">{d.name}</p>
+                          <div className="flex justify-between gap-4"><span className="text-slate-400">Volume</span><span className="font-mono font-semibold">{d.vol} un.</span></div>
+                          <div className="flex justify-between gap-4"><span className="text-slate-400">Margem</span><span className="font-mono font-semibold">{fmtPct(d.marg)}</span></div>
+                          <div className="flex justify-between gap-4"><span className="text-slate-400">Resultado</span><span className={`font-mono font-bold ${d.res >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmtBRLF(d.res)}</span></div>
+                          <div className="flex justify-between gap-4"><span className="text-slate-400">Lucro Bruto</span><span className="font-mono text-indigo-600">{fmtBRLF(d.lb)}</span></div>
+                        </div>
+                      );
+                    }} />
+                    <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="4 2" />
+                    <ReferenceLine y={avgMarg} stroke="#f59e0b" strokeDasharray="4 2"
+                      label={{ value: `Média ${fmtPct(avgMarg)}`, position: 'insideTopRight', fontSize: 9, fill: '#f59e0b' }} />
+                    <Scatter data={modelFamilyData} name="Modelos" fillOpacity={0.8}>
+                      {modelFamilyData.map((d, i) => (
+                        <Cell key={i} fill={d.res < 0 ? '#ef4444' : d.marg >= avgMarg ? '#10b981' : '#3b82f6'} />
+                      ))}
+                      <LabelList dataKey="name" position="right" style={{ fontSize: 9, fill: '#475569', fontWeight: 600 }} />
+                    </Scatter>
+                  </ScatterChart>
+                </ResponsiveContainer>
+                <div className="flex gap-4 justify-center mt-2 text-[10px] text-slate-400">
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block opacity-80" />Acima da margem média</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block opacity-80" />Abaixo da margem média</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-500 inline-block opacity-80" />Resultado negativo</span>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Donut */}
+                <div>
+                  <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wide mb-3">
+                    {mmCfg.label} por Modelo
+                  </p>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie data={modelFamilyData} dataKey={mmCfg.donutKey} nameKey="name"
+                        cx="50%" cy="50%" outerRadius={110} innerRadius={60}
+                        labelLine={false}
+                        label={DonutLabel as unknown as (props: object) => React.ReactElement | null}>
+                        {modelFamilyData.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                      </Pie>
+                      <Tooltip formatter={(v: number, name: string) => [mmCfg.fmt(v), name]} />
+                      <Legend wrapperStyle={{ fontSize: 11 }}
+                        formatter={(value, entry) => (
+                          <span style={{ color: '#475569' }}>
+                            {value}: {mmCfg.fmt((entry as { payload?: { [key: string]: number } }).payload?.[mmCfg.donutKey] ?? 0)}
+                          </span>
+                        )} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Barra horizontal */}
+                <div>
+                  <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wide mb-3">
+                    {mmCfg.barLabel} por Família
+                    {modelMetric === 'ticket' && avgTicket > 0 && (
+                      <span className="ml-2 text-slate-400 font-normal">— Média: {fmtBRL(avgTicket)}</span>
+                    )}
+                  </p>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart
+                      data={[...modelFamilyData].sort((a, b) => (b[mmCfg.barKey as keyof typeof b] as number) - (a[mmCfg.barKey as keyof typeof a] as number))}
+                      layout="vertical" margin={{ left: 4, right: 72, top: 4, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                      <XAxis type="number" tickFormatter={v => mmCfg.fmt(v)} tick={{ fontSize: 9 }} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={86} />
+                      <Tooltip formatter={(v: number) => [mmCfg.fmt(v), mmCfg.barLabel]} />
+                      {modelMetric === 'ticket' && avgTicket > 0 && (
+                        <ReferenceLine x={avgTicket} stroke="#94a3b8" strokeDasharray="4 2"
+                          label={{ value: 'Média', position: 'top', fontSize: 9, fill: '#94a3b8' }} />
+                      )}
+                      <Bar dataKey={mmCfg.barKey} name={mmCfg.barLabel} radius={[0, 5, 5, 0]}>
+                        {[...modelFamilyData].sort((a, b) => (b[mmCfg.barKey as keyof typeof b] as number) - (a[mmCfg.barKey as keyof typeof a] as number))
+                          .map((d, i) => <Cell key={i} fill={(d[mmCfg.barKey as keyof typeof d] as number) < 0 ? '#ef4444' : PALETTE[i % PALETTE.length]} />)}
+                        {modelMetric !== 'ticket' && (
+                          <LabelList dataKey="marg" position="right"
+                            formatter={(v: number) => fmtPct(v)}
+                            style={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} />
+                        )}
+                        {modelMetric === 'ticket' && (
+                          <LabelList dataKey="vol" position="right"
+                            formatter={(v: number) => `${v} un.`}
+                            style={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} />
+                        )}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Tendência de Margem — 12 meses rolantes ─────────────────────── */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <SH>Tendência de Margem — 12 meses rolantes</SH>
+            <ResponsiveContainer width="100%" height={200}>
+              <ComposedChart data={tendenciaData} margin={{ top: 8, right: 24, left: 8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="label" tick={{ fontSize: 9 }} />
+                <YAxis yAxisId="left" tickFormatter={v => v.toFixed(1) + '%'} tick={{ fontSize: 9 }} width={44} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 9 }} width={32} />
+                <Tooltip content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  const margVal = payload.find(p => p.dataKey === 'marg')?.value as number | undefined;
+                  const volVal  = payload.find(p => p.dataKey === 'vol')?.value as number | undefined;
+                  return (
+                    <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[150px]">
+                      <p className="font-bold text-slate-700 mb-1">{label}</p>
+                      {margVal !== undefined && (
+                        <div className="flex justify-between gap-4">
+                          <span className="text-amber-500">Margem</span>
+                          <span className="font-mono font-bold">{fmtPct(margVal)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between gap-4">
+                        <span className="text-indigo-400">Volume</span>
+                        <span className="font-mono">{volVal ?? '—'} un.</span>
+                      </div>
+                    </div>
+                  );
+                }} />
+                <ReferenceLine yAxisId="left" y={0} stroke="#ef4444" strokeDasharray="4 2" strokeWidth={1} />
+                <Bar yAxisId="right" dataKey="vol" name="Volume" fill="#e0e7ff" opacity={0.65} radius={[2, 2, 0, 0]} />
+                <Line yAxisId="left" type="monotone" dataKey="marg" name="Margem %" stroke="#f59e0b" strokeWidth={2.5}
+                  connectNulls={false}
+                  dot={(props: { cx?: number; cy?: number; payload?: { marg: number | null }; index?: number }) => {
+                    const { cx = 0, cy = 0, payload, index = 0 } = props;
+                    if (payload?.marg === null || payload?.marg === undefined) return <circle key={index} cx={cx} cy={cy} r={0} />;
+                    const col = payload.marg < 0 ? '#ef4444' : payload.marg < 2 ? '#f59e0b' : '#10b981';
+                    return <circle key={index} cx={cx} cy={cy} r={4} fill={col} stroke="white" strokeWidth={1.5} />;
+                  }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <div className="flex gap-4 justify-center mt-2 text-[10px] text-slate-400">
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />Margem ≥ 2%</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-400 inline-block" />0% – 2%</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-500 inline-block" />Negativa</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-indigo-200 inline-block" />Volume (dir.)</span>
+            </div>
+          </div>
+
+          {/* ── Waterfall + Evolução Mensal ──────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-            {/* Waterfall */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-              <ST>Decomposição do Resultado — {periodLabel}</ST>
-              {waterfallData.length === 0 ? <EmptyChart /> : (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              <SH>Decomposição do Resultado — {periodLabel}</SH>
+              {waterfallData.length === 0 ? <Empty /> : (
                 <>
                   <ResponsiveContainer width="100%" height={240}>
                     <BarChart data={waterfallData} margin={{ top: 4, right: 12, left: 8, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 9.5 }} />
-                      <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={90} />
-                      <Tooltip content={<WfTooltip />} />
+                      <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} />
+                      <Tooltip content={<TipWF />} />
                       <Bar dataKey="base" stackId="s" fill="transparent" legendType="none" isAnimationActive={false} />
-                      <Bar dataKey="bar" stackId="s" radius={[4, 4, 0, 0]}>
-                        {waterfallData.map((e, i) => (
-                          <Cell key={i} fill={e.type === 'total' ? '#3b82f6' : e.type === 'pos' ? '#10b981' : '#ef4444'} />
-                        ))}
+                      <Bar dataKey="bar"  stackId="s" radius={[4, 4, 0, 0]}>
+                        {waterfallData.map((e, i) => <Cell key={i} fill={e.type === 'total' ? '#3b82f6' : e.type === 'pos' ? '#10b981' : '#ef4444'} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                  <div className="flex gap-5 justify-center mt-3 text-[10px] text-slate-400">
+                  <div className="flex gap-4 justify-center mt-3 text-[10px] text-slate-400">
                     <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" />Positivo</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-red-500 inline-block" />Dedução</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-blue-500 inline-block" />Resultado Final</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-red-500   inline-block" />Dedução</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-blue-500  inline-block" />Resultado Final</span>
                   </div>
                 </>
               )}
             </div>
 
-            {/* Evolução Mensal */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-              <ST>Evolução Mensal — {year}</ST>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              <SH>Evolução Mensal — {year}</SH>
               <ResponsiveContainer width="100%" height={240}>
                 <ComposedChart data={monthlyData} margin={{ top: 4, right: 12, left: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis yAxisId="left" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={90} />
-                  <YAxis yAxisId="right" orientation="right" tickFormatter={v => v.toFixed(1) + '%'} tick={{ fontSize: 9 }} width={42} />
-                  <Tooltip content={<MthTooltip />} />
+                  <YAxis yAxisId="left"  tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} />
+                  <YAxis yAxisId="right" orientation="right" tickFormatter={v => v.toFixed(1) + '%'} tick={{ fontSize: 9 }} width={40} />
+                  <Tooltip content={<TipBRL />} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar yAxisId="left" dataKey="lcb" name="Lucro c/ Bônus" radius={[3, 3, 0, 0]}>
-                    {monthlyData.map((_, i) => (
-                      <Cell key={i} fill="#6366f1" opacity={month !== null && month !== i + 1 ? 0.4 : 1} />
-                    ))}
+                  <Bar yAxisId="left" dataKey="lb"  name="Lucro Bruto" radius={[3, 3, 0, 0]}>
+                    {monthlyData.map((_, i) => <Cell key={i} fill="#6366f1" opacity={month !== null && month !== i + 1 ? 0.3 : 1} />)}
                   </Bar>
-                  <Bar yAxisId="left" dataKey="res" name="Resultado" radius={[3, 3, 0, 0]}>
-                    {monthlyData.map((d, i) => (
-                      <Cell key={i} fill={d.res < 0 ? '#ef4444' : '#3b82f6'} opacity={month !== null && month !== i + 1 ? 0.4 : 1} />
-                    ))}
+                  <Bar yAxisId="left" dataKey="res" name="Resultado"   radius={[3, 3, 0, 0]}>
+                    {monthlyData.map((d, i) => <Cell key={i} fill={d.res < 0 ? '#ef4444' : '#3b82f6'} opacity={month !== null && month !== i + 1 ? 0.3 : 1} />)}
                   </Bar>
                   <Line yAxisId="right" type="monotone" dataKey="marg" name="Margem %" stroke="#f59e0b" dot={{ r: 3 }} strokeWidth={2} />
                 </ComposedChart>
@@ -669,74 +1032,55 @@ export function VendasNovoAnalise() {
             </div>
           </div>
 
-          {/* ── Ranking de Vendedores + Mix por Modelo ─────────────────────── */}
+          {/* ── Bonificações por Mês + Líquidas por Família ─────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-            {/* Ranking vendedores */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-              <ST>Ranking de Vendedores — {periodLabel}</ST>
-              {vendorData.length === 0 ? <EmptyChart /> : (
-                <div className="space-y-2">
-                  {vendorData.map((v, i) => {
-                    const bestRes = Math.max(...vendorData.map(x => x.res), 1);
-                    const barPct = bestRes > 0 ? Math.max(0, (v.res / bestRes) * 100) : 0;
-                    const aboveAvg = v.marg >= avgMarg;
-                    const isTop = i === 0;
-                    const medals = ['🥇', '🥈', '🥉'];
-                    return (
-                      <div key={v.name} className={`rounded-lg border p-3 transition-colors ${isTop ? 'border-amber-200 bg-amber-50/50' : 'border-slate-100 hover:bg-slate-50'}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                            i < 3 ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white' : 'bg-slate-100 text-slate-500'
-                          }`}>
-                            {i < 3 ? medals[i] : i + 1}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2 mb-1.5">
-                              <span className="text-sm font-semibold text-slate-700 truncate">{v.name}</span>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="text-[10px] text-slate-400">{v.vol} vend.</span>
-                                <span className={`text-sm font-bold font-mono ${v.res >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmtBRL(v.res)}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 bg-slate-100 rounded-full h-1.5">
-                                <div className="h-1.5 rounded-full bg-blue-500 transition-all" style={{ width: `${barPct}%` }} />
-                              </div>
-                              <span className={`text-[10px] font-bold flex-shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full ${
-                                aboveAvg ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                              }`}>
-                                {aboveAvg ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-                                {fmtPct(v.marg)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <p className="text-[10px] text-slate-400 text-right pt-1">
-                    ▲▼ vs média do grupo — margem média: <span className="font-semibold">{fmtPct(avgMarg)}</span>
-                  </p>
+            {/* Bônus mensais */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <SH>Composição de Bônus — {year}</SH>
                 </div>
-              )}
+                {metrics.bon > 0 && (
+                  <div className="text-right -mt-1">
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wide">Acumulado</p>
+                    <p className="text-base font-bold text-amber-600 font-mono">{fmtBRL(metrics.bon)}</p>
+                    {aliqBon > 0 && <p className="text-[10px] text-slate-400">Imp. s/ bônus: {fmtPct(aliqBon, 2)}</p>}
+                  </div>
+                )}
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={bonusMonthly} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                  <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} />
+                  <Tooltip content={<TipBRL />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="piv"     name="PIV"        stackId="b" fill="#3b82f6" />
+                  <Bar dataKey="siq"     name="SIQ"        stackId="b" fill="#6366f1" />
+                  <Bar dataKey="pive"    name="PIVE"       stackId="b" fill="#8b5cf6" />
+                  <Bar dataKey="varejo"  name="Varejo"     stackId="b" fill="#f59e0b" />
+                  <Bar dataKey="tradein" name="Trade IN"   stackId="b" fill="#f97316" />
+                  <Bar dataKey="adics"   name="Adicionais" stackId="b" fill="#10b981" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
 
-            {/* Mix por modelo */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-              <ST>Mix por Modelo — Resultado (Top 10)</ST>
-              {modelData.length === 0 ? <EmptyChart /> : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={modelData} layout="vertical" margin={{ left: 4, right: 65, top: 4, bottom: 4 }}>
+            {/* Bônus líquidas por família */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              <SH>Bonificações Líquidas por Família — {periodLabel}</SH>
+              {bonFamilyData.length === 0 ? <Empty /> : (
+                <ResponsiveContainer width="100%" height={Math.max(200, bonFamilyData.length * 36 + 40)}>
+                  <BarChart data={bonFamilyData} layout="vertical" margin={{ left: 4, right: 72, top: 4, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                     <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 9.5 }} width={85} />
-                    <Tooltip formatter={(v: number) => [fmtBRLFull(v), 'Resultado']} />
-                    <Bar dataKey="res" name="Resultado" radius={[0, 4, 4, 0]}>
-                      {modelData.map((d, i) => (
-                        <Cell key={i} fill={d.res < 0 ? '#ef4444' : PALETTE[i % PALETTE.length]} />
-                      ))}
-                      <LabelList dataKey="marg" position="right" formatter={(v: number) => fmtPct(v)} style={{ fontSize: 9.5, fill: '#64748b' }} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={86} />
+                    <Tooltip content={<TipBRL />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="gross" name="Bônus Bruto" stackId="n" fill="#6366f1" opacity={0.4} />
+                    <Bar dataKey="deduc" name="Imp. s/ Bônus" stackId="n" fill="#ef4444" opacity={0.7} radius={[0, 3, 3, 0]}>
+                      <LabelList dataKey="liq" position="right"
+                        formatter={(v: number) => fmtBRL(v)}
+                        style={{ fontSize: 9, fill: '#475569', fontWeight: 600 }} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -744,105 +1088,468 @@ export function VendasNovoAnalise() {
             </div>
           </div>
 
-          {/* ── Composição de Bônus por Mês ────────────────────────────────── */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-            <ST>Composição de Bônus por Mês — {year}</ST>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={bonusMonthly} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={90} />
-                <Tooltip content={<BonTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="piv"     name="PIV"       stackId="b" fill="#3b82f6" />
-                <Bar dataKey="siq"     name="SIQ"       stackId="b" fill="#6366f1" />
-                <Bar dataKey="pive"    name="PIVE"      stackId="b" fill="#8b5cf6" />
-                <Bar dataKey="varejo"  name="Varejo"    stackId="b" fill="#f59e0b" />
-                <Bar dataKey="tradein" name="Trade IN"  stackId="b" fill="#f97316" />
-                <Bar dataKey="adics"   name="Adicionais"stackId="b" fill="#10b981" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* ── Análise de Custos e Despesas ───────────────────────────────── */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-            <ST>Análise de Custos e Despesas — {periodLabel}</ST>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-              {/* Pie */}
-              <div className="flex flex-col items-center">
-                {costData.length > 0 ? (
-                  <>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <PieChart>
-                        <Pie data={costData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40}>
-                          {costData.map((_, i) => <Cell key={i} fill={PIE_COLS[i % PIE_COLS.length]} />)}
-                        </Pie>
-                        <Tooltip formatter={(v: number) => fmtBRLFull(v)} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </>
-                ) : <EmptyChart />}
-              </div>
-
-              {/* Tabela detalhada */}
-              <div className="space-y-3 flex flex-col justify-center">
-                {[
-                  { label: 'Comissão + DSR + Provisões + Encargos', value: metrics.com + metrics.dsr + metrics.prov + metrics.enc, color: PIE_COLS[0], sub: 'pessoal de vendas' },
-                  { label: 'Juros de Estoque',                       value: metrics.juros, color: PIE_COLS[1], sub: 'custo financeiro flooring' },
-                  { label: 'CI Desconto + Cortesias',                value: metrics.ci + metrics.cort, color: PIE_COLS[2], sub: 'descontos e cortesias operacionais' },
-                  { label: 'Outras Despesas',                        value: metrics.outras, color: PIE_COLS[3], sub: 'diversas' },
-                ].map((item, i) => (
-                  item.value > 0 && (
-                    <div key={i} className="flex items-start justify-between gap-4 border-b border-slate-100 pb-2">
-                      <div className="flex items-start gap-2 min-w-0">
-                        <span className="w-3 h-3 rounded-sm flex-shrink-0 mt-0.5" style={{ background: item.color }} />
-                        <div>
-                          <p className="text-sm text-slate-700 font-medium leading-tight">{item.label}</p>
-                          <p className="text-[10px] text-slate-400">{item.sub}</p>
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-bold font-mono text-red-500">{fmtBRLFull(item.value)}</p>
-                        {metrics.recLiq > 0 && <p className="text-[10px] text-slate-400">{fmtPct(item.value / metrics.recLiq * 100)} da receita</p>}
-                      </div>
+          {/* ── Receitas por Fonte ───────────────────────────────────────────── */}
+          {(totaisReceitas.blind + totaisReceitas.fin + totaisReceitas.desp) > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              <div className="flex items-start justify-between mb-1">
+                <SH>Receitas por Fonte — {year}</SH>
+                <div className="flex gap-4 -mt-1">
+                  {[
+                    { label: 'Blindagem',      value: totaisReceitas.blind, color: '#3b82f6' },
+                    { label: 'Financiamento',  value: totaisReceitas.fin,   color: '#10b981' },
+                    { label: 'Despachante',    value: totaisReceitas.desp,  color: '#f59e0b' },
+                  ].map(item => item.value > 0 && (
+                    <div key={item.label} className="text-right">
+                      <p className="text-[10px] uppercase tracking-wide" style={{ color: item.color }}>{item.label}</p>
+                      <p className="text-sm font-bold font-mono" style={{ color: item.color }}>{fmtBRL(item.value)}</p>
                     </div>
-                  )
-                ))}
-                <div className="flex justify-between pt-1">
-                  <span className="text-sm font-bold text-slate-700">Total de Deduções</span>
-                  <div className="text-right">
-                    <span className="text-sm font-bold font-mono text-red-600">
-                      {fmtBRLFull(metrics.juros + metrics.ci + metrics.cort + metrics.com + metrics.dsr + metrics.prov + metrics.enc + metrics.outras)}
-                    </span>
-                    {metrics.recLiq > 0 && (
-                      <p className="text-[10px] text-slate-400">
-                        {fmtPct((metrics.juros + metrics.ci + metrics.cort + metrics.com + metrics.dsr + metrics.prov + metrics.enc + metrics.outras) / metrics.recLiq * 100)} da receita líquida
-                      </p>
-                    )}
-                  </div>
+                  ))}
                 </div>
-                {/* Receitas extras (blindagem, financiamento, despachante) */}
-                {(metrics.blind + metrics.fin + metrics.desp) > 0 && (
-                  <div className="flex justify-between pt-2 border-t border-slate-100">
-                    <span className="text-sm text-emerald-700 font-medium">Receitas Extras (Blindagem + Fin. + Desp.)</span>
-                    <span className="text-sm font-bold font-mono text-emerald-600">{fmtBRLFull(metrics.blind + metrics.fin + metrics.desp)}</span>
-                  </div>
-                )}
               </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={receitasFonteData} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                  <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} />
+                  <Tooltip content={<TipBRL />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="blind" name="Blindagem"     radius={[3, 3, 0, 0]} fill="#3b82f6" />
+                  <Bar dataKey="fin"   name="Financiamento" radius={[3, 3, 0, 0]} fill="#10b981" />
+                  <Bar dataKey="desp"  name="Despachante"   radius={[3, 3, 0, 0]} fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* ── Análise de Custos ────────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <SH>Análise de Custos — {periodLabel}</SH>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: 'Comissão + DSR + Encargos', value: metrics.com + metrics.dsr + metrics.prov + metrics.enc, color: '#ef4444', sub: 'pessoal de vendas' },
+                { label: 'Juros de Estoque',           value: metrics.juros,                                          color: '#f97316', sub: 'custo financeiro flooring' },
+                { label: 'CI Desc. + Cortesias',       value: metrics.ci + metrics.cort,                              color: '#f59e0b', sub: 'descontos operacionais' },
+                { label: 'Outras Despesas',            value: metrics.outras,                                         color: '#8b5cf6', sub: 'diversas' },
+              ].map((item, i) => (
+                <div key={i} className="rounded-xl border border-slate-100 p-4 bg-slate-50/50" style={{ borderLeft: `3px solid ${item.color}` }}>
+                  <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide mb-1">{item.label}</p>
+                  <p className="text-base font-bold font-mono" style={{ color: item.color }}>{fmtBRLF(item.value)}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">{item.sub}</p>
+                  {metrics.recLiq > 0 && item.value > 0 && (
+                    <p className="text-[10px] text-slate-500 font-semibold mt-1">{fmtPct(item.value / metrics.recLiq * 100)} da receita</p>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* ── Devoluções V07 ─────────────────────────────────────────────── */}
-          {devolucoes.length > 0 && (
-            <div className="bg-amber-50 rounded-xl border border-amber-200 shadow-sm">
-              <button
-                onClick={() => setShowDevol(!showDevol)}
-                className="w-full flex items-center justify-between px-5 py-4"
-              >
+          {/* ── Juros de Estoque por Modelo/Família ─────────────────────────── */}
+          {jurosData.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-1 flex-wrap gap-3">
+                <SH>Juros de Estoque por {jurosGrouping === 'familia' ? 'Família' : 'Modelo'} — {periodLabel}</SH>
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  {(['familia', 'modelo'] as JurosGrouping[]).map(g => (
+                    <button key={g} onClick={() => setJurosGrouping(g)}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${
+                        jurosGrouping === g
+                          ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-orange-300 hover:text-orange-600'
+                      }`}>
+                      {g === 'familia' ? '🏷 Família' : '🔍 Modelo'}
+                    </button>
+                  ))}
+                  <div className="ml-2 text-right">
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wide">Total</p>
+                    <p className="text-sm font-bold font-mono text-orange-600">{fmtBRL(jurosData.reduce((s, d) => s + d.juros, 0))}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-4">
+                <div>
+                  <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-2">Juros Total por {jurosGrouping === 'familia' ? 'Família' : 'Modelo'}</p>
+                  <ResponsiveContainer width="100%" height={Math.max(200, jurosData.length * 32 + 40)}>
+                    <BarChart data={jurosData} layout="vertical" margin={{ left: 4, right: 88, top: 4, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                      <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={92} />
+                      <Tooltip formatter={(v: number) => [fmtBRLF(v), 'Juros']} />
+                      <Bar dataKey="juros" name="Juros Total" fill="#f97316" radius={[0, 5, 5, 0]}>
+                        <LabelList dataKey="juros" position="right"
+                          formatter={(v: number) => fmtBRL(v)}
+                          style={{ fontSize: 9, fill: '#c2410c', fontWeight: 600 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div>
+                  <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-2">Juros por Unidade Vendida</p>
+                  <ResponsiveContainer width="100%" height={Math.max(200, jurosData.length * 32 + 40)}>
+                    <BarChart data={[...jurosData].sort((a, b) => b.jurosPorUnidade - a.jurosPorUnidade)} layout="vertical" margin={{ left: 4, right: 88, top: 4, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                      <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={92} />
+                      <Tooltip formatter={(v: number) => [fmtBRLF(v), 'Juros / un.']} />
+                      <Bar dataKey="jurosPorUnidade" name="Juros / Unidade" fill="#fb923c" radius={[0, 5, 5, 0]}>
+                        <LabelList dataKey="jurosPorUnidade" position="right"
+                          formatter={(v: number) => fmtBRL(v)}
+                          style={{ fontSize: 9, fill: '#c2410c', fontWeight: 600 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Performance por Vendedor ────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            {/* Header com sort dinâmico */}
+            <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Performance por Vendedor — {periodLabel}</span>
+                {vendorData.length > 0 && (
+                  <span className="text-xs text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">{vendorData.length} vendedor(es)</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-slate-400 mr-1">Ordenar por:</span>
+                {(Object.entries(VENDOR_SORT_CFG) as [VendorSort, { label: string }][]).map(([k, cfg]) => (
+                  <Pill key={k} label={cfg.label} active={vendorSort === k} onClick={() => setVendorSort(k)} />
+                ))}
+              </div>
+            </div>
+
+            {vendorData.length === 0 ? <Empty /> : (
+              <>
+                {/* Top 3 — Cards executivos */}
+                <div className={`grid gap-4 mb-5 ${vendorData.length === 1 ? 'grid-cols-1' : vendorData.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  {vendorData.slice(0, 3).map((v, i) => {
+                    const volPct   = totalVol > 0 ? v.vol / totalVol * 100 : 0;
+                    const bestVal  = (vendorData[0]?.[vendorSort] ?? 1) as number;
+                    const barPct   = bestVal > 0 ? Math.max(0, (v[vendorSort] as number) / bestVal * 100) : 0;
+                    const aboveAvg = v.marg >= avgMarg;
+                    const bg = i === 0 ? 'border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50'
+                      : i === 1    ? 'border-slate-300 bg-gradient-to-br from-slate-50 to-gray-50'
+                                   : 'border-orange-300 bg-gradient-to-br from-orange-50 to-amber-50';
+                    return (
+                      <div key={v.name} className={`rounded-2xl border-2 p-5 relative overflow-hidden ${bg}`}>
+                        <div className="absolute top-3 right-3 text-2xl select-none">{['🥇','🥈','🥉'][i]}</div>
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base shadow-md flex-shrink-0"
+                            style={{ background: avatarColor(v.name) }}>
+                            {getInitials(v.name)}
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: MEDAL_COLOR[i] }}>#{i + 1}</p>
+                            <p className="text-sm font-bold text-slate-800 leading-tight">{v.name}</p>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wide font-semibold mb-0.5">Resultado Sorana</p>
+                        <p className={`text-xl font-bold font-mono mb-1 ${v.res >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{fmtBRLF(v.res)}</p>
+                        <div className="w-full bg-white/60 rounded-full h-1.5 mb-3">
+                          <div className="h-1.5 rounded-full transition-all" style={{ width: `${barPct}%`, background: MEDAL_COLOR[i] }} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                          <div>
+                            <p className="text-slate-400 text-[10px]">Volume</p>
+                            <p className="font-semibold text-slate-700">{v.vol} <span className="text-slate-400 font-normal">({fmtPct(volPct, 1)} vol.)</span></p>
+                            {projFactor !== null && (
+                              <p className="text-[10px] text-blue-500 font-semibold mt-0.5">≈ {Math.round(v.vol * projFactor)} proj. mês</p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-slate-400 text-[10px]">% Rentabilidade</p>
+                            <p className={`font-bold flex items-center gap-1 ${v.marg < 0 ? 'text-red-600' : aboveAvg ? 'text-emerald-600' : 'text-amber-600'}`}>
+                              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${v.marg < 0 ? 'bg-red-500' : aboveAvg ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                              {v.marg < 0 ? <TrendingDown className="w-3 h-3" /> : aboveAvg ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                              {fmtPct(v.marg)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-slate-400 text-[10px]">Lucro Bruto</p>
+                            <p className="font-semibold text-indigo-700">{fmtBRLF(v.lb)}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-400 text-[10px]">Rem. Vendedor</p>
+                            <p className="font-semibold text-slate-600">{fmtBRLF(v.remVendedor)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Tabela colapsável (a partir do #4) */}
+                {vendorData.length > 3 && (
+                  <>
+                    <div className="overflow-x-auto rounded-xl border border-slate-100">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            {['#', 'Vendedor', 'Vol.', '% Grupo', 'Lucro Bruto', 'Resultado', 'Margem', 'Rem. Vendedor'].map(h => (
+                              <th key={h} className={`px-3 py-2.5 text-slate-500 font-semibold ${h === 'Vendedor' ? 'text-left' : 'text-right'}`}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {vendorsVisible.slice(3).map((v, i) => {
+                            const aboveAvg = v.marg >= avgMarg;
+                            return (
+                              <tr key={v.name} className={`border-b border-slate-100 hover:bg-slate-50 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                                <td className="px-3 py-2 text-slate-400 font-medium text-right">#{i + 4}</td>
+                                <td className="px-3 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                                      style={{ background: avatarColor(v.name) }}>
+                                      {getInitials(v.name)}
+                                    </div>
+                                    <span className="text-slate-700 font-medium">{v.name}</span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2 text-right text-slate-600">{v.vol}</td>
+                                <td className="px-3 py-2 text-right text-slate-500">{totalVol > 0 ? fmtPct(v.vol / totalVol * 100) : '—'}</td>
+                                <td className="px-3 py-2 text-right font-mono text-indigo-600">{fmtBRL(v.lb)}</td>
+                                <td className={`px-3 py-2 text-right font-mono font-semibold ${v.res >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmtBRL(v.res)}</td>
+                                <td className={`px-3 py-2 text-right font-semibold ${aboveAvg ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                  <span className="flex items-center justify-end gap-0.5">
+                                    {aboveAvg ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                    {fmtPct(v.marg)}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono text-slate-500">{fmtBRL(v.remVendedor)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Botão mostrar mais / menos */}
+                    {vendorData.length > 8 && (
+                      <button onClick={() => setShowAllVendors(!showAllVendors)}
+                        className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-200 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-all">
+                        {showAllVendors
+                          ? <><ChevronUp className="w-3.5 h-3.5" /> Mostrar menos</>
+                          : <><ChevronDown className="w-3.5 h-3.5" /> Ver mais {vendorData.length - 8} vendedor(es)</>}
+                      </button>
+                    )}
+                  </>
+                )}
+                <p className="text-[10px] text-slate-400 mt-2 text-right">
+                  ▲▼ vs margem média do grupo: <strong>{fmtPct(avgMarg)}</strong>
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* ── Remunerações e Comissões — ranking ───────────────────────────── */}
+          {comissoesData.length > 0 && comissoesData[0].total > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              {/* Header + pills */}
+              <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+                <SH>Remunerações e Comissões — {periodLabel}</SH>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {([
+                    { key: 'total',   label: 'Total Folha' },
+                    { key: 'com',     label: 'Comissão' },
+                    { key: 'dsr',     label: 'DSR' },
+                    { key: 'provEnc', label: 'Prov.+Enc.' },
+                  ] as { key: ComissaoMode; label: string }[]).map(opt => (
+                    <button key={opt.key} onClick={() => setComissaoMode(opt.key)}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${
+                        comissaoMode === opt.key
+                          ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-700'
+                      }`}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Sub-totais */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                {[
+                  { label: 'Total Folha', value: metrics.remVendedor, color: '#ef4444', bcolor: 'border-red-300' },
+                  { label: 'Comissão',   value: comissoesData.reduce((s, d) => s + d.com, 0),     color: '#3b82f6', bcolor: 'border-blue-300' },
+                  { label: 'DSR',        value: comissoesData.reduce((s, d) => s + d.dsr, 0),     color: '#10b981', bcolor: 'border-emerald-300' },
+                  { label: 'Prov.+Enc.', value: comissoesData.reduce((s, d) => s + d.provEnc, 0), color: '#64748b', bcolor: 'border-slate-300' },
+                ].map(item => (
+                  <div key={item.label} className={`rounded-xl bg-slate-50 border ${item.bcolor} border-l-4 px-4 py-3`}>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold mb-1">{item.label}</p>
+                    <p className="text-sm font-bold font-mono" style={{ color: item.color }}>{fmtBRL(item.value)}</p>
+                    {item.label !== 'Total Folha' && metrics.remVendedor > 0 && (
+                      <p className="text-[10px] text-slate-400 mt-0.5">{fmtPct(item.value / metrics.remVendedor * 100)} do total</p>
+                    )}
+                    {item.label === 'Total Folha' && metrics.recLiq > 0 && (
+                      <p className="text-[10px] text-slate-400 mt-0.5">{fmtPct(item.value / metrics.recLiq * 100)} da receita</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {/* Ranking */}
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-3">Ranking individual</p>
+              <div className="space-y-0.5">
+                {comissoesVisible.map((v, i) => {
+                  const barColors: Record<ComissaoMode, string> = { total: '#ef4444', com: '#3b82f6', dsr: '#10b981', provEnc: '#64748b' };
+                  const displayVal = comissaoMode === 'com' ? v.com : comissaoMode === 'dsr' ? v.dsr : comissaoMode === 'provEnc' ? v.provEnc : v.total;
+                  const topVal = (comissoesData[0]?.[comissaoMode] ?? 1) as number;
+                  const barPct = topVal > 0 ? Math.min(100, (displayVal / topVal) * 100) : 0;
+                  const barColor = barColors[comissaoMode];
+                  return (
+                    <div key={v.name} className="flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-slate-50 transition-colors group">
+                      <span className="text-xs font-bold text-slate-300 w-5 text-right flex-shrink-0">{i + 1}</span>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
+                        style={{ background: avatarColor(v.name) }}>
+                        {getInitials(v.name)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-xs font-semibold text-slate-700 truncate">{v.name}</span>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            {comissaoMode === 'total' && (
+                              <div className="hidden sm:flex gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span className="text-[10px] text-blue-500 font-mono tabular-nums">Com {fmtBRL(v.com)}</span>
+                                <span className="text-[10px] text-emerald-500 font-mono tabular-nums">DSR {fmtBRL(v.dsr)}</span>
+                                <span className="text-[10px] text-slate-400 font-mono tabular-nums">Enc {fmtBRL(v.provEnc)}</span>
+                              </div>
+                            )}
+                            <div className="text-right">
+                              <p className="text-[10px] text-slate-400 leading-none mb-0.5">
+                                {comissaoMode === 'total' ? 'Total Folha' : comissaoMode === 'com' ? 'Comissão' : comissaoMode === 'dsr' ? 'DSR' : 'Prov.+Enc.'}
+                              </p>
+                              <p className="text-xs font-mono font-bold tabular-nums" style={{ color: barColor }}>{fmtBRL(displayVal)}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-1">
+                          <div className="h-1 rounded-full transition-all duration-300" style={{ width: `${barPct}%`, background: barColor }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {comissoesData.length > 8 && (
+                <button onClick={() => setShowAllComissoes(v => !v)}
+                  className="mt-3 w-full text-center text-xs font-semibold text-slate-400 hover:text-slate-700 py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5">
+                  {showAllComissoes
+                    ? <><ChevronUp className="w-3.5 h-3.5" /> Mostrar menos</>
+                    : <><ChevronDown className="w-3.5 h-3.5" /> Ver todos os {comissoesData.length} vendedores</>}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ── Comparativo de Períodos ──────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <SH>Comparativo de Períodos</SH>
+              <button onClick={addPeriod}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-colors shadow-sm">
+                <Plus className="w-3.5 h-3.5" /> Adicionar Período
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-3 mb-5">
+              {periods.map((p, pi) => (
+                <div key={p.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${pi === 0 ? 'border-amber-300 bg-amber-50' : 'border-blue-200 bg-blue-50'}`}>
+                  <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${pi === 0 ? 'bg-amber-200 text-amber-800' : 'bg-blue-200 text-blue-800'}`}>
+                    {pi === 0 ? 'Base' : `#${pi}`}
+                  </span>
+                  <select value={p.year} onChange={e => updatePeriod(p.id, { year: +e.target.value })}
+                    className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 text-xs focus:outline-none">
+                    {availYears.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <select value={p.gran} onChange={e => updatePeriod(p.id, { gran: e.target.value as 'mes' | 'ano' })}
+                    className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 text-xs focus:outline-none">
+                    <option value="mes">Mês</option>
+                    <option value="ano">Ano</option>
+                  </select>
+                  {p.gran === 'mes' && (
+                    <select value={p.month} onChange={e => updatePeriod(p.id, { month: +e.target.value })}
+                      className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 text-xs focus:outline-none">
+                      {MS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                    </select>
+                  )}
+                  <select value={p.vendedor} onChange={e => updatePeriod(p.id, { vendedor: e.target.value })}
+                    className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 text-xs max-w-[130px] focus:outline-none">
+                    {availVendedores.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                  {pi > 0 && (
+                    <button onClick={() => removePeriod(p.id)} className="text-slate-400 hover:text-red-500 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-gradient-to-r from-slate-700 to-slate-600">
+                    <th className="text-left px-4 py-3 text-white font-semibold w-52">Métrica</th>
+                    {periodLabels.map((lbl, i) => (
+                      <th key={i} className="text-right px-4 py-3 font-semibold" style={{ color: i === 0 ? '#fcd34d' : '#93c5fd' }}>
+                        {i === 0 ? '● ' : '○ '}{lbl}
+                      </th>
+                    ))}
+                    {periods.length > 1 && <th className="text-right px-4 py-3 text-slate-300 font-semibold">Δ vs Base</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {([
+                    { label: 'Qtd. de Vendas',    get: (m: Agg) => m.netVol,        fmt: (v: number) => String(v), hl: false },
+                    { label: 'Receita Bruta',      get: (m: Agg) => m.receita,       fmt: fmtBRLF, hl: false },
+                    { label: 'Receita Líquida',    get: (m: Agg) => m.recLiq,        fmt: fmtBRLF, hl: false },
+                    { label: 'Custo',              get: (m: Agg) => m.custo,         fmt: fmtBRLF, hl: false },
+                    { label: 'Lucro Bruto',        get: (m: Agg) => m.lb,            fmt: fmtBRLF, hl: false },
+                    { label: 'Margem Bruta %',     get: (m: Agg) => m.lbPct,        fmt: (v: number) => fmtPct(v), hl: false },
+                    { label: 'Ticket Médio',       get: (m: Agg) => m.ticketReceita, fmt: (v: number, pm: Agg) => pm.netVol > 0 ? fmtBRLF(v) : '—', hl: false },
+                    { label: 'Lucro c/ Bônus',     get: (m: Agg) => m.lcb,          fmt: fmtBRLF, hl: false },
+                    { label: 'Resultado Sorana',   get: (m: Agg) => m.res,           fmt: fmtBRLF, hl: true },
+                    { label: '% Resultado Sorana', get: (m: Agg) => m.marg,          fmt: (v: number) => fmtPct(v), hl: true },
+                    { label: 'Rem. Vendedores',    get: (m: Agg) => m.remVendedor,   fmt: fmtBRLF, hl: false },
+                    { label: 'Total Bônus',        get: (m: Agg) => m.bon,           fmt: fmtBRLF, hl: false },
+                    { label: 'Juros de Estoque',   get: (m: Agg) => m.juros,         fmt: fmtBRLF, hl: false },
+                  ] as { label: string; get: (m: Agg) => number; fmt: (v: number, m: Agg) => string; hl: boolean }[]).map((row, ri) => {
+                    const base = periodMetrics[0];
+                    const comp = periodMetrics[1];
+                    const bVal = base ? row.get(base) : null;
+                    const cVal = comp ? row.get(comp) : null;
+                    const delta = bVal !== null && cVal !== null ? cVal - bVal : null;
+                    const deltaPct = bVal !== null && bVal !== 0 && delta !== null ? delta / Math.abs(bVal) * 100 : null;
+                    return (
+                      <tr key={ri} className={`border-b border-slate-100 hover:bg-slate-100/60 ${row.hl ? 'bg-blue-50/60' : ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                        <td className={`px-4 py-2.5 font-semibold ${row.hl ? 'text-blue-700' : 'text-slate-600'}`}>{row.label}</td>
+                        {periodMetrics.map((pm, pi) => (
+                          <td key={pi} className={`px-4 py-2.5 text-right font-mono ${row.hl ? 'font-bold text-blue-700' : 'text-slate-700'}`}>
+                            {pm ? row.fmt(row.get(pm), pm) : <span className="text-slate-300">—</span>}
+                          </td>
+                        ))}
+                        {periods.length > 1 && (
+                          <td className="px-4 py-2.5 text-right font-mono">
+                            {delta !== null && deltaPct !== null ? (
+                              <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold rounded px-1.5 py-0.5 ${delta > 0 ? 'bg-emerald-100 text-emerald-700' : delta < 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'}`}>
+                                {delta > 0 ? <TrendingUp className="w-3 h-3" /> : delta < 0 ? <TrendingDown className="w-3 h-3" /> : null}
+                                {delta > 0 ? '+' : ''}{deltaPct.toFixed(1)}%
+                              </span>
+                            ) : <span className="text-slate-300">—</span>}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ── Devoluções V07 ──────────────────────────────────────────────── */}
+          {devolucoes.length > 0 && (
+            <div className="bg-amber-50 rounded-2xl border border-amber-200 shadow-sm">
+              <button onClick={() => setShowDevol(!showDevol)}
+                className="w-full flex items-center justify-between px-5 py-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
                   <span className="text-sm font-bold text-amber-800">
                     Devoluções (V07) — {devolucoes.length} registro(s) deduzido(s) do volume
                   </span>
@@ -850,37 +1557,33 @@ export function VendasNovoAnalise() {
                 {showDevol ? <ChevronUp className="w-4 h-4 text-amber-600" /> : <ChevronDown className="w-4 h-4 text-amber-600" />}
               </button>
               {showDevol && (
-                <div className="px-5 pb-4">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-amber-200">
-                          <th className="text-left py-1.5 px-2 text-amber-700 font-semibold">Chassi</th>
-                          <th className="text-left py-1.5 px-2 text-amber-700 font-semibold">Modelo</th>
-                          <th className="text-left py-1.5 px-2 text-amber-700 font-semibold">Vendedor</th>
-                          <th className="text-left py-1.5 px-2 text-amber-700 font-semibold">Data da Venda</th>
-                          <th className="text-right py-1.5 px-2 text-amber-700 font-semibold">Valor de Venda</th>
-                          <th className="text-right py-1.5 px-2 text-amber-700 font-semibold">Resultado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {devolucoes.map(r => {
-                          const d = dsrFor(dsrCfg, r.dataVenda);
-                          const c = calcNovos(r, aliqBon, d);
-                          return (
-                            <tr key={r.id} className="border-b border-amber-100 hover:bg-amber-100/40">
-                              <td className="py-1.5 px-2 font-mono text-slate-600">{r.chassi || '—'}</td>
-                              <td className="py-1.5 px-2 text-slate-700">{r.modelo || '—'}</td>
-                              <td className="py-1.5 px-2 text-slate-700">{r.vendedor || '—'}</td>
-                              <td className="py-1.5 px-2 font-mono text-slate-500">{r.dataVenda || '—'}</td>
-                              <td className="py-1.5 px-2 text-right font-mono text-slate-600">{fmtBRLFull(n(r.valorVenda))}</td>
-                              <td className={`py-1.5 px-2 text-right font-mono font-semibold ${c.resultado < 0 ? 'text-red-500' : 'text-emerald-600'}`}>{fmtBRLFull(c.resultado)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                <div className="px-5 pb-4 overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-amber-200 text-amber-700">
+                        {['Chassi', 'Modelo', 'Vendedor', 'Data', 'Valor Venda', 'Resultado'].map((h, i) => (
+                          <th key={h} className={`py-1.5 px-2 font-semibold ${i >= 4 ? 'text-right' : 'text-left'}`}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {devolucoes.map(r => {
+                        const c = calcNovos(r, aliqBon, dsrFor(dsrCfg, r.dataVenda));
+                        return (
+                          <tr key={r.id} className="border-b border-amber-100 hover:bg-amber-100/40">
+                            <td className="py-1.5 px-2 font-mono text-slate-500">{r.chassi || '—'}</td>
+                            <td className="py-1.5 px-2 text-slate-700">{r.modelo || '—'}</td>
+                            <td className="py-1.5 px-2 text-slate-700">{r.vendedor || '—'}</td>
+                            <td className="py-1.5 px-2 font-mono text-slate-500">{r.dataVenda || '—'}</td>
+                            <td className="py-1.5 px-2 text-right font-mono text-slate-600">{fmtBRLF(n(r.valorVenda))}</td>
+                            <td className={`py-1.5 px-2 text-right font-mono font-semibold ${c.resultado < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                              {fmtBRLF(c.resultado)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
