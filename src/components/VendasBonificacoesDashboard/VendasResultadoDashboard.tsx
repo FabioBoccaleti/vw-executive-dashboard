@@ -14,6 +14,7 @@ import {
 import { loadAliquotas, loadRemuneracao, loadVendasDsr, type RemuneracaoData, type RemuneracaoModalidade, type FaixaBonus, type VendasDsrConfig } from './vendedoresRemuneracaoStorage';
 import { loadModelos, loadRegras, getRegra, type VeiculoModelo, type VeiculoRegra } from './veiculosRegrasStorage';
 import { loadJurosRotativoRows, type JurosRotativoRow } from './jurosRotativoStorage';
+import { loadVendasRows, type VendasRow as BlindagemRow } from './vendasStorage';
 
 // ─── Helpers numéricos ────────────────────────────────────────────────────────
 function n(v: string): number { return parseFloat(String(v).replace(',', '.')) || 0; }
@@ -211,6 +212,36 @@ function applyComissaoAutoFill(
     const total = com1 + com2 + com3;
     if (total === 0) return row;
     return { ...row, comissaoVenda: total.toFixed(2) };
+  });
+}
+
+// ─── Blindagem auto-fill ─────────────────────────────────────────────────────────────────
+function buildBlindagemMap(blindagemRows: BlindagemRow[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const r of blindagemRows) {
+    if (!r.revenda || r.revenda.trim().toUpperCase() !== 'VW') continue;
+    const chassi = r.chassi?.trim();
+    if (!chassi || !r.comissaoBrutaSorana) continue;
+    // Indexa pelos últimos 7 caracteres (maiúsculo)
+    const key = chassi.slice(-7).toUpperCase();
+    map.set(key, r.comissaoBrutaSorana);
+  }
+  return map;
+}
+
+function applyBlindagemAutoFill(
+  rows: VendasResultadoRow[],
+  blindagemMap: Map<string, string>,
+): VendasResultadoRow[] {
+  if (blindagemMap.size === 0) return rows;
+  return rows.map(row => {
+    const chassi = row.chassi?.trim();
+    if (!chassi) return row;
+    const key = chassi.slice(-7).toUpperCase();
+    const valor = blindagemMap.get(key);
+    if (valor === undefined) return row;
+    // Sempre sincroniza com a Análise de Blindagem
+    return { ...row, recBlindagem: valor };
   });
 }
 
@@ -503,6 +534,8 @@ export default function VendasResultadoDashboard() {
   const [modelos, setModelos] = useState<VeiculoModelo[]>([]);
   const [regras,  setRegras]  = useState<VeiculoRegra[]>([]);
   const [jurosMap, setJurosMap] = useState<Map<string, number>>(new Map());
+  const [blindagemMap, setBlindagemMap] = useState<Map<string, string>>(new Map());
+  const blindagemMapRef = useRef<Map<string, string>>(new Map());
   const [remuneracao, setRemuneracao] = useState<RemuneracaoData | null>(null);
   const remuneracaoRef = useRef<RemuneracaoData | null>(null);
 
@@ -526,14 +559,16 @@ export default function VendasResultadoDashboard() {
           : loaded;
         const withJuros = applyJurosAutoFill(rows, jMap);
         rows = m.length > 0 ? applyAutoFill(withJuros, m, r) : withJuros;
+        rows = applyBlindagemAutoFill(rows, blindagemMapRef.current);
         setRows(rows);
       });
     } else {
       setModelos([]); setRegras([]); setJurosMap(new Map());
       loadVendasResultadoRows(activeTab).then(loaded => {
         const rem = remuneracaoRef.current;
+        const bMap = blindagemMapRef.current;
         if (rem && activeTab === 'direta') {
-          setRows(applyComissaoAutoFillDireta(loaded, rem.vd_frotista));
+          setRows(applyBlindagemAutoFill(applyComissaoAutoFillDireta(loaded, rem.vd_frotista), bMap));
         } else if (rem && activeTab === 'usados') {
           setRows(applyComissaoAutoFill(loaded, rem.usados, true));
         } else {
@@ -565,6 +600,11 @@ export default function VendasResultadoDashboard() {
     });
     loadRemuneracao().then(r => { remuneracaoRef.current = r; setRemuneracao(r); });
     loadVendasDsr().then(setDsrConfigs);
+    loadVendasRows().then(bRows => {
+      const bMap = buildBlindagemMap(bRows);
+      blindagemMapRef.current = bMap;
+      setBlindagemMap(bMap);
+    });
   }, []);
 
   // Aplica auto-preenchimento de Comissão quando a remuneração é carregada
@@ -577,6 +617,13 @@ export default function VendasResultadoDashboard() {
       setRows(prev => applyComissaoAutoFill(prev, modalidade, activeTab === 'usados'));
     }
   }, [remuneracao, activeTab]);
+
+  // Re-aplica blindagem quando o mapa é atualizado (aba novos ou direta)
+  useEffect(() => {
+    if (blindagemMap.size === 0) return;
+    if (activeTab !== 'novos' && activeTab !== 'direta') return;
+    setRows(prev => applyBlindagemAutoFill(prev, blindagemMap));
+  }, [blindagemMap, activeTab]);
 
   const save = useCallback(async (updated: VendasResultadoRow[]) => {
     setRows(updated);
@@ -648,6 +695,10 @@ export default function VendasResultadoDashboard() {
       // Limpa comissaoVenda da linha editada para forçar recalculo
       updated = updated.map(r => r.id === id ? { ...r, comissaoVenda: '' } : r);
       updated = applyComissaoAutoFillDireta(updated, remuneracao.vd_frotista);
+    }
+    // Se o chassi foi alterado em novos ou direta, re-aplica blindagem nessa linha
+    if ((activeTab === 'novos' || activeTab === 'direta') && key === 'chassi' && blindagemMap.size > 0) {
+      updated = applyBlindagemAutoFill(updated, blindagemMap);
     }
     save(updated);
   }
