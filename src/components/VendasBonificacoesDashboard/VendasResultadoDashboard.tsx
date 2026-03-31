@@ -507,32 +507,48 @@ export default function VendasResultadoDashboard() {
   const remuneracaoRef = useRef<RemuneracaoData | null>(null);
 
   useEffect(() => {
-    loadVendasResultadoRows(activeTab).then(loaded => {
-      const rem = remuneracaoRef.current;
-      if (rem && activeTab === 'direta') {
-        setRows(applyComissaoAutoFillDireta(loaded, rem.vd_frotista));
-      } else if (rem && activeTab !== 'direta') {
-        const modalidade = rem[activeTab as 'novos' | 'usados'];
-        setRows(applyComissaoAutoFill(loaded, modalidade, activeTab === 'usados'));
-      } else {
-        setRows(loaded);
-      }
-    });
+    if (activeTab === 'novos') {
+      // Carrega linhas + modelos/regras/juros em paralelo para evitar condição de corrida
+      Promise.all([
+        loadVendasResultadoRows(activeTab),
+        loadModelos(),
+        loadRegras(),
+        loadJurosRotativoRows(),
+      ]).then(([loaded, m, r, jr]) => {
+        setModelos(m);
+        setRegras(r);
+        const jMap = buildJurosMap(jr);
+        setJurosMap(jMap);
+        const rem = remuneracaoRef.current;
+        const modalidade = rem?.[activeTab as 'novos' | 'usados'];
+        let rows = modalidade
+          ? applyComissaoAutoFill(loaded, modalidade, false)
+          : loaded;
+        const withJuros = applyJurosAutoFill(rows, jMap);
+        rows = m.length > 0 ? applyAutoFill(withJuros, m, r) : withJuros;
+        setRows(rows);
+      });
+    } else {
+      setModelos([]); setRegras([]); setJurosMap(new Map());
+      loadVendasResultadoRows(activeTab).then(loaded => {
+        const rem = remuneracaoRef.current;
+        if (rem && activeTab === 'direta') {
+          setRows(applyComissaoAutoFillDireta(loaded, rem.vd_frotista));
+        } else if (rem && activeTab === 'usados') {
+          setRows(applyComissaoAutoFill(loaded, rem.usados, true));
+        } else {
+          setRows(loaded);
+        }
+      });
+    }
   }, [activeTab]);
 
-  // Carrega modelos/regras/juros apenas para a aba Novos
-  useEffect(() => {
-    if (activeTab !== 'novos') { setModelos([]); setRegras([]); setJurosMap(new Map()); return; }
-    Promise.all([loadModelos(), loadRegras(), loadJurosRotativoRows()]).then(([m, r, jr]) => {
-      setModelos(m);
-      setRegras(r);
-      setJurosMap(buildJurosMap(jr));
-    });
-  }, [activeTab]);
+  // Carrega modelos/regras/juros – mantido vazio pois foi unificado acima
+  // (kept para não quebrar o effect de auto-fill abaixo)
 
-  // Aplica auto-preenchimento de PIV/SIQ/PIVE e Juros Estoque quando cadastros são carregados
+  // Aplica auto-preenchimento de PIV/SIQ/PIVE e Juros Estoque quando cadastros são recarregados fora do mount
   useEffect(() => {
-    if (activeTab !== 'novos') return;
+    if (activeTab !== 'novos' || (modelos.length === 0 && jurosMap.size === 0)) return;
     setRows(prev => {
       const withJuros = applyJurosAutoFill(prev, jurosMap);
       if (modelos.length === 0) return withJuros;
