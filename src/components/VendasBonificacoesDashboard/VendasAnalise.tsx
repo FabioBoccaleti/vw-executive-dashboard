@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -1409,8 +1409,8 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
                   const isExpanded = expandedBlindadoras.has(item.blindadora);
                   const itemRows = brandRows.filter(r => !r.numeroNFComissao && !!r.dataVenda && r.blindadora === item.blindadora);
                   return (
-                    <>
-                      <tr key={item.blindadora} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                    <Fragment key={item.blindadora}>
+                      <tr className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
                         <td className="py-2.5 px-3 text-slate-400 font-mono text-xs">{i + 1}</td>
                         <td className="py-2.5 px-3">
                           <div className="flex items-center gap-2">
@@ -1566,7 +1566,7 @@ export function VendasAnalise({ rows, onUpdateRow }: VendasAnaliseProps) {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>

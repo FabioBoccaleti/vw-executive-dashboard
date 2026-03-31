@@ -379,7 +379,6 @@ function FilterCell({ col, value, onChange, options, filterYear, filterMonth, av
           <input
             type="date"
             value={value ? (() => { const p = value.split('/'); return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : ''; })() : ''}
-            defaultValue={todayISO()}
             onChange={e => { const [y, m, d] = e.target.value.split('-'); if (y && m && d) onChange(`${d}/${m}/${y}`); }}
             onClick={e => { if (!(e.currentTarget as HTMLInputElement).value) (e.currentTarget as HTMLInputElement).value = todayISO(); }}
             className="w-6 h-6 opacity-0 absolute pointer-events-none"
@@ -424,7 +423,6 @@ function FilterCell({ col, value, onChange, options, filterYear, filterMonth, av
             if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
             return '';
           })() : ''}
-          defaultValue={todayISO()}
           onChange={e => {
             const [y, m, d] = e.target.value.split('-');
             if (y && m && d) onChange(`${d}/${m}/${y}`);
@@ -1364,7 +1362,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
           <table className="border-collapse text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
             <colgroup>
               <col style={{ width: 56, minWidth: 56 }} />
-              {COLUMNS.map(c => <col key={c.key} style={{ width: c.width, minWidth: c.width }} />)}
+              {COLUMNS.map((c, ci) => <col key={`col-${ci}`} style={{ width: c.width, minWidth: c.width }} />)}
               <col style={{ width: 130, minWidth: 130 }} />
             </colgroup>
 

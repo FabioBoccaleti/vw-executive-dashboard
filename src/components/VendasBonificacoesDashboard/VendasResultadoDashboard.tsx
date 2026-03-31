@@ -60,6 +60,7 @@ function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false, aliq
   const provisoes          = baseProvEnc * (7 / 36);
   // Encargos: (base + provisões) * 35,8%  (27,8% INSS + 8% FGTS)
   const encargos           = (baseProvEnc + provisoes) * 0.358;
+  // Blindagem: valor já armazenado líquido (bruto - 14,25%)
   const resultado          = (isUsados ? lucroBruto : lucroComBon) + n(r.recBlindagem) + n(r.recFinanciamento) + n(r.recDespachante)
                            - (isDireta ? 0 : n(r.jurosEstoque))
                            - (!isUsados ? n(r.ciDesconto) + n(r.cortesiaEmplacamento) : 0)
@@ -240,8 +241,9 @@ function applyBlindagemAutoFill(
     const key = chassi.slice(-7).toUpperCase();
     const valor = blindagemMap.get(key);
     if (valor === undefined) return row;
-    // Sempre sincroniza com a Análise de Blindagem
-    return { ...row, recBlindagem: valor };
+    // Armazena já o valor líquido: bruto - 14,25% de impostos
+    const liquido = (parseFloat(valor) || 0) * (1 - 0.1425);
+    return { ...row, recBlindagem: liquido.toFixed(2) };
   });
 }
 
