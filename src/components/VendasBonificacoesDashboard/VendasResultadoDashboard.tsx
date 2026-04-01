@@ -15,6 +15,7 @@ import { loadAliquotas, loadRemuneracao, loadVendasDsr, type RemuneracaoData, ty
 import { loadModelos, loadRegras, getRegra, type VeiculoModelo, type VeiculoRegra } from './veiculosRegrasStorage';
 import { loadJurosRotativoRows, type JurosRotativoRow } from './jurosRotativoStorage';
 import { loadVendasRows, type VendasRow as BlindagemRow } from './vendasStorage';
+import { loadRegistroRows, type RegistroVendasRow } from './registroVendasStorage';
 
 // ─── Helpers numéricos ────────────────────────────────────────────────────────
 function n(v: string): number { return parseFloat(String(v).replace(',', '.')) || 0; }
@@ -23,6 +24,42 @@ function fmt(v: number): string {
 }
 function fmtPct(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+}
+
+// ─── Dias de Estoque: calcula a partir de dtaEntrada e dtaVenda do Registros ─
+function parseDMY(s: string): Date | null {
+  if (!s) return null;
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+    const [d, m, y] = s.split('/').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return null;
+}
+
+function applyDiasEstoqueFromRegistros(
+  rows: VendasResultadoRow[],
+  registroMap: Map<string, RegistroVendasRow>,
+): VendasResultadoRow[] {
+  return rows.map(r => {
+    const reg = registroMap.get((r.chassi ?? '').trim().toUpperCase());
+    if (!reg) return r;
+    const entrada = parseDMY(reg.dtaEntrada);
+    const venda   = parseDMY(reg.dtaVenda);
+    if (!entrada || !venda) return r;
+    const dias = Math.round((venda.getTime() - entrada.getTime()) / 86_400_000);
+    if (dias < 0) return r;
+    return { ...r, diasEstoque: String(dias) };
+  });
+}
+
+function buildRegistroMap(regs: RegistroVendasRow[]): Map<string, RegistroVendasRow> {
+  const m = new Map<string, RegistroVendasRow>();
+  for (const r of regs) m.set((r.chassi ?? '').trim().toUpperCase(), r);
+  return m;
 }
 
 // ─── Cálculos derivados ───────────────────────────────────────────────────────
@@ -549,11 +586,13 @@ export default function VendasResultadoDashboard() {
         loadModelos(),
         loadRegras(),
         loadJurosRotativoRows(),
-      ]).then(([loaded, m, r, jr]) => {
+        loadRegistroRows('novos'),
+      ]).then(([loaded, m, r, jr, regs]) => {
         setModelos(m);
         setRegras(r);
         const jMap = buildJurosMap(jr);
         setJurosMap(jMap);
+        const regMap = buildRegistroMap(regs);
         const rem = remuneracaoRef.current;
         const modalidade = rem?.[activeTab as 'novos' | 'usados'];
         let rows = modalidade
@@ -562,20 +601,28 @@ export default function VendasResultadoDashboard() {
         const withJuros = applyJurosAutoFill(rows, jMap);
         rows = m.length > 0 ? applyAutoFill(withJuros, m, r) : withJuros;
         rows = applyBlindagemAutoFill(rows, blindagemMapRef.current);
+        rows = applyDiasEstoqueFromRegistros(rows, regMap);
         setRows(rows);
       });
     } else {
       setModelos([]); setRegras([]); setJurosMap(new Map());
-      loadVendasResultadoRows(activeTab).then(loaded => {
+      const regTab = activeTab === 'usados' ? 'usados' : null;
+      Promise.all([
+        loadVendasResultadoRows(activeTab),
+        regTab ? loadRegistroRows(regTab) : Promise.resolve([] as RegistroVendasRow[]),
+      ]).then(([loaded, regs]) => {
         const rem = remuneracaoRef.current;
         const bMap = blindagemMapRef.current;
+        let rows = loaded;
         if (rem && activeTab === 'direta') {
-          setRows(applyBlindagemAutoFill(applyComissaoAutoFillDireta(loaded, rem.vd_frotista), bMap));
+          rows = applyBlindagemAutoFill(applyComissaoAutoFillDireta(loaded, rem.vd_frotista), bMap);
         } else if (rem && activeTab === 'usados') {
-          setRows(applyComissaoAutoFill(loaded, rem.usados, true));
-        } else {
-          setRows(loaded);
+          rows = applyComissaoAutoFill(loaded, rem.usados, true);
         }
+        if (regTab && regs.length > 0) {
+          rows = applyDiasEstoqueFromRegistros(rows, buildRegistroMap(regs));
+        }
+        setRows(rows);
       });
     }
   }, [activeTab]);
@@ -728,7 +775,7 @@ export default function VendasResultadoDashboard() {
       const tabLabel = SUB_TABS.find(t => t.id === activeTab)?.label ?? activeTab;
       const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
       const sheetName = `${tabLabel.slice(0, 20)} - ${monthLabel}-${filterYear}`.slice(0, 31);
-      await exportToExcel(filteredRows, sheetName, `${activeTab}_resultado_${filterYear}_${monthLabel}.xlsx`, isDireta, isUsados, aliquotaBonPct);
+      await exportToExcel(filteredRows, sheetName, `${activeTab}_resultado_${filterYear}_${monthLabel}.xlsx`, isDireta, isUsados, aliquotaBonPct, totals, filteredRows.length);
       toast.success('Arquivo Excel gerado!');
     } catch (err) {
       console.error(err);
