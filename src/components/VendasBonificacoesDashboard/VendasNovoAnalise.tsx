@@ -16,6 +16,9 @@ import {
   loadAliquotas, loadVendasDsr, loadRemuneracao,
   type VendasDsrConfig, type RemuneracaoModalidade, type FaixaBonus,
 } from './vendedoresRemuneracaoStorage';
+import { loadModelos, loadRegras, getRegra, type VeiculoModelo, type VeiculoRegra } from './veiculosRegrasStorage';
+import { loadJurosRotativoRows, type JurosRotativoRow } from './jurosRotativoStorage';
+import { loadVendasRows, type VendasRow as BlindagemRow } from './vendasStorage';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
 const MS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -106,6 +109,88 @@ function applyComissaoAutoFill(rows: VendasResultadoRow[], modalidade: Remunerac
     const total = com1 + com2 + com3;
     if (total === 0) return row;
     return { ...row, comissaoVenda: total.toFixed(2) };
+  });
+}
+
+// ─── Auto-fill: PIV/SIQ/PIVE via cadastro de regras ─────────────────────────
+function applyAutoFill(
+  rows: VendasResultadoRow[],
+  modelos: VeiculoModelo[],
+  regras: VeiculoRegra[],
+): VendasResultadoRow[] {
+  return rows.map(row => {
+    if (row.bonusPIV !== '' && row.bonusSIQ !== '' && row.bonusPIVE !== '') return row;
+    const d = row.dataVenda;
+    let ano: number | null = null, mes: number | null = null;
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) { ano = parseInt(d.split('/')[2]); mes = parseInt(d.split('/')[1]); }
+    else if (/^\d{4}-\d{2}-\d{2}/.test(d)) { ano = parseInt(d.split('-')[0]); mes = parseInt(d.split('-')[1]); }
+    if (!ano || !mes) return row;
+    const modelo = modelos.find(m => m.modelo.trim().toLowerCase() === (row.modelo ?? '').trim().toLowerCase());
+    if (!modelo) return row;
+    const regra = getRegra(regras, modelo.id, ano, mes);
+    if (!regra) return row;
+    const preco = parseFloat(String(regra.precoPublico).replace(',', '.')) || 0;
+    const sign = row.transacao === 'V07' ? -1 : 1;
+    return {
+      ...row,
+      bonusPIV:  row.bonusPIV  === '' ? (preco * (parseFloat(String(regra.piv).replace(',',  '.')) || 0) / 100 * sign).toFixed(2) : row.bonusPIV,
+      bonusSIQ:  row.bonusSIQ  === '' ? (preco * (parseFloat(String(regra.siq).replace(',',  '.')) || 0) / 100 * sign).toFixed(2) : row.bonusSIQ,
+      bonusPIVE: row.bonusPIVE === '' ? (preco * (parseFloat(String(regra.pive).replace(',', '.')) || 0) / 100 * sign).toFixed(2) : row.bonusPIVE,
+    };
+  });
+}
+
+// ─── Auto-fill: recBlindagem via dados de películas/blindagem ────────────────
+function buildBlindagemMap(blindagemRows: BlindagemRow[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const r of blindagemRows) {
+    if (!r.revenda || r.revenda.trim().toUpperCase() !== 'VW') continue;
+    const chassi = r.chassi?.trim();
+    if (!chassi || !r.comissaoBrutaSorana) continue;
+    map.set(chassi.slice(-7).toUpperCase(), r.comissaoBrutaSorana);
+  }
+  return map;
+}
+
+function applyBlindagemAutoFill(
+  rows: VendasResultadoRow[],
+  blindagemMap: Map<string, string>,
+): VendasResultadoRow[] {
+  if (blindagemMap.size === 0) return rows;
+  return rows.map(row => {
+    if (row.recBlindagem !== '') return row;
+    const chassi = row.chassi?.trim();
+    if (!chassi) return row;
+    const valor = blindagemMap.get(chassi.slice(-7).toUpperCase());
+    if (valor === undefined) return row;
+    const liquido = (parseFloat(valor) || 0) * (1 - 0.1425);
+    return { ...row, recBlindagem: liquido.toFixed(2) };
+  });
+}
+
+// ─── Auto-fill: jurosEstoque via juros rotativos ─────────────────────────────
+function buildJurosMap(jurosRows: JurosRotativoRow[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const jr of jurosRows) {
+    const nota = jr.notaFiscal.trim();
+    if (!nota) continue;
+    const val = parseFloat(String(jr.jurosPagos).replace(',', '.')) || 0;
+    map.set(nota, (map.get(nota) ?? 0) + val);
+  }
+  return map;
+}
+
+function applyJurosAutoFill(
+  rows: VendasResultadoRow[],
+  jurosMap: Map<string, number>,
+): VendasResultadoRow[] {
+  return rows.map(row => {
+    if (row.jurosEstoque !== '') return row;
+    const nota = (row.notaCompra ?? '').trim();
+    if (!nota) return row;
+    const total = jurosMap.get(nota);
+    if (total === undefined) return row;
+    return { ...row, jurosEstoque: total.toFixed(2) };
   });
 }
 
@@ -477,16 +562,31 @@ export function VendasNovoAnalise() {
 
   // ─── Carga ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    Promise.all([loadVendasResultadoRows('novos'), loadAliquotas(), loadVendasDsr(), loadRemuneracao()])
-      .then(([rows, aliq, dsr, rem]) => {
-        const filledRows = applyComissaoAutoFill(rows, rem.novos);
-        setAllRows(filledRows);
-        setAliqBon(aliq
-          .filter(i => i.tipo.toLowerCase().includes('bonificações'))
-          .reduce((s, i) => s + (parseFloat(i.aliquota) || 0), 0));
-        setDsrCfg(dsr);
-        setLoading(false);
-      });
+    Promise.all([
+      loadVendasResultadoRows('novos'),
+      loadAliquotas(),
+      loadVendasDsr(),
+      loadRemuneracao(),
+      loadModelos(),
+      loadRegras(),
+      loadJurosRotativoRows(),
+      loadVendasRows(),
+    ]).then(([rows, aliq, dsr, rem, modelos, regras, jurosRows, blindRows]) => {
+      const jurosMap = buildJurosMap(jurosRows as JurosRotativoRow[]);
+      const blindMap = buildBlindagemMap(blindRows as BlindagemRow[]);
+      let filledRows = applyComissaoAutoFill(rows as VendasResultadoRow[], (rem as { novos: RemuneracaoModalidade }).novos);
+      filledRows = applyJurosAutoFill(filledRows, jurosMap);
+      if ((modelos as VeiculoModelo[]).length > 0) {
+        filledRows = applyAutoFill(filledRows, modelos as VeiculoModelo[], regras as VeiculoRegra[]);
+      }
+      filledRows = applyBlindagemAutoFill(filledRows, blindMap);
+      setAllRows(filledRows);
+      setAliqBon((aliq as { tipo: string; aliquota: string }[])
+        .filter(i => i.tipo.toLowerCase().includes('bonificações'))
+        .reduce((s, i) => s + (parseFloat(i.aliquota) || 0), 0));
+      setDsrCfg(dsr as VendasDsrConfig[]);
+      setLoading(false);
+    });
   }, []);
 
   const availYears = useMemo(() => {
