@@ -24,10 +24,11 @@ const AVATAR_BG = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#06b6d4','
 const MEDAL_COLOR = ['#f59e0b','#9ca3af','#cd7f32'];
 
 // ─── Tipos auxiliares ─────────────────────────────────────────────────────────
-type ModelMetric   = 'vol' | 'lb' | 'res' | 'ticket' | 'marg' | 'bubble';
-type VendorSort    = 'res' | 'vol' | 'lb' | 'marg';
-type ComissaoMode  = 'total' | 'com' | 'dsr' | 'provEnc';
-type JurosGrouping = 'familia' | 'modelo';
+type ModelMetric        = 'vol' | 'lb' | 'res' | 'ticket' | 'marg' | 'bubble';
+type VendorSort         = 'res' | 'vol' | 'lb' | 'marg';
+type ComissaoMode       = 'total' | 'com' | 'dsr' | 'provEnc';
+type JurosGrouping      = 'familia' | 'modelo';
+type ComissoesGrouping  = 'familia' | 'modelo';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n  = (v?: string | null) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
@@ -387,11 +388,11 @@ const MODEL_METRIC_CFG: Record<ModelMetric, {
   fmt: (v: number) => string; icon: React.ReactNode;
 }> = {
   vol:    { label: 'Volume',       donutKey: 'vol',    barKey: 'vol',    barLabel: 'Unidades',     fmt: v => String(v),            icon: <BarChart2 className="w-3 h-3" /> },
-  lb:     { label: 'Lucro Bruto',  donutKey: 'lb',     barKey: 'lb',     barLabel: 'Lucro Bruto',  fmt: fmtBRL,                    icon: <DollarSign className="w-3 h-3" /> },
-  res:    { label: 'Resultado',    donutKey: 'res',     barKey: 'res',    barLabel: 'Resultado',    fmt: fmtBRL,                    icon: <TrendingUp className="w-3 h-3" /> },
   ticket: { label: 'Ticket Médio', donutKey: 'receita', barKey: 'ticket', barLabel: 'Ticket Médio', fmt: fmtBRL,                    icon: <ShoppingCart className="w-3 h-3" /> },
+  lb:     { label: 'Lucro Bruto',  donutKey: 'lb',     barKey: 'lb',     barLabel: 'Lucro Bruto',  fmt: fmtBRL,                    icon: <DollarSign className="w-3 h-3" /> },
   marg:   { label: 'Margem %',     donutKey: 'lb',     barKey: 'marg',   barLabel: 'Margem',       fmt: v => fmtPct(v),            icon: <Percent className="w-3 h-3" /> },
   bubble: { label: 'Análise 2D',   donutKey: 'vol',    barKey: 'vol',    barLabel: 'Vol × Marg',   fmt: v => String(v),            icon: <span style={{ fontSize: 11, lineHeight: 1 }}>⬤</span> },
+  res:    { label: 'Resultado',    donutKey: 'res',     barKey: 'res',    barLabel: 'Resultado',    fmt: fmtBRL,                    icon: <TrendingUp className="w-3 h-3" /> },
 };
 
 const VENDOR_SORT_CFG: Record<VendorSort, { label: string }> = {
@@ -464,9 +465,10 @@ export function VendasNovoAnalise() {
   const [modelMetric,   setModelMetric]   = useState<ModelMetric>('vol');
   const [vendorSort,    setVendorSort]    = useState<VendorSort>('res');
   const [showAllVendors,   setShowAllVendors]   = useState(false);
-  const [comissaoMode,     setComissaoMode]     = useState<ComissaoMode>('total');
-  const [jurosGrouping,    setJurosGrouping]    = useState<JurosGrouping>('familia');
-  const [showAllComissoes, setShowAllComissoes] = useState(false);
+  const [comissaoMode,        setComissaoMode]        = useState<ComissaoMode>('total');
+  const [jurosGrouping,       setJurosGrouping]       = useState<JurosGrouping>('familia');
+  const [comissoesGrouping,   setComissoesGrouping]   = useState<ComissoesGrouping>('familia');
+  const [showAllComissoes,    setShowAllComissoes]    = useState(false);
 
   // Comparativo de períodos
   const [periods, setPeriods] = useState<PeriodCfg[]>([
@@ -646,9 +648,82 @@ export function VendasNovoAnalise() {
     }
     return [...map.entries()]
       .map(([name, d]) => ({ name, juros: d.juros, vol: d.vol, jurosPorUnidade: d.vol > 0 ? d.juros / d.vol : 0 }))
-      .filter(d => d.juros > 0)
+      .filter(d => Math.round(d.juros) > 0)
       .sort((a, b) => b.juros - a.juros);
   }, [filteredRows, jurosGrouping]);
+
+  // Análise de Cores — ranking e heatmap família × cor
+  const coresData = useMemo(() => {
+    const map = new Map<string, { vol: number; lb: number }>();
+    for (const r of filteredRows) {
+      const cor = (r.cor ?? '').trim() || '(sem cor)';
+      const dsrPct = dsrFor(dsrCfg, r.dataVenda);
+      const c = calcNovos(r, aliqBon, dsrPct);
+      const prev = map.get(cor) ?? { vol: 0, lb: 0 };
+      map.set(cor, { vol: prev.vol + 1, lb: prev.lb + c.lb });
+    }
+    return [...map.entries()]
+      .map(([name, d]) => ({ name, vol: d.vol, lb: d.lb, lbPerUnit: d.vol > 0 ? d.lb / d.vol : 0 }))
+      .sort((a, b) => b.vol - a.vol);
+  }, [filteredRows, aliqBon, dsrCfg]);
+
+  const coresHeatmap = useMemo(() => {
+    const topCores = coresData.slice(0, 8).map(c => c.name);
+    // aggregate family × colour
+    const famMap = new Map<string, Map<string, { vol: number; lb: number }>>();
+    for (const r of filteredRows) {
+      const fam = normalizeModelo(r.modelo ?? '');
+      const cor = (r.cor ?? '').trim() || '(sem cor)';
+      if (!topCores.includes(cor)) continue;
+      const dsrPct = dsrFor(dsrCfg, r.dataVenda);
+      const c = calcNovos(r, aliqBon, dsrPct);
+      if (!famMap.has(fam)) famMap.set(fam, new Map());
+      const corMap = famMap.get(fam)!;
+      const prev = corMap.get(cor) ?? { vol: 0, lb: 0 };
+      corMap.set(cor, { vol: prev.vol + 1, lb: prev.lb + c.lb });
+    }
+    const families = [...famMap.entries()]
+      .map(([fam, corMap]) => ({ fam, total: [...corMap.values()].reduce((s, d) => s + d.vol, 0) }))
+      .sort((a, b) => b.total - a.total)
+      .map(x => x.fam);
+    // max lbPerUnit for heat scale
+    let maxLbPU = 0;
+    for (const [, corMap] of famMap) {
+      for (const d of corMap.values()) {
+        const v = d.vol > 0 ? d.lb / d.vol : 0;
+        if (v > maxLbPU) maxLbPU = v;
+      }
+    }
+    return { topCores, families, famMap, maxLbPU };
+  }, [coresData, filteredRows, aliqBon, dsrCfg]);
+
+  // Comissões por Família / Modelo
+  const comissoesPorGrupoData = useMemo(() => {
+    const map = new Map<string, { com: number; dsr: number; provEnc: number; recLiq: number; vol: number }>();
+    for (const r of filteredRows) {
+      const k = comissoesGrouping === 'familia'
+        ? normalizeModelo(r.modelo ?? '')
+        : (r.modelo?.trim() || '(sem modelo)');
+      const dsrPct = dsrFor(dsrCfg, r.dataVenda);
+      const c = calcNovos(r, aliqBon, dsrPct);
+      const prev = map.get(k) ?? { com: 0, dsr: 0, provEnc: 0, recLiq: 0, vol: 0 };
+      map.set(k, {
+        com:     prev.com     + c.com,
+        dsr:     prev.dsr     + c.dsr,
+        provEnc: prev.provEnc + c.prov + c.enc,
+        recLiq:  prev.recLiq  + c.recLiq,
+        vol:     prev.vol     + 1,
+      });
+    }
+    return [...map.entries()]
+      .map(([name, d]) => ({
+        name, ...d,
+        total: d.com + d.dsr + d.provEnc,
+        pct:   d.recLiq > 0 ? (d.com + d.dsr + d.provEnc) / d.recLiq * 100 : 0,
+      }))
+      .filter(d => d.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [filteredRows, aliqBon, dsrCfg, comissoesGrouping]);
 
   // Tendência de Margem — 12 meses rolantes
   const tendenciaData = useMemo(() => {
@@ -728,7 +803,7 @@ export function VendasNovoAnalise() {
         accent: metrics.marg >= 2 ? '#10b981' : metrics.marg >= 0 ? '#f59e0b' : '#ef4444' },
       { id: 'lucroBruto', label: 'Lucro Bruto', value: fmtBRL(metrics.lb), sub: fmtPct(metrics.lbPct) + ' da receita',
         color: 'text-indigo-700', accent: '#6366f1' },
-      { id: 'totalBon',   label: 'Total de Bônus', value: fmtBRL(metrics.bon * (1 - aliqBon / 100)),
+      { id: 'totalBon',   label: 'Total de Bônus (líquido)', value: fmtBRL(metrics.bon * (1 - aliqBon / 100)),
         sub: metrics.recLiq > 0 ? fmtPct(metrics.bon * (1 - aliqBon / 100) / metrics.recLiq * 100) + ' da receita' : undefined,
         color: 'text-amber-700', accent: '#f59e0b',
         info: metrics.bon === 0 ? 'PIV/SIQ/PIVE não preenchidos na aba Vendas → Novos' : undefined },
@@ -1057,7 +1132,22 @@ export function VendasNovoAnalise() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 9.5 }} />
                       <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} />
-                      <Tooltip content={<TipWF />} />
+                      <Tooltip content={({ active, payload, label }: { active?: boolean; payload?: { payload: { value: number; type: string } }[]; label?: string }) => {
+                        if (!active || !payload?.length) return null;
+                        const e = payload[0]?.payload;
+                        const v = e?.value ?? 0;
+                        const recLiq = metrics?.recLiq ?? 0;
+                        const pct = recLiq > 0 ? Math.abs(v) / recLiq * 100 : null;
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[190px]">
+                            <p className="font-semibold text-slate-700 mb-1">{label}</p>
+                            <p className={`font-mono font-bold ${v >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmtBRLF(v)}</p>
+                            {pct !== null && (
+                              <p className="text-slate-400 mt-0.5">{fmtPct(pct)} da rec. líquida</p>
+                            )}
+                          </div>
+                        );
+                      }} />
                       <Bar dataKey="base" stackId="s" fill="transparent" legendType="none" isAnimationActive={false} />
                       <Bar dataKey="bar"  stackId="s" radius={[4, 4, 0, 0]}>
                         {waterfallData.map((e, i) => <Cell key={i} fill={e.type === 'total' ? '#3b82f6' : e.type === 'pos' ? '#10b981' : '#ef4444'} />)}
@@ -1076,20 +1166,40 @@ export function VendasNovoAnalise() {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
               <SH>Evolução Mensal — {year}</SH>
               <ResponsiveContainer width="100%" height={240}>
-                <ComposedChart data={monthlyData} margin={{ top: 4, right: 12, left: 8, bottom: 0 }}>
+                <ComposedChart data={monthlyData} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis dataKey="label" tick={{ fontSize: 10 }} />
                   <YAxis yAxisId="left"  tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} />
-                  <YAxis yAxisId="right" orientation="right" tickFormatter={v => v.toFixed(1) + '%'} tick={{ fontSize: 9 }} width={40} />
-                  <Tooltip content={<TipBRL />} />
+                  <YAxis yAxisId="right" orientation="right" tickFormatter={v => v >= 1_000_000 ? (v / 1_000_000).toFixed(1) + 'M' : fmtBRL(v)} tick={{ fontSize: 9 }} width={52} />
+                  <Tooltip content={({ active, payload, label }: { active?: boolean; payload?: { payload: { recLiq: number; lb: number; res: number } }[]; label?: string }) => {
+                    if (!active || !payload?.length) return null;
+                    const d = payload[0].payload;
+                    return (
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[220px]">
+                        <p className="font-bold text-slate-700 mb-1.5">{label}</p>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-400">Receita Líquida</span>
+                          <span className="font-mono text-slate-600">{fmtBRLF(d.recLiq)}</span>
+                        </div>
+                        <div className="flex justify-between gap-4 mt-0.5">
+                          <span className="text-indigo-500">Lucro Bruto</span>
+                          <span className="font-mono text-slate-700">{fmtBRLF(d.lb)}{d.recLiq > 0 && <span className="text-slate-400 ml-1">({fmtPct(d.lb / d.recLiq * 100)})</span>}</span>
+                        </div>
+                        <div className="flex justify-between gap-4 mt-0.5">
+                          <span className={d.res < 0 ? 'text-red-500' : 'text-blue-500'}>Resultado</span>
+                          <span className="font-mono text-slate-700">{fmtBRLF(d.res)}{d.recLiq > 0 && <span className="text-slate-400 ml-1">({fmtPct(d.res / d.recLiq * 100)})</span>}</span>
+                        </div>
+                      </div>
+                    );
+                  }} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar yAxisId="left" dataKey="lb"  name="Lucro Bruto" radius={[3, 3, 0, 0]}>
                     {monthlyData.map((_, i) => <Cell key={i} fill="#6366f1" opacity={month !== null && month !== i + 1 ? 0.3 : 1} />)}
                   </Bar>
-                  <Bar yAxisId="left" dataKey="res" name="Resultado"   radius={[3, 3, 0, 0]}>
+                  <Bar yAxisId="left" dataKey="res" name="Resultado" radius={[3, 3, 0, 0]}>
                     {monthlyData.map((d, i) => <Cell key={i} fill={d.res < 0 ? '#ef4444' : '#3b82f6'} opacity={month !== null && month !== i + 1 ? 0.3 : 1} />)}
                   </Bar>
-                  <Line yAxisId="right" type="monotone" dataKey="marg" name="Margem %" stroke="#f59e0b" dot={{ r: 3 }} strokeWidth={2} />
+                  <Line yAxisId="right" type="monotone" dataKey="recLiq" name="Receita Líquida" stroke="#94a3b8" strokeWidth={2} dot={(props: { cx?: number; cy?: number; payload?: { recLiq: number }; index?: number }) => { const { cx = 0, cy = 0, payload, index = 0 } = props; if (!payload?.recLiq) return <circle key={index} cx={cx} cy={cy} r={0} />; return <circle key={index} cx={cx} cy={cy} r={3} fill="#94a3b8" stroke="white" strokeWidth={1.5} />; }} connectNulls={false} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -1101,7 +1211,7 @@ export function VendasNovoAnalise() {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <SH>Composição de Bônus — {year}</SH>
+                  <SH>Composição de Bônus — {periodLabel}</SH>
                 </div>
                 {metrics.bon > 0 && (
                   <div className="text-right -mt-1">
@@ -1119,8 +1229,8 @@ export function VendasNovoAnalise() {
                   <Tooltip content={<TipBRL />} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="piv"   name="PIV"        stackId="b" fill="#3b82f6" />
-                  <Bar dataKey="siq"   name="SIQ"        stackId="b" fill="#6366f1" />
-                  <Bar dataKey="pive"  name="PIVE"       stackId="b" fill="#8b5cf6" />
+                  <Bar dataKey="siq"   name="SIQ"        stackId="b" fill="#f97316" />
+                  <Bar dataKey="pive"  name="PIVE"       stackId="b" fill="#a855f7" />
                   <Bar dataKey="adics" name="Adicionais" stackId="b" fill="#10b981" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -1153,7 +1263,7 @@ export function VendasNovoAnalise() {
           {(totaisReceitas.blind + totaisReceitas.fin + totaisReceitas.desp) > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
               <div className="flex items-start justify-between mb-1">
-                <SH>Receitas por Fonte — {year}</SH>
+                <SH>Receitas por Fonte — {periodLabel}</SH>
                 <div className="flex gap-4 -mt-1">
                   {[
                     { label: 'Blindagem',      value: totaisReceitas.blind, color: '#3b82f6' },
@@ -1203,6 +1313,119 @@ export function VendasNovoAnalise() {
               ))}
             </div>
           </div>
+
+          {/* ── Análise de Cores ──────────────────────────────────────────── */}
+          {coresData.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                <div>
+                  <SH>Análise de Cores — {periodLabel}</SH>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Volume vendido e rentabilidade (Lucro Bruto) por cor</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wide">Cores distintas</p>
+                  <p className="text-sm font-bold font-mono text-slate-700">{coresData.length}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Ranking por cor */}
+                <div>
+                  <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-3">Volume por Cor</p>
+                  <ResponsiveContainer width="100%" height={Math.max(200, coresData.length * 30 + 40)}>
+                    <BarChart data={coresData} layout="vertical" margin={{ left: 4, right: 90, top: 4, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 9 }} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 9.5 }} width={130} />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload?.length) return null;
+                          const d = payload[0].payload as { vol: number; lb: number; lbPerUnit: number };
+                          return (
+                            <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[200px]">
+                              <p className="font-bold text-slate-700 mb-1.5">{label}</p>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-blue-500">Volume</span>
+                                <span className="font-mono font-semibold text-slate-700">{d.vol} un.</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-indigo-500">Lucro Bruto total</span>
+                                <span className="font-mono text-slate-700">{fmtBRLF(d.lb)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                                <span className="text-emerald-600 font-medium">LB / unidade</span>
+                                <span className="font-mono font-bold text-emerald-700">{fmtBRLF(d.lbPerUnit)}</span>
+                              </div>
+                            </div>
+                          );
+                        }}
+                      />
+                      <Bar dataKey="vol" name="Volume" radius={[0, 5, 5, 0]}>
+                        {coresData.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                        <LabelList dataKey="vol" position="right"
+                          formatter={(v: number) => `${v} un.`}
+                          style={{ fontSize: 9, fill: '#64748b', fontWeight: 600 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Heatmap Família × Cor */}
+                <div>
+                  <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-3">
+                    Rentabilidade por Família × Cor <span className="font-normal text-slate-300 ml-1">(Lucro Bruto / un.)</span>
+                  </p>
+                  {coresHeatmap.families.length === 0 ? <Empty /> : (
+                    <div className="overflow-x-auto rounded-xl border border-slate-100">
+                      <table className="w-full text-[10px] border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50">
+                            <th className="px-3 py-2 text-left font-semibold text-slate-500 border-b border-slate-200 min-w-[90px]">Família</th>
+                            {coresHeatmap.topCores.map(cor => (
+                              <th key={cor} className="px-2 py-2 text-center font-semibold text-slate-500 border-b border-slate-200 min-w-[72px] max-w-[90px]">
+                                <span className="block leading-tight">{cor.length > 12 ? cor.slice(0, 12) + '…' : cor}</span>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {coresHeatmap.families.map((fam, fi) => (
+                            <tr key={fam} className={fi % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}>
+                              <td className="px-3 py-2 font-semibold text-slate-700 border-b border-slate-100">{fam}</td>
+                              {coresHeatmap.topCores.map(cor => {
+                                const cell = coresHeatmap.famMap.get(fam)?.get(cor);
+                                const lbpu = cell && cell.vol > 0 ? cell.lb / cell.vol : 0;
+                                const intensity = coresHeatmap.maxLbPU > 0 ? lbpu / coresHeatmap.maxLbPU : 0;
+                                const bg = cell && cell.vol > 0
+                                  ? `rgba(16,185,129,${0.08 + intensity * 0.52})`
+                                  : 'transparent';
+                                const textC = lbpu < 0 ? '#ef4444' : intensity > 0.5 ? '#065f46' : '#374151';
+                                return (
+                                  <td key={cor} className="px-2 py-2 text-center border-b border-slate-100 transition-colors"
+                                    style={{ background: bg }}
+                                    title={cell ? `${fam} / ${cor}\n${cell.vol} un. — LB: ${fmtBRLF(cell.lb)} — LB/un: ${fmtBRLF(lbpu)}` : undefined}>
+                                    {cell && cell.vol > 0 ? (
+                                      <div>
+                                        <span className="font-bold" style={{ color: textC }}>{cell.vol}</span>
+                                        <span className="block font-mono text-[9px] mt-0.5" style={{ color: textC, opacity: 0.8 }}>{fmtBRL(lbpu)}</span>
+                                      </div>
+                                    ) : <span className="text-slate-200">—</span>}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <p className="text-[9px] text-slate-400 mt-2">
+                    Verde mais intenso = maior Lucro Bruto por unidade. Número = qtd. vendida. Exibindo top 8 cores.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── Juros de Estoque por Modelo/Família ─────────────────────────── */}
           {jurosData.length > 0 && (
@@ -1258,6 +1481,129 @@ export function VendasNovoAnalise() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Comissões por Família / Modelo ──────────────────────────────── */}
+          {comissoesPorGrupoData.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                <div>
+                  <SH>Remuneração de Vendas por {comissoesGrouping === 'familia' ? 'Família' : 'Modelo'} — {periodLabel}</SH>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Comissão base · DSR · Provisões e Encargos</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {(['familia', 'modelo'] as ComissoesGrouping[]).map(g => (
+                    <button key={g} onClick={() => setComissoesGrouping(g)}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${
+                        comissoesGrouping === g
+                          ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600'
+                      }`}>
+                      {g === 'familia' ? '🏷 Família' : '🔍 Modelo'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Gráfico de barras empilhadas horizontais */}
+                <div>
+                  <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-3">Composição por {comissoesGrouping === 'familia' ? 'Família' : 'Modelo'}</p>
+                  <ResponsiveContainer width="100%" height={Math.max(200, comissoesPorGrupoData.length * 36 + 50)}>
+                    <BarChart data={comissoesPorGrupoData} layout="vertical" margin={{ left: 4, right: 16, top: 4, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                      <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 9.5 }} width={comissoesGrouping === 'familia' ? 80 : 160} />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload?.length) return null;
+                          const d = payload[0].payload as typeof comissoesPorGrupoData[number];
+                          return (
+                            <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[220px]">
+                              <p className="font-bold text-slate-700 mb-2">{label}</p>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-violet-500">Comissão base</span>
+                                <span className="font-mono text-slate-700">{fmtBRLF(d.com)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-indigo-400">DSR</span>
+                                <span className="font-mono text-slate-700">{fmtBRLF(d.dsr)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-blue-400">Prov. + Encargos</span>
+                                <span className="font-mono text-slate-700">{fmtBRLF(d.provEnc)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4 mt-1.5 pt-1.5 border-t border-slate-100">
+                                <span className="font-bold text-slate-600">Total</span>
+                                <span className="font-mono font-bold text-slate-800">{fmtBRLF(d.total)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4 mt-1">
+                                <span className="text-slate-400">% Receita Líq.</span>
+                                <span className="font-mono text-amber-600 font-semibold">{fmtPct(d.pct)}</span>
+                              </div>
+                            </div>
+                          );
+                        }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                      <Bar dataKey="com"     name="Comissão base"   stackId="s" fill="#8b5cf6" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="dsr"     name="DSR"             stackId="s" fill="#6366f1" />
+                      <Bar dataKey="provEnc" name="Prov. + Encargos" stackId="s" fill="#a5b4fc" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Tabela detalhada */}
+                <div>
+                  <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-3">Detalhamento</p>
+                  <div className="overflow-x-auto rounded-xl border border-slate-100">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th className="px-3 py-2.5 text-left font-semibold text-slate-500">{comissoesGrouping === 'familia' ? 'Família' : 'Modelo'}</th>
+                          <th className="px-2 py-2.5 text-right font-semibold text-slate-500">Vol.</th>
+                          <th className="px-2 py-2.5 text-right font-semibold text-slate-500">Com. Base</th>
+                          <th className="px-2 py-2.5 text-right font-semibold text-slate-500">DSR</th>
+                          <th className="px-2 py-2.5 text-right font-semibold text-slate-500">Prov.+Enc.</th>
+                          <th className="px-2 py-2.5 text-right font-semibold text-slate-500">Total</th>
+                          <th className="px-2 py-2.5 text-right font-semibold text-slate-500">% Rec.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comissoesPorGrupoData.map((d, i) => (
+                          <tr key={d.name} className={`border-b border-slate-100 hover:bg-slate-50 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                            <td className="px-3 py-2 font-medium text-slate-700">{d.name}</td>
+                            <td className="px-2 py-2 text-right text-slate-500">{d.vol}</td>
+                            <td className="px-2 py-2 text-right font-mono text-violet-600">{fmtBRL(d.com)}</td>
+                            <td className="px-2 py-2 text-right font-mono text-indigo-500">{fmtBRL(d.dsr)}</td>
+                            <td className="px-2 py-2 text-right font-mono text-blue-400">{fmtBRL(d.provEnc)}</td>
+                            <td className="px-2 py-2 text-right font-mono font-bold text-slate-800">{fmtBRL(d.total)}</td>
+                            <td className="px-2 py-2 text-right font-semibold text-amber-600">{fmtPct(d.pct)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-800 text-white">
+                          <td className="px-3 py-2 font-bold text-[11px]">TOTAL</td>
+                          <td className="px-2 py-2 text-right font-mono">{comissoesPorGrupoData.reduce((s, d) => s + d.vol, 0)}</td>
+                          <td className="px-2 py-2 text-right font-mono">{fmtBRL(comissoesPorGrupoData.reduce((s, d) => s + d.com, 0))}</td>
+                          <td className="px-2 py-2 text-right font-mono">{fmtBRL(comissoesPorGrupoData.reduce((s, d) => s + d.dsr, 0))}</td>
+                          <td className="px-2 py-2 text-right font-mono">{fmtBRL(comissoesPorGrupoData.reduce((s, d) => s + d.provEnc, 0))}</td>
+                          <td className="px-2 py-2 text-right font-mono font-bold text-yellow-300">{fmtBRL(comissoesPorGrupoData.reduce((s, d) => s + d.total, 0))}</td>
+                          <td className="px-2 py-2 text-right font-semibold text-sky-200">
+                            {(() => {
+                              const totRec = comissoesPorGrupoData.reduce((s, d) => s + d.recLiq, 0);
+                              const totCom = comissoesPorGrupoData.reduce((s, d) => s + d.total, 0);
+                              return totRec > 0 ? fmtPct(totCom / totRec * 100) : '—';
+                            })()}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
