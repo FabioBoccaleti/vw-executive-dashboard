@@ -1165,43 +1165,59 @@ export function VendasNovoAnalise() {
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
               <SH>Evolução Mensal — {year}</SH>
-              <ResponsiveContainer width="100%" height={240}>
-                <ComposedChart data={monthlyData} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis yAxisId="left"  tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} />
-                  <YAxis yAxisId="right" orientation="right" tickFormatter={v => v >= 1_000_000 ? (v / 1_000_000).toFixed(1) + 'M' : fmtBRL(v)} tick={{ fontSize: 9 }} width={52} />
-                  <Tooltip content={({ active, payload, label }: { active?: boolean; payload?: { payload: { recLiq: number; lb: number; res: number } }[]; label?: string }) => {
+              <ResponsiveContainer width="100%" height={290}>
+                <ComposedChart data={monthlyData} margin={{ top: 8, right: 58, left: 8, bottom: 0 }} barCategoryGap="22%" barGap={3}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="right" orientation="right" tickFormatter={v => v >= 1_000_000 ? (v / 1_000_000).toFixed(1) + 'M' : fmtBRL(v)} tick={{ fontSize: 9 }} width={55} axisLine={false} tickLine={false} />
+                  <Tooltip content={({ active, payload, label }: { active?: boolean; payload?: { payload?: { recLiq: number; lb: number; res: number } }[]; label?: string }) => {
                     if (!active || !payload?.length) return null;
-                    const d = payload[0].payload;
+                    const d = payload[0]?.payload;
+                    if (!d) return null;
                     return (
-                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[220px]">
-                        <p className="font-bold text-slate-700 mb-1.5">{label}</p>
-                        <div className="flex justify-between gap-4">
-                          <span className="text-slate-400">Receita Líquida</span>
-                          <span className="font-mono text-slate-600">{fmtBRLF(d.recLiq)}</span>
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3.5 text-xs min-w-[240px]" style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.10)' }}>
+                        <p className="font-bold text-slate-700 mb-2 text-sm">{label}</p>
+                        <div className="flex justify-between items-center gap-4 py-1 border-b border-slate-100">
+                          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: '#38bdf8' }} />Receita Líquida</span>
+                          <span className="font-mono font-medium text-sky-600">{fmtBRLF(d.recLiq)}</span>
                         </div>
-                        <div className="flex justify-between gap-4 mt-0.5">
-                          <span className="text-indigo-500">Lucro Bruto</span>
-                          <span className="font-mono text-slate-700">{fmtBRLF(d.lb)}{d.recLiq > 0 && <span className="text-slate-400 ml-1">({fmtPct(d.lb / d.recLiq * 100)})</span>}</span>
+                        <div className="flex justify-between items-center gap-4 py-1 border-b border-slate-100">
+                          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-indigo-500 inline-block" />Lucro Bruto</span>
+                          <span className="font-mono font-medium text-indigo-600">
+                            {fmtBRLF(d.lb)}
+                            {d.recLiq > 0 && <span className="text-slate-400 font-normal ml-1.5">({fmtPct(d.lb / d.recLiq * 100)})</span>}
+                          </span>
                         </div>
-                        <div className="flex justify-between gap-4 mt-0.5">
-                          <span className={d.res < 0 ? 'text-red-500' : 'text-blue-500'}>Resultado</span>
-                          <span className="font-mono text-slate-700">{fmtBRLF(d.res)}{d.recLiq > 0 && <span className="text-slate-400 ml-1">({fmtPct(d.res / d.recLiq * 100)})</span>}</span>
+                        <div className="flex justify-between items-center gap-4 py-1">
+                          <span className={`flex items-center gap-1.5 ${d.res < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                            <span className={`w-2.5 h-2.5 rounded-sm inline-block ${d.res < 0 ? 'bg-red-500' : 'bg-emerald-500'}`} />Resultado
+                          </span>
+                          <span className={`font-mono font-medium ${d.res < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                            {fmtBRLF(d.res)}
+                            {d.recLiq > 0 && <span className="text-slate-400 font-normal ml-1.5">({fmtPct(d.res / d.recLiq * 100)})</span>}
+                          </span>
                         </div>
                       </div>
                     );
                   }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar yAxisId="left" dataKey="lb"  name="Lucro Bruto" radius={[3, 3, 0, 0]}>
+                  <Bar yAxisId="right" dataKey="recLiq" name="Receita Líquida" radius={[4, 4, 0, 0]}>
+                    {monthlyData.map((_, i) => <Cell key={i} fill="#38bdf8" opacity={month !== null && month !== i + 1 ? 0.18 : 0.55} />)}
+                  </Bar>
+                  <Bar yAxisId="left" dataKey="lb" name="Lucro Bruto" radius={[4, 4, 0, 0]}>
                     {monthlyData.map((_, i) => <Cell key={i} fill="#6366f1" opacity={month !== null && month !== i + 1 ? 0.3 : 1} />)}
                   </Bar>
-                  <Bar yAxisId="left" dataKey="res" name="Resultado" radius={[3, 3, 0, 0]}>
-                    {monthlyData.map((d, i) => <Cell key={i} fill={d.res < 0 ? '#ef4444' : '#3b82f6'} opacity={month !== null && month !== i + 1 ? 0.3 : 1} />)}
+                  <Bar yAxisId="left" dataKey="res" name="Resultado" radius={[4, 4, 0, 0]}>
+                    {monthlyData.map((d, i) => <Cell key={i} fill={d.res < 0 ? '#ef4444' : '#10b981'} opacity={month !== null && month !== i + 1 ? 0.3 : 1} />)}
                   </Bar>
-                  <Line yAxisId="right" type="monotone" dataKey="recLiq" name="Receita Líquida" stroke="#94a3b8" strokeWidth={2} dot={(props: { cx?: number; cy?: number; payload?: { recLiq: number }; index?: number }) => { const { cx = 0, cy = 0, payload, index = 0 } = props; if (!payload?.recLiq) return <circle key={index} cx={cx} cy={cy} r={0} />; return <circle key={index} cx={cx} cy={cy} r={3} fill="#94a3b8" stroke="white" strokeWidth={1.5} />; }} connectNulls={false} />
                 </ComposedChart>
               </ResponsiveContainer>
+              <div className="flex flex-wrap gap-x-5 gap-y-1.5 justify-center mt-3 text-[10.5px] text-slate-500">
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: '#38bdf8', opacity: 0.7 }} />Receita Líquida <span className="text-slate-400">(eixo dir.)</span></span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-indigo-500 inline-block" />Lucro Bruto</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" />Resultado (+)</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-500 inline-block" />Resultado (−)</span>
+              </div>
             </div>
           </div>
 
