@@ -296,6 +296,66 @@ function TipBRL({ active, payload, label }: { active?: boolean; payload?: { name
   );
 }
 
+function TipBonFam({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string; dataKey: string }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const gross = payload.find(p => p.dataKey === 'gross')?.value ?? 0;
+  const deduc = payload.find(p => p.dataKey === 'deduc')?.value ?? 0;
+  const liq   = gross - deduc;
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[200px]">
+      <p className="font-bold text-slate-700 mb-1.5">{label}</p>
+      <div className="flex justify-between gap-4">
+        <span className="font-medium text-indigo-500">Bônus Bruto</span>
+        <span className="font-mono text-slate-700">{fmtBRLF(gross)}</span>
+      </div>
+      <div className="flex justify-between gap-4">
+        <span className="font-medium text-red-500">Imp. s/ Bônus</span>
+        <span className="font-mono text-red-600">-{fmtBRLF(deduc)}</span>
+      </div>
+      <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+        <span className="font-bold text-slate-600">Total</span>
+        <span className="font-mono font-bold text-slate-700">{fmtBRLF(liq)}</span>
+      </div>
+    </div>
+  );
+}
+
+function TipJurosTotal({ active, payload, label }: { active?: boolean; payload?: { payload: { juros: number; vol: number } }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const { juros, vol } = payload[0].payload;
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[190px]">
+      <p className="font-bold text-slate-700 mb-1.5">{label}</p>
+      <div className="flex justify-between gap-4">
+        <span className="font-medium text-orange-500">Juros</span>
+        <span className="font-mono text-slate-700">{fmtBRLF(juros)}</span>
+      </div>
+      <div className="flex justify-between gap-4">
+        <span className="font-medium text-slate-500">Qtd. veíc. c/ juros</span>
+        <span className="font-mono text-slate-700">{vol}</span>
+      </div>
+    </div>
+  );
+}
+
+function TipJurosUnit({ active, payload, label }: { active?: boolean; payload?: { payload: { jurosPorUnidade: number; vol: number } }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const { jurosPorUnidade, vol } = payload[0].payload;
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[200px]">
+      <p className="font-bold text-slate-700 mb-1.5">{label}</p>
+      <div className="flex justify-between gap-4">
+        <span className="font-medium text-orange-500">Juros / un.</span>
+        <span className="font-mono text-slate-700">{fmtBRLF(jurosPorUnidade)}</span>
+      </div>
+      <div className="flex justify-between gap-4">
+        <span className="font-medium text-slate-500">Qtd. veíc. considerados</span>
+        <span className="font-mono text-slate-700">{vol}</span>
+      </div>
+    </div>
+  );
+}
+
 function TipWF({ active, payload, label }: { active?: boolean; payload?: { payload: { value: number } }[]; label?: string }) {
   if (!active || !payload?.length) return null;
   const v = payload[0]?.payload?.value ?? 0;
@@ -510,19 +570,21 @@ export function VendasNovoAnalise() {
 
   // Bônus mensais
   const bonusMonthly = useMemo(() => MS.map((label, i) => {
-    const m  = i + 1;
-    const mr = yearRows.filter(r => getMo(r) === m);
-    const aliq = aliqBon / 100;
-    const gross = mr.reduce((s, r) => s + n(r.bonusPIV) + n(r.bonusSIQ) + n(r.bonusPIVE) + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3), 0);
-    const deduc = gross * aliq;
+    const m   = i + 1;
+    const mr  = yearRows.filter(r => getMo(r) === m);
+    const net = 1 - aliqBon / 100;
+    const pivG  = mr.reduce((s, r) => s + n(r.bonusPIV), 0);
+    const siqG  = mr.reduce((s, r) => s + n(r.bonusSIQ), 0);
+    const piveG = mr.reduce((s, r) => s + n(r.bonusPIVE), 0);
+    const adicsG = mr.reduce((s, r) => s + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3), 0);
+    const gross = pivG + siqG + piveG + adicsG;
+    const deduc = gross * (aliqBon / 100);
     return {
       label,
-      piv:     mr.reduce((s, r) => s + n(r.bonusPIV), 0),
-      siq:     mr.reduce((s, r) => s + n(r.bonusSIQ), 0),
-      pive:    mr.reduce((s, r) => s + n(r.bonusPIVE), 0),
-      varejo:  mr.reduce((s, r) => s + n(r.bonusVarejo), 0),
-      tradein: mr.reduce((s, r) => s + n(r.bonusTradeIn), 0),
-      adics:   mr.reduce((s, r) => s + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3), 0),
+      piv:   pivG  * net,
+      siq:   siqG  * net,
+      pive:  piveG * net,
+      adics: adicsG * net,
       gross, deduc, liq: gross - deduc,
     };
   }), [yearRows, aliqBon]);
@@ -578,8 +640,9 @@ export function VendasNovoAnalise() {
     const map = new Map<string, { juros: number; vol: number }>();
     for (const r of filteredRows) {
       const k = jurosGrouping === 'familia' ? normalizeModelo(r.modelo ?? '') : (r.modelo?.trim() || '(sem modelo)');
+      const j = n(r.jurosEstoque);
       const prev = map.get(k) ?? { juros: 0, vol: 0 };
-      map.set(k, { juros: prev.juros + n(r.jurosEstoque), vol: prev.vol + 1 });
+      map.set(k, { juros: prev.juros + j, vol: prev.vol + (j > 0 ? 1 : 0) });
     }
     return [...map.entries()]
       .map(([name, d]) => ({ name, juros: d.juros, vol: d.vol, jurosPorUnidade: d.vol > 0 ? d.juros / d.vol : 0 }))
@@ -665,8 +728,8 @@ export function VendasNovoAnalise() {
         accent: metrics.marg >= 2 ? '#10b981' : metrics.marg >= 0 ? '#f59e0b' : '#ef4444' },
       { id: 'lucroBruto', label: 'Lucro Bruto', value: fmtBRL(metrics.lb), sub: fmtPct(metrics.lbPct) + ' da receita',
         color: 'text-indigo-700', accent: '#6366f1' },
-      { id: 'totalBon',   label: 'Total de Bônus', value: fmtBRL(metrics.bon),
-        sub: metrics.recLiq > 0 ? fmtPct(metrics.bon / metrics.recLiq * 100) + ' da receita' : undefined,
+      { id: 'totalBon',   label: 'Total de Bônus', value: fmtBRL(metrics.bon * (1 - aliqBon / 100)),
+        sub: metrics.recLiq > 0 ? fmtPct(metrics.bon * (1 - aliqBon / 100) / metrics.recLiq * 100) + ' da receita' : undefined,
         color: 'text-amber-700', accent: '#f59e0b',
         info: metrics.bon === 0 ? 'PIV/SIQ/PIVE não preenchidos na aba Vendas → Novos' : undefined },
       { id: 'ticket',     label: 'Ticket (Resultado)', value: metrics.netVol > 0 ? fmtBRL(metrics.res / metrics.netVol) : '—',
@@ -1043,7 +1106,7 @@ export function VendasNovoAnalise() {
                 {metrics.bon > 0 && (
                   <div className="text-right -mt-1">
                     <p className="text-[10px] text-slate-400 uppercase tracking-wide">Acumulado</p>
-                    <p className="text-base font-bold text-amber-600 font-mono">{fmtBRL(metrics.bon)}</p>
+                    <p className="text-base font-bold text-amber-600 font-mono">{fmtBRL(metrics.bon * (1 - aliqBon / 100))}</p>
                     {aliqBon > 0 && <p className="text-[10px] text-slate-400">Imp. s/ bônus: {fmtPct(aliqBon, 2)}</p>}
                   </div>
                 )}
@@ -1055,12 +1118,10 @@ export function VendasNovoAnalise() {
                   <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} />
                   <Tooltip content={<TipBRL />} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="piv"     name="PIV"        stackId="b" fill="#3b82f6" />
-                  <Bar dataKey="siq"     name="SIQ"        stackId="b" fill="#6366f1" />
-                  <Bar dataKey="pive"    name="PIVE"       stackId="b" fill="#8b5cf6" />
-                  <Bar dataKey="varejo"  name="Varejo"     stackId="b" fill="#f59e0b" />
-                  <Bar dataKey="tradein" name="Trade IN"   stackId="b" fill="#f97316" />
-                  <Bar dataKey="adics"   name="Adicionais" stackId="b" fill="#10b981" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="piv"   name="PIV"        stackId="b" fill="#3b82f6" />
+                  <Bar dataKey="siq"   name="SIQ"        stackId="b" fill="#6366f1" />
+                  <Bar dataKey="pive"  name="PIVE"       stackId="b" fill="#8b5cf6" />
+                  <Bar dataKey="adics" name="Adicionais" stackId="b" fill="#10b981" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1074,7 +1135,7 @@ export function VendasNovoAnalise() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                     <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={86} />
-                    <Tooltip content={<TipBRL />} />
+                    <Tooltip content={<TipBonFam />} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <Bar dataKey="gross" name="Bônus Bruto" stackId="n" fill="#6366f1" opacity={0.4} />
                     <Bar dataKey="deduc" name="Imp. s/ Bônus" stackId="n" fill="#ef4444" opacity={0.7} radius={[0, 3, 3, 0]}>
@@ -1173,7 +1234,7 @@ export function VendasNovoAnalise() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                       <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} />
                       <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={92} />
-                      <Tooltip formatter={(v: number) => [fmtBRLF(v), 'Juros']} />
+                      <Tooltip content={<TipJurosTotal />} />
                       <Bar dataKey="juros" name="Juros Total" fill="#f97316" radius={[0, 5, 5, 0]}>
                         <LabelList dataKey="juros" position="right"
                           formatter={(v: number) => fmtBRL(v)}
@@ -1189,7 +1250,7 @@ export function VendasNovoAnalise() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                       <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} />
                       <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={92} />
-                      <Tooltip formatter={(v: number) => [fmtBRLF(v), 'Juros / un.']} />
+                      <Tooltip content={<TipJurosUnit />} />
                       <Bar dataKey="jurosPorUnidade" name="Juros / Unidade" fill="#fb923c" radius={[0, 5, 5, 0]}>
                         <LabelList dataKey="jurosPorUnidade" position="right"
                           formatter={(v: number) => fmtBRL(v)}
