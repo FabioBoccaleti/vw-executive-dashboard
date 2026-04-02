@@ -1296,13 +1296,13 @@ export function VendasNovoAnalise() {
                     );
                   }} />
                   <Bar yAxisId="right" dataKey="recLiq" name="Receita Líquida" radius={[4, 4, 0, 0]}>
-                    {monthlyData.map((_, i) => <Cell key={i} fill="#38bdf8" opacity={month !== null && month !== i + 1 ? 0.18 : 0.55} />)}
+                    {monthlyData.map((_, i) => <Cell key={i} fill="#38bdf8" opacity={month !== null && month !== i + 1 ? 0.45 : 0.75} />)}
                   </Bar>
                   <Bar yAxisId="left" dataKey="lb" name="Lucro Bruto" radius={[4, 4, 0, 0]}>
-                    {monthlyData.map((_, i) => <Cell key={i} fill="#6366f1" opacity={month !== null && month !== i + 1 ? 0.3 : 1} />)}
+                    {monthlyData.map((_, i) => <Cell key={i} fill="#6366f1" opacity={month !== null && month !== i + 1 ? 0.55 : 1} />)}
                   </Bar>
                   <Bar yAxisId="left" dataKey="res" name="Resultado" radius={[4, 4, 0, 0]}>
-                    {monthlyData.map((d, i) => <Cell key={i} fill={d.res < 0 ? '#ef4444' : '#10b981'} opacity={month !== null && month !== i + 1 ? 0.3 : 1} />)}
+                    {monthlyData.map((d, i) => <Cell key={i} fill={d.res < 0 ? '#ef4444' : '#10b981'} opacity={month !== null && month !== i + 1 ? 0.55 : 1} />)}
                   </Bar>
                 </ComposedChart>
               </ResponsiveContainer>
