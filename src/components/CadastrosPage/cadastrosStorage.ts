@@ -37,6 +37,15 @@ export const CARGOS_VENDEDOR_PELICULAS = [
 
 export type CargoVendedorPeliculas = typeof CARGOS_VENDEDOR_PELICULAS[number];
 
+export const CARGOS_VENDEDOR_ESTETICA = [
+  'Vendedor',
+  'Gerência',
+  'Diretoria',
+  'Vendedor de Acessórios',
+] as const;
+
+export type CargoVendedorEstetica = typeof CARGOS_VENDEDOR_ESTETICA[number];
+
 export interface Vendedor {
   id: string;
   codigo?: string;
