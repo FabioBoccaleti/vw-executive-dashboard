@@ -2062,7 +2062,7 @@ export function VendasNovoAnalise() {
                     { label: 'Lucro c/ Bônus',     get: (m: Agg) => m.lcb,          fmt: fmtBRLF, hl: false },
                     { label: 'Resultado Sorana',   get: (m: Agg) => m.res,           fmt: fmtBRLF, hl: true },
                     { label: '% Resultado Sorana', get: (m: Agg) => m.marg,          fmt: (v: number) => fmtPct(v), hl: true },
-                    { label: 'Rem. Vendedores',    get: (m: Agg) => m.remVendedor,   fmt: fmtBRLF, hl: false },
+                    { label: 'Total Folha Vendedor', get: (m: Agg) => m.remVendedor,   fmt: fmtBRLF, hl: false },
                     { label: 'Total Bônus',        get: (m: Agg) => m.bon,           fmt: fmtBRLF, hl: false },
                     { label: 'Juros de Estoque',   get: (m: Agg) => m.juros,         fmt: fmtBRLF, hl: false },
                   ] as { label: string; get: (m: Agg) => number; fmt: (v: number, m: Agg) => string; hl: boolean }[]).map((row, ri) => {
