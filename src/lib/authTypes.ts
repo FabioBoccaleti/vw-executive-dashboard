@@ -2,11 +2,11 @@
 
 export type UserRole = 'admin' | 'gestor' | 'leitura';
 
-export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes';
+export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento';
 
 export type BrandId = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros';
 
-export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes'];
+export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento'];
 
 export const ALL_BRANDS: BrandId[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
 
@@ -15,6 +15,7 @@ export const MODULE_LABELS: Record<ModuleId, string> = {
   despesas: 'Gerenciamento de Despesas',
   fluxo_caixa: 'Fluxo de Caixa',
   vendas_bonificacoes: 'Demonstrativo de Vendas e Bonificações',
+  folha_pagamento: 'Folha de Pagamento',
 };
 
 export const BRAND_LABELS: Record<BrandId, string> = {

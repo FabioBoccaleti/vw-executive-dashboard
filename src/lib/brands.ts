@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento';
 
 // Interface de configuração visual da marca
 export interface BrandConfig {
@@ -238,10 +238,35 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-accent': '#fbbf24',
     }
   },
+  folha_pagamento: {
+    id: 'folha_pagamento',
+    name: 'Folha de Pagamento',
+    shortName: 'Folha',
+    colors: {
+      primary: '#0f766e',
+      primaryHover: '#0d6460',
+      primaryLight: '#ccfbf1',
+      secondary: '#14b8a6',
+      accent: '#2dd4bf',
+      headerBg: 'bg-[#0f766e]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#0f766e] hover:bg-[#0d6460]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-teal-100 dark:bg-teal-900/30',
+      badgeText: 'text-teal-800 dark:text-teal-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#0f766e',
+      '--brand-primary-hover': '#0d6460',
+      '--brand-primary-light': '#ccfbf1',
+      '--brand-secondary': '#14b8a6',
+      '--brand-accent': '#2dd4bf',
+    }
+  },
 };
 
 // Lista de marcas disponíveis (para iteração) - ordem de exibição
-export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes'];
+export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento'];
 
 // Chave de armazenamento para marca selecionada
 export const SELECTED_BRAND_KEY = 'selected_brand';

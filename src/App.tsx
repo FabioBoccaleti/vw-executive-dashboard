@@ -207,6 +207,22 @@ function AppContent() {
         <DespesasDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'fluxo_caixa' ? (
         <FluxoCaixaDashboard onChangeBrand={handleChangeBrand} />
+      ) : brand === 'folha_pagamento' ? (
+        <div className="min-h-screen bg-gradient-to-br from-teal-50 to-slate-100 flex flex-col items-center justify-center gap-6">
+          <div className="bg-white rounded-2xl border border-teal-100 shadow-lg px-12 py-10 flex flex-col items-center gap-4 max-w-md text-center">
+            <div className="p-4 bg-teal-50 rounded-full">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20H7a2 2 0 01-2-2V6a2 2 0 012-2h6l6 6v8a2 2 0 01-2 2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 4v5h5M9 12h6M9 16h4" /></svg>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800">Folha de Pagamento</h2>
+            <p className="text-slate-500 text-sm leading-relaxed">Este módulo está em desenvolvimento e estará disponível em breve.</p>
+            <button
+              onClick={handleChangeBrand}
+              className="mt-2 px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              ← Voltar ao menu
+            </button>
+          </div>
+        </div>
       ) : brand === 'vendas_bonificacoes' ? (
         vendasSubPage === 'selection' ? (
           <VendasSelectionPage
