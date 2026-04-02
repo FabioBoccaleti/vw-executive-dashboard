@@ -879,7 +879,7 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
                       {c.key === 'lucroBruto' && <col style={{ width: 115, minWidth: 115 }} />}
                     </Fragment>
                   ))}
-                  <col style={{ width: 110, minWidth: 110 }} /> {/* Ações */}
+                  {/* Ações */}<col style={{ width: 110, minWidth: 110 }} />
                 </colgroup>
 
                 {/* ── THEAD ── */}
