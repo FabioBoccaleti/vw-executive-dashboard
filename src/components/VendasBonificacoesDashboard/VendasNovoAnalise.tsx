@@ -818,7 +818,8 @@ export function VendasNovoAnalise() {
         const mid = Math.floor(sorted.length / 2);
         const mediana = sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
         const media = arr.reduce((s, v) => s + v, 0) / arr.length;
-        return { name, mediana: Math.round(mediana), media: Math.round(media), vol: arr.length };
+        const pct90 = Math.round((arr.filter(v => v > 90).length / arr.length) * 100);
+        return { name, mediana: Math.round(mediana), media: Math.round(media), vol: arr.length, pct90 };
       })
       .sort((a, b) => a.mediana - b.mediana);
   }, [filteredRows, giroGrouping]);
@@ -1275,17 +1276,47 @@ export function VendasNovoAnalise() {
                   <BarChart data={giroEstoqueData} layout="vertical" margin={{ left: 4, right: 80, top: 4, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                     <XAxis type="number" tick={{ fontSize: 9 }} tickFormatter={v => `${v}d`} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
+                    <YAxis type="category" dataKey="name" width={100}
+                      tick={({ x, y, payload }: any) => {
+                        const entry = giroEstoqueData.find(d => d.name === payload.value);
+                        const warn = entry ? (entry.media / entry.mediana) >= 1.4 : false;
+                        return (
+                          <g transform={`translate(${x},${y})`}>
+                            <text x={-4} y={0} dy={4} textAnchor="end" fontSize={10}
+                              fill={warn ? '#b45309' : '#64748b'}
+                              fontWeight={warn ? 600 : 400}>
+                              {warn ? `⚠ ${payload.value}` : payload.value}
+                            </text>
+                          </g>
+                        );
+                      }}
+                    />
                     <Tooltip
                       content={({ active, payload }) => {
                         if (!active || !payload?.length) return null;
-                        const d = payload[0]?.payload as { name: string; mediana: number; media: number; vol: number };
+                        const d = payload[0]?.payload as { name: string; mediana: number; media: number; vol: number; pct90: number };
+                        const ratio = d.media / d.mediana;
+                        const distortion = ratio >= 1.4;
+                        const insight = distortion
+                          ? d.pct90 > 0
+                            ? `Maioria vende em ${d.mediana}d, mas ${d.pct90}% do estoque está há +90 dias`
+                            : `Poucos veículos encalhados puxam a média para cima (+${Math.round((ratio - 1) * 100)}%)`
+                          : null;
                         return (
-                          <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[170px]">
-                            <p className="font-bold text-slate-700 mb-2">{d.name}</p>
+                          <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[200px]">
+                            <p className="font-bold text-slate-700 mb-2">{distortion ? `⚠ ${d.name}` : d.name}</p>
                             <div className="flex justify-between gap-4"><span className="text-cyan-600">Mediana</span><span className="font-mono font-bold">{d.mediana} dias</span></div>
                             <div className="flex justify-between gap-4"><span className="text-slate-400">Média</span><span className="font-mono">{d.media} dias</span></div>
                             <div className="flex justify-between gap-4"><span className="text-slate-400">Unidades</span><span className="font-mono">{d.vol}</span></div>
+                            {d.pct90 > 0 && (
+                              <div className="flex justify-between gap-4"><span className="text-red-500">&gt; 90 dias</span><span className="font-mono text-red-500 font-bold">{d.pct90}%</span></div>
+                            )}
+                            {distortion && (
+                              <div className="flex justify-between gap-4"><span className="text-amber-600">Distorção</span><span className="font-mono text-amber-600 font-bold">+{Math.round((ratio - 1) * 100)}%</span></div>
+                            )}
+                            {insight && (
+                              <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] text-amber-700 italic leading-tight">{insight}</div>
+                            )}
                           </div>
                         );
                       }}
@@ -1306,10 +1337,11 @@ export function VendasNovoAnalise() {
                     <Bar dataKey="media" name="Média" radius={[0, 4, 4, 0]} barSize={6} fill="#cbd5e1" opacity={0.6} />
                   </BarChart>
                 </ResponsiveContainer>
-                <div className="flex gap-4 justify-center mt-3 text-[10px] text-slate-400">
+                <div className="flex gap-4 justify-center mt-3 text-[10px] text-slate-400 flex-wrap">
                   <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />até 30 dias</span>
                   <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-400 inline-block" />31–60 dias</span>
                   <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-500 inline-block" />acima de 60 dias</span>
+                  <span className="flex items-center gap-1 text-amber-700 font-semibold"><span className="text-amber-600">⚠</span>outliers (média/mediana ≥ 1.4×)</span>
                 </div>
               </>
             )}
