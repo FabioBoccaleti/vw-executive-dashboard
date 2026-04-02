@@ -300,7 +300,7 @@ function agg(rows: VendasResultadoRow[], aliqBon: number, dsrCfg: VendasDsrConfi
 }
 
 // ─── Período comparativo ──────────────────────────────────────────────────────
-interface PeriodCfg { id: string; year: number; gran: 'mes' | 'ano'; month: number; vendedor: string; }
+interface PeriodCfg { id: string; year: number; gran: 'mes' | 'ano'; month: number; vendedor: string; familia: string; modelo: string; }
 
 // ─── Sub-componentes UI ───────────────────────────────────────────────────────
 function SH({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
@@ -559,7 +559,7 @@ export function VendasNovoAnalise() {
 
   // Comparativo de períodos
   const [periods, setPeriods] = useState<PeriodCfg[]>([
-    { id: 'base', year: curYear, gran: 'mes', month: curMonth, vendedor: 'Todos' },
+    { id: 'base', year: curYear, gran: 'mes', month: curMonth, vendedor: 'Todos', familia: 'Todas', modelo: 'Todos' },
   ]);
 
   // ─── Carga ────────────────────────────────────────────────────────────────
@@ -863,16 +863,23 @@ export function VendasNovoAnalise() {
       if (getYr(r) !== p.year) return false;
       if (p.gran === 'mes' && getMo(r) !== p.month) return false;
       if (p.vendedor !== 'Todos' && (r.vendedor?.trim() || '') !== p.vendedor) return false;
+      if (p.familia !== 'Todas' && normalizeModelo(r.modelo ?? '') !== p.familia) return false;
+      if (p.modelo !== 'Todos' && (r.modelo?.trim() || '') !== p.modelo) return false;
       return true;
     });
     return agg(pr, aliqBon, dsrCfg);
   }), [periods, allRows, aliqBon, dsrCfg]);
 
   const periodLabels = useMemo(() =>
-    periods.map(p => p.gran === 'mes' ? `${MS[p.month - 1]}/${p.year}` : String(p.year)),
+    periods.map(p => {
+      const base = p.gran === 'mes' ? `${MS[p.month - 1]}/${p.year}` : String(p.year);
+      if (p.familia !== 'Todas' && p.modelo !== 'Todos') return `${base} · ${p.familia} / ${p.modelo}`;
+      if (p.familia !== 'Todas') return `${base} · ${p.familia}`;
+      return base;
+    }),
     [periods]);
 
-  function addPeriod() { setPeriods(prev => [...prev, { id: crypto.randomUUID(), year: curYear, gran: 'mes', month: curMonth, vendedor: 'Todos' }]); }
+  function addPeriod() { setPeriods(prev => [...prev, { id: crypto.randomUUID(), year: curYear, gran: 'mes', month: curMonth, vendedor: 'Todos', familia: 'Todas', modelo: 'Todos' }]); }
   function removePeriod(id: string) { setPeriods(prev => prev.filter(p => p.id !== id)); }
   function updatePeriod(id: string, patch: Partial<PeriodCfg>) { setPeriods(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p)); }
 
@@ -1972,34 +1979,61 @@ export function VendasNovoAnalise() {
             </div>
             <div className="flex flex-wrap gap-3 mb-5">
               {periods.map((p, pi) => (
-                <div key={p.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${pi === 0 ? 'border-amber-300 bg-amber-50' : 'border-blue-200 bg-blue-50'}`}>
-                  <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${pi === 0 ? 'bg-amber-200 text-amber-800' : 'bg-blue-200 text-blue-800'}`}>
-                    {pi === 0 ? 'Base' : `#${pi}`}
-                  </span>
-                  <select value={p.year} onChange={e => updatePeriod(p.id, { year: +e.target.value })}
-                    className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 text-xs focus:outline-none">
-                    {availYears.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                  <select value={p.gran} onChange={e => updatePeriod(p.id, { gran: e.target.value as 'mes' | 'ano' })}
-                    className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 text-xs focus:outline-none">
-                    <option value="mes">Mês</option>
-                    <option value="ano">Ano</option>
-                  </select>
-                  {p.gran === 'mes' && (
-                    <select value={p.month} onChange={e => updatePeriod(p.id, { month: +e.target.value })}
+                <div key={p.id} className={`flex flex-col gap-1.5 rounded-xl border px-3 py-2 text-xs ${pi === 0 ? 'border-amber-300 bg-amber-50' : 'border-blue-200 bg-blue-50'}`}>
+                  {/* Linha 1: Período + Vendedor */}
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${pi === 0 ? 'bg-amber-200 text-amber-800' : 'bg-blue-200 text-blue-800'}`}>
+                      {pi === 0 ? 'Base' : `#${pi}`}
+                    </span>
+                    <select value={p.year} onChange={e => updatePeriod(p.id, { year: +e.target.value })}
                       className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 text-xs focus:outline-none">
-                      {MS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                      {availYears.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
-                  )}
-                  <select value={p.vendedor} onChange={e => updatePeriod(p.id, { vendedor: e.target.value })}
-                    className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 text-xs max-w-[130px] focus:outline-none">
-                    {availVendedores.map(v => <option key={v} value={v}>{v}</option>)}
-                  </select>
-                  {pi > 0 && (
-                    <button onClick={() => removePeriod(p.id)} className="text-slate-400 hover:text-red-500 transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                    <select value={p.gran} onChange={e => updatePeriod(p.id, { gran: e.target.value as 'mes' | 'ano' })}
+                      className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 text-xs focus:outline-none">
+                      <option value="mes">Mês</option>
+                      <option value="ano">Ano</option>
+                    </select>
+                    {p.gran === 'mes' && (
+                      <select value={p.month} onChange={e => updatePeriod(p.id, { month: +e.target.value })}
+                        className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 text-xs focus:outline-none">
+                        {MS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                      </select>
+                    )}
+                    <select value={p.vendedor} onChange={e => updatePeriod(p.id, { vendedor: e.target.value })}
+                      className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 text-xs max-w-[130px] focus:outline-none">
+                      {availVendedores.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                    {pi > 0 && (
+                      <button onClick={() => removePeriod(p.id)} className="text-slate-400 hover:text-red-500 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {/* Linha 2: Família + Modelo */}
+                  {(() => {
+                    const periodoFamilias = ['Todas', ...Array.from(new Set(
+                      allRows.filter(r => getYr(r) === p.year).map(r => normalizeModelo(r.modelo ?? '')).filter(f => f !== '(sem modelo)')
+                    )).sort()];
+                    const periodoModelos = p.familia === 'Todas' ? [] : ['Todos', ...Array.from(new Set(
+                      allRows.filter(r => getYr(r) === p.year && normalizeModelo(r.modelo ?? '') === p.familia).map(r => r.modelo?.trim() || '').filter(Boolean)
+                    )).sort()];
+                    return (
+                      <div className="flex items-center gap-2 pl-1">
+                        <span className="text-slate-400 text-[10px]">Família</span>
+                        <select value={p.familia} onChange={e => updatePeriod(p.id, { familia: e.target.value, modelo: 'Todos' })}
+                          className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-600 text-xs focus:outline-none">
+                          {periodoFamilias.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                        <span className="text-slate-400 text-[10px]">Modelo</span>
+                        <select value={p.modelo} onChange={e => updatePeriod(p.id, { modelo: e.target.value })}
+                          disabled={p.familia === 'Todas'}
+                          className={`border border-slate-200 rounded-lg px-1.5 py-1 text-xs focus:outline-none ${p.familia === 'Todas' ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-600'}`}>
+                          {periodoModelos.map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
