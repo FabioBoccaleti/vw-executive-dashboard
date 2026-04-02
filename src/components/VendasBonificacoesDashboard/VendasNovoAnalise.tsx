@@ -767,35 +767,26 @@ export function VendasNovoAnalise() {
       .sort((a, b) => b.vol - a.vol);
   }, [filteredRows, aliqBon, dsrCfg]);
 
-  const coresHeatmap = useMemo(() => {
+  const coresStackedData = useMemo(() => {
     const topCores = coresData.slice(0, 8).map(c => c.name);
-    // aggregate family × colour
-    const famMap = new Map<string, Map<string, { vol: number; lb: number }>>();
+    const famMap = new Map<string, Record<string, number>>();
     for (const r of filteredRows) {
       const fam = normalizeModelo(r.modelo ?? '');
       const cor = (r.cor ?? '').trim() || '(sem cor)';
       if (!topCores.includes(cor)) continue;
-      const dsrPct = dsrFor(dsrCfg, r.dataVenda);
-      const c = calcNovos(r, aliqBon, dsrPct);
-      if (!famMap.has(fam)) famMap.set(fam, new Map());
-      const corMap = famMap.get(fam)!;
-      const prev = corMap.get(cor) ?? { vol: 0, lb: 0 };
-      corMap.set(cor, { vol: prev.vol + 1, lb: prev.lb + c.lb });
+      if (!famMap.has(fam)) famMap.set(fam, {});
+      const row = famMap.get(fam)!;
+      row[cor] = (row[cor] ?? 0) + 1;
     }
-    const families = [...famMap.entries()]
-      .map(([fam, corMap]) => ({ fam, total: [...corMap.values()].reduce((s, d) => s + d.vol, 0) }))
-      .sort((a, b) => b.total - a.total)
-      .map(x => x.fam);
-    // max lbPerUnit for heat scale
-    let maxLbPU = 0;
-    for (const [, corMap] of famMap) {
-      for (const d of corMap.values()) {
-        const v = d.vol > 0 ? d.lb / d.vol : 0;
-        if (v > maxLbPU) maxLbPU = v;
-      }
-    }
-    return { topCores, families, famMap, maxLbPU };
-  }, [coresData, filteredRows, aliqBon, dsrCfg]);
+    const rows = [...famMap.entries()]
+      .map(([name, cols]) => ({
+        name,
+        ...cols,
+        total: Object.values(cols).reduce((s, v) => s + v, 0),
+      }))
+      .sort((a, b) => b.total - a.total);
+    return { topCores, rows };
+  }, [coresData, filteredRows]);
 
   // Comissões por Família / Modelo
   const comissoesPorGrupoData = useMemo(() => {
@@ -1432,112 +1423,113 @@ export function VendasNovoAnalise() {
 
           {/* ── Análise de Cores ──────────────────────────────────────────── */}
           {coresData.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-                <div>
-                  <SH>Análise de Cores — {periodLabel}</SH>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Volume vendido e rentabilidade (Lucro Bruto) por cor</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wide">Cores distintas</p>
-                  <p className="text-sm font-bold font-mono text-slate-700">{coresData.length}</p>
-                </div>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <div className="flex items-start justify-between mb-5">
+                <SH>Análise de Cores — {periodLabel}</SH>
+                <span className="bg-slate-50 border border-slate-200 rounded-full px-3 py-1 text-[11px] font-semibold text-slate-500 whitespace-nowrap">
+                  {coresData.length} cores distintas
+                </span>
               </div>
 
+              {/* KPI Strip */}
+              {(() => {
+                const topVol  = coresData[0];
+                const topLbPU = [...coresData].sort((a, b) => b.lbPerUnit - a.lbPerUnit)[0];
+                const topFam  = coresStackedData.rows[0];
+                return (
+                  <div className="grid grid-cols-3 gap-3 mb-6">
+                    {[
+                      { label: 'Cor Líder em Volume',   value: topVol?.name  ?? '—', sub: topVol  ? `${topVol.vol} unidades` : '—' },
+                      { label: 'Melhor LB por Unidade', value: topLbPU?.name ?? '—', sub: topLbPU ? fmtBRLF(topLbPU.lbPerUnit) : '—' },
+                      { label: 'Família Mais Vendida',  value: topFam?.name  ?? '—', sub: topFam  ? `${topFam.total} unidades` : '—' },
+                    ].map((kpi, i) => (
+                      <div key={i} className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+                        <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 mb-1.5">{kpi.label}</p>
+                        <p className="text-sm font-bold text-slate-800 leading-tight truncate">{kpi.value}</p>
+                        <p className="text-[11px] text-slate-500 font-mono mt-1">{kpi.sub}</p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* Donut + Barras Empilhadas */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Ranking por cor */}
+
+                {/* Donut — volume por cor */}
                 <div>
-                  <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-3">Volume por Cor</p>
-                  <ResponsiveContainer width="100%" height={Math.max(200, coresData.length * 30 + 40)}>
-                    <BarChart data={coresData} layout="vertical" margin={{ left: 4, right: 90, top: 4, bottom: 4 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 9 }} />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 9.5 }} width={130} />
-                      <Tooltip
-                        content={({ active, payload, label }) => {
-                          if (!active || !payload?.length) return null;
-                          const d = payload[0].payload as { vol: number; lb: number; lbPerUnit: number };
-                          return (
-                            <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[200px]">
-                              <p className="font-bold text-slate-700 mb-1.5">{label}</p>
-                              <div className="flex justify-between gap-4">
-                                <span className="text-blue-500">Volume</span>
-                                <span className="font-mono font-semibold text-slate-700">{d.vol} un.</span>
-                              </div>
-                              <div className="flex justify-between gap-4">
-                                <span className="text-indigo-500">Lucro Bruto total</span>
-                                <span className="font-mono text-slate-700">{fmtBRLF(d.lb)}</span>
-                              </div>
-                              <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
-                                <span className="text-emerald-600 font-medium">LB / unidade</span>
-                                <span className="font-mono font-bold text-emerald-700">{fmtBRLF(d.lbPerUnit)}</span>
-                              </div>
-                            </div>
-                          );
-                        }}
+                  <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wide mb-3">Volume por Cor</p>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={coresData.slice(0, 8)}
+                        dataKey="vol"
+                        nameKey="name"
+                        cx="50%" cy="50%"
+                        outerRadius={110} innerRadius={60}
+                        labelLine={false}
+                        label={DonutLabel as unknown as (props: object) => React.ReactElement | null}
+                      >
+                        {coresData.slice(0, 8).map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                      </Pie>
+                      <Tooltip formatter={(v: number, name: string) => [`${v} un.`, name]} />
+                      <Legend
+                        wrapperStyle={{ fontSize: 11 }}
+                        formatter={(value, entry) => (
+                          <span style={{ color: '#475569' }}>
+                            {value}: {(entry as { payload?: { vol?: number } }).payload?.vol ?? 0} un.
+                          </span>
+                        )}
                       />
-                      <Bar dataKey="vol" name="Volume" radius={[0, 5, 5, 0]}>
-                        {coresData.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
-                        <LabelList dataKey="vol" position="right"
-                          formatter={(v: number) => `${v} un.`}
-                          style={{ fontSize: 9, fill: '#64748b', fontWeight: 600 }} />
-                      </Bar>
-                    </BarChart>
+                    </PieChart>
                   </ResponsiveContainer>
                 </div>
 
-                {/* Heatmap Família × Cor */}
+                {/* Barras empilhadas — composição de cores por família */}
                 <div>
-                  <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-3">
-                    Rentabilidade por Família × Cor <span className="font-normal text-slate-300 ml-1">(Lucro Bruto / un.)</span>
-                  </p>
-                  {coresHeatmap.families.length === 0 ? <Empty /> : (
-                    <div className="overflow-x-auto rounded-xl border border-slate-100">
-                      <table className="w-full text-[10px] border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50">
-                            <th className="px-3 py-2 text-left font-semibold text-slate-500 border-b border-slate-200 min-w-[90px]">Família</th>
-                            {coresHeatmap.topCores.map(cor => (
-                              <th key={cor} className="px-2 py-2 text-center font-semibold text-slate-500 border-b border-slate-200 min-w-[72px] max-w-[90px]">
-                                <span className="block leading-tight">{cor.length > 12 ? cor.slice(0, 12) + '…' : cor}</span>
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {coresHeatmap.families.map((fam, fi) => (
-                            <tr key={fam} className={fi % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}>
-                              <td className="px-3 py-2 font-semibold text-slate-700 border-b border-slate-100">{fam}</td>
-                              {coresHeatmap.topCores.map(cor => {
-                                const cell = coresHeatmap.famMap.get(fam)?.get(cor);
-                                const lbpu = cell && cell.vol > 0 ? cell.lb / cell.vol : 0;
-                                const intensity = coresHeatmap.maxLbPU > 0 ? lbpu / coresHeatmap.maxLbPU : 0;
-                                const bg = cell && cell.vol > 0
-                                  ? `rgba(16,185,129,${0.08 + intensity * 0.52})`
-                                  : 'transparent';
-                                const textC = lbpu < 0 ? '#ef4444' : intensity > 0.5 ? '#065f46' : '#374151';
-                                return (
-                                  <td key={cor} className="px-2 py-2 text-center border-b border-slate-100 transition-colors"
-                                    style={{ background: bg }}
-                                    title={cell ? `${fam} / ${cor}\n${cell.vol} un. — LB: ${fmtBRLF(cell.lb)} — LB/un: ${fmtBRLF(lbpu)}` : undefined}>
-                                    {cell && cell.vol > 0 ? (
-                                      <div>
-                                        <span className="font-bold" style={{ color: textC }}>{cell.vol}</span>
-                                        <span className="block font-mono text-[9px] mt-0.5" style={{ color: textC, opacity: 0.8 }}>{fmtBRL(lbpu)}</span>
-                                      </div>
-                                    ) : <span className="text-slate-200">—</span>}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                  <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-wide mb-3">Composição por Família</p>
+                  {coresStackedData.rows.length === 0 ? <Empty /> : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart
+                        data={coresStackedData.rows}
+                        layout="vertical"
+                        margin={{ left: 4, right: 56, top: 4, bottom: 4 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 9 }} />
+                        <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={72} />
+                        <Tooltip
+                          content={({ active, payload, label }) => {
+                            if (!active || !payload?.length) return null;
+                            const total = (payload[0]?.payload as { total?: number })?.total ?? 0;
+                            return (
+                              <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[200px]">
+                                <p className="font-bold text-slate-700 mb-2">{label} — {total} un.</p>
+                                {[...payload].reverse().map(p => (
+                                  p.value ? (
+                                    <div key={p.dataKey as string} className="flex justify-between gap-4">
+                                      <span style={{ color: p.color as string }}>{p.dataKey as string}</span>
+                                      <span className="font-mono font-semibold text-slate-700">{p.value as number} un.</span>
+                                    </div>
+                                  ) : null
+                                ))}
+                              </div>
+                            );
+                          }}
+                        />
+                        {coresStackedData.topCores.map((cor, i) => (
+                          <Bar key={cor} dataKey={cor} stackId="a" fill={PALETTE[i % PALETTE.length]} name={cor}
+                            radius={i === coresStackedData.topCores.length - 1 ? [0, 4, 4, 0] : undefined}>
+                            {i === coresStackedData.topCores.length - 1 && (
+                              <LabelList dataKey="total" position="right"
+                                formatter={(v: number) => `${v} un.`}
+                                style={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} />
+                            )}
+                          </Bar>
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
                   )}
-                  <p className="text-[9px] text-slate-400 mt-2">
-                    Verde mais intenso = maior Lucro Bruto por unidade. Número = qtd. vendida. Exibindo top 8 cores.
-                  </p>
                 </div>
               </div>
             </div>
