@@ -635,6 +635,21 @@ export function VendasNovoAnalise() {
         .filter(i => i.tipo.toLowerCase().includes('bonificações'))
         .reduce((s, i) => s + (parseFloat(i.aliquota) || 0), 0));
       setDsrCfg(dsr as VendasDsrConfig[]);
+
+      // Detectar último mês com dados e inicializar filtros + comparativo
+      if ((filledRows as VendasResultadoRow[]).length > 0) {
+        const yr = Math.max(...(filledRows as VendasResultadoRow[]).map(getYr).filter(y => y > 2000));
+        const mo = Math.max(...(filledRows as VendasResultadoRow[]).filter(r => getYr(r) === yr).map(getMo).filter(m => m >= 1 && m <= 12));
+        setYear(yr);
+        setMonth(mo);
+        const prevMo = mo === 1 ? 12 : mo - 1;
+        const prevYr = mo === 1 ? yr - 1 : yr;
+        setPeriods([
+          { id: 'base', year: prevYr, gran: 'mes', month: prevMo, vendedor: 'Todos', familia: 'Todas', modelo: 'Todos' },
+          { id: crypto.randomUUID(), year: yr,    gran: 'mes', month: mo,     vendedor: 'Todos', familia: 'Todas', modelo: 'Todos' },
+        ]);
+      }
+
       setLoading(false);
     });
   }, []);
