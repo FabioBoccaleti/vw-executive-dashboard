@@ -6,6 +6,7 @@ import { FluxoCaixaDashboard } from '@/components/FluxoCaixaDashboard'
 import { VendasBonificacoesDashboard } from '@/components/VendasBonificacoesDashboard'
 import { VendasSelectionPage } from '@/components/VendasBonificacoesDashboard/VendasSelectionPage'
 import { PeliculasDashboard } from '@/components/VendasBonificacoesDashboard/PeliculasDashboard'
+import { EsteticaDashboard } from '@/components/VendasBonificacoesDashboard/EsteticaDashboard'
 import { ImportarPDFPage } from '@/components/VendasBonificacoesDashboard/ImportarPDFPage'
 import { CadastrosPage } from '@/components/CadastrosPage'
 import { BrandSelector } from '@/components/BrandSelector'
@@ -25,8 +26,8 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<'app' | 'admin' | 'cadastros'>(() =>
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
-  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'importar-pdf'>('selection')
-  const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas'>('blindagem')
+  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf'>('selection')
+  const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica'>('blindagem')
   
   // Inicializa o banco de dados em produção
   useEffect(() => {
@@ -237,6 +238,11 @@ function AppContent() {
           <PeliculasDashboard
             onBack={() => setVendasSubPage('selection')}
             onOpenCadastros={() => { setCadastrosVariant('peliculas'); setCurrentPage('cadastros'); }}
+          />
+        ) : vendasSubPage === 'estetica' ? (
+          <EsteticaDashboard
+            onBack={() => setVendasSubPage('selection')}
+            onOpenCadastros={() => { setCadastrosVariant('estetica'); setCurrentPage('cadastros'); }}
           />
         ) : (
           <VendasBonificacoesDashboard

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Layers, Car, X, Lock } from 'lucide-react';
+import { Shield, Layers, Car, X, Lock, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { VendasSubModuleId } from '@/lib/authTypes';
 
@@ -8,9 +8,10 @@ const BLINDAGEM_SUBS: VendasSubModuleId[] = [
   'blindagem.revenda_vw', 'blindagem.revenda_audi', 'blindagem.estoque', 'blindagem.notas_a_emitir',
 ];
 const PELICULAS_SUBS: VendasSubModuleId[] = ['peliculas.tabela', 'peliculas.analise'];
+const ESTETICA_SUBS: VendasSubModuleId[] = ['estetica.tabela', 'estetica.analise'];
 
 interface VendasSelectionPageProps {
-  onSelect: (option: 'blindagem' | 'peliculas' | 'importar-pdf') => void;
+  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf') => void;
   onChangeBrand: () => void;
 }
 
@@ -18,6 +19,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
   const { canAccessVendasSub, isAdmin } = useAuth();
   const canBlindagem = isAdmin() || BLINDAGEM_SUBS.some(s => canAccessVendasSub(s));
   const canPeliculas = isAdmin() || PELICULAS_SUBS.some(s => canAccessVendasSub(s));
+  const canEstetica  = isAdmin() || ESTETICA_SUBS.some(s => canAccessVendasSub(s));
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordInput, setPasswordInput]         = useState('');
@@ -94,6 +96,23 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">
                 Análise e Controle de Vendas<br />de Películas na Audi
+              </h2>
+            </div>
+          </button>
+          )}
+
+          {/* Card — Análise e Controle de Vendas de Serviços de Estética Audi */}
+          {canEstetica && (
+          <button
+            onClick={() => onSelect('estetica')}
+            className="flex-1 bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-teal-50 group-hover:bg-teal-100 transition-colors">
+              <Sparkles className="w-10 h-10 text-teal-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Análise e Controle de Vendas<br />de Serviços de Estética Audi
               </h2>
             </div>
           </button>

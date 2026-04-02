@@ -36,7 +36,9 @@ export type VendasSubModuleId =
   | 'blindagem.estoque'
   | 'blindagem.notas_a_emitir'
   | 'peliculas.tabela'
-  | 'peliculas.analise';
+  | 'peliculas.analise'
+  | 'estetica.tabela'
+  | 'estetica.analise';
 
 export const VENDAS_SUB_MODULE_LABELS: Record<VendasSubModuleId, string> = {
   'blindagem.tabela': 'Tabela',
@@ -48,6 +50,8 @@ export const VENDAS_SUB_MODULE_LABELS: Record<VendasSubModuleId, string> = {
   'blindagem.notas_a_emitir': 'Notas a Emitir',
   'peliculas.tabela': 'Tabela',
   'peliculas.analise': 'Análise',
+  'estetica.tabela': 'Tabela',
+  'estetica.analise': 'Análise',
 };
 
 export interface UserRecord {

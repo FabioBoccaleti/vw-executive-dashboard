@@ -225,3 +225,94 @@ export async function loadPeliculasDsr(): Promise<DsrConfig[]> {
 export async function savePeliculasDsr(items: DsrConfig[]): Promise<boolean> {
   return kvSet(KEY_PELICULAS_DSR, items);
 }
+
+
+// ── Estética: Vendedores ───────────────────────────────────────────────────────
+const KEY_ESTETICA_VENDEDORES = 'estetica_cadastro_vendedores';
+
+export async function loadEsteticaVendedores(): Promise<Vendedor[]> {
+  return (await kvGet<Vendedor[]>(KEY_ESTETICA_VENDEDORES)) ?? [];
+}
+export async function saveEsteticaVendedores(items: Vendedor[]): Promise<boolean> {
+  return kvSet(KEY_ESTETICA_VENDEDORES, items);
+}
+
+// ── Estética: Revendas ─────────────────────────────────────────────────────────
+const KEY_ESTETICA_REVENDAS = 'estetica_cadastro_revendas';
+
+export async function loadEsteticaRevendas(): Promise<Revenda[]> {
+  return (await kvGet<Revenda[]>(KEY_ESTETICA_REVENDAS)) ?? [];
+}
+export async function saveEsteticaRevendas(items: Revenda[]): Promise<boolean> {
+  return kvSet(KEY_ESTETICA_REVENDAS, items);
+}
+
+// ── Estética: Regras de Remuneração ───────────────────────────────────────────
+const KEY_ESTETICA_REGRAS = 'estetica_cadastro_regras';
+
+export const BASES_CALCULO_ESTETICA = [
+  'Lucro Bruto',
+] as const;
+
+export async function loadEsteticaRegras(): Promise<RegraRemuneracao[]> {
+  return (await kvGet<RegraRemuneracao[]>(KEY_ESTETICA_REGRAS)) ?? [];
+}
+export async function saveEsteticaRegras(items: RegraRemuneracao[]): Promise<boolean> {
+  return kvSet(KEY_ESTETICA_REGRAS, items);
+}
+
+// ── Estética: Produtos / Serviços ─────────────────────────────────────────────
+const KEY_ESTETICA_PRODUTOS = 'estetica_cadastro_produtos';
+
+export async function loadEsteticaProdutos(): Promise<ProdutoServico[]> {
+  return (await kvGet<ProdutoServico[]>(KEY_ESTETICA_PRODUTOS)) ?? [];
+}
+export async function saveEsteticaProdutos(items: ProdutoServico[]): Promise<boolean> {
+  return kvSet(KEY_ESTETICA_PRODUTOS, items);
+}
+
+// ── Estética: Vendedores de Acessórios ────────────────────────────────────────
+const KEY_ESTETICA_VENDEDORES_ACESSORIOS = 'estetica_cadastro_vendedores_acessorios';
+
+export async function loadEsteticaVendedoresAcessorios(): Promise<VendedorAcessorios[]> {
+  return (await kvGet<VendedorAcessorios[]>(KEY_ESTETICA_VENDEDORES_ACESSORIOS)) ?? [];
+}
+export async function saveEsteticaVendedoresAcessorios(items: VendedorAcessorios[]): Promise<boolean> {
+  return kvSet(KEY_ESTETICA_VENDEDORES_ACESSORIOS, items);
+}
+
+// ── Estética: Alíquotas de Imposto ────────────────────────────────────────────
+const KEY_ESTETICA_ALIQUOTAS = 'estetica_cadastro_aliquotas';
+
+export async function loadEsteticaAliquotas(): Promise<AliquotaImposto[]> {
+  return (await kvGet<AliquotaImposto[]>(KEY_ESTETICA_ALIQUOTAS)) ?? [];
+}
+export async function saveEsteticaAliquotas(items: AliquotaImposto[]): Promise<boolean> {
+  return kvSet(KEY_ESTETICA_ALIQUOTAS, items);
+}
+
+// ── Estética: DSR ─────────────────────────────────────────────────────────────
+const KEY_ESTETICA_DSR = 'estetica_cadastro_dsr';
+
+export async function loadEsteticaDsr(): Promise<DsrConfig[]> {
+  return (await kvGet<DsrConfig[]>(KEY_ESTETICA_DSR)) ?? [];
+}
+export async function saveEsteticaDsr(items: DsrConfig[]): Promise<boolean> {
+  return kvSet(KEY_ESTETICA_DSR, items);
+}
+
+// ── Estética: Veículos ────────────────────────────────────────────────────────
+const KEY_ESTETICA_VEICULOS = 'estetica_cadastro_veiculos';
+
+export interface Veiculo {
+  id: string;
+  modelo: string;
+  placa?: string;
+}
+
+export async function loadEsteticaVeiculos(): Promise<Veiculo[]> {
+  return (await kvGet<Veiculo[]>(KEY_ESTETICA_VEICULOS)) ?? [];
+}
+export async function saveEsteticaVeiculos(items: Veiculo[]): Promise<boolean> {
+  return kvSet(KEY_ESTETICA_VEICULOS, items);
+}

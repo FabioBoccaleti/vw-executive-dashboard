@@ -14,6 +14,14 @@ import { PeliculasProdutosSection } from './sections/PeliculasProdutosSection';
 import { PeliculasVendedoresAcessoriosSection } from './sections/PeliculasVendedoresAcessoriosSection';
 import { PeliculasAliquotasSection } from './sections/PeliculasAliquotasSection';
 import { PeliculasDsrSection } from './sections/PeliculasDsrSection';
+import { EsteticaVeiculosSection } from './sections/EsteticaVeiculosSection';
+import { EsteticaVendedoresSection } from './sections/EsteticaVendedoresSection';
+import { EsteticaRevendasSection } from './sections/EsteticaRevendasSection';
+import { EsteticaRegrasSection } from './sections/EsteticaRegrasSection';
+import { EsteticaProdutosSection } from './sections/EsteticaProdutosSection';
+import { EsteticaVendedoresAcessoriosSection } from './sections/EsteticaVendedoresAcessoriosSection';
+import { EsteticaAliquotasSection } from './sections/EsteticaAliquotasSection';
+import { EsteticaDsrSection } from './sections/EsteticaDsrSection';
 
 type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos' | 'aliquotas' | 'dsr';
 
@@ -44,15 +52,27 @@ const MENU_PELICULAS: MenuItem[] = [
   { id: 'regras',                label: 'Regras de Remuneração',     description: 'Percentuais e bases de cálculo', icon: <Percent className="w-5 h-5" /> },
 ];
 
+const MENU_ESTETICA: MenuItem[] = [
+  { id: 'veiculos',              label: 'Veículos',                  description: 'Marcas e modelos',               icon: <Car className="w-5 h-5" /> },
+  { id: 'produtos',              label: 'Produtos / Serviços',       description: 'Catálogo de produtos e serviços', icon: <ShoppingBag className="w-5 h-5" /> },
+  { id: 'revendas',              label: 'Revendas',                  description: 'Concessionárias e revendas',     icon: <Store className="w-5 h-5" /> },
+  { id: 'vendedores',            label: 'Vendedores',                description: 'Equipe de vendas e cargos',      icon: <Users className="w-5 h-5" /> },
+  { id: 'vendedoresAcessorios',  label: 'Vendedores de Acessórios',  description: 'Equipe de vendedores de acessórios', icon: <UserCheck className="w-5 h-5" /> },
+  { id: 'aliquotas',             label: 'Alíquotas de Imposto',       description: 'Tipos de imposto, alíquotas e encargos', icon: <Receipt className="w-5 h-5" /> },
+  { id: 'dsr',                   label: 'DSR',                        description: 'Percentual de DSR por Ano e Mês',   icon: <CalendarCog className="w-5 h-5" /> },
+  { id: 'regras',                label: 'Regras de Remuneração',     description: 'Percentuais e bases de cálculo', icon: <Percent className="w-5 h-5" /> },
+];
+
 interface CadastrosPageProps {
   onBack: () => void;
-  variant?: 'blindagem' | 'peliculas';
+  variant?: 'blindagem' | 'peliculas' | 'estetica';
 }
 
 export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPageProps) {
   const [activeSection, setActiveSection] = useState<SectionId>('veiculos');
   const isPeliculas = variant === 'peliculas';
-  const MENU_ITEMS = isPeliculas ? MENU_PELICULAS : MENU_BLINDAGEM;
+  const isEstetica  = variant === 'estetica';
+  const MENU_ITEMS = isEstetica ? MENU_ESTETICA : isPeliculas ? MENU_PELICULAS : MENU_BLINDAGEM;
 
   const current = MENU_ITEMS.find(m => m.id === activeSection)!;
 
@@ -63,6 +83,8 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
         className="text-white shadow-lg flex-shrink-0"
         style={isPeliculas
           ? { background: 'linear-gradient(135deg, #312e81 0%, #4338ca 100%)' }
+          : isEstetica
+          ? { background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)' }
           : { background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)' }}
       >
         <div className="px-6 py-4 flex items-center gap-4">
@@ -77,6 +99,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
           <div>
             <h1 className="text-base font-bold tracking-tight">Cadastros</h1>
             {isPeliculas && <p className="text-xs text-white/60 mt-0.5">Películas na Audi</p>}
+            {isEstetica  && <p className="text-xs text-white/60 mt-0.5">Estética Audi</p>}
           </div>
         </div>
       </header>
@@ -123,11 +146,11 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
               <p className="text-sm text-slate-500">{current.description}</p>
             </div>
 
-            {!isPeliculas && activeSection === 'veiculos'    && <VeiculosSection />}
-            {!isPeliculas && activeSection === 'blindadoras' && <BlinadorasSection />}
-            {!isPeliculas && activeSection === 'revendas'    && <RevendasSection />}
-            {!isPeliculas && activeSection === 'vendedores'  && <VendedoresSection />}
-            {!isPeliculas && activeSection === 'regras'      && <RegrasSection />}
+            {!isPeliculas && !isEstetica && activeSection === 'veiculos'    && <VeiculosSection />}
+            {!isPeliculas && !isEstetica && activeSection === 'blindadoras' && <BlinadorasSection />}
+            {!isPeliculas && !isEstetica && activeSection === 'revendas'    && <RevendasSection />}
+            {!isPeliculas && !isEstetica && activeSection === 'vendedores'  && <VendedoresSection />}
+            {!isPeliculas && !isEstetica && activeSection === 'regras'      && <RegrasSection />}
             {isPeliculas  && activeSection === 'veiculos'             && <PeliculasVeiculosSection />}
             {isPeliculas  && activeSection === 'prestadores'          && <PrestadoresSection />}
             {isPeliculas  && activeSection === 'produtos'             && <PeliculasProdutosSection />}
@@ -137,6 +160,14 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
             {isPeliculas  && activeSection === 'aliquotas'             && <PeliculasAliquotasSection />}
             {isPeliculas  && activeSection === 'dsr'                   && <PeliculasDsrSection />}
             {isPeliculas  && activeSection === 'regras'               && <PeliculasRegrasSection />}
+            {isEstetica   && activeSection === 'veiculos'             && <EsteticaVeiculosSection />}
+            {isEstetica   && activeSection === 'produtos'             && <EsteticaProdutosSection />}
+            {isEstetica   && activeSection === 'revendas'             && <EsteticaRevendasSection />}
+            {isEstetica   && activeSection === 'vendedores'           && <EsteticaVendedoresSection />}
+            {isEstetica   && activeSection === 'vendedoresAcessorios' && <EsteticaVendedoresAcessoriosSection />}
+            {isEstetica   && activeSection === 'aliquotas'             && <EsteticaAliquotasSection />}
+            {isEstetica   && activeSection === 'dsr'                   && <EsteticaDsrSection />}
+            {isEstetica   && activeSection === 'regras'               && <EsteticaRegrasSection />}
           </div>
         </main>
       </div>
