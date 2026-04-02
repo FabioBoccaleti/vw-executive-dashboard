@@ -792,6 +792,12 @@ export function VendasNovoAnalise() {
       .sort((a, b) => b.total - a.total);
   }, [filteredRows]);
 
+  const totaisReceitasFamilia = useMemo(() => ({
+    blind: receitasFamiliaData.reduce((s, d) => s + d.blind, 0),
+    fin:   receitasFamiliaData.reduce((s, d) => s + d.fin, 0),
+    desp:  receitasFamiliaData.reduce((s, d) => s + d.desp, 0),
+  }), [receitasFamiliaData]);
+
   // Comissões ranking
   const comissoesData = useMemo(() =>
     [...vendorData]
@@ -1593,11 +1599,14 @@ export function VendasNovoAnalise() {
                     : `Receitas por Família — ${periodLabel}`}
                 </SH>
                 <div className="flex gap-4 -mt-1">
-                  {[
-                    { label: 'Blindagem',      value: totaisReceitas.blind, color: '#3b82f6' },
-                    { label: 'Financiamento',  value: totaisReceitas.fin,   color: '#10b981' },
-                    { label: 'Despachante',    value: totaisReceitas.desp,  color: '#f59e0b' },
-                  ].map(item => item.value > 0 && (
+                  {(() => {
+                    const t = receitasView === 'familia' ? totaisReceitasFamilia : totaisReceitas;
+                    return [
+                      { label: 'Blindagem',      value: t.blind, color: '#3b82f6' },
+                      { label: 'Financiamento',  value: t.fin,   color: '#10b981' },
+                      { label: 'Despachante',    value: t.desp,  color: '#f59e0b' },
+                    ];
+                  })().map(item => item.value > 0 && (
                     <div key={item.label} className="text-right">
                       <p className="text-[10px] uppercase tracking-wide" style={{ color: item.color }}>{item.label}</p>
                       <p className="text-sm font-bold font-mono" style={{ color: item.color }}>{fmtBRL(item.value)}</p>
