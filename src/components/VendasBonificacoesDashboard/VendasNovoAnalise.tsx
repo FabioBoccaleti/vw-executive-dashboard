@@ -263,7 +263,7 @@ interface Agg {
   dsr: number; prov: number; enc: number; res: number; marg: number;
   ticket: number; ticketReceita: number;
   juros: number; ci: number; cort: number; com: number; outras: number;
-  blind: number; fin: number; desp: number; mediaDias: number;
+  blind: number; fin: number; desp: number; mediaDias: number; medianaDias: number;
   remVendedor: number;
 }
 function agg(rows: VendasResultadoRow[], aliqBon: number, dsrCfg: VendasDsrConfig[]): Agg | null {
@@ -273,7 +273,7 @@ function agg(rows: VendasResultadoRow[], aliqBon: number, dsrCfg: VendasDsrConfi
   let receita = 0, custo = 0, recLiq = 0, lb = 0, bon = 0, lcb = 0;
   let dsr = 0, prov = 0, enc = 0, res = 0, remV = 0;
   let juros = 0, ci = 0, cort = 0, com = 0, outras = 0, blind = 0, fin = 0, desp = 0;
-  let diasSum = 0, diasCnt = 0;
+  let diasSum = 0; const diasArr: number[] = [];
   for (const r of rows) {
     const d = dsrFor(dsrCfg, r.dataVenda);
     const c = calcNovos(r, aliqBon, d);
@@ -285,8 +285,14 @@ function agg(rows: VendasResultadoRow[], aliqBon: number, dsrCfg: VendasDsrConfi
     outras += n(r.outrasDespesas);
     blind += n(r.recBlindagem); fin += n(r.recFinanciamento); desp += n(r.recDespachante);
     const dias = n(r.diasEstoque);
-    if (dias > 0) { diasSum += dias; diasCnt++; }
+    if (dias > 0) { diasSum += dias; diasArr.push(dias); }
   }
+  const diasCnt = diasArr.length;
+  const diasSorted = [...diasArr].sort((a, b) => a - b);
+  const mid = Math.floor(diasSorted.length / 2);
+  const medianaDias = diasSorted.length === 0 ? 0
+    : diasSorted.length % 2 === 1 ? diasSorted[mid]
+    : (diasSorted[mid - 1] + diasSorted[mid]) / 2;
   return {
     v07, netVol, receita, custo, recLiq,
     lb, lbPct: recLiq ? lb / recLiq * 100 : 0,
@@ -295,6 +301,7 @@ function agg(rows: VendasResultadoRow[], aliqBon: number, dsrCfg: VendasDsrConfi
     ticketReceita: netVol ? receita / netVol : 0,
     juros, ci, cort, com, outras, blind, fin, desp,
     mediaDias: diasCnt ? diasSum / diasCnt : 0,
+    medianaDias,
     remVendedor: remV,
   };
 }
@@ -2053,6 +2060,7 @@ export function VendasNovoAnalise() {
                 <tbody>
                   {([
                     { label: 'Qtd. de Vendas',    get: (m: Agg) => m.netVol,        fmt: (v: number) => String(v), hl: false },
+                    { label: 'Giro de Estoque',    get: (m: Agg) => m.medianaDias,   fmt: (v: number, pm: Agg) => v > 0 ? `Md: ${Math.round(v)}d · μ: ${Math.round(pm.mediaDias)}d` : '—', hl: false },
                     { label: 'Receita Bruta',      get: (m: Agg) => m.receita,       fmt: fmtBRLF, hl: false },
                     { label: 'Receita Líquida',    get: (m: Agg) => m.recLiq,        fmt: fmtBRLF, hl: false },
                     { label: 'Custo',              get: (m: Agg) => m.custo,         fmt: fmtBRLF, hl: false },
