@@ -596,6 +596,7 @@ export function VendasNovoAnalise() {
   const [showAllVendors,   setShowAllVendors]   = useState(false);
   const [comissaoMode,        setComissaoMode]        = useState<ComissaoMode>('total');
   const [jurosGrouping,       setJurosGrouping]       = useState<JurosGrouping>('familia');
+  const [giroGrouping,        setGiroGrouping]        = useState<JurosGrouping>('familia');
   const [comissoesGrouping,   setComissoesGrouping]   = useState<ComissoesGrouping>('familia');
   const [comissoesScenario,   setComissoesScenario]   = useState<ComissoesScenario>('custoUn');
   const [showAllComissoes,    setShowAllComissoes]    = useState(false);
@@ -799,6 +800,28 @@ export function VendasNovoAnalise() {
       .filter(d => Math.round(d.juros) > 0)
       .sort((a, b) => b.juros - a.juros);
   }, [filteredRows, jurosGrouping]);
+
+  // Giro de Estoque (mediana de diasEstoque) por Família/Modelo
+  const giroEstoqueData = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (const r of filteredRows) {
+      const dias = n(r.diasEstoque);
+      if (dias <= 0) continue;
+      const k = giroGrouping === 'familia' ? normalizeModelo(r.modelo ?? '') : (r.modelo?.trim() || '(sem modelo)');
+      const arr = map.get(k) ?? [];
+      arr.push(dias);
+      map.set(k, arr);
+    }
+    return [...map.entries()]
+      .map(([name, arr]) => {
+        const sorted = [...arr].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        const mediana = sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        const media = arr.reduce((s, v) => s + v, 0) / arr.length;
+        return { name, mediana: Math.round(mediana), media: Math.round(media), vol: arr.length };
+      })
+      .sort((a, b) => a.mediana - b.mediana);
+  }, [filteredRows, giroGrouping]);
 
   // Análise de Cores — ranking e heatmap família × cor
   const coresData = useMemo(() => {
@@ -1215,6 +1238,80 @@ export function VendasNovoAnalise() {
                   </ResponsiveContainer>
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* ── Giro de Estoque por Família/Modelo ─────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <SH right={
+              <div className="flex items-center gap-1">
+                {(['familia', 'modelo'] as JurosGrouping[]).map(g => (
+                  <button key={g} onClick={() => setGiroGrouping(g)}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                      giroGrouping === g
+                        ? 'bg-cyan-600 text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}>
+                    {g === 'familia' ? 'Família' : 'Modelo'}
+                  </button>
+                ))}
+              </div>
+            }>
+              Giro de Estoque por {giroGrouping === 'familia' ? 'Família' : 'Modelo'} — {periodLabel}
+            </SH>
+            {giroEstoqueData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                <p className="text-sm">Sem dados de dias de estoque para o período</p>
+                <p className="text-xs mt-1">Os dias são calculados automaticamente via Registros de Vendas</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-4 mb-3 text-[10px] text-slate-400">
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-1.5 rounded bg-cyan-500 inline-block" />Mediana (dias)</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-1.5 rounded bg-slate-300 inline-block" />Média (dias)</span>
+                  <span className="ml-auto">ordenado por mediana crescente (menor = gira mais rápido)</span>
+                </div>
+                <ResponsiveContainer width="100%" height={Math.max(200, giroEstoqueData.length * 38)}>
+                  <BarChart data={giroEstoqueData} layout="vertical" margin={{ left: 4, right: 80, top: 4, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 9 }} tickFormatter={v => `${v}d`} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0]?.payload as { name: string; mediana: number; media: number; vol: number };
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[170px]">
+                            <p className="font-bold text-slate-700 mb-2">{d.name}</p>
+                            <div className="flex justify-between gap-4"><span className="text-cyan-600">Mediana</span><span className="font-mono font-bold">{d.mediana} dias</span></div>
+                            <div className="flex justify-between gap-4"><span className="text-slate-400">Média</span><span className="font-mono">{d.media} dias</span></div>
+                            <div className="flex justify-between gap-4"><span className="text-slate-400">Unidades</span><span className="font-mono">{d.vol}</span></div>
+                          </div>
+                        );
+                      }}
+                    />
+                    {(() => {
+                      const avgMediana = Math.round(giroEstoqueData.reduce((s, d) => s + d.mediana, 0) / giroEstoqueData.length);
+                      return <ReferenceLine x={avgMediana} stroke="#f59e0b" strokeDasharray="4 2"
+                        label={{ value: `Média geral ${avgMediana}d`, position: 'top', fontSize: 9, fill: '#f59e0b' }} />;
+                    })()}
+                    <Bar dataKey="mediana" name="Mediana" radius={[0, 4, 4, 0]} barSize={14}>
+                      {giroEstoqueData.map((d, i) => (
+                        <Cell key={i} fill={d.mediana <= 30 ? '#10b981' : d.mediana <= 60 ? '#f59e0b' : '#ef4444'} />
+                      ))}
+                      <LabelList dataKey="mediana" position="right"
+                        formatter={(v: number) => `${v}d`}
+                        style={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} />
+                    </Bar>
+                    <Bar dataKey="media" name="Média" radius={[0, 4, 4, 0]} barSize={6} fill="#cbd5e1" opacity={0.6} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="flex gap-4 justify-center mt-3 text-[10px] text-slate-400">
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />até 30 dias</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-400 inline-block" />31–60 dias</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-500 inline-block" />acima de 60 dias</span>
+                </div>
+              </>
             )}
           </div>
 
