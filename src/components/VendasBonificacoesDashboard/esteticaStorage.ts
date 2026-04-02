@@ -96,7 +96,7 @@ export function recalcEsteticaRow(row: EsteticaRow, totalAliquotaPct = 0, comiss
     const cargoVendedor = comissaoCtx.vendedores.find(v => v.nome === row.vendedor)?.cargo ?? '';
     row.comissaoVendedor = calcComissaoPorCargo(cargoVendedor, lb, rl, comissaoCtx.regras);
     row.comissaoVendedorAcessorios = row.vendedorAcessorios?.trim()
-      ? calcComissaoPorCargo('Vendedor de Acessórios', lb, rl, comissaoCtx.regras)
+      ? calcComissaoPorCargo('Vendedor de Serviço de Estética', lb, rl, comissaoCtx.regras)
       : '0';
   }
   // Situação automática

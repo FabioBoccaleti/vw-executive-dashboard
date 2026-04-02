@@ -38,7 +38,7 @@ const REQUIRED_LABELS: Record<string, string> = {
   produto: 'Produto',
   valorVenda: 'Valor da Venda',
   vendedor: 'Vendedor',
-  vendedorAcessorios: 'Vendedor de Acessórios',
+  vendedorAcessorios: 'Vendedor de Serviço de Estética',
 };
 
 type RegisterDraft = {
@@ -112,9 +112,9 @@ const COLUMNS: ColDef[] = [
   { key: 'custoPrestador', label: 'Custo Prestador',          type: 'currency', width: 140 },
   { key: 'lucroBruto',                  label: 'Lucro Bruto',                        type: 'currency', width: 130 },
   { key: 'vendedor',                   label: 'Vendedor',                           type: 'text',     width: 160 },
-  { key: 'vendedorAcessorios',         label: 'Vendedor de Acessórios',             type: 'text',     width: 175 },
+  { key: 'vendedorAcessorios',         label: 'Vendedor de Serviço de Estética',    type: 'text',     width: 195 },
   { key: 'comissaoVendedor',           label: 'Comissão Vendedor',                  type: 'currency', width: 160 },
-  { key: 'comissaoVendedorAcessorios', label: 'Comissão Vendedor de Acessórios',    type: 'currency', width: 200 },
+  { key: 'comissaoVendedorAcessorios', label: 'Comissão Vendedor de Serviço de Estética', type: 'currency', width: 230 },
   { key: 'nfPrestador',               label: 'Número NF Prestador do Serviço',   type: 'text',     width: 200 },
   { key: 'situacao',                   label: 'Situação',                           type: 'text',     width: 130 },
 ];

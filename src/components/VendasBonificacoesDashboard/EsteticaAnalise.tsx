@@ -537,7 +537,7 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
     { label: '% Lucro Bruto',           key: 'pctLucroMedio',          fmt: fmtPct,          trend: true },
     { label: 'Ticket Médio',            key: 'ticketMedio',            fmt: fmtBRLFull },
     { label: 'Com. + DSR Vendedor',      key: 'comissaoVendedorComDSR',   fmt: fmtBRLFull },
-    { label: 'Com. + DSR Acessórios',    key: 'comissaoAcessoriosComDSR', fmt: fmtBRLFull },
+    { label: 'Com. + DSR Serv. Estética', key: 'comissaoAcessoriosComDSR', fmt: fmtBRLFull },
     { label: 'Provisões',                key: 'totalProvisoes',           fmt: fmtBRLFull },
     { label: 'Encargos',                 key: 'totalEncargos',            fmt: fmtBRLFull },
     { label: 'Resultado',                key: 'resultado',                fmt: fmtBRLFull,     highlight: true, trend: true },
@@ -628,7 +628,7 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
           <KpiCard label="Comissão Vendedor"          value={fmtBRL(metrics.totalComissaoVendedor)}   color="text-violet-600" accentColor="#8b5cf6"
             sub={metrics.totalRL > 0 ? `${fmtPct(metrics.totalComissaoVendedor / metrics.totalRL * 100)} da RL` : undefined} />
-          <KpiCard label="Comissão Vendedor Acessórios" value={fmtBRL(metrics.totalComissaoAcessorios)} color="text-fuchsia-600" accentColor="#d946ef"
+          <KpiCard label="Comissão Vendedor Serv. Estética" value={fmtBRL(metrics.totalComissaoAcessorios)} color="text-fuchsia-600" accentColor="#d946ef"
             sub={metrics.totalRL > 0 ? `${fmtPct(metrics.totalComissaoAcessorios / metrics.totalRL * 100)} da RL` : undefined} />
           <KpiCard label="Total de Comissões"         value={fmtBRL(metrics.totalComissoes)}          color="text-slate-800"  accentColor="#475569"
             sub={metrics.totalLucro > 0 ? `${fmtPct(metrics.totalComissoes / metrics.totalLucro * 100)} do lucro` : undefined} />
@@ -651,7 +651,7 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
                 </div>
                 <div className="text-right flex-shrink-0 text-xs text-slate-400 space-y-0.5">
                   <p>Vendedor: <span className="font-semibold text-violet-600 font-mono">{fmtBRL(custoComissoesData.custoFolhaVendedor)}</span></p>
-                  <p>Acessórios: <span className="font-semibold text-fuchsia-600 font-mono">{fmtBRL(custoComissoesData.custoFolhaAcessorios)}</span></p>
+                  <p>Serv. Estética: <span className="font-semibold text-fuchsia-600 font-mono">{fmtBRL(custoComissoesData.custoFolhaAcessorios)}</span></p>
                 </div>
               </div>
             );
@@ -1110,7 +1110,7 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
                   layout="vertical"
                   data={[
                     { grupo: 'Vendedor',   custoFolha: custoComissoesData.custoFolhaVendedor },
-                    { grupo: 'Acessórios', custoFolha: custoComissoesData.custoFolhaAcessorios },
+                    { grupo: 'Serv. Estética', custoFolha: custoComissoesData.custoFolhaAcessorios },
                   ]}
                   margin={{ left: 8, right: 80, top: 4, bottom: 4 }}
                 >
@@ -1192,7 +1192,7 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
                   {custoComissoesData.grupoAcessorios.length > 0 && (
                     <>
                       <tr className="bg-fuchsia-50">
-                        <td colSpan={7} className="py-1.5 px-3 text-[11px] font-bold text-fuchsia-600 uppercase tracking-widest">Vendedor de Acessórios</td>
+                        <td colSpan={7} className="py-1.5 px-3 text-[11px] font-bold text-fuchsia-600 uppercase tracking-widest">Vendedor de Serviço de Estética</td>
                       </tr>
                       {custoComissoesData.grupoAcessorios.map(v => {
                         const dsr = v.dsr;
@@ -1224,7 +1224,7 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
                           const baseEncA = totalComDsrA + provA;
                           const encA = baseEncA * 0.08 + baseEncA * 0.278;
                           return (<>
-                            <td className="py-2 px-3 text-fuchsia-700 text-[11px] font-bold uppercase">Subtotal Acessórios</td>
+                            <td className="py-2 px-3 text-fuchsia-700 text-[11px] font-bold uppercase">Subtotal Serv. Estética</td>
                             <td className="py-2 px-3 text-right tabular-nums font-mono text-fuchsia-700">{fmtBRL(custoComissoesData.totalAcessorios)}</td>
                             <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-400">{fmtBRL(dsrA)}</td>
                             <td className="py-2 px-3 text-right tabular-nums font-mono text-slate-600">{fmtBRL(totalComDsrA)}</td>

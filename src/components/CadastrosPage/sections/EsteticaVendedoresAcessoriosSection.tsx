@@ -36,7 +36,7 @@ export function EsteticaVendedoresAcessoriosSection() {
     if (!nome) return;
     await persist(sortAlpha([...items, { id: crypto.randomUUID(), nome }]));
     setNovoNome('');
-    toast.success('Vendedor de Acessórios cadastrado');
+    toast.success('Vendedor de Serviço de Estética cadastrado');
   };
 
   const saveEdit = async () => {
@@ -44,12 +44,12 @@ export function EsteticaVendedoresAcessoriosSection() {
     if (!nome || !editingId) return;
     await persist(sortAlpha(items.map(i => i.id === editingId ? { ...i, nome } : i)));
     setEditingId(null);
-    toast.success('Vendedor de Acessórios atualizado');
+    toast.success('Vendedor de Serviço de Estética atualizado');
   };
 
   const remove = async (id: string) => {
     await persist(items.filter(i => i.id !== id));
-    toast.success('Vendedor de Acessórios removido');
+    toast.success('Vendedor de Serviço de Estética removido');
   };
 
   if (loading) return <div className="text-slate-400 text-sm py-8 text-center">Carregando...</div>;
@@ -58,7 +58,7 @@ export function EsteticaVendedoresAcessoriosSection() {
     <div>
       <div className="flex gap-2 mb-5">
         <Input
-          placeholder="Nome do vendedor de acessórios..."
+          placeholder="Nome do vendedor de serviço de estética..."
           value={novoNome}
           onChange={e => setNovoNome(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') add(); }}
@@ -73,13 +73,13 @@ export function EsteticaVendedoresAcessoriosSection() {
         <table className="w-full text-sm">
           <thead>
             <tr style={{ background: '#312e81' }}>
-              <th className="text-white text-left px-4 py-3 text-xs font-semibold">Nome do Vendedor de Acessórios</th>
+              <th className="text-white text-left px-4 py-3 text-xs font-semibold">Nome do Vendedor de Serviço de Estética</th>
               <th className="text-white text-center px-4 py-3 text-xs font-semibold w-24">Ações</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 && (
-              <tr><td colSpan={2} className="text-center text-slate-400 text-xs py-8">Nenhum vendedor de acessórios cadastrado</td></tr>
+              <tr><td colSpan={2} className="text-center text-slate-400 text-xs py-8">Nenhum vendedor de serviço de estética cadastrado</td></tr>
             )}
             {items.map((item, idx) => (
               <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>

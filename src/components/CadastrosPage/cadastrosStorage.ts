@@ -41,7 +41,7 @@ export const CARGOS_VENDEDOR_ESTETICA = [
   'Vendedor',
   'Gerência',
   'Diretoria',
-  'Vendedor de Acessórios',
+  'Vendedor de Serviço de Estética',
 ] as const;
 
 export type CargoVendedorEstetica = typeof CARGOS_VENDEDOR_ESTETICA[number];
