@@ -19,6 +19,42 @@ import {
 import { loadModelos, loadRegras, getRegra, type VeiculoModelo, type VeiculoRegra } from './veiculosRegrasStorage';
 import { loadJurosRotativoRows, type JurosRotativoRow } from './jurosRotativoStorage';
 import { loadVendasRows, type VendasRow as BlindagemRow } from './vendasStorage';
+import { loadRegistroRows, type RegistroVendasRow } from './registroVendasStorage';
+
+// ─── Dias de Estoque auto-calc ───────────────────────────────────────────────
+function parseDMY(s: string): Date | null {
+  if (!s) return null;
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+    const [d, m, y] = s.split('/').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return null;
+}
+function buildRegistroMap(regs: RegistroVendasRow[]): Map<string, RegistroVendasRow> {
+  const m = new Map<string, RegistroVendasRow>();
+  for (const r of regs) m.set((r.chassi ?? '').trim().toUpperCase(), r);
+  return m;
+}
+function applyDiasEstoqueFromRegistros(
+  rows: VendasResultadoRow[],
+  registroMap: Map<string, RegistroVendasRow>,
+): VendasResultadoRow[] {
+  return rows.map(r => {
+    if (n(r.diasEstoque) > 0) return r; // já preenchido manualmente
+    const reg = registroMap.get((r.chassi ?? '').trim().toUpperCase());
+    if (!reg) return r;
+    const entrada = parseDMY(reg.dtaEntrada);
+    const venda   = parseDMY(reg.dtaVenda);
+    if (!entrada || !venda) return r;
+    const dias = Math.round((venda.getTime() - entrada.getTime()) / 86_400_000);
+    if (dias < 0) return r;
+    return { ...r, diasEstoque: String(dias) };
+  });
+}
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
 const MS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -580,15 +616,18 @@ export function VendasNovoAnalise() {
       loadRegras(),
       loadJurosRotativoRows(),
       loadVendasRows(),
-    ]).then(([rows, aliq, dsr, rem, modelos, regras, jurosRows, blindRows]) => {
+      loadRegistroRows(),
+    ]).then(([rows, aliq, dsr, rem, modelos, regras, jurosRows, blindRows, regRows]) => {
       const jurosMap = buildJurosMap(jurosRows as JurosRotativoRow[]);
       const blindMap = buildBlindagemMap(blindRows as BlindagemRow[]);
+      const regMap   = buildRegistroMap(regRows as RegistroVendasRow[]);
       let filledRows = applyComissaoAutoFill(rows as VendasResultadoRow[], (rem as { novos: RemuneracaoModalidade }).novos);
       filledRows = applyJurosAutoFill(filledRows, jurosMap);
       if ((modelos as VeiculoModelo[]).length > 0) {
         filledRows = applyAutoFill(filledRows, modelos as VeiculoModelo[], regras as VeiculoRegra[]);
       }
       filledRows = applyBlindagemAutoFill(filledRows, blindMap);
+      filledRows = applyDiasEstoqueFromRegistros(filledRows, regMap);
       setAllRows(filledRows);
       setAliqBon((aliq as { tipo: string; aliquota: string }[])
         .filter(i => i.tipo.toLowerCase().includes('bonificações'))
