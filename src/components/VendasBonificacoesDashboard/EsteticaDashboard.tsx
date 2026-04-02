@@ -21,7 +21,7 @@ import * as XLSX from 'xlsx';
 import { EsteticaAnalise } from './EsteticaAnalise';
 
 // ─── Campos calculados (somente leitura no modo edição) ──────────────────────
-const CALC_READONLY_KEYS = new Set<string>(['receitaLiquida', 'lucroBruto', 'impostos', 'comissaoVendedor', 'comissaoVendedorAcessorios', 'situacao']);
+const CALC_READONLY_KEYS = new Set<string>(['receitaLiquida', 'lucroBruto', 'impostos', 'comissaoVendedor', 'comissaoVendedorAcessorios', 'situacao', 'custoPrestador']);
 const DATE_READONLY_KEYS  = new Set<string>(['dataRegistro']);
 const RESULTADO_KEYS     = new Set<string>(['lucroBruto']);
 const RL_KEY             = 'receitaLiquida';
@@ -335,6 +335,7 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
   const [cadastroVendedores, setCadastroVendedores] = useState<string[]>([]);
   const [cadastroVendedoresAcessorios, setCadastroVendedoresAcessorios] = useState<string[]>([]);
   const [cadastroProdutos, setCadastroProdutos] = useState<string[]>([]);
+  const [cadastroProdutosMap, setCadastroProdutosMap] = useState<Record<string, string>>({});
   const [aliquotaTotal, setAliquotaTotal] = useState(0);
   const [regras, setRegras] = useState<RegraRemuneracao[]>([]);
   const [vendedoresCompletos, setVendedoresCompletos] = useState<Array<{ nome: string; cargo: string }>>([]);
@@ -346,7 +347,12 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
       setVendedoresCompletos(list.map(v => ({ nome: v.nome, cargo: v.cargo })));
     });
     loadEsteticaVendedoresAcessorios().then(list => setCadastroVendedoresAcessorios(list.map(v => v.nome)));
-    loadEsteticaProdutos().then(list => setCadastroProdutos(list.map(p => p.nome)));
+    loadEsteticaProdutos().then(list => {
+      setCadastroProdutos(list.map(p => p.nome));
+      const map: Record<string, string> = {};
+      list.forEach(p => { if (p.nome) map[p.nome] = p.custo ?? ''; });
+      setCadastroProdutosMap(map);
+    });
     loadEsteticaAliquotas().then(list => {
       const TIPOS = ['iss', 'pis', 'cofins'];
       const total = list
@@ -436,7 +442,9 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
   const changeField = (field: keyof EsteticaRow, value: string) =>
     setEditDraft(prev => {
       if (!prev) return prev;
-      const next = recalcEsteticaRow({ ...prev, [field]: value }, aliquotaTotal, comissaoCtx);
+      const base = { ...prev, [field]: value };
+      if (field === 'produto') base.custoPrestador = cadastroProdutosMap[value] ?? '';
+      const next = recalcEsteticaRow(base, aliquotaTotal, comissaoCtx);
       return next;
     });
 
@@ -1332,7 +1340,11 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
               {/* Produto */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Produto <span className="text-red-500">*</span></label>
-                <select value={registerDraft.produto} onChange={e => setRegisterDraft(p => ({ ...p, produto: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+                <select value={registerDraft.produto} onChange={e => {
+                  const nome = e.target.value;
+                  const custo = cadastroProdutosMap[nome] ?? '';
+                  setRegisterDraft(p => ({ ...p, produto: nome, custoPrestador: custo ? toDisplayNumber(custo) : '' }));
+                }} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
                   <option value="">Selecione...</option>
                   {cadastroProdutos.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
@@ -1361,7 +1373,7 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
               {/* Custo Prestador */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Custo do Prestador</label>
-                <input type="text" value={registerDraft.custoPrestador} onChange={e => setRegisterDraft(p => ({ ...p, custoPrestador: e.target.value }))} onBlur={e => { const v = parseBrazilianNumber(e.target.value); if (v) setRegisterDraft(p => ({ ...p, custoPrestador: toDisplayNumber(v) })); }} placeholder="Ex: 800,00" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                <input type="text" value={registerDraft.custoPrestador} readOnly placeholder="—" className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-600 font-mono tabular-nums cursor-not-allowed" />
               </div>
             </div>
 

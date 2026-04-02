@@ -173,6 +173,7 @@ const KEY_PELICULAS_PRODUTOS = 'peliculas_cadastro_produtos';
 export interface ProdutoServico {
   id: string;
   nome: string;
+  custo?: string;
 }
 
 export async function loadPeliculasProdutos(): Promise<ProdutoServico[]> {
