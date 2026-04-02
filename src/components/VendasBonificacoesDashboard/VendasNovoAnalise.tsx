@@ -597,6 +597,7 @@ export function VendasNovoAnalise() {
   const [comissaoMode,        setComissaoMode]        = useState<ComissaoMode>('total');
   const [jurosGrouping,       setJurosGrouping]       = useState<JurosGrouping>('familia');
   const [giroGrouping,        setGiroGrouping]        = useState<JurosGrouping>('familia');
+  const [receitasView,        setReceitasView]        = useState<'fonte' | 'familia'>('fonte');
   const [comissoesGrouping,   setComissoesGrouping]   = useState<ComissoesGrouping>('familia');
   const [comissoesScenario,   setComissoesScenario]   = useState<ComissoesScenario>('custoUn');
   const [showAllComissoes,    setShowAllComissoes]    = useState(false);
@@ -772,6 +773,24 @@ export function VendasNovoAnalise() {
     fin:   receitasFonteData.reduce((s, d) => s + d.fin, 0),
     desp:  receitasFonteData.reduce((s, d) => s + d.desp, 0),
   }), [receitasFonteData]);
+
+  // Receitas por família (período filtrado)
+  const receitasFamiliaData = useMemo(() => {
+    const map = new Map<string, { blind: number; fin: number; desp: number }>();
+    for (const r of filteredRows) {
+      const k = normalizeModelo(r.modelo ?? '');
+      const prev = map.get(k) ?? { blind: 0, fin: 0, desp: 0 };
+      map.set(k, {
+        blind: prev.blind + n(r.recBlindagem),
+        fin:   prev.fin   + n(r.recFinanciamento),
+        desp:  prev.desp  + n(r.recDespachante),
+      });
+    }
+    return [...map.entries()]
+      .map(([name, d]) => ({ name, ...d, total: d.blind + d.fin + d.desp }))
+      .filter(d => d.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [filteredRows]);
 
   // Comissões ranking
   const comissoesData = useMemo(() =>
@@ -1555,7 +1574,24 @@ export function VendasNovoAnalise() {
           {(totaisReceitas.blind + totaisReceitas.fin + totaisReceitas.desp) > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
               <div className="flex items-start justify-between mb-1">
-                <SH>Receitas por Fonte — {periodLabel}</SH>
+                <SH right={
+                  <div className="flex items-center gap-1">
+                    {(['fonte', 'familia'] as const).map(v => (
+                      <button key={v} onClick={() => setReceitasView(v)}
+                        className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                          receitasView === v
+                            ? 'bg-cyan-600 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}>
+                        {v === 'fonte' ? 'Fonte' : 'Família'}
+                      </button>
+                    ))}
+                  </div>
+                }>
+                  {receitasView === 'fonte'
+                    ? `Receitas por Fonte — ${periodLabel}`
+                    : `Receitas por Família — ${periodLabel}`}
+                </SH>
                 <div className="flex gap-4 -mt-1">
                   {[
                     { label: 'Blindagem',      value: totaisReceitas.blind, color: '#3b82f6' },
@@ -1569,18 +1605,54 @@ export function VendasNovoAnalise() {
                   ))}
                 </div>
               </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={receitasFonteData} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} />
-                  <Tooltip content={<TipBRL />} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="blind" name="Blindagem"     radius={[3, 3, 0, 0]} fill="#3b82f6" />
-                  <Bar dataKey="fin"   name="Financiamento" radius={[3, 3, 0, 0]} fill="#10b981" />
-                  <Bar dataKey="desp"  name="Despachante"   radius={[3, 3, 0, 0]} fill="#f59e0b" />
-                </BarChart>
-              </ResponsiveContainer>
+
+              {receitasView === 'fonte' ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={receitasFonteData} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                    <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} />
+                    <Tooltip content={<TipBRL />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="blind" name="Blindagem"     radius={[3, 3, 0, 0]} fill="#3b82f6" />
+                    <Bar dataKey="fin"   name="Financiamento" radius={[3, 3, 0, 0]} fill="#10b981" />
+                    <Bar dataKey="desp"  name="Despachante"   radius={[3, 3, 0, 0]} fill="#f59e0b" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : receitasFamiliaData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                  <p className="text-sm">Sem receitas extras no período</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={Math.max(200, receitasFamiliaData.length * 40)}>
+                  <BarChart data={receitasFamiliaData} layout="vertical" margin={{ left: 4, right: 80, top: 4, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 9 }} tickFormatter={v => fmtBRL(v)} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0]?.payload as { name: string; blind: number; fin: number; desp: number; total: number };
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[200px]">
+                            <p className="font-bold text-slate-700 mb-2">{d.name}</p>
+                            {d.blind > 0 && <div className="flex justify-between gap-4"><span className="text-blue-500">Blindagem</span><span className="font-mono font-bold">{fmtBRL(d.blind)}</span></div>}
+                            {d.fin   > 0 && <div className="flex justify-between gap-4"><span className="text-emerald-500">Financiamento</span><span className="font-mono">{fmtBRL(d.fin)}</span></div>}
+                            {d.desp  > 0 && <div className="flex justify-between gap-4"><span className="text-amber-500">Despachante</span><span className="font-mono">{fmtBRL(d.desp)}</span></div>}
+                            <div className="flex justify-between gap-4 pt-2 mt-1 border-t border-slate-100"><span className="text-slate-600 font-semibold">Total</span><span className="font-mono font-bold text-slate-800">{fmtBRL(d.total)}</span></div>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="blind" name="Blindagem"     stackId="a" radius={[0, 0, 0, 0]} fill="#3b82f6">
+                      <LabelList dataKey="total" position="right" formatter={(v: number) => fmtBRL(v)} style={{ fontSize: 9, fill: '#64748b', fontWeight: 600 }} />
+                    </Bar>
+                    <Bar dataKey="fin"   name="Financiamento" stackId="a" fill="#10b981" />
+                    <Bar dataKey="desp"  name="Despachante"   stackId="a" radius={[0, 4, 4, 0]} fill="#f59e0b" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           )}
 
