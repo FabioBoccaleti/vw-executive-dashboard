@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useRef, useMemo, type ChangeEvent } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/useAuth';
 import { Button } from '@/components/ui/button';
 import {
   LogOut, Layers, Pencil, Trash2, Check, X, Plus, Search,

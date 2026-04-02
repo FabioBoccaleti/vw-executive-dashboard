@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import type { SessionPayload, ModuleId, BrandId, VendasSubModuleId } from '@/lib/authTypes';
 import { getSessionToken, saveSession, clearSession, apiLogin, apiLogout } from '@/lib/authClient';
 
-interface AuthContextValue {
+export interface AuthContextValue {
   session: SessionPayload | null;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<string | null>;
@@ -13,7 +13,7 @@ interface AuthContextValue {
   isAdmin: () => boolean;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SessionPayload | null>(null);
@@ -100,10 +100,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
-  return ctx;
 }

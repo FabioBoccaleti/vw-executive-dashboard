@@ -2,11 +2,11 @@
 
 export type UserRole = 'admin' | 'gestor' | 'leitura';
 
-export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento';
+export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'central_vendas_vw';
 
 export type BrandId = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros';
 
-export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento'];
+export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw'];
 
 export const ALL_BRANDS: BrandId[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
 
@@ -16,6 +16,7 @@ export const MODULE_LABELS: Record<ModuleId, string> = {
   fluxo_caixa: 'Fluxo de Caixa',
   vendas_bonificacoes: 'Demonstrativo de Vendas e Bonificações',
   folha_pagamento: 'Folha de Pagamento',
+  central_vendas_vw: 'Central de Vendas VW',
 };
 
 export const BRAND_LABELS: Record<BrandId, string> = {
@@ -40,6 +41,22 @@ export type VendasSubModuleId =
   | 'estetica.tabela'
   | 'estetica.analise';
 
+// Subpermissões do módulo central_vendas_vw
+export type CentralVendasVWSubModuleId =
+  | 'central_vw.analises'
+  | 'central_vw.vendas'
+  | 'central_vw.financeiro'
+  | 'central_vw.registros'
+  | 'central_vw.cadastros';
+
+export const CENTRAL_VENDAS_VW_SUB_MODULE_LABELS: Record<CentralVendasVWSubModuleId, string> = {
+  'central_vw.analises': 'Análises',
+  'central_vw.vendas': 'Vendas',
+  'central_vw.financeiro': 'Financeiro',
+  'central_vw.registros': 'Registros',
+  'central_vw.cadastros': 'Cadastros',
+};
+
 export const VENDAS_SUB_MODULE_LABELS: Record<VendasSubModuleId, string> = {
   'blindagem.tabela': 'Tabela',
   'blindagem.analise': 'Análise',
@@ -63,6 +80,7 @@ export interface UserRecord {
   modules: ModuleId[];
   brands: BrandId[];
   vendasSubModules?: VendasSubModuleId[];
+  centralVendasVWSubModules?: CentralVendasVWSubModuleId[];
   active: boolean;
   createdAt: number;
   updatedAt: number;
@@ -75,6 +93,7 @@ export interface SessionPayload {
   modules: ModuleId[];
   brands: BrandId[];
   vendasSubModules?: VendasSubModuleId[];
+  centralVendasVWSubModules?: CentralVendasVWSubModuleId[];
   expiresAt: number;
 }
 

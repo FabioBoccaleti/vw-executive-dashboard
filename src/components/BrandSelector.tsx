@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { BRAND_CONFIGS, type Brand } from '@/lib/brands';
 import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, TrendingUp, Settings, LogOut, Users } from 'lucide-react';
 import { PasswordDialog } from '@/components/PasswordDialog';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/useAuth';
 
 const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
 const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento'];

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Shield, Layers, Car, X, Lock, Sparkles } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/useAuth';
 import type { VendasSubModuleId } from '@/lib/authTypes';
 
 const BLINDAGEM_SUBS: VendasSubModuleId[] = [

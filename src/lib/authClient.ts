@@ -52,9 +52,10 @@ export async function apiLogin(username: string, password: string): Promise<{ to
       userId: 'dev',
       username: username || 'dev',
       role: 'admin',
-      modules: ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes'],
+      modules: ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw'],
       brands: ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'],
       vendasSubModules: [],
+      centralVendasVWSubModules: [],
       expiresAt: Date.now() + 1000 * 60 * 60 * 24,
     };
     return { token: 'dev-token', session };

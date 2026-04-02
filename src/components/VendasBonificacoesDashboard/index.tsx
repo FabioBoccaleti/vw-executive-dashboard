@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useRef, useMemo } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/useAuth';
 import { Button } from '@/components/ui/button';
 import { LogOut, TrendingUp, Pencil, Trash2, Check, X, Plus, Search, FilterX, BookOpen, BarChart2, TableProperties, Download, Upload, RefreshCw, Package, ListRestart, FileText, Lock, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';

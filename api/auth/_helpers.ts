@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 
 // Tipos inline (evita importação cross-directory que pode falhar no bundler Vercel)
 export type UserRole = 'admin' | 'gestor' | 'leitura';
-export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes';
+export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'central_vendas_vw';
 export type BrandId = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros';
 export type VendasSubModuleId =
   | 'blindagem.tabela'
@@ -16,7 +16,13 @@ export type VendasSubModuleId =
   | 'blindagem.notas_a_emitir'
   | 'peliculas.tabela'
   | 'peliculas.analise';
-export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes'];
+export type CentralVendasVWSubModuleId =
+  | 'central_vw.analises'
+  | 'central_vw.vendas'
+  | 'central_vw.financeiro'
+  | 'central_vw.registros'
+  | 'central_vw.cadastros';
+export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw'];
 export const ALL_BRANDS: BrandId[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
 
 export interface UserRecord {
@@ -28,6 +34,7 @@ export interface UserRecord {
   modules: ModuleId[];
   brands: BrandId[];
   vendasSubModules?: VendasSubModuleId[];
+  centralVendasVWSubModules?: CentralVendasVWSubModuleId[];
   active: boolean;
   createdAt: number;
   updatedAt: number;
@@ -40,6 +47,7 @@ export interface SessionPayload {
   modules: ModuleId[];
   brands: BrandId[];
   vendasSubModules?: VendasSubModuleId[];
+  centralVendasVWSubModules?: CentralVendasVWSubModuleId[];
   expiresAt: number;
 }
 
@@ -68,6 +76,7 @@ export async function createSession(user: UserRecord): Promise<string> {
     modules: user.modules,
     brands: user.brands,
     vendasSubModules: user.vendasSubModules,
+    centralVendasVWSubModules: user.centralVendasVWSubModules,
     expiresAt: Date.now() + SESSION_TTL * 1000,
   };
   await redis.setex(KEYS.session(token), SESSION_TTL, JSON.stringify(payload));

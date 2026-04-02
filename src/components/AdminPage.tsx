@@ -9,8 +9,8 @@ import {
   ChevronLeft, Eye, EyeOff, Check, AlertCircle, RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { PublicUser, AccessLogEntry, ModuleId, BrandId, UserRole, VendasSubModuleId } from '@/lib/authTypes';
-import { ALL_MODULES, ALL_BRANDS, MODULE_LABELS, BRAND_LABELS, VENDAS_SUB_MODULE_LABELS } from '@/lib/authTypes';
+import type { PublicUser, AccessLogEntry, ModuleId, BrandId, UserRole, VendasSubModuleId, CentralVendasVWSubModuleId } from '@/lib/authTypes';
+import { ALL_MODULES, ALL_BRANDS, MODULE_LABELS, BRAND_LABELS, VENDAS_SUB_MODULE_LABELS, CENTRAL_VENDAS_VW_SUB_MODULE_LABELS } from '@/lib/authTypes';
 import {
   apiListUsers, apiCreateUser, apiUpdateUser, apiDeleteUser, apiGetLogs,
 } from '@/lib/authClient';
@@ -46,12 +46,13 @@ interface UserFormData {
   modules: ModuleId[];
   brands: BrandId[];
   vendasSubModules: VendasSubModuleId[];
+  centralVendasVWSubModules: CentralVendasVWSubModuleId[];
   active: boolean;
 }
 
 const defaultForm = (): UserFormData => ({
   name: '', username: '', password: '', role: 'leitura',
-  modules: [], brands: [], vendasSubModules: [], active: true,
+  modules: [], brands: [], vendasSubModules: [], centralVendasVWSubModules: [], active: true,
 });
 
 interface UserFormProps {
@@ -85,6 +86,14 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
       vendasSubModules: f.vendasSubModules.includes(s)
         ? f.vendasSubModules.filter(x => x !== s)
         : [...f.vendasSubModules, s],
+    }));
+
+  const toggleCentralVendasSub = (s: CentralVendasVWSubModuleId) =>
+    setForm(f => ({
+      ...f,
+      centralVendasVWSubModules: f.centralVendasVWSubModules.includes(s)
+        ? f.centralVendasVWSubModules.filter(x => x !== s)
+        : [...f.centralVendasVWSubModules, s],
     }));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -273,6 +282,32 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subpermissões Central de Vendas VW */}
+      {!isAdmin && form.modules.includes('central_vendas_vw') && (
+        <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800 p-4">
+          <Label className="text-sm font-semibold text-blue-800 dark:text-blue-300">
+            Permissões — Central de Vendas VW
+          </Label>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {(['central_vw.analises', 'central_vw.vendas', 'central_vw.financeiro', 'central_vw.registros', 'central_vw.cadastros'] as CentralVendasVWSubModuleId[]).map(s => (
+              <button
+                key={s} type="button"
+                onClick={() => toggleCentralVendasSub(s)}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                  form.centralVendasVWSubModules.includes(s)
+                    ? 'border-blue-500 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 font-medium'
+                    : 'border-border bg-background text-muted-foreground hover:border-input',
+                )}
+              >
+                {form.centralVendasVWSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                {CENTRAL_VENDAS_VW_SUB_MODULE_LABELS[s]}
+              </button>
+            ))}
           </div>
         </div>
       )}
