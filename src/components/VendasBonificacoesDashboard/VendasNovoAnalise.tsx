@@ -1650,7 +1650,7 @@ export function VendasNovoAnalise() {
                 </div>
 
                 {/* Chart — único, troca conforme cenário */}
-                <ResponsiveContainer width="100%" height={Math.max(200, sorted.length * 44 + 40)}>
+                <ResponsiveContainer key={comissoesScenario} width="100%" height={Math.max(200, sorted.length * 44 + 40)}>
                   <BarChart data={sorted} layout="vertical" margin={{ left: 4, right: 80, top: 4, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                     <XAxis type="number"
