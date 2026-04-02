@@ -616,7 +616,7 @@ export function VendasNovoAnalise() {
       loadRegras(),
       loadJurosRotativoRows(),
       loadVendasRows(),
-      loadRegistroRows(),
+      loadRegistroRows('novos'),
     ]).then(([rows, aliq, dsr, rem, modelos, regras, jurosRows, blindRows, regRows]) => {
       const jurosMap = buildJurosMap(jurosRows as JurosRotativoRow[]);
       const blindMap = buildBlindagemMap(blindRows as BlindagemRow[]);
