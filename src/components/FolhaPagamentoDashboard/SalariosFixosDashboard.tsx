@@ -10,6 +10,7 @@ import {
   type SalarioFuncionario,
   type SalarioBrand,
 } from './salariosFixosStorage';
+import { SalariosAnalise } from './SalariosAnalise';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const MONTHS = [
@@ -509,11 +510,37 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
         )}
       </div>
       </>) : (
-        /* Aba Análise — placeholder */
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400">
-          <BarChart2 className="w-10 h-10 opacity-30" />
-          <p className="text-sm font-medium">Análise em desenvolvimento</p>
-        </div>
+        /* Aba Análise */
+        <>
+          <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-0">
+            {(['audi', 'vw', 'total'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                  activeTab === tab
+                    ? 'border-teal-500 text-teal-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                {tab === 'audi' ? 'Audi' : tab === 'vw' ? 'VW' : 'Total'}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <SalariosAnalise
+              rows={
+                activeTab === 'audi'  ? audiRows :
+                activeTab === 'vw'    ? vwRows   :
+                [...audiRows, ...vwRows]
+              }
+              brand={activeTab}
+              selectedMonth={selectedMonth}
+              selectedYear={selectedYear}
+              brandLabel={activeTab === 'audi' ? 'Audi' : activeTab === 'vw' ? 'VW' : 'Total'}
+            />
+          </div>
+        </>
       )}
     </div>
   );
