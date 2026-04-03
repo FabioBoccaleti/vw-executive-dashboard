@@ -38,8 +38,12 @@ function has(dept: string, ...terms: string[]): boolean {
 
 /**
  * Mapeia o nome bruto do departamento (vindo do TXT) para um grupo analítico.
- * Prioridade: Afastados > Diretoria > Administração > Funilaria > Oficina >
- *             Usados > Novos > Peças > Outros
+ * Prioridade: Afastados > Diretoria > Funilaria > Oficina >
+ *             Usados > Novos > Peças > Administração > Outros
+ *
+ * "adm" vem por ÚLTIMO entre os grupos específicos: o TXT pode prefixar
+ * qualquer seção com "ADM" (ex: "ADM V.Usados", "ADM Peças"),
+ * então só classifica como Administração se nenhum outro termo específico bater.
  */
 export function classifyDept(dept: string): GrupoDept {
   if (!dept?.trim()) return 'Outros';
@@ -50,23 +54,23 @@ export function classifyDept(dept: string): GrupoDept {
   // 2. Diretoria — "ADM + Diretoria" ou só "Diretoria"
   if (has(dept, 'diretoria')) return 'Diretoria';
 
-  // 3. Administração — ADM sem Diretoria e sem Afastado
-  if (has(dept, 'adm')) return 'Administração';
-
-  // 4. Funilaria (antes de Oficina — A.Tec. com funilaria = Funilaria)
+  // 3. Funilaria — vem antes de Oficina
   if (has(dept, 'funilaria')) return 'Funilaria';
 
-  // 5. Oficina — A.Tec. (sem funilaria, já tratado acima) ou Express.
+  // 4. Oficina — A.Tec. ou Express. (só NÃO é Oficina se tiver "funilaria")
   if (has(dept, 'a.tec.', 'express.')) return 'Oficina';
 
-  // 6. Usados
-  if (has(dept, 'v.usados', 'v. usados')) return 'Usados';
+  // 5. Usados — ANTES do "adm" para evitar "ADM V.Usados" virar Administração
+  if (has(dept, 'v.usados', 'v. usados', 'usados')) return 'Usados';
 
-  // 7. Novos — V.Novos, V. Novos, Frotista, Consorcio/Consórcio, V.Audi Pin
+  // 6. Novos — ANTES do "adm"
   if (has(dept, 'v.novos', 'v. novos', 'frotista', 'consorcio', 'consórcio', 'v.audi pin')) return 'Novos';
 
-  // 8. Peças
+  // 7. Peças — ANTES do "adm" para evitar "ADM Peças" virar Administração
   if (has(dept, 'peças', 'pecas', 'peca')) return 'Peças';
+
+  // 8. Administração — somente ADM sem nenhuma categoria específica acima
+  if (has(dept, 'adm')) return 'Administração';
 
   return 'Outros';
 }

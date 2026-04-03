@@ -181,29 +181,50 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
   const classified = useMemo(() =>
     rows.map(e => ({ ...e, grupo: classifyDept(e.departamento) })), [rows]);
 
-  // ── KPIs ──────────────────────────────────────────────────────────────────
-  const totalFolha = useMemo(() => classified.reduce((a, e) => a + sal(e), 0), [classified]);
-  const headcount  = classified.length;
-  const custoMedio = headcount > 0 ? totalFolha / headcount : 0;
+  // Afastados excluídos de TODA análise (totais, headcount, gráficos, movimentação)
+  const activeClassified = useMemo(() =>
+    classified.filter(e => e.grupo !== 'Afastados'), [classified]);
 
-  // KPI delta vs first comparison period
-  const prevData  = compPeriods.length > 0 ? (compDataMap[periodKey(compPeriods[0])] ?? []) : [];
-  const prevTotal = prevData.reduce((a, e) => a + sal(e), 0);
-  const prevHead  = prevData.length;
+  // ── KPIs ──────────────────────────────────────────────────────────────────
+  const totalFolha       = useMemo(() => activeClassified.reduce((a, e) => a + sal(e), 0), [activeClassified]);
+  const headcount        = activeClassified.length;
+  const headcountComFixo = useMemo(() => activeClassified.filter(e => sal(e) > 0).length, [activeClassified]);
+  const headcountComiss  = headcount - headcountComFixo;
+  // Custo médio exclui colaboradores 100% comissionados (fixo = 0) para não distorcer a média
+  const custoMedio = headcountComFixo > 0 ? totalFolha / headcountComFixo : 0;
+
+  // KPI delta vs first comparison period (também exclui Afastados)
+  const prevData = useMemo(() =>
+    compPeriods.length > 0
+      ? (compDataMap[periodKey(compPeriods[0])] ?? [])
+          .map(e => ({ ...e, grupo: classifyDept(e.departamento) }))
+          .filter(e => e.grupo !== 'Afastados')
+      : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [compPeriods, compDataMap]);
+  const prevTotal    = prevData.reduce((a, e) => a + sal(e), 0);
+  const prevHead     = prevData.length;
+  const prevCountRem = prevData.filter(e => sal(e) > 0).length;
   const deltaTotal = prevTotal > 0 ? ((totalFolha - prevTotal) / prevTotal) * 100 : null;
   const deltaHead  = prevHead  > 0 ? ((headcount  - prevHead ) / prevHead ) * 100 : null;
-  const deltaCusto = prevHead > 0 && prevTotal > 0 ? ((custoMedio - prevTotal / prevHead) / (prevTotal / prevHead)) * 100 : null;
+  const deltaCusto = prevCountRem > 0 && prevTotal > 0
+    ? ((custoMedio - prevTotal / prevCountRem) / (prevTotal / prevCountRem)) * 100
+    : null;
 
   // Maior grupo
   const byGrupo = useMemo(() => {
-    const map = new Map<GrupoDept, { total: number; count: number }>();
-    for (const e of classified) {
+    const map = new Map<GrupoDept, { total: number; count: number; countRemunerado: number }>();
+    for (const e of activeClassified) {
       const g = e.grupo;
-      const cur = map.get(g) ?? { total: 0, count: 0 };
-      map.set(g, { total: cur.total + sal(e), count: cur.count + 1 });
+      const cur = map.get(g) ?? { total: 0, count: 0, countRemunerado: 0 };
+      map.set(g, {
+        total:           cur.total + sal(e),
+        count:           cur.count + 1,
+        countRemunerado: cur.countRemunerado + (sal(e) > 0 ? 1 : 0),
+      });
     }
     return map;
-  }, [classified]);
+  }, [activeClassified]);
 
   const maiorGrupo = useMemo(() => {
     let best: GrupoDept | null = null;
@@ -219,11 +240,14 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
     GRUPO_ORDER
       .filter(g => byGrupo.has(g))
       .map(g => ({
-        grupo: g,
-        total: byGrupo.get(g)!.total,
-        count: byGrupo.get(g)!.count,
-        medio: byGrupo.get(g)!.count > 0 ? byGrupo.get(g)!.total / byGrupo.get(g)!.count : 0,
-        fill: GRUPO_COLORS[g],
+        grupo:  g,
+        total:  byGrupo.get(g)!.total,
+        count:  byGrupo.get(g)!.count,
+        // custo médio: ignora colaboradores 100% comissionados (salário fixo = 0)
+        medio:  byGrupo.get(g)!.countRemunerado > 0
+                  ? byGrupo.get(g)!.total / byGrupo.get(g)!.countRemunerado
+                  : 0,
+        fill:   GRUPO_COLORS[g],
       }))
       .sort((a, b) => b.total - a.total),
     [byGrupo]);
@@ -240,19 +264,19 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
   const faixaDist = useMemo(() =>
     FAIXAS.map(f => ({
       faixa: f.label,
-      count: classified.filter(e => sal(e) >= f.min && sal(e) < f.max).length,
+      count: activeClassified.filter(e => sal(e) >= f.min && sal(e) < f.max).length,
     })),
-    [classified]);
+    [activeClassified]);
 
   // ── 4. Scatter: tempo de casa vs salário ─────────────────────────────────────
   const scatterData = useMemo(() =>
-    classified.map(e => ({
+    activeClassified.map(e => ({
       nome:  e.nome,
       anos:  parseFloat(admYears(e).toFixed(1)),
       salario: sal(e),
       grupo: e.grupo,
     })).filter(e => e.anos >= 0 && e.salario > 0),
-    [classified]);
+    [activeClassified]);
 
   const avgSalario = headcount > 0 ? totalFolha / headcount : 0;
 
@@ -261,23 +285,32 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
 
   const compKpiRows = useMemo(() =>
     allPeriods.map((p, i) => {
-      const d = i === 0 ? classified : (compDataMap[periodKey(p)] ?? []).map(e => ({ ...e, grupo: classifyDept(e.departamento) }));
-      const total = d.reduce((a, e) => a + sal(e), 0);
-      const hc    = d.length;
-      return { label: periodLabel(p), total, hc, medio: hc > 0 ? total / hc : 0, color: PERIOD_COLORS[i] };
+      const raw = i === 0
+        ? activeClassified
+        : (compDataMap[periodKey(p)] ?? [])
+            .map(e => ({ ...e, grupo: classifyDept(e.departamento) }))
+            .filter(e => e.grupo !== 'Afastados');
+      const total = raw.reduce((a, e) => a + sal(e), 0);
+      const hc    = raw.length;
+      const countRem = raw.filter(e => sal(e) > 0).length;
+      return { label: periodLabel(p), total, hc, medio: countRem > 0 ? total / countRem : 0, color: PERIOD_COLORS[i] };
     }),
-    [allPeriods, classified, compDataMap]);
+    [allPeriods, activeClassified, compDataMap]);
 
   const compDeptBars = useMemo(() =>
-    GRUPO_ORDER.filter(g => byGrupo.has(g)).map(g => {
+    GRUPO_ORDER.filter(g => byGrupo.has(g) && g !== 'Afastados').map(g => {
       const entry: Record<string, number | string> = { grupo: g };
       allPeriods.forEach((p, i) => {
-        const d = i === 0 ? classified : (compDataMap[periodKey(p)] ?? []).map(e => ({ ...e, grupo: classifyDept(e.departamento) }));
-        entry[periodLabel(p)] = d.filter(e => e.grupo === g).reduce((a, e) => a + sal(e), 0);
+        const raw = i === 0
+          ? activeClassified
+          : (compDataMap[periodKey(p)] ?? [])
+              .map(e => ({ ...e, grupo: classifyDept(e.departamento) }))
+              .filter(e => e.grupo !== 'Afastados');
+        entry[periodLabel(p)] = raw.filter(e => e.grupo === g).reduce((a, e) => a + sal(e), 0);
       });
       return entry;
     }),
-    [allPeriods, classified, compDataMap, byGrupo]);
+    [allPeriods, activeClassified, compDataMap, byGrupo]);
 
   // ── Movimentação Salarial ─────────────────────────────────────────────────
   const safeMoviIdx     = Math.min(moviIdx, Math.max(0, compPeriods.length - 1));
@@ -287,18 +320,20 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [compDataMap, safeMoviIdx]);
   const moviPrevClassified = useMemo(() =>
-    moviPrevData.map(e => ({ ...e, grupo: classifyDept(e.departamento) })),
+    moviPrevData
+      .map(e => ({ ...e, grupo: classifyDept(e.departamento) }))
+      .filter(e => e.grupo !== 'Afastados'),
     [moviPrevData]);
 
   const movimentacao = useMemo(() => {
     if (moviPrevData.length === 0) return null;
     const prevMap = new Map(moviPrevClassified.map(e => [e.codigo, e]));
-    const currMap = new Map(classified.map(e => [e.codigo, e]));
-    const novos:      typeof classified          = [];
-    const desligados: typeof moviPrevClassified  = [];
-    const alterados:  { cur: typeof classified[0]; prev: typeof moviPrevClassified[0]; delta: number; deltaPct: number }[] = [];
-    const estaveis:   typeof classified          = [];
-    for (const e of classified) {
+    const currMap = new Map(activeClassified.map(e => [e.codigo, e]));
+    const novos:      typeof activeClassified        = [];
+    const desligados: typeof moviPrevClassified      = [];
+    const alterados:  { cur: typeof activeClassified[0]; prev: typeof moviPrevClassified[0]; delta: number; deltaPct: number }[] = [];
+    const estaveis:   typeof activeClassified        = [];
+    for (const e of activeClassified) {
       const prev = prevMap.get(e.codigo);
       if (!prev) { novos.push(e); continue; }
       const d = sal(e) - sal(prev);
@@ -308,12 +343,17 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
     for (const e of moviPrevClassified) { if (!currMap.has(e.codigo)) desligados.push(e); }
     const avgDelta = alterados.length > 0 ? alterados.reduce((a, x) => a + x.deltaPct, 0) / alterados.length : 0;
     return { novos, desligados, alterados, estaveis, avgDelta };
-  }, [classified, moviPrevClassified, moviPrevData]);
+  }, [activeClassified, moviPrevClassified, moviPrevData]);
 
   // ── Drill ─────────────────────────────────────────────────────────────────
   const drillRows = useMemo(() =>
-    deptDrill ? classified.filter(e => e.grupo === deptDrill).sort((a, b) => sal(b) - sal(a)) : [],
-    [deptDrill, classified]);
+    deptDrill ? activeClassified.filter(e => e.grupo === deptDrill).sort((a, b) => sal(b) - sal(a)) : [],
+    [deptDrill, activeClassified]);
+
+  // ── Afastados (somente para listagem no rodapé) ───────────────────────────
+  const afastados = useMemo(() =>
+    classified.filter(e => e.grupo === 'Afastados').sort((a, b) => a.nome.localeCompare(b.nome)),
+    [classified]);
 
   if (rows.length === 0) {
     return (
@@ -340,6 +380,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
         <KpiCard
           label="Headcount"
           value={String(headcount)}
+          sub={headcountComiss > 0 ? `${headcountComFixo} com fixo · ${headcountComiss} comissionados` : undefined}
           delta={deltaHead}
           icon={<Users className="w-4 h-4 text-blue-600" />}
           color="bg-blue-50"
@@ -347,6 +388,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
         <KpiCard
           label="Custo Médio / Colaborador"
           value={fmtBRL(custoMedio)}
+          sub={headcountComiss > 0 ? `Calculado sobre ${headcountComFixo} de ${headcount} colaboradores` : undefined}
           delta={deltaCusto}
           icon={<Award className="w-4 h-4 text-violet-600" />}
           color="bg-violet-50"
@@ -566,7 +608,8 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
 
         {/* Custo Médio por Departamento */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <h3 className="text-sm font-bold text-slate-700 mb-4">Custo Médio por Colaborador / Departamento</h3>
+          <h3 className="text-sm font-bold text-slate-700 mb-1">Custo Médio por Colaborador / Departamento</h3>
+          <p className="text-xs text-slate-400 mb-4">Colaboradores 100% comissionados (salário fixo R$0) são excluídos deste cálculo.</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={custoPorGrupo} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -717,6 +760,48 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
           </>
         )}
       </div>
+
+      {/* ── Colaboradores Afastados ───────────────────────────────────────── */}
+      {afastados.length > 0 && (
+        <details className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group">
+          <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-slate-50 transition-colors">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-slate-400" />
+              <span className="text-sm font-bold text-slate-500">Colaboradores Afastados</span>
+              <span className="text-xs bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded-full border border-slate-200">
+                {afastados.length}
+              </span>
+            </div>
+            <span className="text-xs text-slate-400 font-medium">Não incluídos nas análises acima · clique para expandir</span>
+          </summary>
+          <div className="px-4 pb-4 pt-1">
+            <div className="overflow-auto max-h-64">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left px-2 py-1.5 font-semibold text-slate-500">Nome</th>
+                    <th className="text-left px-2 py-1.5 font-semibold text-slate-500">Cargo</th>
+                    <th className="text-left px-2 py-1.5 font-semibold text-slate-500">Departamento</th>
+                    <th className="text-right px-2 py-1.5 font-semibold text-slate-500">Salário</th>
+                    <th className="text-right px-2 py-1.5 font-semibold text-slate-500">Admissão</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {afastados.map(e => (
+                    <tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-2 py-1.5 font-medium text-slate-600">{e.nome}</td>
+                      <td className="px-2 py-1.5 text-slate-400">{e.cargo}</td>
+                      <td className="px-2 py-1.5 text-slate-400">{e.departamento}</td>
+                      <td className="px-2 py-1.5 text-right font-mono text-slate-500">{sal(e) > 0 ? fmtBRL(sal(e)) : <span className="text-slate-300">—</span>}</td>
+                      <td className="px-2 py-1.5 text-right text-slate-400">{e.dataAdmissao}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+      )}
     </div>
   );
 }
