@@ -57,14 +57,14 @@ export function classifyDept(dept: string): GrupoDept {
   // 3. Funilaria — vem antes de Oficina
   if (has(dept, 'funilaria')) return 'Funilaria';
 
-  // 4. Oficina — A.Tec. ou Express. (só NÃO é Oficina se tiver "funilaria")
-  if (has(dept, 'a.tec.', 'express.')) return 'Oficina';
+  // 4. Oficina — A.Tec., Express. ou VW Express
+  if (has(dept, 'a.tec.', 'express.', 'express')) return 'Oficina';
 
   // 5. Usados — ANTES do "adm" para evitar "ADM V.Usados" virar Administração
   if (has(dept, 'v.usados', 'v. usados', 'usados')) return 'Usados';
 
   // 6. Novos — ANTES do "adm"
-  if (has(dept, 'v.novos', 'v. novos', 'frotista', 'consorcio', 'consórcio', 'v.audi pin')) return 'Novos';
+  if (has(dept, 'v.novos', 'v. novos', 'frotista', 'consorcio', 'consórcio', 'v.audi pin', 'marketing')) return 'Novos';
 
   // 7. Peças — ANTES do "adm" para evitar "ADM Peças" virar Administração
   if (has(dept, 'peças', 'pecas', 'peca')) return 'Peças';
