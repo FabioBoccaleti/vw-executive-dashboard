@@ -1,20 +1,10 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { SessionPayload, ModuleId, BrandId, VendasSubModuleId, FolhaSubModuleId } from '@/lib/authTypes';
 import { getSessionToken, saveSession, clearSession, apiLogin, apiLogout } from '@/lib/authClient';
+import { AuthContext } from './authContextDef';
+import type { AuthContextValue } from './authContextDef';
 
-export interface AuthContextValue {
-  session: SessionPayload | null;
-  isLoading: boolean;
-  login: (username: string, password: string) => Promise<string | null>;
-  logout: () => Promise<void>;
-  canAccessModule: (module: ModuleId) => boolean;
-  canAccessBrand: (brand: BrandId) => boolean;
-  canAccessVendasSub: (sub: VendasSubModuleId) => boolean;
-  canAccessFolhaSub: (sub: FolhaSubModuleId) => boolean;
-  isAdmin: () => boolean;
-}
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
+export type { AuthContextValue };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SessionPayload | null>(null);
