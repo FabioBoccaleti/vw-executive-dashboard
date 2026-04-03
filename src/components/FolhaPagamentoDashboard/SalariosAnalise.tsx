@@ -139,6 +139,7 @@ interface SalariosAnaliseProps {
 
 export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, brandLabel }: SalariosAnaliseProps) {
   const [deptDrill, setDeptDrill] = useState<GrupoDept | null>(null);
+  const [faixaDrill, setFaixaDrill] = useState<string | null>(null);
 
   // ── Comparison periods state ──────────────────────────────────────────────
   const basePeriod = useMemo<CompPeriod>(() => ({ month: selectedMonth, year: selectedYear }), [selectedMonth, selectedYear]);
@@ -344,6 +345,16 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
     const avgDelta = alterados.length > 0 ? alterados.reduce((a, x) => a + x.deltaPct, 0) / alterados.length : 0;
     return { novos, desligados, alterados, estaveis, avgDelta };
   }, [activeClassified, moviPrevClassified, moviPrevData]);
+
+  // ── Drill faixa salarial ───────────────────────────────────────────────
+  const faixaDrillRows = useMemo(() => {
+    if (!faixaDrill) return [];
+    const faixa = FAIXAS.find(f => f.label === faixaDrill);
+    if (!faixa) return [];
+    return activeClassified
+      .filter(e => sal(e) >= faixa.min && sal(e) < faixa.max)
+      .sort((a, b) => sal(b) - sal(a));
+  }, [faixaDrill, activeClassified]);
 
   // ── Drill ─────────────────────────────────────────────────────────────────
   const drillRows = useMemo(() =>
@@ -603,16 +614,57 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
 
         {/* Distribuição por Faixa Salarial */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <h3 className="text-sm font-bold text-slate-700 mb-4">Distribuição por Faixa Salarial</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={faixaDist}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="faixa" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-              <Tooltip content={<CountTooltip />} />
-              <Bar dataKey="count" name="Colaboradores" fill="#14b8a6" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-sm font-bold text-slate-700">Distribuição por Faixa Salarial</h3>
+            {faixaDrill && (
+              <button onClick={() => setFaixaDrill(null)} className="text-xs text-teal-600 hover:underline">
+                ← voltar
+              </button>
+            )}
+          </div>
+          {!faixaDrill && (
+            <p className="text-xs text-slate-400 mb-3">💡 Clique em uma faixa para ver os colaboradores</p>
+          )}
+
+          {!faixaDrill ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={faixaDist} onClick={d => d?.activePayload && setFaixaDrill(d.activePayload[0]?.payload?.faixa)}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="faixa" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                <Tooltip content={<CountTooltip />} />
+                <Bar dataKey="count" name="Colaboradores" fill="#14b8a6" radius={[4, 4, 0, 0]} cursor="pointer" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-2">
+                {faixaDrill} — {faixaDrillRows.length} colaboradores
+              </p>
+              <div className="max-h-64 overflow-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="text-left px-2 py-1.5 font-semibold text-slate-500">Nome</th>
+                      <th className="text-left px-2 py-1.5 font-semibold text-slate-500">Cargo</th>
+                      <th className="text-left px-2 py-1.5 font-semibold text-slate-500">Departamento</th>
+                      <th className="text-right px-2 py-1.5 font-semibold text-slate-500">Salário</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {faixaDrillRows.map(e => (
+                      <tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="px-2 py-1.5 font-medium text-slate-800">{e.nome}</td>
+                        <td className="px-2 py-1.5 text-slate-500">{e.cargo}</td>
+                        <td className="px-2 py-1.5 text-slate-500">{e.grupo}</td>
+                        <td className="px-2 py-1.5 text-right font-mono text-slate-800">{fmtBRL(sal(e))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Custo Médio por Departamento */}
@@ -797,6 +849,46 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
                     <td className="px-2 py-1.5 text-slate-500">{e.grupo}</td>
                     <td className="px-2 py-1.5 text-slate-500">{e.cargo}</td>
                     <td className="px-2 py-1.5 text-right font-mono text-slate-800">
+                      {sal(e) > 0 ? fmtBRL(sal(e)) : <span className="text-slate-300">comissionado</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Desligados no Mês ────────────────────────────────────────────── */}
+      {movimentacao && movimentacao.desligados.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Users className="w-4 h-4 text-red-400" />
+            <h3 className="text-sm font-bold text-slate-700">Desligados no Mês</h3>
+            <span className="text-xs bg-red-50 text-red-600 font-semibold px-2 py-0.5 rounded-full border border-red-200">
+              {movimentacao.desligados.length}
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mb-3">
+            Presentes em {moviPrev ? periodLabel(moviPrev) : '—'} e ausentes no período atual.
+          </p>
+          <div className="overflow-auto max-h-64">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left px-2 py-1.5 font-semibold text-slate-500">Nome</th>
+                  <th className="text-left px-2 py-1.5 font-semibold text-slate-500">Departamento</th>
+                  <th className="text-left px-2 py-1.5 font-semibold text-slate-500">Cargo</th>
+                  <th className="text-right px-2 py-1.5 font-semibold text-slate-500">Último Salário</th>
+                </tr>
+              </thead>
+              <tbody>
+                {movimentacao.desligados.sort((a, b) => a.nome.localeCompare(b.nome)).map(e => (
+                  <tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="px-2 py-1.5 font-medium text-slate-700">{e.nome}</td>
+                    <td className="px-2 py-1.5 text-slate-500">{e.grupo}</td>
+                    <td className="px-2 py-1.5 text-slate-500">{e.cargo}</td>
+                    <td className="px-2 py-1.5 text-right font-mono text-slate-500">
                       {sal(e) > 0 ? fmtBRL(sal(e)) : <span className="text-slate-300">comissionado</span>}
                     </td>
                   </tr>
