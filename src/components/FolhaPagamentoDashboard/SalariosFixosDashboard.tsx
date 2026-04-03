@@ -419,6 +419,29 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
               Análise
             </button>
           </div>
+          {/* Seletor de período — apenas na visão Análise */}
+          {mainView === 'analise' && (
+            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50">
+              <select
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(Number(e.target.value))}
+                className="text-xs font-semibold text-slate-700 bg-transparent border-none outline-none cursor-pointer"
+              >
+                {MONTHS.map((m, i) => (
+                  <option key={i} value={i + 1}>{m}</option>
+                ))}
+              </select>
+              <select
+                value={selectedYear}
+                onChange={e => setSelectedYear(Number(e.target.value))}
+                className="text-xs font-semibold text-slate-700 bg-transparent border-none outline-none cursor-pointer"
+              >
+                {YEARS.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <button
             onClick={onBack}
             className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
