@@ -159,7 +159,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
       brand === 'audi' || brand === 'total' ? loadSalariosFixos('audi', year, month) : Promise.resolve<SalarioFuncionario[]>([]),
       brand === 'vw'   || brand === 'total' ? loadSalariosFixos('vw',   year, month) : Promise.resolve<SalarioFuncionario[]>([]),
     ]);
-    return [...audi, ...vw];
+    return [...audi, ...vw].filter(e => !e.departamento.toLowerCase().includes('toyota'));
   }, [brand]);
 
   useEffect(() => {
@@ -179,8 +179,12 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
   }, [compPeriods, loadBrandData]);
 
   // ── Classify current period ───────────────────────────────────────────────
+  // Departamentos toyota são completamente ignorados (não entram em nenhuma análise nem tabela)
   const classified = useMemo(() =>
-    rows.map(e => ({ ...e, grupo: classifyDept(e.departamento) })), [rows]);
+    rows
+      .filter(e => !e.departamento.toLowerCase().includes('toyota'))
+      .map(e => ({ ...e, grupo: classifyDept(e.departamento) })),
+    [rows]);
 
   // Afastados excluídos de TODA análise (totais, headcount, gráficos, movimentação)
   const activeClassified = useMemo(() =>

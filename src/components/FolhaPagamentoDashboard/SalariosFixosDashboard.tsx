@@ -280,9 +280,11 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
         activeTab === 'audi'  || activeTab === 'total' ? loadSalariosFixos('audi', selectedYear, selectedMonth) : Promise.resolve(audiRows),
         activeTab === 'vw'    || activeTab === 'total' ? loadSalariosFixos('vw',   selectedYear, selectedMonth) : Promise.resolve(vwRows),
       ]);
+      const noToyota = (rows: SalarioFuncionario[]) =>
+        rows.filter(e => !e.departamento.toLowerCase().includes('toyota'));
       if (!cancelled) {
-        if (activeTab === 'audi' || activeTab === 'total') setAudiRows(audi);
-        if (activeTab === 'vw'   || activeTab === 'total') setVwRows(vw);
+        if (activeTab === 'audi' || activeTab === 'total') setAudiRows(noToyota(audi));
+        if (activeTab === 'vw'   || activeTab === 'total') setVwRows(noToyota(vw));
         setLoading(false);
       }
     }
@@ -326,8 +328,10 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
       loadSalariosFixos('audi', firstYear, firstMonth),
       loadSalariosFixos('vw',   firstYear, firstMonth),
     ]);
-    setAudiRows(newAudi);
-    setVwRows(newVw);
+    const noToyota = (rows: SalarioFuncionario[]) =>
+      rows.filter(e => !e.departamento.toLowerCase().includes('toyota'));
+    setAudiRows(noToyota(newAudi));
+    setVwRows(noToyota(newVw));
   }
 
   async function handleClearConfirmed() {
