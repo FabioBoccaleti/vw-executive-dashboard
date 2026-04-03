@@ -683,8 +683,8 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
               )}
             </div>
             <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block bg-sky-400" /> Δ% Headcount</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block bg-slate-400" /> Δ% Folha</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: '#38bdf8' }} /> Δ% Headcount</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: '#14b8a6' }} /> Δ% Folha</span>
             </div>
           </div>
 
