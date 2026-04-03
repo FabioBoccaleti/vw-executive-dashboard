@@ -1,7 +1,8 @@
 import { Fragment, useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Trash2, TableProperties, BarChart2, Pencil, Check, X } from 'lucide-react';
+import { Upload, FileText, Trash2, TableProperties, BarChart2, Pencil, Check, X, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/useAuth';
 import {
   loadSalariosFixos,
   saveAllParsedSalarios,
@@ -326,8 +327,20 @@ interface SalariosFixosDashboardProps {
 }
 
 export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) {
-  const [mainView, setMainView]         = useState<'relacao' | 'analise'>('analise');
-  const [activeTab, setActiveTab]       = useState<ActiveTab>('audi');
+  const { canAccessFolhaSub, isAdmin } = useAuth();
+  const canAnalise = isAdmin() || canAccessFolhaSub('folha.analise');
+  const canRelacao = isAdmin() || canAccessFolhaSub('folha.relacao');
+  const canAudi    = isAdmin() || canAccessFolhaSub('folha.audi');
+  const canVw      = isAdmin() || canAccessFolhaSub('folha.vw');
+  const canTotal   = isAdmin() || canAccessFolhaSub('folha.total');
+  const hasAnyAccess = canAnalise || canRelacao;
+
+  const [mainView, setMainView] = useState<'relacao' | 'analise'>(
+    canAnalise ? 'analise' : 'relacao'
+  );
+  const [activeTab, setActiveTab] = useState<ActiveTab>(
+    canAudi ? 'audi' : canVw ? 'vw' : 'total'
+  );
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear]   = useState(CURRENT_YEAR);
 
@@ -440,6 +453,21 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
   const currentRows = activeTab === 'audi' ? audiRows : activeTab === 'vw' ? vwRows : [...audiRows, ...vwRows];
   const hasData     = currentRows.length > 0;
 
+  if (!hasAnyAccess) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center gap-4 text-slate-500">
+        <Lock className="w-10 h-10 opacity-40" />
+        <p className="text-sm font-medium">Você não tem permissão para acessar este módulo.</p>
+        <button
+          onClick={onBack}
+          className="text-xs text-teal-600 hover:underline"
+        >
+          ← Voltar
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       {/* Hidden file input */}
@@ -492,7 +520,9 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
         </div>
         <div className="flex items-center gap-3">
           {/* Seletor de visão principal */}
+          {(canRelacao || canAnalise) && (
           <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
+            {canRelacao && (
             <button
               onClick={() => setMainView('relacao')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -502,6 +532,8 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
               <TableProperties className="w-3.5 h-3.5" />
               Relação de Salários Fixos
             </button>
+            )}
+            {canAnalise && (
             <button
               onClick={() => setMainView('analise')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -511,7 +543,9 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
               <BarChart2 className="w-3.5 h-3.5" />
               Análise
             </button>
+            )}
           </div>
+          )}
           {/* Seletor de período — apenas na visão Análise */}
           {mainView === 'analise' && (
             <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-1.5 bg-slate-50">
@@ -547,7 +581,9 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
       {/* Tabs Audi/VW/Total — apenas na visão Relação */}
       {mainView === 'relacao' && (
       <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-0">
-        {(['audi', 'vw', 'total'] as const).map(tab => (
+        {(['audi', 'vw', 'total'] as const)
+          .filter(tab => tab === 'audi' ? canAudi : tab === 'vw' ? canVw : canTotal)
+          .map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -644,7 +680,9 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
         /* Aba Análise */
         <>
           <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-0">
-            {(['audi', 'vw', 'total'] as const).map(tab => (
+            {(['audi', 'vw', 'total'] as const)
+              .filter(tab => tab === 'audi' ? canAudi : tab === 'vw' ? canVw : canTotal)
+              .map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}

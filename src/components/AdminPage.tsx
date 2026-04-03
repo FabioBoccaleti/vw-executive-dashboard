@@ -9,8 +9,8 @@ import {
   ChevronLeft, Eye, EyeOff, Check, AlertCircle, RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { PublicUser, AccessLogEntry, ModuleId, BrandId, UserRole, VendasSubModuleId, CentralVendasVWSubModuleId } from '@/lib/authTypes';
-import { ALL_MODULES, ALL_BRANDS, MODULE_LABELS, BRAND_LABELS, VENDAS_SUB_MODULE_LABELS, CENTRAL_VENDAS_VW_SUB_MODULE_LABELS } from '@/lib/authTypes';
+import type { PublicUser, AccessLogEntry, ModuleId, BrandId, UserRole, VendasSubModuleId, CentralVendasVWSubModuleId, FolhaSubModuleId } from '@/lib/authTypes';
+import { ALL_MODULES, ALL_BRANDS, MODULE_LABELS, BRAND_LABELS, VENDAS_SUB_MODULE_LABELS, CENTRAL_VENDAS_VW_SUB_MODULE_LABELS, FOLHA_SUB_MODULE_LABELS } from '@/lib/authTypes';
 import {
   apiListUsers, apiCreateUser, apiUpdateUser, apiDeleteUser, apiGetLogs,
 } from '@/lib/authClient';
@@ -47,12 +47,13 @@ interface UserFormData {
   brands: BrandId[];
   vendasSubModules: VendasSubModuleId[];
   centralVendasVWSubModules: CentralVendasVWSubModuleId[];
+  folhaSubModules: FolhaSubModuleId[];
   active: boolean;
 }
 
 const defaultForm = (): UserFormData => ({
   name: '', username: '', password: '', role: 'leitura',
-  modules: [], brands: [], vendasSubModules: [], centralVendasVWSubModules: [], active: true,
+  modules: [], brands: [], vendasSubModules: [], centralVendasVWSubModules: [], folhaSubModules: [], active: true,
 });
 
 interface UserFormProps {
@@ -94,6 +95,14 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
       centralVendasVWSubModules: f.centralVendasVWSubModules.includes(s)
         ? f.centralVendasVWSubModules.filter(x => x !== s)
         : [...f.centralVendasVWSubModules, s],
+    }));
+
+  const toggleFolhaSub = (s: FolhaSubModuleId) =>
+    setForm(f => ({
+      ...f,
+      folhaSubModules: f.folhaSubModules.includes(s)
+        ? f.folhaSubModules.filter(x => x !== s)
+        : [...f.folhaSubModules, s],
     }));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -312,6 +321,55 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
         </div>
       )}
 
+      {/* Subpermissões Folha de Pagamento */}
+      {!isAdmin && form.modules.includes('folha_pagamento') && (
+        <div className="space-y-3 rounded-lg border border-teal-200 bg-teal-50/50 dark:bg-teal-950/10 dark:border-teal-800 p-4">
+          <Label className="text-sm font-semibold text-teal-800 dark:text-teal-300">
+            Permissões — Folha de Pagamento
+          </Label>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Visões</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {(['folha.analise', 'folha.relacao'] as FolhaSubModuleId[]).map(s => (
+                <button
+                  key={s} type="button"
+                  onClick={() => toggleFolhaSub(s)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                    form.folhaSubModules.includes(s)
+                      ? 'border-teal-500 bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 font-medium'
+                      : 'border-border bg-background text-muted-foreground hover:border-input',
+                  )}
+                >
+                  {form.folhaSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                  {FOLHA_SUB_MODULE_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Marcas</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {(['folha.audi', 'folha.vw', 'folha.total'] as FolhaSubModuleId[]).map(s => (
+                <button
+                  key={s} type="button"
+                  onClick={() => toggleFolhaSub(s)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                    form.folhaSubModules.includes(s)
+                      ? 'border-teal-500 bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 font-medium'
+                      : 'border-border bg-background text-muted-foreground hover:border-input',
+                  )}
+                >
+                  {form.folhaSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                  {FOLHA_SUB_MODULE_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-2">
         <input
           type="checkbox" id="active"
@@ -498,6 +556,8 @@ export function AdminPage({ onBack }: AdminPageProps) {
                       modules: editingUser.modules,
                       brands: editingUser.brands,
                       vendasSubModules: (editingUser as any).vendasSubModules ?? [],
+                      centralVendasVWSubModules: (editingUser as any).centralVendasVWSubModules ?? [],
+                      folhaSubModules: (editingUser as any).folhaSubModules ?? [],
                       active: editingUser.active,
                     } : undefined}
                     onSave={formMode === 'create' ? handleCreate : handleEdit}

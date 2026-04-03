@@ -71,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      const { name, username, password, role, modules, brands, active } = req.body ?? {};
+      const { name, username, password, role, modules, brands, vendasSubModules, centralVendasVWSubModules, folhaSubModules, active } = req.body ?? {};
       if (!name || !username || !password || !role) {
         return res.status(400).json({ error: 'name, username, password e role são obrigatórios' });
       }
@@ -83,6 +83,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         id: `u_${Date.now()}_${randomBytes(4).toString('hex')}`,
         name, username, passwordHash: hashPassword(password),
         role, modules: modules ?? [], brands: brands ?? [],
+        vendasSubModules: vendasSubModules ?? [],
+        centralVendasVWSubModules: centralVendasVWSubModules ?? [],
+        folhaSubModules: folhaSubModules ?? [],
         active: active ?? true, createdAt: Date.now(), updatedAt: Date.now(),
       };
       await saveUser(user);

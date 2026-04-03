@@ -41,6 +41,22 @@ export type VendasSubModuleId =
   | 'estetica.tabela'
   | 'estetica.analise';
 
+// Subpermissões do módulo folha_pagamento
+export type FolhaSubModuleId =
+  | 'folha.analise'
+  | 'folha.relacao'
+  | 'folha.audi'
+  | 'folha.vw'
+  | 'folha.total';
+
+export const FOLHA_SUB_MODULE_LABELS: Record<FolhaSubModuleId, string> = {
+  'folha.analise': 'Análise',
+  'folha.relacao': 'Relação de Salários Fixos',
+  'folha.audi':   'Audi',
+  'folha.vw':     'VW',
+  'folha.total':  'Total',
+};
+
 // Subpermissões do módulo central_vendas_vw
 export type CentralVendasVWSubModuleId =
   | 'central_vw.analises'
@@ -81,6 +97,7 @@ export interface UserRecord {
   brands: BrandId[];
   vendasSubModules?: VendasSubModuleId[];
   centralVendasVWSubModules?: CentralVendasVWSubModuleId[];
+  folhaSubModules?: FolhaSubModuleId[];
   active: boolean;
   createdAt: number;
   updatedAt: number;
@@ -94,6 +111,7 @@ export interface SessionPayload {
   brands: BrandId[];
   vendasSubModules?: VendasSubModuleId[];
   centralVendasVWSubModules?: CentralVendasVWSubModuleId[];
+  folhaSubModules?: FolhaSubModuleId[];
   expiresAt: number;
 }
 
