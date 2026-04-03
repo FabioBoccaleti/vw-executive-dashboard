@@ -1,11 +1,12 @@
 import { Fragment, useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Trash2, TableProperties, BarChart2 } from 'lucide-react';
+import { Upload, FileText, Trash2, TableProperties, BarChart2, Pencil, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   loadSalariosFixos,
   saveAllParsedSalarios,
   clearSalariosFixos,
+  updateSalarioFuncionario,
   parseSalariosTxt,
   findLatestSalariosPeriod,
   type SalarioFuncionario,
@@ -55,9 +56,28 @@ function groupByDept(rows: SalarioFuncionario[]) {
 }
 
 // ── Table for a single brand tab ──────────────────────────────────────────────
-function SingleBrandTable({ rows }: { rows: SalarioFuncionario[] }) {
+function SingleBrandTable({
+  rows,
+  onUpdate,
+}: {
+  rows: SalarioFuncionario[];
+  onUpdate?: (id: string, updates: { cargo: string; departamento: string; salario: string }) => void;
+}) {
   const revendaGroups = groupByRevenda(rows);
   const grandTotal    = sumSalarios(rows);
+
+  const [editId, setEditId]       = useState<string | null>(null);
+  const [editValues, setEditValues] = useState({ cargo: '', departamento: '', salario: '' });
+
+  function startEdit(emp: SalarioFuncionario) {
+    setEditId(emp.id);
+    setEditValues({ cargo: emp.cargo, departamento: emp.departamento, salario: emp.salario });
+  }
+  function cancelEdit() { setEditId(null); }
+  function saveEdit(emp: SalarioFuncionario) {
+    onUpdate?.(emp.id, editValues);
+    setEditId(null);
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -70,6 +90,7 @@ function SingleBrandTable({ rows }: { rows: SalarioFuncionario[] }) {
             <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider">Cargo</th>
             <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider">Departamento</th>
             <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-36">Salário</th>
+            <th className="w-16"></th>
           </tr>
         </thead>
         <tbody>
@@ -80,7 +101,7 @@ function SingleBrandTable({ rows }: { rows: SalarioFuncionario[] }) {
               <Fragment key={revenda}>
                 {/* Revenda band */}
                 <tr className="bg-teal-50 border-b border-teal-100">
-                  <td colSpan={6} className="px-4 py-2 text-xs font-bold text-teal-700 uppercase tracking-wider">
+                  <td colSpan={7} className="px-4 py-2 text-xs font-bold text-teal-700 uppercase tracking-wider">
                     {revenda}
                   </td>
                 </tr>
@@ -89,26 +110,82 @@ function SingleBrandTable({ rows }: { rows: SalarioFuncionario[] }) {
                   <Fragment key={dept}>
                     {/* Dept header */}
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      <td colSpan={6} className="px-6 py-1.5 text-xs font-semibold text-slate-500 italic">
+                      <td colSpan={7} className="px-6 py-1.5 text-xs font-semibold text-slate-500 italic">
                         {dept}
                       </td>
                     </tr>
 
                     {/* Employee rows */}
-                    {empRows.map(emp => (
-                      <tr key={emp.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-2 text-slate-500 font-mono text-xs">{emp.codigo}</td>
-                        <td className="px-4 py-2 text-slate-800 font-medium">{emp.nome}</td>
-                        <td className="px-4 py-2 text-slate-500">{emp.dataAdmissao}</td>
-                        <td className="px-4 py-2 text-slate-600">{emp.cargo}</td>
-                        <td className="px-4 py-2 text-slate-500 text-xs">{emp.departamento}</td>
-                        <td className="px-4 py-2 text-right text-slate-800 font-mono">{fmtCurrency(emp.salario)}</td>
-                      </tr>
-                    ))}
+                    {empRows.map(emp => {
+                      const isEditing = editId === emp.id;
+                      return (
+                        <tr key={emp.id} className={`border-b border-slate-100 transition-colors ${isEditing ? 'bg-teal-50/60' : 'hover:bg-slate-50'}`}>
+                          <td className="px-4 py-2 text-slate-500 font-mono text-xs">{emp.codigo}</td>
+                          <td className="px-4 py-2 text-slate-800 font-medium">{emp.nome}</td>
+                          <td className="px-4 py-2 text-slate-500">{emp.dataAdmissao}</td>
+                          <td className="px-4 py-2 text-slate-600">
+                            {isEditing
+                              ? <input
+                                  value={editValues.cargo}
+                                  onChange={e => setEditValues(v => ({ ...v, cargo: e.target.value }))}
+                                  className="border border-teal-300 rounded px-2 py-0.5 text-sm w-full focus:outline-none focus:ring-1 focus:ring-teal-400"
+                                />
+                              : emp.cargo}
+                          </td>
+                          <td className="px-4 py-2 text-slate-500 text-xs">
+                            {isEditing
+                              ? <input
+                                  value={editValues.departamento}
+                                  onChange={e => setEditValues(v => ({ ...v, departamento: e.target.value }))}
+                                  className="border border-teal-300 rounded px-2 py-0.5 text-xs w-full focus:outline-none focus:ring-1 focus:ring-teal-400"
+                                />
+                              : emp.departamento}
+                          </td>
+                          <td className="px-4 py-2 text-right text-slate-800 font-mono">
+                            {isEditing
+                              ? <input
+                                  type="number"
+                                  value={editValues.salario}
+                                  onChange={e => setEditValues(v => ({ ...v, salario: e.target.value }))}
+                                  className="border border-teal-300 rounded px-2 py-0.5 text-sm w-28 text-right focus:outline-none focus:ring-1 focus:ring-teal-400"
+                                />
+                              : fmtCurrency(emp.salario)}
+                          </td>
+                          <td className="px-2 py-2 text-right">
+                            {isEditing ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => saveEdit(emp)}
+                                  className="text-teal-600 hover:text-teal-800 p-1 rounded hover:bg-teal-100"
+                                  title="Salvar"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="text-slate-400 hover:text-red-400 p-1 rounded hover:bg-red-50"
+                                  title="Cancelar"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => startEdit(emp)}
+                                className="text-slate-300 hover:text-slate-500 p-1 rounded hover:bg-slate-100"
+                                title="Editar"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
 
                     {/* Dept subtotal */}
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      <td colSpan={5} className="px-6 py-1.5 text-right text-xs font-semibold text-slate-400">
+                      <td colSpan={6} className="px-6 py-1.5 text-right text-xs font-semibold text-slate-400">
                         Subtotal — {dept}
                       </td>
                       <td className="px-4 py-1.5 text-right font-semibold text-slate-600 font-mono text-xs">
@@ -120,7 +197,7 @@ function SingleBrandTable({ rows }: { rows: SalarioFuncionario[] }) {
 
                 {/* Revenda subtotal */}
                 <tr className="bg-teal-50 border-b border-teal-200">
-                  <td colSpan={5} className="px-4 py-2 text-right text-xs font-bold text-teal-700">
+                  <td colSpan={6} className="px-4 py-2 text-right text-xs font-bold text-teal-700">
                     Total — {revenda}
                   </td>
                   <td className="px-4 py-2 text-right font-bold text-teal-700 font-mono">
@@ -133,7 +210,7 @@ function SingleBrandTable({ rows }: { rows: SalarioFuncionario[] }) {
 
           {/* Grand total */}
           <tr className="bg-teal-700">
-            <td colSpan={5} className="px-4 py-3 text-right font-bold text-white text-sm">
+            <td colSpan={6} className="px-4 py-3 text-right font-bold text-white text-sm">
               Total Geral
             </td>
             <td className="px-4 py-3 text-right font-bold text-white font-mono">
@@ -332,6 +409,22 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
       rows.filter(e => !e.departamento.toLowerCase().includes('toyota'));
     setAudiRows(noToyota(newAudi));
     setVwRows(noToyota(newVw));
+  }
+
+  async function handleEmployeeUpdate(
+    id: string,
+    updates: { cargo: string; departamento: string; salario: string },
+  ) {
+    // Determine brand by finding the employee
+    const inAudi = audiRows.some(e => e.id === id);
+    const inVw   = vwRows.some(e => e.id === id);
+    const brand: SalarioBrand | null = inAudi ? 'audi' : inVw ? 'vw' : null;
+    if (!brand) return;
+    await updateSalarioFuncionario(brand, selectedYear, selectedMonth, id, updates);
+    const update = (rows: SalarioFuncionario[]) =>
+      rows.map(e => e.id === id ? { ...e, ...updates } : e);
+    if (brand === 'audi') setAudiRows(prev => update(prev));
+    else                  setVwRows(prev => update(prev));
   }
 
   async function handleClearConfirmed() {
@@ -544,7 +637,7 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
         ) : activeTab === 'total' ? (
           <TotalTable audiRows={audiRows} vwRows={vwRows} />
         ) : (
-          <SingleBrandTable rows={currentRows} />
+          <SingleBrandTable rows={currentRows} onUpdate={handleEmployeeUpdate} />
         )}
       </div>
       </>) : (

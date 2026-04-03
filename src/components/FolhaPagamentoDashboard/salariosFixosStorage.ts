@@ -196,6 +196,22 @@ export async function saveAllParsedSalarios(sections: ParsedSalarios[]): Promise
   return results;
 }
 
+export async function updateSalarioFuncionario(
+  brand: SalarioBrand,
+  year: number,
+  month: number,
+  id: string,
+  updates: { cargo?: string; departamento?: string; salario?: string },
+): Promise<boolean> {
+  try {
+    const existing = await loadSalariosFixos(brand, year, month);
+    const updated  = existing.map(e => e.id === id ? { ...e, ...updates } : e);
+    return await kvSet(getKey(brand, year, month), updated);
+  } catch {
+    return false;
+  }
+}
+
 export async function clearSalariosFixos(
   brand: SalarioBrand,
   year: number,

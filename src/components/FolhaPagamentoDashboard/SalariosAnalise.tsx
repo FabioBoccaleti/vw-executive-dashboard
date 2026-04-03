@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, Cell, ScatterChart, Scatter,
-  ReferenceLine, type TooltipProps,
+  ReferenceLine, LineChart, Line, LabelList, type TooltipProps,
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, Users, DollarSign, Building2, Award, BarChart2, PlusCircle, X as XIcon } from 'lucide-react';
 import { loadSalariosFixos, type SalarioFuncionario } from './salariosFixosStorage';
@@ -148,6 +148,11 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
   const [compLoading, setCompLoading] = useState(false);
   const [moviIdx, setMoviIdx] = useState(0);
 
+  // ── Historical trend chart state ─────────────────────────────────────────
+  const [histDept, setHistDept] = useState<'Total' | GrupoDept>('Total');
+  const [histData, setHistData] = useState<{ month: number; year: number; total: number; byDept: Partial<Record<GrupoDept, number>> }[]>([]);
+  const [histLoading, setHistLoading] = useState(false);
+
   useEffect(() => {
     setCompPeriods([prevOf(selectedMonth, selectedYear)]);
     setCompDataMap({});
@@ -177,6 +182,38 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
     load();
     return () => { cancelled = true; };
   }, [compPeriods, loadBrandData]);
+
+  // ── Load last 12 months for trend chart ──────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    setHistLoading(true);
+    const window12: { month: number; year: number }[] = [];
+    let m = selectedMonth, y = selectedYear;
+    for (let i = 0; i < 12; i++) {
+      window12.unshift({ month: m, year: y });
+      m--;
+      if (m === 0) { m = 12; y--; }
+    }
+    async function load() {
+      const results = await Promise.all(
+        window12.map(async ({ month, year }) => {
+          const data = await loadBrandData(month, year);
+          const cl = data
+            .map(e => ({ ...e, grupo: classifyDept(e.departamento) }))
+            .filter(e => e.grupo !== 'Afastados');
+          const total = cl.reduce((a, e) => a + sal(e), 0);
+          const byDept: Partial<Record<GrupoDept, number>> = {};
+          for (const e of cl) {
+            byDept[e.grupo] = (byDept[e.grupo] ?? 0) + sal(e);
+          }
+          return { month, year, total, byDept };
+        })
+      );
+      if (!cancelled) { setHistData(results); setHistLoading(false); }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [selectedMonth, selectedYear, loadBrandData]);
 
   // ── Classify current period ───────────────────────────────────────────────
   // Departamentos toyota são completamente ignorados (não entram em nenhuma análise nem tabela)
@@ -317,6 +354,45 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
     }),
     [allPeriods, activeClassified, compDataMap, byGrupo]);
 
+  // ── Delta HC & Folha por Departamento (vs período mais próximo) ─────────────
+  const closestCompPeriod = useMemo<CompPeriod | null>(() => {
+    if (compPeriods.length === 0) return null;
+    const baseMonths = basePeriod.year * 12 + basePeriod.month;
+    return compPeriods.reduce((best, p) => {
+      const distBest = Math.abs(best.year * 12 + best.month - baseMonths);
+      const distP    = Math.abs(p.year   * 12 + p.month    - baseMonths);
+      return distP < distBest ? p : best;
+    });
+  }, [compPeriods, basePeriod]);
+
+  const deltaByDept = useMemo(() => {
+    if (!closestCompPeriod) return [];
+    const prevRaw = (compDataMap[periodKey(closestCompPeriod)] ?? [])
+      .map(e => ({ ...e, grupo: classifyDept(e.departamento) }))
+      .filter(e => e.grupo !== 'Afastados');
+    return GRUPO_ORDER
+      .filter(g => g !== 'Afastados' && g !== 'Outros' && byGrupo.has(g))
+      .map(g => {
+        const curHC    = activeClassified.filter(e => e.grupo === g).length;
+        const prevHC   = prevRaw.filter(e => e.grupo === g).length;
+        const curFolha = activeClassified.filter(e => e.grupo === g).reduce((a, e) => a + sal(e), 0);
+        const prevFolha= prevRaw.filter(e => e.grupo === g).reduce((a, e) => a + sal(e), 0);
+        const deltaHC    = prevHC    > 0 ? ((curHC    - prevHC)    / prevHC)    * 100 : null;
+        const deltaFolha = prevFolha > 0 ? ((curFolha - prevFolha) / prevFolha) * 100 : null;
+        return {
+          grupo: g,
+          fill:  GRUPO_COLORS[g],
+          deltaHC,
+          deltaFolha,
+          // Para as barras: valor real ou mínimo visual de 0.2 se zero (para aparecer no gráfico)
+          deltaHCBar:    deltaHC    !== 0 ? (deltaHC    ?? 0.2) : 0.2,
+          deltaFolhaBar: deltaFolha !== 0 ? (deltaFolha ?? 0.2) : 0.2,
+          curHC, prevHC,
+          curFolha, prevFolha,
+        };
+      });
+  }, [closestCompPeriod, compDataMap, activeClassified, byGrupo]);
+
   // ── Movimentação Salarial ─────────────────────────────────────────────────
   const safeMoviIdx     = Math.min(moviIdx, Math.max(0, compPeriods.length - 1));
   const moviPrev        = compPeriods[safeMoviIdx] ?? null;
@@ -378,6 +454,21 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
   const afastados = useMemo(() =>
     classified.filter(e => e.grupo === 'Afastados').sort((a, b) => a.nome.localeCompare(b.nome)),
     [classified]);
+
+  const histChartData = useMemo(() =>
+    histData.map((d, i) => {
+      const value = histDept === 'Total' ? d.total : (d.byDept[histDept as GrupoDept] ?? 0);
+      const prev  = i > 0 ? (histDept === 'Total' ? histData[i - 1].total : (histData[i - 1].byDept[histDept as GrupoDept] ?? 0)) : null;
+      const deltaR   = prev !== null ? value - prev : null;
+      const deltaPct = prev !== null && prev > 0 ? ((value - prev) / prev) * 100 : null;
+      return {
+        label:    `${MONTHS_SHORT[d.month - 1]}/${String(d.year).slice(2)}`,
+        value,
+        deltaR,
+        deltaPct,
+      };
+    }),
+    [histData, histDept]);
 
   if (rows.length === 0) {
     return (
@@ -579,37 +670,106 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
           )}
         </div>
 
-        {/* Headcount vs Folha */}
+        {/* Variação HC & Folha por Departamento */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <h3 className="text-sm font-bold text-slate-700 mb-4">Headcount vs. Folha por Departamento</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={headVsFolha}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="grupo" tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="left" tickFormatter={v => String(v)} tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="right" orientation="right" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={80} />
-              <Tooltip content={({ active, payload, label }) => {
-                if (!active || !payload?.length) return null;
-                return (
-                  <div className="bg-white border border-slate-200 rounded-lg shadow p-2 text-xs">
-                    <p className="font-semibold mb-1">{label}</p>
-                    {payload.map((p, i) => (
-                      <p key={i} style={{ color: p.color }}>
-                        {p.name === 'headcount' ? `Headcount: ${p.value}` : `Folha: ${fmtBRL(p.value as number)}`}
-                      </p>
-                    ))}
-                  </div>
-                );
-              }} />
-              <Legend />
-              <Bar yAxisId="left" dataKey="headcount" name="headcount" fill="#0ea5e9" radius={[4, 4, 0, 0]} opacity={0.8} />
-              <Bar yAxisId="right" dataKey="folha" name="folha" radius={[4, 4, 0, 0]}>
-                {headVsFolha.map((entry, i) => (
-                  <Cell key={i} fill={entry.fill} opacity={0.9} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="flex items-center justify-between mb-1">
+            <div>
+              <h3 className="text-sm font-bold text-slate-700">Variação HC &amp; Folha por Departamento</h3>
+              {closestCompPeriod && (
+                <p className="text-xs text-slate-400 mt-0.5">
+                  vs <span className="font-semibold text-slate-500">{periodLabel(closestCompPeriod)}</span>
+                  {compPeriods.length > 1 && <span className="ml-1 text-slate-300">(período mais próximo)</span>}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block bg-sky-400" /> Δ% Headcount</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block bg-slate-400" /> Δ% Folha</span>
+            </div>
+          </div>
+
+          {!closestCompPeriod ? (
+            <div className="flex items-center justify-center h-48 text-slate-400 text-xs italic">
+              Adicione um período no &quot;Comparativo de Períodos&quot; acima para ver a variação.
+            </div>
+          ) : compLoading ? (
+            <div className="flex items-center justify-center h-48 text-slate-400 text-xs">Carregando...</div>
+          ) : deltaByDept.length === 0 ? (
+            <div className="flex items-center justify-center h-48 text-slate-400 text-xs italic">
+              Sem dados para {periodLabel(closestCompPeriod)}.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={deltaByDept} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="grupo" tick={{ fontSize: 10 }} />
+                <YAxis
+                  tickFormatter={v => `${v > 0 ? '+' : ''}${v.toFixed(0)}%`}
+                  tick={{ fontSize: 10 }}
+                  domain={['auto', 'auto']}
+                />
+                <ReferenceLine y={0} stroke="#94a3b8" strokeWidth={1.5} />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
+                    const d = deltaByDept.find(x => x.grupo === label);
+                    if (!d) return null;
+                    return (
+                      <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs min-w-[200px]">
+                        <p className="font-bold text-slate-700 mb-2">{label}</p>
+                        <div className="space-y-1.5">
+                          <div>
+                            <p className="text-slate-500 font-semibold mb-0.5">Headcount</p>
+                            {d.prevHC === 0 && d.curHC > 0 ? (
+                              <p className="text-amber-500 italic">Sem dados de comparação para HC</p>
+                            ) : (
+                              <p className="text-slate-700">{d.prevHC} → {d.curHC}
+                                {d.deltaHC !== null ? (
+                                  <span className={`ml-1.5 font-bold ${
+                                    d.deltaHC > 0 ? 'text-emerald-600' : d.deltaHC < 0 ? 'text-red-500' : 'text-slate-400'
+                                  }`}>{d.deltaHC >= 0 ? '+' : ''}{d.deltaHC.toFixed(1)}%</span>
+                                ) : <span className="ml-1.5 text-slate-400">0,0%</span>}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-slate-500 font-semibold mb-0.5">Folha</p>
+                            {d.prevFolha === 0 && d.curFolha > 0 ? (
+                              <p className="text-amber-500 italic">Sem dados de comparação para Folha</p>
+                            ) : (
+                              <p className="text-slate-700">{fmtBRL(d.prevFolha)} → {fmtBRL(d.curFolha)}
+                                {d.deltaFolha !== null ? (
+                                  <span className={`ml-1.5 font-bold ${
+                                    d.deltaFolha > 0 ? 'text-emerald-600' : d.deltaFolha < 0 ? 'text-red-500' : 'text-slate-400'
+                                  }`}>{d.deltaFolha >= 0 ? '+' : ''}{d.deltaFolha.toFixed(1)}%</span>
+                                ) : <span className="ml-1.5 text-slate-400">0,0%</span>}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+                <Bar dataKey="deltaHCBar" name="Δ% Headcount" fill="#38bdf8" radius={[3, 3, 0, 0]} opacity={0.9}>
+                  <LabelList
+                    dataKey="deltaHCBar"
+                    position="top"
+                    style={{ fontSize: 9, fill: '#64748b', fontWeight: 600 }}
+                    formatter={(v: number) => Math.abs(v) <= 0.2 ? '0%' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`}
+                  />
+                </Bar>
+                <Bar dataKey="deltaFolhaBar" name="Δ% Folha" fill="#14b8a6" radius={[3, 3, 0, 0]} opacity={0.85}>
+                  <LabelList
+                    dataKey="deltaFolhaBar"
+                    position="top"
+                    style={{ fontSize: 9, fill: '#64748b', fontWeight: 600 }}
+                    formatter={(v: number) => Math.abs(v) <= 0.2 ? '0%' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`}
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
@@ -944,6 +1104,71 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
           </div>
         </details>
       )}
+
+      {/* ── Evolução Histórica da Folha ────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-slate-700">Evolução da Folha — Últimos 12 Meses</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Passe o mouse sobre os pontos para ver a variação em R$ e %.</p>
+          </div>
+          <select
+            value={histDept}
+            onChange={e => setHistDept(e.target.value as 'Total' | GrupoDept)}
+            className="text-xs bg-slate-100 font-semibold text-slate-700 rounded-lg px-3 py-1.5 border border-slate-200 outline-none cursor-pointer"
+          >
+            <option value="Total">Total</option>
+            {GRUPO_ORDER
+              .filter(g => g !== 'Afastados' && g !== 'Outros')
+              .map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+
+        {histLoading ? (
+          <div className="flex items-center justify-center h-48 text-slate-400 text-xs">Carregando histórico...</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={histChartData} margin={{ top: 16, right: 24, left: 8, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+              <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={86} />
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0]?.payload;
+                  return (
+                    <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs min-w-[160px]">
+                      <p className="font-semibold text-slate-700 mb-2">{label}</p>
+                      <p className="text-slate-800 font-mono font-semibold">{fmtBRL(d.value)}</p>
+                      {d.deltaR !== null && d.deltaPct !== null ? (
+                        <div className={`flex items-center gap-1 mt-1.5 font-semibold ${d.deltaR >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {d.deltaR >= 0
+                            ? <TrendingUp className="w-3.5 h-3.5" />
+                            : <TrendingDown className="w-3.5 h-3.5" />}
+                          <span>{d.deltaR >= 0 ? '+' : ''}{fmtBRL(d.deltaR)}</span>
+                          <span className="text-slate-400 font-normal mx-0.5">·</span>
+                          <span>{fmtPct(d.deltaPct!)}</span>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 mt-1">Primeiro ponto do histórico</p>
+                      )}
+                    </div>
+                  );
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey="value"
+                name={histDept === 'Total' ? 'Total da Folha' : histDept}
+                stroke={histDept === 'Total' ? '#14b8a6' : GRUPO_COLORS[histDept as GrupoDept]}
+                strokeWidth={2.5}
+                dot={{ r: 4, strokeWidth: 2 }}
+                activeDot={{ r: 6 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
     </div>
   );
 }
