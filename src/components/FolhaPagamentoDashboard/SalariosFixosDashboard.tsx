@@ -339,7 +339,7 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
     canAnalise ? 'analise' : 'relacao'
   );
   const [activeTab, setActiveTab] = useState<ActiveTab>(
-    canAudi ? 'audi' : canVw ? 'vw' : 'total'
+    canTotal ? 'total' : canVw ? 'vw' : 'audi'
   );
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear]   = useState(CURRENT_YEAR);
@@ -707,6 +707,8 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
               selectedMonth={selectedMonth}
               selectedYear={selectedYear}
               brandLabel={activeTab === 'audi' ? 'Audi' : activeTab === 'vw' ? 'VW' : 'Total'}
+              audiRows={activeTab === 'total' ? audiRows : undefined}
+              vwRows={activeTab === 'total' ? vwRows : undefined}
             />
           </div>
         </>

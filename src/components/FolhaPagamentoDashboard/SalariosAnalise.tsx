@@ -135,11 +135,14 @@ interface SalariosAnaliseProps {
   selectedMonth: number;
   selectedYear: number;
   brandLabel: string;
+  audiRows?: SalarioFuncionario[];
+  vwRows?: SalarioFuncionario[];
 }
 
-export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, brandLabel }: SalariosAnaliseProps) {
+export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, brandLabel, audiRows: audiRowsProp, vwRows: vwRowsProp }: SalariosAnaliseProps) {
   const [deptDrill, setDeptDrill] = useState<GrupoDept | null>(null);
   const [faixaDrill, setFaixaDrill] = useState<string | null>(null);
+  const [compViewMode, setCompViewMode] = useState<'total' | 'medio'>('total');
 
   // ── Comparison periods state ──────────────────────────────────────────────
   const basePeriod = useMemo<CompPeriod>(() => ({ month: selectedMonth, year: selectedYear }), [selectedMonth, selectedYear]);
@@ -469,6 +472,54 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
       };
     }),
     [histData, histDept]);
+
+  // ── Audi vs VW comparative data (only used when brand === 'total') ─────────
+  const audiActive = useMemo(() =>
+    (audiRowsProp ?? [])
+      .filter(e => !e.departamento.toLowerCase().includes('toyota'))
+      .map(e => ({ ...e, grupo: classifyDept(e.departamento) }))
+      .filter(e => e.grupo !== 'Afastados'),
+    [audiRowsProp]);
+
+  const vwActive = useMemo(() =>
+    (vwRowsProp ?? [])
+      .filter(e => !e.departamento.toLowerCase().includes('toyota'))
+      .map(e => ({ ...e, grupo: classifyDept(e.departamento) }))
+      .filter(e => e.grupo !== 'Afastados'),
+    [vwRowsProp]);
+
+  const audiTotalFolha    = useMemo(() => audiActive.reduce((a, e) => a + sal(e), 0), [audiActive]);
+  const vwTotalFolha      = useMemo(() => vwActive.reduce((a, e) => a + sal(e), 0), [vwActive]);
+  const audiHeadcount     = audiActive.length;
+  const vwHeadcount       = vwActive.length;
+  const audiCountRem      = useMemo(() => audiActive.filter(e => sal(e) > 0).length, [audiActive]);
+  const vwCountRem        = useMemo(() => vwActive.filter(e => sal(e) > 0).length, [vwActive]);
+  const audiCustoMedio    = audiCountRem > 0 ? audiTotalFolha / audiCountRem : 0;
+  const vwCustoMedio      = vwCountRem   > 0 ? vwTotalFolha   / vwCountRem   : 0;
+  const grandTotalFolha   = audiTotalFolha + vwTotalFolha;
+  const audiPct           = grandTotalFolha > 0 ? (audiTotalFolha / grandTotalFolha) * 100 : 0;
+  const vwPct             = grandTotalFolha > 0 ? (vwTotalFolha   / grandTotalFolha) * 100 : 0;
+
+  const compDeptData = useMemo(() =>
+    GRUPO_ORDER
+      .filter(g => g !== 'Afastados')
+      .map(g => {
+        const aTot  = audiActive.filter(e => e.grupo === g).reduce((s, e) => s + sal(e), 0);
+        const vTot  = vwActive.filter(e => e.grupo === g).reduce((s, e) => s + sal(e), 0);
+        const aCnt  = audiActive.filter(e => e.grupo === g && sal(e) > 0).length;
+        const vCnt  = vwActive.filter(e => e.grupo === g && sal(e) > 0).length;
+        const aMed  = aCnt > 0 ? aTot / aCnt : 0;
+        const vMed  = vCnt > 0 ? vTot / vCnt : 0;
+        const delta = aTot + vTot > 0 ? Math.abs(aTot - vTot) / Math.max(aTot, vTot) * 100 : 0;
+        return { grupo: g, audi: aTot, vw: vTot, audiMed: aMed, vwMed: vMed, delta };
+      })
+      .filter(d => d.audi > 0 || d.vw > 0),
+    [audiActive, vwActive]);
+
+  const maxGapDept = useMemo(() => {
+    if (compDeptData.length === 0) return null;
+    return compDeptData.reduce((best, d) => d.delta > best.delta ? d : best).grupo;
+  }, [compDeptData]);
 
   if (rows.length === 0) {
     return (
@@ -1169,6 +1220,188 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
           </ResponsiveContainer>
         )}
       </div>
+
+      {/* ── Audi vs VW (apenas aba Total) ─────────────────────────────────── */}
+      {brand === 'total' && (audiRowsProp !== undefined || vwRowsProp !== undefined) && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-slate-700">Audi vs VW — Comparativo do Mês</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Custo de folha comparado entre marcas para o período selecionado.</p>
+            </div>
+            {/* Toggle pill */}
+            <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+              <button
+                onClick={() => setCompViewMode('total')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  compViewMode === 'total'
+                    ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Custo Total
+              </button>
+              <button
+                onClick={() => setCompViewMode('medio')}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  compViewMode === 'medio'
+                    ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Custo Médio
+              </button>
+            </div>
+          </div>
+
+          {/* Sem dados de uma ou ambas as marcas */}
+          {(audiHeadcount === 0 || vwHeadcount === 0) && (
+            <div className="mb-4 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 font-medium">
+              {audiHeadcount === 0 && vwHeadcount === 0
+                ? 'Nenhuma das marcas possui dados importados para este período.'
+                : audiHeadcount === 0
+                  ? 'Audi não possui dados importados para este período. Importe o TXT na aba Relação de Salários Fixos.'
+                  : 'VW não possui dados importados para este período. Importe o TXT na aba Relação de Salários Fixos.'}
+            </div>
+          )}
+
+          {/* Cabeçalho 3 colunas: Audi | Δ | VW */}
+          {(audiHeadcount > 0 || vwHeadcount > 0) && (
+            <div className="mb-5">
+              <div className="grid grid-cols-3 gap-px bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
+                {/* Header */}
+                <div className="bg-slate-50 px-4 py-2 text-xs font-bold text-blue-700 uppercase tracking-wider">Audi</div>
+                <div className="bg-slate-50 px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Δ Diferença</div>
+                <div className="bg-slate-50 px-4 py-2 text-xs font-bold text-teal-700 uppercase tracking-wider text-right">VW</div>
+
+                {/* Total da Folha */}
+                <div className="bg-white px-4 py-3">
+                  <p className="text-xs text-slate-400 mb-0.5">Total da Folha</p>
+                  <p className="text-base font-bold text-slate-800 font-mono">{fmtBRL(audiTotalFolha)}</p>
+                  <p className="text-xs text-blue-600 font-semibold mt-0.5">{audiPct.toFixed(1)}% do total</p>
+                </div>
+                <div className="bg-white px-4 py-3 flex flex-col items-center justify-center">
+                  <p className="text-xs text-slate-400 mb-0.5">Diferença</p>
+                  <p className={`text-sm font-bold font-mono ${audiTotalFolha > vwTotalFolha ? 'text-blue-600' : vwTotalFolha > audiTotalFolha ? 'text-teal-600' : 'text-slate-400'}`}>
+                    {grandTotalFolha > 0 ? fmtBRL(Math.abs(audiTotalFolha - vwTotalFolha)) : '—'}
+                  </p>
+                  {grandTotalFolha > 0 && audiTotalFolha !== vwTotalFolha && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {audiTotalFolha > vwTotalFolha ? 'Audi maior' : 'VW maior'}
+                    </p>
+                  )}
+                </div>
+                <div className="bg-white px-4 py-3 text-right">
+                  <p className="text-xs text-slate-400 mb-0.5">Total da Folha</p>
+                  <p className="text-base font-bold text-slate-800 font-mono">{fmtBRL(vwTotalFolha)}</p>
+                  <p className="text-xs text-teal-600 font-semibold mt-0.5">{vwPct.toFixed(1)}% do total</p>
+                </div>
+
+                {/* Headcount */}
+                <div className="bg-white px-4 py-3 border-t border-slate-100">
+                  <p className="text-xs text-slate-400 mb-0.5">Headcount</p>
+                  <p className="text-base font-bold text-slate-800">{audiHeadcount}</p>
+                  {audiActive.filter(e => sal(e) === 0).length > 0 && (
+                    <p className="text-xs text-slate-400 mt-0.5">{audiActive.filter(e => sal(e) === 0).length} comissionados</p>
+                  )}
+                </div>
+                <div className="bg-white px-4 py-3 border-t border-slate-100 flex flex-col items-center justify-center">
+                  <p className="text-xs text-slate-400 mb-0.5">Diferença</p>
+                  <p className={`text-sm font-bold ${audiHeadcount !== vwHeadcount ? 'text-slate-700' : 'text-slate-400'}`}>
+                    {audiHeadcount !== vwHeadcount
+                      ? `${Math.abs(audiHeadcount - vwHeadcount)} func.`
+                      : 'igual'}
+                  </p>
+                  {audiHeadcount !== vwHeadcount && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {audiHeadcount > vwHeadcount ? 'Audi maior' : 'VW maior'}
+                    </p>
+                  )}
+                </div>
+                <div className="bg-white px-4 py-3 border-t border-slate-100 text-right">
+                  <p className="text-xs text-slate-400 mb-0.5">Headcount</p>
+                  <p className="text-base font-bold text-slate-800">{vwHeadcount}</p>
+                  {vwActive.filter(e => sal(e) === 0).length > 0 && (
+                    <p className="text-xs text-slate-400 mt-0.5">{vwActive.filter(e => sal(e) === 0).length} comissionados</p>
+                  )}
+                </div>
+
+                {/* Custo Médio */}
+                <div className="bg-white px-4 py-3 border-t border-slate-100">
+                  <p className="text-xs text-slate-400 mb-0.5">Custo Médio</p>
+                  <p className="text-base font-bold text-slate-800 font-mono">{audiCustoMedio > 0 ? fmtBRL(audiCustoMedio) : '—'}</p>
+                </div>
+                <div className="bg-white px-4 py-3 border-t border-slate-100 flex flex-col items-center justify-center">
+                  <p className="text-xs text-slate-400 mb-0.5">Diferença</p>
+                  <p className={`text-sm font-bold font-mono ${audiCustoMedio !== vwCustoMedio ? 'text-slate-700' : 'text-slate-400'}`}>
+                    {audiCustoMedio > 0 && vwCustoMedio > 0
+                      ? fmtBRL(Math.abs(audiCustoMedio - vwCustoMedio))
+                      : '—'}
+                  </p>
+                  {audiCustoMedio > 0 && vwCustoMedio > 0 && audiCustoMedio !== vwCustoMedio && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {audiCustoMedio > vwCustoMedio ? 'Audi maior' : 'VW maior'}
+                    </p>
+                  )}
+                </div>
+                <div className="bg-white px-4 py-3 border-t border-slate-100 text-right">
+                  <p className="text-xs text-slate-400 mb-0.5">Custo Médio</p>
+                  <p className="text-base font-bold text-slate-800 font-mono">{vwCustoMedio > 0 ? fmtBRL(vwCustoMedio) : '—'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Gráfico de barras agrupadas por departamento */}
+          {compDeptData.length > 0 && (
+            <>
+              {maxGapDept && (
+                <p className="text-xs text-slate-400 mb-3">
+                  Maior diferença entre marcas:{' '}
+                  <span className="font-semibold text-slate-600" style={{ color: GRUPO_COLORS[maxGapDept as GrupoDept] }}>
+                    {maxGapDept}
+                  </span>
+                </p>
+              )}
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={compDeptData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="grupo" tick={{ fontSize: 10 }} />
+                  <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={82} />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const aVal = compViewMode === 'total'
+                        ? (payload.find(p => p.dataKey === 'audi')?.value as number ?? 0)
+                        : (payload.find(p => p.dataKey === 'audiMed')?.value as number ?? 0);
+                      const vVal = compViewMode === 'total'
+                        ? (payload.find(p => p.dataKey === 'vw')?.value as number ?? 0)
+                        : (payload.find(p => p.dataKey === 'vwMed')?.value as number ?? 0);
+                      const diff = Math.abs(aVal - vVal);
+                      const bigger = aVal > vVal ? 'Audi' : vVal > aVal ? 'VW' : null;
+                      return (
+                        <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs min-w-[180px]">
+                          <p className="font-bold text-slate-700 mb-2">{label}</p>
+                          <p style={{ color: '#3b82f6' }}>Audi: {fmtBRL(aVal)}</p>
+                          <p style={{ color: '#14b8a6' }}>VW: {fmtBRL(vVal)}</p>
+                          {bigger && (
+                            <p className="mt-1.5 text-slate-500">
+                              Δ {fmtBRL(diff)} — <span className="font-semibold">{bigger} maior</span>
+                            </p>
+                          )}
+                        </div>
+                      );
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey={compViewMode === 'total' ? 'audi' : 'audiMed'} name="Audi" fill="#3b82f6" radius={[4, 4, 0, 0]} opacity={0.9} />
+                  <Bar dataKey={compViewMode === 'total' ? 'vw' : 'vwMed'} name="VW" fill="#14b8a6" radius={[4, 4, 0, 0]} opacity={0.85} />
+                </BarChart>
+              </ResponsiveContainer>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
