@@ -1985,24 +1985,28 @@ export function VendasNovoAnalise() {
                         label={{ value: `Média ${fmtPct(avgPct)}`, position: 'insideTopRight', fontSize: 9, fill: '#f59e0b' }} />
                     )}
 
-                    {comissoesScenario === 'comp' ? (
-                      <>
-                        <Bar dataKey="com"     name="Comissão"    stackId="s" fill="#8b5cf6" />
-                        <Bar dataKey="dsr"     name="DSR"         stackId="s" fill="#6366f1" />
-                        <Bar dataKey="provEnc" name="Prov.+Enc."  stackId="s" fill="#a5b4fc" radius={[0, 4, 4, 0]}>
-                          <LabelList dataKey="total" position="right"
-                            formatter={(v: number) => fmtBRL(v)}
-                            style={{ fontSize: 9, fill: '#475569', fontWeight: 600 }} />
-                        </Bar>
-                      </>
-                    ) : comissoesScenario === 'custoUn' ? (
+                    {comissoesScenario === 'comp' && (
+                      <Bar dataKey="com" name="Comissão" stackId="s" fill="#8b5cf6" />
+                    )}
+                    {comissoesScenario === 'comp' && (
+                      <Bar dataKey="dsr" name="DSR" stackId="s" fill="#6366f1" />
+                    )}
+                    {comissoesScenario === 'comp' && (
+                      <Bar dataKey="provEnc" name="Prov.+Enc." stackId="s" fill="#a5b4fc" radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="total" position="right"
+                          formatter={(v: number) => fmtBRL(v)}
+                          style={{ fontSize: 9, fill: '#475569', fontWeight: 600 }} />
+                      </Bar>
+                    )}
+                    {comissoesScenario === 'custoUn' && (
                       <Bar dataKey="custoUn" name="Custo/Un." radius={[0, 5, 5, 0]}>
                         {sorted.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
                         <LabelList dataKey="custoUn" position="right"
                           formatter={(v: number) => fmtBRL(v)}
                           style={{ fontSize: 9, fill: '#475569', fontWeight: 600 }} />
                       </Bar>
-                    ) : (
+                    )}
+                    {comissoesScenario === 'pct' && (
                       <Bar dataKey="pct" name="% Receita" radius={[0, 5, 5, 0]}>
                         {sorted.map((d, i) => <Cell key={i} fill={d.pct > avgPct ? '#ef4444' : PALETTE[i % PALETTE.length]} />)}
                         <LabelList dataKey="pct" position="right"
