@@ -1041,6 +1041,9 @@ export function VendasNovoAnalise() {
 
   const periodLabel    = month !== null ? `${MS[month - 1]}/${year}` : String(year);
   const mmCfg          = MODEL_METRIC_CFG[modelMetric];
+  const familyColorMap = useMemo(() => Object.fromEntries(
+    modelFamilyData.map((d, i) => [d.name, PALETTE[i % PALETTE.length]])
+  ), [modelFamilyData]);
   const vendorsVisible = showAllVendors ? vendorData : vendorData.slice(0, 5 + 3); // top3 + 5 na tabela
   const comissoesVisible = showAllComissoes ? comissoesData : comissoesData.slice(0, 8);
 
@@ -1228,13 +1231,20 @@ export function VendasNovoAnalise() {
                         cx="50%" cy="50%" outerRadius={110} innerRadius={60}
                         labelLine={false}
                         label={DonutLabel as unknown as (props: object) => React.ReactElement | null}>
-                        {modelFamilyData.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                        {modelFamilyData.map((d, i) => <Cell key={i} fill={familyColorMap[d.name] ?? PALETTE[i % PALETTE.length]} />)}
                       </Pie>
-                      <Tooltip formatter={(v: number, name: string) => [mmCfg.fmt(v), name]} />
+                      <Tooltip formatter={(v: number, name: string, props: { payload?: { marg?: number } }) => {
+                        const display = modelMetric === 'marg'
+                          ? fmtPct(props.payload?.marg ?? 0)
+                          : mmCfg.fmt(v);
+                        return [display, name];
+                      }} />
                       <Legend wrapperStyle={{ fontSize: 11 }}
                         formatter={(value, entry) => (
                           <span style={{ color: '#475569' }}>
-                            {value}: {mmCfg.fmt((entry as { payload?: { [key: string]: number } }).payload?.[mmCfg.donutKey] ?? 0)}
+                            {value}: {modelMetric === 'marg'
+                              ? fmtPct((entry as { payload?: { marg?: number } }).payload?.marg ?? 0)
+                              : mmCfg.fmt((entry as { payload?: { [key: string]: number } }).payload?.[mmCfg.donutKey] ?? 0)}
                           </span>
                         )} />
                     </PieChart>
@@ -1263,7 +1273,7 @@ export function VendasNovoAnalise() {
                       )}
                       <Bar dataKey={mmCfg.barKey} name={mmCfg.barLabel} radius={[0, 5, 5, 0]}>
                         {[...modelFamilyData].sort((a, b) => (b[mmCfg.barKey as keyof typeof b] as number) - (a[mmCfg.barKey as keyof typeof a] as number))
-                          .map((d, i) => <Cell key={i} fill={(d[mmCfg.barKey as keyof typeof d] as number) < 0 ? '#ef4444' : PALETTE[i % PALETTE.length]} />)}
+                          .map((d, i) => <Cell key={i} fill={(d[mmCfg.barKey as keyof typeof d] as number) < 0 ? '#ef4444' : (familyColorMap[d.name] ?? PALETTE[i % PALETTE.length])} />)}
                         {modelMetric !== 'ticket' && (
                           <LabelList dataKey="marg" position="right"
                             formatter={(v: number) => fmtPct(v)}
@@ -1847,10 +1857,11 @@ export function VendasNovoAnalise() {
                       <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} />
                       <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={92} />
                       <Tooltip content={<TipJurosTotal />} />
-                      <Bar dataKey="juros" name="Juros Total" fill="#f97316" radius={[0, 5, 5, 0]}>
+                      <Bar dataKey="juros" name="Juros Total" radius={[0, 5, 5, 0]}>
+                        {jurosData.map((d, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
                         <LabelList dataKey="juros" position="right"
                           formatter={(v: number) => fmtBRL(v)}
-                          style={{ fontSize: 9, fill: '#c2410c', fontWeight: 600 }} />
+                          style={{ fontSize: 9, fill: '#64748b', fontWeight: 600 }} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -1863,10 +1874,14 @@ export function VendasNovoAnalise() {
                       <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} />
                       <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={92} />
                       <Tooltip content={<TipJurosUnit />} />
-                      <Bar dataKey="jurosPorUnidade" name="Juros / Unidade" fill="#fb923c" radius={[0, 5, 5, 0]}>
+                      <Bar dataKey="jurosPorUnidade" name="Juros / Unidade" radius={[0, 5, 5, 0]}>
+                        {[...jurosData].sort((a, b) => b.jurosPorUnidade - a.jurosPorUnidade).map((d, i) => {
+                          const origIdx = jurosData.findIndex(x => x.name === d.name);
+                          return <Cell key={i} fill={PALETTE[origIdx % PALETTE.length]} />;
+                        })}
                         <LabelList dataKey="jurosPorUnidade" position="right"
                           formatter={(v: number) => fmtBRL(v)}
-                          style={{ fontSize: 9, fill: '#c2410c', fontWeight: 600 }} />
+                          style={{ fontSize: 9, fill: '#64748b', fontWeight: 600 }} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
