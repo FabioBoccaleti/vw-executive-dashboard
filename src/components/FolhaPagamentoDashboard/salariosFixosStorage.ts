@@ -207,3 +207,37 @@ export async function clearSalariosFixos(
     return false;
   }
 }
+
+/**
+ * Retorna o período (ano/mês) mais recente que tenha dados importados.
+ * Varre as chaves salarios_fixos_* e pega a mais recente com array não vazio.
+ */
+export async function findLatestSalariosPeriod(): Promise<{ year: number; month: number } | null> {
+  try {
+    const { kvKeys } = await import('@/lib/kvClient');
+    const keys = await kvKeys('salarios_fixos_*');
+    // Formato: salarios_fixos_{brand}_{year}_{mm}
+    const periods: { year: number; month: number }[] = [];
+    for (const key of keys) {
+      const m = key.match(/^salarios_fixos_(?:audi|vw)_(\d{4})_(\d{2})$/);
+      if (!m) continue;
+      periods.push({ year: parseInt(m[1]), month: parseInt(m[2]) });
+    }
+    if (periods.length === 0) return null;
+    // Remove duplicatas e ordena decrescente
+    const unique = Array.from(
+      new Map(periods.map(p => [`${p.year}_${p.month}`, p])).values(),
+    ).sort((a, b) => b.year !== a.year ? b.year - a.year : b.month - a.month);
+    // Valida que o período mais recente tem dados de fato não vazios
+    for (const p of unique) {
+      const [audi, vw] = await Promise.all([
+        loadSalariosFixos('audi', p.year, p.month),
+        loadSalariosFixos('vw',   p.year, p.month),
+      ]);
+      if (audi.length > 0 || vw.length > 0) return p;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

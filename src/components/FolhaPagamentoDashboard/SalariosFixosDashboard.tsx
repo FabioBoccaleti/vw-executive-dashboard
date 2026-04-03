@@ -7,6 +7,7 @@ import {
   saveAllParsedSalarios,
   clearSalariosFixos,
   parseSalariosTxt,
+  findLatestSalariosPeriod,
   type SalarioFuncionario,
   type SalarioBrand,
 } from './salariosFixosStorage';
@@ -248,7 +249,7 @@ interface SalariosFixosDashboardProps {
 }
 
 export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) {
-  const [mainView, setMainView]         = useState<'relacao' | 'analise'>('relacao');
+  const [mainView, setMainView]         = useState<'relacao' | 'analise'>('analise');
   const [activeTab, setActiveTab]       = useState<ActiveTab>('audi');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear]   = useState(CURRENT_YEAR);
@@ -257,6 +258,16 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
   const [vwRows,   setVwRows]   = useState<SalarioFuncionario[]>([]);
   const [loading,  setLoading]  = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+
+  // Ao montar: detecta o período mais recente com dados e navega para ele
+  useEffect(() => {
+    findLatestSalariosPeriod().then(p => {
+      if (p) {
+        setSelectedYear(p.year);
+        setSelectedMonth(p.month);
+      }
+    });
+  }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 

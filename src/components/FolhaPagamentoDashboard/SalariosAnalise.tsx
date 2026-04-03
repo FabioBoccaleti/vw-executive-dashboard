@@ -350,6 +350,15 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
     deptDrill ? activeClassified.filter(e => e.grupo === deptDrill).sort((a, b) => sal(b) - sal(a)) : [],
     [deptDrill, activeClassified]);
 
+  // ── Admitidos no mês selecionado (╰ dataAdmissao DD/MM/YYYY) ───────────────
+  const admitidosNoMes = useMemo(() =>
+    activeClassified.filter(e => {
+      const parts = e.dataAdmissao.split('/');
+      if (parts.length < 3) return false;
+      return parseInt(parts[1]) === selectedMonth && parseInt(parts[2]) === selectedYear;
+    }).sort((a, b) => a.nome.localeCompare(b.nome)),
+    [activeClassified, selectedMonth, selectedYear]);
+
   // ── Afastados (somente para listagem no rodapé) ───────────────────────────
   const afastados = useMemo(() =>
     classified.filter(e => e.grupo === 'Afastados').sort((a, b) => a.nome.localeCompare(b.nome)),
@@ -760,6 +769,43 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
           </>
         )}
       </div>
+
+      {/* ── Admitidos no Mês ─────────────────────────────────────────── */}
+      {admitidosNoMes.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-4 h-4 text-emerald-500" />
+            <h3 className="text-sm font-bold text-slate-700">Admitidos no Mês</h3>
+            <span className="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-full border border-emerald-200">
+              {admitidosNoMes.length}
+            </span>
+          </div>
+          <div className="overflow-auto max-h-64">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left px-2 py-1.5 font-semibold text-slate-500">Nome</th>
+                  <th className="text-left px-2 py-1.5 font-semibold text-slate-500">Departamento</th>
+                  <th className="text-left px-2 py-1.5 font-semibold text-slate-500">Cargo</th>
+                  <th className="text-right px-2 py-1.5 font-semibold text-slate-500">Salário</th>
+                </tr>
+              </thead>
+              <tbody>
+                {admitidosNoMes.map(e => (
+                  <tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="px-2 py-1.5 font-medium text-slate-800">{e.nome}</td>
+                    <td className="px-2 py-1.5 text-slate-500">{e.grupo}</td>
+                    <td className="px-2 py-1.5 text-slate-500">{e.cargo}</td>
+                    <td className="px-2 py-1.5 text-right font-mono text-slate-800">
+                      {sal(e) > 0 ? fmtBRL(sal(e)) : <span className="text-slate-300">comissionado</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ── Colaboradores Afastados ───────────────────────────────────────── */}
       {afastados.length > 0 && (
