@@ -617,7 +617,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
               {([
                 { key: 'total' as const, label: 'Total da Folha', fmt: fmtBRL },
                 { key: 'hc'    as const, label: 'Headcount',      fmt: (v: number) => String(v) },
-                { key: 'medio' as const, label: 'Custo Médio',    fmt: fmtBRL },
+                { key: 'medio' as const, label: 'Salário Médio',  fmt: fmtBRL },
               ]).map(row => (
                 <tr key={row.key} className="border-b border-slate-100 hover:bg-slate-50">
                   <td className="px-3 py-2 font-semibold text-slate-600">{row.label}</td>
@@ -664,7 +664,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
         {/* Custo por Departamento — com drill */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
           <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm font-bold text-slate-700">Custo da Folha por Departamento</h3>
+            <h3 className="text-sm font-bold text-slate-700">Total de Salários por Departamento</h3>
             {deptDrill && (
               <button
                 onClick={() => setDeptDrill(null)}
@@ -884,7 +884,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
 
         {/* Custo Médio por Departamento */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <h3 className="text-sm font-bold text-slate-700 mb-1">Custo Médio por Colaborador / Departamento</h3>
+          <h3 className="text-sm font-bold text-slate-700 mb-1">Salário Médio por Departamento</h3>
           <p className="text-xs text-slate-400 mb-4">Colaboradores 100% comissionados (salário fixo R$0) são excluídos deste cálculo.</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={custoPorGrupo} layout="vertical">
@@ -1249,7 +1249,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
                     : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
-                Custo Médio
+                Salário Médio
               </button>
             </div>
           </div>
@@ -1328,7 +1328,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
 
                 {/* Custo Médio */}
                 <div className="bg-white px-4 py-3 border-t border-slate-100">
-                  <p className="text-xs text-slate-400 mb-0.5">Custo Médio</p>
+                  <p className="text-xs text-slate-400 mb-0.5">Salário Médio</p>
                   <p className="text-base font-bold text-slate-800 font-mono">{audiCustoMedio > 0 ? fmtBRL(audiCustoMedio) : '—'}</p>
                 </div>
                 <div className="bg-white px-4 py-3 border-t border-slate-100 flex flex-col items-center justify-center">
@@ -1345,7 +1345,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
                   )}
                 </div>
                 <div className="bg-white px-4 py-3 border-t border-slate-100 text-right">
-                  <p className="text-xs text-slate-400 mb-0.5">Custo Médio</p>
+                  <p className="text-xs text-slate-400 mb-0.5">Salário Médio</p>
                   <p className="text-base font-bold text-slate-800 font-mono">{vwCustoMedio > 0 ? fmtBRL(vwCustoMedio) : '—'}</p>
                 </div>
               </div>
