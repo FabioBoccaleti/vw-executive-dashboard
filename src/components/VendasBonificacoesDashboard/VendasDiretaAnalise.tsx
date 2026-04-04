@@ -747,41 +747,6 @@ export function VendasDiretaAnalise() {
     modelFamilyData.length ? modelFamilyData.reduce((s, d) => s + d.ticket, 0) / modelFamilyData.length : 0,
     [modelFamilyData]);
 
-  // Bônus mensais
-  const bonusMonthly = useMemo(() => MS.map((label, i) => {
-    const m   = i + 1;
-    const mr  = yearRows.filter(r => getMo(r) === m);
-    const net = 1 - aliqBon / 100;
-    const pivG  = mr.reduce((s, r) => s + n(r.bonusPIV), 0);
-    const siqG  = mr.reduce((s, r) => s + n(r.bonusSIQ), 0);
-    const piveG = mr.reduce((s, r) => s + n(r.bonusPIVE), 0);
-    const adicsG = mr.reduce((s, r) => s + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3), 0);
-    const gross = pivG + siqG + piveG + adicsG;
-    const deduc = gross * (aliqBon / 100);
-    return {
-      label,
-      piv:   pivG  * net,
-      siq:   siqG  * net,
-      pive:  piveG * net,
-      adics: adicsG * net,
-      gross, deduc, liq: gross - deduc,
-    };
-  }), [yearRows, aliqBon]);
-
-  // Bonificações líquidas por família
-  const bonFamilyData = useMemo(() => {
-    const map = new Map<string, VendasResultadoRow[]>();
-    for (const r of filteredRows) {
-      const k = normalizeModelo(r.modelo ?? '');
-      map.set(k, [...(map.get(k) ?? []), r]);
-    }
-    return [...map.entries()].map(([name, rows]) => {
-      const gross = rows.reduce((s, r) => s + n(r.bonusPIV) + n(r.bonusSIQ) + n(r.bonusPIVE) + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3), 0);
-      const deduc = gross * (aliqBon / 100);
-      return { name, gross, deduc, liq: gross - deduc };
-    }).filter(d => d.gross > 0).sort((a, b) => b.liq - a.liq);
-  }, [filteredRows, aliqBon]);
-
   // Receitas por fonte por mês
   const receitasFonteData = useMemo(() => MS.map((label, i) => {
     const m  = i + 1;
@@ -1451,60 +1416,6 @@ export function VendasDiretaAnalise() {
                 <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" />Resultado (+)</span>
                 <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-500 inline-block" />Resultado (−)</span>
               </div>
-            </div>
-          </div>
-
-          {/* ── Bonificações por Mês + Líquidas por Família ─────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Bônus mensais */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <SH>Composição de Bônus — {periodLabel}</SH>
-                </div>
-                {metrics.bon > 0 && (
-                  <div className="text-right -mt-1">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wide">Acumulado</p>
-                    <p className="text-base font-bold text-amber-600 font-mono">{fmtBRL(metrics.bon * (1 - aliqBon / 100))}</p>
-                    {aliqBon > 0 && <p className="text-[10px] text-slate-400">Imp. s/ bônus: {fmtPct(aliqBon, 2)}</p>}
-                  </div>
-                )}
-              </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={bonusMonthly} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} />
-                  <Tooltip content={<TipBRL />} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="piv"   name="PIV"        stackId="b" fill="#3b82f6" />
-                  <Bar dataKey="siq"   name="SIQ"        stackId="b" fill="#f97316" />
-                  <Bar dataKey="pive"  name="PIVE"       stackId="b" fill="#a855f7" />
-                  <Bar dataKey="adics" name="Adicionais" stackId="b" fill="#10b981" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Bônus líquidas por família */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-              <SH>Bonificações Líquidas por Família — {periodLabel}</SH>
-              {bonFamilyData.length === 0 ? <Empty /> : (
-                <ResponsiveContainer width="100%" height={Math.max(200, bonFamilyData.length * 36 + 40)}>
-                  <BarChart data={bonFamilyData} layout="vertical" margin={{ left: 4, right: 72, top: 4, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                    <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={86} />
-                    <Tooltip content={<TipBonFam />} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="gross" name="Bônus Bruto" stackId="n" fill="#6366f1" opacity={0.4} />
-                    <Bar dataKey="deduc" name="Imp. s/ Bônus" stackId="n" fill="#ef4444" opacity={0.7} radius={[0, 3, 3, 0]}>
-                      <LabelList dataKey="liq" position="right"
-                        formatter={(v: number) => fmtBRL(v)}
-                        style={{ fontSize: 9, fill: '#475569', fontWeight: 600 }} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
             </div>
           </div>
 
