@@ -13,6 +13,7 @@ import VendasResultadoDashboard from './VendasResultadoDashboard';
 import { CadastrosVWPage } from './CadastrosVWPage';
 import { VendasNovoAnalise } from './VendasNovoAnalise';
 import { VendasUsadoAnalise } from './VendasUsadoAnalise';
+import { VendasDiretaAnalise } from './VendasDiretaAnalise';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
 import type { TabelaDadosRow } from './tabelaDadosStorage';
 
@@ -710,7 +711,8 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           {/* Conteúdo */}
           {analiseTab === 'novos' && <VendasNovoAnalise />}
           {analiseTab === 'usados' && <VendasUsadoAnalise />}
-          {analiseTab !== 'novos' && analiseTab !== 'usados' && (
+          {analiseTab === 'direta' && <VendasDiretaAnalise />}
+          {analiseTab !== 'novos' && analiseTab !== 'usados' && analiseTab !== 'direta' && (
             <div className="flex-1 flex items-center justify-center text-slate-300">
               <div className="flex flex-col items-center gap-3">
                 <BarChart2 className="w-12 h-12" />
