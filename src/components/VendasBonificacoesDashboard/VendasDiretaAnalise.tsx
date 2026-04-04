@@ -16,7 +16,6 @@ import {
   loadAliquotas, loadVendasDsr, loadRemuneracao,
   type VendasDsrConfig, type RemuneracaoModalidade, type FaixaBonus,
 } from './vendedoresRemuneracaoStorage';
-import { loadModelos, loadRegras, getRegra, type VeiculoModelo, type VeiculoRegra } from './veiculosRegrasStorage';
 import { loadJurosRotativoRows, type JurosRotativoRow } from './jurosRotativoStorage';
 import { loadVendasRows, type VendasRow as BlindagemRow } from './vendasStorage';
 import { loadRegistroRows, type RegistroVendasRow } from './registroVendasStorage';
@@ -162,34 +161,6 @@ function applyComissaoAutoFill(rows: VendasResultadoRow[], modalidade: Remunerac
   });
 }
 
-// ─── Auto-fill: PIV/SIQ/PIVE via cadastro de regras ─────────────────────────
-function applyAutoFill(
-  rows: VendasResultadoRow[],
-  modelos: VeiculoModelo[],
-  regras: VeiculoRegra[],
-): VendasResultadoRow[] {
-  return rows.map(row => {
-    if (row.bonusPIV !== '' && row.bonusSIQ !== '' && row.bonusPIVE !== '') return row;
-    const d = row.dataVenda;
-    let ano: number | null = null, mes: number | null = null;
-    if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) { ano = parseInt(d.split('/')[2]); mes = parseInt(d.split('/')[1]); }
-    else if (/^\d{4}-\d{2}-\d{2}/.test(d)) { ano = parseInt(d.split('-')[0]); mes = parseInt(d.split('-')[1]); }
-    if (!ano || !mes) return row;
-    const modelo = modelos.find(m => m.modelo.trim().toLowerCase() === (row.modelo ?? '').trim().toLowerCase());
-    if (!modelo) return row;
-    const regra = getRegra(regras, modelo.id, ano, mes);
-    if (!regra) return row;
-    const preco = parseFloat(String(regra.precoPublico).replace(',', '.')) || 0;
-    const sign = false /* VD/Frotista sem devoluções */ ? -1 : 1;
-    return {
-      ...row,
-      bonusPIV:  row.bonusPIV  === '' ? (preco * (parseFloat(String(regra.piv).replace(',',  '.')) || 0) / 100 * sign).toFixed(2) : row.bonusPIV,
-      bonusSIQ:  row.bonusSIQ  === '' ? (preco * (parseFloat(String(regra.siq).replace(',',  '.')) || 0) / 100 * sign).toFixed(2) : row.bonusSIQ,
-      bonusPIVE: row.bonusPIVE === '' ? (preco * (parseFloat(String(regra.pive).replace(',', '.')) || 0) / 100 * sign).toFixed(2) : row.bonusPIVE,
-    };
-  });
-}
-
 // ─── Auto-fill: recBlindagem via dados de películas/blindagem ────────────────
 function buildBlindagemMap(blindagemRows: BlindagemRow[]): Map<string, string> {
   const map = new Map<string, string>();
@@ -294,8 +265,8 @@ function calcDireta(r: VendasResultadoRow, aliqBon: number, dsrPct: number) {
   const comBruta = n(r.valorVenda) * n(r.pctComissao) / 100;
   const lb = comBruta - n(r.impostos); // Com. Líquida
   const bv = n(r.bonusVarejo);
-  const bon = n(r.bonusPIV) + n(r.bonusSIQ) + n(r.bonusPIVE) + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3);
-  const lcb = lb + bv - bv * aliqBon / 100 + bon - bon * aliqBon / 100;
+  const bon = 0; // VD/Frotista não tem bônus PIV/SIQ/PIVE/Adicionais
+  const lcb = lb + bv - bv * aliqBon / 100;
   const dsr = n(r.comissaoVenda) * dsrPct / 100;
   const base = n(r.comissaoVenda) + dsr;
   const prov = base * 7 / 36;
@@ -628,21 +599,16 @@ export function VendasDiretaAnalise() {
       loadAliquotas(),
       loadVendasDsr(),
       loadRemuneracao(),
-      loadModelos(),
-      loadRegras(),
       loadJurosRotativoRows(),
       loadVendasRows(),
       loadRegistroRows('frotista'),
-    ]).then(([rows, aliq, dsr, rem, modelos, regras, jurosRows, blindRows, regRows]) => {
+    ]).then(([rows, aliq, dsr, rem, jurosRows, blindRows, regRows]) => {
       const jurosMap = buildJurosMap(jurosRows as JurosRotativoRow[]);
       const blindMap = buildBlindagemMap(blindRows as BlindagemRow[]);
       const regMap   = buildRegistroMap(regRows as RegistroVendasRow[]);
       let filledRows = applyComissaoAutoFill(rows as VendasResultadoRow[], (rem as { vd_frotista: RemuneracaoModalidade }).vd_frotista);
       filledRows = applyZeroComissao(filledRows);
       filledRows = applyJurosAutoFill(filledRows, jurosMap);
-      if ((modelos as VeiculoModelo[]).length > 0) {
-        filledRows = applyAutoFill(filledRows, modelos as VeiculoModelo[], regras as VeiculoRegra[]);
-      }
       filledRows = applyBlindagemAutoFill(filledRows, blindMap);
       filledRows = applyDiasEstoqueFromRegistros(filledRows, regMap);
       setAllRows(filledRows);
