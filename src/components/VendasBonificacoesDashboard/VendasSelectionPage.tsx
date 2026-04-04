@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Shield, Layers, Car, X, Lock, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/useAuth';
 import type { VendasSubModuleId } from '@/lib/authTypes';
+import { BaseDateBadge } from '@/components/BaseDateBadge';
 
 const BLINDAGEM_SUBS: VendasSubModuleId[] = [
   'blindagem.tabela', 'blindagem.analise', 'blindagem.todas',
@@ -130,6 +131,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
               <h2 className="text-base font-bold text-slate-800 leading-snug">
                 Central de Vendas VW
               </h2>
+              <BaseDateBadge dateKey="base_date:central_vendas_vw" />
             </div>
           </button>
 

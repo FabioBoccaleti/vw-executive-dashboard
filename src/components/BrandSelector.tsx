@@ -5,6 +5,7 @@ import { BRAND_CONFIGS, type Brand } from '@/lib/brands';
 import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, TrendingUp, Settings, LogOut, Users } from 'lucide-react';
 import { PasswordDialog } from '@/components/PasswordDialog';
 import { useAuth } from '@/contexts/useAuth';
+import { BaseDateBadge } from '@/components/BaseDateBadge';
 
 const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
 const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento'];
@@ -149,6 +150,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
                 <ChevronDown
                   className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${demonstrativoExpanded ? 'rotate-180' : ''}`}
                 />
+                <BaseDateBadge dateKey="base_date:demonstrativo" />
               </CardContent>
 
               {demonstrativoExpanded && (
@@ -248,6 +250,9 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
                     >
                       Selecionado
                     </div>
+                  )}
+                  {(brand === 'fluxo_caixa' || brand === 'folha_pagamento') && (
+                    <BaseDateBadge dateKey={`base_date:${brand}`} />
                   )}
                 </CardContent>
               </Card>
