@@ -663,11 +663,9 @@ export function VendasUsadoAnalise() {
       loadModelos(),
       loadRegras(),
       loadJurosRotativoRows(),
-      loadVendasRows(),
       loadRegistroRows('usados'),
-    ]).then(([rows, aliq, dsr, rem, modelos, regras, jurosRows, blindRows, regRows]) => {
+    ]).then(([rows, aliq, dsr, rem, modelos, regras, jurosRows, regRows]) => {
       const jurosMap = buildJurosMap(jurosRows as JurosRotativoRow[]);
-      const blindMap = buildBlindagemMap(blindRows as BlindagemRow[]);
       const regMap   = buildRegistroMap(regRows as RegistroVendasRow[]);
       let filledRows = applyComissaoAutoFill(rows as VendasResultadoRow[], (rem as { usados: RemuneracaoModalidade }).usados);
       filledRows = applyZeroComissao(filledRows);
@@ -675,7 +673,6 @@ export function VendasUsadoAnalise() {
       if ((modelos as VeiculoModelo[]).length > 0) {
         filledRows = applyAutoFill(filledRows, modelos as VeiculoModelo[], regras as VeiculoRegra[]);
       }
-      filledRows = applyBlindagemAutoFill(filledRows, blindMap);
       filledRows = applyDiasEstoqueFromRegistros(filledRows, regMap);
       setAllRows(filledRows);
       setAliqBon((aliq as { tipo: string; aliquota: string }[])
