@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, ComposedChart, Line, Cell, PieChart, Pie,
@@ -66,8 +66,8 @@ const MEDAL_COLOR = ['#f59e0b','#9ca3af','#cd7f32'];
 type ModelMetric        = 'vol' | 'lb' | 'res' | 'ticket' | 'marg' | 'bubble';
 type VendorSort         = 'res' | 'vol' | 'lb' | 'marg';
 type ComissaoMode       = 'total' | 'com' | 'dsr' | 'provEnc';
-type JurosGrouping      = 'familia' | 'modelo';
-type ComissoesGrouping  = 'familia' | 'modelo';
+type JurosGrouping = 'marca' | 'modelo';
+type ComissoesGrouping = 'marca' | 'modelo';
 type ComissoesScenario  = 'custoUn' | 'comp' | 'pct';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -180,7 +180,7 @@ function applyAutoFill(
     const regra = getRegra(regras, modelo.id, ano, mes);
     if (!regra) return row;
     const preco = parseFloat(String(regra.precoPublico).replace(',', '.')) || 0;
-    const sign = row.transacao === 'V07' ? -1 : 1;
+    const sign = row.transacao === 'U07' ? -1 : 1;
     return {
       ...row,
       bonusPIV:  row.bonusPIV  === '' ? (preco * (parseFloat(String(regra.piv).replace(',',  '.')) || 0) / 100 * sign).toFixed(2) : row.bonusPIV,
@@ -275,6 +275,39 @@ function normalizeModelo(raw: string): string {
   return raw.trim() || '(sem modelo)';
 }
 
+
+// ─── Normalização modelo → marca (para veículos usados) ───────────────────────
+function normalizeMarca(raw: string): string {
+  const u = (raw || '').toUpperCase()
+    .replace(/[ÀÁÂÃÄ]/g,'A').replace(/[ÈÉÊË]/g,'E')
+    .replace(/[ÌÍÎÏ]/g,'I').replace(/[ÒÓÔÕÖ]/g,'O').replace(/[ÙÚÛÜ]/g,'U');
+  if (/\bVW\b/.test(u) || u.startsWith('VW ') || u.includes('VOLKSWAGEN')) return 'VW';
+  if (u.startsWith('GM ') || /\bGM\b/.test(u) || u.includes('CHEVROLET')) return 'GM / Chevrolet';
+  if (u.startsWith('FIAT') || u.includes('FIAT')) return 'Fiat';
+  if (u.startsWith('FORD') || u.includes('FORD')) return 'Ford';
+  if (u.startsWith('TOYOTA') || u.includes('TOYOTA')) return 'Toyota';
+  if (u.startsWith('HONDA') || u.includes('HONDA')) return 'Honda';
+  if (u.startsWith('HYUNDAI') || u.includes('HYUNDAI')) return 'Hyundai';
+  if (u.startsWith('KIA') || u.includes('KIA')) return 'Kia';
+  if (u.startsWith('NISSAN') || u.includes('NISSAN')) return 'Nissan';
+  if (u.startsWith('JEEP') || u.includes('JEEP')) return 'Jeep';
+  if (u.startsWith('RENAULT') || u.includes('RENAULT')) return 'Renault';
+  if (u.startsWith('MITSUBISHI') || u.includes('MITSUBISHI')) return 'Mitsubishi';
+  if (u.startsWith('PEUGEOT') || u.includes('PEUGEOT')) return 'Peugeot';
+  if (u.startsWith('CITROEN') || u.includes('CITROEN') || u.includes('CITROËN')) return 'Citroën';
+  if (u.startsWith('CHERY') || u.includes('CHERY')) return 'Chery';
+  if (u.startsWith('BMW') || u.includes('BMW')) return 'BMW';
+  if (u.startsWith('MERCEDES') || u.includes('MERCEDES')) return 'Mercedes-Benz';
+  if (u.startsWith('AUDI') || u.includes('AUDI')) return 'Audi';
+  if (u.startsWith('SUBARU') || u.includes('SUBARU')) return 'Subaru';
+  if (u.startsWith('VOLVO') || u.includes('VOLVO')) return 'Volvo';
+  if (u.startsWith('MINI') || /\bMINI\b/.test(u)) return 'Mini';
+  if (u.startsWith('LAND ROVER') || u.includes('LAND ROVER')) return 'Land Rover';
+  // Modelos VW sem prefixo "VW"
+  if (/\b(POLO|VIRTUS|JETTA|TIGUAN|AMAROK|T-CROSS|TCROSS|TAOS|NIVUS|SAVEIRO|VOYAGE|PASSAT|ARTEON|TERA)\b/.test(u)) return 'VW';
+  const first = raw.trim().split(/\s+/)[0];
+  return first || '(sem marca)';
+}
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 function getInitials(name: string) {
   const p = name.trim().split(/\s+/).filter(Boolean);
@@ -289,9 +322,9 @@ function avatarColor(name: string) {
 }
 
 // ─── Cálculo por linha ────────────────────────────────────────────────────────
-function calcNovos(r: VendasResultadoRow, aliqBon: number, dsrPct: number) {
+function calcUsados(r: VendasResultadoRow, aliqBon: number, dsrPct: number) {
   const recLiq = n(r.valorVenda) - n(r.impostos);
-  const bv = n(r.bonusVarejo), bt = n(r.bonusTradeIn);
+  const bv = n(r.bonusVarejo), bt = 0; // Trade-in não usado em Usados
   const lb  = recLiq - n(r.valorCusto) + bv + bt - (bv + bt) * aliqBon / 100;
   const bon = n(r.bonusPIV) + n(r.bonusSIQ) + n(r.bonusPIVE) + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3);
   const lcb = lb + bon - bon * aliqBon / 100;
@@ -317,7 +350,7 @@ interface Agg {
 }
 function agg(rows: VendasResultadoRow[], aliqBon: number, dsrCfg: VendasDsrConfig[]): Agg | null {
   if (!rows.length) return null;
-  const v07 = rows.filter(r => r.transacao === 'V07').length;
+  const v07 = rows.filter(r => r.transacao === 'U07').length;
   const netVol = rows.length - v07;
   let receita = 0, custo = 0, recLiq = 0, lb = 0, bon = 0, lcb = 0;
   let dsr = 0, prov = 0, enc = 0, res = 0, remV = 0;
@@ -325,7 +358,7 @@ function agg(rows: VendasResultadoRow[], aliqBon: number, dsrCfg: VendasDsrConfi
   let diasSum = 0; const diasArr: number[] = [];
   for (const r of rows) {
     const d = dsrFor(dsrCfg, r.dataVenda);
-    const c = calcNovos(r, aliqBon, d);
+    const c = calcUsados(r, aliqBon, d);
     receita += n(r.valorVenda); custo += n(r.valorCusto);
     recLiq += c.recLiq; lb += c.lb; bon += c.bon; lcb += c.lcb;
     dsr += c.dsr; prov += c.prov; enc += c.enc; res += c.resultado; com += c.com;
@@ -556,7 +589,7 @@ async function exportExcel(
   const fill = (argb: string) => ({ type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb } });
   const addSheet = (name: string, tab: string, headers: string[], rows: (string | number)[][], widths: number[]) => {
     const ws = wb.addWorksheet(name, { properties: { tabColor: { argb: tab } } });
-    const t = ws.addRow([`Análise Novos — ${periodLabel} — ${name}`]);
+    const t = ws.addRow([`Análise Usados — ${periodLabel} — ${name}`]);
     ws.mergeCells(1, 1, 1, headers.length);
     t.height = 26; t.eachCell(c => { c.fill = fill('FF1E3A5F'); c.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12 }; c.alignment = { vertical: 'middle', horizontal: 'center' }; });
     const h = ws.addRow(headers);
@@ -575,17 +608,17 @@ async function exportExcel(
     vendorData.map(v => [v.name, v.vol, v.res, v.marg, v.lb, v.lbPct, v.remVendedor]), [28, 10, 18, 12, 18, 12, 18]);
   addSheet('Evolução Mensal', 'FF10B981', ['Mês', 'Vol. Líq.', 'Receita Líq.', 'Lucro Bruto', 'Lucro c/ Bôn.', 'Resultado', 'Margem %'],
     monthlyData.map(m => [m.label, m.vol, m.recLiq, m.lb, m.lcb, m.res, m.marg]), [10, 10, 18, 18, 18, 18, 12]);
-  addSheet('Mix por Modelo', 'FFF59E0B', ['Modelo', 'Vol.', 'Lucro Bruto', 'Margem %', 'Resultado'],
+  addSheet('Mix por Marca', 'FFF59E0B', ['Marca', 'Vol.', 'Lucro Bruto', 'Margem %', 'Resultado'],
     modelData.map(m => [m.name, m.vol, m.lb, m.marg, m.res]), [22, 10, 18, 12, 18]);
   const buf = await wb.xlsx.writeBuffer();
   saveAs(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-    `analise-novos-${periodLabel.toLowerCase().replace(/\//g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`);
+    `analise-usados-${periodLabel.toLowerCase().replace(/\//g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ═══════════════════════════════════════════════════════════════════════════════
-export function VendasNovoAnalise() {
+export function VendasUsadoAnalise() {
   const today    = new Date();
   const curYear  = today.getFullYear();
   const curMonth = today.getMonth() + 1;
@@ -608,10 +641,10 @@ export function VendasNovoAnalise() {
   const [vendorSort,    setVendorSort]    = useState<VendorSort>('res');
   const [showAllVendors,   setShowAllVendors]   = useState(false);
   const [comissaoMode,        setComissaoMode]        = useState<ComissaoMode>('total');
-  const [jurosGrouping,       setJurosGrouping]       = useState<JurosGrouping>('familia');
-  const [giroGrouping,        setGiroGrouping]        = useState<JurosGrouping>('familia');
+  const [jurosGrouping,       setJurosGrouping]       = useState<JurosGrouping>('marca');
+  const [giroGrouping,        setGiroGrouping]        = useState<JurosGrouping>('marca');
   const [receitasView,        setReceitasView]        = useState<'fonte' | 'familia'>('fonte');
-  const [comissoesGrouping,   setComissoesGrouping]   = useState<ComissoesGrouping>('familia');
+  const [comissoesGrouping,   setComissoesGrouping]   = useState<ComissoesGrouping>('marca');
   const [comissoesScenario,   setComissoesScenario]   = useState<ComissoesScenario>('custoUn');
   const [showAllComissoes,    setShowAllComissoes]    = useState(false);
 
@@ -623,7 +656,7 @@ export function VendasNovoAnalise() {
   // ─── Carga ────────────────────────────────────────────────────────────────
   useEffect(() => {
     Promise.all([
-      loadVendasResultadoRows('novos'),
+      loadVendasResultadoRows('usados'),
       loadAliquotas(),
       loadVendasDsr(),
       loadRemuneracao(),
@@ -631,12 +664,12 @@ export function VendasNovoAnalise() {
       loadRegras(),
       loadJurosRotativoRows(),
       loadVendasRows(),
-      loadRegistroRows('novos'),
+      loadRegistroRows('usados'),
     ]).then(([rows, aliq, dsr, rem, modelos, regras, jurosRows, blindRows, regRows]) => {
       const jurosMap = buildJurosMap(jurosRows as JurosRotativoRow[]);
       const blindMap = buildBlindagemMap(blindRows as BlindagemRow[]);
       const regMap   = buildRegistroMap(regRows as RegistroVendasRow[]);
-      let filledRows = applyComissaoAutoFill(rows as VendasResultadoRow[], (rem as { novos: RemuneracaoModalidade }).novos);
+      let filledRows = applyComissaoAutoFill(rows as VendasResultadoRow[], (rem as { usados: RemuneracaoModalidade }).usados);
       filledRows = applyZeroComissao(filledRows);
       filledRows = applyJurosAutoFill(filledRows, jurosMap);
       if ((modelos as VeiculoModelo[]).length > 0) {
@@ -691,7 +724,7 @@ export function VendasNovoAnalise() {
     return true;
   }), [yearRows, month, vendedor, modelo]);
 
-  const devolucoes = useMemo(() => filteredRows.filter(r => r.transacao === 'V07'), [filteredRows]);
+  const devolucoes = useMemo(() => filteredRows.filter(r => r.transacao === 'U07'), [filteredRows]);
   const metrics    = useMemo(() => agg(filteredRows, aliqBon, dsrCfg), [filteredRows, aliqBon, dsrCfg]);
 
   const prevMetrics = useMemo(() => {
@@ -734,7 +767,7 @@ export function VendasNovoAnalise() {
   const modelFamilyData = useMemo(() => {
     const map = new Map<string, VendasResultadoRow[]>();
     for (const r of filteredRows) {
-      const k = normalizeModelo(r.modelo ?? '');
+      const k = normalizeMarca(r.modelo ?? '');
       map.set(k, [...(map.get(k) ?? []), r]);
     }
     return [...map.entries()].flatMap(([name, rows]) => {
@@ -774,7 +807,7 @@ export function VendasNovoAnalise() {
   const bonFamilyData = useMemo(() => {
     const map = new Map<string, VendasResultadoRow[]>();
     for (const r of filteredRows) {
-      const k = normalizeModelo(r.modelo ?? '');
+      const k = normalizeMarca(r.modelo ?? '');
       map.set(k, [...(map.get(k) ?? []), r]);
     }
     return [...map.entries()].map(([name, rows]) => {
@@ -807,7 +840,7 @@ export function VendasNovoAnalise() {
   const receitasFamiliaData = useMemo(() => {
     const map = new Map<string, { blind: number; fin: number; desp: number }>();
     for (const r of filteredRows) {
-      const k = normalizeModelo(r.modelo ?? '');
+      const k = normalizeMarca(r.modelo ?? '');
       const prev = map.get(k) ?? { blind: 0, fin: 0, desp: 0 };
       map.set(k, {
         blind: prev.blind + n(r.recBlindagem),
@@ -844,7 +877,7 @@ export function VendasNovoAnalise() {
   const jurosData = useMemo(() => {
     const map = new Map<string, { juros: number; vol: number }>();
     for (const r of filteredRows) {
-      const k = jurosGrouping === 'familia' ? normalizeModelo(r.modelo ?? '') : (r.modelo?.trim() || '(sem modelo)');
+      const k = jurosGrouping === 'marca' ? normalizeMarca(r.modelo ?? '') : (r.modelo?.trim() || '(sem modelo)');
       const j = n(r.jurosEstoque);
       const prev = map.get(k) ?? { juros: 0, vol: 0 };
       map.set(k, { juros: prev.juros + j, vol: prev.vol + (j > 0 ? 1 : 0) });
@@ -861,7 +894,7 @@ export function VendasNovoAnalise() {
     for (const r of filteredRows) {
       const dias = n(r.diasEstoque);
       if (dias <= 0) continue;
-      const k = giroGrouping === 'familia' ? normalizeModelo(r.modelo ?? '') : (r.modelo?.trim() || '(sem modelo)');
+      const k = giroGrouping === 'marca' ? normalizeMarca(r.modelo ?? '') : (r.modelo?.trim() || '(sem modelo)');
       const arr = map.get(k) ?? [];
       arr.push(dias);
       map.set(k, arr);
@@ -884,7 +917,7 @@ export function VendasNovoAnalise() {
     for (const r of filteredRows) {
       const cor = (r.cor ?? '').trim() || '(sem cor)';
       const dsrPct = dsrFor(dsrCfg, r.dataVenda);
-      const c = calcNovos(r, aliqBon, dsrPct);
+      const c = calcUsados(r, aliqBon, dsrPct);
       const prev = map.get(cor) ?? { vol: 0, lb: 0 };
       map.set(cor, { vol: prev.vol + 1, lb: prev.lb + c.lb });
     }
@@ -897,7 +930,7 @@ export function VendasNovoAnalise() {
     const topCores = coresData.slice(0, 8).map(c => c.name);
     const famMap = new Map<string, Record<string, number>>();
     for (const r of filteredRows) {
-      const fam = normalizeModelo(r.modelo ?? '');
+      const fam = normalizeMarca(r.modelo ?? '');
       const cor = (r.cor ?? '').trim() || '(sem cor)';
       if (!topCores.includes(cor)) continue;
       if (!famMap.has(fam)) famMap.set(fam, {});
@@ -918,11 +951,11 @@ export function VendasNovoAnalise() {
   const comissoesPorGrupoData = useMemo(() => {
     const map = new Map<string, { com: number; dsr: number; provEnc: number; recLiq: number; vol: number }>();
     for (const r of filteredRows) {
-      const k = comissoesGrouping === 'familia'
-        ? normalizeModelo(r.modelo ?? '')
+      const k = comissoesGrouping === 'marca'
+        ? normalizeMarca(r.modelo ?? '')
         : (r.modelo?.trim() || '(sem modelo)');
       const dsrPct = dsrFor(dsrCfg, r.dataVenda);
-      const c = calcNovos(r, aliqBon, dsrPct);
+      const c = calcUsados(r, aliqBon, dsrPct);
       const prev = map.get(k) ?? { com: 0, dsr: 0, provEnc: 0, recLiq: 0, vol: 0 };
       map.set(k, {
         com:     prev.com     + c.com,
@@ -987,7 +1020,7 @@ export function VendasNovoAnalise() {
       if (getYr(r) !== p.year) return false;
       if (p.gran === 'mes' && getMo(r) !== p.month) return false;
       if (p.vendedor !== 'Todos' && (r.vendedor?.trim() || '') !== p.vendedor) return false;
-      if (p.familia !== 'Todas' && normalizeModelo(r.modelo ?? '') !== p.familia) return false;
+      if (p.familia !== 'Todas' && normalizeMarca(r.modelo ?? '') !== p.familia) return false;
       if (p.modelo !== 'Todos' && (r.modelo?.trim() || '') !== p.modelo) return false;
       return true;
     });
@@ -1031,18 +1064,18 @@ export function VendasNovoAnalise() {
       { id: 'totalBon',   label: 'Total de Bônus (líquido)', value: fmtBRL(metrics.bon * (1 - aliqBon / 100)),
         sub: metrics.recLiq > 0 ? fmtPct(metrics.bon * (1 - aliqBon / 100) / metrics.recLiq * 100) + ' da receita' : undefined,
         color: 'text-amber-700', accent: '#f59e0b',
-        info: metrics.bon === 0 ? 'PIV/SIQ/PIVE não preenchidos na aba Vendas → Novos' : undefined },
+        info: metrics.bon === 0 ? 'PIV/SIQ/PIVE não preenchidos na aba Vendas → Usados' : undefined },
       { id: 'ticket',     label: 'Ticket (Resultado)', value: metrics.netVol > 0 ? fmtBRL(metrics.res / metrics.netVol) : '—',
         color: 'text-violet-700', accent: '#8b5cf6' },
       { id: 'juros',      label: 'Juros de Estoque', value: fmtBRL(metrics.juros),
         sub: metrics.juros === 0 ? 'não preenchido na aba Vendas' : (metrics.recLiq > 0 ? fmtPct(metrics.juros / metrics.recLiq * 100) + ' da receita' : undefined),
         color: metrics.juros > metrics.recLiq * 0.02 ? 'text-red-600' : 'text-slate-400', accent: '#ef4444',
-        info: 'Campo "Juros Estoque" — preencher manualmente em Vendas → Novos' },
+        info: 'Campo "Juros Estoque" — preencher manualmente em Vendas → Usados' },
       { id: 'mediaDias',  label: 'Giro Médio (dias)', value: metrics.mediaDias > 0 ? metrics.mediaDias.toFixed(0) + ' dias' : '—',
         sub: metrics.mediaDias === 0 ? 'não preenchido na aba Vendas' : 'tempo médio até venda',
         color: metrics.mediaDias > 60 ? 'text-red-600' : metrics.mediaDias > 30 ? 'text-amber-600' : metrics.mediaDias > 0 ? 'text-emerald-700' : 'text-slate-400',
         accent: '#06b6d4',
-        info: 'Campo "Dias Estoque" — preencher manualmente em Vendas → Novos' },
+        info: 'Campo "Dias Estoque" — preencher manualmente em Vendas → Usados' },
     ];
   }, [metrics, prevMetrics]);
 
@@ -1175,7 +1208,7 @@ export function VendasNovoAnalise() {
             ★ clique em qualquer card para fixar como destaque (máx. 3) — ⓘ = campo não preenchido
           </p>
 
-          {/* ── Vendas por Modelo (família) — botões dinâmicos ──────────────── */}
+          {/* ── Vendas POR MARCA — botões dinâmicos ──────────────── */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <SH right={
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -1184,7 +1217,7 @@ export function VendasNovoAnalise() {
                 ))}
               </div>
             }>
-              Vendas por Modelo (Família) — {periodLabel}
+              Vendas POR MARCA — {periodLabel}
             </SH>
             {modelFamilyData.length === 0 ? <Empty /> : modelMetric === 'bubble' ? (
               /* ── Bubble: Volume × Margem × Resultado ── */
@@ -1317,12 +1350,12 @@ export function VendasNovoAnalise() {
                         ? 'bg-cyan-600 text-white shadow-sm'
                         : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                     }`}>
-                    {g === 'familia' ? 'Família' : 'Modelo'}
+                    {g === 'familia' ? 'Marca' : 'Modelo'}
                   </button>
                 ))}
               </div>
             }>
-              Giro de Estoque por {giroGrouping === 'familia' ? 'Família' : 'Modelo'} — {periodLabel}
+              Giro de Estoque por {giroGrouping === 'marca' ? 'Marca' : 'Modelo'} — {periodLabel}
             </SH>
             {giroEstoqueData.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-slate-400">
@@ -1561,60 +1594,6 @@ export function VendasNovoAnalise() {
             </div>
           </div>
 
-          {/* ── Bonificações por Mês + Líquidas por Família ─────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* Bônus mensais */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <SH>Composição de Bônus — {periodLabel}</SH>
-                </div>
-                {metrics.bon > 0 && (
-                  <div className="text-right -mt-1">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wide">Acumulado</p>
-                    <p className="text-base font-bold text-amber-600 font-mono">{fmtBRL(metrics.bon * (1 - aliqBon / 100))}</p>
-                    {aliqBon > 0 && <p className="text-[10px] text-slate-400">Imp. s/ bônus: {fmtPct(aliqBon, 2)}</p>}
-                  </div>
-                )}
-              </div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={bonusMonthly} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                  <YAxis tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} width={88} />
-                  <Tooltip content={<TipBRL />} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="piv"   name="PIV"        stackId="b" fill="#3b82f6" />
-                  <Bar dataKey="siq"   name="SIQ"        stackId="b" fill="#f97316" />
-                  <Bar dataKey="pive"  name="PIVE"       stackId="b" fill="#a855f7" />
-                  <Bar dataKey="adics" name="Adicionais" stackId="b" fill="#10b981" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Bônus líquidas por família */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-              <SH>Bonificações Líquidas por Família — {periodLabel}</SH>
-              {bonFamilyData.length === 0 ? <Empty /> : (
-                <ResponsiveContainer width="100%" height={Math.max(200, bonFamilyData.length * 36 + 40)}>
-                  <BarChart data={bonFamilyData} layout="vertical" margin={{ left: 4, right: 72, top: 4, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                    <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 9 }} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={86} />
-                    <Tooltip content={<TipBonFam />} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="gross" name="Bônus Bruto" stackId="n" fill="#6366f1" opacity={0.4} />
-                    <Bar dataKey="deduc" name="Imp. s/ Bônus" stackId="n" fill="#ef4444" opacity={0.7} radius={[0, 3, 3, 0]}>
-                      <LabelList dataKey="liq" position="right"
-                        formatter={(v: number) => fmtBRL(v)}
-                        style={{ fontSize: 9, fill: '#475569', fontWeight: 600 }} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-
           {/* ── Receitas por Fonte ───────────────────────────────────────────── */}
           {(totaisReceitas.blind + totaisReceitas.fin + totaisReceitas.desp) > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
@@ -1628,7 +1607,7 @@ export function VendasNovoAnalise() {
                             ? 'bg-cyan-600 text-white shadow-sm'
                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                         }`}>
-                        {v === 'fonte' ? 'Fonte' : 'Família'}
+                        {v === 'fonte' ? 'Fonte' : 'Marca'}
                       </button>
                     ))}
                   </div>
@@ -1844,7 +1823,7 @@ export function VendasNovoAnalise() {
           {jurosData.length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
               <div className="flex items-center justify-between mb-1 flex-wrap gap-3">
-                <SH>Juros de Estoque por {jurosGrouping === 'familia' ? 'Família' : 'Modelo'} — {periodLabel}</SH>
+                <SH>Juros de Estoque por {jurosGrouping === 'marca' ? 'Marca' : 'Modelo'} — {periodLabel}</SH>
                 <div className="flex items-center gap-2">
                   {(['familia', 'modelo'] as JurosGrouping[]).map(g => (
                     <button key={g} onClick={() => setJurosGrouping(g)}
@@ -1864,7 +1843,7 @@ export function VendasNovoAnalise() {
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-4">
                 <div>
-                  <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-2">Juros Total por {jurosGrouping === 'familia' ? 'Família' : 'Modelo'}</p>
+                  <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-2">Juros Total por {jurosGrouping === 'marca' ? 'Marca' : 'Modelo'}</p>
                   <ResponsiveContainer width="100%" height={Math.max(200, jurosData.length * 32 + 40)}>
                     <BarChart data={jurosData} layout="vertical" margin={{ left: 4, right: 88, top: 4, bottom: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
@@ -1928,7 +1907,7 @@ export function VendasNovoAnalise() {
                   </div>
                   <div className="flex gap-1.5">
                     {(['familia', 'modelo'] as ComissoesGrouping[]).map(g => (
-                      <Pill key={g} label={g === 'familia' ? 'Família' : 'Modelo'}
+                      <Pill key={g} label={g === 'familia' ? 'Marca' : 'Modelo'}
                         active={comissoesGrouping === g} onClick={() => setComissoesGrouping(g)} />
                     ))}
                   </div>
@@ -1964,7 +1943,7 @@ export function VendasNovoAnalise() {
                       tickFormatter={v => comissoesScenario === 'pct' ? fmtPct(v) : fmtBRL(v)}
                       tick={{ fontSize: 9 }} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }}
-                      width={comissoesGrouping === 'familia' ? 80 : 160} />
+                      width={comissoesGrouping === 'marca' ? 80 : 160} />
                     <Tooltip content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null;
                       const d = payload[0].payload as typeof comissoesPorGrupoData[number];
@@ -2317,14 +2296,14 @@ export function VendasNovoAnalise() {
                   {/* Linha 2: Família + Modelo */}
                   {(() => {
                     const periodoFamilias = ['Todas', ...Array.from(new Set(
-                      allRows.filter(r => getYr(r) === p.year).map(r => normalizeModelo(r.modelo ?? '')).filter(f => f !== '(sem modelo)')
+                      allRows.filter(r => getYr(r) === p.year).map(r => normalizeMarca(r.modelo ?? '')).filter(f => f !== '(sem modelo)')
                     )).sort()];
                     const periodoModelos = p.familia === 'Todas' ? [] : ['Todos', ...Array.from(new Set(
-                      allRows.filter(r => getYr(r) === p.year && normalizeModelo(r.modelo ?? '') === p.familia).map(r => r.modelo?.trim() || '').filter(Boolean)
+                      allRows.filter(r => getYr(r) === p.year && normalizeMarca(r.modelo ?? '') === p.familia).map(r => r.modelo?.trim() || '').filter(Boolean)
                     )).sort()];
                     return (
                       <div className="flex items-center gap-2 pl-1">
-                        <span className="text-slate-400 text-[10px]">Família</span>
+                        <span className="text-slate-400 text-[10px]">Marca</span>
                         <select value={p.familia} onChange={e => updatePeriod(p.id, { familia: e.target.value, modelo: 'Todos' })}
                           className="border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-600 text-xs focus:outline-none">
                           {periodoFamilias.map(f => <option key={f} value={f}>{f}</option>)}
@@ -2403,7 +2382,7 @@ export function VendasNovoAnalise() {
             </div>
           </div>
 
-          {/* ── Devoluções V07 ──────────────────────────────────────────────── */}
+          {/* ── Devoluções U07 ──────────────────────────────────────────────── */}
           {devolucoes.length > 0 && (
             <div className="bg-amber-50 rounded-2xl border border-amber-200 shadow-sm">
               <button onClick={() => setShowDevol(!showDevol)}
@@ -2411,7 +2390,7 @@ export function VendasNovoAnalise() {
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
                   <span className="text-sm font-bold text-amber-800">
-                    Devoluções (V07) — {devolucoes.length} registro(s) deduzido(s) do volume
+                    Devoluções (U07) — {devolucoes.length} registro(s) deduzido(s) do volume
                   </span>
                 </div>
                 {showDevol ? <ChevronUp className="w-4 h-4 text-amber-600" /> : <ChevronDown className="w-4 h-4 text-amber-600" />}
@@ -2428,7 +2407,7 @@ export function VendasNovoAnalise() {
                     </thead>
                     <tbody>
                       {devolucoes.map(r => {
-                        const c = calcNovos(r, aliqBon, dsrFor(dsrCfg, r.dataVenda));
+                        const c = calcUsados(r, aliqBon, dsrFor(dsrCfg, r.dataVenda));
                         return (
                           <tr key={r.id} className="border-b border-amber-100 hover:bg-amber-100/40">
                             <td className="py-1.5 px-2 font-mono text-slate-500">{r.chassi || '—'}</td>
@@ -2454,3 +2433,5 @@ export function VendasNovoAnalise() {
     </div>
   );
 }
+
+
