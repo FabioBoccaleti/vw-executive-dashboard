@@ -1005,6 +1005,23 @@ export function VendasDiretaAnalise() {
     return null;
   })();
 
+  // Pendências de % comissão sem preenchimento (todo o ano)
+  const pctComissaoPendencias = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of allRows) {
+      const pct = (r.pctComissao ?? '').toString().trim();
+      if (pct !== '' && pct !== '0') continue;
+      const d = r.dataVenda;
+      let yr: number | null = null, mo: number | null = null;
+      if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) { yr = +d.split('/')[2]; mo = +d.split('/')[1]; }
+      else if (/^\d{4}-\d{2}-\d{2}/.test(d)) { yr = +d.split('-')[0]; mo = +d.split('-')[1]; }
+      if (!yr || !mo) continue;
+      const key = `${String(mo).padStart(2, '0')}/${String(yr).slice(-2)}`;
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [allRows]);
+
   // ─── RENDER ───────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 p-6 space-y-6" style={{ minHeight: 0 }}>
@@ -1068,6 +1085,21 @@ export function VendasDiretaAnalise() {
           </button>
         </div>
       </div>
+
+      {/* ── Banner pendências % comissão ─────────────────────────────────────── */}
+      {pctComissaoPendencias.length > 0 && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-2xl px-5 py-3.5 shadow-sm">
+          <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-bold text-amber-800">% de Comissão não preenchido</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              {pctComissaoPendencias.map(([mes, qtd]) =>
+                `${mes}: ${qtd} venda${qtd > 1 ? 's' : ''}`
+              ).join(' · ')}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Loading / sem dados ──────────────────────────────────────────────── */}
       {loading && (
