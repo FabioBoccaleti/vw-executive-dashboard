@@ -552,7 +552,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
           color="bg-blue-50"
         />
         <KpiCard
-          label="Custo Médio / Colaborador"
+          label="Salário Médio / Colaborador"
           value={fmtBRL(custoMedio)}
           sub={headcountComiss > 0 ? `Calculado sobre ${headcountComFixo} de ${headcount} colaboradores` : undefined}
           delta={deltaCusto}

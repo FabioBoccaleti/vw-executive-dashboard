@@ -20,8 +20,8 @@ export const GRUPO_COLORS: Record<GrupoDept, string> = {
   Administração: '#2563eb', // blue
   Funilaria:     '#d97706', // amber
   Oficina:       '#059669', // emerald
-  Usados:        '#0891b2', // cyan
-  Novos:         '#16a34a', // green
+  Usados:        '#db2777', // rose
+  Novos:         '#facc15', // yellow-400
   Peças:         '#dc2626', // red
   Outros:        '#6b7280', // gray
 };
