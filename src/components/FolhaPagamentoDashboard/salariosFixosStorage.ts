@@ -212,6 +212,34 @@ export async function updateSalarioFuncionario(
   }
 }
 
+export async function addSalarioFuncionario(
+  brand: SalarioBrand,
+  year: number,
+  month: number,
+  employee: SalarioFuncionario,
+): Promise<boolean> {
+  try {
+    const existing = await loadSalariosFixos(brand, year, month);
+    return await kvSet(getKey(brand, year, month), [...existing, employee]);
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteSalarioFuncionario(
+  brand: SalarioBrand,
+  year: number,
+  month: number,
+  id: string,
+): Promise<boolean> {
+  try {
+    const existing = await loadSalariosFixos(brand, year, month);
+    return await kvSet(getKey(brand, year, month), existing.filter(e => e.id !== id));
+  } catch {
+    return false;
+  }
+}
+
 export async function clearSalariosFixos(
   brand: SalarioBrand,
   year: number,

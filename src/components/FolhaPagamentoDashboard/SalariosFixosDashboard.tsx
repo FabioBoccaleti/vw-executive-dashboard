@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Trash2, TableProperties, BarChart2, Pencil, Check, X, Lock } from 'lucide-react';
+import { Upload, FileText, Trash2, TableProperties, BarChart2, Pencil, Check, X, Lock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/useAuth';
@@ -8,6 +8,8 @@ import {
   saveAllParsedSalarios,
   clearSalariosFixos,
   updateSalarioFuncionario,
+  addSalarioFuncionario,
+  deleteSalarioFuncionario,
   parseSalariosTxt,
   findLatestSalariosPeriod,
   type SalarioFuncionario,
@@ -22,6 +24,11 @@ const MONTHS = [
 ];
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 2 + i);
+
+const REVENDAS_BY_BRAND: Record<SalarioBrand, string[]> = {
+  audi: ['Audi Lapa', 'Pinheiros', 'Luiz Gatti'],
+  vw:   ['B.L 295', 'S.L 88/192'],
+};
 
 type ActiveTab = 'audi' | 'vw' | 'total';
 
@@ -56,19 +63,152 @@ function groupByDept(rows: SalarioFuncionario[]) {
   return Array.from(map.entries()).map(([dept, items]) => ({ dept, items }));
 }
 
+// ── Add Employee Dialog ────────────────────────────────────────────────────────
+function AddEmployeeDialog({
+  brand,
+  onConfirm,
+  onCancel,
+}: {
+  brand: SalarioBrand;
+  onConfirm: (emp: Omit<SalarioFuncionario, 'id'>) => void;
+  onCancel: () => void;
+}) {
+  const revendas = REVENDAS_BY_BRAND[brand];
+  const [form, setForm] = useState({
+    codigo: '',
+    nome: '',
+    dataAdmissao: '',
+    cargo: '',
+    departamento: '',
+    revenda: revendas[0],
+    salario: '',
+  });
+
+  function set(field: string, value: string) {
+    setForm(prev => ({ ...prev, [field]: value }));
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.nome.trim()) { toast.error('Informe o nome do funcionário.'); return; }
+    if (!form.salario || isNaN(parseFloat(form.salario))) { toast.error('Informe um salário válido.'); return; }
+    onConfirm({ ...form, salario: String(parseFloat(form.salario)) });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full mx-4">
+        <div className="flex items-center justify-between mb-4">
+          <p className="font-semibold text-slate-800 text-sm">Adicionar Funcionário — {brand === 'audi' ? 'Audi' : 'VW'}</p>
+          <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Código</label>
+            <input
+              value={form.codigo}
+              onChange={e => set('codigo', e.target.value)}
+              className="border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              placeholder="ex: 5567"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Nome <span className="text-red-500">*</span></label>
+            <input
+              value={form.nome}
+              onChange={e => set('nome', e.target.value)}
+              className="border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              placeholder="Nome completo"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Data de Admissão</label>
+            <input
+              value={form.dataAdmissao}
+              onChange={e => set('dataAdmissao', e.target.value)}
+              className="border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              placeholder="DD/MM/AAAA"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cargo</label>
+            <input
+              value={form.cargo}
+              onChange={e => set('cargo', e.target.value)}
+              className="border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              placeholder="ex: Analista"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Departamento</label>
+            <input
+              value={form.departamento}
+              onChange={e => set('departamento', e.target.value)}
+              className="border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              placeholder="ex: Adm 295 / Copa"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Revenda</label>
+            <select
+              value={form.revenda}
+              onChange={e => set('revenda', e.target.value)}
+              className="border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+            >
+              {revendas.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div className="col-span-2 flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Salário (R$) <span className="text-red-500">*</span></label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.salario}
+              onChange={e => set('salario', e.target.value)}
+              className="border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              placeholder="ex: 5392.00"
+            />
+          </div>
+          <div className="col-span-2 flex justify-end gap-2 mt-1">
+            <button
+              type="button"
+              className="text-xs border border-slate-200 rounded px-3 py-1.5 hover:bg-slate-50"
+              onClick={onCancel}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="text-xs bg-teal-600 hover:bg-teal-700 text-white rounded px-4 py-1.5"
+            >
+              Adicionar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Table for a single brand tab ──────────────────────────────────────────────
 function SingleBrandTable({
   rows,
+  isAdmin,
   onUpdate,
+  onDelete,
 }: {
   rows: SalarioFuncionario[];
+  isAdmin?: boolean;
   onUpdate?: (id: string, updates: { cargo: string; departamento: string; salario: string }) => void;
+  onDelete?: (id: string) => void;
 }) {
   const revendaGroups = groupByRevenda(rows);
   const grandTotal    = sumSalarios(rows);
 
-  const [editId, setEditId]       = useState<string | null>(null);
-  const [editValues, setEditValues] = useState({ cargo: '', departamento: '', salario: '' });
+  const [editId, setEditId]             = useState<string | null>(null);
+  const [editValues, setEditValues]     = useState({ cargo: '', departamento: '', salario: '' });
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   function startEdit(emp: SalarioFuncionario) {
     setEditId(emp.id);
@@ -153,7 +293,25 @@ function SingleBrandTable({
                               : fmtCurrency(emp.salario)}
                           </td>
                           <td className="px-2 py-2 text-right">
-                            {isEditing ? (
+                            {deleteConfirmId === emp.id ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-xs text-red-500 mr-1">Excluir?</span>
+                                <button
+                                  onClick={() => { onDelete?.(emp.id); setDeleteConfirmId(null); }}
+                                  className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
+                                  title="Confirmar exclusão"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setDeleteConfirmId(null)}
+                                  className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100"
+                                  title="Cancelar"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : isEditing ? (
                               <div className="flex items-center justify-end gap-1">
                                 <button
                                   onClick={() => saveEdit(emp)}
@@ -171,13 +329,24 @@ function SingleBrandTable({
                                 </button>
                               </div>
                             ) : (
-                              <button
-                                onClick={() => startEdit(emp)}
-                                className="text-slate-300 hover:text-slate-500 p-1 rounded hover:bg-slate-100"
-                                title="Editar"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => startEdit(emp)}
+                                  className="text-slate-300 hover:text-slate-500 p-1 rounded hover:bg-slate-100"
+                                  title="Editar"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => setDeleteConfirmId(emp.id)}
+                                    className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50"
+                                    title="Excluir"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -348,6 +517,7 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
   const [vwRows,   setVwRows]   = useState<SalarioFuncionario[]>([]);
   const [loading,  setLoading]  = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
 
   // Ao montar: detecta o período mais recente com dados e navega para ele
   useEffect(() => {
@@ -440,6 +610,26 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
     else                  setVwRows(prev => update(prev));
   }
 
+  async function handleAddEmployee(data: Omit<SalarioFuncionario, 'id'>) {
+    const brand = activeTab as SalarioBrand;
+    const employee: SalarioFuncionario = { id: crypto.randomUUID(), ...data };
+    await addSalarioFuncionario(brand, selectedYear, selectedMonth, employee);
+    if (brand === 'audi') setAudiRows(prev => [...prev, employee]);
+    else                  setVwRows(prev => [...prev, employee]);
+    setShowAddDialog(false);
+    toast.success(`Funcionário "${employee.nome}" adicionado.`);
+  }
+
+  async function handleDeleteEmployee(id: string) {
+    const inAudi = audiRows.some(e => e.id === id);
+    const brand: SalarioBrand = inAudi ? 'audi' : 'vw';
+    const name = (inAudi ? audiRows : vwRows).find(e => e.id === id)?.nome ?? '';
+    await deleteSalarioFuncionario(brand, selectedYear, selectedMonth, id);
+    if (brand === 'audi') setAudiRows(prev => prev.filter(e => e.id !== id));
+    else                  setVwRows(prev => prev.filter(e => e.id !== id));
+    toast.success(`Funcionário "${name}" removido.`);
+  }
+
   async function handleClearConfirmed() {
     setConfirmClear(false);
     const brands: SalarioBrand[] = activeTab === 'total' ? ['audi', 'vw'] : [activeTab as SalarioBrand];
@@ -478,6 +668,15 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
         className="hidden"
         onChange={handleImport}
       />
+
+      {/* Add employee dialog */}
+      {showAddDialog && activeTab !== 'total' && (
+        <AddEmployeeDialog
+          brand={activeTab as SalarioBrand}
+          onConfirm={handleAddEmployee}
+          onCancel={() => setShowAddDialog(false)}
+        />
+      )}
 
       {/* Confirm clear dialog */}
       {confirmClear && (
@@ -626,6 +825,17 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
         </select>
 
         <div className="ml-auto flex items-center gap-2">
+          {isAdmin() && activeTab !== 'total' && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 text-teal-600 border-teal-200 hover:bg-teal-50 hover:border-teal-300"
+              onClick={() => setShowAddDialog(true)}
+            >
+              <Plus className="w-4 h-4" />
+              Adicionar Funcionário
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -673,7 +883,7 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
         ) : activeTab === 'total' ? (
           <TotalTable audiRows={audiRows} vwRows={vwRows} />
         ) : (
-          <SingleBrandTable rows={currentRows} onUpdate={handleEmployeeUpdate} />
+          <SingleBrandTable rows={currentRows} isAdmin={isAdmin()} onUpdate={handleEmployeeUpdate} onDelete={handleDeleteEmployee} />
         )}
       </div>
       </>) : (
