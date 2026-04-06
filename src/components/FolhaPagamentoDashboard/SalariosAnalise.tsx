@@ -85,6 +85,31 @@ function CountTooltip({ active, payload, label }: TooltipProps<number, string>) 
 }
 
 // ─── Comparison periods ───────────────────────────────────────────────────────
+// ─── Nome similarity ─────────────────────────────────────────────────────────
+// Normaliza nome: minúsculo, sem acentos, espaços colapsados
+function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Retorna true se os dois nomes pertencem claramente à mesma pessoa.
+// Lógica: ao menos 2 palavras em comum OU primeiro+último nome iguais.
+// Isso tolera variações menores (ex: abreviação de nome do meio) sem confundir
+// pessoas realmente distintas que compartilham apenas o código de matrícula.
+function isSamePerson(nameA: string, nameB: string): boolean {
+  const a = normalizeName(nameA).split(' ').filter(Boolean);
+  const b = normalizeName(nameB).split(' ').filter(Boolean);
+  const setB = new Set(b);
+  const common = a.filter(w => setB.has(w)).length;
+  if (common >= 2) return true;
+  // Primeiro E último nome iguais basta (ex: "João Silva" vs "João X. Silva")
+  if (a.length >= 2 && b.length >= 2 && a[0] === b[0] && a[a.length - 1] === b[b.length - 1]) return true;
+  return false;
+}
 const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const CURRENT_YEAR_A = new Date().getFullYear();
 const YEARS_A = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR_A - 2 + i);
@@ -411,23 +436,37 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
 
   const movimentacao = useMemo(() => {
     if (moviPrevData.length === 0) return null;
-    // Chave composta codigo|nome para evitar falsos positivos quando
-    // uma matrícula é reutilizada para outro funcionário entre períodos.
-    const mkKey = (e: { codigo: string; nome: string }) => `${e.codigo}|${e.nome.trim().toLowerCase()}`;
-    const prevMap = new Map(moviPrevClassified.map(e => [mkKey(e), e]));
-    const currMap = new Map(activeClassified.map(e => [mkKey(e), e]));
-    const novos:      typeof activeClassified        = [];
-    const desligados: typeof moviPrevClassified      = [];
+
+    // Etapa 1: casa por código (matrícula).
+    // Etapa 2: se o código casar mas os nomes forem claramente diferentes
+    //          (matrícula reutilizada), trata como desligado + novo.
+    const prevByCodigo = new Map(moviPrevClassified.map(e => [e.codigo, e]));
+    const currByCodigo = new Map(activeClassified.map(e => [e.codigo, e]));
+
+    const novos:      typeof activeClassified   = [];
+    const desligados: typeof moviPrevClassified = [];
     const alterados:  { cur: typeof activeClassified[0]; prev: typeof moviPrevClassified[0]; delta: number; deltaPct: number }[] = [];
-    const estaveis:   typeof activeClassified        = [];
+    const estaveis:   typeof activeClassified   = [];
+
     for (const e of activeClassified) {
-      const prev = prevMap.get(mkKey(e));
-      if (!prev) { novos.push(e); continue; }
+      const prev = prevByCodigo.get(e.codigo);
+      if (!prev || !isSamePerson(e.nome, prev.nome)) {
+        // Código não encontrado ou matrícula reutilizada para outra pessoa
+        novos.push(e);
+        continue;
+      }
       const d = sal(e) - sal(prev);
       if (Math.abs(d) > 0.01) alterados.push({ cur: e, prev, delta: d, deltaPct: sal(prev) > 0 ? (d / sal(prev)) * 100 : 0 });
       else estaveis.push(e);
     }
-    for (const e of moviPrevClassified) { if (!currMap.has(mkKey(e))) desligados.push(e); }
+
+    for (const e of moviPrevClassified) {
+      const curr = currByCodigo.get(e.codigo);
+      if (!curr || !isSamePerson(e.nome, curr.nome)) {
+        desligados.push(e);
+      }
+    }
+
     const avgDelta = alterados.length > 0 ? alterados.reduce((a, x) => a + x.deltaPct, 0) / alterados.length : 0;
     return { novos, desligados, alterados, estaveis, avgDelta };
   }, [activeClassified, moviPrevClassified, moviPrevData]);
