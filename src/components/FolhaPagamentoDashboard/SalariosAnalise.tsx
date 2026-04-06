@@ -178,7 +178,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
 
   // ── Historical trend chart state ─────────────────────────────────────────
   const [histDept, setHistDept] = useState<'Total' | GrupoDept>('Total');
-  const [histData, setHistData] = useState<{ month: number; year: number; total: number; byDept: Partial<Record<GrupoDept, number>> }[]>([]);
+  const [histData, setHistData] = useState<{ month: number; year: number; total: number; headcount: number; byDept: Partial<Record<GrupoDept, number>> }[]>([]);
   const [histLoading, setHistLoading] = useState(false);
 
   useEffect(() => {
@@ -230,11 +230,12 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
             .map(e => ({ ...e, grupo: classifyDept(e.departamento) }))
             .filter(e => e.grupo !== 'Afastados');
           const total = cl.reduce((a, e) => a + sal(e), 0);
+          const headcount = cl.length;
           const byDept: Partial<Record<GrupoDept, number>> = {};
           for (const e of cl) {
             byDept[e.grupo] = (byDept[e.grupo] ?? 0) + sal(e);
           }
-          return { month, year, total, byDept };
+          return { month, year, total, headcount, byDept };
         })
       );
       if (!cancelled) { setHistData(results); setHistLoading(false); }
@@ -507,8 +508,9 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
       const deltaR   = prev !== null ? value - prev : null;
       const deltaPct = prev !== null && prev > 0 ? ((value - prev) / prev) * 100 : null;
       return {
-        label:    `${MONTHS_SHORT[d.month - 1]}/${String(d.year).slice(2)}`,
+        label:      `${MONTHS_SHORT[d.month - 1]}/${String(d.year).slice(2)}`,
         value,
+        headcount:  d.headcount,
         deltaR,
         deltaPct,
       };
@@ -1244,6 +1246,12 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
                         </div>
                       ) : (
                         <p className="text-xs text-slate-400 mt-1">Primeiro ponto do histórico</p>
+                      )}
+                      {d.headcount > 0 && (
+                        <p className="text-slate-500 mt-1.5 flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          {d.headcount} colaboradores
+                        </p>
                       )}
                     </div>
                   );
