@@ -411,20 +411,23 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
 
   const movimentacao = useMemo(() => {
     if (moviPrevData.length === 0) return null;
-    const prevMap = new Map(moviPrevClassified.map(e => [e.codigo, e]));
-    const currMap = new Map(activeClassified.map(e => [e.codigo, e]));
+    // Chave composta codigo|nome para evitar falsos positivos quando
+    // uma matrícula é reutilizada para outro funcionário entre períodos.
+    const mkKey = (e: { codigo: string; nome: string }) => `${e.codigo}|${e.nome.trim().toLowerCase()}`;
+    const prevMap = new Map(moviPrevClassified.map(e => [mkKey(e), e]));
+    const currMap = new Map(activeClassified.map(e => [mkKey(e), e]));
     const novos:      typeof activeClassified        = [];
     const desligados: typeof moviPrevClassified      = [];
     const alterados:  { cur: typeof activeClassified[0]; prev: typeof moviPrevClassified[0]; delta: number; deltaPct: number }[] = [];
     const estaveis:   typeof activeClassified        = [];
     for (const e of activeClassified) {
-      const prev = prevMap.get(e.codigo);
+      const prev = prevMap.get(mkKey(e));
       if (!prev) { novos.push(e); continue; }
       const d = sal(e) - sal(prev);
       if (Math.abs(d) > 0.01) alterados.push({ cur: e, prev, delta: d, deltaPct: sal(prev) > 0 ? (d / sal(prev)) * 100 : 0 });
       else estaveis.push(e);
     }
-    for (const e of moviPrevClassified) { if (!currMap.has(e.codigo)) desligados.push(e); }
+    for (const e of moviPrevClassified) { if (!currMap.has(mkKey(e))) desligados.push(e); }
     const avgDelta = alterados.length > 0 ? alterados.reduce((a, x) => a + x.deltaPct, 0) / alterados.length : 0;
     return { novos, desligados, alterados, estaveis, avgDelta };
   }, [activeClassified, moviPrevClassified, moviPrevData]);
