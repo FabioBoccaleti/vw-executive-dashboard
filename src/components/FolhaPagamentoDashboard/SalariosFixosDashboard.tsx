@@ -11,6 +11,7 @@ import {
   addSalarioFuncionario,
   deleteSalarioFuncionario,
   parseSalariosTxt,
+  parseSalariosPdf,
   findLatestSalariosPeriod,
   type SalarioFuncionario,
   type SalarioBrand,
@@ -558,11 +559,22 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
     if (!file) return;
     if (fileInputRef.current) fileInputRef.current.value = '';
 
-    const text     = await file.text();
-    const sections = parseSalariosTxt(text);
+    let sections: Awaited<ReturnType<typeof parseSalariosTxt>>;
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+    try {
+      if (isPdf) {
+        sections = await parseSalariosPdf(file);
+      } else {
+        const text = await file.text();
+        sections = parseSalariosTxt(text);
+      }
+    } catch {
+      toast.error('Erro ao ler o arquivo. Verifique se o PDF possui texto nativo (não é uma imagem).');
+      return;
+    }
 
     if (sections.length === 0) {
-      toast.error('Arquivo não reconhecido ou sem funcionários. Verifique o formato do TXT.');
+      toast.error(`Arquivo não reconhecido ou sem funcionários. Verifique o formato do ${isPdf ? 'PDF' : 'TXT'}.`);
       return;
     }
 
@@ -664,7 +676,7 @@ export function SalariosFixosDashboard({ onBack }: SalariosFixosDashboardProps) 
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt"
+        accept=".txt,.pdf"
         className="hidden"
         onChange={handleImport}
       />

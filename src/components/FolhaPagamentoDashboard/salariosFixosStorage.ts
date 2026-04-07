@@ -1,4 +1,80 @@
 import { kvGet, kvSet } from '@/lib/kvClient';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Worker configurado uma única vez para este módulo
+let _workerConfigured = false;
+function ensurePdfjsWorker() {
+  if (_workerConfigured) return;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url,
+  ).href;
+  _workerConfigured = true;
+}
+
+/**
+ * Extrai o texto de um PDF de salários fixos e o converte para o mesmo
+ * formato de string que o parser TXT espera, então reutiliza parseSalariosTxt.
+ *
+ * O PDF gerado pelo sistema possui texto nativo (não é scan), portanto
+ * o pdfjs consegue extrair as linhas diretamente.
+ * A extração agrupa itens pelo eixo Y (linha visual) e os ordena por X
+ * (posição horizontal), reproduzindo a estrutura de colunas do relatório.
+ */
+export async function parseSalariosPdf(file: File): Promise<ParsedSalarios[]> {
+  ensurePdfjsWorker();
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  const allLines: string[] = [];
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page    = await pdf.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 1 });
+    const content = await page.getTextContent();
+
+    // Agrupa itens por linha (Y arredondado com tolerância de 3px)
+    const byY = new Map<number, { x: number; width: number; str: string }[]>();
+    for (const item of content.items) {
+      if (!('str' in item)) continue;
+      const str   = (item as { str: string }).str;
+      if (!str.trim()) continue;
+      const t     = (item as { transform: number[]; width: number }).transform;
+      const width = (item as { width: number }).width ?? 0;
+      const y     = Math.round((viewport.height - t[5]) / 3) * 3;
+      const x     = t[4];
+      if (!byY.has(y)) byY.set(y, []);
+      byY.get(y)!.push({ x, width, str });
+    }
+
+    // Ordena linhas por Y crescente e itens dentro de cada linha por X
+    const sortedYs = Array.from(byY.keys()).sort((a, b) => a - b);
+    for (const y of sortedYs) {
+      const items = byY.get(y)!.sort((a, b) => a.x - b.x);
+      // Reconstrói a linha usando o gap real entre itens para determinar separador:
+      // gap ≤ 10px → palavras do mesmo campo (ex: "Audi" + "Lapa") → 1 espaço
+      // gap > 10px → separação de colunas                          → 3 espaços
+      // O parser TXT usa 2+ espaços como delimitador de coluna, então 3 espaços
+      // garante que ele reconheça as colunas corretamente.
+      let line = items[0].str;
+      for (let i = 1; i < items.length; i++) {
+        const prev = items[i - 1];
+        const curr = items[i];
+        const gap  = curr.x - (prev.x + prev.width);
+        line += gap <= 10 ? ' ' : '   ';
+        line += curr.str;
+      }
+      allLines.push(line);
+    }
+  }
+
+  // Corrige artefato de PDF: letras maiúsculas isoladas separadas por espaço
+  // da sílaba seguinte (ex: "A udi Lapa" → "Audi Lapa").
+  // Aplica-se apenas à string completa antes de passar ao parser TXT.
+  const fullText = allLines.join('\n').replace(/\b([A-Z]) ([a-z])/g, '$1$2');
+
+  return parseSalariosTxt(fullText);
+}
 
 export type SalarioBrand = 'audi' | 'vw';
 
