@@ -438,11 +438,14 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
   const movimentacao = useMemo(() => {
     if (moviPrevData.length === 0) return null;
 
-    // Etapa 1: casa por código (matrícula).
-    // Etapa 2: se o código casar mas os nomes forem claramente diferentes
-    //          (matrícula reutilizada), trata como desligado + novo.
-    const prevByCodigo = new Map(moviPrevClassified.map(e => [e.codigo, e]));
-    const currByCodigo = new Map(activeClassified.map(e => [e.codigo, e]));
+    // Chave composta codigo|nomeNormalizado:
+    // - Evita colisão quando Audi e VW têm o mesmo número de matrícula
+    //   (sistemas de RH independentes — códigos não são únicos entre marcas)
+    // - Tolera variações menores de grafia (acento, espaço extra) via normalizeName
+    // - Detecta reutilização de matrícula: mesmo código, nome diferente → chave diferente
+    const mkKey = (e: { codigo: string; nome: string }) => `${e.codigo}|${normalizeName(e.nome)}`;
+    const prevByKey = new Map(moviPrevClassified.map(e => [mkKey(e), e]));
+    const currByKey = new Map(activeClassified.map(e => [mkKey(e), e]));
 
     const novos:      typeof activeClassified   = [];
     const desligados: typeof moviPrevClassified = [];
@@ -450,9 +453,8 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
     const estaveis:   typeof activeClassified   = [];
 
     for (const e of activeClassified) {
-      const prev = prevByCodigo.get(e.codigo);
-      if (!prev || !isSamePerson(e.nome, prev.nome)) {
-        // Código não encontrado ou matrícula reutilizada para outra pessoa
+      const prev = prevByKey.get(mkKey(e));
+      if (!prev) {
         novos.push(e);
         continue;
       }
@@ -462,8 +464,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
     }
 
     for (const e of moviPrevClassified) {
-      const curr = currByCodigo.get(e.codigo);
-      if (!curr || !isSamePerson(e.nome, curr.nome)) {
+      if (!currByKey.has(mkKey(e))) {
         desligados.push(e);
       }
     }
