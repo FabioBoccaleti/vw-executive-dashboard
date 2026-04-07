@@ -341,12 +341,15 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
 
   // ── 4. Scatter: tempo de casa vs salário ─────────────────────────────────────
   const scatterData = useMemo(() =>
-    activeClassified.map(e => ({
-      nome:  e.nome,
-      anos:  parseFloat(admYears(e).toFixed(1)),
-      salario: sal(e),
-      grupo: e.grupo,
-    })).filter(e => e.anos >= 0 && e.salario > 0),
+    activeClassified
+      .filter(e => admYears(e) >= 0)
+      .map(e => ({
+        nome:        e.nome,
+        anos:        parseFloat(admYears(e).toFixed(1)),
+        salario:     sal(e),
+        grupo:       e.grupo,
+        comissionado: sal(e) === 0,
+      })),
     [activeClassified]);
 
   const avgSalario = headcount > 0 ? totalFolha / headcount : 0;
@@ -951,7 +954,7 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
       {/* ── Row 3: Tempo de Casa vs Salário (scatter) ──────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
         <h3 className="text-sm font-bold text-slate-700 mb-1">Tempo de Casa vs. Salário</h3>
-        <p className="text-xs text-slate-400 mb-4">Cada ponto = 1 colaborador. Linha tracejada = salário médio.</p>
+        <p className="text-xs text-slate-400 mb-4">Cada ponto = 1 colaborador. Pontos translúcidos = comissionados (sem salário fixo). Linha tracejada = salário médio.</p>
         <ResponsiveContainer width="100%" height={260}>
           <ScatterChart>
             <CartesianGrid strokeDasharray="3 3" />
@@ -967,19 +970,31 @@ export function SalariosAnalise({ rows, brand, selectedMonth, selectedYear, bran
                     <p className="font-semibold text-slate-800 mb-0.5">{d?.nome}</p>
                     <p className="text-slate-500">{d?.grupo}</p>
                     <p className="text-slate-600">Admissão: {d?.anos} anos</p>
-                    <p className="text-teal-700 font-semibold">{fmtBRL(d?.salario)}</p>
+                    <p className="text-teal-700 font-semibold">{d?.comissionado ? 'Comissionado' : fmtBRL(d?.salario)}</p>
                   </div>
                 );
               }}
             />
             <ReferenceLine y={custoMedio} stroke="#94a3b8" strokeDasharray="4 2" />
-            {GRUPO_ORDER.filter(g => scatterData.some(d => d.grupo === g)).map(g => (
+            {/* Colaboradores com salário fixo — opacidade normal */}
+            {GRUPO_ORDER.filter(g => scatterData.some(d => d.grupo === g && !d.comissionado)).map(g => (
               <Scatter
                 key={g}
                 name={g}
-                data={scatterData.filter(d => d.grupo === g)}
+                data={scatterData.filter(d => d.grupo === g && !d.comissionado)}
                 fill={GRUPO_COLORS[g]}
                 opacity={0.8}
+              />
+            ))}
+            {/* Comissionados — mesma cor do grupo, opacidade reduzida, sem entrada extra na legenda */}
+            {GRUPO_ORDER.filter(g => scatterData.some(d => d.grupo === g && d.comissionado)).map(g => (
+              <Scatter
+                key={`${g}-comiss`}
+                name={g}
+                data={scatterData.filter(d => d.grupo === g && d.comissionado)}
+                fill={GRUPO_COLORS[g]}
+                opacity={0.35}
+                legendType="none"
               />
             ))}
             <Legend />
