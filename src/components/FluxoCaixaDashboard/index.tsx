@@ -108,7 +108,8 @@ function parseBalancete(text: string) {
   const contasPagar = { ant: absAnt('2.1.2.03'), atu: absAtu('2.1.2.03') };
   const fornecVW = { ant: absAnt('2.1.3'), atu: absAtu('2.1.3') };
   const fornecAudi = { ant: absAnt('2.1.4'), atu: absAtu('2.1.4') };
-  const fornecTotal = { ant: fornecVW.ant + fornecAudi.ant, atu: fornecVW.atu + fornecAudi.atu };
+  const fpFloorAudi = { ant: absAnt('2.1.4.01.01.007'), atu: absAtu('2.1.4.01.01.007') }; // Floor Plan Novos Audi → financiamento
+  const fornecTotal = { ant: fornecVW.ant + fornecAudi.ant - fpFloorAudi.ant, atu: fornecVW.atu + fornecAudi.atu - fpFloorAudi.atu };
 
   // PASSIVO NÃO CIRCULANTE
   const passNaoCirc  = { ant: absAnt('2.2'),       atu: absAtu('2.2') };
@@ -235,6 +236,7 @@ function parseBalancete(text: string) {
   const dDebitosLig = debitosLig.atu - debitosLig.ant;
   const dArrendLP   = arrendLP.atu   - arrendLP.ant;
   const dOutrosPassLP = outrosPassLP.atu - outrosPassLP.ant; // 2.2.3
+  const dFpFloorAudi  = fpFloorAudi.atu  - fpFloorAudi.ant;  // Floor Plan Novos Audi → financiamento
   // NOTA: 2.2.2 (Receitas Diferidas) excluída do financiamento — contém ICMS ST Diferido (não-caixa)
   // dOutros2_2_1 (resíduo 2.2.1) movido para Atividades Operacionais
 
@@ -245,6 +247,7 @@ function parseBalancete(text: string) {
     dDebitosLig +
     dArrendLP   +
     dOutrosPassLP +
+    dFpFloorAudi  +
     dPL_extra; // Aportes/retiradas/dividendos diretos no PL além do resultado;
 
   const varCaixaReal = disponib.atu - disponib.ant;
@@ -289,6 +292,7 @@ function parseBalancete(text: string) {
       dRecDiferidas, ajusteResidualBP,
       dEstoque, dCred, dContasCorr, dValDiv, dDespAntec, dFornec, dObrigTrib, dObrigTrab, dContasPag,
       dEmprestCP, dEmprestCP_01, dEmprestCP_02, dEmprestLP, dPessoasLig, dDebitosLig, dArrendLP,
+      dFpFloorAudi, fpFloorAudiAnt: fpFloorAudi.ant, fpFloorAudiAtu: fpFloorAudi.atu,
       dIntangivel, dRealizLPCred, dRealizLPOutros, dInvestimentos,
       dOutrosPassLP, dOutros2_2_1, outros2_2_1Ant, outros2_2_1Atu,
       dPL_extra,
@@ -3219,7 +3223,10 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
     const dContasCorr_acum = getAtu('1.1.4') - getJanAnt('1.1.4');
     const dDespAntec_acum  = getAtu('1.1.6') - getJanAnt('1.1.6');
     const dValDiv_acum     = getAtu('1.1.5') - getJanAnt('1.1.5');
-    const dFornec_acum     = (getAtu('2.1.3') + getAtu('2.1.4')) - (getJanAnt('2.1.3') + getJanAnt('2.1.4'));
+    const fpFloorAudi_ant  = getJanAnt('2.1.4.01.01.007');
+    const fpFloorAudi_atu  = getAtu('2.1.4.01.01.007');
+    const dFpFloorAudi_acum = fpFloorAudi_atu - fpFloorAudi_ant;
+    const dFornec_acum     = (getAtu('2.1.3') + getAtu('2.1.4') - fpFloorAudi_atu) - (getJanAnt('2.1.3') + getJanAnt('2.1.4') - fpFloorAudi_ant);
     const dObrigTrib_acum  = getAtu('2.1.2.02') - getJanAnt('2.1.2.02');
     const dObrigTrab_acum  = getAtu('2.1.2.01') - getJanAnt('2.1.2.01');
     const dContasPag_acum  = getAtu('2.1.2.03') - getJanAnt('2.1.2.03');
@@ -3299,7 +3306,7 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
     const fluxoOper_acum_comRec = fluxoOper_acum_comForn + dRecDiferidas_acum;
     const dPL_extra_acum = (PL_atu - PL_ant) - resLiq_dfc_acum;
     const fluxoFinanc_acum = dEmprestCP_02_acum + dEmprestLP_acum + dPessoasLig_acum + dDebitosLig_acum
-                           + dArrendLP_acum + dOutrosPassLP_acum + dPL_extra_acum;
+                           + dArrendLP_acum + dOutrosPassLP_acum + dFpFloorAudi_acum + dPL_extra_acum;
     const disponibAnt_jan  = getJanAnt('1.1.1');
     const varCaixaReal_acum = getAtu('1.1.1') - disponibAnt_jan;
     const ajusteResidualBP_acum = varCaixaReal_acum - (fluxoOper_acum_comRec + fluxoInvest_acum + fluxoFinanc_acum);
@@ -3328,6 +3335,7 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
       dEmprestLP: dEmprestLP_acum,
       dPessoasLig: dPessoasLig_acum, dDebitosLig: dDebitosLig_acum,
       dArrendLP: dArrendLP_acum, dIntangivel: dIntangivel_acum,
+      dFpFloorAudi: dFpFloorAudi_acum, fpFloorAudiAnt: fpFloorAudi_ant, fpFloorAudiAtu: fpFloorAudi_atu,
       dRealizLPCred: dRealizLPCred_acum, dInvestimentos: dInvestimentos_acum,
       dOutrosPassLP: dOutrosPassLP_acum, dOutros2_2_1: dOutros2_2_1_acum,
       outros2_2_1Ant: outros2_2_1_ant, outros2_2_1Atu: outros2_2_1_atu,
@@ -3479,6 +3487,9 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
             {(d.emprestCP_02Ant > 0 || d.emprestCP_02Atu > 0) && (
               <DFCRow label={`${d.dEmprestCP_02 >= 0 ? '(+) Captação' : '(–) Amortização'} Financiamentos CP / Floor Plan (2.1.1.02)  (${fmtBRL(d.emprestCP_02Ant, true)} → ${fmtBRL(d.emprestCP_02Atu, true)})`} value={d.dEmprestCP_02} value2={dAcum?.dEmprestCP_02} hasAcum={hasAcum} indent={1} />
             )}
+            {(d.fpFloorAudiAnt > 0 || d.fpFloorAudiAtu > 0) && (
+              <DFCRow label={`${d.dFpFloorAudi >= 0 ? '(+) Captação' : '(–) Amortização'} Floor Plan Novos Audi (2.1.4.01.01.007)  (${fmtBRL(d.fpFloorAudiAnt, true)} → ${fmtBRL(d.fpFloorAudiAtu, true)})`} value={d.dFpFloorAudi} value2={dAcum?.dFpFloorAudi} hasAcum={hasAcum} indent={1} />
+            )}
             {(d.emprestLPAnt > 0 || d.emprestLPAtu > 0) && (
               <DFCRow label={`${d.dEmprestLP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos Bancários LP  (${fmtBRL(d.emprestLPAnt, true)} → ${fmtBRL(d.emprestLPAtu, true)})`} value={d.dEmprestLP} value2={dAcum?.dEmprestLP} hasAcum={hasAcum} indent={1} />
             )}
@@ -3623,7 +3634,10 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
     const dCred_a       = getAtu('1.1.3')       - getJanAnt('1.1.3');
     const dContasCorr_a = getAtu('1.1.4')       - getJanAnt('1.1.4');
     const dEstoque_a    = (getAtu('1.1.2') + getAtu('1.1.7.02')) - (getJanAnt('1.1.2') + getJanAnt('1.1.7.02'));
-    const dFornec_a     = (getAtu('2.1.3') + getAtu('2.1.4')) - (getJanAnt('2.1.3') + getJanAnt('2.1.4'));
+    const fpFloorAudi_ant_a = getJanAnt('2.1.4.01.01.007');
+    const fpFloorAudi_atu_a = getAtu('2.1.4.01.01.007');
+    const dFpFloorAudi_a    = fpFloorAudi_atu_a - fpFloorAudi_ant_a;
+    const dFornec_a     = (getAtu('2.1.3') + getAtu('2.1.4') - fpFloorAudi_atu_a) - (getJanAnt('2.1.3') + getJanAnt('2.1.4') - fpFloorAudi_ant_a);
     const dObrigTrib_a  = getAtu('2.1.2.02')    - getJanAnt('2.1.2.02');
     const dObrigTrab_a  = getAtu('2.1.2.01')    - getJanAnt('2.1.2.01');
     const dContasPag_a  = getAtu('2.1.2.03')    - getJanAnt('2.1.2.03');
@@ -3681,7 +3695,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
       - despOper5Net_a + rendOper_a + rendFinanc_a + rendNaoOper_a - provisaoIR_a);
     const fluxoFinanc_a = dEmprestCP_02_a + (empLP_atu - empLP_ant) + (pesLig_atu - pesLig_ant)
                         + (debLig_atu - debLig_ant) + (arr_atu - arr_ant) + (outLP_atu - outLP_ant)
-                        + dPL_extra_a;
+                        + dFpFloorAudi_a + dPL_extra_a;
     const disponibJan   = getJanAnt('1.1.1');
     const varCaixaReal_a = getAtu('1.1.1') - disponibJan;
     const ajusteResidualBP_a = varCaixaReal_a - (fluxoOperDireto_a_base + fluxoInvest_a + fluxoFinanc_a);
@@ -3711,6 +3725,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
       dEmprestCP: empCP_atu - empCP_ant,   empCP_ant, empCP_atu,
       dEmprestCP_01: dEmprestCP_01_a, empCP_01_ant, empCP_01_atu,
       dEmprestCP_02: dEmprestCP_02_a, empCP_02_ant, empCP_02_atu,
+      dFpFloorAudi: dFpFloorAudi_a, fpFloorAudiAnt: fpFloorAudi_ant_a, fpFloorAudiAtu: fpFloorAudi_atu_a,
       dEmprestLP: empLP_atu - empLP_ant,   empLP_ant, empLP_atu,
       dPessoasLig: pesLig_atu - pesLig_ant, pesLig_ant, pesLig_atu,
       dDebitosLig: debLig_atu - debLig_ant, debLig_ant, debLig_atu,
@@ -3873,6 +3888,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
               {/* ── Financiamento ── */}
               <DFCRow label="ATIVIDADES DE FINANCIAMENTO" value={0} value2={0} hasAcum={hasAcum} highlight />
               {(d.emprestCP_02Ant > 0 || d.emprestCP_02Atu > 0) && <DFCRow label={`${d.dEmprestCP_02 >= 0 ? '(+) Captação' : '(–) Amortização'} Financiamentos CP / Floor Plan (2.1.1.02) (${fmtBRL(d.emprestCP_02Ant, true)} → ${fmtBRL(d.emprestCP_02Atu, true)})`} value={d.dEmprestCP_02} value2={acum?.dEmprestCP_02} hasAcum={hasAcum} indent={1} />}
+              {(d.fpFloorAudiAnt > 0 || d.fpFloorAudiAtu > 0) && <DFCRow label={`${d.dFpFloorAudi >= 0 ? '(+) Captação' : '(–) Amortização'} Floor Plan Novos Audi (2.1.4.01.01.007) (${fmtBRL(d.fpFloorAudiAnt, true)} → ${fmtBRL(d.fpFloorAudiAtu, true)})`} value={d.dFpFloorAudi} value2={acum?.dFpFloorAudi} hasAcum={hasAcum} indent={1} />}
               {(d.emprestLPAnt > 0 || d.emprestLPAtu > 0) && <DFCRow label={`${d.dEmprestLP >= 0 ? '(+) Captação' : '(–) Amortização'} Empréstimos Bancários LP (${fmtBRL(d.emprestLPAnt, true)} → ${fmtBRL(d.emprestLPAtu, true)})`} value={d.dEmprestLP} value2={acum?.dEmprestLP} hasAcum={hasAcum} indent={1} />}
               {(d.pessoasLigAnt > 0 || d.pessoasLigAtu > 0) && <DFCRow label={`${d.dPessoasLig >= 0 ? '(+) Aporte' : '(–) Retirada'} Sócios / Pessoas Ligadas (${fmtBRL(d.pessoasLigAnt, true)} → ${fmtBRL(d.pessoasLigAtu, true)})`} value={d.dPessoasLig} value2={acum?.dPessoasLig} hasAcum={hasAcum} indent={1} />}
               {(d.debitosLigAnt > 0 || d.debitosLigAtu > 0) && <DFCRow label={`${d.dDebitosLig >= 0 ? '(+) Captação' : '(–) Liquidação'} Débitos com Ligadas LP (${fmtBRL(d.debitosLigAnt, true)} → ${fmtBRL(d.debitosLigAtu, true)})`} value={d.dDebitosLig} value2={acum?.dDebitosLig} hasAcum={hasAcum} indent={1} />}
