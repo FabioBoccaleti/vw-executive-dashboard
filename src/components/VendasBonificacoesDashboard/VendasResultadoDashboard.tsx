@@ -26,6 +26,15 @@ function fmtPct(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
 }
 
+// ─── Impostos automáticos – Veículos Usados ──────────────────────────────────
+// Parte 1 (sempre): Vlr de Venda × 1,8%
+// Parte 2 (condicional): se (Vlr de Venda − Valor Custo − Parte1) > 0 → base × 3,65%
+function calcImpostosUsados(valorVenda: number, valorCusto: number): number {
+  const parte1 = valorVenda * 0.018;
+  const base   = valorVenda - valorCusto - parte1;
+  return parte1 + (base > 0 ? base * 0.0365 : 0);
+}
+
 // ─── Dias de Estoque: calcula a partir de dtaEntrada e dtaVenda do Registros ─
 function parseDMY(s: string): Date | null {
   if (!s) return null;
@@ -80,7 +89,8 @@ function getDsrPct(configs: VendasDsrConfig[], dateStr: string): number {
 
 function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false, aliquotaBonPct = 0, dsrPct = 0) {
   const comissaoBruta      = isDireta ? n(r.valorVenda) * n(r.pctComissao) / 100 : 0;
-  const recLiq             = isDireta ? comissaoBruta - n(r.impostos) : n(r.valorVenda) - n(r.impostos);
+  const impostosBase       = isUsados ? calcImpostosUsados(n(r.valorVenda), n(r.valorCusto)) : n(r.impostos);
+  const recLiq             = isDireta ? comissaoBruta - impostosBase : n(r.valorVenda) - impostosBase;
   const comissaoLiquidaPct = n(r.valorVenda) !== 0 ? (recLiq / n(r.valorVenda)) * 100 : 0;
   const impostosBonus      = !isDireta && !isUsados ? (n(r.bonusVarejo) + n(r.bonusTradeIn ?? '')) * (aliquotaBonPct / 100) : 0;
   const impostosTradeIn    = isUsados ? n(r.bonusVarejo) * (aliquotaBonPct / 100) : 0;
@@ -105,7 +115,7 @@ function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false, aliq
                            - n(r.comissaoVenda) - dsr
                            - provisoes - encargos - n(r.outrasDespesas);
   const resultadoPct       = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
-  return { comissaoBruta, recLiq, comissaoLiquidaPct, impostosBonus, impostosTradeIn, lucroBruto, lucroBrutoPct, impostosBonificacoes, lucroComBon, lucroComBonPct, dsr, provisoes, encargos, resultado, resultadoPct };
+  return { comissaoBruta, impostosBase, recLiq, comissaoLiquidaPct, impostosBonus, impostosTradeIn, lucroBruto, lucroBrutoPct, impostosBonificacoes, lucroComBon, lucroComBonPct, dsr, provisoes, encargos, resultado, resultadoPct };
 }
 
 // ─── Auto-preenchimento PIV/SIQ/PIVE ────────────────────────────────────────
@@ -227,7 +237,7 @@ function applyComissaoAutoFill(
     if (row.comissaoVenda !== '') return row;
     const vv = n(row.valorVenda);
     if (vv === 0) return row;
-    const recLiq = vv - n(row.impostos);
+    const recLiq = isUsados ? vv - calcImpostosUsados(vv, n(row.valorCusto)) : vv - n(row.impostos);
     const lb = recLiq - n(row.valorCusto) + n(row.bonusVarejo) + (!isUsados ? n(row.bonusTradeIn ?? '') : 0);
     // 1. Comissão s/ Venda
     const pct1 = parseFloat(String(modalidade.comissaoVenda).replace(',', '.')) || 0;
@@ -509,7 +519,7 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
       row.notaCompra, row.chassi, row.modelo, row.cor, row.nfVenda, row.dataVenda,
       n(row.diasEstoque),
       row.vendedor, row.transacao,
-      n(row.valorVenda), n(row.impostos), c.recLiq,
+      n(row.valorVenda), c.impostosBase, c.recLiq,
       n(row.valorCusto), n(row.bonusVarejo), c.lucroBruto, c.lucroBrutoPct,
       n(row.recBlindagem), n(row.recFinanciamento), n(row.recDespachante),
       n(row.jurosEstoque), n(row.cortesiaTransferencia), n(row.comissaoVenda), n(row.dsr),
@@ -789,7 +799,9 @@ export default function VendasResultadoDashboard() {
     const isUsados = activeTab === 'usados';
     const sum = (key: EditableKey) => filteredRows.reduce((a, r) => a + n((r as unknown as Record<string, string>)[key] ?? ''), 0);
     const valorVenda       = sum('valorVenda');
-    const impostos         = sum('impostos');
+    const impostos         = isUsados
+      ? filteredRows.reduce((a, r) => a + calcImpostosUsados(n(r.valorVenda), n(r.valorCusto)), 0)
+      : sum('impostos');
     const comissaoBruta    = isDireta
       ? filteredRows.reduce((a, r) => a + n(r.valorVenda) * n(r.pctComissao) / 100, 0)
       : 0;
@@ -1053,7 +1065,7 @@ export default function VendasResultadoDashboard() {
                   <td className={`${tdR} px-2 min-w-[110px]`}>{EC('valorVenda', 'currency')}</td>
                   {isDireta && <td className={`${tdR} px-2 min-w-[80px]`}>{EC('pctComissao', 'number')}</td>}
                   {isDireta && <td className={`${tdR} px-2 min-w-[110px]`}><CalcCell value={c.comissaoBruta} /></td>}
-                  <td className={`${tdR} px-2 min-w-[100px]`}>{EC('impostos', 'currency')}</td>
+                  <td className={`${tdR} px-2 min-w-[100px]`}>{isUsados ? <CalcCell value={c.impostosBase} /> : EC('impostos', 'currency')}</td>
                   <td className={`${tdR} px-2 min-w-[110px]`}><CalcCell value={c.recLiq} /></td>
                   {isDireta && <td className={`${tdR} px-2 min-w-[90px]`}><CalcCell value={c.comissaoLiquidaPct} pct /></td>}
                   {/* Lucro bruto */}
