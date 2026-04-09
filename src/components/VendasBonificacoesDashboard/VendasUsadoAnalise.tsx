@@ -138,8 +138,8 @@ function applyComissaoAutoFill(rows: VendasResultadoRow[], modalidade: Remunerac
     if (row.comissaoVenda !== '') return row;
     const vv = n(row.valorVenda);
     if (vv === 0) return row;
-    const recLiq = vv - n(row.impostos);
-    const lb = recLiq - n(row.valorCusto) + n(row.bonusVarejo) + n(row.bonusTradeIn ?? '');
+    const recLiq = vv - calcImpostosUsados(vv, n(row.valorCusto));
+    const lb = recLiq - n(row.valorCusto) + n(row.bonusVarejo);
     const pct1 = parseFloat(String(modalidade.comissaoVenda).replace(',', '.')) || 0;
     const com1 = vv * pct1 / 100;
     const vend = (row.vendedor ?? '').trim().toLowerCase();
@@ -321,21 +321,32 @@ function avatarColor(name: string) {
   return AVATAR_BG[Math.abs(h) % AVATAR_BG.length];
 }
 
+// ─── Impostos automáticos – mesma fórmula da tabela ─────────────────────────
+// Parte 1 (sempre): Vlr de Venda × 1,8%
+// Parte 2 (condicional): se (Vlr de Venda − Valor Custo − Parte1) > 0 → base × 3,65%
+function calcImpostosUsados(valorVenda: number, valorCusto: number): number {
+  const parte1 = valorVenda * 0.018;
+  const base   = valorVenda - valorCusto - parte1;
+  return parte1 + (base > 0 ? base * 0.0365 : 0);
+}
+
 // ─── Cálculo por linha ────────────────────────────────────────────────────────
 function calcUsados(r: VendasResultadoRow, aliqBon: number, dsrPct: number) {
-  const recLiq = n(r.valorVenda) - n(r.impostos);
-  const bv = n(r.bonusVarejo), bt = 0; // Trade-in não usado em Usados
-  const lb  = recLiq - n(r.valorCusto) + bv + bt - (bv + bt) * aliqBon / 100;
+  const impostosBase = calcImpostosUsados(n(r.valorVenda), n(r.valorCusto));
+  const recLiq = n(r.valorVenda) - impostosBase;
+  const bv = n(r.bonusVarejo);
+  const lb  = recLiq - n(r.valorCusto) + bv - bv * aliqBon / 100;
   const bon = n(r.bonusPIV) + n(r.bonusSIQ) + n(r.bonusPIVE) + n(r.bonusAdic1) + n(r.bonusAdic2) + n(r.bonusAdic3);
-  const lcb = lb + bon - bon * aliqBon / 100;
+  const lcb = lb + bon;
   const dsr = n(r.comissaoVenda) * dsrPct / 100;
   const base = n(r.comissaoVenda) + dsr;
   const prov = base * 7 / 36;
   const enc  = (base + prov) * 0.358;
-  const resultado = lcb + n(r.recBlindagem) + n(r.recFinanciamento) + n(r.recDespachante)
-    - n(r.jurosEstoque) - n(r.ciDesconto) - n(r.cortesiaEmplacamento)
+  // resultado baseado em lb (sem PIV/SIQ/PIVE) e usando cortesiaTransferencia
+  const resultado = lb + n(r.recBlindagem) + n(r.recFinanciamento) + n(r.recDespachante)
+    - n(r.jurosEstoque) - n(r.cortesiaTransferencia)
     - n(r.comissaoVenda) - dsr - prov - enc - n(r.outrasDespesas);
-  return { recLiq, lb, bon, lcb, dsr, prov, enc, resultado, com: n(r.comissaoVenda) };
+  return { impostosBase, recLiq, lb, bon, lcb, dsr, prov, enc, resultado, com: n(r.comissaoVenda) };
 }
 
 // ─── Agregador ────────────────────────────────────────────────────────────────
@@ -363,7 +374,7 @@ function agg(rows: VendasResultadoRow[], aliqBon: number, dsrCfg: VendasDsrConfi
     recLiq += c.recLiq; lb += c.lb; bon += c.bon; lcb += c.lcb;
     dsr += c.dsr; prov += c.prov; enc += c.enc; res += c.resultado; com += c.com;
     remV += c.com + c.dsr + c.prov + c.enc;
-    juros += n(r.jurosEstoque); ci += n(r.ciDesconto); cort += n(r.cortesiaEmplacamento);
+    juros += n(r.jurosEstoque); ci += 0; cort += n(r.cortesiaTransferencia);
     outras += n(r.outrasDespesas);
     blind += n(r.recBlindagem); fin += n(r.recFinanciamento); desp += n(r.recDespachante);
     const dias = n(r.diasEstoque);
