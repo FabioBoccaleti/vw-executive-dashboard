@@ -702,15 +702,25 @@ export default function VendasResultadoDashboard() {
     return [...yrs].sort();
   }, [rows]);
 
+  // Retorna {year, month} preferindo periodoImport sobre dataVenda
+  function rowPeriod(r: VendasResultadoRow): { year: number; month: number } | null {
+    if (r.periodoImport) {
+      const [y, m] = r.periodoImport.split('-').map(Number);
+      if (y > 2000 && m >= 1 && m <= 12) return { year: y, month: m };
+    }
+    const d = r.dataVenda;
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return { year: parseInt(d.split('/')[2]), month: parseInt(d.split('/')[1]) };
+    if (/^\d{4}-\d{2}-\d{2}/.test(d)) return { year: parseInt(d.split('-')[0]), month: parseInt(d.split('-')[1]) };
+    return null;
+  }
+
   // Registros filtrados
   const filteredRows = useMemo(() => {
     return rows.filter(r => {
-      const d = r.dataVenda;
-      let yr: number | null = null, mo: number | null = null;
-      if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) { yr = parseInt(d.split('/')[2]); mo = parseInt(d.split('/')[1]); }
-      else if (/^\d{4}-\d{2}-\d{2}/.test(d)) { yr = parseInt(d.split('-')[0]); mo = parseInt(d.split('-')[1]); }
-      if (yr !== filterYear) return false;
-      if (filterMonth !== null && mo !== filterMonth) return false;
+      const p = rowPeriod(r);
+      if (!p) return false;
+      if (p.year !== filterYear) return false;
+      if (filterMonth !== null && p.month !== filterMonth) return false;
       return true;
     });
   }, [rows, filterYear, filterMonth]);
@@ -718,16 +728,10 @@ export default function VendasResultadoDashboard() {
   // Contagem por mês
   const monthCounts = useMemo(() => {
     const counts: Record<number, number> = {};
-    rows.filter(r => {
-      const d = r.dataVenda;
-      if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return parseInt(d.split('/')[2]) === filterYear;
-      if (/^\d{4}-\d{2}-\d{2}/.test(d)) return parseInt(d.split('-')[0]) === filterYear;
-      return false;
-    }).forEach(r => {
-      const d = r.dataVenda;
-      const mo = /^\d{2}\/\d{2}\/\d{4}/.test(d) ? parseInt(d.split('/')[1])
-               : /^\d{4}-\d{2}-\d{2}/.test(d) ? parseInt(d.split('-')[1]) : null;
-      if (mo) counts[mo] = (counts[mo] || 0) + 1;
+    rows.forEach(r => {
+      const p = rowPeriod(r);
+      if (!p || p.year !== filterYear) return;
+      counts[p.month] = (counts[p.month] || 0) + 1;
     });
     return counts;
   }, [rows, filterYear]);

@@ -76,12 +76,20 @@ const fmtBRLF = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', cu
 const fmtPct  = (v: number, d = 1) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%';
 
 function getYr(r: VendasResultadoRow) {
+  if (r.periodoImport) {
+    const [y] = r.periodoImport.split('-').map(Number);
+    if (y > 2000) return y;
+  }
   const d = r.dataVenda;
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[2];
   if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[0];
   return 0;
 }
 function getMo(r: VendasResultadoRow) {
+  if (r.periodoImport) {
+    const [, m] = r.periodoImport.split('-').map(Number);
+    if (m >= 1 && m <= 12) return m;
+  }
   const d = r.dataVenda;
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[1];
   if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[1];

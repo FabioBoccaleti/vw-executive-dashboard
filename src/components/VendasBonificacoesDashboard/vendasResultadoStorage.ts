@@ -61,6 +61,7 @@ export interface VendasResultadoRow {
   highlight?:           boolean;
   annotation?:          string;
   syncedFromRegistro?:  boolean;
+  periodoImport?:       string; // "YYYY-MM" — herdado do registro, tem prioridade sobre dataVenda para fins de classificação
 }
 
 export async function loadVendasResultadoRows(tab: VendasResultadoSubTab): Promise<VendasResultadoRow[]> {
@@ -84,16 +85,27 @@ const REGISTRO_TO_VENDAS_TAB: Record<'novos' | 'frotista' | 'usados', VendasResu
 
 // ─── Sync Registro → Vendas ───────────────────────────────────────────────────
 export interface RegistroSyncRow {
-  chassi:       string;
-  modelo:       string;
-  nomeCor:      string;
-  nfVenda:      string;
-  nfEntrada:    string;
-  dtaVenda:     string;
-  valVenda:     string;
-  valCusto:     string;
-  nomeVendedor: string;
-  transacao:    string;
+  chassi:        string;
+  modelo:        string;
+  nomeCor:       string;
+  nfVenda:       string;
+  nfEntrada:     string;
+  dtaVenda:      string;
+  valVenda:      string;
+  valCusto:      string;
+  nomeVendedor:  string;
+  transacao:     string;
+  periodoImport?: string; // "YYYY-MM"
+}
+
+/**
+ * Chave única por transação: chassi + NF de venda.
+ * Fallback para chassi + data + transação quando a NF estiver em branco,
+ * garantindo que venda, devolução e revenda do mesmo chassi gerem linhas
+ * independentes em vez de se sobrescreverem.
+ */
+function registroSyncKey(chassi: string, nfVenda: string, dtaVenda: string, transacao: string): string {
+  return `${chassi}||${nfVenda || `${dtaVenda}|${transacao}`}`;
 }
 
 export async function syncVendasFromRegistro(
@@ -103,33 +115,43 @@ export async function syncVendasFromRegistro(
   const vendaTab = REGISTRO_TO_VENDAS_TAB[registroTab];
   const current  = await loadVendasResultadoRows(vendaTab);
 
-  const registroChassisSet = new Set(registroRows.map(r => r.chassi).filter(Boolean));
-
-  // Remove linhas sincronizadas cujo chassi não existe mais no registro
-  const kept = current.filter(r =>
-    !r.syncedFromRegistro || (r.chassi && registroChassisSet.has(r.chassi))
+  // Conjunto de chaves compostas presentes no registro atual
+  const registroKeySet = new Set(
+    registroRows
+      .filter(r => r.chassi)
+      .map(r => registroSyncKey(r.chassi, r.nfVenda, r.dtaVenda, r.transacao))
   );
 
-  // Mapa chassi → linha em vendas (para upsert)
-  const keptMap = new Map(kept.map(r => [r.chassi, r]));
+  // Remove linhas sincronizadas cuja chave composta não existe mais no registro
+  const kept = current.filter(r =>
+    !r.syncedFromRegistro ||
+    (r.chassi && registroKeySet.has(registroSyncKey(r.chassi, r.nfVenda, r.dataVenda, r.transacao)))
+  );
+
+  // Mapa chave-composta → linha em vendas (para upsert)
+  const keptMap = new Map(
+    kept.map(r => [registroSyncKey(r.chassi, r.nfVenda, r.dataVenda, r.transacao), r])
+  );
 
   const result: VendasResultadoRow[] = [...kept];
 
   for (const reg of registroRows) {
     if (!reg.chassi) continue;
-    const existing = keptMap.get(reg.chassi);
+    const key      = registroSyncKey(reg.chassi, reg.nfVenda, reg.dtaVenda, reg.transacao);
+    const existing = keptMap.get(key);
     if (existing) {
       // Atualiza apenas os campos compartilhados
-      existing.notaCompra  = reg.nfEntrada;
-      existing.chassi      = reg.chassi;
-      existing.modelo      = reg.modelo;
-      existing.cor         = reg.nomeCor;
-      existing.nfVenda     = reg.nfVenda;
-      existing.dataVenda   = reg.dtaVenda;
-      existing.valorVenda  = reg.valVenda;
-      existing.valorCusto  = reg.valCusto;
-      existing.vendedor    = reg.nomeVendedor;
-      existing.transacao   = reg.transacao;
+      existing.notaCompra    = reg.nfEntrada;
+      existing.chassi        = reg.chassi;
+      existing.modelo        = reg.modelo;
+      existing.cor           = reg.nomeCor;
+      existing.nfVenda       = reg.nfVenda;
+      existing.dataVenda     = reg.dtaVenda;
+      existing.valorVenda    = reg.valVenda;
+      existing.valorCusto    = reg.valCusto;
+      existing.vendedor      = reg.nomeVendedor;
+      existing.transacao     = reg.transacao;
+      existing.periodoImport = reg.periodoImport;
       existing.syncedFromRegistro = true;
     } else {
       // Cria nova linha com campos financeiros em branco
@@ -146,6 +168,7 @@ export async function syncVendasFromRegistro(
         valorCusto:         reg.valCusto,
         vendedor:           reg.nomeVendedor,
         transacao:          reg.transacao,
+        periodoImport:      reg.periodoImport,
         syncedFromRegistro: true,
       };
       result.push(newRow);
