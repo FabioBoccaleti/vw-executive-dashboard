@@ -263,12 +263,14 @@ export function VPecasItemDashboard() {
       return;
     }
     const periodo = `${importPeriodYear}-${String(importPeriodMonth).padStart(2, '0')}`;
-    const { added, removed } = await importVPecasItemForPeriod(periodo, parsed);
+    const { added, removed, originalCount } = await importVPecasItemForPeriod(periodo, parsed);
     const updated = await loadVPecasItemRows();
     setRows(updated);
+    const filteredOut = originalCount - added;
+    const filterNote = filteredOut > 0 ? ` (${filteredOut} filtrado(s) por rentabilidade)` : '';
     const msg = removed > 0
-      ? `${added} item(s) importado(s) · ${removed} substituido(s) — ${MONTHS[importPeriodMonth - 1]}/${importPeriodYear}.`
-      : `${added} item(s) importado(s) — ${MONTHS[importPeriodMonth - 1]}/${importPeriodYear}.`;
+      ? `${added} item(s) importado(s) de ${originalCount}${filterNote} · ${removed} substituido(s) — ${MONTHS[importPeriodMonth - 1]}/${importPeriodYear}.`
+      : `${added} item(s) importado(s) de ${originalCount}${filterNote} — ${MONTHS[importPeriodMonth - 1]}/${importPeriodYear}.`;
     toast.success(msg);
     if (txtInputRef.current) txtInputRef.current.value = '';
   }
@@ -286,10 +288,12 @@ export function VPecasItemDashboard() {
       if (xlsxInputRef.current) xlsxInputRef.current.value = '';
       return;
     }
-    const { total } = await replaceVPecasItemRows(parsed);
+    const { total, originalCount } = await replaceVPecasItemRows(parsed);
     const updated = await loadVPecasItemRows();
     setRows(updated);
-    toast.success(`${total} item(s) importado(s) — dados anteriores substituidos.`);
+    const filteredOut = originalCount - total;
+    const filterNote = filteredOut > 0 ? ` (${filteredOut} filtrado(s) por rentabilidade por departamento)` : '';
+    toast.success(`${total} item(s) importado(s) de ${originalCount}${filterNote} — dados anteriores substituidos.`);
     if (xlsxInputRef.current) xlsxInputRef.current.value = '';
   }
 
@@ -307,6 +311,14 @@ export function VPecasItemDashboard() {
     <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
       <input ref={txtInputRef}  type="file" accept=".txt"            className="hidden" onChange={handleTxtImport} />
       <input ref={xlsxInputRef} type="file" accept=".xlsx,.xls,.ods" className="hidden" onChange={handleXlsxImport} />
+
+      <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+        <span className="mt-0.5 shrink-0">⚠️</span>
+        <span>
+          <strong>Importação filtrada:</strong> são armazenados até 100 itens com maior lucro e 100 com maior prejuízo por departamento.
+          Os totais exibidos não refletem o arquivo completo.
+        </span>
+      </div>
 
       {importPeriodModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

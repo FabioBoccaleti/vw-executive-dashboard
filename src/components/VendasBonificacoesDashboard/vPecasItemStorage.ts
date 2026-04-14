@@ -70,30 +70,71 @@ export async function saveVPecasItemRows(rows: VPecasItemRow[]): Promise<boolean
   }
 }
 
+// ─── Limite de importação por departamento ───────────────────────────────────
+const ITEM_LIMIT_PER_DEPT = 100; // top 100 lucro + top 100 prejuízo por departamento
+
+export function filterTopItemsByDept(
+  rows: Omit<VPecasItemRow, 'id'>[],
+): { filtered: Omit<VPecasItemRow, 'id'>[]; originalCount: number } {
+  const originalCount = rows.length;
+  const n = (v?: string) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
+
+  // Agrupa por departamento
+  const byDept = new Map<string, Omit<VPecasItemRow, 'id'>[]>();
+  for (const r of rows) {
+    const dept = r.data['DEPARTAMENTO']?.trim() || '(sem depto)';
+    const list = byDept.get(dept) ?? [];
+    list.push(r);
+    byDept.set(dept, list);
+  }
+
+  const result: Omit<VPecasItemRow, 'id'>[] = [];
+  for (const items of byDept.values()) {
+    const sorted = [...items].sort(
+      (a, b) => n(b.data['VAL_RENTABILIDADE']) - n(a.data['VAL_RENTABILIDADE'])
+    );
+    // Top 100 lucro (valores mais altos)
+    const topLucro = sorted.slice(0, ITEM_LIMIT_PER_DEPT);
+    // Top 100 prejuízo (valores mais baixos = final do array)
+    const topPrejuizo = sorted.length > ITEM_LIMIT_PER_DEPT
+      ? sorted.slice(-ITEM_LIMIT_PER_DEPT)
+      : [];
+    // União sem duplicatas (um item pode estar nos dois ranges se a lista for pequena)
+    const seen = new Set<number>();
+    for (const entry of [...topLucro, ...topPrejuizo]) {
+      const idx = items.indexOf(entry);
+      if (!seen.has(idx)) { seen.add(idx); result.push(entry); }
+    }
+  }
+  return { filtered: result, originalCount };
+}
+
 // TXT import: substitui linhas do mesmo periodo, mantem os demais
 export async function importVPecasItemForPeriod(
   periodo: string,
   newRows: Omit<VPecasItemRow, 'id'>[],
-): Promise<{ added: number; removed: number }> {
+): Promise<{ added: number; removed: number; originalCount: number }> {
+  const { filtered, originalCount } = filterTopItemsByDept(newRows);
   const existing = await loadVPecasItemRows();
   const kept = existing.filter(r => r.periodoImport !== periodo);
   const removed = existing.length - kept.length;
-  const toAdd: VPecasItemRow[] = newRows.map(r => ({
+  const toAdd: VPecasItemRow[] = filtered.map(r => ({
     ...r,
     id: crypto.randomUUID(),
     periodoImport: periodo,
   }));
   await saveVPecasItemRows([...kept, ...toAdd]);
-  return { added: toAdd.length, removed };
+  return { added: toAdd.length, removed, originalCount };
 }
 
 // Excel import: substitui tudo
 export async function replaceVPecasItemRows(
   rows: Omit<VPecasItemRow, 'id'>[],
-): Promise<{ total: number }> {
-  const withIds: VPecasItemRow[] = rows.map(r => ({ ...r, id: crypto.randomUUID() }));
+): Promise<{ total: number; originalCount: number }> {
+  const { filtered, originalCount } = filterTopItemsByDept(rows);
+  const withIds: VPecasItemRow[] = filtered.map(r => ({ ...r, id: crypto.randomUUID() }));
   await saveVPecasItemRows(withIds);
-  return { total: withIds.length };
+  return { total: withIds.length, originalCount };
 }
 
 // Parser TXT: uma linha de cabecalho, todas as linhas de dados comecam com digito

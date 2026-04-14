@@ -165,7 +165,7 @@ function normalizeV07Bonus(rows: VendasResultadoRow[]): VendasResultadoRow[] {
   });
 }
 
-rows: VendasResultadoRow[], changedId: string, newTransacao: string): VendasResultadoRow[] {
+function applyTransacaoSign(rows: VendasResultadoRow[], changedId: string, newTransacao: string): VendasResultadoRow[] {
   return rows.map(row => {
     if (row.id !== changedId) return row;
     const factor = newTransacao === 'V07' ? -1 : 1;
