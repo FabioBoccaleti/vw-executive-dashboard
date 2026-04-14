@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { loadVPecasRows, type VPecasRow } from './vPecasStorage';
+import { loadVPecasItemRows, type VPecasItemRow } from './vPecasItemStorage';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
 const MS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -138,6 +139,29 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
   );
 }
 
+// ─── Helpers para Itens de Peças ────────────────────────────────────────────
+function getItemYr(row: VPecasItemRow): number {
+  if (row.periodoImport) { const [y] = row.periodoImport.split('-').map(Number); if (y > 2000) return y; }
+  const d = row.data['DTA_ENTRADA_SAIDA'] ?? '';
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[2];
+  return 0;
+}
+function getItemMo(row: VPecasItemRow): number {
+  if (row.periodoImport) { const [,m] = row.periodoImport.split('-').map(Number); if (m >= 1 && m <= 12) return m; }
+  const d = row.data['DTA_ENTRADA_SAIDA'] ?? '';
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[1];
+  return 0;
+}
+function calcItem(d: Record<string, string>): { recLiq: number; lucroBruto: number; lbPct: number } {
+  const valorVenda = n(d['VAL_VENDA']);
+  const impostos   = n(d['VAL_IMPOSTOS']);
+  const custo      = n(d['CUSTO_MEDIO']);
+  const recLiq     = valorVenda - impostos;
+  const lucroBruto = recLiq - custo;
+  const lbPct      = recLiq !== 0 ? (lucroBruto / recLiq) * 100 : 0;
+  return { recLiq, lucroBruto, lbPct };
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function VPecasAnalise() {
   const curYear = new Date().getFullYear();
@@ -155,6 +179,15 @@ export default function VPecasAnalise() {
   const [estadoExpanded, setEstadoExpanded] = useState(false);
   const [prejuizoExpanded, setPrejuizoExpanded] = useState(false);
   const [clienteExpanded, setClienteExpanded] = useState(false);
+  const [analiseTab, setAnaliseTab]                     = useState<'nfs' | 'itens'>('nfs');
+  const [allItemRows, setAllItemRows]                   = useState<VPecasItemRow[]>([]);
+  const [itemPrejuizoDept, setItemPrejuizoDept]         = useState('Todos');
+  const [itemPrejuizoExpanded, setItemPrejuizoExpanded] = useState(false);
+  const [itemLucroExpanded, setItemLucroExpanded]       = useState(false);
+
+  useEffect(() => {
+    loadVPecasItemRows().then(setAllItemRows);
+  }, []);
 
   useEffect(() => {
     loadVPecasRows().then(rows => {
@@ -341,6 +374,102 @@ export default function VPecasAnalise() {
     }).sort((a, b) => b.valorVenda - a.valorVenda);
   }, [filteredRows]);
 
+  // ─── Itens de Peças ─────────────────────────────────────────────────────────────────────────
+  const filteredItemRows = useMemo(() =>
+    allItemRows.filter(r => {
+      if (getItemYr(r) !== year) return false;
+      if (month !== null && getItemMo(r) !== month) return false;
+      return true;
+    })
+  , [allItemRows, year, month]);
+
+  const itemKpis = useMemo(() => {
+    let comLucro = 0, comPrejuizo = 0, lucroBrutoTotal = 0, recLiqTotal = 0;
+    for (const r of filteredItemRows) {
+      const c = calcItem(r.data);
+      recLiqTotal    += c.recLiq;
+      lucroBrutoTotal += c.lucroBruto;
+      if (c.lucroBruto > 0) comLucro++;
+      else if (c.lucroBruto < 0) comPrejuizo++;
+    }
+    const total = filteredItemRows.length;
+    const pctLucro  = total > 0 ? (comLucro / total) * 100 : 0;
+    const lbPctTotal = recLiqTotal !== 0 ? (lucroBrutoTotal / recLiqTotal) * 100 : 0;
+    return { total, comLucro, comPrejuizo, lucroBrutoTotal, pctLucro, lbPctTotal };
+  }, [filteredItemRows]);
+
+  const availItemDepts = useMemo(() => {
+    const s = new Set(filteredItemRows.map(r => r.data['DEPARTAMENTO']?.trim() || '(sem depto)'));
+    return ['Todos', ...[...s].sort()];
+  }, [filteredItemRows]);
+
+  const itemPrejuizoData = useMemo(() => {
+    const source = itemPrejuizoDept !== 'Todos'
+      ? filteredItemRows.filter(r => (r.data['DEPARTAMENTO']?.trim() || '(sem depto)') === itemPrejuizoDept)
+      : filteredItemRows;
+    return source
+      .map(r => {
+        const c = calcItem(r.data);
+        return {
+          codigo:     r.data['ITEM_ESTOQUE_PUB']?.trim() || '—',
+          descricao:  r.data['DES_ITEM_ESTOQUE']?.trim() || '—',
+          depto:      r.data['DEPARTAMENTO']?.trim() || '(sem depto)',
+          vendedor:   r.data['NOME_VENDEDOR']?.trim() || '—',
+          qtd:        r.data['QUANTIDADE']?.trim() || '0',
+          recLiq:     c.recLiq,
+          custo:      n(r.data['CUSTO_MEDIO']),
+          lucroBruto: c.lucroBruto,
+          lbPct:      c.lbPct,
+        };
+      })
+      .filter(r => r.lucroBruto < 0)
+      .sort((a, b) => a.lucroBruto - b.lucroBruto)
+      .slice(0, 20);
+  }, [filteredItemRows, itemPrejuizoDept]);
+
+  const itemLucroData = useMemo(() => {
+    const source = itemPrejuizoDept !== 'Todos'
+      ? filteredItemRows.filter(r => (r.data['DEPARTAMENTO']?.trim() || '(sem depto)') === itemPrejuizoDept)
+      : filteredItemRows;
+    return source
+      .map(r => {
+        const c = calcItem(r.data);
+        return {
+          codigo:     r.data['ITEM_ESTOQUE_PUB']?.trim() || '—',
+          descricao:  r.data['DES_ITEM_ESTOQUE']?.trim() || '—',
+          depto:      r.data['DEPARTAMENTO']?.trim() || '(sem depto)',
+          vendedor:   r.data['NOME_VENDEDOR']?.trim() || '—',
+          qtd:        r.data['QUANTIDADE']?.trim() || '0',
+          recLiq:     c.recLiq,
+          custo:      n(r.data['CUSTO_MEDIO']),
+          lucroBruto: c.lucroBruto,
+          lbPct:      c.lbPct,
+        };
+      })
+      .filter(r => r.lucroBruto > 0)
+      .sort((a, b) => b.lucroBruto - a.lucroBruto)
+      .slice(0, 20);
+  }, [filteredItemRows, itemPrejuizoDept]);
+
+  const itemDeptSummary = useMemo(() => {
+    const map = new Map<string, { total: number; comLucro: number; comPrejuizo: number; lucroBruto: number; recLiq: number }>();
+    for (const r of filteredItemRows) {
+      const dept = r.data['DEPARTAMENTO']?.trim() || '(sem depto)';
+      const c = calcItem(r.data);
+      const entry = map.get(dept) ?? { total: 0, comLucro: 0, comPrejuizo: 0, lucroBruto: 0, recLiq: 0 };
+      entry.total++;
+      entry.lucroBruto += c.lucroBruto;
+      entry.recLiq += c.recLiq;
+      if (c.lucroBruto > 0) entry.comLucro++;
+      else if (c.lucroBruto < 0) entry.comPrejuizo++;
+      map.set(dept, entry);
+    }
+    return [...map.entries()].map(([depto, v]) => ({
+      depto, ...v,
+      lbPct: v.recLiq !== 0 ? (v.lucroBruto / v.recLiq) * 100 : 0,
+    })).sort((a, b) => b.lucroBruto - a.lucroBruto);
+  }, [filteredItemRows]);
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-300">
@@ -396,6 +525,23 @@ export default function VPecasAnalise() {
         <span className="ml-auto text-[11px] text-slate-400">{filteredRows.length} NF{filteredRows.length !== 1 ? 's' : ''}</span>
       </div>
 
+      {/* ── Sub-tabs Análise ──────────────────────────────────────────────── */}
+      <div className="flex gap-1 bg-white rounded-xl border border-slate-200 shadow-sm px-3 py-2">
+        <button
+          onClick={() => setAnaliseTab('nfs')}
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${analiseTab === 'nfs' ? 'bg-violet-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
+        >
+          Análise por NF (Vendas de Peças)
+        </button>
+        <button
+          onClick={() => setAnaliseTab('itens')}
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${analiseTab === 'itens' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
+        >
+          Análise por Item (Itens de Peças)
+        </button>
+      </div>
+
+      {analiseTab === 'nfs' && <>
       {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <KpiCard label="Total de NFs" value={metrics.nfs.toLocaleString('pt-BR')} accent={VIOLET}
@@ -909,6 +1055,156 @@ export default function VPecasAnalise() {
           </div>
         )}
       </div>
+      </>}
+
+      {analiseTab === 'itens' && <>
+        {/* ── KPI Cards — Itens ────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <KpiCard label="Total de Itens" value={itemKpis.total.toLocaleString('pt-BR')} accent={CYAN} />
+          <KpiCard label="Itens com Lucro" value={itemKpis.comLucro.toLocaleString('pt-BR')} color="text-emerald-700" accent={EMERALD} sub={`${fmtPct(itemKpis.pctLucro)} do total`} />
+          <KpiCard label="Itens com Prejuízo" value={itemKpis.comPrejuizo.toLocaleString('pt-BR')} color="text-rose-600" accent={ROSE} />
+          <KpiCard label="Lucro Bruto Total" value={fmtBRL(itemKpis.lucroBrutoTotal)} color={itemKpis.lucroBrutoTotal >= 0 ? 'text-emerald-700' : 'text-rose-600'} accent={itemKpis.lucroBrutoTotal >= 0 ? EMERALD : ROSE} />
+          <KpiCard label="% LB Médio" value={fmtPct(itemKpis.lbPctTotal)} color={itemKpis.lbPctTotal >= 0 ? 'text-emerald-700' : 'text-rose-600'} accent={itemKpis.lbPctTotal >= 0 ? EMERALD : ROSE} />
+        </div>
+
+        {/* ── Filtro de Departamento (compartilhado) ─────────────────────── */}
+        <div className="flex gap-1 flex-wrap">
+          {availItemDepts.map(d => (
+            <button
+              key={d}
+              onClick={() => setItemPrejuizoDept(d)}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all border ${
+                itemPrejuizoDept === d ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white text-slate-500 border-slate-200 hover:border-cyan-300 hover:text-cyan-600'
+              }`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Top 20 Itens com Prejuízo ───────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5" style={{ borderLeft: '4px solid #fb7185' }}>
+          <SH right={<span className="text-[10px] text-slate-400">{itemPrejuizoData.length} item(s) com prejuízo</span>}>
+            Top 20 Itens com Prejuízo
+          </SH>
+          {itemPrejuizoData.length === 0 ? (
+            <div className="flex items-center justify-center h-16 text-xs text-emerald-600 font-semibold">
+              Nenhum item com prejuízo no período 🎉
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-[auto_1.2fr_2fr_1fr_1fr_0.5fr_1fr_1fr_1.2fr] gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
+                <span className="w-5">#</span>
+                <span>Código</span>
+                <span>Descrição</span>
+                <span>Departamento</span>
+                <span>Vendedor</span>
+                <span className="text-right">Qtd</span>
+                <span className="text-right">Rec. Líq.</span>
+                <span className="text-right">Custo</span>
+                <span className="text-right">Lucro Bruto</span>
+              </div>
+              {(itemPrejuizoExpanded ? itemPrejuizoData : itemPrejuizoData.slice(0, 5)).map((item, i) => (
+                <div key={i} className="grid grid-cols-[auto_1.2fr_2fr_1fr_1fr_0.5fr_1fr_1fr_1.2fr] gap-2 items-center px-2 py-1.5 rounded-lg bg-rose-50/40 hover:bg-rose-50 transition-colors">
+                  <span className="w-5 text-[11px] font-bold text-slate-300 text-center">{i + 1}</span>
+                  <span className="text-xs font-mono text-slate-600 truncate">{item.codigo}</span>
+                  <span className="text-xs text-slate-700 truncate">{item.descricao}</span>
+                  <span className="text-xs text-slate-500 truncate">{item.depto}</span>
+                  <span className="text-xs text-slate-500 truncate">{item.vendedor}</span>
+                  <span className="text-right text-xs font-mono text-slate-600">{item.qtd}</span>
+                  <span className="text-right text-xs font-mono text-slate-600">{fmtBRLF(item.recLiq)}</span>
+                  <span className="text-right text-xs font-mono text-slate-600">{fmtBRLF(item.custo)}</span>
+                  <span className="text-right text-xs font-mono font-bold text-rose-600">
+                    {fmtBRLF(item.lucroBruto)} <span className="text-[10px] text-rose-400">({fmtPct(item.lbPct)})</span>
+                  </span>
+                </div>
+              ))}
+              {itemPrejuizoData.length > 5 && (
+                <button
+                  onClick={() => setItemPrejuizoExpanded(e => !e)}
+                  className="mt-1 self-center px-4 py-1 rounded-full text-[11px] font-bold text-rose-600 border border-rose-200 hover:bg-rose-50 transition-all"
+                >
+                  {itemPrejuizoExpanded ? 'Mostrar menos' : `Mostrar mais (${itemPrejuizoData.length - 5} restantes)`}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Top 20 Itens com Lucro ──────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5" style={{ borderLeft: '4px solid #10b981' }}>
+          <SH right={<span className="text-[10px] text-slate-400">{itemLucroData.length} item(s) com lucro</span>}>
+            Top 20 Itens com Lucro
+          </SH>
+          {itemLucroData.length === 0 ? (
+            <div className="text-center text-sm text-slate-300 py-8">Nenhum item com lucro no período</div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-[auto_1.2fr_2fr_1fr_1fr_0.5fr_1fr_1fr_1.2fr] gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
+                <span className="w-5">#</span>
+                <span>Código</span>
+                <span>Descrição</span>
+                <span>Departamento</span>
+                <span>Vendedor</span>
+                <span className="text-right">Qtd</span>
+                <span className="text-right">Rec. Líq.</span>
+                <span className="text-right">Custo</span>
+                <span className="text-right">Lucro Bruto</span>
+              </div>
+              {(itemLucroExpanded ? itemLucroData : itemLucroData.slice(0, 5)).map((item, i) => (
+                <div key={i} className="grid grid-cols-[auto_1.2fr_2fr_1fr_1fr_0.5fr_1fr_1fr_1.2fr] gap-2 items-center px-2 py-1.5 rounded-lg bg-emerald-50/40 hover:bg-emerald-50 transition-colors">
+                  <span className="w-5 text-[11px] font-bold text-slate-300 text-center">{i + 1}</span>
+                  <span className="text-xs font-mono text-slate-600 truncate">{item.codigo}</span>
+                  <span className="text-xs text-slate-700 truncate">{item.descricao}</span>
+                  <span className="text-xs text-slate-500 truncate">{item.depto}</span>
+                  <span className="text-xs text-slate-500 truncate">{item.vendedor}</span>
+                  <span className="text-right text-xs font-mono text-slate-600">{item.qtd}</span>
+                  <span className="text-right text-xs font-mono text-slate-600">{fmtBRLF(item.recLiq)}</span>
+                  <span className="text-right text-xs font-mono text-slate-600">{fmtBRLF(item.custo)}</span>
+                  <span className="text-right text-xs font-mono font-bold text-emerald-700">
+                    {fmtBRLF(item.lucroBruto)} <span className="text-[10px] text-emerald-500">({fmtPct(item.lbPct)})</span>
+                  </span>
+                </div>
+              ))}
+              {itemLucroData.length > 5 && (
+                <button
+                  onClick={() => setItemLucroExpanded(e => !e)}
+                  className="mt-1 self-center px-4 py-1 rounded-full text-[11px] font-bold text-emerald-600 border border-emerald-200 hover:bg-emerald-50 transition-all"
+                >
+                  {itemLucroExpanded ? 'Mostrar menos' : `Mostrar mais (${itemLucroData.length - 5} restantes)`}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Resumo por Departamento ──────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
+          <SH>Resumo por Departamento</SH>
+          {itemDeptSummary.length === 0 ? <Empty /> : (
+            <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-[2fr_0.8fr_0.8fr_0.8fr_1.2fr_0.8fr] gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
+                <span>Departamento</span>
+                <span className="text-right">Total</span>
+                <span className="text-right">c/ Lucro</span>
+                <span className="text-right">c/ Prejuízo</span>
+                <span className="text-right">Lucro Bruto</span>
+                <span className="text-right">% LB</span>
+              </div>
+              {itemDeptSummary.map((d, i) => (
+                <div key={i} className={`grid grid-cols-[2fr_0.8fr_0.8fr_0.8fr_1.2fr_0.8fr] gap-3 items-center px-2 py-1.5 rounded-lg ${i % 2 === 0 ? '' : 'bg-slate-50/40'} hover:bg-cyan-50/40 transition-colors`}>
+                  <span className="text-xs font-semibold text-slate-700 truncate">{d.depto}</span>
+                  <span className="text-right text-xs font-mono text-slate-600">{d.total}</span>
+                  <span className="text-right text-xs font-mono text-emerald-700">{d.comLucro}</span>
+                  <span className="text-right text-xs font-mono text-rose-600">{d.comPrejuizo}</span>
+                  <span className={`text-right text-xs font-mono font-semibold ${d.lucroBruto >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtBRLF(d.lucroBruto)}</span>
+                  <span className={`text-right text-xs font-mono font-bold ${d.lbPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtPct(d.lbPct)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </>}
     </div>
   );
 }
