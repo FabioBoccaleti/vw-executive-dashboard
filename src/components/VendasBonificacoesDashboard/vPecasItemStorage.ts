@@ -93,16 +93,15 @@ export function filterTopItemsByDept(
     const sorted = [...items].sort(
       (a, b) => n(b.data['VAL_RENTABILIDADE']) - n(a.data['VAL_RENTABILIDADE'])
     );
-    // Top 100 lucro (valores mais altos)
+    // 100 linhas com maior lucro (topo) + 100 linhas com maior prejuízo (base)
     const topLucro = sorted.slice(0, ITEM_LIMIT_PER_DEPT);
-    // Top 100 prejuízo (valores mais baixos = final do array)
     const topPrejuizo = sorted.length > ITEM_LIMIT_PER_DEPT
       ? sorted.slice(-ITEM_LIMIT_PER_DEPT)
       : [];
-    // União sem duplicatas (um item pode estar nos dois ranges se a lista for pequena)
+    // União sem duplicatas por índice (quando depto tem ≤ 200 linhas)
     const seen = new Set<number>();
     for (const entry of [...topLucro, ...topPrejuizo]) {
-      const idx = items.indexOf(entry);
+      const idx = sorted.indexOf(entry);
       if (!seen.has(idx)) { seen.add(idx); result.push(entry); }
     }
   }
