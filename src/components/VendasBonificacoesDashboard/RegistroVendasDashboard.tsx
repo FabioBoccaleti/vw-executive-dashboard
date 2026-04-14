@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import { Upload, Download, FileSpreadsheet, ChevronDown, AlertTriangle, Pencil, Trash2, Highlighter, StickyNote, Check, X, Package } from 'lucide-react';
 import { VPecasDashboard } from './VPecasDashboard';
+import { VPecasItemDashboard } from './VPecasItemDashboard';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -196,16 +197,17 @@ export function RegistroVendasDashboard() {
   const [importPeriodYear, setImportPeriodYear]   = useState<number>(new Date().getFullYear());
   const [importPeriodMonth, setImportPeriodMonth] = useState<number>(new Date().getMonth() + 1);
   const [showVPecas, setShowVPecas]               = useState(false);
+  const [showVPecasItem, setShowVPecasItem]         = useState(false);
 
   // Carrega dados ao trocar de aba
   useEffect(() => {
-    if (showVPecas) { setLoading(false); return; }
+    if (showVPecas || showVPecasItem) { setLoading(false); return; }
     setLoading(true);
     loadRegistroRows(activeTab).then(data => {
       setRows(data);
       setLoading(false);
     });
-  }, [activeTab, showVPecas]);
+  }, [activeTab, showVPecas, showVPecasItem]);
 
   // Anos disponíveis
   const availableYears = useMemo(() => {
@@ -518,7 +520,7 @@ export function RegistroVendasDashboard() {
       )}
 
       {/* Barra superior — Importar TXT (apenas veículos, alimenta as 3 abas) */}
-      {!showVPecas && (
+      {!showVPecas && !showVPecasItem && (
       <div className="bg-white border-b border-slate-100 px-6 py-3 flex items-center gap-3 flex-shrink-0">
         <Button
           size="sm"
@@ -538,9 +540,9 @@ export function RegistroVendasDashboard() {
           {SUB_TABS.map(({ id, label }) => (
             <button
               key={id}
-              onClick={() => { setActiveTab(id); setShowVPecas(false); }}
+              onClick={() => { setActiveTab(id); setShowVPecas(false); setShowVPecasItem(false); }}
               className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-                !showVPecas && activeTab === id
+                !showVPecas && !showVPecasItem && activeTab === id
                   ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
               }`}
@@ -549,9 +551,9 @@ export function RegistroVendasDashboard() {
             </button>
           ))}
           <button
-            onClick={() => setShowVPecas(true)}
+            onClick={() => { setShowVPecas(true); setShowVPecasItem(false); }}
             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
-              showVPecas
+              showVPecas && !showVPecasItem
                 ? 'border-violet-500 text-violet-700 bg-violet-50/50'
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
             }`}
@@ -559,8 +561,19 @@ export function RegistroVendasDashboard() {
             <Package className="w-4 h-4" />
             V. Peças
           </button>
+          <button
+            onClick={() => { setShowVPecasItem(true); setShowVPecas(false); }}
+            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+              showVPecasItem
+                ? 'border-teal-500 text-teal-700 bg-teal-50/50'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            Itens de Peças
+          </button>
         </div>
-        {!showVPecas && (
+        {!showVPecas && !showVPecasItem && (
         <div className="flex items-center gap-2 py-1.5">
           <Button
             size="sm"
@@ -595,14 +608,20 @@ export function RegistroVendasDashboard() {
       </div>
 
       {/* V. Peças */}
-      {showVPecas && (
+      {showVPecas && !showVPecasItem && (
         <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
           <VPecasDashboard />
         </div>
       )}
 
+      {showVPecasItem && (
+        <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+          <VPecasItemDashboard />
+        </div>
+      )}
+
       {/* Filtro Ano / Mês — apenas veículos */}
-      {!showVPecas && (<>
+      {!showVPecas && !showVPecasItem && !showVPecasItem && (<>
       <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
         <div className="relative mr-2">
