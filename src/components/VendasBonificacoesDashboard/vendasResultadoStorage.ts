@@ -228,8 +228,10 @@ export async function syncBonusTradeInToNovos(
     if (!tradeInMap.has(key)) return r;
     const newVal = (() => {
       const raw = tradeInMap.get(key)!;
-      const n = parseFloat(String(raw).replace(',', '.'));
-      return isNaN(n) ? raw : n.toFixed(2);
+      const num = parseFloat(String(raw).replace(',', '.'));
+      if (isNaN(num)) return raw;
+      const abs = Math.abs(num);
+      return (r.transacao === 'V07' ? -abs : abs).toFixed(2);
     })();
     if (r.bonusTradeIn === newVal) return r;
     changed = true;
@@ -261,7 +263,8 @@ export async function syncBonusVarejoToNovos(
     const key = `${r.nfVenda.trim()}|${d.year}|${d.month}`;
     if (!bonusMap.has(key)) return r;
     const soma = bonusMap.get(key)!;
-    const newVal = soma.toFixed(2);
+    const abs = Math.abs(soma);
+    const newVal = (r.transacao === 'V07' ? -abs : abs).toFixed(2);
     if (r.bonusVarejo === newVal) return r;
     changed = true;
     return { ...r, bonusVarejo: newVal };

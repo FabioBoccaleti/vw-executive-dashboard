@@ -148,8 +148,24 @@ function applyAutoFill(
   });
 }
 
-// Inverte o sinal de PIV/SIQ/PIVE de uma linha ao mudar a transação
-function applyTransacaoSign(rows: VendasResultadoRow[], changedId: string, newTransacao: string): VendasResultadoRow[] {
+// Garante que linhas V07 tenham bonusVarejo e bonusTradeIn negativos
+function normalizeV07Bonus(rows: VendasResultadoRow[]): VendasResultadoRow[] {
+  return rows.map(row => {
+    if (row.transacao !== 'V07') return row;
+    const ensureNeg = (v: string) => {
+      if (!v) return v;
+      const num = parseFloat(v);
+      if (isNaN(num) || num <= 0) return v;
+      return (-num).toFixed(2);
+    };
+    const bv = ensureNeg(row.bonusVarejo);
+    const bt = ensureNeg(row.bonusTradeIn ?? '');
+    if (bv === row.bonusVarejo && bt === (row.bonusTradeIn ?? '')) return row;
+    return { ...row, bonusVarejo: bv, bonusTradeIn: bt };
+  });
+}
+
+rows: VendasResultadoRow[], changedId: string, newTransacao: string): VendasResultadoRow[] {
   return rows.map(row => {
     if (row.id !== changedId) return row;
     const factor = newTransacao === 'V07' ? -1 : 1;
@@ -164,6 +180,8 @@ function applyTransacaoSign(rows: VendasResultadoRow[], changedId: string, newTr
       bonusPIV:  applySign(row.bonusPIV),
       bonusSIQ:  applySign(row.bonusSIQ),
       bonusPIVE: applySign(row.bonusPIVE),
+      bonusVarejo:  applySign(row.bonusVarejo),
+      bonusTradeIn: applySign(row.bonusTradeIn ?? ''),
     };
   });
 }
@@ -614,7 +632,13 @@ export default function VendasResultadoDashboard() {
         rows = m.length > 0 ? applyAutoFill(withJuros, m, r) : withJuros;
         rows = applyBlindagemAutoFill(rows, blindagemMapRef.current);
         rows = applyDiasEstoqueFromRegistros(rows, regMap);
-        setRows(rows);
+        const normalized = normalizeV07Bonus(rows);
+        // Se havia linhas V07 com bônus positivos, persiste a correção
+        const hasChanges = normalized.some((r, i) =>
+          r.bonusVarejo !== rows[i].bonusVarejo || r.bonusTradeIn !== rows[i].bonusTradeIn
+        );
+        if (hasChanges) saveVendasResultadoRows('novos', normalized);
+        setRows(normalized);
       });
     } else {
       setModelos([]); setRegras([]); setJurosMap(new Map());
