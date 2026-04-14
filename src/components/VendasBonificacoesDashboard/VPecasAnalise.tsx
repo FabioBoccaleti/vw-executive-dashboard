@@ -149,6 +149,12 @@ export default function VPecasAnalise() {
   const [vendorSort, setVendorSort] = useState<'valorVenda' | 'nfs' | 'lucroBruto' | 'lbPct'>('valorVenda');
   const [estadoMetric, setEstadoMetric] = useState<'valorVenda' | 'recLiq' | 'lucroBruto'>('valorVenda');
   const [clienteMetric, setClienteMetric] = useState<'valorVenda' | 'nfs'>('valorVenda');
+  const [vendorDept, setVendorDept]       = useState('Todos');
+  const [clienteDept, setClienteDept]     = useState('Todos');
+  const [vendorExpanded, setVendorExpanded] = useState(false);
+  const [estadoExpanded, setEstadoExpanded] = useState(false);
+  const [prejuizoExpanded, setPrejuizoExpanded] = useState(false);
+  const [clienteExpanded, setClienteExpanded] = useState(false);
 
   useEffect(() => {
     loadVPecasRows().then(rows => {
@@ -218,9 +224,17 @@ export default function VPecasAnalise() {
   }, [deptData]);
 
   // ─── 3. Ranking Vendedores ────────────────────────────────────────────────
+  const availVendorDepts = useMemo(() => {
+    const s = new Set(filteredRows.map(r => r.data['DEPARTAMENTO']?.trim() || '(sem depto)'));
+    return ['Todos', ...[...s].sort()];
+  }, [filteredRows]);
+
   const vendorData = useMemo(() => {
+    const source = vendorDept !== 'Todos'
+      ? filteredRows.filter(r => (r.data['DEPARTAMENTO']?.trim() || '(sem depto)') === vendorDept)
+      : filteredRows;
     const map = new Map<string, VPecasRow[]>();
-    for (const r of filteredRows) {
+    for (const r of source) {
       const k = r.data['NOME_VENDEDOR']?.trim() || '(sem nome)';
       map.set(k, [...(map.get(k) ?? []), r]);
     }
@@ -228,7 +242,7 @@ export default function VPecasAnalise() {
       const a = agg(rows);
       return { name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct };
     }).sort((a, b) => b[vendorSort] - a[vendorSort]);
-  }, [filteredRows, vendorSort]);
+  }, [filteredRows, vendorSort, vendorDept]);
 
   const vendorMax = useMemo(() => Math.max(...vendorData.map(v => v[vendorSort]), 1), [vendorData, vendorSort]);
 
@@ -258,9 +272,17 @@ export default function VPecasAnalise() {
   }, [metrics]);
 
   // ─── 6. Top Clientes ──────────────────────────────────────────────────────
+  const availClienteDepts = useMemo(() => {
+    const s = new Set(filteredRows.map(r => r.data['DEPARTAMENTO']?.trim() || '(sem depto)'));
+    return ['Todos', ...[...s].sort()];
+  }, [filteredRows]);
+
   const clienteData = useMemo(() => {
+    const source = clienteDept !== 'Todos'
+      ? filteredRows.filter(r => (r.data['DEPARTAMENTO']?.trim() || '(sem depto)') === clienteDept)
+      : filteredRows;
     const map = new Map<string, { rows: VPecasRow[]; cidade: string; estado: string }>();
-    for (const r of filteredRows) {
+    for (const r of source) {
       const k = r.data['NOME_CLIENTE']?.trim() || '(sem nome)';
       const existing = map.get(k);
       if (existing) existing.rows.push(r);
@@ -268,13 +290,45 @@ export default function VPecasAnalise() {
     }
     return [...map.entries()].map(([name, { rows, cidade, estado }]) => {
       const a = agg(rows);
-      return { name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, cidade, estado };
+      return { name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct, cidade, estado };
     }).sort((a, b) => b[clienteMetric] - a[clienteMetric]).slice(0, 15);
-  }, [filteredRows, clienteMetric]);
+  }, [filteredRows, clienteMetric, clienteDept]);
 
   const clienteMax = useMemo(() => Math.max(...clienteData.map(c => c[clienteMetric]), 1), [clienteData, clienteMetric]);
 
-  // ─── 7. Por Tipo de Transação ─────────────────────────────────────────────
+  // ─── 7. Top NFs com Prejuízo ─────────────────────────────────────────────
+  const [prejuizoDept, setPrejuizoDept] = useState('Todos');
+
+  const availPrejuizoDepts = useMemo(() => {
+    const s = new Set(filteredRows.map(r => r.data['DEPARTAMENTO']?.trim() || '(sem depto)'));
+    return ['Todos', ...[...s].sort()];
+  }, [filteredRows]);
+
+  const prejuizoData = useMemo(() => {
+    const source = prejuizoDept !== 'Todos'
+      ? filteredRows.filter(r => (r.data['DEPARTAMENTO']?.trim() || '(sem depto)') === prejuizoDept)
+      : filteredRows;
+    return source
+      .map(r => {
+        const c = calcPecas(r.data);
+        return {
+          nf:        r.data['NUMERO_NOTA_FISCAL']?.trim() || '—',
+          serie:     r.data['SERIE_NOTA_FISCAL']?.trim() || '',
+          cliente:   r.data['NOME_CLIENTE']?.trim() || '(sem cliente)',
+          vendedor:  r.data['NOME_VENDEDOR']?.trim() || '(sem vendedor)',
+          depto:     r.data['DEPARTAMENTO']?.trim() || '(sem depto)',
+          valorVenda: c.valorVenda,
+          recLiq:     c.recLiq,
+          lucroBruto: c.lucroBruto,
+          lbPct:      c.lucroBrutoPct,
+        };
+      })
+      .filter(r => r.lucroBruto < 0)
+      .sort((a, b) => a.lucroBruto - b.lucroBruto)
+      .slice(0, 20);
+  }, [filteredRows, prejuizoDept]);
+
+  // ─── 8. Por Tipo de Transação ─────────────────────────────────────────────
   const transacaoData = useMemo(() => {
     const map = new Map<string, VPecasRow[]>();
     for (const r of filteredRows) {
@@ -283,7 +337,7 @@ export default function VPecasAnalise() {
     }
     return [...map.entries()].map(([name, rows]) => {
       const a = agg(rows);
-      return { name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto };
+      return { name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct };
     }).sort((a, b) => b.valorVenda - a.valorVenda);
   }, [filteredRows]);
 
@@ -360,6 +414,7 @@ export default function VPecasAnalise() {
           color={metrics.lucroBruto >= 0 ? 'text-emerald-700' : 'text-rose-600'}
           accent={metrics.lucroBruto >= 0 ? EMERALD : ROSE}
           delta={month !== null ? delta(metrics.lucroBruto, prevMetrics.lucroBruto) : undefined}
+          sub={fmtPct(metrics.lbPct) + ' margem'}
         />
         <KpiCard
           label="% Lucro Bruto"
@@ -439,7 +494,27 @@ export default function VPecasAnalise() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                   <XAxis type="number" tickFormatter={v => deptMetric === 'nfs' ? v.toString() : `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} width={100} />
-                  <Tooltip content={<TipBRL />} />
+                  <Tooltip content={(props: any) => {
+                    const { active, payload, label } = props;
+                    if (!active || !payload?.length) return null;
+                    const entry = payload[0].payload;
+                    const val = payload[0].value as number;
+                    return (
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[200px]">
+                        <p className="font-bold text-slate-700 mb-1.5">{label}</p>
+                        <div className="flex justify-between gap-4">
+                          <span style={{ color: payload[0].color }} className="font-medium">{payload[0].name}</span>
+                          <span className="font-mono text-slate-700">{deptMetric === 'nfs' ? val : fmtBRLF(val)}</span>
+                        </div>
+                        {deptMetric === 'lucroBruto' && (
+                          <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                            <span className="text-slate-500">% Lucro Bruto</span>
+                            <span className={`font-mono font-bold ${entry.lbPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtPct(entry.lbPct)}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }} />
                   <Bar dataKey={deptMetric} name={deptMetricLabel[deptMetric]} radius={[0, 4, 4, 0]}>
                     {deptData.map((d, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
                     <LabelList dataKey={deptMetric} position="right" formatter={(v: number) => deptMetric === 'nfs' ? v : fmtBRL(v)} style={{ fontSize: 10, fill: '#64748b' }} />
@@ -455,7 +530,7 @@ export default function VPecasAnalise() {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
         <SH
           right={
-            <div className="flex gap-1">
+            <div className="flex gap-1 flex-wrap justify-end">
               {(['valorVenda', 'nfs', 'lucroBruto', 'lbPct'] as const).map(m => (
                 <Pill key={m} label={vendorSortLabel[m]} active={vendorSort === m} onClick={() => setVendorSort(m)} />
               ))}
@@ -464,6 +539,20 @@ export default function VPecasAnalise() {
         >
           Ranking de Vendedores
         </SH>
+        {/* Filtro de departamento */}
+        <div className="flex gap-1 flex-wrap mb-3">
+          {availVendorDepts.map(d => (
+            <button
+              key={d}
+              onClick={() => setVendorDept(d)}
+              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all border ${
+                vendorDept === d ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600'
+              }`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
         {vendorData.length === 0 ? <Empty /> : (
           <div className="flex flex-col gap-2">
             {/* Header */}
@@ -474,7 +563,7 @@ export default function VPecasAnalise() {
               <span className="text-right">Lucro Bruto</span>
               <span className="text-right">% LB</span>
             </div>
-            {vendorData.map((v, i) => {
+            {(vendorExpanded ? vendorData : vendorData.slice(0, 5)).map((v, i) => {
               const barW = vendorMax > 0 ? (v[vendorSort] / vendorMax) * 100 : 0;
               const medalColors = ['#f59e0b','#9ca3af','#cd7f32'];
               return (
@@ -499,6 +588,14 @@ export default function VPecasAnalise() {
                 </div>
               );
             })}
+            {vendorData.length > 5 && (
+              <button
+                onClick={() => setVendorExpanded(e => !e)}
+                className="mt-1 self-center px-4 py-1 rounded-full text-[11px] font-bold text-violet-600 border border-violet-200 hover:bg-violet-50 transition-all"
+              >
+                {vendorExpanded ? `Mostrar menos` : `Mostrar mais (${vendorData.length - 5} restantes)`}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -517,23 +614,69 @@ export default function VPecasAnalise() {
           Vendas por Estado (Top 20)
         </SH>
         {estadoData.length === 0 ? <Empty /> : (
-          <ResponsiveContainer width="100%" height={Math.max(240, estadoData.length * 28 + 20)}>
-            <BarChart layout="vertical" data={estadoData} margin={{ top: 0, right: 90, left: 10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-              <XAxis type="number" tickFormatter={v => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} width={40} />
-              <Tooltip content={<TipBRL />} />
-              <Bar dataKey={estadoMetric} name={estadoMetricLabel[estadoMetric]} radius={[0, 4, 4, 0]}>
-                {estadoData.map((d, i) => (
-                  <Cell key={i}
-                    fill={estadoMetric === 'lucroBruto' && d.lucroBruto < 0 ? ROSE : VIOLET}
-                    fillOpacity={0.7 + (estadoData.length - i) / estadoData.length * 0.3}
+          <div className="flex flex-col gap-2">
+            <ResponsiveContainer width="100%" height={Math.max(160, (estadoExpanded ? estadoData.length : Math.min(5, estadoData.length)) * 28 + 20)}>
+              <BarChart layout="vertical" data={estadoExpanded ? estadoData : estadoData.slice(0, 5)} margin={{ top: 0, right: estadoMetric === 'lucroBruto' ? 150 : 90, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" tickFormatter={v => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} width={40} />
+                <Tooltip content={(props: any) => {
+                    const { active, payload, label } = props;
+                    if (!active || !payload?.length) return null;
+                    const entry = payload[0].payload;
+                    const val = payload[0].value as number;
+                    return (
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[200px]">
+                        <p className="font-bold text-slate-700 mb-1.5">{label}</p>
+                        <div className="flex justify-between gap-4">
+                          <span style={{ color: payload[0].color }} className="font-medium">{payload[0].name}</span>
+                          <span className="font-mono text-slate-700">{fmtBRLF(val)}</span>
+                        </div>
+                        {estadoMetric === 'lucroBruto' && (
+                          <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                            <span className="text-slate-500">% Lucro Bruto</span>
+                            <span className={`font-mono font-bold ${entry.lbPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtPct(entry.lbPct)}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }} />
+                <Bar dataKey={estadoMetric} name={estadoMetricLabel[estadoMetric]} radius={[0, 4, 4, 0]}>
+                  {(estadoExpanded ? estadoData : estadoData.slice(0, 5)).map((d, i) => (
+                    <Cell key={i}
+                      fill={estadoMetric === 'lucroBruto' && d.lucroBruto < 0 ? ROSE : VIOLET}
+                      fillOpacity={0.7 + (estadoData.length - i) / estadoData.length * 0.3}
+                    />
+                  ))}
+                  <LabelList
+                    dataKey={estadoMetric}
+                    position="right"
+                    content={(props: any) => {
+                      const { x, y, width, height, value, index } = props;
+                      const src = estadoExpanded ? estadoData : estadoData.slice(0, 5);
+                      const entry = src[index];
+                      const label = estadoMetric === 'lucroBruto' && entry
+                        ? `${fmtBRL(value)} (${fmtPct(entry.lbPct)})`
+                        : fmtBRL(value);
+                      return (
+                        <text x={x + width + 6} y={y + height / 2} dy={4} fontSize={10} fill="#64748b" textAnchor="start">
+                          {label}
+                        </text>
+                      );
+                    }}
                   />
-                ))}
-                <LabelList dataKey={estadoMetric} position="right" formatter={(v: number) => fmtBRL(v)} style={{ fontSize: 10, fill: '#64748b' }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            {estadoData.length > 5 && (
+              <button
+                onClick={() => setEstadoExpanded(e => !e)}
+                className="mt-1 self-center px-4 py-1 rounded-full text-[11px] font-bold text-violet-600 border border-violet-200 hover:bg-violet-50 transition-all"
+              >
+                {estadoExpanded ? 'Mostrar menos' : `Mostrar mais (${estadoData.length - 5} restantes)`}
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -587,17 +730,116 @@ export default function VPecasAnalise() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#475569' }} />
                 <YAxis tickFormatter={v => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10, fill: '#94a3b8' }} width={50} />
-                <Tooltip content={<TipBRL />} />
+                <Tooltip content={(props: any) => {
+                  const { active, payload, label } = props;
+                  if (!active || !payload?.length) return null;
+                  const entry = payload[0].payload;
+                  return (
+                    <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[200px]">
+                      <p className="font-bold text-slate-700 mb-1.5">{label}</p>
+                      {payload.map((p: any, i: number) => (
+                        <div key={i} className="flex justify-between gap-4">
+                          <span style={{ color: p.color }} className="font-medium">{p.name}</span>
+                          <span className="font-mono text-slate-700">{fmtBRLF(p.value)}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                        <span className="text-slate-500">Lucro Bruto</span>
+                        <span className={`font-mono font-bold ${entry.lucroBruto >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtBRLF(entry.lucroBruto)}</span>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-slate-500">% Lucro Bruto</span>
+                        <span className={`font-mono font-bold ${entry.lbPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtPct(entry.lbPct)}</span>
+                      </div>
+                    </div>
+                  );
+                }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="valorVenda" name="Receita Bruta" fill={VIOLET} fillOpacity={0.8} radius={[3, 3, 0, 0]} />
                 <Bar dataKey="recLiq" name="Rec. Líquida" fill={EMERALD} fillOpacity={0.8} radius={[3, 3, 0, 0]} />
+                <Bar dataKey="lucroBruto" name="Lucro Bruto" fill={AMBER} fillOpacity={0.8} radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
       </div>
 
-      {/* ── Seção 7: Top Clientes ──────────────────────────────────────────── */}
+      {/* ── Seção 8: Top 20 NFs com Prejuízo ────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
+        <SH right={
+          <span className="text-[10px] text-slate-400">{prejuizoData.length} NF{prejuizoData.length !== 1 ? 's' : ''} com prejuízo</span>
+        }>
+          Top 20 NFs com Prejuízo
+        </SH>
+        {/* Filtro de departamento */}
+        <div className="flex gap-1 flex-wrap mb-3">
+          {availPrejuizoDepts.map(d => (
+            <button
+              key={d}
+              onClick={() => setPrejuizoDept(d)}
+              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all border ${
+                prejuizoDept === d ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-500 border-slate-200 hover:border-rose-300 hover:text-rose-600'
+              }`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+        {prejuizoData.length === 0 ? (
+          <div className="flex items-center justify-center h-16 text-xs text-emerald-600 font-semibold">
+            Nenhum prejuízo no período selecionado 🎉
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <div className="grid grid-cols-[auto_1fr_2fr_2fr_1fr_1fr_1fr_1fr_1fr] gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
+              <span className="w-5">#</span>
+              <span>Nota Fiscal</span>
+              <span>Cliente</span>
+              <span>Vendedor</span>
+              <span>Departamento</span>
+              <span className="text-right">Rec. Bruta</span>
+              <span className="text-right">Rec. Líq.</span>
+              <span className="text-right">Prejuízo</span>
+              <span className="text-right">% LB</span>
+            </div>
+            {(prejuizoExpanded ? prejuizoData : prejuizoData.slice(0, 5)).map((p, i) => {
+              const maxPrej = Math.abs(prejuizoData[0].lucroBruto);
+              const barW = maxPrej > 0 ? (Math.abs(p.lucroBruto) / maxPrej) * 100 : 0;
+              return (
+                <div key={i} className={`grid grid-cols-[auto_1fr_2fr_2fr_1fr_1fr_1fr_1fr_1fr] gap-3 items-center px-2 py-1.5 rounded-lg ${i % 2 === 0 ? '' : 'bg-slate-50/40'} hover:bg-rose-50/40 transition-colors`}>
+                  <span className="w-5 text-[11px] font-bold text-slate-300 text-center">{i + 1}</span>
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="text-xs font-mono font-semibold text-slate-700">{p.nf}</span>
+                    {p.serie && <span className="text-[10px] text-slate-400">Série {p.serie}</span>}
+                  </div>
+                  <span className="text-xs font-semibold text-slate-700 truncate">{p.cliente}</span>
+                  <span className="text-xs text-slate-600 truncate">{p.vendedor}</span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] font-semibold text-slate-500 truncate">{p.depto}</span>
+                    <div className="h-1 rounded-full bg-rose-100 overflow-hidden">
+                      <div className="h-full rounded-full bg-rose-400 transition-all" style={{ width: `${barW}%` }} />
+                    </div>
+                  </div>
+                  <span className="text-right text-xs font-mono text-slate-700">{fmtBRL(p.valorVenda)}</span>
+                  <span className="text-right text-xs font-mono text-emerald-700">{fmtBRL(p.recLiq)}</span>
+                  <span className="text-right text-xs font-mono font-bold text-rose-600">{fmtBRL(p.lucroBruto)}</span>
+                  <span className="text-right text-xs font-mono font-bold text-rose-600">{fmtPct(p.lbPct)}</span>
+                </div>
+              );
+            })}
+            {prejuizoData.length > 5 && (
+              <button
+                onClick={() => setPrejuizoExpanded(e => !e)}
+                className="mt-1 self-center px-4 py-1 rounded-full text-[11px] font-bold text-rose-600 border border-rose-200 hover:bg-rose-50 transition-all"
+              >
+                {prejuizoExpanded ? 'Mostrar menos' : `Mostrar mais (${prejuizoData.length - 5} restantes)`}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Seção 8: Top Clientes ──────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
         <SH
           right={
@@ -609,20 +851,35 @@ export default function VPecasAnalise() {
         >
           Top 15 Clientes
         </SH>
+        {/* Filtro de departamento */}
+        <div className="flex gap-1 flex-wrap mb-3">
+          {availClienteDepts.map(d => (
+            <button
+              key={d}
+              onClick={() => setClienteDept(d)}
+              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all border ${
+                clienteDept === d ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600'
+              }`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
         {clienteData.length === 0 ? <Empty /> : (
           <div className="flex flex-col gap-1.5">
-            <div className="grid grid-cols-[auto_3fr_1fr_1fr_1fr_1fr] gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
+            <div className="grid grid-cols-[auto_3fr_1fr_1fr_1fr_1fr_1fr] gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
               <span className="w-5">#</span>
               <span>Cliente</span>
               <span className="text-right">NFs</span>
               <span className="text-right">Rec. Bruta</span>
               <span className="text-right">Rec. Líq.</span>
               <span className="text-right">Lucro Bruto</span>
+              <span className="text-right">% LB</span>
             </div>
-            {clienteData.map((c, i) => {
+            {(clienteExpanded ? clienteData : clienteData.slice(0, 5)).map((c, i) => {
               const barW = clienteMax > 0 ? (c[clienteMetric] / clienteMax) * 100 : 0;
               return (
-                <div key={i} className={`grid grid-cols-[auto_3fr_1fr_1fr_1fr_1fr] gap-3 items-center px-2 py-1.5 rounded-lg ${i % 2 === 0 ? '' : 'bg-slate-50/40'} hover:bg-violet-50/40 transition-colors`}>
+                <div key={i} className={`grid grid-cols-[auto_3fr_1fr_1fr_1fr_1fr_1fr] gap-3 items-center px-2 py-1.5 rounded-lg ${i % 2 === 0 ? '' : 'bg-slate-50/40'} hover:bg-violet-50/40 transition-colors`}>
                   <span className="w-5 text-[11px] font-bold text-slate-300 text-center">{i + 1}</span>
                   <div className="flex flex-col gap-0.5 min-w-0">
                     <span className="text-xs font-semibold text-slate-700 truncate">{c.name}</span>
@@ -637,9 +894,18 @@ export default function VPecasAnalise() {
                   <span className="text-right text-xs font-mono text-slate-700">{fmtBRL(c.valorVenda)}</span>
                   <span className="text-right text-xs font-mono text-emerald-700">{fmtBRL(c.recLiq)}</span>
                   <span className={`text-right text-xs font-mono font-semibold ${c.lucroBruto >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtBRL(c.lucroBruto)}</span>
+                  <span className={`text-right text-xs font-mono font-bold ${c.lbPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtPct(c.lbPct)}</span>
                 </div>
               );
             })}
+            {clienteData.length > 5 && (
+              <button
+                onClick={() => setClienteExpanded(e => !e)}
+                className="mt-1 self-center px-4 py-1 rounded-full text-[11px] font-bold text-violet-600 border border-violet-200 hover:bg-violet-50 transition-all"
+              >
+                {clienteExpanded ? 'Mostrar menos' : `Mostrar mais (${clienteData.length - 5} restantes)`}
+              </button>
+            )}
           </div>
         )}
       </div>
