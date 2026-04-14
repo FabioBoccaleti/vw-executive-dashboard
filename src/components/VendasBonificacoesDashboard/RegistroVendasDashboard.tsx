@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
-import { Upload, Download, FileSpreadsheet, ChevronDown, AlertTriangle, Pencil, Trash2, Highlighter, StickyNote, Check, X } from 'lucide-react';
+import { Upload, Download, FileSpreadsheet, ChevronDown, AlertTriangle, Pencil, Trash2, Highlighter, StickyNote, Check, X, Package } from 'lucide-react';
+import { VPecasDashboard } from './VPecasDashboard';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -194,15 +195,17 @@ export function RegistroVendasDashboard() {
   const [importPeriodModal, setImportPeriodModal] = useState(false);
   const [importPeriodYear, setImportPeriodYear]   = useState<number>(new Date().getFullYear());
   const [importPeriodMonth, setImportPeriodMonth] = useState<number>(new Date().getMonth() + 1);
+  const [showVPecas, setShowVPecas]               = useState(false);
 
   // Carrega dados ao trocar de aba
   useEffect(() => {
+    if (showVPecas) { setLoading(false); return; }
     setLoading(true);
     loadRegistroRows(activeTab).then(data => {
       setRows(data);
       setLoading(false);
     });
-  }, [activeTab]);
+  }, [activeTab, showVPecas]);
 
   // Anos disponíveis
   const availableYears = useMemo(() => {
@@ -514,7 +517,8 @@ export function RegistroVendasDashboard() {
         </div>
       )}
 
-      {/* Barra superior — Importar TXT (único, alimenta as 3 abas) */}
+      {/* Barra superior — Importar TXT (apenas veículos, alimenta as 3 abas) */}
+      {!showVPecas && (
       <div className="bg-white border-b border-slate-100 px-6 py-3 flex items-center gap-3 flex-shrink-0">
         <Button
           size="sm"
@@ -526,6 +530,7 @@ export function RegistroVendasDashboard() {
         </Button>
         <span className="text-xs text-slate-400">Os dados serão distribuídos automaticamente entre as abas pelo tipo de transação.</span>
       </div>
+      )}
 
       {/* Sub-abas + botões de Excel por aba */}
       <div className="bg-white border-b border-slate-200 px-6 flex items-center justify-between flex-shrink-0">
@@ -533,9 +538,9 @@ export function RegistroVendasDashboard() {
           {SUB_TABS.map(({ id, label }) => (
             <button
               key={id}
-              onClick={() => setActiveTab(id)}
+              onClick={() => { setActiveTab(id); setShowVPecas(false); }}
               className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === id
+                !showVPecas && activeTab === id
                   ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
               }`}
@@ -543,7 +548,19 @@ export function RegistroVendasDashboard() {
               {label}
             </button>
           ))}
+          <button
+            onClick={() => setShowVPecas(true)}
+            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+              showVPecas
+                ? 'border-violet-500 text-violet-700 bg-violet-50/50'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            V. Peças
+          </button>
         </div>
+        {!showVPecas && (
         <div className="flex items-center gap-2 py-1.5">
           <Button
             size="sm"
@@ -574,9 +591,18 @@ export function RegistroVendasDashboard() {
             Limpar Tudo
           </Button>
         </div>
+        )}
       </div>
 
-      {/* Filtro Ano / Mês */}
+      {/* V. Peças */}
+      {showVPecas && (
+        <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+          <VPecasDashboard />
+        </div>
+      )}
+
+      {/* Filtro Ano / Mês — apenas veículos */}
+      {!showVPecas && (<>
       <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
         <div className="relative mr-2">
@@ -724,6 +750,7 @@ export function RegistroVendasDashboard() {
           className="overflow-x-auto overflow-y-hidden shrink-0 border-t border-slate-100 bg-white" style={{ height: 14 }}>
           <div ref={scrollDummyRef} style={{ height: 1 }} />
         </div>      </div>
+      </>)}
     </div>
   );
 }

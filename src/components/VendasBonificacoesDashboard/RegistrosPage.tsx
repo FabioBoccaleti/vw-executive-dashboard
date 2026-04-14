@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { Upload, TableProperties, ClipboardList, Tag, TrendingDown } from 'lucide-react';
+import { Upload, TableProperties, ClipboardList, Tag, TrendingDown, Package } from 'lucide-react';
 import { ImportarPDFPage } from './ImportarPDFPage';
 import { TabelaDadosDashboard } from './TabelaDadosDashboard';
 import { RegistroVendasDashboard } from './RegistroVendasDashboard';
 import { BonusVarejoDashboard } from './BonusVarejoDashboard';
 import { BonusTradeInDashboard } from './BonusTradeInDashboard';
 import { JurosRotativoDashboard } from './JurosRotativoDashboard';
+import { VPecasDashboard } from './VPecasDashboard';
 
 export function RegistrosPage({ onBack }: { onBack?: () => void }) {
-  const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros'>('importar');
+  const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros' | 'vpecas'>('importar');
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -95,6 +96,17 @@ export function RegistrosPage({ onBack }: { onBack?: () => void }) {
           <TrendingDown className="w-4 h-4" />
           Juros Rotativo
         </button>
+        <button
+          onClick={() => setActiveTab('vpecas')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'vpecas'
+              ? 'border-violet-500 text-violet-700 bg-violet-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          V. Peças
+        </button>
       </div>
 
       {/* Conteúdo da aba */}
@@ -104,6 +116,7 @@ export function RegistrosPage({ onBack }: { onBack?: () => void }) {
       {activeTab === 'bonus' && <BonusVarejoDashboard />}
       {activeTab === 'tradein' && <BonusTradeInDashboard />}
       {activeTab === 'juros' && <JurosRotativoDashboard />}
+      {activeTab === 'vpecas' && <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}><VPecasDashboard /></div>}
     </div>
   );
 }
