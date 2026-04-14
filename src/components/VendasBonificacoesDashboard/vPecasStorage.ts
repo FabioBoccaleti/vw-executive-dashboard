@@ -109,12 +109,24 @@ export async function replaceVPecasRows(
   return { total: withIds.length };
 }
 
+// ─── Transações ignoradas na importação (case-insensitive) ───────────────────
+const IGNORED_TRANSACOES_EXACT = new Set([
+  'V21', 'U21', 'I21', 'C41', 'C21',
+  'V42', 'V29', 'U25', 'P68', 'P37', 'P30',
+  'G23', 'P27', 'O25',
+]);
+function isIgnoredTransacao(t: string): boolean {
+  const upper = t.toUpperCase();
+  return IGNORED_TRANSACOES_EXACT.has(upper) || upper.startsWith('L');
+}
+
 // ─── Parser TXT ───────────────────────────────────────────────────────────────
 // Linha 0: cabeçalho das NFs (começa direto com "EMPRESA;...")
 // Linha 1: cabeçalho dos itens (começa com ";TIPO;...")
 // Linhas de dados de NF: começam com dígito (EMPRESA = "1")
 // Linhas de itens: começam com ";"
 export function parsePecasTxt(content: string): Omit<VPecasRow, 'id'>[] {
+
   const rawLines = content.split(/\r?\n/);
   const lines: string[] = [];
   for (const raw of rawLines) {
@@ -159,7 +171,7 @@ export function parsePecasTxt(content: string): Omit<VPecasRow, 'id'>[] {
     result.push({ data: rowData });
   }
 
-  return result;
+  return result.filter(r => !isIgnoredTransacao(r.data['TIPO_TRANSACAO'] ?? ''));
 }
 
 // ─── Parser Excel ─────────────────────────────────────────────────────────────
@@ -167,9 +179,11 @@ export function parsePecasExcel(buffer: ArrayBuffer): Omit<VPecasRow, 'id'>[] {
   const wb = XLSX.read(buffer, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const raw: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
-  return raw.map(r => ({
-    data: Object.fromEntries(
-      Object.entries(r).map(([k, v]) => [k.trim(), String(v ?? '')])
-    ),
-  }));
+  return raw
+    .map(r => ({
+      data: Object.fromEntries(
+        Object.entries(r).map(([k, v]) => [k.trim(), String(v ?? '')])
+      ),
+    }))
+    .filter(r => !isIgnoredTransacao(r.data['TIPO_TRANSACAO'] ?? ''));
 }
