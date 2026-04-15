@@ -161,6 +161,10 @@ export function parsePecasItemTxt(content: string): Omit<VPecasItemRow, 'id'>[] 
       if (h && !(h in rowData)) rowData[h] = (fields[idx] ?? '').trim();
     });
 
+    // Ignora transações P07 e A07
+    const tipoTransacao = (rowData['TIPO_TRANSACAO'] ?? '').trim().toUpperCase();
+    if (tipoTransacao === 'P07' || tipoTransacao === 'A07') continue;
+
     result.push({ data: rowData });
   }
   return result;
