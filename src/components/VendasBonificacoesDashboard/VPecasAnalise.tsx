@@ -338,9 +338,10 @@ export default function VPecasAnalise() {
   }, [filteredRows]);
 
   const prejuizoData = useMemo(() => {
+    const base = filteredRows.filter(r => (r.data['TIPO_TRANSACAO']?.trim().toUpperCase()) !== 'P07');
     const source = prejuizoDept !== 'Todos'
-      ? filteredRows.filter(r => (r.data['DEPARTAMENTO']?.trim() || '(sem depto)') === prejuizoDept)
-      : filteredRows;
+      ? base.filter(r => (r.data['DEPARTAMENTO']?.trim() || '(sem depto)') === prejuizoDept)
+      : base;
     return source
       .map(r => {
         const c = calcPecas(r.data);
@@ -415,6 +416,9 @@ export default function VPecasAnalise() {
           descricao:  r.data['DES_ITEM_ESTOQUE']?.trim() || '—',
           depto:      r.data['DEPARTAMENTO']?.trim() || '(sem depto)',
           vendedor:   r.data['NOME_VENDEDOR']?.trim() || '—',
+          cliente:    r.data['NOME_CLIENTE']?.trim() || '—',
+          nf:         r.data['NUMERO_NOTA_FISCAL']?.trim() || '—',
+          transacao:  r.data['TIPO_TRANSACAO']?.trim() || '—',
           qtd:        r.data['QUANTIDADE']?.trim() || '0',
           recLiq:     c.recLiq,
           custo:      n(r.data['CUSTO_MEDIO']),
@@ -424,7 +428,7 @@ export default function VPecasAnalise() {
       })
       .filter(r => r.lucroBruto < 0)
       .sort((a, b) => a.lucroBruto - b.lucroBruto)
-      .slice(0, 20);
+      .slice(0, 40);
   }, [filteredItemRows, itemPrejuizoDept]);
 
   const itemLucroData = useMemo(() => {
@@ -439,6 +443,9 @@ export default function VPecasAnalise() {
           descricao:  r.data['DES_ITEM_ESTOQUE']?.trim() || '—',
           depto:      r.data['DEPARTAMENTO']?.trim() || '(sem depto)',
           vendedor:   r.data['NOME_VENDEDOR']?.trim() || '—',
+          cliente:    r.data['NOME_CLIENTE']?.trim() || '—',
+          nf:         r.data['NUMERO_NOTA_FISCAL']?.trim() || '—',
+          transacao:  r.data['TIPO_TRANSACAO']?.trim() || '—',
           qtd:        r.data['QUANTIDADE']?.trim() || '0',
           recLiq:     c.recLiq,
           custo:      n(r.data['CUSTO_MEDIO']),
@@ -448,7 +455,7 @@ export default function VPecasAnalise() {
       })
       .filter(r => r.lucroBruto > 0)
       .sort((a, b) => b.lucroBruto - a.lucroBruto)
-      .slice(0, 20);
+      .slice(0, 40);
   }, [filteredItemRows, itemPrejuizoDept]);
 
   const itemDeptSummary = useMemo(() => {
@@ -1082,10 +1089,10 @@ export default function VPecasAnalise() {
           ))}
         </div>
 
-        {/* ── Top 20 Itens com Prejuízo ───────────────────────────────────── */}
+        {/* ── Top 40 Itens com Prejuízo ───────────────────────────────────── */
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5" style={{ borderLeft: '4px solid #fb7185' }}>
           <SH right={<span className="text-[10px] text-slate-400">{itemPrejuizoData.length} item(s) com prejuízo</span>}>
-            Top 20 Itens com Prejuízo
+            Top 40 Itens com Prejuízo
           </SH>
           {itemPrejuizoData.length === 0 ? (
             <div className="flex items-center justify-center h-16 text-xs text-emerald-600 font-semibold">
@@ -1093,11 +1100,12 @@ export default function VPecasAnalise() {
             </div>
           ) : (
             <div className="flex flex-col gap-1">
-              <div className="grid grid-cols-[auto_1.2fr_2fr_1fr_1fr_0.5fr_1fr_1fr_1.2fr] gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
+              <div className="grid grid-cols-[auto_1.2fr_2fr_1.5fr_1fr_1fr_0.5fr_1fr_1fr_1.2fr] gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
                 <span className="w-5">#</span>
                 <span>Código</span>
                 <span>Descrição</span>
-                <span>Departamento</span>
+                <span>Cliente</span>
+                <span>NF / Transação</span>
                 <span>Vendedor</span>
                 <span className="text-right">Qtd</span>
                 <span className="text-right">Rec. Líq.</span>
@@ -1105,11 +1113,15 @@ export default function VPecasAnalise() {
                 <span className="text-right">Lucro Bruto</span>
               </div>
               {(itemPrejuizoExpanded ? itemPrejuizoData : itemPrejuizoData.slice(0, 5)).map((item, i) => (
-                <div key={i} className="grid grid-cols-[auto_1.2fr_2fr_1fr_1fr_0.5fr_1fr_1fr_1.2fr] gap-2 items-center px-2 py-1.5 rounded-lg bg-rose-50/40 hover:bg-rose-50 transition-colors">
+                <div key={i} className="grid grid-cols-[auto_1.2fr_2fr_1.5fr_1fr_1fr_0.5fr_1fr_1fr_1.2fr] gap-2 items-center px-2 py-1.5 rounded-lg bg-rose-50/40 hover:bg-rose-50 transition-colors">
                   <span className="w-5 text-[11px] font-bold text-slate-300 text-center">{i + 1}</span>
                   <span className="text-xs font-mono text-slate-600 truncate">{item.codigo}</span>
                   <span className="text-xs text-slate-700 truncate">{item.descricao}</span>
-                  <span className="text-xs text-slate-500 truncate">{item.depto}</span>
+                  <span className="text-xs text-slate-500 truncate">{item.cliente}</span>
+                  <div className="flex flex-col gap-0">
+                    <span className="text-xs font-mono text-slate-600 truncate">{item.nf}</span>
+                    <span className="text-[10px] text-slate-400">{item.transacao}</span>
+                  </div>
                   <span className="text-xs text-slate-500 truncate">{item.vendedor}</span>
                   <span className="text-right text-xs font-mono text-slate-600">{item.qtd}</span>
                   <span className="text-right text-xs font-mono text-slate-600">{fmtBRLF(item.recLiq)}</span>
@@ -1131,20 +1143,21 @@ export default function VPecasAnalise() {
           )}
         </div>
 
-        {/* ── Top 20 Itens com Lucro ──────────────────────────────────────── */}
+        {/* ── Top 40 Itens com Lucro ──────────────────────────────────────── */
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5" style={{ borderLeft: '4px solid #10b981' }}>
           <SH right={<span className="text-[10px] text-slate-400">{itemLucroData.length} item(s) com lucro</span>}>
-            Top 20 Itens com Lucro
+            Top 40 Itens com Lucro
           </SH>
           {itemLucroData.length === 0 ? (
             <div className="text-center text-sm text-slate-300 py-8">Nenhum item com lucro no período</div>
           ) : (
             <div className="flex flex-col gap-1">
-              <div className="grid grid-cols-[auto_1.2fr_2fr_1fr_1fr_0.5fr_1fr_1fr_1.2fr] gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
+              <div className="grid grid-cols-[auto_1.2fr_2fr_1.5fr_1fr_1fr_0.5fr_1fr_1fr_1.2fr] gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
                 <span className="w-5">#</span>
                 <span>Código</span>
                 <span>Descrição</span>
-                <span>Departamento</span>
+                <span>Cliente</span>
+                <span>NF / Transação</span>
                 <span>Vendedor</span>
                 <span className="text-right">Qtd</span>
                 <span className="text-right">Rec. Líq.</span>
@@ -1152,11 +1165,15 @@ export default function VPecasAnalise() {
                 <span className="text-right">Lucro Bruto</span>
               </div>
               {(itemLucroExpanded ? itemLucroData : itemLucroData.slice(0, 5)).map((item, i) => (
-                <div key={i} className="grid grid-cols-[auto_1.2fr_2fr_1fr_1fr_0.5fr_1fr_1fr_1.2fr] gap-2 items-center px-2 py-1.5 rounded-lg bg-emerald-50/40 hover:bg-emerald-50 transition-colors">
+                <div key={i} className="grid grid-cols-[auto_1.2fr_2fr_1.5fr_1fr_1fr_0.5fr_1fr_1fr_1.2fr] gap-2 items-center px-2 py-1.5 rounded-lg bg-emerald-50/40 hover:bg-emerald-50 transition-colors">
                   <span className="w-5 text-[11px] font-bold text-slate-300 text-center">{i + 1}</span>
                   <span className="text-xs font-mono text-slate-600 truncate">{item.codigo}</span>
                   <span className="text-xs text-slate-700 truncate">{item.descricao}</span>
-                  <span className="text-xs text-slate-500 truncate">{item.depto}</span>
+                  <span className="text-xs text-slate-500 truncate">{item.cliente}</span>
+                  <div className="flex flex-col gap-0">
+                    <span className="text-xs font-mono text-slate-600 truncate">{item.nf}</span>
+                    <span className="text-[10px] text-slate-400">{item.transacao}</span>
+                  </div>
                   <span className="text-xs text-slate-500 truncate">{item.vendedor}</span>
                   <span className="text-right text-xs font-mono text-slate-600">{item.qtd}</span>
                   <span className="text-right text-xs font-mono text-slate-600">{fmtBRLF(item.recLiq)}</span>
@@ -1178,32 +1195,6 @@ export default function VPecasAnalise() {
           )}
         </div>
 
-        {/* ── Resumo por Departamento ──────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
-          <SH>Resumo por Departamento</SH>
-          {itemDeptSummary.length === 0 ? <Empty /> : (
-            <div className="flex flex-col gap-1">
-              <div className="grid grid-cols-[2fr_0.8fr_0.8fr_0.8fr_1.2fr_0.8fr] gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
-                <span>Departamento</span>
-                <span className="text-right">Total</span>
-                <span className="text-right">c/ Lucro</span>
-                <span className="text-right">c/ Prejuízo</span>
-                <span className="text-right">Lucro Bruto</span>
-                <span className="text-right">% LB</span>
-              </div>
-              {itemDeptSummary.map((d, i) => (
-                <div key={i} className={`grid grid-cols-[2fr_0.8fr_0.8fr_0.8fr_1.2fr_0.8fr] gap-3 items-center px-2 py-1.5 rounded-lg ${i % 2 === 0 ? '' : 'bg-slate-50/40'} hover:bg-cyan-50/40 transition-colors`}>
-                  <span className="text-xs font-semibold text-slate-700 truncate">{d.depto}</span>
-                  <span className="text-right text-xs font-mono text-slate-600">{d.total}</span>
-                  <span className="text-right text-xs font-mono text-emerald-700">{d.comLucro}</span>
-                  <span className="text-right text-xs font-mono text-rose-600">{d.comPrejuizo}</span>
-                  <span className={`text-right text-xs font-mono font-semibold ${d.lucroBruto >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtBRLF(d.lucroBruto)}</span>
-                  <span className={`text-right text-xs font-mono font-bold ${d.lbPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtPct(d.lbPct)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </>}
     </div>
   );
