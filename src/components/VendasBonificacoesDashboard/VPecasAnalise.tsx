@@ -1089,7 +1089,7 @@ export default function VPecasAnalise() {
           ))}
         </div>
 
-        {/* ── Top 40 Itens com Prejuízo ───────────────────────────────────── */
+        {/* ── Top 40 Itens com Prejuízo ───────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5" style={{ borderLeft: '4px solid #fb7185' }}>
           <SH right={<span className="text-[10px] text-slate-400">{itemPrejuizoData.length} item(s) com prejuízo</span>}>
             Top 40 Itens com Prejuízo
@@ -1143,7 +1143,7 @@ export default function VPecasAnalise() {
           )}
         </div>
 
-        {/* ── Top 40 Itens com Lucro ──────────────────────────────────────── */
+        {/* ── Top 40 Itens com Lucro ──────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5" style={{ borderLeft: '4px solid #10b981' }}>
           <SH right={<span className="text-[10px] text-slate-400">{itemLucroData.length} item(s) com lucro</span>}>
             Top 40 Itens com Lucro
