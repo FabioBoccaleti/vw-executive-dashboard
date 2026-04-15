@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { kvGet, kvSet } from '@/lib/kvClient';
-import { loadVPecasRows, type VPecasRow } from './vPecasStorage';
+import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from './vPecasStorage';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function n(v: string | undefined): number {
@@ -258,8 +258,9 @@ export default function VPecasVendasDashboard() {
   const [annotationDraft, setAnnotationDraft] = useState('');
 
   useEffect(() => {
-    Promise.all([loadVPecasRows(), loadOverrides()]).then(([rows, ov]) => {
-      setAllRows(rows.filter(r => r.data['SERIE_NOTA_FISCAL'] !== 'RPS'));
+    Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows(), loadOverrides()]).then(([rows, devol, ov]) => {
+      const combined = [...rows, ...devol];
+      setAllRows(combined.filter(r => r.data['SERIE_NOTA_FISCAL'] !== 'RPS'));
       setOverrides(ov);
     });
   }, []);
@@ -402,6 +403,17 @@ export default function VPecasVendasDashboard() {
             <Download className="w-3.5 h-3.5" /> Exportar
           </Button>
         </div>
+      </div>
+
+      {/* Aviso de filtros ativos */}
+      <div className="mx-4 mb-2 mt-1 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs text-blue-800">
+        <span className="mt-0.5 shrink-0">ℹ️</span>
+        <span>
+          <strong>Transações consideradas:</strong> todas exceto{' '}
+          <span className="font-mono">V21, U21, I21, C41, C21, V42, V29, U25, P68, P37, P30, G23, P27, O25</span>{' '}
+          e as iniciadas com <span className="font-mono">L</span>.
+          Também são excluídas notas com <strong>SERIE = RPS</strong>.
+        </span>
       </div>
 
       {/* Tabela */}

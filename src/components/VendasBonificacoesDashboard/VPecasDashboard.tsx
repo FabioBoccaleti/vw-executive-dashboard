@@ -15,6 +15,10 @@ import {
   saveVPecasRows,
   parsePecasTxt,
   parsePecasExcel,
+  loadVPecasDevolucaoRows,
+  saveVPecasDevolucaoRows,
+  appendVPecasDevolucaoRows,
+  parsePecasDevolucaoTxt,
 } from './vPecasStorage';
 
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -139,17 +143,22 @@ async function exportToExcel(rows: VPecasRow[], allCols: string[], filename: str
 // ─── Componente principal ─────────────────────────────────────────────────────
 export function VPecasDashboard() {
   const [rows, setRows]               = useState<VPecasRow[]>([]);
+  const [devolucaoRows, setDevolucaoRows] = useState<VPecasRow[]>([]);
   const [loading, setLoading]         = useState(true);
   const [filterYear, setFilterYear]   = useState<number>(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
 
   const txtInputRef  = useRef<HTMLInputElement>(null);
+  const devolTxtRef  = useRef<HTMLInputElement>(null);
   const xlsxInputRef = useRef<HTMLInputElement>(null);
   const tableRef     = useRef<HTMLDivElement>(null);
 
   const [importPeriodModal, setImportPeriodModal] = useState(false);
   const [importPeriodYear, setImportPeriodYear]   = useState<number>(new Date().getFullYear());
   const [importPeriodMonth, setImportPeriodMonth] = useState<number>(new Date().getMonth() + 1);
+  const [devolPeriodModal, setDevolPeriodModal]   = useState(false);
+  const [devolPeriodYear, setDevolPeriodYear]     = useState<number>(new Date().getFullYear());
+  const [devolPeriodMonth, setDevolPeriodMonth]   = useState<number>(new Date().getMonth() + 1);
   const [confirmImport, setConfirmImport]         = useState(false);
   const [confirmDeleteId, setConfirmDeleteId]     = useState<string | null>(null);
   const [confirmDeleteAll, setConfirmDeleteAll]   = useState(false);
@@ -160,43 +169,46 @@ export function VPecasDashboard() {
   // Colunas dinamicas: NF_HEADERS + extras presentes nos dados
   const allColumns = useMemo(() => {
     const extras = new Set<string>();
-    rows.forEach(r => Object.keys(r.data).forEach(k => {
+    [...rows, ...devolucaoRows].forEach(r => Object.keys(r.data).forEach(k => {
       if (!NF_HEADERS.includes(k as never)) extras.add(k);
     }));
     return [...NF_HEADERS, ...Array.from(extras)];
-  }, [rows]);
+  }, [rows, devolucaoRows]);
 
   useEffect(() => {
     setLoading(true);
-    loadVPecasRows().then(data => {
+    Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows()]).then(([data, devol]) => {
       setRows(data);
+      setDevolucaoRows(devol);
       setLoading(false);
     });
   }, []);
 
+  const allRows = useMemo(() => [...rows, ...devolucaoRows], [rows, devolucaoRows]);
+
   const availableYears = useMemo(() => {
     const years = new Set<number>();
-    rows.forEach(r => { const d = getRowPeriod(r); if (d) years.add(d.year); });
+    allRows.forEach(r => { const d = getRowPeriod(r); if (d) years.add(d.year); });
     const sorted = Array.from(years).sort((a, b) => b - a);
     return sorted.length ? sorted : [new Date().getFullYear()];
-  }, [rows]);
+  }, [allRows]);
 
   const monthCounts = useMemo(() => {
     const counts: Record<number, number> = {};
-    rows.forEach(r => {
+    allRows.forEach(r => {
       const d = getRowPeriod(r);
       if (d && d.year === filterYear) counts[d.month] = (counts[d.month] ?? 0) + 1;
     });
     return counts;
-  }, [rows, filterYear]);
+  }, [allRows, filterYear]);
 
-  const filteredRows = useMemo(() => rows.filter(r => {
+  const filteredRows = useMemo(() => allRows.filter(r => {
     const d = getRowPeriod(r);
     if (!d) return false;
     if (d.year !== filterYear) return false;
     if (filterMonth !== null && d.month !== filterMonth) return false;
     return true;
-  }), [rows, filterYear, filterMonth]);
+  }), [allRows, filterYear, filterMonth]);
 
   const kpis = useMemo(() =>
     Object.fromEntries(KPI_FIELDS.map(k => [k, sumField(filteredRows, k)])),
@@ -205,16 +217,29 @@ export function VPecasDashboard() {
 
   // ─── Acoes ──────────────────────────────────────────────────────────────────
   async function handleToggleHighlight(row: VPecasRow) {
-    const updated = rows.map(r => r.id === row.id ? { ...r, highlight: !r.highlight } : r);
-    setRows(updated);
-    await saveVPecasRows(updated);
+    if (row.isDevolucao) {
+      const updated = devolucaoRows.map(r => r.id === row.id ? { ...r, highlight: !r.highlight } : r);
+      setDevolucaoRows(updated);
+      await saveVPecasDevolucaoRows(updated);
+    } else {
+      const updated = rows.map(r => r.id === row.id ? { ...r, highlight: !r.highlight } : r);
+      setRows(updated);
+      await saveVPecasRows(updated);
+    }
   }
 
   async function handleConfirmDelete() {
     if (!confirmDeleteId) return;
-    const updated = rows.filter(r => r.id !== confirmDeleteId);
-    setRows(updated);
-    await saveVPecasRows(updated);
+    const isDevol = devolucaoRows.some(r => r.id === confirmDeleteId);
+    if (isDevol) {
+      const updated = devolucaoRows.filter(r => r.id !== confirmDeleteId);
+      setDevolucaoRows(updated);
+      await saveVPecasDevolucaoRows(updated);
+    } else {
+      const updated = rows.filter(r => r.id !== confirmDeleteId);
+      setRows(updated);
+      await saveVPecasRows(updated);
+    }
     setConfirmDeleteId(null);
     toast.success('Linha excluida.');
   }
@@ -228,33 +253,50 @@ export function VPecasDashboard() {
   }
 
   async function handleAnnotationChange(id: string, text: string) {
-    setRows(prev => prev.map(r => r.id === id ? { ...r, annotation: text } : r));
+    if (devolucaoRows.some(r => r.id === id)) {
+      setDevolucaoRows(prev => prev.map(r => r.id === id ? { ...r, annotation: text } : r));
+    } else {
+      setRows(prev => prev.map(r => r.id === id ? { ...r, annotation: text } : r));
+    }
   }
 
   async function handleAnnotationBlur() {
     await saveVPecasRows(rows);
+    await saveVPecasDevolucaoRows(devolucaoRows);
   }
 
   async function handleSaveEditModal() {
     if (!editModal || !editValues) return;
-    const updated = rows.map(r =>
-      r.id === editModal.id ? { ...r, data: { ...r.data, ...editValues } } : r
-    );
-    setRows(updated);
-    await saveVPecasRows(updated);
+    if (editModal.isDevolucao) {
+      const updated = devolucaoRows.map(r =>
+        r.id === editModal.id ? { ...r, data: { ...r.data, ...editValues } } : r
+      );
+      setDevolucaoRows(updated);
+      await saveVPecasDevolucaoRows(updated);
+    } else {
+      const updated = rows.map(r =>
+        r.id === editModal.id ? { ...r, data: { ...r.data, ...editValues } } : r
+      );
+      setRows(updated);
+      await saveVPecasRows(updated);
+    }
     setEditModal(null);
     setEditValues(null);
     toast.success('Linha salva.');
   }
 
   async function handleDeleteAll() {
-    const kept = rows.filter(r => {
+    const periodFilter = (r: VPecasRow) => {
       const d = getRowPeriod(r);
       if (!d) return true;
       return !(d.year === filterYear && d.month === filterMonth!);
-    });
-    setRows(kept);
-    await saveVPecasRows(kept);
+    };
+    const keptVendas = rows.filter(periodFilter);
+    const keptDevol  = devolucaoRows.filter(periodFilter);
+    setRows(keptVendas);
+    setDevolucaoRows(keptDevol);
+    await saveVPecasRows(keptVendas);
+    await saveVPecasDevolucaoRows(keptDevol);
     setConfirmDeleteAll(false);
     toast.success(`Linhas de ${MONTHS[(filterMonth ?? 1) - 1]}/${filterYear} excluidas.`);
   }
@@ -279,6 +321,27 @@ export function VPecasDashboard() {
 
   function handleXlsxClick() { setConfirmImport(true); }
   function handleConfirmImport() { setConfirmImport(false); xlsxInputRef.current?.click(); }
+
+  async function handleDevolucaoTxtImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const parsed = parsePecasDevolucaoTxt(text);
+    if (parsed.length === 0) {
+      toast.warning('Nenhuma NF de devolução (P07/A07) reconhecida no arquivo.');
+      if (devolTxtRef.current) devolTxtRef.current.value = '';
+      return;
+    }
+    const periodo = `${devolPeriodYear}-${String(devolPeriodMonth).padStart(2, '0')}`;
+    const { added, removed } = await appendVPecasDevolucaoRows(periodo, parsed);
+    const updated = await loadVPecasDevolucaoRows();
+    setDevolucaoRows(updated);
+    const msg = removed > 0
+      ? `${added} NF(s) de devolução importada(s) · ${removed} substituída(s) — ${MONTHS[devolPeriodMonth - 1]}/${devolPeriodYear}.`
+      : `${added} NF(s) de devolução importada(s) — ${MONTHS[devolPeriodMonth - 1]}/${devolPeriodYear}.`;
+    toast.success(msg);
+    if (devolTxtRef.current) devolTxtRef.current.value = '';
+  }
 
   async function handleXlsxImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -311,8 +374,9 @@ export function VPecasDashboard() {
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
-      <input ref={txtInputRef}  type="file" accept=".txt"            className="hidden" onChange={handleTxtImport} />
-      <input ref={xlsxInputRef} type="file" accept=".xlsx,.xls,.ods" className="hidden" onChange={handleXlsxImport} />
+      <input ref={txtInputRef}   type="file" accept=".txt"            className="hidden" onChange={handleTxtImport} />
+      <input ref={devolTxtRef}   type="file" accept=".txt"            className="hidden" onChange={handleDevolucaoTxtImport} />
+      <input ref={xlsxInputRef}  type="file" accept=".xlsx,.xls,.ods" className="hidden" onChange={handleXlsxImport} />
 
       {importPeriodModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -346,6 +410,45 @@ export function VPecasDashboard() {
               <Button size="sm" variant="outline" onClick={() => setImportPeriodModal(false)}>Cancelar</Button>
               <Button size="sm" className="bg-violet-600 hover:bg-violet-700 text-white"
                 onClick={() => { setImportPeriodModal(false); txtInputRef.current?.click(); }}>
+                Confirmar e selecionar arquivo
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {devolPeriodModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-start gap-3 mb-5">
+              <Upload className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-slate-800 text-sm">Importar Devoluções (P07/A07) — Período?</p>
+                <p className="text-slate-500 text-xs mt-1">Os valores monetários serão negativados. Se já houver devoluções neste mês, serão substituídas.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex-1">
+                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Mes</label>
+                <select value={devolPeriodMonth} onChange={e => setDevolPeriodMonth(Number(e.target.value))}
+                  className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                  {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Ano</label>
+                <select value={devolPeriodYear} onChange={e => setDevolPeriodYear(Number(e.target.value))}
+                  className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => setDevolPeriodModal(false)}>Cancelar</Button>
+              <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white"
+                onClick={() => { setDevolPeriodModal(false); devolTxtRef.current?.click(); }}>
                 Confirmar e selecionar arquivo
               </Button>
             </div>
@@ -451,6 +554,10 @@ export function VPecasDashboard() {
         <Button size="sm" className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white"
           onClick={() => setImportPeriodModal(true)}>
           <Upload className="w-4 h-4" />Importar TXT
+        </Button>
+        <Button size="sm" className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white"
+          onClick={() => setDevolPeriodModal(true)}>
+          <Upload className="w-4 h-4" />Importar Devoluções
         </Button>
         <Button size="sm" variant="outline" className="flex items-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
           onClick={handleXlsxClick}>

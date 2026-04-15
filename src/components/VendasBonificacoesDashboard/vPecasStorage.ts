@@ -2,6 +2,7 @@ import { kvGet, kvSet } from '@/lib/kvClient';
 import * as XLSX from 'xlsx';
 
 const KEY_VPECAS = 'registro_vpecas';
+const KEY_VPECAS_DEVOLUCAO = 'registro_vpecas_devolucao';
 
 // ─── Todos os cabeçalhos do nível de NF (na ordem original do arquivo) ────────
 export const NF_HEADERS = [
@@ -56,6 +57,7 @@ export const DATE_FIELDS = new Set<string>(['DTA_ENTRADA_SAIDA', 'DTA_DOCUMENTO'
 export interface VPecasRow {
   id: string;
   periodoImport?: string; // "YYYY-MM"
+  isDevolucao?: boolean;
   highlight?: boolean;
   annotation?: string;
   data: Record<string, string>; // todos os campos do cabeçalho NF
@@ -172,6 +174,107 @@ export function parsePecasTxt(content: string): Omit<VPecasRow, 'id'>[] {
   }
 
   return result.filter(r => !isIgnoredTransacao(r.data['TIPO_TRANSACAO'] ?? ''));
+}
+
+// ─── Devoluções (P07 / A07) ───────────────────────────────────────────────────
+
+function negateCurrencyFields(data: Record<string, string>): Record<string, string> {
+  const result = { ...data };
+  for (const field of CURRENCY_FIELDS) {
+    const raw = result[field];
+    if (!raw) continue;
+    const n = parseFloat(raw.replace(',', '.'));
+    if (!isNaN(n)) result[field] = (-n).toFixed(2).replace('.', ',');
+  }
+  return result;
+}
+
+export async function loadVPecasDevolucaoRows(): Promise<VPecasRow[]> {
+  try {
+    const rawData = await kvGet(KEY_VPECAS_DEVOLUCAO);
+    if (!Array.isArray(rawData)) return [];
+    return (rawData as Record<string, unknown>[]).map(item => {
+      if (item.data && typeof item.data === 'object') return { ...(item as unknown as VPecasRow), isDevolucao: true };
+      const { id, periodoImport, highlight, annotation, isDevolucao: _d, ...fields } = item as Record<string, unknown>;
+      return {
+        id: String(id ?? crypto.randomUUID()),
+        periodoImport: periodoImport as string | undefined,
+        isDevolucao: true,
+        highlight: highlight as boolean | undefined,
+        annotation: annotation as string | undefined,
+        data: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, String(v ?? '')])),
+      } as VPecasRow;
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function saveVPecasDevolucaoRows(rows: VPecasRow[]): Promise<boolean> {
+  try {
+    await kvSet(KEY_VPECAS_DEVOLUCAO, rows);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function appendVPecasDevolucaoRows(
+  periodo: string,
+  newRows: Omit<VPecasRow, 'id'>[],
+): Promise<{ added: number; removed: number }> {
+  const existing = await loadVPecasDevolucaoRows();
+  const kept = existing.filter(r => r.periodoImport !== periodo);
+  const removed = existing.length - kept.length;
+  const toAdd: VPecasRow[] = newRows.map(r => ({ ...r, id: crypto.randomUUID(), periodoImport: periodo, isDevolucao: true }));
+  await saveVPecasDevolucaoRows([...kept, ...toAdd]);
+  return { added: toAdd.length, removed };
+}
+
+// Parser TXT de devoluções: aceita apenas P07 e A07, nega campos monetários
+export function parsePecasDevolucaoTxt(content: string): Omit<VPecasRow, 'id'>[] {
+  const TIPOS_DEVOLUCAO = new Set(['P07', 'A07']);
+
+  const rawLines = content.split(/\r?\n/);
+  const lines: string[] = [];
+  for (const raw of rawLines) {
+    if (!raw.trim()) continue;
+    if (lines.length === 0 || /^[A-Za-z\d]/.test(raw)) {
+      lines.push(raw);
+    } else {
+      lines[lines.length - 1] += raw;
+    }
+  }
+
+  if (lines.length < 2) return [];
+
+  const nfHeaders = lines[0].split(';').map(h => h.trim());
+  const nfColIdx: Record<string, number> = {};
+  nfHeaders.forEach((h, i) => { if (h) nfColIdx[h] = i; });
+
+  const result: Omit<VPecasRow, 'id'>[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!/^\d/.test(line)) continue;
+
+    const fields = line.split(';');
+    const tipoIdx = nfColIdx['TIPO_TRANSACAO'];
+    const tipo = tipoIdx !== undefined ? (fields[tipoIdx] ?? '').trim().toUpperCase() : '';
+    if (!TIPOS_DEVOLUCAO.has(tipo)) continue;
+
+    const rowData: Record<string, string> = {};
+    for (const header of NF_HEADERS) {
+      const idx = nfColIdx[header];
+      rowData[header] = idx !== undefined ? (fields[idx] ?? '').trim() : '';
+    }
+    nfHeaders.forEach((h, idx) => {
+      if (h && !(h in rowData)) rowData[h] = (fields[idx] ?? '').trim();
+    });
+
+    result.push({ data: negateCurrencyFields(rowData), isDevolucao: true });
+  }
+  return result;
 }
 
 // ─── Parser Excel ─────────────────────────────────────────────────────────────

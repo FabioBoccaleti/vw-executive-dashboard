@@ -5,7 +5,7 @@ import {
   ReferenceLine, Legend,
 } from 'recharts';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { loadVPecasRows, type VPecasRow } from './vPecasStorage';
+import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from './vPecasStorage';
 import { loadVPecasItemRows, type VPecasItemRow } from './vPecasItemStorage';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
@@ -190,8 +190,8 @@ export default function VPecasAnalise() {
   }, []);
 
   useEffect(() => {
-    loadVPecasRows().then(rows => {
-      const filtered = rows.filter(r => r.data['SERIE_NOTA_FISCAL'] !== 'RPS');
+    Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows()]).then(([rows, devol]) => {
+      const filtered = [...rows, ...devol].filter(r => r.data['SERIE_NOTA_FISCAL'] !== 'RPS');
       setAllRows(filtered);
       if (filtered.length > 0) {
         const yr = Math.max(...filtered.map(getYr).filter(y => y > 2000));
