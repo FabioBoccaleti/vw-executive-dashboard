@@ -1,4 +1,4 @@
-import { kvGet, kvSet } from '@/lib/kvClient';
+import { kvGet, kvSet, kvKeys } from '@/lib/kvClient';
 import * as XLSX from 'xlsx';
 
 const KEY_VPECAS = 'registro_vpecas';
@@ -64,12 +64,49 @@ export interface VPecasRow {
 }
 
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
+
+// ─── Chunked period storage (contorna limite 1 MB do Upstash por valor) ───────
+const CHUNK_SIZE       = 200;
+const KEY_PERIOD_META  = (p: string) => `registro_vpecas_per_${p}_meta`;
+const KEY_PERIOD_CHUNK = (p: string, i: number) => `registro_vpecas_per_${p}_c${i}`;
+
+async function savePeriodRows(periodo: string, rows: VPecasRow[]): Promise<void> {
+  const chunks: VPecasRow[][] = [];
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) chunks.push(rows.slice(i, i + CHUNK_SIZE));
+  await Promise.all([
+    kvSet(KEY_PERIOD_META(periodo), { chunks: chunks.length }),
+    ...chunks.map((chunk, i) => kvSet(KEY_PERIOD_CHUNK(periodo, i), chunk)),
+  ]);
+}
+
+async function loadPeriodRows(periodo: string): Promise<VPecasRow[]> {
+  const meta = await kvGet<{ chunks: number }>(KEY_PERIOD_META(periodo));
+  if (!meta || !meta.chunks) return [];
+  const keys = Array.from({ length: meta.chunks }, (_, i) => KEY_PERIOD_CHUNK(periodo, i));
+  const chunks = await Promise.all(keys.map(k => kvGet<VPecasRow[]>(k)));
+  return chunks.filter((c): c is VPecasRow[] => Array.isArray(c)).flat();
+}
+
+async function getAllVPecasPeriods(): Promise<string[]> {
+  try {
+    const keys = await kvKeys('registro_vpecas_per_*_meta');
+    return keys.map(k => k.replace('registro_vpecas_per_', '').replace('_meta', ''));
+  } catch { return []; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 export async function loadVPecasRows(): Promise<VPecasRow[]> {
   try {
+    // Novo: carrega do storage por período em chunks
+    const periods = await getAllVPecasPeriods();
+    if (periods.length > 0) {
+      const arrays = await Promise.all(periods.map(loadPeriodRows));
+      return arrays.flat();
+    }
+    // Fallback: chave legada (backward compat)
     const rawData = await kvGet(KEY_VPECAS);
     if (!Array.isArray(rawData)) return [];
     return (rawData as Record<string, unknown>[]).map(item => {
-      // Migração: formato antigo tinha campos avulsos; novo tem `.data`
       if (item.data && typeof item.data === 'object') return item as unknown as VPecasRow;
       const { id, periodoImport, highlight, annotation, ...fields } = item as Record<string, unknown>;
       return {
@@ -87,7 +124,21 @@ export async function loadVPecasRows(): Promise<VPecasRow[]> {
 
 export async function saveVPecasRows(rows: VPecasRow[]): Promise<boolean> {
   try {
-    await kvSet(KEY_VPECAS, rows);
+    // Agrupa por período
+    const byPeriod = new Map<string, VPecasRow[]>();
+    for (const r of rows) {
+      const p = r.periodoImport ?? 'sem-periodo';
+      byPeriod.set(p, [...(byPeriod.get(p) ?? []), r]);
+    }
+    // Salva cada período em chunks
+    const saveOps = [...byPeriod.entries()].map(([p, rs]) => savePeriodRows(p, rs));
+    // Limpa períodos que não têm mais linhas (ex: após deleteAll)
+    const existingPeriods = await getAllVPecasPeriods();
+    const presentPeriods = new Set(byPeriod.keys());
+    const clearOps = existingPeriods
+      .filter(p => !presentPeriods.has(p))
+      .map(p => savePeriodRows(p, []));
+    await Promise.all([...saveOps, ...clearOps]);
     return true;
   } catch {
     return false;
@@ -97,18 +148,29 @@ export async function saveVPecasRows(rows: VPecasRow[]): Promise<boolean> {
 export async function appendVPecasRows(
   newRows: Omit<VPecasRow, 'id'>[],
 ): Promise<{ added: number }> {
-  const existing = await loadVPecasRows();
-  const toAdd: VPecasRow[] = newRows.map(r => ({ ...r, id: crypto.randomUUID() }));
-  await saveVPecasRows([...existing, ...toAdd]);
-  return { added: toAdd.length };
+  // Agrupa por período e salva cada um separadamente (substitui o período)
+  const byPeriod = new Map<string, Omit<VPecasRow, 'id'>[]>();
+  for (const r of newRows) {
+    const p = r.periodoImport ?? 'sem-periodo';
+    byPeriod.set(p, [...(byPeriod.get(p) ?? []), r]);
+  }
+  await Promise.all([...byPeriod.entries()].map(([periodo, rs]) => {
+    const withIds = rs.map(r => ({ ...r, id: crypto.randomUUID() }));
+    return savePeriodRows(periodo, withIds);
+  }));
+  return { added: newRows.length };
 }
 
 export async function replaceVPecasRows(
   rows: Omit<VPecasRow, 'id'>[],
 ): Promise<{ total: number }> {
-  const withIds: VPecasRow[] = rows.map(r => ({ ...r, id: crypto.randomUUID() }));
-  await saveVPecasRows(withIds);
-  return { total: withIds.length };
+  // Limpa todos os períodos existentes
+  const periods = await getAllVPecasPeriods();
+  await Promise.all(periods.map(p => savePeriodRows(p, [])));
+  try { await kvSet(KEY_VPECAS, []); } catch { /* legacy */ }
+  // Salva os novos dados por período
+  const { added } = await appendVPecasRows(rows);
+  return { total: added };
 }
 
 // ─── Transações ignoradas na importação (case-insensitive) ───────────────────
