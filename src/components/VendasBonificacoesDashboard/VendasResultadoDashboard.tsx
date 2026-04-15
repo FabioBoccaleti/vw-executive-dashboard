@@ -12,6 +12,7 @@ import {
   emptyVendasResultadoRow,
 } from './vendasResultadoStorage';
 import VPecasVendasDashboard from './VPecasVendasDashboard';
+import VServicosVendasDashboard from './VServicosVendasDashboard';
 import VPecasItemVendasTable from './VPecasItemVendasTable';
 import { loadAliquotas, loadRemuneracao, loadVendasDsr, type RemuneracaoData, type RemuneracaoModalidade, type FaixaBonus, type VendasDsrConfig } from './vendedoresRemuneracaoStorage';
 import { loadModelos, loadRegras, getRegra, type VeiculoModelo, type VeiculoRegra } from './veiculosRegrasStorage';
@@ -595,6 +596,7 @@ export default function VendasResultadoDashboard() {
   const [activeTab, setActiveTab]     = useState<VendasResultadoSubTab>('novos');
   const [showPecas, setShowPecas]         = useState(false);
   const [showItemPecas, setShowItemPecas] = useState(false);
+  const [showServicos, setShowServicos]   = useState(false);
   const [rows, setRows]               = useState<VendasResultadoRow[]>([]);
   const [filterYear, setFilterYear]   = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
@@ -922,9 +924,9 @@ export default function VendasResultadoDashboard() {
         {SUB_TABS.map(tab => (
           <button
             key={tab.id}
-            onClick={() => { setActiveTab(tab.id); setShowPecas(false); setShowItemPecas(false); }}
+            onClick={() => { setActiveTab(tab.id); setShowPecas(false); setShowItemPecas(false); setShowServicos(false); }}
             className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-              !showPecas && !showItemPecas && activeTab === tab.id
+              !showPecas && !showItemPecas && !showServicos && activeTab === tab.id
                 ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
             }`}
@@ -933,7 +935,7 @@ export default function VendasResultadoDashboard() {
           </button>
         ))}
         <button
-          onClick={() => { setShowPecas(true); setShowItemPecas(false); }}
+          onClick={() => { setShowPecas(true); setShowItemPecas(false); setShowServicos(false); }}
           className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
             showPecas
               ? 'border-violet-500 text-violet-700 bg-violet-50/50'
@@ -943,7 +945,7 @@ export default function VendasResultadoDashboard() {
           Vendas de Peças
         </button>
         <button
-          onClick={() => { setShowItemPecas(true); setShowPecas(false); }}
+          onClick={() => { setShowItemPecas(true); setShowPecas(false); setShowServicos(false); }}
           className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
             showItemPecas
               ? 'border-sky-500 text-sky-700 bg-sky-50/50'
@@ -952,11 +954,22 @@ export default function VendasResultadoDashboard() {
         >
           Vendas de Peças por Item
         </button>
+        <button
+          onClick={() => { setShowServicos(true); setShowPecas(false); setShowItemPecas(false); }}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            showServicos
+              ? 'border-teal-500 text-teal-700 bg-teal-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          Vendas de Serviços
+        </button>
       </div>
 
       {showPecas && <VPecasVendasDashboard />}
       {showItemPecas && <VPecasItemVendasTable />}
-      {!showPecas && !showItemPecas && <>
+      {showServicos && <VServicosVendasDashboard />}
+      {!showPecas && !showItemPecas && !showServicos && <>
       {/* Toolbar */}
       <div className="bg-white border-b border-slate-100 px-6 py-2 flex items-center justify-between flex-shrink-0">
         {/* Filtro Ano / Mês */}
