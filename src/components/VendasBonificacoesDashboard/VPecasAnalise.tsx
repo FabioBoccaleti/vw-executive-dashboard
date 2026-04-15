@@ -1094,6 +1094,10 @@ export default function VPecasAnalise() {
           <SH right={<span className="text-[10px] text-slate-400">{itemPrejuizoData.length} item(s) com prejuízo</span>}>
             Top 40 Itens com Prejuízo
           </SH>
+          <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 mb-3 text-xs text-blue-700">
+            <span className="shrink-0 mt-0.5">ℹ️</span>
+            <span>Esta análise exibe apenas os <strong>40 itens com maior impacto negativo no resultado</strong> dentro do período e departamento selecionados. Itens fora desse corte não aparecem nesta listagem.</span>
+          </div>
           {itemPrejuizoData.length === 0 ? (
             <div className="flex items-center justify-center h-16 text-xs text-emerald-600 font-semibold">
               Nenhum item com prejuízo no período 🎉
@@ -1148,6 +1152,10 @@ export default function VPecasAnalise() {
           <SH right={<span className="text-[10px] text-slate-400">{itemLucroData.length} item(s) com lucro</span>}>
             Top 40 Itens com Lucro
           </SH>
+          <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 mb-3 text-xs text-blue-700">
+            <span className="shrink-0 mt-0.5">ℹ️</span>
+            <span>Esta análise exibe apenas os <strong>40 itens com maior impacto positivo no resultado</strong> dentro do período e departamento selecionados. Itens fora desse corte não aparecem nesta listagem.</span>
+          </div>
           {itemLucroData.length === 0 ? (
             <div className="text-center text-sm text-slate-300 py-8">Nenhum item com lucro no período</div>
           ) : (
