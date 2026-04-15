@@ -694,7 +694,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
               { id: 'usados',  label: 'Usados' },
               { id: 'direta',  label: 'VD / Frotista' },
               { id: 'pecas',   label: 'Peças' },
-              { id: 'oficina', label: 'Oficina' },
+              { id: 'oficina', label: 'Serviços' },
             ] as const).map(tab => (
               <button
                 key={tab.id}
