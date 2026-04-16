@@ -330,7 +330,57 @@ export default function VPecasAnalise() {
 
   const clienteMax = useMemo(() => Math.max(...clienteData.map(c => c[clienteMetric]), 1), [clienteData, clienteMetric]);
 
-  // ─── 7. Top NFs com Prejuízo ─────────────────────────────────────────────
+  // ─── 7. Análise de Risco por Departamento ────────────────────────────────
+  // Consolidação: 122→104, 108→103, 129→106
+  const DEPT_MERGE: Record<string, string> = { '122': '104', '108': '103', '129': '106' };
+  const normDept = (raw: string) => DEPT_MERGE[raw] ?? raw;
+
+  const deptRiskData = useMemo(() => {
+    const map = new Map<string, VPecasRow[]>();
+    for (const r of filteredRows) {
+      const k = normDept(r.data['DEPARTAMENTO']?.trim() || '(sem depto)');
+      map.set(k, [...(map.get(k) ?? []), r]);
+    }
+    return [...map.entries()].map(([dept, rows]) => {
+      const calcs = rows.map(r => calcPecas(r.data));
+      const total    = calcs.length;
+      const withPrej = calcs.filter(c => c.lucroBruto < 0);
+      const pct      = (arr: typeof calcs) => total > 0 ? arr.length / total * 100 : 0;
+      const sumPrej  = withPrej.reduce((s, c) => s + c.lucroBruto, 0);
+      const gt = (thr: number) => withPrej.filter(c => c.recLiq !== 0 && Math.abs(c.lucroBruto / c.recLiq * 100) > thr);
+      return {
+        dept,
+        total,
+        withPrej: withPrej.length,
+        pctPrej:  pct(withPrej),
+        gt5:  gt(5).length,   pctGt5:  pct(gt(5)),
+        gt10: gt(10).length,  pctGt10: pct(gt(10)),
+        gt15: gt(15).length,  pctGt15: pct(gt(15)),
+        gt20: gt(20).length,  pctGt20: pct(gt(20)),
+        gt25: gt(25).length,  pctGt25: pct(gt(25)),
+        sumPrej,
+      };
+    }).sort((a, b) => b.pctPrej - a.pctPrej);
+  }, [filteredRows]);
+
+  const globalDeptRisk = useMemo(() => {
+    const allCalcs = filteredRows.map(r => calcPecas(r.data));
+    const total    = allCalcs.length;
+    const withPrej = allCalcs.filter(c => c.lucroBruto < 0);
+    const sumPrej  = withPrej.reduce((s, c) => s + c.lucroBruto, 0);
+    const gt = (thr: number) => withPrej.filter(c => c.recLiq !== 0 && Math.abs(c.lucroBruto / c.recLiq * 100) > thr);
+    const pct = (n: number) => total > 0 ? n / total * 100 : 0;
+    return {
+      total, withPrej: withPrej.length, pctPrej: pct(withPrej.length), sumPrej,
+      gt5: gt(5).length, pctGt5: pct(gt(5).length),
+      gt10: gt(10).length, pctGt10: pct(gt(10).length),
+      gt15: gt(15).length, pctGt15: pct(gt(15).length),
+      gt20: gt(20).length, pctGt20: pct(gt(20).length),
+      gt25: gt(25).length, pctGt25: pct(gt(25).length),
+    };
+  }, [filteredRows]);
+
+  // ─── 8. Top NFs com Prejuízo ─────────────────────────────────────────────
   const [prejuizoDept, setPrejuizoDept] = useState('Todos');
 
   const availPrejuizoDepts = useMemo(() => {
@@ -922,6 +972,71 @@ export default function VPecasAnalise() {
             </ResponsiveContainer>
           )}
         </div>
+      </div>
+
+      {/* ── Seção 7b: Análise de Risco por Departamento ─────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5 space-y-5">
+        <SH>Análise de Risco — NFs com Prejuízo por Departamento</SH>
+
+        {/* KPI cards globais */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+          {[
+            { label: 'Total NFs',     value: globalDeptRisk.total.toLocaleString('pt-BR'),    sub: '100%',                        color: 'text-slate-700', accent: '#94a3b8' },
+            { label: 'c/ Prejuízo',   value: globalDeptRisk.withPrej.toLocaleString('pt-BR'), sub: fmtPct(globalDeptRisk.pctPrej), color: 'text-rose-700',  accent: '#f43f5e' },
+            { label: 'Soma Prejuízo', value: fmtBRL(globalDeptRisk.sumPrej),                  sub: '',                            color: 'text-rose-700',  accent: '#f43f5e' },
+            { label: 'Margem < −5%',  value: globalDeptRisk.gt5.toLocaleString('pt-BR'),      sub: fmtPct(globalDeptRisk.pctGt5),  color: 'text-orange-600', accent: '#f97316' },
+            { label: 'Margem < −10%', value: globalDeptRisk.gt10.toLocaleString('pt-BR'),     sub: fmtPct(globalDeptRisk.pctGt10), color: 'text-orange-700', accent: '#ea580c' },
+            { label: 'Margem < −15%', value: globalDeptRisk.gt15.toLocaleString('pt-BR'),     sub: fmtPct(globalDeptRisk.pctGt15), color: 'text-red-600',    accent: '#dc2626' },
+            { label: 'Margem < −20%', value: globalDeptRisk.gt20.toLocaleString('pt-BR'),     sub: fmtPct(globalDeptRisk.pctGt20), color: 'text-red-700',    accent: '#b91c1c' },
+            { label: 'Margem < −25%', value: globalDeptRisk.gt25.toLocaleString('pt-BR'),     sub: fmtPct(globalDeptRisk.pctGt25), color: 'text-red-800',    accent: '#991b1b' },
+          ].map(card => (
+            <div key={card.label} className="rounded-lg border border-slate-100 px-3 py-2.5 flex flex-col gap-0.5" style={{ borderLeft: `3px solid ${card.accent}` }}>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide leading-tight">{card.label}</span>
+              <span className={`text-sm font-bold leading-tight ${card.color}`}>{card.value}</span>
+              {card.sub && <span className="text-[10px] text-slate-400">{card.sub} das NFs</span>}
+            </div>
+          ))}
+        </div>
+
+        {/* Tabela heatmap por departamento */}
+        {deptRiskData.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  {['Depto','Total NFs','c/ Prej.','% Prej.','<−5%','<−10%','<−15%','<−20%','<−25%','Soma Prejuízo'].map(h => (
+                    <th key={h} className="text-[10px] font-bold text-slate-400 uppercase tracking-wide py-1.5 px-2 text-right first:text-left whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {deptRiskData.map((s, i) => {
+                  const heat = (pct: number) => {
+                    if (pct === 0) return '';
+                    if (pct < 10)  return 'bg-yellow-50 text-yellow-700';
+                    if (pct < 20)  return 'bg-orange-50 text-orange-700';
+                    if (pct < 35)  return 'bg-red-50 text-red-700';
+                    return 'bg-red-100 text-red-800 font-bold';
+                  };
+                  return (
+                    <tr key={s.dept} className={`border-b border-slate-50 ${i % 2 === 0 ? '' : 'bg-slate-50/50'}`}>
+                      <td className="py-1.5 px-2 font-mono font-semibold text-slate-700">{s.dept}</td>
+                      <td className="py-1.5 px-2 text-right text-slate-500">{s.total}</td>
+                      <td className="py-1.5 px-2 text-right text-rose-600 font-semibold">{s.withPrej}</td>
+                      <td className={`py-1.5 px-2 text-right rounded ${heat(s.pctPrej)}`}>{fmtPct(s.pctPrej)}</td>
+                      <td className={`py-1.5 px-2 text-right rounded ${heat(s.pctGt5)}`}>{s.gt5  > 0 ? `${s.gt5}  (${fmtPct(s.pctGt5)})` : '—'}</td>
+                      <td className={`py-1.5 px-2 text-right rounded ${heat(s.pctGt10)}`}>{s.gt10 > 0 ? `${s.gt10} (${fmtPct(s.pctGt10)})` : '—'}</td>
+                      <td className={`py-1.5 px-2 text-right rounded ${heat(s.pctGt15)}`}>{s.gt15 > 0 ? `${s.gt15} (${fmtPct(s.pctGt15)})` : '—'}</td>
+                      <td className={`py-1.5 px-2 text-right rounded ${heat(s.pctGt20)}`}>{s.gt20 > 0 ? `${s.gt20} (${fmtPct(s.pctGt20)})` : '—'}</td>
+                      <td className={`py-1.5 px-2 text-right rounded ${heat(s.pctGt25)}`}>{s.gt25 > 0 ? `${s.gt25} (${fmtPct(s.pctGt25)})` : '—'}</td>
+                      <td className="py-1.5 px-2 text-right font-mono font-bold text-rose-600">{fmtBRL(s.sumPrej)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ── Seção 8: Top 20 NFs com Prejuízo ────────────────────────────────── */}
