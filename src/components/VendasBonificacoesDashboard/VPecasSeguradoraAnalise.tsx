@@ -153,7 +153,9 @@ export default function VPecasSeguradoraAnalise() {
   // NFs com prejuízo
   const [prejExpanded, setPrejExpanded] = useState(false);
   const [prejSeg, setPrejSeg] = useState('Todas');
-
+  // NFs com lucro
+  const [lucroExpanded, setLucroExpanded] = useState(false);
+  const [lucroSeg, setLucroSeg] = useState('Todas');
   useEffect(() => {
     Promise.all([loadVPecasSegRows(), loadVPecasSegDevolucaoRows()]).then(([rows, devol]) => {
       setAllRows([...rows, ...devol]);
@@ -239,14 +241,15 @@ export default function VPecasSeguradoraAnalise() {
 
   // ─── 4. Pizza distribuição ────────────────────────────────────────────────
   const pieData = useMemo(() => {
-    const total = segData.reduce((s, d) => s + d.valorVenda, 0);
-    return segData.slice(0, 8).map((d, i) => ({
+    const validData = segData.filter(d => d[rankMetric] > 0);
+    const total = validData.reduce((s, d) => s + d[rankMetric], 0);
+    return validData.slice(0, 8).map((d, i) => ({
       name: d.name,
-      value: d.valorVenda,
-      pct: total ? (d.valorVenda / total) * 100 : 0,
+      value: d[rankMetric],
+      pct: total ? (d[rankMetric] / total) * 100 : 0,
       color: PALETTE[i % PALETTE.length],
     }));
-  }, [segData]);
+  }, [segData, rankMetric]);
 
   // ─── 5. Detalhe seguradora selecionada ───────────────────────────────────
   const segDetail = useMemo(() => {
@@ -288,6 +291,7 @@ export default function VPecasSeguradoraAnalise() {
           nf:         r.data['NUMERO_NOTA_FISCAL']?.trim() || '—',
           serie:      r.data['SERIE_NOTA_FISCAL']?.trim() || '',
           seguradora: r.data['NOME_CLIENTE']?.trim() || '—',
+          vendedor:   r.data['NOME_VENDEDOR']?.trim() || '—',
           valorVenda: c.valorVenda,
           recLiq:     c.recLiq,
           lucroBruto: c.lucroBruto,
@@ -295,9 +299,31 @@ export default function VPecasSeguradoraAnalise() {
         };
       })
       .filter(r => r.lucroBruto < 0)
-      .sort((a, b) => a.lucroBruto - b.lucroBruto)
-      .slice(0, 30);
+      .sort((a, b) => a.lucroBruto - b.lucroBruto);
   }, [filteredRows, prejSeg]);
+
+  // ─── 7. NFs com Lucro ────────────────────────────────────────────────────
+  const lucroData = useMemo(() => {
+    const source = lucroSeg !== 'Todas'
+      ? filteredRows.filter(r => (r.data['NOME_CLIENTE']?.trim() || '(sem seguradora)') === lucroSeg)
+      : filteredRows;
+    return source
+      .map(r => {
+        const c = calcRow(r.data);
+        return {
+          nf:         r.data['NUMERO_NOTA_FISCAL']?.trim() || '—',
+          serie:      r.data['SERIE_NOTA_FISCAL']?.trim() || '',
+          seguradora: r.data['NOME_CLIENTE']?.trim() || '—',
+          vendedor:   r.data['NOME_VENDEDOR']?.trim() || '—',
+          valorVenda: c.valorVenda,
+          recLiq:     c.recLiq,
+          lucroBruto: c.lucroBruto,
+          lbPct:      c.lucroBrutoPct,
+        };
+      })
+      .filter(r => r.lucroBruto > 0)
+      .sort((a, b) => b.lucroBruto - a.lucroBruto);
+  }, [filteredRows, lucroSeg]);
 
   if (loading) {
     return (
@@ -459,7 +485,7 @@ export default function VPecasSeguradoraAnalise() {
                         <span className="text-xs font-semibold text-slate-700 truncate">{s.name}</span>
                       </div>
                       <div className="ml-5 h-1 rounded-full bg-slate-100 overflow-hidden">
-                        <div className="h-full rounded-full bg-sky-400 transition-all" style={{ width: `${barW}%` }} />
+                        <div className="h-full rounded-full transition-all" style={{ width: `${barW}%`, backgroundColor: PALETTE[i % PALETTE.length] }} />
                       </div>
                     </div>
                     <span className="text-right text-xs font-mono text-slate-600">{s.nfs}</span>
@@ -486,7 +512,7 @@ export default function VPecasSeguradoraAnalise() {
 
         {/* Pizza */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <SH>Distribuição % por Seguradora</SH>
+          <SH>Distribuição % — {rankLabel[rankMetric]}</SH>
           {pieData.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-slate-200 gap-2">
               <span className="text-xs">Sem dados</span>
@@ -498,7 +524,7 @@ export default function VPecasSeguradoraAnalise() {
                   <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
                     {pieData.map((d, i) => <Cell key={i} fill={d.color} />)}
                   </Pie>
-                  <Tooltip formatter={(v: number) => fmtBRL(v)} />
+                  <Tooltip formatter={(v: number) => rankMetric === 'nfs' ? v.toLocaleString('pt-BR') : fmtBRL(v)} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="space-y-1 mt-1">
@@ -630,22 +656,24 @@ export default function VPecasSeguradoraAnalise() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-[auto_1fr_2fr_1fr_1fr_0.8fr] gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
+            <div className="grid grid-cols-[auto_1fr_2fr_1.5fr_1fr_1fr_0.8fr] gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
               <span className="w-5">#</span>
               <span>NF</span>
               <span>Seguradora</span>
+              <span>Vendedor</span>
               <span className="text-right">Rec. Bruta</span>
               <span className="text-right">Lucro Bruto</span>
               <span className="text-right">% Margem</span>
             </div>
             {(prejExpanded ? prejData : prejData.slice(0, 8)).map((p, i) => (
-              <div key={i} className="grid grid-cols-[auto_1fr_2fr_1fr_1fr_0.8fr] gap-2 items-center px-2 py-2 rounded-lg hover:bg-rose-50 transition-colors">
+              <div key={i} className="grid grid-cols-[auto_1fr_2fr_1.5fr_1fr_1fr_0.8fr] gap-2 items-center px-2 py-2 rounded-lg hover:bg-rose-50 transition-colors">
                 <span className="w-5 text-[10px] font-bold text-slate-300">{i + 1}</span>
                 <div>
                   <span className="text-xs font-mono font-semibold text-slate-700">{p.nf}</span>
                   {p.serie && <span className="text-[10px] text-slate-400 ml-1">S{p.serie}</span>}
                 </div>
                 <span className="text-xs text-slate-600 truncate">{p.seguradora}</span>
+                <span className="text-xs text-slate-500 truncate">{p.vendedor}</span>
                 <span className="text-right text-xs font-mono text-slate-700">{fmtBRL(p.valorVenda)}</span>
                 <span className="text-right text-xs font-mono font-bold text-rose-600">{fmtBRL(p.lucroBruto)}</span>
                 <span className="text-right text-xs font-mono text-rose-600">{fmtPct(p.lbPct)}</span>
@@ -658,6 +686,61 @@ export default function VPecasSeguradoraAnalise() {
                 {prejExpanded
                   ? <><ChevronUp className="w-3.5 h-3.5" /> Ver menos</>
                   : <><ChevronDown className="w-3.5 h-3.5" /> Ver todas ({prejData.length})</>}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── NFs com Lucro ──────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        <SH right={
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-500">Seguradora:</span>
+            <select value={lucroSeg} onChange={e => setLucroSeg(e.target.value)}
+              className="border border-slate-200 rounded px-2 py-0.5 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-emerald-300"
+            >
+              {availSegs.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        }>NFs com Lucro {lucroData.length > 0 && <span className="ml-1 text-emerald-600">({lucroData.length})</span>}</SH>
+
+        {lucroData.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-16 gap-1">
+            <span className="text-xs text-slate-300">Nenhuma NF com lucro no período</span>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-[auto_1fr_2fr_1.5fr_1fr_1fr_0.8fr] gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1 border-b border-slate-100">
+              <span className="w-5">#</span>
+              <span>NF</span>
+              <span>Seguradora</span>
+              <span>Vendedor</span>
+              <span className="text-right">Rec. Bruta</span>
+              <span className="text-right">Lucro Bruto</span>
+              <span className="text-right">% Margem</span>
+            </div>
+            {(lucroExpanded ? lucroData : lucroData.slice(0, 8)).map((p, i) => (
+              <div key={i} className="grid grid-cols-[auto_1fr_2fr_1.5fr_1fr_1fr_0.8fr] gap-2 items-center px-2 py-2 rounded-lg hover:bg-emerald-50 transition-colors">
+                <span className="w-5 text-[10px] font-bold text-slate-300">{i + 1}</span>
+                <div>
+                  <span className="text-xs font-mono font-semibold text-slate-700">{p.nf}</span>
+                  {p.serie && <span className="text-[10px] text-slate-400 ml-1">S{p.serie}</span>}
+                </div>
+                <span className="text-xs text-slate-600 truncate">{p.seguradora}</span>
+                <span className="text-xs text-slate-500 truncate">{p.vendedor}</span>
+                <span className="text-right text-xs font-mono text-slate-700">{fmtBRL(p.valorVenda)}</span>
+                <span className="text-right text-xs font-mono font-bold text-emerald-700">{fmtBRL(p.lucroBruto)}</span>
+                <span className="text-right text-xs font-mono text-emerald-600">{fmtPct(p.lbPct)}</span>
+              </div>
+            ))}
+            {lucroData.length > 8 && (
+              <button onClick={() => setLucroExpanded(e => !e)}
+                className="mt-1 w-full flex items-center justify-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-800 font-semibold py-1"
+              >
+                {lucroExpanded
+                  ? <><ChevronUp className="w-3.5 h-3.5" /> Ver menos</>
+                  : <><ChevronDown className="w-3.5 h-3.5" /> Ver todas ({lucroData.length})</>}
               </button>
             )}
           </>
