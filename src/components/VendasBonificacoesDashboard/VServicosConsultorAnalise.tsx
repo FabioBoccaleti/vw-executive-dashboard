@@ -11,6 +11,7 @@ const VIOLET  = '#7c3aed';
 const TEAL    = '#0d9488';
 const EMERALD = '#10b981';
 const ROSE    = '#f43f5e';
+const CMP_COLORS = ['#7c3aed', '#0d9488', '#f59e0b', '#f43f5e'] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n   = (v?: string | null) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
@@ -88,6 +89,9 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
   const [chartTab, setChartTab]   = useState<ChartTab>('pecas');
   const [selConsultor, setSelConsultor] = useState<string | null>(null);
   const [sortBy, setSortBy]       = useState<SortKey>('pecasRec');
+  const [cmpConsultores, setCmpConsultores] = useState<string[]>([]);
+  const [pecasTransAtivas, setPecasTransAtivas]       = useState<Set<string> | null>(null);
+  const [servicosTransAtivas, setServicosTransAtivas] = useState<Set<string> | null>(null);
 
   // Carrega peças (SERIE ≠ RPS) de dept oficina
   useEffect(() => {
@@ -104,7 +108,7 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
   }, []);
 
   // Reseta seleção ao trocar período
-  useEffect(() => { setSelConsultor(null); }, [year, month]);
+  useEffect(() => { setSelConsultor(null); setCmpConsultores([]); }, [year, month]);
 
   const availYears = useMemo(() => {
     const s = new Set([...pecasRows, ...servicosRows].map(getYr).filter(y => y > 2000));
@@ -175,6 +179,54 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
     });
   }, [consultores, sortBy]);
 
+  // ─── Dados para tabela comparativa (até 4 consultores) ───────────────────────
+  const cmpData = useMemo(() => {
+    return cmpConsultores.map(nome => {
+      const pRows = pecasByC.get(nome) ?? [];
+      const sRows = servicosByC.get(nome) ?? [];
+
+      const pecasByTrans: Record<string, number> = {};
+      let pRecBruta = 0, pRecLiq = 0, pLucroBruto = 0;
+      for (const r of pRows) {
+        const tipo = r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)';
+        const c = calcPecas(r.data);
+        pecasByTrans[tipo] = (pecasByTrans[tipo] ?? 0) + c.recBruta;
+        pRecBruta += c.recBruta; pRecLiq += c.recLiq; pLucroBruto += c.lucroBruto;
+      }
+
+      const servicosByTrans: Record<string, number> = {};
+      let sRecBruta = 0, sRecLiq = 0;
+      for (const r of sRows) {
+        const tipo = r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)';
+        const c = calcServicos(r.data);
+        servicosByTrans[tipo] = (servicosByTrans[tipo] ?? 0) + c.recBruta;
+        sRecBruta += c.recBruta; sRecLiq += c.recLiq;
+      }
+
+      const pMargem = pRecLiq !== 0 ? (pLucroBruto / pRecLiq) * 100 : 0;
+      return {
+        nome,
+        pecasByTrans,
+        pecas: { recBruta: pRecBruta, recLiq: pRecLiq, lucroBruto: pLucroBruto, margem: pMargem },
+        servicosByTrans,
+        servicos: { recBruta: sRecBruta, recLiq: sRecLiq },
+        total: { recBruta: pRecBruta + sRecBruta, recLiq: pRecLiq + sRecLiq },
+      };
+    });
+  }, [cmpConsultores, pecasByC, servicosByC]);
+
+  const cmpPecasTipos = useMemo(() => {
+    const s = new Set<string>();
+    for (const d of cmpData) Object.keys(d.pecasByTrans).forEach(t => s.add(t));
+    return [...s].sort();
+  }, [cmpData]);
+
+  const cmpServicosTipos = useMemo(() => {
+    const s = new Set<string>();
+    for (const d of cmpData) Object.keys(d.servicosByTrans).forEach(t => s.add(t));
+    return [...s].sort();
+  }, [cmpData]);
+
   // Dados diários para o gráfico
   const daysInMonth = useMemo(() => {
     const total = new Date(year, month, 0).getDate();
@@ -204,6 +256,63 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
       };
     });
   }, [daysInMonth, filteredPecas, filteredServicos, selConsultor]);
+
+  // ─── Tipos de transação únicos ───────────────────────────────────────────────
+  const pecasTransacoes = useMemo(() => {
+    const filterBy = (source: VPecasRow[]) =>
+      selConsultor ? source.filter(r => (r.data['NOME_VENDEDOR']?.trim() || '(sem nome)') === selConsultor) : source;
+    const s = new Set(filterBy(filteredPecas).map(r => r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)'));
+    return [...s].sort();
+  }, [filteredPecas, selConsultor]);
+
+  const servicosTransacoes = useMemo(() => {
+    const filterBy = (source: VPecasRow[]) =>
+      selConsultor ? source.filter(r => (r.data['NOME_VENDEDOR']?.trim() || '(sem nome)') === selConsultor) : source;
+    const s = new Set(filterBy(filteredServicos).map(r => r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)'));
+    return [...s].sort();
+  }, [filteredServicos, selConsultor]);
+
+  // ─── Paleta de cores por tipo de transação ───────────────────────────────────
+  const TRANS_PALETTE = ['#7c3aed','#06b6d4','#f59e0b','#10b981','#f97316','#e879f9','#84cc16','#3b82f6','#fb7185','#fbbf24','#a78bfa','#34d399'];
+  const TRANS_LABEL: Record<string, string> = { 'G21': 'Garantia', 'O26': 'Serviço Interno', 'O21': 'Venda' };
+  const transLabel = (t: string) => TRANS_LABEL[t] ?? t;
+  function transColor(tipos: string[], tipo: string) {
+    const idx = tipos.indexOf(tipo);
+    return TRANS_PALETTE[idx % TRANS_PALETTE.length];
+  }
+
+  // ─── Dados diários por transação ─────────────────────────────────────────────
+  const dailyPecasByTrans = useMemo(() => {
+    const filterBy = (source: VPecasRow[]) =>
+      selConsultor ? source.filter(r => (r.data['NOME_VENDEDOR']?.trim() || '(sem nome)') === selConsultor) : source;
+    const rows = filterBy(filteredPecas);
+    return daysInMonth.map(day => {
+      const obj: Record<string, number> = { dia: day } as any;
+      obj['dia_str'] = String(day).padStart(2, '0');
+      for (const t of pecasTransacoes) obj[t] = 0;
+      for (const r of rows.filter(r2 => getDia(r2) === day)) {
+        const t = r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)';
+        obj[t] = (obj[t] ?? 0) + n(r.data['LIQ_NOTA_FISCAL']);
+      }
+      return obj;
+    });
+  }, [daysInMonth, filteredPecas, selConsultor, pecasTransacoes]);
+
+  const dailyServicosByTrans = useMemo(() => {
+    const filterBy = (source: VPecasRow[]) =>
+      selConsultor ? source.filter(r => (r.data['NOME_VENDEDOR']?.trim() || '(sem nome)') === selConsultor) : source;
+    const rows = filterBy(filteredServicos);
+    return daysInMonth.map(day => {
+      const obj: Record<string, number> = { dia: day } as any;
+      obj['dia_str'] = String(day).padStart(2, '0');
+      for (const t of servicosTransacoes) obj[t] = 0;
+      for (const r of rows.filter(r2 => getDia(r2) === day)) {
+        const t = r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)';
+        obj[t] = (obj[t] ?? 0) + n(r.data['LIQ_NOTA_FISCAL']);
+      }
+      return obj;
+    });
+  }, [daysInMonth, filteredServicos, selConsultor, servicosTransacoes]);
 
   if (loading) {
     return (
@@ -376,12 +485,191 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
             )}
           </div>
 
+          {/* Gráficos por Transação lado a lado */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+            {/* Peças por Transação */}
+            {(() => {
+              const ativos = pecasTransAtivas ?? new Set(pecasTransacoes);
+              const hasData = dailyPecasByTrans.some(d => pecasTransacoes.some(t => (d[t] ?? 0) > 0));
+              return (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
+                  <SH
+                    right={
+                      <div className="flex gap-1 flex-wrap justify-end">
+                        {pecasTransacoes.map((t, i) => {
+                          const color = TRANS_PALETTE[i % TRANS_PALETTE.length];
+                          const active = ativos.has(t);
+                          return (
+                            <button
+                              key={t}
+                              onClick={() => {
+                                const next = new Set(ativos);
+                                if (active) { if (next.size > 1) next.delete(t); }
+                                else next.add(t);
+                                setPecasTransAtivas(next);
+                              }}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                                active
+                                  ? 'text-white border-transparent shadow-sm'
+                                  : 'bg-white text-slate-400 border-slate-200'
+                              }`}
+                              style={active ? { background: color, borderColor: color } : undefined}
+                            >
+                              {active ? '✓ ' : ''}{transLabel(t)}
+                            </button>
+                          );
+                        })}
+                        {pecasTransAtivas && (
+                          <button
+                            onClick={() => setPecasTransAtivas(null)}
+                            className="px-2 py-0.5 rounded-full text-[10px] text-slate-400 border border-slate-200 hover:text-slate-600 transition-all"
+                          >
+                            Todos
+                          </button>
+                        )}
+                      </div>
+                    }
+                  >
+                    Peças por Tipo de Serviço
+                  </SH>
+                  {!hasData ? (
+                    <div className="h-32 flex items-center justify-center text-slate-300 text-xs">Sem dados</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart key={`pt-${selConsultor ?? 'all'}`} data={dailyPecasByTrans} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <XAxis dataKey="dia_str" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={0} angle={-45} textAnchor="end" height={36} />
+                        <YAxis tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} width={52} />
+                        <Tooltip
+                          content={({ active, payload, label }: any) => {
+                            if (!active || !payload?.length) return null;
+                            const total = payload.reduce((s: number, p: any) => s + (p.value ?? 0), 0);
+                            return (
+                              <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[180px]">
+                                <p className="font-bold text-slate-700 mb-1.5">Dia {label} — Peças</p>
+                                {payload.map((p: any, i: number) => p.value > 0 && (
+                                  <div key={i} className="flex justify-between gap-4">
+                                    <span style={{ color: p.fill }} className="font-semibold">{p.name}</span>
+                                    <span className="font-mono text-slate-700">{fmtBRLF(p.value)}</span>
+                                  </div>
+                                ))}
+                                {payload.length > 1 && (
+                                  <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                                    <span className="font-bold text-slate-700">Total</span>
+                                    <span className="font-mono font-bold text-slate-800">{fmtBRLF(total)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }}
+                        />
+                        <Legend wrapperStyle={{ fontSize: 10 }} />
+                        {pecasTransacoes.filter(t => ativos.has(t)).map((t, i) => (
+                          <Bar key={t} dataKey={t} name={transLabel(t)} stackId="p" fill={transColor(pecasTransacoes, t)} fillOpacity={0.85}
+                            radius={i === pecasTransacoes.filter(tt => ativos.has(tt)).length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]} />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Serviços por Transação */}
+            {(() => {
+              const ativos = servicosTransAtivas ?? new Set(servicosTransacoes);
+              const hasData = dailyServicosByTrans.some(d => servicosTransacoes.some(t => (d[t] ?? 0) > 0));
+              return (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
+                  <SH
+                    right={
+                      <div className="flex gap-1 flex-wrap justify-end">
+                        {servicosTransacoes.map((t, i) => {
+                          const color = TRANS_PALETTE[i % TRANS_PALETTE.length];
+                          const active = ativos.has(t);
+                          return (
+                            <button
+                              key={t}
+                              onClick={() => {
+                                const next = new Set(ativos);
+                                if (active) { if (next.size > 1) next.delete(t); }
+                                else next.add(t);
+                                setServicosTransAtivas(next);
+                              }}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${
+                                active
+                                  ? 'text-white border-transparent shadow-sm'
+                                  : 'bg-white text-slate-400 border-slate-200'
+                              }`}
+                              style={active ? { background: color, borderColor: color } : undefined}
+                            >
+                              {active ? '✓ ' : ''}{transLabel(t)}
+                            </button>
+                          );
+                        })}
+                        {servicosTransAtivas && (
+                          <button
+                            onClick={() => setServicosTransAtivas(null)}
+                            className="px-2 py-0.5 rounded-full text-[10px] text-slate-400 border border-slate-200 hover:text-slate-600 transition-all"
+                          >
+                            Todos
+                          </button>
+                        )}
+                      </div>
+                    }
+                  >
+                    Tipo de Serviço
+                  </SH>
+                  {!hasData ? (
+                    <div className="h-32 flex items-center justify-center text-slate-300 text-xs">Sem dados</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart key={`st-${selConsultor ?? 'all'}`} data={dailyServicosByTrans} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <XAxis dataKey="dia_str" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={0} angle={-45} textAnchor="end" height={36} />
+                        <YAxis tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} width={52} />
+                        <Tooltip
+                          content={({ active, payload, label }: any) => {
+                            if (!active || !payload?.length) return null;
+                            const total = payload.reduce((s: number, p: any) => s + (p.value ?? 0), 0);
+                            return (
+                              <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[180px]">
+                                <p className="font-bold text-slate-700 mb-1.5">Dia {label} — Serviços</p>
+                                {payload.map((p: any, i: number) => p.value > 0 && (
+                                  <div key={i} className="flex justify-between gap-4">
+                                    <span style={{ color: p.fill }} className="font-semibold">{p.name}</span>
+                                    <span className="font-mono text-slate-700">{fmtBRLF(p.value)}</span>
+                                  </div>
+                                ))}
+                                {payload.length > 1 && (
+                                  <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                                    <span className="font-bold text-slate-700">Total</span>
+                                    <span className="font-mono font-bold text-slate-800">{fmtBRLF(total)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }}
+                        />
+                        <Legend wrapperStyle={{ fontSize: 10 }} />
+                        {servicosTransacoes.filter(t => ativos.has(t)).map((t, i) => (
+                          <Bar key={t} dataKey={t} name={transLabel(t)} stackId="s" fill={transColor(servicosTransacoes, t)} fillOpacity={0.85}
+                            radius={i === servicosTransacoes.filter(tt => ativos.has(tt)).length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]} />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
           {/* Ranking */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
             <SH
               right={
                 <span className="text-[10px] text-slate-400">
-                  Clique no cabeçalho para ordenar · Clique na linha para destacar no gráfico
+                  Clique no cabeçalho para ordenar · Clique na linha para comparar (até 4)
                 </span>
               }
             >
@@ -437,21 +725,28 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                 </thead>
                 <tbody>
                   {sortedConsultores.map((c, i) => {
-                    const isSelected = selConsultor === c.nome;
+                    const isSelected = cmpConsultores.includes(c.nome);
+                    const cmpIdx     = cmpConsultores.indexOf(c.nome);
                     const medals     = ['①', '②', '③'];
                     const medaColors = ['#f59e0b', '#9ca3af', '#cd7f32'];
                     return (
                       <tr
                         key={c.nome}
-                        onClick={() => setSelConsultor(isSelected ? null : c.nome)}
-                        className={`cursor-pointer transition-colors ${
+                        onClick={() => {
+                          if (isSelected) {
+                            setCmpConsultores(prev => prev.filter(n => n !== c.nome));
+                          } else if (cmpConsultores.length < 4) {
+                            setCmpConsultores(prev => [...prev, c.nome]);
+                          }
+                        }}
+                        className={`transition-colors ${
                           isSelected
-                            ? 'bg-teal-50 ring-1 ring-teal-300'
-                            : i % 2 === 0
-                              ? 'hover:bg-slate-50'
-                              : 'bg-slate-50/40 hover:bg-slate-100/60'
+                            ? 'cursor-pointer'
+                            : cmpConsultores.length >= 4
+                              ? 'opacity-50 cursor-not-allowed'
+                              : 'cursor-pointer ' + (i % 2 === 0 ? 'hover:bg-slate-50' : 'bg-slate-50/40 hover:bg-slate-100/60')
                         }`}
-                      >
+                        style={isSelected ? { background: CMP_COLORS[cmpIdx] + '18', boxShadow: `inset 0 0 0 1px ${CMP_COLORS[cmpIdx]}` } : undefined}
                         <td className="px-2 py-2 text-center border-b border-slate-50">
                           {i < 3
                             ? <span className="text-[11px] font-black" style={{ color: medaColors[i] }}>{medals[i]}</span>
@@ -460,7 +755,7 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                         </td>
                         <td className="px-2 py-2 font-semibold text-slate-700 border-b border-slate-50 max-w-[160px]">
                           <span className="truncate block">{c.nome}</span>
-                          {isSelected && <span className="text-[9px] text-teal-500 font-bold">● destacado no gráfico</span>}
+                          {isSelected && <span className="text-[9px] font-bold" style={{ color: CMP_COLORS[cmpIdx] }}>● na comparação #{cmpIdx + 1}</span>}
                         </td>
                         {/* Peças */}
                         <td className="px-2 py-2 text-right font-mono text-slate-500 border-b border-slate-50 bg-violet-50/10">{c.pecas.nfs}</td>
@@ -519,6 +814,169 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
             </div>
           </div>
 
+          {/* Tabela Comparativa */}
+          {cmpConsultores.length > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
+              <SH
+                right={
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400">
+                      {cmpConsultores.length}/4 selecionados · valor em destaque = melhor da linha
+                    </span>
+                    <button
+                      onClick={() => setCmpConsultores([])}
+                      className="px-2.5 py-1 rounded-full text-[10px] text-rose-400 border border-rose-200 hover:bg-rose-50 transition-all"
+                    >
+                      Limpar
+                    </button>
+                  </div>
+                }
+              >
+                Comparativo de Consultores — {MS[month - 1]}/{year}
+              </SH>
+
+              <div className="overflow-x-auto mt-3">
+                <table className="w-full text-xs border-separate border-spacing-0">
+                  <thead>
+                    <tr>
+                      <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200 min-w-[170px]">
+                        Métrica
+                      </th>
+                      {cmpData.map((d, i) => (
+                        <th key={d.nome} className="text-right px-3 py-2 text-[11px] font-black uppercase tracking-wide border-b border-slate-200 min-w-[150px] whitespace-nowrap"
+                          style={{ color: CMP_COLORS[i], borderBottom: `2px solid ${CMP_COLORS[i]}` }}>
+                          {d.nome.split(' ').slice(0, 2).join(' ')}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* ── PEÇAS ── */}
+                    <tr>
+                      <td colSpan={cmpData.length + 1} className="px-3 py-1.5 text-[10px] font-black text-violet-600 uppercase tracking-widest bg-violet-50/60 border-b border-violet-100">
+                        Peças (SERIE ≠ RPS)
+                      </td>
+                    </tr>
+                    {cmpPecasTipos.map(tipo => {
+                      const vals = cmpData.map(d => d.pecasByTrans[tipo] ?? 0);
+                      const best = Math.max(...vals);
+                      return (
+                        <tr key={`p-t-${tipo}`} className="hover:bg-slate-50/60">
+                          <td className="px-3 py-1.5 text-slate-400 border-b border-slate-50 pl-7 italic">{transLabel(tipo)}</td>
+                          {vals.map((v, i) => (
+                            <td key={i} className={`px-3 py-1.5 text-right font-mono border-b border-slate-50 whitespace-nowrap ${v === best && best > 0 ? 'font-bold text-[12px]' : 'text-slate-400'}`}
+                              style={v === best && best > 0 ? { color: CMP_COLORS[i] } : undefined}>
+                              {v > 0 ? fmtBRL(v) : <span className="text-slate-200">—</span>}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                    {([
+                      { label: 'Rec. Bruta', fn: (d: typeof cmpData[0]) => d.pecas.recBruta, bold: false },
+                      { label: 'Rec. Líquida', fn: (d: typeof cmpData[0]) => d.pecas.recLiq, bold: false },
+                      { label: 'Lucro Bruto', fn: (d: typeof cmpData[0]) => d.pecas.lucroBruto, bold: true },
+                    ] as const).map(({ label, fn, bold }) => {
+                      const vals = cmpData.map(fn);
+                      const best = Math.max(...vals);
+                      return (
+                        <tr key={`p-${label}`} className="hover:bg-slate-50/60">
+                          <td className="px-3 py-1.5 font-semibold text-slate-600 border-b border-slate-100 bg-violet-50/20">{label}</td>
+                          {vals.map((v, i) => (
+                            <td key={i} className={`px-3 py-1.5 text-right font-mono border-b border-slate-100 bg-violet-50/20 whitespace-nowrap ${v === best && best > 0 ? (bold ? 'font-black text-[12px]' : 'font-bold') : 'text-slate-500'}`}
+                              style={v === best && best > 0 ? { color: CMP_COLORS[i] } : undefined}>
+                              {fmtBRL(v)}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                    {/* Margem */}
+                    {(() => {
+                      const vals = cmpData.map(d => d.pecas.margem);
+                      const best = Math.max(...vals);
+                      return (
+                        <tr className="hover:bg-slate-50/60">
+                          <td className="px-3 py-1.5 font-semibold text-slate-600 border-b border-slate-200 bg-violet-50/20">Margem %</td>
+                          {vals.map((v, i) => (
+                            <td key={i} className={`px-3 py-1.5 text-right font-mono border-b border-slate-200 bg-violet-50/20 ${v === best && best > 0 ? 'font-bold text-[12px]' : 'text-slate-500'}`}
+                              style={v === best && best > 0 ? { color: CMP_COLORS[i] } : undefined}>
+                              {fmtPct(v)}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })()}
+
+                    {/* ── SERVIÇOS ── */}
+                    <tr>
+                      <td colSpan={cmpData.length + 1} className="px-3 py-1.5 text-[10px] font-black text-teal-600 uppercase tracking-widest bg-teal-50/60 border-b border-teal-100">
+                        Serviços (SERIE = RPS)
+                      </td>
+                    </tr>
+                    {cmpServicosTipos.map(tipo => {
+                      const vals = cmpData.map(d => d.servicosByTrans[tipo] ?? 0);
+                      const best = Math.max(...vals);
+                      return (
+                        <tr key={`s-t-${tipo}`} className="hover:bg-slate-50/60">
+                          <td className="px-3 py-1.5 text-slate-400 border-b border-slate-50 pl-7 italic">{transLabel(tipo)}</td>
+                          {vals.map((v, i) => (
+                            <td key={i} className={`px-3 py-1.5 text-right font-mono border-b border-slate-50 whitespace-nowrap ${v === best && best > 0 ? 'font-bold text-[12px]' : 'text-slate-400'}`}
+                              style={v === best && best > 0 ? { color: CMP_COLORS[i] } : undefined}>
+                              {v > 0 ? fmtBRL(v) : <span className="text-slate-200">—</span>}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                    {([
+                      { label: 'Rec. Bruta', fn: (d: typeof cmpData[0]) => d.servicos.recBruta },
+                      { label: 'Rec. Líquida', fn: (d: typeof cmpData[0]) => d.servicos.recLiq },
+                    ] as const).map(({ label, fn }) => {
+                      const vals = cmpData.map(fn);
+                      const best = Math.max(...vals);
+                      return (
+                        <tr key={`s-${label}`} className="hover:bg-slate-50/60">
+                          <td className="px-3 py-1.5 font-semibold text-slate-600 border-b border-slate-200 bg-teal-50/20">{label}</td>
+                          {vals.map((v, i) => (
+                            <td key={i} className={`px-3 py-1.5 text-right font-mono border-b border-slate-200 bg-teal-50/20 whitespace-nowrap ${v === best && best > 0 ? 'font-bold' : 'text-slate-500'}`}
+                              style={v === best && best > 0 ? { color: CMP_COLORS[i] } : undefined}>
+                              {fmtBRL(v)}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+
+                    {/* ── TOTAL GERAL ── */}
+                    <tr>
+                      <td colSpan={cmpData.length + 1} className="px-3 py-1.5 text-[10px] font-black text-slate-600 uppercase tracking-widest bg-slate-100/80 border-b border-slate-200">
+                        Total Geral (Peças + Serviços)
+                      </td>
+                    </tr>
+                    {([
+                      { label: 'Rec. Bruta Total', fn: (d: typeof cmpData[0]) => d.total.recBruta },
+                      { label: 'Rec. Líquida Total', fn: (d: typeof cmpData[0]) => d.total.recLiq },
+                    ] as const).map(({ label, fn }) => {
+                      const vals = cmpData.map(fn);
+                      const best = Math.max(...vals);
+                      return (
+                        <tr key={`t-${label}`} className="hover:bg-slate-50/60">
+                          <td className="px-3 py-2 font-bold text-slate-700 border-b border-slate-100 bg-slate-50/60">{label}</td>
+                          {vals.map((v, i) => (
+                            <td key={i} className={`px-3 py-2 text-right font-mono border-b border-slate-100 bg-slate-50/60 whitespace-nowrap ${v === best && best > 0 ? 'font-black text-[13px]' : 'text-slate-500'}`}
+                              style={v === best && best > 0 ? { color: CMP_COLORS[i] } : undefined}>
+                              {fmtBRL(v)}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
         </>
       )}
