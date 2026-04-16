@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from './vPecasStorage';
 import { loadVPecasItemRows, type VPecasItemRow } from './vPecasItemStorage';
 import VPecasSeguradoraAnalise from './VPecasSeguradoraAnalise';
+import VPecasComparativo from './VPecasComparativo';
 import VPecasItemSeguradoraAnalise from './VPecasItemSeguradoraAnalise';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
@@ -1191,6 +1192,9 @@ export default function VPecasAnalise() {
           </div>
         )}
       </div>
+
+      {/* ── Comparativo de Períodos ──────────────────────────────────────── */}
+      <VPecasComparativo allRows={allRows} />
       </>}
 
       {analiseTab === 'itens' && <>
