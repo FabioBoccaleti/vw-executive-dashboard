@@ -1,12 +1,12 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from './vPecasStorage';
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 const MS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-const OFICINA_DEPTS = new Set(['104', '122']);
+const OFICINA_DEPTS = new Set(['104', '122']); // fallback padrão
 const VIOLET  = '#7c3aed';
 const TEAL    = '#0d9488';
 const EMERALD = '#10b981';
@@ -76,19 +76,22 @@ interface ConsultorEntry {
 }
 
 interface Props {
-  /** Linhas já filtradas por SERIE_NOTA_FISCAL === 'RPS' e DEPARTAMENTO ∈ {104, 122} */
+  /** Linhas já filtradas por SERIE_NOTA_FISCAL === 'RPS' e pelo departamento correspondente */
   servicosRows: VPecasRow[];
+  /** Departamentos usados para filtrar peças (SERIE ≠ RPS). Padrão: ['104','122'] */
+  pecasDepts?: string[];
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
-export default function VServicosConsultorAnalise({ servicosRows }: Props) {
+export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: Props) {
+  const deptSet = useMemo(() => new Set(pecasDepts ?? ['104', '122']), [pecasDepts]);
   const curYear = new Date().getFullYear();
 
   const [pecasRows, setPecasRows] = useState<VPecasRow[]>([]);
   const [loading, setLoading]     = useState(true);
   const [year, setYear]           = useState(curYear);
   const [month, setMonth]         = useState<number>(new Date().getMonth() + 1);
-  const [chartTab, setChartTab]   = useState<ChartTab>('pecas');
+  const [chartTab, setChartTab]   = useState<ChartTab>('total');
   const [selConsultor, setSelConsultor] = useState<string | null>(null);
   const [sortBy, setSortBy]       = useState<SortKey>('pecasRec');
   const [slots, setSlots]         = useState<(CmpSlot | null)[]>([null, null, null, null]);
@@ -98,19 +101,20 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
   const [cmpMonth, setCmpMonth]   = useState<number>(new Date().getMonth() + 1);
   const [cmpYear, setCmpYear]     = useState<number>(curYear - 1);
 
-  // Carrega peças (SERIE ≠ RPS) de dept oficina
+  // Carrega peças (SERIE ≠ RPS) filtradas pelo dept configurado
   useEffect(() => {
+    setLoading(true);
     Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows()]).then(([rows, devol]) => {
       const combined = [...rows, ...devol];
       setPecasRows(
         combined.filter(r =>
           r.data['SERIE_NOTA_FISCAL'] !== 'RPS' &&
-          OFICINA_DEPTS.has(r.data['DEPARTAMENTO']?.trim() ?? '')
+          deptSet.has(r.data['DEPARTAMENTO']?.trim() ?? '')
         )
       );
       setLoading(false);
     });
-  }, []);
+  }, [deptSet]);
 
   // Reseta seleção ao trocar período
   useEffect(() => { setSelConsultor(null); }, [year, month]);
@@ -565,7 +569,7 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart key={`${chartTab}-${cmpActive}`} data={mergedDailyData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                <BarChart data={mergedDailyData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={0} angle={-45} textAnchor="end" height={36} />
                   <YAxis tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} width={52} />
@@ -641,25 +645,29 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                     }}
                   />
                   {chartTab === 'total' && <Legend wrapperStyle={{ fontSize: 11 }} />}
-                  {chartTab === 'total' && <Bar dataKey="pecas" name="Peças" stackId="a" fill={VIOLET} fillOpacity={0.85} radius={[0, 0, 0, 0]} />}
-                  {chartTab === 'total' && <Bar dataKey="servicos" name="Serviços" stackId="a" fill={TEAL} fillOpacity={0.85} radius={[3, 3, 0, 0]} />}
-                  {chartTab === 'total' && cmpActive && <Bar dataKey="pecasCmp" name={`Peças (${MS[cmpMonth - 1]}/${cmpYear})`} stackId="b" fill={VIOLET} fillOpacity={0.35} radius={[0, 0, 0, 0]} />}
-                  {chartTab === 'total' && cmpActive && <Bar dataKey="servicosCmp" name={`Serviços (${MS[cmpMonth - 1]}/${cmpYear})`} stackId="b" fill={TEAL} fillOpacity={0.35} radius={[3, 3, 0, 0]} />}
-                  {chartTab !== 'total' && (
-                    <>
-                      <Bar dataKey={chartTab} name={chartTab === 'pecas' ? 'Peças' : 'Serviços'} radius={[3, 3, 0, 0]}>
-                        {mergedDailyData.map((d, i) => (
-                          <Cell key={i} fill={chartTab === 'pecas' ? VIOLET : TEAL}
-                            fillOpacity={(chartTab === 'pecas' ? d.pecas : d.servicos) > 0 ? 0.85 : 0.15} />
-                        ))}
-                      </Bar>
-                      {cmpActive && (
-                        <Bar dataKey={chartTab === 'pecas' ? 'pecasCmp' : 'servicosCmp'}
-                          name={`${chartTab === 'pecas' ? 'Peças' : 'Serviços'} (${MS[cmpMonth - 1]}/${cmpYear})`}
-                          radius={[3, 3, 0, 0]} fill={chartTab === 'pecas' ? VIOLET : TEAL} fillOpacity={0.35} />
-                      )}
-                    </>
-                  )}
+                  {/* Peças — sempre renderizado, hide quando não é a aba ativa */}
+                  <Bar dataKey="pecas" name="Peças"
+                    hide={chartTab === 'servicos'}
+                    stackId={chartTab === 'total' ? 'a' : undefined}
+                    fill={VIOLET} fillOpacity={0.85}
+                    radius={chartTab === 'total' ? [0, 0, 0, 0] : [3, 3, 0, 0]} />
+                  {/* Serviços — sempre renderizado, hide quando não é a aba ativa */}
+                  <Bar dataKey="servicos" name="Serviços"
+                    hide={chartTab === 'pecas'}
+                    stackId={chartTab === 'total' ? 'a' : undefined}
+                    fill={TEAL} fillOpacity={0.85}
+                    radius={[3, 3, 0, 0]} />
+                  {/* Comparação */}
+                  {cmpActive && <Bar dataKey="pecasCmp" name={`Peças (${MS[cmpMonth - 1]}/${cmpYear})`}
+                    hide={chartTab === 'servicos'}
+                    stackId={chartTab === 'total' ? 'b' : undefined}
+                    fill={VIOLET} fillOpacity={0.35}
+                    radius={chartTab === 'total' ? [0, 0, 0, 0] : [3, 3, 0, 0]} />}
+                  {cmpActive && <Bar dataKey="servicosCmp" name={`Serviços (${MS[cmpMonth - 1]}/${cmpYear})`}
+                    hide={chartTab === 'pecas'}
+                    stackId={chartTab === 'total' ? 'b' : undefined}
+                    fill={TEAL} fillOpacity={0.35}
+                    radius={[3, 3, 0, 0]} />}
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -877,10 +885,10 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                       Consultor {sortBy === 'nome' && '▲'}
                     </th>
                     <th className="text-center px-2 py-1.5 text-[10px] font-bold text-violet-500 uppercase tracking-wider border-b border-slate-100 bg-violet-50/40" colSpan={5}>
-                      Peças (SERIE ≠ RPS)
+                      Peças
                     </th>
                     <th className="text-center px-2 py-1.5 text-[10px] font-bold text-teal-500 uppercase tracking-wider border-b border-slate-100 bg-teal-50/40" colSpan={3}>
-                      Serviços (SERIE = RPS)
+                      Serviços
                     </th>
                   </tr>
                   <tr>
@@ -1095,7 +1103,7 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                       {/* ── PEÇAS ── */}
                       <tr>
                         <td colSpan={activeCols.length + 1} className="px-3 py-1.5 text-[10px] font-black text-violet-600 uppercase tracking-widest bg-violet-50/60 border-b border-violet-100">
-                          Peças (SERIE ≠ RPS)
+                          Peças
                         </td>
                       </tr>
                       {slotPecasTipos.map(tipo => {
@@ -1153,7 +1161,7 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                       {/* ── SERVIÇOS ── */}
                       <tr>
                         <td colSpan={activeCols.length + 1} className="px-3 py-1.5 text-[10px] font-black text-teal-600 uppercase tracking-widest bg-teal-50/60 border-b border-teal-100">
-                          Serviços (SERIE = RPS)
+                          Serviços
                         </td>
                       </tr>
                       {slotServicosTipos.map(tipo => {
