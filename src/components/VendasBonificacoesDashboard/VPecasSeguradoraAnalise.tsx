@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { loadVPecasSegRows, loadVPecasSegDevolucaoRows, type VPecasSegRow } from './vPecasSeguradoraStorage';
+import VPecasSegComparativo from './VPecasSegComparativo';
 
 // ─── Paleta sky ───────────────────────────────────────────────────────────────
 const MS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -858,7 +859,7 @@ export default function VPecasSeguradoraAnalise() {
           </>
         )}
       </div>
-
+      <VPecasSegComparativo allRows={filteredRows} />
     </div>
   );
 }
