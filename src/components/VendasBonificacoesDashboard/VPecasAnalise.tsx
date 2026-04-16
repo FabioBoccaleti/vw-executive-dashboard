@@ -7,6 +7,7 @@ import {
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from './vPecasStorage';
 import { loadVPecasItemRows, type VPecasItemRow } from './vPecasItemStorage';
+import VPecasSeguradoraAnalise from './VPecasSeguradoraAnalise';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
 const MS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -179,7 +180,7 @@ export default function VPecasAnalise() {
   const [estadoExpanded, setEstadoExpanded] = useState(false);
   const [prejuizoExpanded, setPrejuizoExpanded] = useState(false);
   const [clienteExpanded, setClienteExpanded] = useState(false);
-  const [analiseTab, setAnaliseTab]                     = useState<'nfs' | 'itens'>('nfs');
+  const [analiseTab, setAnaliseTab]                     = useState<'nfs' | 'itens' | 'seg'>('nfs');
   const [allItemRows, setAllItemRows]                   = useState<VPecasItemRow[]>([]);
   const [itemPrejuizoDept, setItemPrejuizoDept]         = useState('Todos');
   const [itemPrejuizoExpanded, setItemPrejuizoExpanded] = useState(false);
@@ -545,6 +546,12 @@ export default function VPecasAnalise() {
           className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${analiseTab === 'itens' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
         >
           Análise por Item (Itens de Peças)
+        </button>
+        <button
+          onClick={() => setAnaliseTab('seg')}
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${analiseTab === 'seg' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
+        >
+          Análise Seguradora Balcão
         </button>
       </div>
 
@@ -1195,6 +1202,8 @@ export default function VPecasAnalise() {
         </div>
 
       </>}
+
+      {analiseTab === 'seg' && <VPecasSeguradoraAnalise />}
     </div>
   );
 }
