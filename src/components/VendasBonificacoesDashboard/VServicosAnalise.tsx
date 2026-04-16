@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { loadVPecasRows, type VPecasRow } from './vPecasStorage';
+import VServicosConsultorAnalise from './VServicosConsultorAnalise';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
 const MS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -630,6 +631,7 @@ export default function VServicosAnalise() {
   const [allRows, setAllRows]   = useState<VPecasRow[]>([]);
   const [loading, setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState<ServicoTab>('oficina');
+  const [oficinaInnerTab, setOficinaInnerTab] = useState<'analise' | 'consultor'>('analise');
 
   useEffect(() => {
     loadVPecasRows().then(rows => {
@@ -661,7 +663,7 @@ export default function VServicosAnalise() {
 
   return (
     <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
-      {/* Sub-tabs */}
+      {/* Sub-tabs principais */}
       <div className="flex gap-1 bg-white border-b border-slate-200 px-5 py-2 flex-shrink-0">
         {(Object.keys(SERVICO_CONFIG) as ServicoTab[]).map(tab => {
           const cfg = SERVICO_CONFIG[tab];
@@ -683,8 +685,37 @@ export default function VServicosAnalise() {
         </span>
       </div>
 
+      {/* Inner tabs da Oficina */}
+      {activeTab === 'oficina' && (
+        <div className="flex gap-1 bg-slate-50 border-b border-slate-200 px-5 py-1.5 flex-shrink-0">
+          <button
+            onClick={() => setOficinaInnerTab('analise')}
+            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+              oficinaInnerTab === 'analise'
+                ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-teal-300 hover:text-teal-600'
+            }`}
+          >
+            Análise Geral
+          </button>
+          <button
+            onClick={() => setOficinaInnerTab('consultor')}
+            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+              oficinaInnerTab === 'consultor'
+                ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-teal-300 hover:text-teal-600'
+            }`}
+          >
+            Por Consultor
+          </button>
+        </div>
+      )}
+
       {/* Painel da sub-tab ativa */}
-      <ServicoPanel key={activeTab} rows={tabRows} color={SERVICO_CONFIG[activeTab].color} />
+      {activeTab === 'oficina' && oficinaInnerTab === 'consultor'
+        ? <VServicosConsultorAnalise servicosRows={tabRows} />
+        : <ServicoPanel key={activeTab} rows={tabRows} color={SERVICO_CONFIG[activeTab].color} />
+      }
     </div>
   );
 }
