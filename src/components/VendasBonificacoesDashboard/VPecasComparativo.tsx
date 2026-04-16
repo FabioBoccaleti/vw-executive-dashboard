@@ -19,6 +19,20 @@ const DEPT_GROUPS: { label: string; depts: Set<string> }[] = [
   { label: 'Funilaria',  depts: new Set(['106', '129']) },
   { label: 'Acessórios', depts: new Set(['107']) },
 ];
+
+const TRANSACAO_LABEL: Record<string, string> = {
+  'P21': 'V. Peças Balcão',
+  'O21': 'V. Peças (Of / Fu / Ac)',
+  'P24': 'V. Peças Rede VW',
+  'P32': 'V. Peças Fora Est s/ST',
+  'G21': 'V. Peças Garantia',
+  'O26': 'V. Peças Interna (Of / Fu / Ac)',
+  'P33': 'V. Peças Rede VW Fora Est',
+  'P69': 'V. Peças Exportação',
+  'P26': 'V. Peças Interna Balcão',
+  'P31': 'V. Peças Fora do Estado',
+};
+const transacaoName = (code: string) => TRANSACAO_LABEL[code] ?? code;
 const n = (v?: string | null) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
 const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 const fmtPct  = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
@@ -392,7 +406,9 @@ export default function VPecasComparativo({ allRows }: Props) {
             <tbody>
               {matrix.map(({ key, aggs }, ri) => (
                 <tr key={key} className={`border-b border-slate-50 hover:bg-violet-50/30 transition-colors ${ri % 2 === 0 ? '' : 'bg-slate-50/40'}`}>
-                  <td className="py-1.5 pr-3 font-semibold text-slate-700 truncate max-w-[200px]">{key}</td>
+                  <td className="py-1.5 pr-3 font-semibold text-slate-700 truncate max-w-[200px]">
+                    {view === 'transacao' ? transacaoName(key) : key}
+                  </td>
                   {slots.map((slot, idx) => {
                     const a   = aggs[idx];
                     const ref = aggs[0];

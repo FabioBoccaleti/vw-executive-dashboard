@@ -28,6 +28,20 @@ const DEPT_LABEL: Record<string, string> = {
 };
 const deptName = (code: string) => DEPT_LABEL[code] ?? code;
 
+const TRANSACAO_LABEL: Record<string, string> = {
+  'P21': 'V. Peças Balcão',
+  'O21': 'V. Peças (Of / Fu / Ac)',
+  'P24': 'V. Peças Rede VW',
+  'P32': 'V. Peças Fora Est s/ST',
+  'G21': 'V. Peças Garantia',
+  'O26': 'V. Peças Interna (Of / Fu / Ac)',
+  'P33': 'V. Peças Rede VW Fora Est',
+  'P69': 'V. Peças Exportação',
+  'P26': 'V. Peças Interna Balcão',
+  'P31': 'V. Peças Fora do Estado',
+};
+const transacaoName = (code: string) => TRANSACAO_LABEL[code] ?? code;
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v?: string | null) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
 const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
@@ -432,7 +446,7 @@ export default function VPecasAnalise() {
     }
     return [...map.entries()].map(([name, rows]) => {
       const a = agg(rows);
-      return { name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct };
+      return { name: transacaoName(name), code: name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct };
     }).sort((a, b) => b.valorVenda - a.valorVenda);
   }, [filteredRows]);
 
@@ -954,7 +968,7 @@ export default function VPecasAnalise() {
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={transacaoData} margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#475569' }} />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#475569' }} angle={-20} textAnchor="end" interval={0} height={48} />
                 <YAxis tickFormatter={v => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10, fill: '#94a3b8' }} width={50} />
                 <Tooltip content={(props: any) => {
                   const { active, payload, label } = props;
