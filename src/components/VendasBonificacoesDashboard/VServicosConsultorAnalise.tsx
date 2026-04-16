@@ -465,10 +465,10 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
           <div className="ml-auto flex items-center gap-3">
             <button
               onClick={() => setCmpActive(v => !v)}
-              className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all ${
+              className={`px-4 py-1.5 rounded-full text-[12px] font-black border-2 transition-all shadow-sm ${
                 cmpActive
-                  ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                  : 'text-slate-500 border-slate-200 hover:border-amber-400 hover:text-amber-600'
+                  ? 'bg-amber-500 text-white border-amber-500 shadow-amber-200 shadow-md'
+                  : 'bg-amber-50 text-amber-600 border-amber-400 hover:bg-amber-500 hover:text-white hover:shadow-md hover:shadow-amber-200'
               }`}
             >
               {cmpActive ? '✕ Fechar comparação' : '⇄ Comparar período'}
