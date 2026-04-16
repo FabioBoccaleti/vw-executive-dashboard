@@ -94,6 +94,9 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
   const [slots, setSlots]         = useState<(CmpSlot | null)[]>([null, null, null, null]);
   const [pecasTransAtivas, setPecasTransAtivas]       = useState<Set<string> | null>(null);
   const [servicosTransAtivas, setServicosTransAtivas] = useState<Set<string> | null>(null);
+  const [cmpActive, setCmpActive] = useState(false);
+  const [cmpMonth, setCmpMonth]   = useState<number>(new Date().getMonth() + 1);
+  const [cmpYear, setCmpYear]     = useState<number>(curYear - 1);
 
   // Carrega peças (SERIE ≠ RPS) de dept oficina
   useEffect(() => {
@@ -331,6 +334,86 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
     });
   }, [daysInMonth, filteredServicos, selConsultor, servicosTransacoes]);
 
+  // ─── Comparação de período ────────────────────────────────────────────────────
+  const filteredPecasCmp = useMemo(
+    () => cmpActive ? pecasRows.filter(r => getYr(r) === cmpYear && getMo(r) === cmpMonth) : [],
+    [pecasRows, cmpYear, cmpMonth, cmpActive]
+  );
+  const filteredServicosCmp = useMemo(
+    () => cmpActive ? servicosRows.filter(r => getYr(r) === cmpYear && getMo(r) === cmpMonth) : [],
+    [servicosRows, cmpYear, cmpMonth, cmpActive]
+  );
+
+  const dailyDataCmp = useMemo(() => {
+    const maxDay = cmpActive ? new Date(cmpYear, cmpMonth, 0).getDate() : 0;
+    const filterBy = (source: VPecasRow[]) =>
+      selConsultor ? source.filter(r => (r.data['NOME_VENDEDOR']?.trim() || '(sem nome)') === selConsultor) : source;
+    const pFiltered = filterBy(filteredPecasCmp);
+    const sFiltered = filterBy(filteredServicosCmp);
+    return daysInMonth.map(day => {
+      if (!cmpActive || day > maxDay) return { pecas: 0, servicos: 0, total: 0 };
+      const pRows = pFiltered.filter(r => getDia(r) === day);
+      const sRows = sFiltered.filter(r => getDia(r) === day);
+      let pecas = 0, servicos = 0;
+      for (const r of pRows) pecas += n(r.data['LIQ_NOTA_FISCAL']);
+      for (const r of sRows) servicos += n(r.data['LIQ_NOTA_FISCAL']);
+      return { pecas, servicos, total: pecas + servicos };
+    });
+  }, [cmpActive, daysInMonth, filteredPecasCmp, filteredServicosCmp, selConsultor, cmpYear, cmpMonth]);
+
+  const mergedDailyData = useMemo(() =>
+    dailyData.map((d, i) => ({
+      ...d,
+      pecasCmp:    cmpActive ? (dailyDataCmp[i]?.pecas    ?? 0) : undefined,
+      servicosCmp: cmpActive ? (dailyDataCmp[i]?.servicos ?? 0) : undefined,
+      totalCmp:    cmpActive ? (dailyDataCmp[i]?.total    ?? 0) : undefined,
+    })),
+  [dailyData, dailyDataCmp, cmpActive]);
+
+  const dailyPecasByTransCmp = useMemo(() => {
+    const maxDay = cmpActive ? new Date(cmpYear, cmpMonth, 0).getDate() : 0;
+    const filterBy = (source: VPecasRow[]) =>
+      selConsultor ? source.filter(r => (r.data['NOME_VENDEDOR']?.trim() || '(sem nome)') === selConsultor) : source;
+    const rows = filterBy(filteredPecasCmp);
+    return daysInMonth.map(day => {
+      const obj: Record<string, number> = {};
+      for (const t of pecasTransacoes) obj[`${t}_cmp`] = 0;
+      if (cmpActive && day <= maxDay) {
+        for (const r of rows.filter(r2 => getDia(r2) === day)) {
+          const t = r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)';
+          obj[`${t}_cmp`] = (obj[`${t}_cmp`] ?? 0) + n(r.data['LIQ_NOTA_FISCAL']);
+        }
+      }
+      return obj;
+    });
+  }, [cmpActive, daysInMonth, filteredPecasCmp, selConsultor, pecasTransacoes, cmpYear, cmpMonth]);
+
+  const mergedPecasByTrans = useMemo(() =>
+    dailyPecasByTrans.map((d, i) => ({ ...d, ...dailyPecasByTransCmp[i] })),
+  [dailyPecasByTrans, dailyPecasByTransCmp]);
+
+  const dailyServicosByTransCmp = useMemo(() => {
+    const maxDay = cmpActive ? new Date(cmpYear, cmpMonth, 0).getDate() : 0;
+    const filterBy = (source: VPecasRow[]) =>
+      selConsultor ? source.filter(r => (r.data['NOME_VENDEDOR']?.trim() || '(sem nome)') === selConsultor) : source;
+    const rows = filterBy(filteredServicosCmp);
+    return daysInMonth.map(day => {
+      const obj: Record<string, number> = {};
+      for (const t of servicosTransacoes) obj[`${t}_cmp`] = 0;
+      if (cmpActive && day <= maxDay) {
+        for (const r of rows.filter(r2 => getDia(r2) === day)) {
+          const t = r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)';
+          obj[`${t}_cmp`] = (obj[`${t}_cmp`] ?? 0) + n(r.data['LIQ_NOTA_FISCAL']);
+        }
+      }
+      return obj;
+    });
+  }, [cmpActive, daysInMonth, filteredServicosCmp, selConsultor, servicosTransacoes, cmpYear, cmpMonth]);
+
+  const mergedServicosByTrans = useMemo(() =>
+    dailyServicosByTrans.map((d, i) => ({ ...d, ...dailyServicosByTransCmp[i] })),
+  [dailyServicosByTrans, dailyServicosByTransCmp]);
+
   if (loading) {
     return (
       <div className="p-10 text-center text-slate-300 text-sm animate-pulse">
@@ -351,35 +434,79 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
     <div className="flex-1 overflow-auto bg-slate-50 px-6 py-5 space-y-5" style={{ minHeight: 0 }}>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-3 flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-          ANO
-          <select
-            value={year}
-            onChange={e => setYear(+e.target.value)}
-            className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
-          >
-            {availYears.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
-        <div className="flex items-center gap-1 flex-wrap">
-          {MS.map((m, i) => (
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-3 flex flex-col gap-2">
+        {/* Linha principal */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+            ANO
+            <select
+              value={year}
+              onChange={e => setYear(+e.target.value)}
+              className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
+            >
+              {availYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-1 flex-wrap">
+            {MS.map((m, i) => (
+              <button
+                key={m}
+                onClick={() => setMonth(i + 1)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                  month === i + 1
+                    ? 'bg-teal-600 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <div className="ml-auto flex items-center gap-3">
             <button
-              key={m}
-              onClick={() => setMonth(i + 1)}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                month === i + 1
-                  ? 'bg-teal-600 text-white'
-                  : 'text-slate-500 hover:bg-slate-100'
+              onClick={() => setCmpActive(v => !v)}
+              className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                cmpActive
+                  ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                  : 'text-slate-500 border-slate-200 hover:border-amber-400 hover:text-amber-600'
               }`}
             >
-              {m}
+              {cmpActive ? '✕ Fechar comparação' : '⇄ Comparar período'}
             </button>
-          ))}
+            <span className="text-[11px] text-slate-400">
+              {consultores.length} consultor{consultores.length !== 1 ? 'es' : ''} com Peças + Serviços
+            </span>
+          </div>
         </div>
-        <span className="ml-auto text-[11px] text-slate-400">
-          {consultores.length} consultor{consultores.length !== 1 ? 'es' : ''} com Peças + Serviços
-        </span>
+        {/* Seletor do período de comparação */}
+        {cmpActive && (
+          <div className="flex items-center gap-3 pt-2 border-t border-slate-100 flex-wrap">
+            <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider whitespace-nowrap">Comparar com</span>
+            <div className="flex items-center gap-1 flex-wrap">
+              {MS.map((m, i) => (
+                <button
+                  key={m}
+                  onClick={() => setCmpMonth(i + 1)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                    cmpMonth === i + 1
+                      ? 'bg-amber-500 text-white'
+                      : 'text-slate-400 hover:bg-slate-100'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+            <select
+              value={cmpYear}
+              onChange={e => setCmpYear(+e.target.value)}
+              className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+            >
+              {availYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <span className="text-[11px] text-amber-600 font-semibold">→ {MS[cmpMonth - 1]}/{cmpYear}</span>
+          </div>
+        )}
       </div>
 
       {/* Estado vazio */}
@@ -428,6 +555,7 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
               }
             >
               Evolução Diária — {MS[month - 1]}/{year}
+              {cmpActive && <span className="text-amber-500 normal-case ml-1 text-[11px] font-bold"> vs {MS[cmpMonth - 1]}/{cmpYear}</span>}
               {selConsultor && <span className="text-teal-600 normal-case ml-1 text-[11px]">· {selConsultor}</span>}
             </SH>
 
@@ -437,7 +565,7 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart key={chartTab} data={dailyData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                <BarChart key={`${chartTab}-${cmpActive}`} data={mergedDailyData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={0} angle={-45} textAnchor="end" height={36} />
                   <YAxis tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} width={52} />
@@ -465,6 +593,23 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                               <span className="text-slate-400">NFs</span>
                               <span className="font-mono text-slate-500">{(d?.nfsPecas ?? 0) + (d?.nfsServicos ?? 0)}</span>
                             </div>
+                            {cmpActive && (
+                              <div className="mt-2 pt-1.5 border-t-2 border-amber-200">
+                                <p className="text-[10px] text-amber-500 font-bold mb-1">{MS[cmpMonth - 1]}/{cmpYear}</p>
+                                <div className="flex justify-between gap-4">
+                                  <span style={{ color: VIOLET }} className="font-semibold opacity-70">Peças</span>
+                                  <span className="font-mono text-amber-600">{fmtBRLF(d?.pecasCmp ?? 0)}</span>
+                                </div>
+                                <div className="flex justify-between gap-4 mt-0.5">
+                                  <span style={{ color: TEAL }} className="font-semibold opacity-70">Serviços</span>
+                                  <span className="font-mono text-amber-600">{fmtBRLF(d?.servicosCmp ?? 0)}</span>
+                                </div>
+                                <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-amber-100">
+                                  <span className="font-bold text-slate-600">Total</span>
+                                  <span className="font-mono font-bold text-amber-600">{fmtBRLF(d?.totalCmp ?? 0)}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       }
@@ -482,6 +627,15 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                             <span className="text-slate-500">NFs</span>
                             <span className="font-mono text-slate-600">{nfs ?? 0}</span>
                           </div>
+                          {cmpActive && (
+                            <div className="mt-2 pt-1.5 border-t-2 border-amber-200">
+                              <p className="text-[10px] text-amber-500 font-bold mb-1">{MS[cmpMonth - 1]}/{cmpYear}</p>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-slate-500">Rec. Bruta</span>
+                                <span className="font-mono font-semibold text-amber-600">{fmtBRLF(chartTab === 'pecas' ? (d?.pecasCmp ?? 0) : (d?.servicosCmp ?? 0))}</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     }}
@@ -489,13 +643,22 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                   {chartTab === 'total' && <Legend wrapperStyle={{ fontSize: 11 }} />}
                   {chartTab === 'total' && <Bar dataKey="pecas" name="Peças" stackId="a" fill={VIOLET} fillOpacity={0.85} radius={[0, 0, 0, 0]} />}
                   {chartTab === 'total' && <Bar dataKey="servicos" name="Serviços" stackId="a" fill={TEAL} fillOpacity={0.85} radius={[3, 3, 0, 0]} />}
+                  {chartTab === 'total' && cmpActive && <Bar dataKey="pecasCmp" name={`Peças (${MS[cmpMonth - 1]}/${cmpYear})`} stackId="b" fill={VIOLET} fillOpacity={0.35} radius={[0, 0, 0, 0]} />}
+                  {chartTab === 'total' && cmpActive && <Bar dataKey="servicosCmp" name={`Serviços (${MS[cmpMonth - 1]}/${cmpYear})`} stackId="b" fill={TEAL} fillOpacity={0.35} radius={[3, 3, 0, 0]} />}
                   {chartTab !== 'total' && (
-                    <Bar dataKey={chartTab} name={chartTab === 'pecas' ? 'Peças' : 'Serviços'} radius={[3, 3, 0, 0]}>
-                      {dailyData.map((d, i) => (
-                        <Cell key={i} fill={chartTab === 'pecas' ? VIOLET : TEAL}
-                          fillOpacity={(chartTab === 'pecas' ? d.pecas : d.servicos) > 0 ? 0.85 : 0.15} />
-                      ))}
-                    </Bar>
+                    <>
+                      <Bar dataKey={chartTab} name={chartTab === 'pecas' ? 'Peças' : 'Serviços'} radius={[3, 3, 0, 0]}>
+                        {mergedDailyData.map((d, i) => (
+                          <Cell key={i} fill={chartTab === 'pecas' ? VIOLET : TEAL}
+                            fillOpacity={(chartTab === 'pecas' ? d.pecas : d.servicos) > 0 ? 0.85 : 0.15} />
+                        ))}
+                      </Bar>
+                      {cmpActive && (
+                        <Bar dataKey={chartTab === 'pecas' ? 'pecasCmp' : 'servicosCmp'}
+                          name={`${chartTab === 'pecas' ? 'Peças' : 'Serviços'} (${MS[cmpMonth - 1]}/${cmpYear})`}
+                          radius={[3, 3, 0, 0]} fill={chartTab === 'pecas' ? VIOLET : TEAL} fillOpacity={0.35} />
+                      )}
+                    </>
                   )}
                 </BarChart>
               </ResponsiveContainer>
@@ -553,7 +716,7 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                     <div className="h-32 flex items-center justify-center text-slate-300 text-xs">Sem dados</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
-                      <BarChart key={`pt-${selConsultor ?? 'all'}`} data={dailyPecasByTrans} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                      <BarChart key={`pt-${selConsultor ?? 'all'}-${cmpActive}`} data={mergedPecasByTrans} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                         <XAxis dataKey="dia_str" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={0} angle={-45} textAnchor="end" height={36} />
                         <YAxis tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} width={52} />
@@ -583,6 +746,10 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                         <Legend wrapperStyle={{ fontSize: 10 }} />
                         {pecasTransacoes.filter(t => ativos.has(t)).map((t, i) => (
                           <Bar key={t} dataKey={t} name={transLabel(t)} stackId="p" fill={transColor(pecasTransacoes, t)} fillOpacity={0.85}
+                            radius={i === pecasTransacoes.filter(tt => ativos.has(tt)).length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]} />
+                        ))}
+                        {cmpActive && pecasTransacoes.filter(t => ativos.has(t)).map((t, i) => (
+                          <Bar key={`${t}_cmp`} dataKey={`${t}_cmp`} name={`${transLabel(t)} (${MS[cmpMonth - 1]}/${cmpYear})`} stackId="p_cmp" fill={transColor(pecasTransacoes, t)} fillOpacity={0.35} legendType="none"
                             radius={i === pecasTransacoes.filter(tt => ativos.has(tt)).length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]} />
                         ))}
                       </BarChart>
@@ -641,7 +808,7 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                     <div className="h-32 flex items-center justify-center text-slate-300 text-xs">Sem dados</div>
                   ) : (
                     <ResponsiveContainer width="100%" height={220}>
-                      <BarChart key={`st-${selConsultor ?? 'all'}`} data={dailyServicosByTrans} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                      <BarChart key={`st-${selConsultor ?? 'all'}-${cmpActive}`} data={mergedServicosByTrans} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                         <XAxis dataKey="dia_str" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={0} angle={-45} textAnchor="end" height={36} />
                         <YAxis tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} width={52} />
@@ -671,6 +838,10 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                         <Legend wrapperStyle={{ fontSize: 10 }} />
                         {servicosTransacoes.filter(t => ativos.has(t)).map((t, i) => (
                           <Bar key={t} dataKey={t} name={transLabel(t)} stackId="s" fill={transColor(servicosTransacoes, t)} fillOpacity={0.85}
+                            radius={i === servicosTransacoes.filter(tt => ativos.has(tt)).length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]} />
+                        ))}
+                        {cmpActive && servicosTransacoes.filter(t => ativos.has(t)).map((t, i) => (
+                          <Bar key={`${t}_cmp`} dataKey={`${t}_cmp`} name={`${transLabel(t)} (${MS[cmpMonth - 1]}/${cmpYear})`} stackId="s_cmp" fill={transColor(servicosTransacoes, t)} fillOpacity={0.35} legendType="none"
                             radius={i === servicosTransacoes.filter(tt => ativos.has(tt)).length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]} />
                         ))}
                       </BarChart>
