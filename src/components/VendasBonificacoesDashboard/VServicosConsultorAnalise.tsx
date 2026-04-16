@@ -67,6 +67,8 @@ function calcServicos(d: Record<string, string>) {
 type ChartTab = 'pecas' | 'servicos' | 'total';
 type SortKey  = 'pecasRec' | 'pecasLucro' | 'servRec' | 'nome';
 
+interface CmpSlot { consultor: string; month: number; year: number; }
+
 interface ConsultorEntry {
   nome: string;
   pecas:    { nfs: number; recBruta: number; recLiq: number; lucroBruto: number; margem: number };
@@ -89,7 +91,7 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
   const [chartTab, setChartTab]   = useState<ChartTab>('pecas');
   const [selConsultor, setSelConsultor] = useState<string | null>(null);
   const [sortBy, setSortBy]       = useState<SortKey>('pecasRec');
-  const [cmpConsultores, setCmpConsultores] = useState<string[]>([]);
+  const [slots, setSlots]         = useState<(CmpSlot | null)[]>([null, null, null, null]);
   const [pecasTransAtivas, setPecasTransAtivas]       = useState<Set<string> | null>(null);
   const [servicosTransAtivas, setServicosTransAtivas] = useState<Set<string> | null>(null);
 
@@ -108,7 +110,9 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
   }, []);
 
   // Reseta seleção ao trocar período
-  useEffect(() => { setSelConsultor(null); setCmpConsultores([]); }, [year, month]);
+  useEffect(() => { setSelConsultor(null); }, [year, month]);
+
+  // Dados diários para o gráfico
 
   const availYears = useMemo(() => {
     const s = new Set([...pecasRows, ...servicosRows].map(getYr).filter(y => y > 2000));
@@ -179,12 +183,27 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
     });
   }, [consultores, sortBy]);
 
-  // ─── Dados para tabela comparativa (até 4 consultores) ───────────────────────
-  const cmpData = useMemo(() => {
-    return cmpConsultores.map(nome => {
-      const pRows = pecasByC.get(nome) ?? [];
-      const sRows = servicosByC.get(nome) ?? [];
+  // Todos os consultores únicos em qualquer período (para dropdowns dos slots)
+  const allConsultores = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of pecasRows) s.add(r.data['NOME_VENDEDOR']?.trim() || '(sem nome)');
+    for (const r of servicosRows) s.add(r.data['NOME_VENDEDOR']?.trim() || '(sem nome)');
+    return [...s].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [pecasRows, servicosRows]);
 
+  // Cálculo de dados por slot (consultor + mês + ano independentes)
+  const slotData = useMemo(() => {
+    return slots.map(slot => {
+      if (!slot) return null;
+      const { consultor, month: sm, year: sy } = slot;
+      const pRows = pecasRows.filter(r =>
+        getYr(r) === sy && getMo(r) === sm &&
+        (r.data['NOME_VENDEDOR']?.trim() || '(sem nome)') === consultor
+      );
+      const sRows = servicosRows.filter(r =>
+        getYr(r) === sy && getMo(r) === sm &&
+        (r.data['NOME_VENDEDOR']?.trim() || '(sem nome)') === consultor
+      );
       const pecasByTrans: Record<string, number> = {};
       let pRecBruta = 0, pRecLiq = 0, pLucroBruto = 0;
       for (const r of pRows) {
@@ -193,7 +212,6 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
         pecasByTrans[tipo] = (pecasByTrans[tipo] ?? 0) + c.recBruta;
         pRecBruta += c.recBruta; pRecLiq += c.recLiq; pLucroBruto += c.lucroBruto;
       }
-
       const servicosByTrans: Record<string, number> = {};
       let sRecBruta = 0, sRecLiq = 0;
       for (const r of sRows) {
@@ -202,30 +220,29 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
         servicosByTrans[tipo] = (servicosByTrans[tipo] ?? 0) + c.recBruta;
         sRecBruta += c.recBruta; sRecLiq += c.recLiq;
       }
-
       const pMargem = pRecLiq !== 0 ? (pLucroBruto / pRecLiq) * 100 : 0;
       return {
-        nome,
+        label: `${consultor.split(' ')[0]} · ${MS[sm - 1]}/${sy}`,
         pecasByTrans,
-        pecas: { recBruta: pRecBruta, recLiq: pRecLiq, lucroBruto: pLucroBruto, margem: pMargem },
+        pecas: { nfs: pRows.length, recBruta: pRecBruta, recLiq: pRecLiq, lucroBruto: pLucroBruto, margem: pMargem },
         servicosByTrans,
-        servicos: { recBruta: sRecBruta, recLiq: sRecLiq },
+        servicos: { nfs: sRows.length, recBruta: sRecBruta, recLiq: sRecLiq },
         total: { recBruta: pRecBruta + sRecBruta, recLiq: pRecLiq + sRecLiq },
       };
     });
-  }, [cmpConsultores, pecasByC, servicosByC]);
+  }, [slots, pecasRows, servicosRows]);
 
-  const cmpPecasTipos = useMemo(() => {
+  const slotPecasTipos = useMemo(() => {
     const s = new Set<string>();
-    for (const d of cmpData) Object.keys(d.pecasByTrans).forEach(t => s.add(t));
+    for (const d of slotData) if (d) Object.keys(d.pecasByTrans).forEach(t => s.add(t));
     return [...s].sort();
-  }, [cmpData]);
+  }, [slotData]);
 
-  const cmpServicosTipos = useMemo(() => {
+  const slotServicosTipos = useMemo(() => {
     const s = new Set<string>();
-    for (const d of cmpData) Object.keys(d.servicosByTrans).forEach(t => s.add(t));
+    for (const d of slotData) if (d) Object.keys(d.servicosByTrans).forEach(t => s.add(t));
     return [...s].sort();
-  }, [cmpData]);
+  }, [slotData]);
 
   // Dados diários para o gráfico
   const daysInMonth = useMemo(() => {
@@ -725,28 +742,21 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                 </thead>
                 <tbody>
                   {sortedConsultores.map((c, i) => {
-                    const isSelected = cmpConsultores.includes(c.nome);
-                    const cmpIdx     = cmpConsultores.indexOf(c.nome);
+                    const isSelected = selConsultor === c.nome;
                     const medals     = ['①', '②', '③'];
                     const medaColors = ['#f59e0b', '#9ca3af', '#cd7f32'];
                     return (
                       <tr
                         key={c.nome}
-                        onClick={() => {
-                          if (isSelected) {
-                            setCmpConsultores(prev => prev.filter(n => n !== c.nome));
-                          } else if (cmpConsultores.length < 4) {
-                            setCmpConsultores(prev => [...prev, c.nome]);
-                          }
-                        }}
-                        className={`transition-colors ${
+                        onClick={() => setSelConsultor(isSelected ? null : c.nome)}
+                        className={`cursor-pointer transition-colors ${
                           isSelected
-                            ? 'cursor-pointer'
-                            : cmpConsultores.length >= 4
-                              ? 'opacity-50 cursor-not-allowed'
-                              : 'cursor-pointer ' + (i % 2 === 0 ? 'hover:bg-slate-50' : 'bg-slate-50/40 hover:bg-slate-100/60')
+                            ? 'bg-teal-50 ring-1 ring-teal-300'
+                            : i % 2 === 0
+                              ? 'hover:bg-slate-50'
+                              : 'bg-slate-50/40 hover:bg-slate-100/60'
                         }`}
-                        style={isSelected ? { background: CMP_COLORS[cmpIdx] + '18', boxShadow: `inset 0 0 0 1px ${CMP_COLORS[cmpIdx]}` } : undefined}
+                      >
                         <td className="px-2 py-2 text-center border-b border-slate-50">
                           {i < 3
                             ? <span className="text-[11px] font-black" style={{ color: medaColors[i] }}>{medals[i]}</span>
@@ -755,7 +765,7 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
                         </td>
                         <td className="px-2 py-2 font-semibold text-slate-700 border-b border-slate-50 max-w-[160px]">
                           <span className="truncate block">{c.nome}</span>
-                          {isSelected && <span className="text-[9px] font-bold" style={{ color: CMP_COLORS[cmpIdx] }}>● na comparação #{cmpIdx + 1}</span>}
+                          {isSelected && <span className="text-[9px] text-teal-500 font-bold">● destacado no gráfico</span>}
                         </td>
                         {/* Peças */}
                         <td className="px-2 py-2 text-right font-mono text-slate-500 border-b border-slate-50 bg-violet-50/10">{c.pecas.nfs}</td>
@@ -814,9 +824,239 @@ export default function VServicosConsultorAnalise({ servicosRows }: Props) {
             </div>
           </div>
 
-          {/* Tabela Comparativa */}
-          {cmpConsultores.length > 0 && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
+          {/* ── Comparativo de Cenários ──────────────────────────────────────── */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
+            <SH
+              right={
+                <button
+                  onClick={() => setSlots([null, null, null, null])}
+                  className="px-2.5 py-1 rounded-full text-[10px] text-rose-400 border border-rose-200 hover:bg-rose-50 transition-all"
+                >
+                  Limpar todos
+                </button>
+              }
+            >
+              Comparativo de Cenários
+            </SH>
+            <p className="text-[11px] text-slate-400 mb-4">
+              Monte até 4 cenários combinando consultor, mês e ano. O melhor valor de cada linha fica destacado.
+            </p>
+
+            {/* Cards de slots */}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
+              {slots.map((slot, idx) => {
+                const color = CMP_COLORS[idx];
+                const slotYear = slot?.year ?? year;
+                const slotMonth = slot?.month ?? month;
+                return (
+                  <div key={idx} className="rounded-xl border-2 p-3 flex flex-col gap-2 transition-all"
+                    style={{ borderColor: slot ? color : '#e2e8f0', background: slot ? color + '08' : '#f8fafc' }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black uppercase tracking-wider" style={{ color }}>
+                        Cenário {idx + 1}
+                      </span>
+                      {slot && (
+                        <button
+                          onClick={() => setSlots(prev => prev.map((s, i) => i === idx ? null : s))}
+                          className="text-[10px] text-slate-400 hover:text-rose-400 transition-colors"
+                        >✕</button>
+                      )}
+                    </div>
+                    {/* Consultor */}
+                    <select
+                      value={slot?.consultor ?? ''}
+                      onChange={e => {
+                        const consultor = e.target.value;
+                        if (!consultor) { setSlots(prev => prev.map((s, i) => i === idx ? null : s)); return; }
+                        setSlots(prev => prev.map((s, i) => i === idx ? { consultor, month: slotMonth, year: slotYear } : s));
+                      }}
+                      className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] bg-white focus:outline-none focus:ring-1 transition-all"
+                      style={{ focusRingColor: color } as any}
+                    >
+                      <option value="">— Consultor —</option>
+                      {allConsultores.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    {/* Mês */}
+                    <div className="flex flex-wrap gap-1">
+                      {MS.map((m, mi) => (
+                        <button key={mi}
+                          onClick={() => setSlots(prev => prev.map((s, i) => i === idx && s ? { ...s, month: mi + 1 } : s))}
+                          disabled={!slot}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${slot && slotMonth === mi + 1 ? 'text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200 disabled:opacity-40'}`}
+                          style={slot && slotMonth === mi + 1 ? { background: color } : undefined}
+                        >{m}</button>
+                      ))}
+                    </div>
+                    {/* Ano */}
+                    <div className="flex gap-1 flex-wrap">
+                      {availYears.map(y => (
+                        <button key={y}
+                          onClick={() => setSlots(prev => prev.map((s, i) => i === idx && s ? { ...s, year: y } : s))}
+                          disabled={!slot}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${slot && slotYear === y ? 'text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200 disabled:opacity-40'}`}
+                          style={slot && slotYear === y ? { background: color } : undefined}
+                        >{y}</button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Tabela comparativa — só aparece quando ≥1 slot preenchido */}
+            {slotData.some(d => d !== null) && (() => {
+              const activeCols = slotData.map((d, i) => ({ d, i })).filter(x => x.d !== null) as { d: NonNullable<typeof slotData[0]>; i: number }[];
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-separate border-spacing-0">
+                    <thead>
+                      <tr>
+                        <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b-2 border-slate-200 min-w-[170px]">Métrica</th>
+                        {activeCols.map(({ d, i }) => (
+                          <th key={i} className="text-right px-3 py-2 text-[11px] font-black tracking-wide min-w-[160px] whitespace-nowrap"
+                            style={{ color: CMP_COLORS[i], borderBottom: `2px solid ${CMP_COLORS[i]}` }}>
+                            {d.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* ── PEÇAS ── */}
+                      <tr>
+                        <td colSpan={activeCols.length + 1} className="px-3 py-1.5 text-[10px] font-black text-violet-600 uppercase tracking-widest bg-violet-50/60 border-b border-violet-100">
+                          Peças (SERIE ≠ RPS)
+                        </td>
+                      </tr>
+                      {slotPecasTipos.map(tipo => {
+                        const vals = activeCols.map(({ d }) => d.pecasByTrans[tipo] ?? 0);
+                        const best = Math.max(...vals);
+                        return (
+                          <tr key={`p-t-${tipo}`} className="hover:bg-slate-50/60">
+                            <td className="px-3 py-1.5 text-slate-400 border-b border-slate-50 pl-7 italic">{transLabel(tipo)}</td>
+                            {vals.map((v, ci) => (
+                              <td key={ci} className={`px-3 py-1.5 text-right font-mono border-b border-slate-50 whitespace-nowrap ${v === best && best > 0 ? 'font-bold' : 'text-slate-400'}`}
+                                style={v === best && best > 0 ? { color: CMP_COLORS[activeCols[ci].i] } : undefined}>
+                                {v > 0 ? fmtBRL(v) : <span className="text-slate-200">—</span>}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                      {([
+                        { label: 'NFs Peças',    fn: (d: NonNullable<typeof slotData[0]>) => d.pecas.nfs,        fmt: (v: number) => String(v) },
+                        { label: 'Rec. Bruta',   fn: (d: NonNullable<typeof slotData[0]>) => d.pecas.recBruta,   fmt: fmtBRL },
+                        { label: 'Rec. Líquida', fn: (d: NonNullable<typeof slotData[0]>) => d.pecas.recLiq,     fmt: fmtBRL },
+                        { label: 'Lucro Bruto',  fn: (d: NonNullable<typeof slotData[0]>) => d.pecas.lucroBruto, fmt: fmtBRL },
+                      ]).map(({ label, fn, fmt }) => {
+                        const vals = activeCols.map(({ d }) => fn(d));
+                        const best = Math.max(...vals);
+                        return (
+                          <tr key={`p-${label}`} className="hover:bg-slate-50/60">
+                            <td className="px-3 py-1.5 font-semibold text-slate-600 border-b border-slate-100 bg-violet-50/20">{label}</td>
+                            {vals.map((v, ci) => (
+                              <td key={ci} className={`px-3 py-1.5 text-right font-mono border-b border-slate-100 bg-violet-50/20 whitespace-nowrap ${v === best && best > 0 ? 'font-bold' : 'text-slate-500'}`}
+                                style={v === best && best > 0 ? { color: CMP_COLORS[activeCols[ci].i] } : undefined}>
+                                {fmt(v)}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                      {/* Margem */}
+                      {(() => {
+                        const vals = activeCols.map(({ d }) => d.pecas.margem);
+                        const best = Math.max(...vals);
+                        return (
+                          <tr className="hover:bg-slate-50/60">
+                            <td className="px-3 py-1.5 font-semibold text-slate-600 border-b border-slate-200 bg-violet-50/20">Margem %</td>
+                            {vals.map((v, ci) => (
+                              <td key={ci} className={`px-3 py-1.5 text-right font-mono border-b border-slate-200 bg-violet-50/20 ${v === best && best > 0 ? 'font-bold' : 'text-slate-500'}`}
+                                style={v === best && best > 0 ? { color: CMP_COLORS[activeCols[ci].i] } : undefined}>
+                                {fmtPct(v)}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })()}
+
+                      {/* ── SERVIÇOS ── */}
+                      <tr>
+                        <td colSpan={activeCols.length + 1} className="px-3 py-1.5 text-[10px] font-black text-teal-600 uppercase tracking-widest bg-teal-50/60 border-b border-teal-100">
+                          Serviços (SERIE = RPS)
+                        </td>
+                      </tr>
+                      {slotServicosTipos.map(tipo => {
+                        const vals = activeCols.map(({ d }) => d.servicosByTrans[tipo] ?? 0);
+                        const best = Math.max(...vals);
+                        return (
+                          <tr key={`s-t-${tipo}`} className="hover:bg-slate-50/60">
+                            <td className="px-3 py-1.5 text-slate-400 border-b border-slate-50 pl-7 italic">{transLabel(tipo)}</td>
+                            {vals.map((v, ci) => (
+                              <td key={ci} className={`px-3 py-1.5 text-right font-mono border-b border-slate-50 whitespace-nowrap ${v === best && best > 0 ? 'font-bold' : 'text-slate-400'}`}
+                                style={v === best && best > 0 ? { color: CMP_COLORS[activeCols[ci].i] } : undefined}>
+                                {v > 0 ? fmtBRL(v) : <span className="text-slate-200">—</span>}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                      {([
+                        { label: 'NFs Serviços', fn: (d: NonNullable<typeof slotData[0]>) => d.servicos.nfs,      fmt: (v: number) => String(v) },
+                        { label: 'Rec. Bruta',   fn: (d: NonNullable<typeof slotData[0]>) => d.servicos.recBruta, fmt: fmtBRL },
+                        { label: 'Rec. Líquida', fn: (d: NonNullable<typeof slotData[0]>) => d.servicos.recLiq,   fmt: fmtBRL },
+                      ]).map(({ label, fn, fmt }) => {
+                        const vals = activeCols.map(({ d }) => fn(d));
+                        const best = Math.max(...vals);
+                        return (
+                          <tr key={`s-${label}`} className="hover:bg-slate-50/60">
+                            <td className="px-3 py-1.5 font-semibold text-slate-600 border-b border-slate-200 bg-teal-50/20">{label}</td>
+                            {vals.map((v, ci) => (
+                              <td key={ci} className={`px-3 py-1.5 text-right font-mono border-b border-slate-200 bg-teal-50/20 whitespace-nowrap ${v === best && best > 0 ? 'font-bold' : 'text-slate-500'}`}
+                                style={v === best && best > 0 ? { color: CMP_COLORS[activeCols[ci].i] } : undefined}>
+                                {fmt(v)}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+
+                      {/* ── TOTAL GERAL ── */}
+                      <tr>
+                        <td colSpan={activeCols.length + 1} className="px-3 py-1.5 text-[10px] font-black text-slate-600 uppercase tracking-widest bg-slate-100/80 border-b border-slate-200">
+                          Total Geral (Peças + Serviços)
+                        </td>
+                      </tr>
+                      {([
+                        { label: 'Rec. Bruta Total',   fn: (d: NonNullable<typeof slotData[0]>) => d.total.recBruta },
+                        { label: 'Rec. Líquida Total', fn: (d: NonNullable<typeof slotData[0]>) => d.total.recLiq },
+                      ]).map(({ label, fn }) => {
+                        const vals = activeCols.map(({ d }) => fn(d));
+                        const best = Math.max(...vals);
+                        return (
+                          <tr key={`t-${label}`} className="hover:bg-slate-50/60">
+                            <td className="px-3 py-2 font-bold text-slate-700 border-b border-slate-100 bg-slate-50/60">{label}</td>
+                            {vals.map((v, ci) => (
+                              <td key={ci} className={`px-3 py-2 text-right font-mono border-b border-slate-100 bg-slate-50/60 whitespace-nowrap ${v === best && best > 0 ? 'font-black text-[13px]' : 'text-slate-500'}`}
+                                style={v === best && best > 0 ? { color: CMP_COLORS[activeCols[ci].i] } : undefined}>
+                                {fmtBRL(v)}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+          </div>
+
+        </>
+      )}
+    </div>
+  );
+}
+
               <SH
                 right={
                   <div className="flex items-center gap-2">
