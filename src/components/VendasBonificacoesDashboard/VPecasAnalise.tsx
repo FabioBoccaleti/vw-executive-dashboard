@@ -1065,15 +1065,6 @@ export default function VPecasAnalise() {
       </>}
 
       {analiseTab === 'itens' && <>
-        {/* ── KPI Cards — Itens ────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          <KpiCard label="Total de Itens" value={itemKpis.total.toLocaleString('pt-BR')} accent={CYAN} />
-          <KpiCard label="Itens com Lucro" value={itemKpis.comLucro.toLocaleString('pt-BR')} color="text-emerald-700" accent={EMERALD} sub={`${fmtPct(itemKpis.pctLucro)} do total`} />
-          <KpiCard label="Itens com Prejuízo" value={itemKpis.comPrejuizo.toLocaleString('pt-BR')} color="text-rose-600" accent={ROSE} />
-          <KpiCard label="Lucro Bruto Total" value={fmtBRL(itemKpis.lucroBrutoTotal)} color={itemKpis.lucroBrutoTotal >= 0 ? 'text-emerald-700' : 'text-rose-600'} accent={itemKpis.lucroBrutoTotal >= 0 ? EMERALD : ROSE} />
-          <KpiCard label="% LB Médio" value={fmtPct(itemKpis.lbPctTotal)} color={itemKpis.lbPctTotal >= 0 ? 'text-emerald-700' : 'text-rose-600'} accent={itemKpis.lbPctTotal >= 0 ? EMERALD : ROSE} />
-        </div>
-
         {/* ── Filtro de Departamento (compartilhado) ─────────────────────── */}
         <div className="flex gap-1 flex-wrap">
           {availItemDepts.map(d => (
