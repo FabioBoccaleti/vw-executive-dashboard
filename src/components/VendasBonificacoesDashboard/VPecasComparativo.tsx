@@ -11,6 +11,14 @@ const DEPT_LABEL: Record<string, string> = {
   '107': 'Acessórios',
 };
 const deptName = (code: string) => DEPT_LABEL[code] ?? code;
+
+// Grupos de departamentos para o filtro
+const DEPT_GROUPS: { label: string; depts: Set<string> }[] = [
+  { label: 'Peças',      depts: new Set(['103', '108']) },
+  { label: 'Oficina',    depts: new Set(['104', '122']) },
+  { label: 'Funilaria',  depts: new Set(['106', '129']) },
+  { label: 'Acessórios', depts: new Set(['107']) },
+];
 const n = (v?: string | null) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
 const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 const fmtPct  = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
@@ -137,19 +145,28 @@ export default function VPecasComparativo({ allRows }: Props) {
   }
 
   // ─── filtro de departamento e visão ──────────────────────────────────────
-  const availDepts = useMemo(() => {
-    const s = new Set(allRows.map(r => r.data['DEPARTAMENTO']?.trim() || '(sem depto)'));
-    return ['Todos', ...[...s].sort()];
-  }, [allRows]);
-
   const [deptFilter, setDeptFilter] = useState('Todos');
   const [view, setView]             = useState<'transacao' | 'vendedor'>('transacao');
   const [collapsed, setCollapsed]   = useState(false);
 
-  // linhas filtradas por dept
+  // grupos disponíveis (só os que têm dados)
+  const availGroups = useMemo(() => {
+    const allDepts = new Set(allRows.map(r => r.data['DEPARTAMENTO']?.trim() || ''));
+    return DEPT_GROUPS.filter(g => [...g.depts].some(d => allDepts.has(d)));
+  }, [allRows]);
+
+  // depts do grupo selecionado
+  const activeDepts = useMemo(() => {
+    if (deptFilter === 'Todos') return null;
+    return DEPT_GROUPS.find(g => g.label === deptFilter)?.depts ?? null;
+  }, [deptFilter]);
+
+  // linhas filtradas por grupo
   const baseRows = useMemo(() =>
-    deptFilter === 'Todos' ? allRows : allRows.filter(r => (r.data['DEPARTAMENTO']?.trim() || '(sem depto)') === deptFilter)
-  , [allRows, deptFilter]);
+    activeDepts === null
+      ? allRows
+      : allRows.filter(r => activeDepts.has(r.data['DEPARTAMENTO']?.trim() || ''))
+  , [allRows, activeDepts]);
 
   // ─── dados por slot ───────────────────────────────────────────────────────
   const slotRows = useMemo(() =>
@@ -285,17 +302,27 @@ export default function VPecasComparativo({ allRows }: Props) {
 
         {/* ── Filtro de departamento ────────────────────────────────────── */}
         <div className="flex gap-1 flex-wrap mb-3">
-          {availDepts.map(d => (
+          <button
+            onClick={() => setDeptFilter('Todos')}
+            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all border ${
+              deptFilter === 'Todos'
+                ? 'bg-violet-600 text-white border-violet-600'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600'
+            }`}
+          >
+            Todos
+          </button>
+          {availGroups.map(g => (
             <button
-              key={d}
-              onClick={() => setDeptFilter(d)}
+              key={g.label}
+              onClick={() => setDeptFilter(g.label)}
               className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all border ${
-                deptFilter === d
+                deptFilter === g.label
                   ? 'bg-violet-600 text-white border-violet-600'
                   : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600'
               }`}
             >
-              {deptName(d)}
+              {g.label}
             </button>
           ))}
         </div>
