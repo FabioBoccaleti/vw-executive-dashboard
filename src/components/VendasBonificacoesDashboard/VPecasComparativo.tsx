@@ -4,6 +4,13 @@ import type { VPecasRow } from './vPecasStorage';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const MS_ABBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const DEPT_LABEL: Record<string, string> = {
+  '103': 'Peças',
+  '104': 'Oficina',
+  '106': 'Funilaria',
+  '107': 'Acessórios',
+};
+const deptName = (code: string) => DEPT_LABEL[code] ?? code;
 const n = (v?: string | null) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
 const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 const fmtPct  = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
@@ -288,7 +295,7 @@ export default function VPecasComparativo({ allRows }: Props) {
                   : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600'
               }`}
             >
-              {d}
+              {deptName(d)}
             </button>
           ))}
         </div>

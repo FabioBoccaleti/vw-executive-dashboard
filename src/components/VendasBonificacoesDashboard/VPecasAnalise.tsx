@@ -20,6 +20,14 @@ const AMBER   = '#f59e0b';
 const ROSE    = '#f43f5e';
 const CYAN    = '#06b6d4';
 
+const DEPT_LABEL: Record<string, string> = {
+  '103': 'Peças',
+  '104': 'Oficina',
+  '106': 'Funilaria',
+  '107': 'Acessórios',
+};
+const deptName = (code: string) => DEPT_LABEL[code] ?? code;
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v?: string | null) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
 const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
@@ -256,7 +264,7 @@ export default function VPecasAnalise() {
 
   const deptDonut = useMemo(() => {
     const total = deptData.reduce((s, d) => s + d.valorVenda, 0);
-    return deptData.map((d, i) => ({ name: d.name, value: d.valorVenda, pct: total ? d.valorVenda / total * 100 : 0, color: PALETTE[i % PALETTE.length] }));
+    return deptData.map((d, i) => ({ name: deptName(d.name), value: d.valorVenda, pct: total ? d.valorVenda / total * 100 : 0, color: PALETTE[i % PALETTE.length] }));
   }, [deptData]);
 
   // ─── 3. Ranking Vendedores ────────────────────────────────────────────────
@@ -711,7 +719,7 @@ export default function VPecasAnalise() {
                 <BarChart layout="vertical" data={deptData} margin={{ top: 0, right: 80, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                   <XAxis type="number" tickFormatter={v => deptMetric === 'nfs' ? v.toString() : `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} width={100} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} width={100} tickFormatter={(v: string) => deptName(v)} />
                   <Tooltip content={(props: any) => {
                     const { active, payload, label } = props;
                     if (!active || !payload?.length) return null;
@@ -767,7 +775,7 @@ export default function VPecasAnalise() {
                 vendorDept === d ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600'
               }`}
             >
-              {d}
+              {deptName(d)}
             </button>
           ))}
         </div>
@@ -1028,7 +1036,7 @@ export default function VPecasAnalise() {
                   };
                   return (
                     <tr key={s.dept} className={`border-b border-slate-50 ${i % 2 === 0 ? '' : 'bg-slate-50/50'}`}>
-                      <td className="py-1.5 px-2 font-mono font-semibold text-slate-700">{s.dept}</td>
+                      <td className="py-1.5 px-2 font-mono font-semibold text-slate-700">{deptName(s.dept)}</td>
                       <td className="py-1.5 px-2 text-right text-slate-500">{s.total}</td>
                       <td className="py-1.5 px-2 text-right text-rose-600 font-semibold">{s.withPrej}</td>
                       <td className={`py-1.5 px-2 text-right rounded ${heat(s.pctPrej)}`}>{fmtPct(s.pctPrej)}</td>
@@ -1064,7 +1072,7 @@ export default function VPecasAnalise() {
                 prejuizoDept === d ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-500 border-slate-200 hover:border-rose-300 hover:text-rose-600'
               }`}
             >
-              {d}
+              {deptName(d)}
             </button>
           ))}
         </div>
@@ -1098,7 +1106,7 @@ export default function VPecasAnalise() {
                   <span className="text-xs font-semibold text-slate-700 truncate">{p.cliente}</span>
                   <span className="text-xs text-slate-600 truncate">{p.vendedor}</span>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] font-semibold text-slate-500 truncate">{p.depto}</span>
+                    <span className="text-[10px] font-semibold text-slate-500 truncate">{deptName(p.depto)}</span>
                     <div className="h-1 rounded-full bg-rose-100 overflow-hidden">
                       <div className="h-full rounded-full bg-rose-400 transition-all" style={{ width: `${barW}%` }} />
                     </div>
@@ -1144,7 +1152,7 @@ export default function VPecasAnalise() {
                 clienteDept === d ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600'
               }`}
             >
-              {d}
+              {deptName(d)}
             </button>
           ))}
         </div>
