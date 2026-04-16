@@ -132,7 +132,6 @@ export default function VPecasItemSeguradoraAnalise() {
       })
       .filter(r => r.lucroBruto < 0)
       .sort((a, b) => a.lucroBruto - b.lucroBruto)
-      .slice(0, 40)
   , [filteredRows]);
 
   const lucroData = useMemo(() =>
@@ -155,7 +154,6 @@ export default function VPecasItemSeguradoraAnalise() {
       })
       .filter(r => r.lucroBruto > 0)
       .sort((a, b) => b.lucroBruto - a.lucroBruto)
-      .slice(0, 40)
   , [filteredRows]);
 
   if (loading) {
@@ -247,11 +245,11 @@ export default function VPecasItemSeguradoraAnalise() {
       {/* ── Top 40 Itens com Prejuízo ───────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5" style={{ borderLeft: '4px solid #fb7185' }}>
         <SH right={<span className="text-[10px] text-slate-400">{prejData.length} item(s) com prejuízo</span>}>
-          Top 40 Itens com Prejuízo — Seguradora (Deptos 103/108)
+          Itens com Prejuízo — Seguradora (Deptos 103/108)
         </SH>
         <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 mb-3 text-xs text-blue-700">
           <span className="shrink-0 mt-0.5">ℹ️</span>
-          <span>Exibe os <strong>40 itens com maior impacto negativo</strong> vendidos para seguradoras nos departamentos 103 e 108.</span>
+          <span>Exibe <strong>todos os itens com prejuízo</strong> vendidos para seguradoras nos departamentos 103 e 108.</span>
         </div>
         {prejData.length === 0 ? (
           <div className="flex items-center justify-center h-16 text-xs text-emerald-600 font-semibold">
@@ -284,11 +282,11 @@ export default function VPecasItemSeguradoraAnalise() {
       {/* ── Top 40 Itens com Lucro ──────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5" style={{ borderLeft: '4px solid #10b981' }}>
         <SH right={<span className="text-[10px] text-slate-400">{lucroData.length} item(s) com lucro</span>}>
-          Top 40 Itens com Lucro — Seguradora (Deptos 103/108)
+          Itens com Lucro — Seguradora (Deptos 103/108)
         </SH>
         <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 mb-3 text-xs text-blue-700">
           <span className="shrink-0 mt-0.5">ℹ️</span>
-          <span>Exibe os <strong>40 itens com maior impacto positivo</strong> vendidos para seguradoras nos departamentos 103 e 108.</span>
+          <span>Exibe <strong>todos os itens com lucro</strong> vendidos para seguradoras nos departamentos 103 e 108.</span>
         </div>
         {lucroData.length === 0 ? (
           <div className="text-center text-sm text-slate-300 py-8">Nenhum item com lucro no período</div>
