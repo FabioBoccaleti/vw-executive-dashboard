@@ -633,6 +633,7 @@ export default function VServicosAnalise() {
   const [activeTab, setActiveTab] = useState<ServicoTab>('oficina');
   const [oficinaInnerTab, setOficinaInnerTab]       = useState<'analise' | 'consultor'>('analise');
   const [funilariaInnerTab, setFunilariaInnerTab]   = useState<'analise' | 'consultor'>('analise');
+  const [acessoriosInnerTab, setAcessoriosInnerTab] = useState<'analise' | 'consultor'>('analise');
 
   useEffect(() => {
     loadVPecasRows().then(rows => {
@@ -738,11 +739,39 @@ export default function VServicosAnalise() {
         </div>
       )}
 
+      {/* Inner tabs de Acessórios */}
+      {activeTab === 'acessorios' && (
+        <div className="flex gap-1 bg-slate-50 border-b border-slate-200 px-5 py-1.5 flex-shrink-0">
+          <button
+            onClick={() => setAcessoriosInnerTab('analise')}
+            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+              acessoriosInnerTab === 'analise'
+                ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300 hover:text-amber-600'
+            }`}
+          >
+            Análise Geral
+          </button>
+          <button
+            onClick={() => setAcessoriosInnerTab('consultor')}
+            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all border ${
+              acessoriosInnerTab === 'consultor'
+                ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300 hover:text-amber-600'
+            }`}
+          >
+            Por Consultor
+          </button>
+        </div>
+      )}
+
       {/* Painel da sub-tab ativa */}
       {activeTab === 'oficina' && oficinaInnerTab === 'consultor'
         ? <VServicosConsultorAnalise servicosRows={tabRows} pecasDepts={['104', '122']} />
         : activeTab === 'funilaria' && funilariaInnerTab === 'consultor'
         ? <VServicosConsultorAnalise servicosRows={tabRows} pecasDepts={['106', '129']} />
+        : activeTab === 'acessorios' && acessoriosInnerTab === 'consultor'
+        ? <VServicosConsultorAnalise servicosRows={tabRows} pecasDepts={['107']} />
         : <ServicoPanel key={activeTab} rows={tabRows} color={SERVICO_CONFIG[activeTab].color} />
       }
     </div>
