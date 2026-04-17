@@ -74,6 +74,12 @@ function getMo(row: VPecasRow): number {
   if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[1];
   return 0;
 }
+function getDia(row: VPecasRow): number {
+  const d = row.data['DTA_DOCUMENTO'] ?? '';
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[0];
+  if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[2];
+  return 0;
+}
 
 // ─── Cálculo por linha ────────────────────────────────────────────────────────
 interface Calc { valorVenda: number; icms: number; pis: number; cofins: number; difal: number; totalImpostos: number; recLiq: number; custo: number; lucroBruto: number; lucroBrutoPct: number; }
@@ -216,6 +222,10 @@ export default function VPecasAnalise() {
   const [itemPrejuizoDept, setItemPrejuizoDept]         = useState('Todos');
   const [itemPrejuizoExpanded, setItemPrejuizoExpanded] = useState(false);
   const [itemLucroExpanded, setItemLucroExpanded]       = useState(false);
+  // ─── Estado do gráfico diário ──────────────────────────────────────────────
+  const [dailyGroupBy, setDailyGroupBy] = useState<'dept' | 'trans'>('dept');
+  const [dailySelDept, setDailySelDept]   = useState<string>('Todos');
+  const [dailySelTrans, setDailySelTrans] = useState<string>('Todos');
 
   useEffect(() => {
     loadVPecasItemRows().then(setAllItemRows);
@@ -261,6 +271,62 @@ export default function VPecasAnalise() {
 
   const delta = (cur: number, prev: number) =>
     prev !== 0 ? ((cur - prev) / Math.abs(prev)) * 100 : undefined;
+
+  // ─── 0. Evolução Diária ───────────────────────────────────────────────────
+  const daysInMonth = useMemo(() => {
+    if (month === null) return [];
+    const total = new Date(year, month, 0).getDate();
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }, [year, month]);
+
+  const dailySourceRows = useMemo(() =>
+    filteredRows, // já filtrado por ano+mês
+  [filteredRows]);
+
+  const dailyDepts = useMemo(() => {
+    const s = new Set(dailySourceRows.map(r => r.data['DEPARTAMENTO']?.trim() || '(sem depto)'));
+    return [...s].sort();
+  }, [dailySourceRows]);
+
+  const dailyTransacoes = useMemo(() => {
+    const s = new Set(dailySourceRows.map(r => r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)'));
+    return [...s].sort();
+  }, [dailySourceRows]);
+
+  const dailyChartData = useMemo(() => {
+    if (month === null || daysInMonth.length === 0) return [];
+    const keys = dailyGroupBy === 'dept' ? dailyDepts : dailyTransacoes;
+    const cumulative: Record<string, number> = {};
+    for (const k of keys) cumulative[k] = 0;
+    return daysInMonth.map(day => {
+      const dayRows = dailySourceRows.filter(r => getDia(r) === day);
+      const obj: Record<string, any> = { dia: String(day).padStart(2, '0') };
+      let dayTotal = 0;
+      for (const k of keys) {
+        const val = dailyGroupBy === 'dept'
+          ? dayRows.filter(r => (r.data['DEPARTAMENTO']?.trim() || '(sem depto)') === k)
+              .reduce((s, r) => s + n(r.data['LIQ_NOTA_FISCAL']), 0)
+          : dayRows.filter(r => (r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)') === k)
+              .reduce((s, r) => s + n(r.data['LIQ_NOTA_FISCAL']), 0);
+        obj[k] = val;
+        cumulative[k] += val;
+        obj[`cum_${k}`] = cumulative[k];
+        dayTotal += val;
+      }
+      obj['_total'] = dayTotal;
+      obj['_cumTotal'] = Object.values(cumulative).reduce((s, v) => s + v, 0);
+      return obj;
+    });
+  }, [month, daysInMonth, dailySourceRows, dailyGroupBy, dailyDepts, dailyTransacoes]);
+
+  const TRANS_LABEL_MAP: Record<string, string> = {
+    'P21': 'Balão', 'O21': 'Of/Fu/Ac', 'P24': 'Rede VW', 'P32': 'Fora Est s/ST',
+    'G21': 'Garantia', 'O26': 'Interna', 'P33': 'Rede VW Fora Est', 'P69': 'Exportação',
+    'P26': 'Interna Balão', 'P31': 'Fora do Estado',
+  };
+  const TRANS_PALETTE_D = ['#7c3aed','#0d9488','#f59e0b','#f43f5e','#06b6d4','#10b981','#f97316','#e879f9','#84cc16','#3b82f6'];
+  const transLabelD = (t: string) => TRANS_LABEL_MAP[t] ?? t;
+  const transColorD = (keys: string[], k: string) => TRANS_PALETTE_D[keys.indexOf(k) % TRANS_PALETTE_D.length];
 
   // ─── 1. Evolução Mensal ────────────────────────────────────────────────────
   const monthlyData = useMemo(() => MS.map((label, i) => {
@@ -669,6 +735,135 @@ export default function VPecasAnalise() {
           color={metrics.lbPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}
           accent={metrics.lbPct >= 0 ? EMERALD : ROSE}
         />
+      </div>
+
+      {/* ── Seção 0: Evolução Diária ─────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
+        <SH
+          right={
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Agrupar por */}
+              <div className="flex gap-1">
+                {(['dept', 'trans'] as const).map(g => (
+                  <button key={g} onClick={() => { setDailyGroupBy(g); setDailySelDept('Todos'); setDailySelTrans('Todos'); }}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                      dailyGroupBy === g
+                        ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600'
+                    }`}>
+                    {g === 'dept' ? 'Por Departamento' : 'Por Transação'}
+                  </button>
+                ))}
+              </div>
+              {/* Dropdown de departamento */}
+              {dailyGroupBy === 'dept' && (
+                <select
+                  value={dailySelDept}
+                  onChange={e => setDailySelDept(e.target.value)}
+                  className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-violet-400"
+                >
+                  <option value="Todos">Todos os departamentos</option>
+                  {dailyDepts.filter(d => dailyChartData.some(row => (row[d] ?? 0) > 0)).map(d => (
+                    <option key={d} value={d}>{deptName(d)}</option>
+                  ))}
+                </select>
+              )}
+              {/* Dropdown de transação */}
+              {dailyGroupBy === 'trans' && (
+                <select
+                  value={dailySelTrans}
+                  onChange={e => setDailySelTrans(e.target.value)}
+                  className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-violet-400"
+                >
+                  <option value="Todos">Todos os tipos</option>
+                  {dailyTransacoes.map(t => (
+                    <option key={t} value={t}>{transLabelD(t)} ({t})</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          }
+        >
+          Evolução Diária — {month !== null ? `${MS[month - 1]}/${year}` : `${year}`}
+        </SH>
+        {month === null ? (
+          <div className="h-24 flex items-center justify-center text-slate-300 text-xs">Selecione um mês para ver a evolução diária</div>
+        ) : dailyChartData.every(d => d['_total'] === 0) ? (
+          <div className="h-24 flex items-center justify-center text-slate-300 text-xs">Sem dados no período</div>
+        ) : (() => {
+          const singleDept = dailyGroupBy === 'dept' && dailySelDept !== 'Todos';
+          const keys = dailyGroupBy === 'dept'
+            ? (singleDept ? [dailySelDept] : dailyDepts).filter(k => dailyChartData.some(d => (d[k] ?? 0) > 0))
+            : (dailySelTrans === 'Todos' ? dailyTransacoes : [dailySelTrans]).filter(k => dailyChartData.some(d => (d[k] ?? 0) > 0));
+          return (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={dailyChartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={0} angle={-45} textAnchor="end" height={36} />
+                <YAxis tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} width={52} />
+                <Tooltip
+                  content={({ active, payload, label: lbl }: any) => {
+                    if (!active || !payload?.length) return null;
+                    const d = payload[0]?.payload;
+                    const activeKeys = dailyGroupBy === 'dept'
+                      ? (singleDept ? [dailySelDept] : dailyDepts).filter(k => (d?.[k] ?? 0) > 0)
+                      : (dailySelTrans === 'Todos' ? dailyTransacoes : [dailySelTrans]).filter(k => (d?.[k] ?? 0) > 0);
+                    const dayTotal = activeKeys.reduce((s, k) => s + (d?.[k] ?? 0), 0);
+                    const cumTotal = activeKeys.reduce((s, k) => s + (d?.[`cum_${k}`] ?? 0), 0);
+                    return (
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[200px]">
+                        <p className="font-bold text-slate-700 mb-1.5">Dia {lbl} — {MS[month! - 1]}/{year}</p>
+                        {activeKeys.map(k => (
+                          <div key={k} className="flex justify-between gap-4">
+                            <span className="font-semibold" style={{ color: dailyGroupBy === 'dept' ? deptColor(k, dailyDepts.indexOf(k)) : transColorD(dailyTransacoes, k) }}>
+                              {dailyGroupBy === 'dept' ? deptName(k) : transLabelD(k)}
+                            </span>
+                            <span className="font-mono text-slate-700">{fmtBRLF(d?.[k] ?? 0)}</span>
+                          </div>
+                        ))}
+                        {activeKeys.length > 1 && (
+                          <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                            <span className="font-bold text-slate-700">Total</span>
+                            <span className="font-mono font-bold text-slate-800">{fmtBRLF(dayTotal)}</span>
+                          </div>
+                        )}
+                        <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
+                          <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {lbl}</p>
+                          {activeKeys.map(k => (d?.[`cum_${k}`] ?? 0) > 0 && (
+                            <div key={k} className="flex justify-between gap-4">
+                              <span className="font-semibold" style={{ color: dailyGroupBy === 'dept' ? deptColor(k, dailyDepts.indexOf(k)) : transColorD(dailyTransacoes, k) }}>
+                                {dailyGroupBy === 'dept' ? deptName(k) : transLabelD(k)}
+                              </span>
+                              <span className="font-mono text-slate-600">{fmtBRLF(d?.[`cum_${k}`] ?? 0)}</span>
+                            </div>
+                          ))}
+                          {activeKeys.length > 1 && (
+                            <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                              <span className="font-bold text-slate-700">Total</span>
+                              <span className="font-mono font-bold text-slate-800">{fmtBRLF(cumTotal)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 10 }}
+                  formatter={(value: string) => dailyGroupBy === 'dept' ? deptName(value) : transLabelD(value)}
+                />
+                {keys.map((k, i) => (
+                  <Bar key={k} dataKey={k}
+                    name={k}
+                    stackId={singleDept ? undefined : 'daily'}
+                    fill={dailyGroupBy === 'dept' ? deptColor(k, dailyDepts.indexOf(k)) : transColorD(dailyTransacoes, k)}
+                    fillOpacity={0.85}
+                    radius={singleDept || i === keys.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          );
+        })()}
       </div>
 
       {/* ── Seção 1: Evolução Mensal ───────────────────────────────────────── */}
