@@ -244,72 +244,88 @@ export default function VPecasComparativo({ allRows }: Props) {
       </div>
 
       {!collapsed && <>
-        {/* ── Seletores de período ─────────────────────────────────────── */}
-        <div className="flex flex-wrap gap-3 mb-4">
-          {slots.map((slot, idx) => (
-            <div
-              key={slot.id}
-              className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"
-              style={{ borderLeft: `3px solid ${PERIOD_COLORS[idx]}` }}
-            >
-              <span className="text-[11px] font-black" style={{ color: PERIOD_COLORS[idx] }}>
-                {PERIOD_NAMES[idx]}
-              </span>
+        {/* ── Cards de período ─────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
+          {slots.map((slot, idx) => {
+            const color = PERIOD_COLORS[idx];
+            const nfs   = filterPeriod(baseRows, slot).length;
+            return (
+              <div key={slot.id} className="rounded-xl border-2 overflow-hidden shadow-sm transition-all"
+                style={{ borderColor: color }}>
+                {/* Header strip */}
+                <div className="px-3 py-2.5 flex items-center justify-between"
+                  style={{ background: color }}>
+                  <span className="text-[12px] font-black uppercase tracking-widest text-white drop-shadow-sm">
+                    {PERIOD_NAMES[idx]} — {periodLabel(slot)}
+                  </span>
+                  {slots.length > 1 && (
+                    <button
+                      onClick={() => removeSlot(slot.id)}
+                      className="text-[11px] text-white/60 hover:text-white transition-colors"
+                    >✕</button>
+                  )}
+                </div>
+                {/* Body */}
+                <div className="p-3 flex flex-col gap-2" style={{ background: color + '0d' }}>
+                  {/* modo */}
+                  <div className="flex gap-1">
+                    {(['mes', 'ano'] as PeriodMode[]).map(m => (
+                      <button key={m}
+                        onClick={() => updateSlot(slot.id, { mode: m })}
+                        className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all border ${
+                          slot.mode === m
+                            ? 'text-white border-transparent'
+                            : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
+                        }`}
+                        style={slot.mode === m ? { background: color } : undefined}
+                      >
+                        {m === 'mes' ? 'Mês' : 'Ano'}
+                      </button>
+                    ))}
+                  </div>
+                  {/* ano */}
+                  <div className="flex gap-1 flex-wrap">
+                    {availYears.map(y => (
+                      <button key={y}
+                        onClick={() => updateSlot(slot.id, { year: y })}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                          slot.year === y ? 'text-white' : 'bg-white text-slate-400 border border-slate-200 hover:border-slate-300'
+                        }`}
+                        style={slot.year === y ? { background: color } : undefined}
+                      >{y}</button>
+                    ))}
+                  </div>
+                  {/* mês — só se mode === 'mes' */}
+                  {slot.mode === 'mes' && (
+                    <div className="flex flex-wrap gap-1">
+                      {MS_ABBR.map((m, mi) => (
+                        <button key={mi}
+                          onClick={() => updateSlot(slot.id, { month: mi + 1 })}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                            slot.month === mi + 1 ? 'text-white' : 'bg-white text-slate-400 border border-slate-200 hover:border-slate-300'
+                          }`}
+                          style={slot.month === mi + 1 ? { background: color } : undefined}
+                        >{m}</button>
+                      ))}
+                    </div>
+                  )}
+                  {/* NFs */}
+                  <span className="text-[10px] font-semibold" style={{ color }}>
+                    {nfs.toLocaleString('pt-BR')} NFs
+                  </span>
+                </div>
+              </div>
+            );
+          })}
 
-              {/* modo */}
-              <select
-                value={slot.mode}
-                onChange={e => updateSlot(slot.id, { mode: e.target.value as PeriodMode })}
-                className="border border-slate-200 rounded px-1.5 py-0.5 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-violet-400"
-              >
-                <option value="mes">Mês</option>
-                <option value="ano">Ano</option>
-              </select>
-
-              {/* ano */}
-              <select
-                value={slot.year}
-                onChange={e => updateSlot(slot.id, { year: +e.target.value })}
-                className="border border-slate-200 rounded px-1.5 py-0.5 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-violet-400"
-              >
-                {availYears.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-
-              {/* mês — só aparece se mode === 'mes' */}
-              {slot.mode === 'mes' && (
-                <select
-                  value={slot.month}
-                  onChange={e => updateSlot(slot.id, { month: +e.target.value })}
-                  className="border border-slate-200 rounded px-1.5 py-0.5 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-violet-400"
-                >
-                  {MS_ABBR.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
-                </select>
-              )}
-
-              {/* NFs do slot */}
-              <span className="text-[10px] text-slate-400 whitespace-nowrap">
-                {filterPeriod(baseRows, slot).length} NFs
-              </span>
-
-              {/* remover — só se houver mais de 1 */}
-              {slots.length > 1 && (
-                <button
-                  onClick={() => removeSlot(slot.id)}
-                  className="ml-1 text-slate-300 hover:text-rose-500 transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          ))}
-
-          {/* adicionar slot */}
+          {/* Adicionar período */}
           {slots.length < 4 && (
             <button
               onClick={addSlot}
-              className="flex items-center gap-1.5 border border-dashed border-slate-300 rounded-xl px-4 py-2 text-[11px] font-bold text-slate-400 hover:border-violet-400 hover:text-violet-600 transition-colors"
+              className="rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-1.5 py-6 text-[11px] font-bold text-slate-400 hover:border-violet-400 hover:text-violet-600 transition-colors min-h-[120px]"
             >
-              <Plus className="w-3.5 h-3.5" /> Adicionar período
+              <Plus className="w-5 h-5" />
+              Adicionar período
             </button>
           )}
         </div>
