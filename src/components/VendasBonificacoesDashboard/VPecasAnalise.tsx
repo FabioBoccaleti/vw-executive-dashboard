@@ -22,7 +22,7 @@ const CYAN    = '#06b6d4';
 // Paleta de métricas financeiras (Rec. Bruta / Rec. Líquida / Lucro Bruto)
 const M_REC_BRUTA  = '#1d4ed8'; // azul escuro
 const M_REC_LIQ    = '#dc2626'; // vermelho
-const M_LB         = '#f97316'; // laranja
+const M_LB         = '#eab308'; // amarelo sol
 
 const DEPT_LABEL: Record<string, string> = {
   '103': 'Peças',
@@ -150,15 +150,11 @@ function TipBRL({ active, payload, label }: { active?: boolean; payload?: { name
       {payload.map((p, i) => p.value !== 0 && (
         <div key={i} className="flex justify-between gap-4">
           <span style={{ color: p.color }} className="font-medium">{p.name}</span>
-          <span className="font-mono text-slate-700">{fmtBRLF(p.value)}</span>
+          <span className="font-mono text-slate-700">
+            {p.name === '% LB' ? fmtPct(p.value) : fmtBRLF(p.value)}
+          </span>
         </div>
       ))}
-      {payload.length > 1 && total !== 0 && (
-        <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
-          <span className="font-bold text-slate-600">Total</span>
-          <span className="font-mono font-bold text-slate-700">{fmtBRLF(total)}</span>
-        </div>
-      )}
     </div>
   );
 }
