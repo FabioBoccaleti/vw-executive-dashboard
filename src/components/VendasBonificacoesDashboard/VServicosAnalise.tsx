@@ -176,11 +176,25 @@ function Pill({ label, active, onClick, activeClass }: { label: string; active: 
   );
 }
 
+// ─── Helper: mês mais recente com dados importados ─────────────────────────
+function latestPeriod(rows: VPecasRow[]): { year: number; month: number } {
+  const curYear  = new Date().getFullYear();
+  const curMonth = new Date().getMonth() + 1;
+  const periods  = rows
+    .map(r => ({ y: getYr(r), m: getMo(r) }))
+    .filter(p => p.y > 2000 && p.m >= 1 && p.m <= 12);
+  if (!periods.length) return { year: curYear, month: curMonth };
+  const best = periods.reduce((b, p) =>
+    p.y > b.y || (p.y === b.y && p.m > b.m) ? p : b
+  );
+  return { year: best.y, month: best.m };
+}
+
 // ─── Painel de análise de uma categoria ──────────────────────────────────────
 function ServicoPanel({ rows, color }: { rows: VPecasRow[]; color: string }) {
   const curYear = new Date().getFullYear();
-  const [year, setYear]   = useState(curYear);
-  const [month, setMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [year, setYear]   = useState(() => latestPeriod(rows).year);
+  const [month, setMonth] = useState<number | null>(() => latestPeriod(rows).month);
   const [vendorSort, setVendorSort] = useState<'valorVenda' | 'nfs' | 'recLiq'>('valorVenda');
   const [estadoMetric, setEstadoMetric] = useState<'valorVenda' | 'recLiq' | 'totalImpostos'>('valorVenda');
   const [clienteMetric, setClienteMetric] = useState<'valorVenda' | 'nfs'>('valorVenda');

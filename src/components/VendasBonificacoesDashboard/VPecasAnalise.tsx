@@ -19,6 +19,10 @@ const EMERALD = '#10b981';
 const AMBER   = '#f59e0b';
 const ROSE    = '#f43f5e';
 const CYAN    = '#06b6d4';
+// Paleta de métricas financeiras (Rec. Bruta / Rec. Líquida / Lucro Bruto)
+const M_REC_BRUTA  = '#1d4ed8'; // azul escuro
+const M_REC_LIQ    = '#dc2626'; // vermelho
+const M_LB         = '#f97316'; // laranja
 
 const DEPT_LABEL: Record<string, string> = {
   '103': 'Peças',
@@ -26,7 +30,14 @@ const DEPT_LABEL: Record<string, string> = {
   '106': 'Funilaria',
   '107': 'Acessórios',
 };
-const deptName = (code: string) => DEPT_LABEL[code] ?? code;
+const DEPT_COLOR: Record<string, string> = {
+  '103': '#7c3aed',  // Peças — violeta
+  '104': '#f59e0b',  // Oficina — âmbar/amarelo
+  '106': '#06b6d4',  // Funilaria — ciano
+  '107': '#10b981',  // Acessórios — esmeralda
+};
+const deptName  = (code: string) => DEPT_LABEL[code] ?? code;
+const deptColor = (code: string, fallbackIdx: number) => DEPT_COLOR[code] ?? PALETTE[fallbackIdx % PALETTE.length];
 
 const TRANSACAO_LABEL: Record<string, string> = {
   'P21': 'V. Peças Balcão',
@@ -278,7 +289,7 @@ export default function VPecasAnalise() {
 
   const deptDonut = useMemo(() => {
     const total = deptData.reduce((s, d) => s + d.valorVenda, 0);
-    return deptData.map((d, i) => ({ name: deptName(d.name), value: d.valorVenda, pct: total ? d.valorVenda / total * 100 : 0, color: PALETTE[i % PALETTE.length] }));
+    return deptData.map((d, i) => ({ name: deptName(d.name), value: d.valorVenda, pct: total ? d.valorVenda / total * 100 : 0, color: deptColor(d.name, i) }));
   }, [deptData]);
 
   // ─── 3. Ranking Vendedores ────────────────────────────────────────────────
@@ -322,7 +333,7 @@ export default function VPecasAnalise() {
     const a = metrics;
     const total = a.icms + a.pis + a.cofins + a.difal;
     return [
-      { name: 'ICMS',  value: a.icms,   color: VIOLET,        pct: total ? a.icms  / total * 100 : 0 },
+      { name: 'ICMS',  value: a.icms,   color: '#818cf8',     pct: total ? a.icms  / total * 100 : 0 },
       { name: 'PIS',   value: a.pis,    color: CYAN,          pct: total ? a.pis   / total * 100 : 0 },
       { name: 'COFINS',value: a.cofins, color: EMERALD,       pct: total ? a.cofins/ total * 100 : 0 },
       { name: 'Difal', value: a.difal,  color: AMBER,         pct: total ? a.difal / total * 100 : 0 },
@@ -676,17 +687,17 @@ export default function VPecasAnalise() {
               <YAxis yAxisId="pct" orientation="right" tickFormatter={v => `${v.toFixed(0)}%`} tick={{ fontSize: 10, fill: '#94a3b8' }} width={40} />
               <Tooltip content={<TipBRL />} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar yAxisId="brl" dataKey="valorVenda" name="Receita Bruta" fill={VIOLET} fillOpacity={0.7} radius={[3, 3, 0, 0]}>
+              <Bar yAxisId="brl" dataKey="valorVenda" name="Receita Bruta" fill={M_REC_BRUTA} fillOpacity={0.7} radius={[3, 3, 0, 0]}>
                 {monthlyData.map((d, i) => (
-                  <Cell key={i} fill={month === i + 1 ? VIOLET : `${VIOLET}55`} />
+                  <Cell key={i} fill={month === i + 1 ? M_REC_BRUTA : `${M_REC_BRUTA}55`} />
                 ))}
               </Bar>
-              <Bar yAxisId="brl" dataKey="recLiq" name="Rec. Líquida" fill={EMERALD} fillOpacity={0.7} radius={[3, 3, 0, 0]}>
+              <Bar yAxisId="brl" dataKey="recLiq" name="Rec. Líquida" fill={M_REC_LIQ} fillOpacity={0.7} radius={[3, 3, 0, 0]}>
                 {monthlyData.map((d, i) => (
-                  <Cell key={i} fill={month === i + 1 ? EMERALD : `${EMERALD}55`} />
+                  <Cell key={i} fill={month === i + 1 ? M_REC_LIQ : `${M_REC_LIQ}55`} />
                 ))}
               </Bar>
-              <Line yAxisId="pct" type="monotone" dataKey="lbPct" name="% LB" stroke={AMBER} strokeWidth={2} dot={{ r: 3, fill: AMBER }} />
+              <Line yAxisId="pct" type="monotone" dataKey="lbPct" name="% LB" stroke={M_LB} strokeWidth={2} dot={{ r: 3, fill: M_LB }} />
             </ComposedChart>
           </ResponsiveContainer>
         )}
@@ -756,7 +767,7 @@ export default function VPecasAnalise() {
                     );
                   }} />
                   <Bar dataKey={deptMetric} name={deptMetricLabel[deptMetric]} radius={[0, 4, 4, 0]}>
-                    {deptData.map((d, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                    {deptData.map((d, i) => <Cell key={i} fill={deptColor(d.name, i)} />)}
                     <LabelList dataKey={deptMetric} position="right" formatter={(v: number) => deptMetric === 'nfs' ? v : fmtBRL(v)} style={{ fontSize: 10, fill: '#64748b' }} />
                   </Bar>
                 </BarChart>
@@ -995,9 +1006,9 @@ export default function VPecasAnalise() {
                   );
                 }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="valorVenda" name="Receita Bruta" fill={VIOLET} fillOpacity={0.8} radius={[3, 3, 0, 0]} />
-                <Bar dataKey="recLiq" name="Rec. Líquida" fill={EMERALD} fillOpacity={0.8} radius={[3, 3, 0, 0]} />
-                <Bar dataKey="lucroBruto" name="Lucro Bruto" fill={AMBER} fillOpacity={0.8} radius={[3, 3, 0, 0]} />
+                <Bar dataKey="valorVenda" name="Receita Bruta" fill={M_REC_BRUTA} fillOpacity={0.8} radius={[3, 3, 0, 0]} />
+                <Bar dataKey="recLiq" name="Rec. Líquida" fill={M_REC_LIQ} fillOpacity={0.8} radius={[3, 3, 0, 0]} />
+                <Bar dataKey="lucroBruto" name="Lucro Bruto" fill={M_LB} fillOpacity={0.8} radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

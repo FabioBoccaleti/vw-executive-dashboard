@@ -63,6 +63,20 @@ function calcServicos(d: Record<string, string>) {
   return { recBruta, recLiq };
 }
 
+// ─── Helper: mês mais recente com dados importados ─────────────────────────
+function latestPeriod(rows: VPecasRow[]): { year: number; month: number } {
+  const curYear  = new Date().getFullYear();
+  const curMonth = new Date().getMonth() + 1;
+  const periods  = rows
+    .map(r => ({ y: getYr(r), m: getMo(r) }))
+    .filter(p => p.y > 2000 && p.m >= 1 && p.m <= 12);
+  if (!periods.length) return { year: curYear, month: curMonth };
+  const best = periods.reduce((b, p) =>
+    p.y > b.y || (p.y === b.y && p.m > b.m) ? p : b
+  );
+  return { year: best.y, month: best.m };
+}
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 type ChartTab = 'pecas' | 'servicos' | 'total';
 type SortKey  = 'pecasRec' | 'pecasLucro' | 'servRec' | 'nome';
@@ -89,8 +103,8 @@ export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: 
 
   const [pecasRows, setPecasRows] = useState<VPecasRow[]>([]);
   const [loading, setLoading]     = useState(true);
-  const [year, setYear]           = useState(curYear);
-  const [month, setMonth]         = useState<number>(new Date().getMonth() + 1);
+  const [year, setYear]           = useState(() => latestPeriod(servicosRows).year);
+  const [month, setMonth]         = useState<number>(() => latestPeriod(servicosRows).month);
   const [chartTab, setChartTab]   = useState<ChartTab>('total');
   const [selConsultor, setSelConsultor] = useState<string | null>(null);
   const [sortBy, setSortBy]       = useState<SortKey>('pecasRec');
@@ -365,14 +379,25 @@ export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: 
     });
   }, [cmpActive, daysInMonth, filteredPecasCmp, filteredServicosCmp, selConsultor, cmpYear, cmpMonth]);
 
-  const mergedDailyData = useMemo(() =>
-    dailyData.map((d, i) => ({
-      ...d,
-      pecasCmp:    cmpActive ? (dailyDataCmp[i]?.pecas    ?? 0) : undefined,
-      servicosCmp: cmpActive ? (dailyDataCmp[i]?.servicos ?? 0) : undefined,
-      totalCmp:    cmpActive ? (dailyDataCmp[i]?.total    ?? 0) : undefined,
-    })),
-  [dailyData, dailyDataCmp, cmpActive]);
+  const mergedDailyData = useMemo(() => {
+    let cumPecas = 0, cumServicos = 0, cumTotal = 0, cumNfs = 0;
+    return dailyData.map((d, i) => {
+      cumPecas    += d.pecas;
+      cumServicos += d.servicos;
+      cumTotal    += d.total;
+      cumNfs      += (d.nfsPecas + d.nfsServicos);
+      return {
+        ...d,
+        cumPecas,
+        cumServicos,
+        cumTotal,
+        cumNfs,
+        pecasCmp:    cmpActive ? (dailyDataCmp[i]?.pecas    ?? 0) : undefined,
+        servicosCmp: cmpActive ? (dailyDataCmp[i]?.servicos ?? 0) : undefined,
+        totalCmp:    cmpActive ? (dailyDataCmp[i]?.total    ?? 0) : undefined,
+      };
+    });
+  }, [dailyData, dailyDataCmp, cmpActive]);
 
   const dailyPecasByTransCmp = useMemo(() => {
     const maxDay = cmpActive ? new Date(cmpYear, cmpMonth, 0).getDate() : 0;
@@ -392,9 +417,17 @@ export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: 
     });
   }, [cmpActive, daysInMonth, filteredPecasCmp, selConsultor, pecasTransacoes, cmpYear, cmpMonth]);
 
-  const mergedPecasByTrans = useMemo(() =>
-    dailyPecasByTrans.map((d, i) => ({ ...d, ...dailyPecasByTransCmp[i] })),
-  [dailyPecasByTrans, dailyPecasByTransCmp]);
+  const mergedPecasByTrans = useMemo(() => {
+    const cumByType: Record<string, number> = {};
+    return dailyPecasByTrans.map((d, i) => {
+      const merged: Record<string, any> = { ...d, ...dailyPecasByTransCmp[i] };
+      for (const t of pecasTransacoes) {
+        cumByType[t] = (cumByType[t] ?? 0) + (d[t] ?? 0);
+        merged[`cum_${t}`] = cumByType[t];
+      }
+      return merged;
+    });
+  }, [dailyPecasByTrans, dailyPecasByTransCmp, pecasTransacoes]);
 
   const dailyServicosByTransCmp = useMemo(() => {
     const maxDay = cmpActive ? new Date(cmpYear, cmpMonth, 0).getDate() : 0;
@@ -414,9 +447,17 @@ export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: 
     });
   }, [cmpActive, daysInMonth, filteredServicosCmp, selConsultor, servicosTransacoes, cmpYear, cmpMonth]);
 
-  const mergedServicosByTrans = useMemo(() =>
-    dailyServicosByTrans.map((d, i) => ({ ...d, ...dailyServicosByTransCmp[i] })),
-  [dailyServicosByTrans, dailyServicosByTransCmp]);
+  const mergedServicosByTrans = useMemo(() => {
+    const cumByType: Record<string, number> = {};
+    return dailyServicosByTrans.map((d, i) => {
+      const merged: Record<string, any> = { ...d, ...dailyServicosByTransCmp[i] };
+      for (const t of servicosTransacoes) {
+        cumByType[t] = (cumByType[t] ?? 0) + (d[t] ?? 0);
+        merged[`cum_${t}`] = cumByType[t];
+      }
+      return merged;
+    });
+  }, [dailyServicosByTrans, dailyServicosByTransCmp, servicosTransacoes]);
 
   if (loading) {
     return (
@@ -597,6 +638,25 @@ export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: 
                               <span className="text-slate-400">NFs</span>
                               <span className="font-mono text-slate-500">{(d?.nfsPecas ?? 0) + (d?.nfsServicos ?? 0)}</span>
                             </div>
+                            <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
+                              <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {label}</p>
+                              <div className="flex justify-between gap-4">
+                                <span style={{ color: VIOLET }} className="font-semibold">Peças</span>
+                                <span className="font-mono text-slate-600">{fmtBRLF(d?.cumPecas ?? 0)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4 mt-0.5">
+                                <span style={{ color: TEAL }} className="font-semibold">Serviços</span>
+                                <span className="font-mono text-slate-600">{fmtBRLF(d?.cumServicos ?? 0)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                                <span className="font-bold text-slate-700">Total</span>
+                                <span className="font-mono font-bold text-slate-800">{fmtBRLF(d?.cumTotal ?? 0)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4 mt-0.5">
+                                <span className="text-slate-400">NFs</span>
+                                <span className="font-mono text-slate-500">{d?.cumNfs ?? 0}</span>
+                              </div>
+                            </div>
                             {cmpActive && (
                               <div className="mt-2 pt-1.5 border-t-2 border-amber-200">
                                 <p className="text-[10px] text-amber-500 font-bold mb-1">{MS[cmpMonth - 1]}/{cmpYear}</p>
@@ -630,6 +690,13 @@ export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: 
                           <div className="flex justify-between gap-4 mt-0.5">
                             <span className="text-slate-500">NFs</span>
                             <span className="font-mono text-slate-600">{nfs ?? 0}</span>
+                          </div>
+                          <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
+                            <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {label}</p>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-slate-500">Rec. Bruta</span>
+                              <span className="font-mono font-semibold" style={{ color }}>{fmtBRLF(chartTab === 'pecas' ? (d?.cumPecas ?? 0) : (d?.cumServicos ?? 0))}</span>
+                            </div>
                           </div>
                           {cmpActive && (
                             <div className="mt-2 pt-1.5 border-t-2 border-amber-200">
@@ -731,7 +798,10 @@ export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: 
                         <Tooltip
                           content={({ active, payload, label }: any) => {
                             if (!active || !payload?.length) return null;
-                            const total = payload.reduce((s: number, p: any) => s + (p.value ?? 0), 0);
+                            const d = payload[0]?.payload;
+                            const activePecasTipos = pecasTransacoes.filter(t => ativos.has(t));
+                            const total = activePecasTipos.reduce((s, t) => s + ((d?.[t]) ?? 0), 0);
+                            const cumTotal = activePecasTipos.reduce((s, t) => s + ((d?.[`cum_${t}`]) ?? 0), 0);
                             return (
                               <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[180px]">
                                 <p className="font-bold text-slate-700 mb-1.5">Dia {label} — Peças</p>
@@ -747,6 +817,21 @@ export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: 
                                     <span className="font-mono font-bold text-slate-800">{fmtBRLF(total)}</span>
                                   </div>
                                 )}
+                                <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
+                                  <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {label}</p>
+                                  {activePecasTipos.map(t => (d?.[`cum_${t}`] ?? 0) > 0 && (
+                                    <div key={t} className="flex justify-between gap-4">
+                                      <span style={{ color: transColor(pecasTransacoes, t) }} className="font-semibold">{transLabel(t)}</span>
+                                      <span className="font-mono text-slate-600">{fmtBRLF(d?.[`cum_${t}`] ?? 0)}</span>
+                                    </div>
+                                  ))}
+                                  {activePecasTipos.length > 1 && (
+                                    <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                                      <span className="font-bold text-slate-700">Total</span>
+                                      <span className="font-mono font-bold text-slate-800">{fmtBRLF(cumTotal)}</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             );
                           }}
@@ -823,7 +908,10 @@ export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: 
                         <Tooltip
                           content={({ active, payload, label }: any) => {
                             if (!active || !payload?.length) return null;
-                            const total = payload.reduce((s: number, p: any) => s + (p.value ?? 0), 0);
+                            const d = payload[0]?.payload;
+                            const activeServicosTipos = servicosTransacoes.filter(t => ativos.has(t));
+                            const total = activeServicosTipos.reduce((s, t) => s + ((d?.[t]) ?? 0), 0);
+                            const cumTotal = activeServicosTipos.reduce((s, t) => s + ((d?.[`cum_${t}`]) ?? 0), 0);
                             return (
                               <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[180px]">
                                 <p className="font-bold text-slate-700 mb-1.5">Dia {label} — Serviços</p>
@@ -839,6 +927,21 @@ export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: 
                                     <span className="font-mono font-bold text-slate-800">{fmtBRLF(total)}</span>
                                   </div>
                                 )}
+                                <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
+                                  <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {label}</p>
+                                  {activeServicosTipos.map(t => (d?.[`cum_${t}`] ?? 0) > 0 && (
+                                    <div key={t} className="flex justify-between gap-4">
+                                      <span style={{ color: transColor(servicosTransacoes, t) }} className="font-semibold">{transLabel(t)}</span>
+                                      <span className="font-mono text-slate-600">{fmtBRLF(d?.[`cum_${t}`] ?? 0)}</span>
+                                    </div>
+                                  ))}
+                                  {activeServicosTipos.length > 1 && (
+                                    <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                                      <span className="font-bold text-slate-700">Total</span>
+                                      <span className="font-mono font-bold text-slate-800">{fmtBRLF(cumTotal)}</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             );
                           }}
@@ -1028,19 +1131,23 @@ export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: 
                 const slotYear = slot?.year ?? year;
                 const slotMonth = slot?.month ?? month;
                 return (
-                  <div key={idx} className="rounded-xl border-2 p-3 flex flex-col gap-2 transition-all"
-                    style={{ borderColor: slot ? color : '#e2e8f0', background: slot ? color + '08' : '#f8fafc' }}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-black uppercase tracking-wider" style={{ color }}>
+                  <div key={idx} className="rounded-xl border-2 overflow-hidden transition-all shadow-sm"
+                    style={{ borderColor: slot ? color : '#475569' }}>
+                    {/* Header strip */}
+                    <div className="px-3 py-2.5 flex items-center justify-between"
+                      style={{ background: slot ? color : '#334155' }}>
+                      <span className="text-[12px] font-black uppercase tracking-widest text-white drop-shadow-sm">
                         Cenário {idx + 1}
                       </span>
                       {slot && (
                         <button
                           onClick={() => setSlots(prev => prev.map((s, i) => i === idx ? null : s))}
-                          className="text-[10px] text-slate-400 hover:text-rose-400 transition-colors"
+                          className="text-[11px] text-white/60 hover:text-white transition-colors"
                         >✕</button>
                       )}
                     </div>
+                    {/* Body */}
+                    <div className="p-3 flex flex-col gap-2" style={{ background: slot ? color + '0d' : '#f8fafc' }}>
                     {/* Consultor */}
                     <select
                       value={slot?.consultor ?? ''}
@@ -1077,6 +1184,7 @@ export default function VServicosConsultorAnalise({ servicosRows, pecasDepts }: 
                         >{y}</button>
                       ))}
                     </div>
+                    </div>{/* /body */}
                   </div>
                 );
               })}
