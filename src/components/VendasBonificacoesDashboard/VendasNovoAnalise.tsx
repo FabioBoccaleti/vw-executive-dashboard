@@ -634,6 +634,10 @@ export function VendasNovoAnalise() {
   const [dailyFamilia,   setDailyFamilia]   = useState('Todas');
   const [dailyMetric,    setDailyMetric]    = useState<'receita' | 'qtd'>('receita');
 
+  // Tabela Pivot
+  const [pivotGrouping, setPivotGrouping] = useState<'familia' | 'modelo'>('familia');
+  const [pivotMetric,   setPivotMetric]   = useState<'vol' | 'lbPct' | 'margPct' | 'mediaDias' | 'medianaDias'>('vol');
+
   // Comparativo de períodos
   const [periods, setPeriods] = useState<PeriodCfg[]>([
     { id: 'base', year: curYear, gran: 'mes', month: curMonth, vendedor: 'Todos', familia: 'Todas', modelo: 'Todos' },
@@ -804,6 +808,102 @@ export function VendasNovoAnalise() {
       return { dia: String(day).padStart(2, '0'), receita, qtd, cumReceita, cumQtd };
     });
   }, [filteredRows, month, dailyVendedor, dailyFamilia, daysInMonthNovos]);
+
+  // ── Tabela Pivot Família/Modelo × Meses ─────────────────────────────────
+  const pivotActiveMeses = useMemo(() => {
+    const s = new Set<number>();
+    for (const r of yearRows) {
+      const m = getMo(r);
+      if (m >= 1 && m <= 12) s.add(m);
+    }
+    return [...s].sort((a, b) => a - b);
+  }, [yearRows]);
+
+  const pivotData = useMemo(() => {
+    if (!pivotActiveMeses.length) return { rows: [], totals: {} as Record<number, { vol: number; lbPct: number; margPct: number; mediaDias: number; medianaDias: number }>, grandTotal: null };
+    const getKey = (r: VendasResultadoRow) =>
+      pivotGrouping === 'familia' ? normalizeModelo(r.modelo ?? '') : (r.modelo?.trim() || '(sem modelo)');
+
+    // Agrupar por chave e mês
+    const map = new Map<string, Map<number, VendasResultadoRow[]>>();
+    for (const r of yearRows) {
+      if (r.transacao === 'V07') continue;
+      const key = getKey(r);
+      const mo  = getMo(r);
+      if (!map.has(key)) map.set(key, new Map());
+      const byMo = map.get(key)!;
+      byMo.set(mo, [...(byMo.get(mo) ?? []), r]);
+    }
+
+    // Calcular métricas por célula
+    type Cell = { vol: number; lbPct: number; margPct: number; mediaDias: number; medianaDias: number };
+    const rows: { name: string; cells: Record<number, Cell>; total: Cell }[] = [];
+
+    for (const [name, byMo] of map) {
+      const cells: Record<number, Cell> = {};
+      let totalVol = 0, totalRecLiq = 0, totalLb = 0, totalRes = 0;
+      const allDias: number[] = [];
+      for (const mo of pivotActiveMeses) {
+        const mr = byMo.get(mo) ?? [];
+        const a  = agg(mr, aliqBon, dsrCfg);
+        const cell: Cell = a
+          ? { vol: a.netVol, lbPct: a.lbPct, margPct: a.marg, mediaDias: a.mediaDias, medianaDias: a.medianaDias }
+          : { vol: 0, lbPct: 0, margPct: 0, mediaDias: 0, medianaDias: 0 };
+        cells[mo] = cell;
+        totalVol    += cell.vol;
+        totalRecLiq += a?.recLiq ?? 0;
+        totalLb     += a?.lb ?? 0;
+        totalRes    += a?.res ?? 0;
+        mr.forEach(r => { const d = n(r.diasEstoque); if (d > 0) allDias.push(d); });
+      }
+      const sorted = [...allDias].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      const mediana = sorted.length === 0 ? 0
+        : sorted.length % 2 === 1 ? sorted[mid]
+        : (sorted[mid - 1] + sorted[mid]) / 2;
+      rows.push({
+        name,
+        cells,
+        total: {
+          vol: totalVol,
+          lbPct:     totalRecLiq > 0 ? totalLb  / totalRecLiq * 100 : 0,
+          margPct:   totalRecLiq > 0 ? totalRes / totalRecLiq * 100 : 0,
+          mediaDias:   allDias.length > 0 ? allDias.reduce((s, d) => s + d, 0) / allDias.length : 0,
+          medianaDias: mediana,
+        },
+      });
+    }
+
+    rows.sort((a, b) => b.total.vol - a.total.vol);
+
+    // Linha de totais
+    const totals: Record<number, Cell> = {};
+    let gVol = 0, gRecLiq = 0, gLb = 0, gRes = 0;
+    const gAllDias: number[] = [];
+    for (const mo of pivotActiveMeses) {
+      const mr = yearRows.filter(r => getMo(r) === mo && r.transacao !== 'V07');
+      const a  = agg(mr, aliqBon, dsrCfg);
+      totals[mo] = a
+        ? { vol: a.netVol, lbPct: a.lbPct, margPct: a.marg, mediaDias: a.mediaDias, medianaDias: a.medianaDias }
+        : { vol: 0, lbPct: 0, margPct: 0, mediaDias: 0, medianaDias: 0 };
+      gVol    += totals[mo].vol;
+      gRecLiq += a?.recLiq ?? 0;
+      gLb     += a?.lb ?? 0;
+      gRes    += a?.res ?? 0;
+      mr.forEach(r => { const d = n(r.diasEstoque); if (d > 0) gAllDias.push(d); });
+    }
+    const gSorted = [...gAllDias].sort((a, b) => a - b);
+    const gMid = Math.floor(gSorted.length / 2);
+    const grandTotal: Cell = {
+      vol: gVol,
+      lbPct:     gRecLiq > 0 ? gLb  / gRecLiq * 100 : 0,
+      margPct:   gRecLiq > 0 ? gRes / gRecLiq * 100 : 0,
+      mediaDias:   gAllDias.length > 0 ? gAllDias.reduce((s, d) => s + d, 0) / gAllDias.length : 0,
+      medianaDias: gSorted.length === 0 ? 0 : gSorted.length % 2 === 1 ? gSorted[gMid] : (gSorted[gMid - 1] + gSorted[gMid]) / 2,
+    };
+
+    return { rows, totals, grandTotal };
+  }, [yearRows, pivotGrouping, pivotActiveMeses, aliqBon, dsrCfg]);
 
   // Bônus mensais
   const bonusMonthly = useMemo(() => MS.map((label, i) => {
@@ -2192,6 +2292,169 @@ export function VendasNovoAnalise() {
                     )}
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+            );
+          })()}
+
+          {/* ── Tabela Pivot: Família/Modelo × Meses ────────────────────────── */}
+          {month === null && pivotData.rows.length > 0 && (() => {
+            const { rows, totals, grandTotal } = pivotData;
+            const meses = pivotActiveMeses;
+
+            const fmtCell = (cell: { vol: number; lbPct: number; margPct: number; mediaDias: number; medianaDias: number }) => {
+              if (pivotMetric === 'vol')        return cell.vol > 0 ? String(cell.vol) : '—';
+              if (pivotMetric === 'lbPct')      return cell.vol > 0 ? cell.lbPct.toFixed(1)      + '%' : '—';
+              if (pivotMetric === 'margPct')    return cell.vol > 0 ? cell.margPct.toFixed(1)    + '%' : '—';
+              if (pivotMetric === 'mediaDias')  return cell.vol > 0 ? cell.mediaDias.toFixed(0)  + 'd' : '—';
+              if (pivotMetric === 'medianaDias')return cell.vol > 0 ? cell.medianaDias.toFixed(0) + 'd' : '—';
+              return '—';
+            };
+            const isDias = pivotMetric === 'mediaDias' || pivotMetric === 'medianaDias';
+            const cellColor = (cell: { vol: number; lbPct: number; margPct: number; mediaDias: number; medianaDias: number }) => {
+              if (pivotMetric === 'vol' || cell.vol === 0) return '';
+              if (isDias) {
+                const d = pivotMetric === 'mediaDias' ? cell.mediaDias : cell.medianaDias;
+                if (d === 0)   return 'text-slate-300';
+                if (d <= 30)   return 'text-emerald-600 font-semibold';
+                if (d <= 60)   return 'text-sky-600';
+                if (d <= 90)   return 'text-amber-600';
+                return 'text-red-600 font-semibold';
+              }
+              const v = pivotMetric === 'lbPct' ? cell.lbPct : cell.margPct;
+              if (v < 0)    return 'text-red-600 font-semibold';
+              if (v < 2)    return 'text-amber-600';
+              if (v < 5)    return 'text-sky-600';
+              return 'text-emerald-600 font-semibold';
+            };
+            const cellBg = (cell: { vol: number; lbPct: number; margPct: number; mediaDias: number; medianaDias: number }) => {
+              if (pivotMetric === 'vol' || cell.vol === 0) return '';
+              if (isDias) {
+                const d = pivotMetric === 'mediaDias' ? cell.mediaDias : cell.medianaDias;
+                if (d === 0)  return '';
+                if (d <= 30)  return 'bg-emerald-50';
+                if (d <= 60)  return 'bg-sky-50';
+                if (d <= 90)  return 'bg-amber-50';
+                return 'bg-red-50';
+              }
+              const v = pivotMetric === 'lbPct' ? cell.lbPct : cell.margPct;
+              if (v < 0)  return 'bg-red-50';
+              if (v < 2)  return 'bg-amber-50';
+              if (v < 5)  return 'bg-sky-50';
+              return 'bg-emerald-50';
+            };
+
+            return (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <SH right={
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Agrupamento */}
+                    <div className="flex gap-1">
+                      {(['familia', 'modelo'] as const).map(g => (
+                        <button key={g} onClick={() => setPivotGrouping(g)}
+                          className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                            pivotGrouping === g
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300 hover:text-blue-600'
+                          }`}>
+                          {g === 'familia' ? 'Família' : 'Modelo'}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="w-px h-4 bg-slate-200" />
+                    {/* Métrica */}
+                    {([['vol', 'Volume'], ['lbPct', '% L. Bruto'], ['margPct', '% Resultado'], ['mediaDias', 'Dias (média)'], ['medianaDias', 'Dias (mediana)']] as const).map(([k, label]) => (
+                      <button key={k} onClick={() => setPivotMetric(k)}
+                        className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                          pivotMetric === k
+                            ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
+                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                        }`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                }>
+                  Comparativo Mensal por {pivotGrouping === 'familia' ? 'Família' : 'Modelo'} — {year}
+                </SH>
+
+                {/* Legenda de cores */}
+                {pivotMetric !== 'vol' && (
+                  <div className="flex gap-4 text-[10px] mb-3 flex-wrap">
+                    {isDias ? (
+                      <>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-100 border border-emerald-300 inline-block" />≤ 30 dias</span>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-sky-100 border border-sky-300 inline-block" />31 – 60 dias</span>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-300 inline-block" />61 – 90 dias</span>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-100 border border-red-300 inline-block" />&gt; 90 dias</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-100 border border-emerald-300 inline-block" />≥ 5%</span>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-sky-100 border border-sky-300 inline-block" />2% – 5%</span>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-300 inline-block" />0% – 2%</span>
+                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-100 border border-red-300 inline-block" />Negativo</span>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b-2 border-slate-200">
+                        <th className="sticky left-0 bg-white z-10 text-left py-2 pr-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px] min-w-[120px]">
+                          {pivotGrouping === 'familia' ? 'Família' : 'Modelo'}
+                        </th>
+                        {meses.map(mo => (
+                          <th key={mo} className="text-center py-2 px-2 font-semibold text-slate-400 uppercase tracking-wide text-[10px] min-w-[56px]">
+                            {MS[mo - 1]}
+                          </th>
+                        ))}
+                        <th className="text-center py-2 px-2 font-semibold text-slate-600 uppercase tracking-wide text-[10px] min-w-[56px]">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, ri) => (
+                        <tr key={row.name} className={`border-b border-slate-100 transition-colors hover:bg-slate-50 ${ri % 2 === 0 ? '' : 'bg-slate-50/40'}`}>
+                          <td className="sticky left-0 bg-inherit z-10 py-2 pr-3 font-medium text-slate-700 truncate max-w-[160px]" title={row.name}>
+                            {row.name}
+                          </td>
+                          {meses.map(mo => {
+                            const cell = row.cells[mo] ?? { vol: 0, lbPct: 0, margPct: 0 };
+                            return (
+                              <td key={mo} className={`text-center py-2 px-2 tabular-nums ${cellBg(cell)} ${cellColor(cell)}`}>
+                                {fmtCell(cell)}
+                              </td>
+                            );
+                          })}
+                          <td className={`text-center py-2 px-2 tabular-nums font-bold ${cellBg(row.total)} ${cellColor(row.total)}`}>
+                            {fmtCell(row.total)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-slate-300 bg-slate-50">
+                        <td className="sticky left-0 bg-slate-50 z-10 py-2 pr-3 font-bold text-slate-700 uppercase text-[10px] tracking-wide">
+                          Total
+                        </td>
+                        {meses.map(mo => {
+                          const cell = (totals as Record<number, { vol: number; lbPct: number; margPct: number; mediaDias: number; medianaDias: number }>)[mo] ?? { vol: 0, lbPct: 0, margPct: 0, mediaDias: 0, medianaDias: 0 };
+                          return (
+                            <td key={mo} className={`text-center py-2 px-2 tabular-nums font-bold ${cellBg(cell)} ${cellColor(cell)}`}>
+                              {fmtCell(cell)}
+                            </td>
+                          );
+                        })}
+                        <td className={`text-center py-2 px-2 tabular-nums font-bold text-slate-800 ${grandTotal ? cellBg(grandTotal) : ''}`}>
+                          {grandTotal ? fmtCell(grandTotal) : '—'}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
             );
           })()}
