@@ -606,6 +606,10 @@ export function VendasDiretaAnalise() {
   const [dailyFamilia,   setDailyFamilia]   = useState('Todas');
   const [dailyMetric,    setDailyMetric]    = useState<'receita' | 'qtd'>('receita');
 
+  // Tabela Pivot
+  const [pivotGrouping, setPivotGrouping] = useState<'familia' | 'modelo'>('familia');
+  const [pivotMetric,   setPivotMetric]   = useState<'vol' | 'lbPct' | 'margPct'>('vol');
+
   // Comparativo de períodos
   const [periods, setPeriods] = useState<PeriodCfg[]>([
     { id: 'base', year: curYear, gran: 'mes', month: curMonth, vendedor: 'Todos', familia: 'Todas', modelo: 'Todos' },
@@ -865,6 +869,78 @@ export function VendasDiretaAnalise() {
       })
       .sort((a, b) => a.mediana - b.mediana);
   }, [filteredRows, giroGrouping]);
+
+  // ── Tabela Pivot Família/Modelo × Meses ──────────────────────────────────
+  const pivotActiveMeses = useMemo(() => {
+    const s = new Set<number>();
+    for (const r of yearRows) s.add(getMo(r));
+    return [...s].sort((a, b) => a - b);
+  }, [yearRows]);
+
+  const pivotData = useMemo(() => {
+    type Cell = { vol: number; lbPct: number; margPct: number };
+    if (!pivotActiveMeses.length) return { rows: [], totals: {} as Record<number, Cell>, grandTotal: null };
+    const getKey = (r: VendasResultadoRow) =>
+      pivotGrouping === 'familia' ? normalizeModelo(r.modelo ?? '') : (r.modelo?.trim() || '(sem modelo)');
+
+    const map = new Map<string, Map<number, VendasResultadoRow[]>>();
+    for (const r of yearRows) {
+      const key = getKey(r);
+      const mo  = getMo(r);
+      if (!map.has(key)) map.set(key, new Map());
+      const byMo = map.get(key)!;
+      byMo.set(mo, [...(byMo.get(mo) ?? []), r]);
+    }
+
+    const rows: { name: string; cells: Record<number, Cell>; total: Cell }[] = [];
+    for (const [name, byMo] of map) {
+      const cells: Record<number, Cell> = {};
+      let totalVol = 0, totalRecLiq = 0, totalLb = 0, totalRes = 0;
+      for (const mo of pivotActiveMeses) {
+        const mr = byMo.get(mo) ?? [];
+        const a  = agg(mr, aliqBon, dsrCfg);
+        const cell: Cell = a
+          ? { vol: a.netVol, lbPct: a.lbPct, margPct: a.marg }
+          : { vol: 0, lbPct: 0, margPct: 0 };
+        cells[mo] = cell;
+        totalVol    += cell.vol;
+        totalRecLiq += a?.recLiq ?? 0;
+        totalLb     += a?.lb ?? 0;
+        totalRes    += a?.res ?? 0;
+      }
+      rows.push({
+        name,
+        cells,
+        total: {
+          vol:     totalVol,
+          lbPct:   totalRecLiq > 0 ? totalLb  / totalRecLiq * 100 : 0,
+          margPct: totalRecLiq > 0 ? totalRes / totalRecLiq * 100 : 0,
+        },
+      });
+    }
+    rows.sort((a, b) => b.total.vol - a.total.vol);
+
+    const totals: Record<number, Cell> = {};
+    let gVol = 0, gRecLiq = 0, gLb = 0, gRes = 0;
+    for (const mo of pivotActiveMeses) {
+      const mr = yearRows.filter(r => getMo(r) === mo);
+      const a  = agg(mr, aliqBon, dsrCfg);
+      totals[mo] = a
+        ? { vol: a.netVol, lbPct: a.lbPct, margPct: a.marg }
+        : { vol: 0, lbPct: 0, margPct: 0 };
+      gVol    += totals[mo].vol;
+      gRecLiq += a?.recLiq ?? 0;
+      gLb     += a?.lb ?? 0;
+      gRes    += a?.res ?? 0;
+    }
+    const grandTotal: Cell = {
+      vol:     gVol,
+      lbPct:   gRecLiq > 0 ? gLb  / gRecLiq * 100 : 0,
+      margPct: gRecLiq > 0 ? gRes / gRecLiq * 100 : 0,
+    };
+
+    return { rows, totals, grandTotal };
+  }, [yearRows, pivotGrouping, pivotActiveMeses, aliqBon, dsrCfg]);
 
   // Análise de Cores — ranking e heatmap família × cor
   const coresData = useMemo(() => {
@@ -1994,6 +2070,136 @@ export function VendasDiretaAnalise() {
                     )}
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+            );
+          })()}
+
+          {/* ── Tabela Pivot: Família/Modelo × Meses ──────────────────────────── */}
+          {month === null && pivotData.rows.length > 0 && (() => {
+            const { rows, totals, grandTotal } = pivotData;
+            const meses = pivotActiveMeses;
+
+            const fmtCell = (cell: { vol: number; lbPct: number; margPct: number }) => {
+              if (pivotMetric === 'vol')     return cell.vol > 0 ? String(cell.vol) : '—';
+              if (pivotMetric === 'lbPct')   return cell.vol > 0 ? cell.lbPct.toFixed(1)  + '%' : '—';
+              if (pivotMetric === 'margPct') return cell.vol > 0 ? cell.margPct.toFixed(1) + '%' : '—';
+              return '—';
+            };
+            const cellColor = (cell: { vol: number; lbPct: number; margPct: number }) => {
+              if (pivotMetric === 'vol' || cell.vol === 0) return '';
+              const v = pivotMetric === 'lbPct' ? cell.lbPct : cell.margPct;
+              if (v < 0)  return 'text-red-600 font-semibold';
+              if (v < 2)  return 'text-amber-600';
+              if (v < 5)  return 'text-sky-600';
+              return 'text-emerald-600 font-semibold';
+            };
+            const cellBg = (cell: { vol: number; lbPct: number; margPct: number }) => {
+              if (pivotMetric === 'vol' || cell.vol === 0) return '';
+              const v = pivotMetric === 'lbPct' ? cell.lbPct : cell.margPct;
+              if (v < 0)  return 'bg-red-50';
+              if (v < 2)  return 'bg-amber-50';
+              if (v < 5)  return 'bg-sky-50';
+              return 'bg-emerald-50';
+            };
+
+            return (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <SH right={
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex gap-1">
+                      {(['familia', 'modelo'] as const).map(g => (
+                        <button key={g} onClick={() => setPivotGrouping(g)}
+                          className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                            pivotGrouping === g
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-400 hover:text-emerald-600'
+                          }`}>
+                          {g === 'familia' ? 'Família' : 'Modelo'}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="w-px h-4 bg-slate-200" />
+                    {([['vol', 'Volume'], ['lbPct', '% L. Bruto'], ['margPct', '% Resultado']] as const).map(([k, label]) => (
+                      <button key={k} onClick={() => setPivotMetric(k)}
+                        className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                          pivotMetric === k
+                            ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
+                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                        }`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                }>
+                  Comparativo Mensal por {pivotGrouping === 'familia' ? 'Família' : 'Modelo'} — {year}
+                </SH>
+
+                {pivotMetric !== 'vol' && (
+                  <div className="flex gap-4 text-[10px] mb-3 flex-wrap">
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-100 border border-emerald-300 inline-block" />≥ 5%</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-sky-100 border border-sky-300 inline-block" />2% – 5%</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-300 inline-block" />0% – 2%</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-100 border border-red-300 inline-block" />Negativo</span>
+                  </div>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b-2 border-slate-200">
+                        <th className="sticky left-0 bg-white z-10 text-left py-2 pr-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px] min-w-[120px]">
+                          {pivotGrouping === 'familia' ? 'Família' : 'Modelo'}
+                        </th>
+                        {meses.map(mo => (
+                          <th key={mo} className="text-center py-2 px-2 font-semibold text-slate-400 uppercase tracking-wide text-[10px] min-w-[56px]">
+                            {MS[mo - 1]}
+                          </th>
+                        ))}
+                        <th className="text-center py-2 px-2 font-semibold text-slate-600 uppercase tracking-wide text-[10px] min-w-[56px]">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, ri) => (
+                        <tr key={row.name} className={`border-b border-slate-100 transition-colors hover:bg-slate-50 ${ri % 2 === 0 ? '' : 'bg-slate-50/40'}`}>
+                          <td className="sticky left-0 bg-inherit z-10 py-2 pr-3 font-medium text-slate-700 truncate max-w-[160px]" title={row.name}>
+                            {row.name}
+                          </td>
+                          {meses.map(mo => {
+                            const cell = row.cells[mo] ?? { vol: 0, lbPct: 0, margPct: 0 };
+                            return (
+                              <td key={mo} className={`text-center py-2 px-2 tabular-nums ${cellBg(cell)} ${cellColor(cell)}`}>
+                                {fmtCell(cell)}
+                              </td>
+                            );
+                          })}
+                          <td className={`text-center py-2 px-2 tabular-nums font-bold ${cellBg(row.total)} ${cellColor(row.total)}`}>
+                            {fmtCell(row.total)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-slate-300 bg-slate-50">
+                        <td className="sticky left-0 bg-slate-50 z-10 py-2 pr-3 font-bold text-slate-700 uppercase text-[10px] tracking-wide">
+                          Total
+                        </td>
+                        {meses.map(mo => {
+                          const cell = (totals as Record<number, { vol: number; lbPct: number; margPct: number }>)[mo] ?? { vol: 0, lbPct: 0, margPct: 0 };
+                          return (
+                            <td key={mo} className={`text-center py-2 px-2 tabular-nums font-bold ${cellBg(cell)} ${cellColor(cell)}`}>
+                              {fmtCell(cell)}
+                            </td>
+                          );
+                        })}
+                        <td className={`text-center py-2 px-2 tabular-nums font-bold text-slate-800 ${grandTotal ? cellBg(grandTotal) : ''}`}>
+                          {grandTotal ? fmtCell(grandTotal) : '—'}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
             );
           })()}
