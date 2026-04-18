@@ -96,6 +96,12 @@ function getMo(r: VendasResultadoRow) {
   if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[1];
   return 0;
 }
+function getDiaVenda(r: VendasResultadoRow): number {
+  const d = r.dataVenda;
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[0];
+  if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[2];
+  return 0;
+}
 function dsrFor(cfgs: VendasDsrConfig[], dateStr: string) {
   let a = 0, m = 0;
   if (/^\d{2}\/\d{2}\/\d{4}/.test(dateStr)) { a = +dateStr.split('/')[2]; m = +dateStr.split('/')[1]; }
@@ -623,6 +629,11 @@ export function VendasNovoAnalise() {
   const [comissoesScenario,   setComissoesScenario]   = useState<ComissoesScenario>('custoUn');
   const [showAllComissoes,    setShowAllComissoes]    = useState(false);
 
+  // Evolução Diária
+  const [dailyVendedor,  setDailyVendedor]  = useState('Todos');
+  const [dailyFamilia,   setDailyFamilia]   = useState('Todas');
+  const [dailyMetric,    setDailyMetric]    = useState<'receita' | 'qtd'>('receita');
+
   // Comparativo de períodos
   const [periods, setPeriods] = useState<PeriodCfg[]>([
     { id: 'base', year: curYear, gran: 'mes', month: curMonth, vendedor: 'Todos', familia: 'Todas', modelo: 'Todos' },
@@ -756,6 +767,43 @@ export function VendasNovoAnalise() {
   const avgTicket = useMemo(() =>
     modelFamilyData.length ? modelFamilyData.reduce((s, d) => s + d.ticket, 0) / modelFamilyData.length : 0,
     [modelFamilyData]);
+
+  // ── Evolução Diária ────────────────────────────────────────────────────────
+  const dailyFamilias = useMemo(() => {
+    if (month === null) return [];
+    const s = new Set<string>();
+    for (const r of filteredRows) s.add(normalizeModelo(r.modelo ?? ''));
+    return ['Todas', ...[...s].sort()];
+  }, [filteredRows, month]);
+
+  const dailyVendedores = useMemo(() => {
+    if (month === null) return ['Todos'];
+    const s = new Set<string>();
+    for (const r of filteredRows) s.add(r.vendedor?.trim() || '(sem nome)');
+    return ['Todos', ...[...s].sort()];
+  }, [filteredRows, month]);
+
+  const daysInMonthNovos = useMemo(() => {
+    if (month === null) return [];
+    return Array.from({ length: new Date(year, month, 0).getDate() }, (_, i) => i + 1);
+  }, [year, month]);
+
+  const dailyNovosData = useMemo(() => {
+    if (month === null) return [];
+    const baseRows = filteredRows.filter(r =>
+      (dailyVendedor === 'Todos' || (r.vendedor?.trim() || '') === dailyVendedor) &&
+      (dailyFamilia  === 'Todas' || normalizeModelo(r.modelo ?? '') === dailyFamilia)
+    );
+    let cumReceita = 0, cumQtd = 0;
+    return daysInMonthNovos.map(day => {
+      const dayRows = baseRows.filter(r => getDiaVenda(r) === day && r.transacao !== 'V07');
+      const receita = dayRows.reduce((s, r) => s + n(r.valorVenda), 0);
+      const qtd     = dayRows.length;
+      cumReceita += receita;
+      cumQtd     += qtd;
+      return { dia: String(day).padStart(2, '0'), receita, qtd, cumReceita, cumQtd };
+    });
+  }, [filteredRows, month, dailyVendedor, dailyFamilia, daysInMonthNovos]);
 
   // Bônus mensais
   const bonusMonthly = useMemo(() => MS.map((label, i) => {
@@ -1182,6 +1230,112 @@ export function VendasNovoAnalise() {
           <p className="text-[10px] text-slate-400 text-right -mt-4">
             ★ clique em qualquer card para fixar como destaque (máx. 3) — ⓘ = campo não preenchido
           </p>
+
+          {/* ── Evolução Diária ─────────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <SH right={
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Seletor de vendedor */}
+                <select
+                  value={dailyVendedor}
+                  onChange={e => setDailyVendedor(e.target.value)}
+                  className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 max-w-[200px]"
+                >
+                  {dailyVendedores.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+                {/* Seletor de família */}
+                <select
+                  value={dailyFamilia}
+                  onChange={e => setDailyFamilia(e.target.value)}
+                  className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 max-w-[200px]"
+                >
+                  {dailyFamilias.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+                {/* Métrica */}
+                <div className="flex gap-1 ml-1">
+                  {(['receita', 'qtd'] as const).map(m => {
+                    const labels = { receita: 'Receita', qtd: 'Quantidade' };
+                    return (
+                      <button
+                        key={m}
+                        onClick={() => setDailyMetric(m)}
+                        className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                          dailyMetric === m
+                            ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
+                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                        }`}
+                      >
+                        {labels[m]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            }>
+              Evolução Diária{month !== null ? ` — ${MS[month - 1]}/${year}` : ''}
+              {dailyVendedor !== 'Todos' && <span className="text-blue-500 normal-case ml-1 text-[11px]">· {dailyVendedor}</span>}
+            </SH>
+            {month === null ? (
+              <div className="h-24 flex items-center justify-center text-slate-300 text-xs">
+                Selecione um mês para ver a evolução diária
+              </div>
+            ) : dailyNovosData.every(d => d.receita === 0 && d.qtd === 0) ? (
+              <div className="h-24 flex items-center justify-center text-slate-300 text-xs">Sem dados no período</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={dailyNovosData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={0} angle={-45} textAnchor="end" height={36} />
+                  <YAxis
+                    tickFormatter={v => dailyMetric === 'receita'
+                      ? (v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))
+                      : String(v)
+                    }
+                    tick={{ fontSize: 10, fill: '#94a3b8' }}
+                    width={52}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }: any) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0]?.payload;
+                      const moStr = MS[(month as number) - 1];
+                      return (
+                        <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[210px]">
+                          <p className="font-bold text-slate-700 mb-1.5">Dia {label} — {moStr}/{year}</p>
+                          <div className="flex justify-between gap-4">
+                            <span className="text-slate-500">Receita Bruta</span>
+                            <span className="font-mono text-slate-700">{fmtBRL(d?.receita ?? 0)}</span>
+                          </div>
+                          <div className="flex justify-between gap-4 mt-0.5">
+                            <span className="text-slate-500">Quantidade</span>
+                            <span className="font-mono text-slate-700">{d?.qtd ?? 0} un.</span>
+                          </div>
+                          <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
+                            <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {label}</p>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-slate-500">Receita Bruta</span>
+                              <span className="font-mono text-slate-600">{fmtBRL(d?.cumReceita ?? 0)}</span>
+                            </div>
+                            <div className="flex justify-between gap-4 mt-0.5">
+                              <span className="text-slate-500">Quantidade</span>
+                              <span className="font-mono text-slate-600">{d?.cumQtd ?? 0} un.</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar
+                    dataKey={dailyMetric}
+                    name={dailyMetric === 'receita' ? 'Receita Bruta' : 'Quantidade'}
+                    fill="#3b82f6"
+                    fillOpacity={0.85}
+                    radius={[3, 3, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
 
           {/* ── Vendas por Modelo (família) — botões dinâmicos ──────────────── */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
