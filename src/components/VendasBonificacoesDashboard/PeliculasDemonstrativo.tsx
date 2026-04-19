@@ -30,6 +30,7 @@ interface EntryItem {
   cliente: string;
   produto: string;
   valorVenda: number;
+  pctLucroBruto: number | null;
   comissao: number;
 }
 
@@ -92,7 +93,9 @@ export function PeliculasDemonstrativo({ rows, onPagar, onClose }: Props) {
         map.get(pessoa)!.push({
           rowId: r.id, role: 'vendedor',
           os: r.numeroOS, dataRegistro: r.dataRegistro, cliente: r.nomeCliente, produto: r.produto,
-          valorVenda: n(r.valorVenda), comissao: comV,
+          valorVenda: n(r.valorVenda),
+          pctLucroBruto: n(r.receitaLiquida) > 0 ? (n(r.lucroBruto) / n(r.receitaLiquida)) * 100 : null,
+          comissao: comV,
         });
       }
 
@@ -104,7 +107,9 @@ export function PeliculasDemonstrativo({ rows, onPagar, onClose }: Props) {
         map.get(pessoa)!.push({
           rowId: r.id, role: 'acessorios',
           os: r.numeroOS, dataRegistro: r.dataRegistro, cliente: r.nomeCliente, produto: r.produto,
-          valorVenda: n(r.valorVenda), comissao: comA,
+          valorVenda: n(r.valorVenda),
+          pctLucroBruto: n(r.receitaLiquida) > 0 ? (n(r.lucroBruto) / n(r.receitaLiquida)) * 100 : null,
+          comissao: comA,
         });
       }
     }
@@ -165,7 +170,7 @@ export function PeliculasDemonstrativo({ rows, onPagar, onClose }: Props) {
                 <td>${e.cliente || '—'}</td>
                 <td>${e.produto || '—'}</td>
                 <td class="c"><span class="badge ${e.role === 'vendedor' ? 'badge-v' : 'badge-a'}">${e.role === 'vendedor' ? 'Vendedor' : 'Acessórios'}</span></td>
-                <td class="r">${fmtBRL(e.valorVenda)}</td>
+                <td class="r">${fmtBRL(e.valorVenda)}${e.pctLucroBruto !== null ? `<div class="data-reg">LB: ${e.pctLucroBruto.toFixed(1)}%</div>` : ''}</td>
                 <td class="r">${fmtBRL(e.comissao)}</td>
               </tr>
             `).join('')}
@@ -307,7 +312,12 @@ export function PeliculasDemonstrativo({ rows, onPagar, onClose }: Props) {
                               {e.role === 'vendedor' ? 'Vendedor' : 'Acessórios'}
                             </span>
                           </td>
-                          <td className="px-4 py-2 text-right font-mono text-slate-600">{fmtBRL(e.valorVenda)}</td>
+                          <td className="px-4 py-2 text-right font-mono text-slate-600">
+                            {fmtBRL(e.valorVenda)}
+                            {e.pctLucroBruto !== null && (
+                              <div className="text-[9px] text-slate-400 font-sans font-normal mt-0.5">LB: {e.pctLucroBruto.toFixed(1)}%</div>
+                            )}
+                          </td>
                           <td className="px-4 py-2 text-right font-mono font-semibold text-indigo-700">{fmtBRL(e.comissao)}</td>
                           <td className="px-4 py-2 text-center">
                             <button
