@@ -19,6 +19,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
 import { EsteticaAnalise } from './EsteticaAnalise';
+import { EsteticaDemonstrativo } from './EsteticaDemonstrativo';
 
 // ─── Campos calculados (somente leitura no modo edição) ──────────────────────
 const CALC_READONLY_KEYS = new Set<string>(['receitaLiquida', 'lucroBruto', 'impostos', 'comissaoVendedor', 'comissaoVendedorAcessorios', 'situacao', 'custoPrestador']);
@@ -330,6 +331,14 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
   const [liberarNFValidador, setLiberarNFValidador] = useState(() => session?.username ?? '');
   const [liberarNFAssinatura, setLiberarNFAssinatura] = useState('');
   const [liberarNFDataHora, setLiberarNFDataHora] = useState('');
+
+  // ── Demonstrativos de Comissão ─────────────────────────────────────────────
+  const [showDemonstrativo, setShowDemonstrativo] = useState(false);
+  const handlePagarComissoes = async (updatedRows: EsteticaRow[]) => {
+    setRows(updatedRows);
+    const ok = await persist(updatedRows);
+    if (ok) toast.success('Comissão(s) marcada(s) como paga(s).');
+  };
 
   // Listas de cadastro para selectors
   const [cadastroVendedores, setCadastroVendedores] = useState<string[]>([]);
@@ -850,6 +859,15 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => setShowDemonstrativo(true)}
+              className="text-white border border-white/30 hover:bg-white/15 gap-2"
+            >
+              <Banknote className="w-4 h-4" />
+              Demonstrativos
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onBack}
               className="text-white border border-white/30 hover:bg-white/15 gap-2"
             >
@@ -901,6 +919,9 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
                         </th>
                         {col.key === 'lucroBruto' && (
                           <th className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-indigo-600 align-top leading-snug text-center" style={{ background: '#4338ca' }}>{EXTRA_PCT_LABEL}</th>
+                        )}
+                        {col.key === 'situacao' && (
+                          <th className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-indigo-600 align-top leading-snug text-center" style={{ background: '#4338ca' }}>Comissão Paga em</th>
                         )}
                       </Fragment>
                     ))}
@@ -1042,6 +1063,26 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
                                   {pctDisplay}
                                 </td>
                               )}
+                              {col.key === 'situacao' && (() => {
+                                const vPago = row.comissaoVendedorPagaEm;
+                                const aPago = row.comissaoAcessoriosPagaEm;
+                                const hasV = !!vPago;
+                                const hasA = !!aPago;
+                                if (!hasV && !hasA) return (
+                                  <td key="pago" className="border-r border-slate-100 px-2 py-2.5 text-center text-slate-300 text-xs" style={{ verticalAlign: 'middle' }}>—</td>
+                                );
+                                if (hasV && hasA && vPago === aPago) return (
+                                  <td key="pago" className="border-r border-slate-100 px-2 py-2.5 text-center text-emerald-700 text-xs font-semibold bg-emerald-50" style={{ verticalAlign: 'middle' }}>
+                                    ✓ {fmtDate(vPago)}
+                                  </td>
+                                );
+                                return (
+                                  <td key="pago" className="border-r border-slate-100 px-2 py-2.5 text-center text-xs bg-emerald-50" style={{ verticalAlign: 'middle' }}>
+                                    {hasV && <div className="text-emerald-700 font-semibold whitespace-nowrap">V: {fmtDate(vPago)}</div>}
+                                    {hasA && <div className="text-emerald-700 font-semibold whitespace-nowrap">S: {fmtDate(aPago)}</div>}
+                                  </td>
+                                );
+                              })()}
                               </Fragment>
                             );
                           })}
@@ -2026,6 +2067,13 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
           </div>
         );
       })()}
+      {showDemonstrativo && (
+        <EsteticaDemonstrativo
+          rows={rows}
+          onPagar={handlePagarComissoes}
+          onClose={() => setShowDemonstrativo(false)}
+        />
+      )}
     </div>
   );
 }

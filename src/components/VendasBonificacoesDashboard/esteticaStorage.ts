@@ -23,6 +23,8 @@ export interface EsteticaRow {
   nfPrestador: string;
   situacao: string;
   observacao: string;
+  comissaoVendedorPagaEm: string;    // data ISO (YYYY-MM-DD) — vazio = pendente
+  comissaoAcessoriosPagaEm: string;  // data ISO (YYYY-MM-DD) — vazio = pendente
 }
 
 export function createEmptyEsteticaRow(): EsteticaRow {
@@ -49,6 +51,8 @@ export function createEmptyEsteticaRow(): EsteticaRow {
     nfPrestador: '',
     situacao: '',
     observacao: '',
+    comissaoVendedorPagaEm: '',
+    comissaoAcessoriosPagaEm: '',
   };
 }
 
