@@ -772,20 +772,20 @@ export function VendasNovoAnalise() {
     modelFamilyData.length ? modelFamilyData.reduce((s, d) => s + d.ticket, 0) / modelFamilyData.length : 0,
     [modelFamilyData]);
 
-  // ── Evolução Diária ────────────────────────────────────────────────────────
+  // ── Evolução Diária / Mensal ───────────────────────────────────────────────
   const dailyFamilias = useMemo(() => {
-    if (month === null) return [];
+    const sourceRows = month === null ? yearRows : filteredRows;
     const s = new Set<string>();
-    for (const r of filteredRows) s.add(normalizeModelo(r.modelo ?? ''));
+    for (const r of sourceRows) s.add(normalizeModelo(r.modelo ?? ''));
     return ['Todas', ...[...s].sort()];
-  }, [filteredRows, month]);
+  }, [filteredRows, yearRows, month]);
 
   const dailyVendedores = useMemo(() => {
-    if (month === null) return ['Todos'];
+    const sourceRows = month === null ? yearRows : filteredRows;
     const s = new Set<string>();
-    for (const r of filteredRows) s.add(r.vendedor?.trim() || '(sem nome)');
+    for (const r of sourceRows) s.add(r.vendedor?.trim() || '(sem nome)');
     return ['Todos', ...[...s].sort()];
-  }, [filteredRows, month]);
+  }, [filteredRows, yearRows, month]);
 
   const daysInMonthNovos = useMemo(() => {
     if (month === null) return [];
@@ -808,6 +808,25 @@ export function VendasNovoAnalise() {
       return { dia: String(day).padStart(2, '0'), receita, qtd, cumReceita, cumQtd };
     });
   }, [filteredRows, month, dailyVendedor, dailyFamilia, daysInMonthNovos]);
+
+  // ── Evolução Mensal (usado quando month === null / "Todos") ───────────────
+  const monthlyNovosData = useMemo(() => {
+    const baseRows = yearRows.filter(r =>
+      (dailyVendedor === 'Todos' || (r.vendedor?.trim() || '') === dailyVendedor) &&
+      (dailyFamilia  === 'Todas' || normalizeModelo(r.modelo ?? '') === dailyFamilia) &&
+      r.transacao !== 'V07'
+    );
+    let cumReceita = 0, cumQtd = 0;
+    return MS.map((label, i) => {
+      const mo = i + 1;
+      const moRows = baseRows.filter(r => getMo(r) === mo);
+      const receita = moRows.reduce((s, r) => s + n(r.valorVenda), 0);
+      const qtd     = moRows.length;
+      cumReceita += receita;
+      cumQtd     += qtd;
+      return { mes: label, receita, qtd, cumReceita, cumQtd };
+    });
+  }, [yearRows, dailyVendedor, dailyFamilia]);
 
   // ── Tabela Pivot Família/Modelo × Meses ─────────────────────────────────
   const pivotActiveMeses = useMemo(() => {
@@ -1331,7 +1350,7 @@ export function VendasNovoAnalise() {
             ★ clique em qualquer card para fixar como destaque (máx. 3) — ⓘ = campo não preenchido
           </p>
 
-          {/* ── Evolução Diária ─────────────────────────────────────────────── */}
+          {/* ── Evolução Diária / Mensal ────────────────────────────────────── */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <SH right={
               <div className="flex items-center gap-2 flex-wrap">
@@ -1372,68 +1391,125 @@ export function VendasNovoAnalise() {
                 </div>
               </div>
             }>
-              Evolução Diária{month !== null ? ` — ${MS[month - 1]}/${year}` : ''}
+              {month === null ? `Evolução Mensal — ${year}` : `Evolução Diária — ${MS[month - 1]}/${year}`}
               {dailyVendedor !== 'Todos' && <span className="text-blue-500 normal-case ml-1 text-[11px]">· {dailyVendedor}</span>}
             </SH>
+
+            {/* ── Modo MENSAL (month === null) ──────────────────────────────── */}
             {month === null ? (
-              <div className="h-24 flex items-center justify-center text-slate-300 text-xs">
-                Selecione um mês para ver a evolução diária
-              </div>
-            ) : dailyNovosData.every(d => d.receita === 0 && d.qtd === 0) ? (
-              <div className="h-24 flex items-center justify-center text-slate-300 text-xs">Sem dados no período</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={dailyNovosData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={0} angle={-45} textAnchor="end" height={36} />
-                  <YAxis
-                    tickFormatter={v => dailyMetric === 'receita'
-                      ? (v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))
-                      : String(v)
-                    }
-                    tick={{ fontSize: 10, fill: '#94a3b8' }}
-                    width={52}
-                  />
-                  <Tooltip
-                    content={({ active, payload, label }: any) => {
-                      if (!active || !payload?.length) return null;
-                      const d = payload[0]?.payload;
-                      const moStr = MS[(month as number) - 1];
-                      return (
-                        <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[210px]">
-                          <p className="font-bold text-slate-700 mb-1.5">Dia {label} — {moStr}/{year}</p>
-                          <div className="flex justify-between gap-4">
-                            <span className="text-slate-500">Receita Bruta</span>
-                            <span className="font-mono text-slate-700">{fmtBRL(d?.receita ?? 0)}</span>
-                          </div>
-                          <div className="flex justify-between gap-4 mt-0.5">
-                            <span className="text-slate-500">Quantidade</span>
-                            <span className="font-mono text-slate-700">{d?.qtd ?? 0} un.</span>
-                          </div>
-                          <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
-                            <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {label}</p>
+              monthlyNovosData.every(d => d.receita === 0 && d.qtd === 0) ? (
+                <div className="h-24 flex items-center justify-center text-slate-300 text-xs">Sem dados no período</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={monthlyNovosData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="mes" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                    <YAxis
+                      tickFormatter={v => dailyMetric === 'receita'
+                        ? (v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))
+                        : String(v)
+                      }
+                      tick={{ fontSize: 10, fill: '#94a3b8' }}
+                      width={52}
+                    />
+                    <Tooltip
+                      content={({ active, payload }: any) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0]?.payload;
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[210px]">
+                            <p className="font-bold text-slate-700 mb-1.5">{d?.mes}/{year}</p>
                             <div className="flex justify-between gap-4">
                               <span className="text-slate-500">Receita Bruta</span>
-                              <span className="font-mono text-slate-600">{fmtBRL(d?.cumReceita ?? 0)}</span>
+                              <span className="font-mono text-slate-700">{fmtBRL(d?.receita ?? 0)}</span>
                             </div>
                             <div className="flex justify-between gap-4 mt-0.5">
                               <span className="text-slate-500">Quantidade</span>
-                              <span className="font-mono text-slate-600">{d?.cumQtd ?? 0} un.</span>
+                              <span className="font-mono text-slate-700">{d?.qtd ?? 0} un.</span>
+                            </div>
+                            <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
+                              <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até {d?.mes}</p>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-slate-500">Receita Bruta</span>
+                                <span className="font-mono text-slate-600">{fmtBRL(d?.cumReceita ?? 0)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4 mt-0.5">
+                                <span className="text-slate-500">Quantidade</span>
+                                <span className="font-mono text-slate-600">{d?.cumQtd ?? 0} un.</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    }}
-                  />
-                  <Bar
-                    dataKey={dailyMetric}
-                    name={dailyMetric === 'receita' ? 'Receita Bruta' : 'Quantidade'}
-                    fill="#3b82f6"
-                    fillOpacity={0.85}
-                    radius={[3, 3, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+                        );
+                      }}
+                    />
+                    <Bar
+                      dataKey={dailyMetric}
+                      name={dailyMetric === 'receita' ? 'Receita Bruta' : 'Quantidade'}
+                      fill="#3b82f6"
+                      fillOpacity={0.85}
+                      radius={[3, 3, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              )
+            ) : (
+              /* ── Modo DIÁRIO (mês selecionado) ──────────────────────────── */
+              dailyNovosData.every(d => d.receita === 0 && d.qtd === 0) ? (
+                <div className="h-24 flex items-center justify-center text-slate-300 text-xs">Sem dados no período</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={dailyNovosData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={0} angle={-45} textAnchor="end" height={36} />
+                    <YAxis
+                      tickFormatter={v => dailyMetric === 'receita'
+                        ? (v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))
+                        : String(v)
+                      }
+                      tick={{ fontSize: 10, fill: '#94a3b8' }}
+                      width={52}
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }: any) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0]?.payload;
+                        const moStr = MS[(month as number) - 1];
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[210px]">
+                            <p className="font-bold text-slate-700 mb-1.5">Dia {label} — {moStr}/{year}</p>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-slate-500">Receita Bruta</span>
+                              <span className="font-mono text-slate-700">{fmtBRL(d?.receita ?? 0)}</span>
+                            </div>
+                            <div className="flex justify-between gap-4 mt-0.5">
+                              <span className="text-slate-500">Quantidade</span>
+                              <span className="font-mono text-slate-700">{d?.qtd ?? 0} un.</span>
+                            </div>
+                            <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
+                              <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {label}</p>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-slate-500">Receita Bruta</span>
+                                <span className="font-mono text-slate-600">{fmtBRL(d?.cumReceita ?? 0)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4 mt-0.5">
+                                <span className="text-slate-500">Quantidade</span>
+                                <span className="font-mono text-slate-600">{d?.cumQtd ?? 0} un.</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Bar
+                      dataKey={dailyMetric}
+                      name={dailyMetric === 'receita' ? 'Receita Bruta' : 'Quantidade'}
+                      fill="#3b82f6"
+                      fillOpacity={0.85}
+                      radius={[3, 3, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              )
             )}
           </div>
 
