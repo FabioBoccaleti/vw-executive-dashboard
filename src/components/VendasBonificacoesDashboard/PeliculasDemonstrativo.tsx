@@ -51,6 +51,9 @@ const PRINT_CSS = `
   body { font-family: Arial, sans-serif; font-size: 10pt; color: #111; margin: 0; }
   .demo-page { page-break-after: always; padding: 28px 32px; max-width: 800px; margin: 0 auto; }
   .demo-page:last-child { page-break-after: auto; }
+  .company-bar { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .company-name { font-size: 11pt; font-weight: 700; color: #1e1b4b; }
+  .company-dept { font-size: 9pt; color: #4338ca; font-weight: 600; }
   .demo-header { border-bottom: 2px solid #312e81; padding-bottom: 10px; margin-bottom: 16px; }
   .demo-title { font-size: 13pt; font-weight: 700; color: #312e81; }
   .demo-subtitle { font-size: 9pt; color: #555; margin-top: 3px; }
@@ -142,6 +145,10 @@ export function PeliculasDemonstrativo({ rows, onPagar, onClose }: Props) {
     const mes = mesRefLabel();
     const pages = demos.map(demo => `
       <div class="demo-page">
+        <div class="company-bar">
+          <span class="company-name">Sorana Audi</span>
+          <span class="company-dept">Departamento: Acessórios</span>
+        </div>
         <div class="demo-header">
           <div class="demo-title">Demonstrativo de Comissão de Películas — ${demo.pessoa}</div>
           <div class="demo-subtitle">Mês de referência: ${mes}</div>
@@ -239,6 +246,12 @@ export function PeliculasDemonstrativo({ rows, onPagar, onClose }: Props) {
           <div ref={printRef} className="space-y-6">
             {demonstrativos.map(demo => (
               <div key={demo.pessoa} className="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+
+                {/* Faixa empresa/departamento */}
+                <div className="flex items-center justify-between px-6 py-2 border-b border-slate-100 bg-slate-50">
+                  <span className="text-[11px] font-bold text-indigo-950 tracking-wide">Sorana Audi</span>
+                  <span className="text-[11px] font-semibold text-indigo-600">Departamento: Acessórios</span>
+                </div>
 
                 {/* Header do card */}
                 <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 px-6 py-4">
