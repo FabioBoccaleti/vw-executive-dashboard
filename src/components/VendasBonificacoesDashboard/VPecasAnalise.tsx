@@ -226,6 +226,8 @@ export default function VPecasAnalise() {
   const [dailyGroupBy, setDailyGroupBy] = useState<'dept' | 'trans'>('dept');
   const [dailySelDept, setDailySelDept]   = useState<string>('Todos');
   const [dailySelTrans, setDailySelTrans] = useState<string>('Todos');
+  const [pecasPivotGroupBy, setPecasPivotGroupBy] = useState<'dept' | 'trans'>('dept');
+  const [pecasPivotMetric,  setPecasPivotMetric]  = useState<'recBruta' | 'lbPct' | 'resPct'>('recBruta');
 
   useEffect(() => {
     loadVPecasItemRows().then(setAllItemRows);
@@ -380,6 +382,68 @@ export default function VPecasAnalise() {
     const total = deptData.reduce((s, d) => s + d.valorVenda, 0);
     return deptData.map((d, i) => ({ name: deptName(d.name), value: d.valorVenda, pct: total ? d.valorVenda / total * 100 : 0, color: deptColor(d.name, i) }));
   }, [deptData]);
+
+  // ─── Comparativo Mensal por Departamento / Transação (Ano Todo) ──────────
+  const pecasPivotData = useMemo(() => {
+    type RawCell = { rb: number; rl: number; lb: number };
+    const groupKey = (r: VPecasRow) =>
+      pecasPivotGroupBy === 'dept'
+        ? (r.data['DEPARTAMENTO']?.trim() || '(sem depto)')
+        : (r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)');
+    const groupLabel = (k: string) =>
+      pecasPivotGroupBy === 'dept' ? deptName(k) : transacaoName(k);
+
+    const groups = [...new Set(yearRows.map(groupKey))].sort();
+    const activeMeses = [...new Set(yearRows.map(getMo).filter(m => m >= 1 && m <= 12))].sort((a, b) => a - b);
+
+    const raw: Record<string, Record<number, RawCell>> = {};
+    for (const g of groups) raw[g] = {};
+    for (const r of yearRows) {
+      const g = groupKey(r);
+      const mo = getMo(r);
+      if (!raw[g][mo]) raw[g][mo] = { rb: 0, rl: 0, lb: 0 };
+      const c = calcPecas(r.data);
+      raw[g][mo].rb += c.valorVenda;
+      raw[g][mo].rl += c.recLiq;
+      raw[g][mo].lb += c.lucroBruto;
+    }
+
+    type OutCell = { recBruta: number; lbPct: number; resPct: number };
+    const mkCell = (c: RawCell): OutCell => ({
+      recBruta: c.rb,
+      lbPct:    c.rl !== 0 ? c.lb / c.rl * 100 : 0,
+      resPct:   c.rb !== 0 ? c.lb / c.rb * 100 : 0,
+    });
+
+    const rows = groups.map(g => {
+      const cells: Record<number, OutCell> = {};
+      let totRb = 0, totRl = 0, totLb = 0;
+      for (const mo of activeMeses) {
+        const c = raw[g][mo] ?? { rb: 0, rl: 0, lb: 0 };
+        totRb += c.rb; totRl += c.rl; totLb += c.lb;
+        cells[mo] = mkCell(c);
+      }
+      return {
+        key: g, name: groupLabel(g), cells,
+        total: mkCell({ rb: totRb, rl: totRl, lb: totLb }),
+      };
+    }).filter(r => r.total.recBruta > 0)
+      .sort((a, b) => b.total.recBruta - a.total.recBruta);
+
+    const monthTotals: Record<number, OutCell> = {};
+    for (const mo of activeMeses) {
+      let rb = 0, rl = 0, lb = 0;
+      for (const g of groups) { const c = raw[g][mo] ?? { rb: 0, rl: 0, lb: 0 }; rb += c.rb; rl += c.rl; lb += c.lb; }
+      monthTotals[mo] = mkCell({ rb, rl, lb });
+    }
+
+    let gtRb = 0, gtRl = 0, gtLb = 0;
+    for (const mo of activeMeses) for (const g of groups) {
+      const c = raw[g][mo] ?? { rb: 0, rl: 0, lb: 0 }; gtRb += c.rb; gtRl += c.rl; gtLb += c.lb;
+    }
+
+    return { rows, activeMeses, monthTotals, grandTotal: mkCell({ rb: gtRb, rl: gtRl, lb: gtLb }) };
+  }, [yearRows, pecasPivotGroupBy]);
 
   // ─── 3. Ranking Vendedores ────────────────────────────────────────────────
   const availVendorDepts = useMemo(() => {
@@ -1074,6 +1138,146 @@ export default function VPecasAnalise() {
           </div>
         )}
       </div>
+
+      {/* ── Comparativo Mensal por Departamento / Transação ─────────────────── */}
+      {month === null && pecasPivotData.rows.length > 0 && (() => {
+        const { rows, activeMeses, monthTotals, grandTotal } = pecasPivotData;
+        type OutCell = { recBruta: number; lbPct: number; resPct: number };
+        const isPct = pecasPivotMetric !== 'recBruta';
+
+        const fmtCell = (cell: OutCell | undefined) => {
+          if (!cell || cell.recBruta === 0) return '—';
+          if (pecasPivotMetric === 'recBruta') return fmtBRL(cell.recBruta);
+          if (pecasPivotMetric === 'lbPct')   return fmtPct(cell.lbPct);
+          return fmtPct(cell.resPct);
+        };
+        const cellVal = (cell: OutCell | undefined) => {
+          if (!cell || cell.recBruta === 0) return null;
+          return pecasPivotMetric === 'lbPct' ? cell.lbPct : cell.resPct;
+        };
+        const cellColor = (cell: OutCell | undefined) => {
+          if (!isPct) return '';
+          const v = cellVal(cell);
+          if (v === null) return '';
+          if (v < 0)   return 'text-red-600 font-semibold';
+          if (v < 5)   return 'text-amber-600';
+          if (v < 15)  return 'text-sky-600';
+          return 'text-emerald-600 font-semibold';
+        };
+        const cellBg = (cell: OutCell | undefined) => {
+          if (!isPct) return '';
+          const v = cellVal(cell);
+          if (v === null) return '';
+          if (v < 0)  return 'bg-red-50';
+          if (v < 5)  return 'bg-amber-50';
+          if (v < 15) return 'bg-sky-50';
+          return 'bg-emerald-50';
+        };
+
+        return (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
+            <SH right={
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex gap-1">
+                  {(['dept', 'trans'] as const).map(g => (
+                    <button key={g} onClick={() => setPecasPivotGroupBy(g)}
+                      className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                        pecasPivotGroupBy === g
+                          ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600'
+                      }`}>
+                      {g === 'dept' ? 'Departamento' : 'Transação'}
+                    </button>
+                  ))}
+                </div>
+                <div className="w-px h-4 bg-slate-200" />
+                {([
+                  ['recBruta', 'Receita Bruta'],
+                  ['lbPct',    '% L. Bruto'],
+                  ['resPct',   '% Resultado'],
+                ] as const).map(([k, label]) => (
+                  <button key={k} onClick={() => setPecasPivotMetric(k)}
+                    className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all ${
+                      pecasPivotMetric === k
+                        ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                    }`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            }>
+              Comparativo Mensal por {pecasPivotGroupBy === 'dept' ? 'Departamento' : 'Transação'} — {year}
+            </SH>
+
+            {isPct && (
+              <div className="flex gap-4 text-[10px] mb-3 flex-wrap">
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-100 border border-emerald-300 inline-block" />≥ 15%</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-sky-100 border border-sky-300 inline-block" />5% – 15%</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-300 inline-block" />0% – 5%</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-100 border border-red-300 inline-block" />Negativo</span>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-slate-200">
+                    <th className="sticky left-0 bg-white z-10 text-left py-2 pr-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px] min-w-[160px]">
+                      {pecasPivotGroupBy === 'dept' ? 'Departamento' : 'Transação'}
+                    </th>
+                    {activeMeses.map(mo => (
+                      <th key={mo} className="text-center py-2 px-2 font-semibold text-slate-400 uppercase tracking-wide text-[10px] min-w-[80px]">
+                        {MS[mo - 1]}
+                      </th>
+                    ))}
+                    <th className="text-center py-2 px-2 font-semibold text-slate-600 uppercase tracking-wide text-[10px] min-w-[80px]">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, ri) => (
+                    <tr key={row.key} className={`border-b border-slate-100 transition-colors hover:bg-slate-50 ${ri % 2 === 0 ? '' : 'bg-slate-50/40'}`}>
+                      <td className="sticky left-0 bg-inherit z-10 py-2 pr-3 font-medium text-slate-700 truncate max-w-[200px]" title={row.name}>
+                        {pecasPivotGroupBy === 'dept' && (
+                          <span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle flex-shrink-0" style={{ background: deptColor(row.key, 0) }} />
+                        )}
+                        {row.name}
+                      </td>
+                      {activeMeses.map(mo => {
+                        const cell = row.cells[mo];
+                        return (
+                          <td key={mo} className={`text-center py-2 px-2 tabular-nums ${cellBg(cell)} ${cellColor(cell)}`}>
+                            {fmtCell(cell)}
+                          </td>
+                        );
+                      })}
+                      <td className={`text-center py-2 px-2 tabular-nums font-bold ${cellBg(row.total)} ${cellColor(row.total)}`}>
+                        {fmtCell(row.total)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-slate-300 bg-slate-50">
+                    <td className="sticky left-0 bg-slate-50 z-10 py-2 pr-3 font-bold text-slate-700 uppercase text-[10px] tracking-wide">Total</td>
+                    {activeMeses.map(mo => {
+                      const cell = monthTotals[mo];
+                      return (
+                        <td key={mo} className={`text-center py-2 px-2 tabular-nums font-bold ${cellBg(cell)} ${cellColor(cell)}`}>
+                          {fmtCell(cell)}
+                        </td>
+                      );
+                    })}
+                    <td className={`text-center py-2 px-2 tabular-nums font-bold text-slate-800 ${cellBg(grandTotal)} ${cellColor(grandTotal)}`}>
+                      {fmtCell(grandTotal)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Seção 3: Ranking Vendedores ───────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">

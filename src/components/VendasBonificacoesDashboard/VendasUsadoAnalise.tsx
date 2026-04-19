@@ -1300,7 +1300,7 @@ export function VendasUsadoAnalise() {
         <div className="flex items-center gap-1 flex-wrap">
           <button onClick={() => setMonth(null)}
             className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all ${month === null ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-            Todos
+            Ano Todo
           </button>
           {MS.map((m, i) => {
             const mi    = i + 1;
