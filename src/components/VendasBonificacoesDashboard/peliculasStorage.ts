@@ -23,6 +23,8 @@ export interface PeliculasRow {
   nfPrestador: string;
   situacao: string;
   observacao: string;
+  comissaoVendedorPagaEm: string;    // data ISO (YYYY-MM-DD) — vazio = pendente
+  comissaoAcessoriosPagaEm: string;  // data ISO (YYYY-MM-DD) — vazio = pendente
 }
 
 export function createEmptyPeliculasRow(): PeliculasRow {
@@ -49,6 +51,8 @@ export function createEmptyPeliculasRow(): PeliculasRow {
     nfPrestador: '',
     situacao: '',
     observacao: '',
+    comissaoVendedorPagaEm: '',
+    comissaoAcessoriosPagaEm: '',
   };
 }
 
