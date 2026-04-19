@@ -26,6 +26,7 @@ interface EntryItem {
   rowId: string;
   role: 'vendedor' | 'acessorios';
   os: string;
+  dataRegistro: string;
   cliente: string;
   produto: string;
   valorVenda: number;
@@ -66,6 +67,7 @@ const PRINT_CSS = `
   .badge { display: inline-block; font-size: 7.5pt; padding: 1px 6px; border-radius: 999px; font-weight: 700; }
   .badge-v { background: #dbeafe; color: #1e40af; }
   .badge-a { background: #dcfce7; color: #166534; }
+  .data-reg { font-size: 7.5pt; color: #888; margin-top: 1px; }
 `;
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -86,7 +88,7 @@ export function PeliculasDemonstrativo({ rows, onPagar, onClose }: Props) {
         if (!map.has(pessoa)) map.set(pessoa, []);
         map.get(pessoa)!.push({
           rowId: r.id, role: 'vendedor',
-          os: r.numeroOS, cliente: r.nomeCliente, produto: r.produto,
+          os: r.numeroOS, dataRegistro: r.dataRegistro, cliente: r.nomeCliente, produto: r.produto,
           valorVenda: n(r.valorVenda), comissao: comV,
         });
       }
@@ -98,7 +100,7 @@ export function PeliculasDemonstrativo({ rows, onPagar, onClose }: Props) {
         if (!map.has(pessoa)) map.set(pessoa, []);
         map.get(pessoa)!.push({
           rowId: r.id, role: 'acessorios',
-          os: r.numeroOS, cliente: r.nomeCliente, produto: r.produto,
+          os: r.numeroOS, dataRegistro: r.dataRegistro, cliente: r.nomeCliente, produto: r.produto,
           valorVenda: n(r.valorVenda), comissao: comA,
         });
       }
@@ -152,7 +154,7 @@ export function PeliculasDemonstrativo({ rows, onPagar, onClose }: Props) {
           <tbody>
             ${demo.entries.map(e => `
               <tr>
-                <td>${e.os || '—'}</td>
+                <td>${e.os || '—'}${e.dataRegistro ? `<div class="data-reg">Reg: ${fmtDate(e.dataRegistro)}</div>` : ''}</td>
                 <td>${e.cliente || '—'}</td>
                 <td>${e.produto || '—'}</td>
                 <td class="c"><span class="badge ${e.role === 'vendedor' ? 'badge-v' : 'badge-a'}">${e.role === 'vendedor' ? 'Vendedor' : 'Acessórios'}</span></td>
@@ -279,7 +281,12 @@ export function PeliculasDemonstrativo({ rows, onPagar, onClose }: Props) {
                     <tbody>
                       {demo.entries.map((e, i) => (
                         <tr key={`${e.rowId}-${e.role}`} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                          <td className="px-4 py-2 font-mono text-slate-600">{e.os || '—'}</td>
+                          <td className="px-4 py-2 font-mono text-slate-600">
+                            {e.os || '—'}
+                            {e.dataRegistro && (
+                              <div className="text-[9px] text-slate-400 font-sans font-normal mt-0.5">Reg: {fmtDate(e.dataRegistro)}</div>
+                            )}
+                          </td>
                           <td className="px-4 py-2 text-slate-700">{e.cliente || '—'}</td>
                           <td className="px-4 py-2 text-slate-600">{e.produto || '—'}</td>
                           <td className="px-4 py-2 text-center">
