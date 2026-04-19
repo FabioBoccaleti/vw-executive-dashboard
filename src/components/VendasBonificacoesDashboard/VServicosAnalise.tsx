@@ -323,16 +323,18 @@ function ServicoPanel({ rows, color, depts }: { rows: VPecasRow[]; color: string
   );
 
   const allConsultoresDiario = useMemo(() => {
+    const source = month !== null ? filteredServicosMes : yearRows;
     const s = new Set<string>();
-    for (const r of filteredServicosMes) s.add(r.data['NOME_VENDEDOR']?.trim() || '(sem nome)');
+    for (const r of source) s.add(r.data['NOME_VENDEDOR']?.trim() || '(sem nome)');
     return [...s].sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  }, [filteredServicosMes]);
+  }, [filteredServicosMes, yearRows, month]);
 
   const allTransacoesDiario = useMemo(() => {
+    const source = month !== null ? filteredServicosMes : yearRows;
     const s = new Set<string>();
-    for (const r of filteredServicosMes) s.add(r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)');
+    for (const r of source) s.add(r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)');
     return [...s].sort();
-  }, [filteredServicosMes]);
+  }, [filteredServicosMes, yearRows, month]);
 
   const daysInMonth = useMemo(() => {
     if (month === null) return [];
@@ -374,6 +376,43 @@ function ServicoPanel({ rows, color, depts }: { rows: VPecasRow[]; color: string
       };
     });
   }, [daysInMonth, filteredServicosMes, selConsultor, selTransacao, allTransacoesDiario]);
+
+  // ─── Evolução Mensal Detalhada (month === null) ────────────────────────────
+  const monthlyServicoData = useMemo(() => {
+    const filterC = (source: VPecasRow[]) =>
+      selConsultor ? source.filter(r => (r.data['NOME_VENDEDOR']?.trim() || '(sem nome)') === selConsultor) : source;
+    const cRows = filterC(yearRows);
+    const tipos = allTransacoesDiario;
+    const cumByTipo: Record<string, number> = {};
+    for (const t of tipos) cumByTipo[t] = 0;
+    let cumNfs = 0;
+    return MS.map((label, i) => {
+      const mo = i + 1;
+      const moRows = cRows.filter(r => getMo(r) === mo);
+      const byTipo: Record<string, number> = {};
+      for (const t of tipos) byTipo[t] = 0;
+      let nfsServicos = 0;
+      for (const r of moRows) {
+        const t = r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)';
+        byTipo[t] = (byTipo[t] ?? 0) + n(r.data['LIQ_NOTA_FISCAL']);
+        nfsServicos++;
+      }
+      for (const t of tipos) cumByTipo[t] += byTipo[t] ?? 0;
+      cumNfs += nfsServicos;
+      const servicos = selTransacao
+        ? (byTipo[selTransacao] ?? 0)
+        : tipos.reduce((s, t) => s + (byTipo[t] ?? 0), 0);
+      const cumServicos = selTransacao
+        ? (cumByTipo[selTransacao] ?? 0)
+        : tipos.reduce((s, t) => s + (cumByTipo[t] ?? 0), 0);
+      return {
+        mes: label,
+        servicos, nfsServicos, cumServicos, cumNfs,
+        ...byTipo,
+        ...Object.fromEntries(tipos.map(t => [`cum_${t}`, cumByTipo[t] ?? 0])),
+      };
+    });
+  }, [yearRows, selConsultor, selTransacao, allTransacoesDiario]);
 
   const vendorSortLabel: Record<typeof vendorSort, string> = { valorVenda: 'Receita Bruta', nfs: 'Qtd NFs', recLiq: 'Rec. Líquida' };
   const TRANS_LABEL: Record<string, string> = { 'G21': 'Garantia', 'O21': 'Venda', 'O26': 'Serviço Interno' };
@@ -448,7 +487,7 @@ function ServicoPanel({ rows, color, depts }: { rows: VPecasRow[]; color: string
         />
       </div>
 
-      {/* ── Evolução Diária ─────────────────────────────────────────── */}
+      {/* ── Evolução Diária / Mensal Detalhada ─────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-5">
         <SH
           right={
@@ -488,43 +527,80 @@ function ServicoPanel({ rows, color, depts }: { rows: VPecasRow[]; color: string
             </div>
           }
         >
-          Evolução Diária{month !== null ? ` — ${MS[month - 1]}/${year}` : ''}
+          {month === null ? `Evolução Mensal Detalhada — ${year}` : `Evolução Diária — ${MS[month - 1]}/${year}`}
           {selConsultor && <span className="text-teal-600 normal-case ml-1 text-[11px]">· {selConsultor}</span>}
         </SH>
+
+        {/* ── Modo MENSAL (month === null) ─────────────────────────────────── */}
         {month === null ? (
-          <div className="h-24 flex items-center justify-center text-slate-300 text-xs">
-            Selecione um mês para ver a evolução diária
-          </div>
-        ) : dailyData.every(d => d.servicos === 0) ? (
-          <div className="h-24 flex items-center justify-center text-slate-300 text-xs">Sem dados no período</div>
-        ) : (
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={dailyData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={0} angle={-45} textAnchor="end" height={36} />
-              <YAxis tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} width={52} />
-              <Tooltip
-                content={({ active, payload, label }: any) => {
-                  if (!active || !payload?.length) return null;
-                  const d = payload[0]?.payload;
-                  const moStr = MS[(month as number) - 1];
-                  if (selTransacao !== null) {
+          monthlyServicoData.every(d => d.servicos === 0) ? (
+            <div className="h-24 flex items-center justify-center text-slate-300 text-xs">Sem dados no período</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={monthlyServicoData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="mes" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                <YAxis tickFormatter={v => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} width={52} />
+                <Tooltip
+                  content={({ active, payload }: any) => {
+                    if (!active || !payload?.length) return null;
+                    const d = payload[0]?.payload;
+                    if (selTransacao !== null) {
+                      return (
+                        <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[210px]">
+                          <p className="font-bold text-slate-700 mb-1.5">{d?.mes}/{year}</p>
+                          <div className="flex justify-between gap-4">
+                            <span style={{ color: transColorFn(selTransacao) }} className="font-semibold">{transLabel(selTransacao)}</span>
+                            <span className="font-mono text-slate-700">{fmtBRLF(d?.servicos ?? 0)}</span>
+                          </div>
+                          <div className="flex justify-between gap-4 mt-0.5">
+                            <span className="text-slate-400">NFs</span>
+                            <span className="font-mono text-slate-500">{d?.nfsServicos ?? 0}</span>
+                          </div>
+                          <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
+                            <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até {d?.mes}</p>
+                            <div className="flex justify-between gap-4">
+                              <span style={{ color: transColorFn(selTransacao) }} className="font-semibold">{transLabel(selTransacao)}</span>
+                              <span className="font-mono text-slate-600">{fmtBRLF(d?.cumServicos ?? 0)}</span>
+                            </div>
+                            <div className="flex justify-between gap-4 mt-0.5">
+                              <span className="text-slate-400">NFs</span>
+                              <span className="font-mono text-slate-500">{d?.cumNfs ?? 0}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    const total    = allTransacoesDiario.reduce((s, t) => s + ((d?.[t] as number) ?? 0), 0);
+                    const cumTotal = allTransacoesDiario.reduce((s, t) => s + ((d?.[`cum_${t}`] as number) ?? 0), 0);
                     return (
-                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[210px]">
-                        <p className="font-bold text-slate-700 mb-1.5">Dia {label} — {moStr}/{year}</p>
-                        <div className="flex justify-between gap-4">
-                          <span style={{ color: transColorFn(selTransacao) }} className="font-semibold">{transLabel(selTransacao)}</span>
-                          <span className="font-mono text-slate-700">{fmtBRLF(d?.servicos ?? 0)}</span>
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[230px]">
+                        <p className="font-bold text-slate-700 mb-1.5">{d?.mes}/{year}</p>
+                        {allTransacoesDiario.map(t => (
+                          <div key={t} className="flex justify-between gap-4">
+                            <span style={{ color: transColorFn(t) }} className="font-semibold">{transLabel(t)}</span>
+                            <span className="font-mono text-slate-700">{fmtBRLF((d?.[t] as number) ?? 0)}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                          <span className="font-bold text-slate-700">Total</span>
+                          <span className="font-mono font-bold text-slate-800">{fmtBRLF(total)}</span>
                         </div>
                         <div className="flex justify-between gap-4 mt-0.5">
                           <span className="text-slate-400">NFs</span>
                           <span className="font-mono text-slate-500">{d?.nfsServicos ?? 0}</span>
                         </div>
                         <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
-                          <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {label}</p>
-                          <div className="flex justify-between gap-4">
-                            <span style={{ color: transColorFn(selTransacao) }} className="font-semibold">{transLabel(selTransacao)}</span>
-                            <span className="font-mono text-slate-600">{fmtBRLF(d?.cumServicos ?? 0)}</span>
+                          <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até {d?.mes}</p>
+                          {allTransacoesDiario.map(t => (
+                            <div key={t} className="flex justify-between gap-4">
+                              <span style={{ color: transColorFn(t) }} className="font-semibold">{transLabel(t)}</span>
+                              <span className="font-mono text-slate-600">{fmtBRLF((d?.[`cum_${t}`] as number) ?? 0)}</span>
+                            </div>
+                          ))}
+                          <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                            <span className="font-bold text-slate-700">Total</span>
+                            <span className="font-mono font-bold text-slate-800">{fmtBRLF(cumTotal)}</span>
                           </div>
                           <div className="flex justify-between gap-4 mt-0.5">
                             <span className="text-slate-400">NFs</span>
@@ -533,57 +609,111 @@ function ServicoPanel({ rows, color, depts }: { rows: VPecasRow[]; color: string
                         </div>
                       </div>
                     );
-                  }
-                  const total    = allTransacoesDiario.reduce((s, t) => s + ((d?.[t] as number) ?? 0), 0);
-                  const cumTotal = allTransacoesDiario.reduce((s, t) => s + ((d?.[`cum_${t}`] as number) ?? 0), 0);
-                  return (
-                    <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[230px]">
-                      <p className="font-bold text-slate-700 mb-1.5">Dia {label} — {moStr}/{year}</p>
-                      {allTransacoesDiario.map(t => (
-                        <div key={t} className="flex justify-between gap-4">
-                          <span style={{ color: transColorFn(t) }} className="font-semibold">{transLabel(t)}</span>
-                          <span className="font-mono text-slate-700">{fmtBRLF((d?.[t] as number) ?? 0)}</span>
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {selTransacao !== null
+                  ? <Bar key="sel" dataKey="servicos" name={transLabel(selTransacao)} fill={transColorFn(selTransacao)} fillOpacity={0.85} radius={[3, 3, 0, 0]} />
+                  : allTransacoesDiario.map((t, i) => (
+                      <Bar key={t} dataKey={t} name={transLabel(t)} stackId="b" fill={transColorFn(t)} fillOpacity={0.85}
+                        radius={i === allTransacoesDiario.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]} />
+                    ))
+                }
+              </BarChart>
+            </ResponsiveContainer>
+          )
+        ) : (
+          /* ── Modo DIÁRIO (mês selecionado) ─────────────────────────────── */
+          dailyData.every(d => d.servicos === 0) ? (
+            <div className="h-24 flex items-center justify-center text-slate-300 text-xs">Sem dados no período</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={dailyData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={0} angle={-45} textAnchor="end" height={36} />
+                <YAxis tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} width={52} />
+                <Tooltip
+                  content={({ active, payload, label }: any) => {
+                    if (!active || !payload?.length) return null;
+                    const d = payload[0]?.payload;
+                    const moStr = MS[(month as number) - 1];
+                    if (selTransacao !== null) {
+                      return (
+                        <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[210px]">
+                          <p className="font-bold text-slate-700 mb-1.5">Dia {label} — {moStr}/{year}</p>
+                          <div className="flex justify-between gap-4">
+                            <span style={{ color: transColorFn(selTransacao) }} className="font-semibold">{transLabel(selTransacao)}</span>
+                            <span className="font-mono text-slate-700">{fmtBRLF(d?.servicos ?? 0)}</span>
+                          </div>
+                          <div className="flex justify-between gap-4 mt-0.5">
+                            <span className="text-slate-400">NFs</span>
+                            <span className="font-mono text-slate-500">{d?.nfsServicos ?? 0}</span>
+                          </div>
+                          <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
+                            <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {label}</p>
+                            <div className="flex justify-between gap-4">
+                              <span style={{ color: transColorFn(selTransacao) }} className="font-semibold">{transLabel(selTransacao)}</span>
+                              <span className="font-mono text-slate-600">{fmtBRLF(d?.cumServicos ?? 0)}</span>
+                            </div>
+                            <div className="flex justify-between gap-4 mt-0.5">
+                              <span className="text-slate-400">NFs</span>
+                              <span className="font-mono text-slate-500">{d?.cumNfs ?? 0}</span>
+                            </div>
+                          </div>
                         </div>
-                      ))}
-                      <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
-                        <span className="font-bold text-slate-700">Total</span>
-                        <span className="font-mono font-bold text-slate-800">{fmtBRLF(total)}</span>
-                      </div>
-                      <div className="flex justify-between gap-4 mt-0.5">
-                        <span className="text-slate-400">NFs</span>
-                        <span className="font-mono text-slate-500">{d?.nfsServicos ?? 0}</span>
-                      </div>
-                      <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
-                        <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {label}</p>
+                      );
+                    }
+                    const total    = allTransacoesDiario.reduce((s, t) => s + ((d?.[t] as number) ?? 0), 0);
+                    const cumTotal = allTransacoesDiario.reduce((s, t) => s + ((d?.[`cum_${t}`] as number) ?? 0), 0);
+                    return (
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[230px]">
+                        <p className="font-bold text-slate-700 mb-1.5">Dia {label} — {moStr}/{year}</p>
                         {allTransacoesDiario.map(t => (
                           <div key={t} className="flex justify-between gap-4">
                             <span style={{ color: transColorFn(t) }} className="font-semibold">{transLabel(t)}</span>
-                            <span className="font-mono text-slate-600">{fmtBRLF((d?.[`cum_${t}`] as number) ?? 0)}</span>
+                            <span className="font-mono text-slate-700">{fmtBRLF((d?.[t] as number) ?? 0)}</span>
                           </div>
                         ))}
                         <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
                           <span className="font-bold text-slate-700">Total</span>
-                          <span className="font-mono font-bold text-slate-800">{fmtBRLF(cumTotal)}</span>
+                          <span className="font-mono font-bold text-slate-800">{fmtBRLF(total)}</span>
                         </div>
                         <div className="flex justify-between gap-4 mt-0.5">
                           <span className="text-slate-400">NFs</span>
-                          <span className="font-mono text-slate-500">{d?.cumNfs ?? 0}</span>
+                          <span className="font-mono text-slate-500">{d?.nfsServicos ?? 0}</span>
+                        </div>
+                        <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
+                          <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {label}</p>
+                          {allTransacoesDiario.map(t => (
+                            <div key={t} className="flex justify-between gap-4">
+                              <span style={{ color: transColorFn(t) }} className="font-semibold">{transLabel(t)}</span>
+                              <span className="font-mono text-slate-600">{fmtBRLF((d?.[`cum_${t}`] as number) ?? 0)}</span>
+                            </div>
+                          ))}
+                          <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
+                            <span className="font-bold text-slate-700">Total</span>
+                            <span className="font-mono font-bold text-slate-800">{fmtBRLF(cumTotal)}</span>
+                          </div>
+                          <div className="flex justify-between gap-4 mt-0.5">
+                            <span className="text-slate-400">NFs</span>
+                            <span className="font-mono text-slate-500">{d?.cumNfs ?? 0}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              {selTransacao !== null
-                ? <Bar key="sel" dataKey="servicos" name={transLabel(selTransacao)} fill={transColorFn(selTransacao)} fillOpacity={0.85} radius={[3, 3, 0, 0]} />
-                : allTransacoesDiario.map((t, i) => (
-                    <Bar key={t} dataKey={t} name={transLabel(t)} stackId="a" fill={transColorFn(t)} fillOpacity={0.85}
-                      radius={i === allTransacoesDiario.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]} />
-                  ))
-              }
-            </BarChart>
-          </ResponsiveContainer>
+                    );
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {selTransacao !== null
+                  ? <Bar key="sel" dataKey="servicos" name={transLabel(selTransacao)} fill={transColorFn(selTransacao)} fillOpacity={0.85} radius={[3, 3, 0, 0]} />
+                  : allTransacoesDiario.map((t, i) => (
+                      <Bar key={t} dataKey={t} name={transLabel(t)} stackId="a" fill={transColorFn(t)} fillOpacity={0.85}
+                        radius={i === allTransacoesDiario.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]} />
+                    ))
+                }
+              </BarChart>
+            </ResponsiveContainer>
+          )
         )}
       </div>
 
