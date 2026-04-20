@@ -1,12 +1,18 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, Trash2, FileSpreadsheet, BarChart2, ClipboardList } from 'lucide-react';
+import { Upload, Trash2, FileSpreadsheet, BarChart2, ClipboardList, Pencil, X, Percent } from 'lucide-react';
 import {
   getFinanciamentoMes,
   setFinanciamentoMes,
   deleteFinanciamentoMes,
   type FinanciamentoMesData,
 } from './financiamentoBancoVolksStorage';
+import {
+  loadRemuneracaoRegras,
+  saveRemuneracaoRegras,
+  type RemuneracaoProdutoRegra,
+  type TipoPremio,
+} from './financiamentoRemuneracaoStorage';
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -95,7 +101,9 @@ function parseNum(val: unknown): number {
 function fmtBRL(n: number): string {
   return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-type ActiveTab = 'importar' | 'vendas' | 'cadastro';
+type ActiveSection = 'vendas' | 'cadastro';
+type VendasSubTab = 'importar' | 'vendas';
+type CadastroSection = 'remuneracao-produto';
 
 interface Props {
   onBack: () => void;
@@ -104,7 +112,9 @@ interface Props {
 export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('importar');
+  const [activeSection, setActiveSection] = useState<ActiveSection>('vendas');
+  const [vendasSubTab, setVendasSubTab] = useState<VendasSubTab>('importar');
+  const [cadastroSection, setCadastroSection] = useState<CadastroSection>('remuneracao-produto');
 
   // ── Aba Importar ──
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
@@ -115,7 +125,17 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // ── Aba Vendas ──
+  // ── Aba Cadastro de Remuneração ──
+  const [regras, setRegras] = useState<RemuneracaoProdutoRegra[]>([]);
+  const [regrasLoading, setRegrasLoading] = useState(false);
+  const [regraForm, setRegraForm] = useState<{ produto: string; tipoPremio: TipoPremio; valorPremio: string }>({
+    produto: '', tipoPremio: 'fixo', valorPremio: '',
+  });
+  const [regraError, setRegraError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Aba vendas
   const [vendasYear, setVendasYear] = useState(CURRENT_YEAR);
   const [vendasMonth, setVendasMonth] = useState(new Date().getMonth() + 1);
   const [vendasData, setVendasData] = useState<FinanciamentoMesData | null>(null);
@@ -143,7 +163,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
 
   // Verifica quais meses têm dados para o ano selecionado na aba Vendas
   useEffect(() => {
-    if (activeTab !== 'vendas') return;
+    if (activeSection !== 'vendas') return;
     setVendasMonthsChecking(true);
     const checks = Array.from({ length: 12 }, (_, i) =>
       getFinanciamentoMes(vendasYear, i + 1).then(d => (d ? i + 1 : null))
@@ -158,16 +178,52 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       }
       setVendasMonthsChecking(false);
     });
-  }, [activeTab, vendasYear]);
+  }, [activeSection, vendasYear]);
 
   // Carrega dados do mês selecionado na aba Vendas
   useEffect(() => {
-    if (activeTab !== 'vendas') return;
+    if (activeSection !== 'vendas') return;
     setVendasLoading(true);
     getFinanciamentoMes(vendasYear, vendasMonth)
       .then(d => setVendasData(d))
       .finally(() => setVendasLoading(false));
-  }, [activeTab, vendasYear, vendasMonth]);
+  }, [activeSection, vendasYear, vendasMonth]);
+
+  // Carrega regras de remuneração
+  useEffect(() => {
+    if (activeSection !== 'cadastro') return;
+    setRegrasLoading(true);
+    loadRemuneracaoRegras().then(r => setRegras(r)).finally(() => setRegrasLoading(false));
+  }, [activeSection]);
+
+  async function handleSalvarRegra() {
+    if (!regraForm.produto.trim()) { setRegraError('Informe o nome do produto.'); return; }
+    if (!regraForm.valorPremio.trim()) { setRegraError('Informe o valor do prêmio.'); return; }
+    setRegraError(null);
+    let novas: RemuneracaoProdutoRegra[];
+    if (editingId) {
+      novas = regras.map(r => r.id === editingId ? { ...r, ...regraForm } : r);
+      setEditingId(null);
+    } else {
+      novas = [...regras, { id: crypto.randomUUID(), ...regraForm }];
+    }
+    await saveRemuneracaoRegras(novas);
+    setRegras(novas);
+    setRegraForm({ produto: '', tipoPremio: 'fixo', valorPremio: '' });
+  }
+
+  function handleEditarRegra(r: RemuneracaoProdutoRegra) {
+    setEditingId(r.id);
+    setRegraForm({ produto: r.produto, tipoPremio: r.tipoPremio, valorPremio: r.valorPremio });
+    setRegraError(null);
+  }
+
+  async function handleDeletarRegra(id: string) {
+    const novas = regras.filter(r => r.id !== id);
+    await saveRemuneracaoRegras(novas);
+    setRegras(novas);
+    setDeletingId(null);
+  }
 
   function handleImportClick() {
     fileInputRef.current?.click();
@@ -276,63 +332,75 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+      {/* Header escuro com navegação integrada */}
+      <header className="bg-slate-800 px-6 py-3 flex items-center justify-between shadow-md shrink-0">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Financiamento Banco Volks</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Demonstrativo de Vendas e Bonificações</p>
+          <h1 className="text-sm font-bold text-white leading-tight">Financiamento Banco Volks</h1>
+          <p className="text-xs text-slate-400 mt-0.5">Demonstrativo de Vendas e Bonificações</p>
         </div>
-        <button
-          onClick={onBack}
-          className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
-        >
-          ← Voltar ao menu
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setActiveSection('vendas')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+              activeSection === 'vendas'
+                ? 'bg-white text-slate-800'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            Vendas
+          </button>
+          <button
+            onClick={() => setActiveSection('cadastro')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+              activeSection === 'cadastro'
+                ? 'bg-white text-slate-800'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            <ClipboardList className="w-3.5 h-3.5" />
+            Cadastro
+          </button>
+          <div className="w-px h-5 bg-slate-600 mx-1" />
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+          >
+            ← Voltar
+          </button>
+        </div>
       </header>
 
-      {/* Tab bar */}
-      <div className="bg-white border-b border-slate-200 px-6 flex items-end gap-1">
-        <button
-          onClick={() => setActiveTab('importar')}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'importar'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-          }`}
-        >
-          <FileSpreadsheet className="w-4 h-4" />
-          Importar Dados
-        </button>
-        <button
-          onClick={() => setActiveTab('vendas')}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'vendas'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-          }`}
-        >
-          <BarChart2 className="w-4 h-4" />
-          Vendas de Financiamento e Produtos
-        </button>
+      {/* Sub-abas da seção Vendas */}
+      {activeSection === 'vendas' && (
+        <div className="bg-white border-b border-slate-200 px-6 flex items-end gap-1 shrink-0">
+          <button
+            onClick={() => setVendasSubTab('importar')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              vendasSubTab === 'importar'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Importar Dados
+          </button>
+          <button
+            onClick={() => setVendasSubTab('vendas')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              vendasSubTab === 'vendas'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            <BarChart2 className="w-4 h-4" />
+            Vendas de Financiamento e Produtos
+          </button>
+        </div>
+      )}
 
-        {/* Empurra a próxima aba para a direita */}
-        <div className="flex-1" />
-
-        <button
-          onClick={() => setActiveTab('cadastro')}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'cadastro'
-              ? 'border-amber-500 text-amber-600'
-              : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-          }`}
-        >
-          <ClipboardList className="w-4 h-4" />
-          Cadastro de Remuneração
-        </button>
-      </div>
-
-      {/* ── ABA: Importar Dados ── */}
-      {activeTab === 'importar' && (
+      {/* ── SEÇÃO: Vendas / Importar Dados ── */}
+      {activeSection === 'vendas' && vendasSubTab === 'importar' && (
         <>
           {/* Controls */}
           <div className="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap items-center gap-3">
@@ -483,8 +551,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
         </>
       )}
 
-      {/* ── ABA: Vendas de Financiamento e Produtos ── */}
-      {activeTab === 'vendas' && (
+      {/* ── SEÇÃO: Vendas / Vendas de Financiamento e Produtos ── */}
+      {activeSection === 'vendas' && vendasSubTab === 'vendas' && (
         <>
           {/* Barra de filtros */}
           <div className="bg-white border-b border-slate-200 px-6 py-2 flex items-center gap-3 flex-wrap">
@@ -619,15 +687,215 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
         </>
       )}
 
-      {/* ── ABA: Cadastro de Remuneração ── */}
-      {activeTab === 'cadastro' && (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="p-5 rounded-full bg-amber-50 inline-flex mb-4">
-              <ClipboardList className="w-12 h-12 text-amber-400" />
+      {/* ── SEÇÃO: Cadastro de Remuneração ── */}
+      {activeSection === 'cadastro' && (
+        <div className="flex-1 flex overflow-hidden">
+
+          {/* Sidebar de navegação */}
+          <aside className="w-56 shrink-0 overflow-y-auto flex flex-col" style={{ background: 'linear-gradient(to bottom, #1e1b4b, #1e3a8a)' }}>
+            <button
+              onClick={() => setCadastroSection('remuneracao-produto')}
+              className={`flex items-start gap-3 px-4 py-4 text-left w-full transition-colors ${
+                cadastroSection === 'remuneracao-produto'
+                  ? 'bg-white/20 border-l-2 border-white'
+                  : 'border-l-2 border-transparent text-indigo-200 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <Percent className={`w-4 h-4 mt-0.5 shrink-0 ${
+                cadastroSection === 'remuneracao-produto' ? 'text-white' : 'text-indigo-300'
+              }`} />
+              <div>
+                <p className={`text-xs font-bold leading-tight ${
+                  cadastroSection === 'remuneracao-produto' ? 'text-white' : 'text-indigo-200'
+                }`}>Regra de Remuneração Produto</p>
+                <p className="text-[10px] mt-0.5 leading-tight text-indigo-300 opacity-80">Produtos e regras de prêmio</p>
+              </div>
+            </button>
+            {/* Novos itens de cadastro serão adicionados aqui */}
+          </aside>
+
+          {/* Área de conteúdo */}
+          <div className="flex-1 overflow-auto bg-slate-100 p-6">
+            {cadastroSection === 'remuneracao-produto' && (
+              <div className="max-w-3xl space-y-5">
+
+                {/* Cabeçalho da seção */}
+                <div className="flex items-center gap-3">
+                  <Percent className="w-5 h-5 text-slate-500" />
+                  <div>
+                    <h2 className="text-base font-bold text-slate-800">Regra de Remuneração Produto</h2>
+                    <p className="text-xs text-slate-500">Produtos e regras de prêmio</p>
+                  </div>
+                </div>
+
+                {/* Formulário */}
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Produto */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Produto *</label>
+                      <input
+                        type="text"
+                        value={regraForm.produto}
+                        onChange={e => setRegraForm(f => ({ ...f, produto: e.target.value }))}
+                        placeholder="Ex: CDC, Seguro, GAP..."
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                      />
+                    </div>
+
+                    {/* Tipo de Prêmio */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Tipo de Prêmio</label>
+                      <div className="flex items-center gap-6 mt-1">
+                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="tipoPremio"
+                            checked={regraForm.tipoPremio === 'fixo'}
+                            onChange={() => setRegraForm(f => ({ ...f, tipoPremio: 'fixo' }))}
+                            className="accent-amber-500"
+                          />
+                          Valor fixo (R$)
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="tipoPremio"
+                            checked={regraForm.tipoPremio === 'percentual'}
+                            onChange={() => setRegraForm(f => ({ ...f, tipoPremio: 'percentual' }))}
+                            className="accent-amber-500"
+                          />
+                          Percentual (%)
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Valor do Prêmio */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        {regraForm.tipoPremio === 'fixo' ? 'Valor do Prêmio (R$) *' : 'Percentual (%) *'}
+                      </label>
+                      <input
+                        type="text"
+                        value={regraForm.valorPremio}
+                        onChange={e => setRegraForm(f => ({ ...f, valorPremio: e.target.value }))}
+                        placeholder={regraForm.tipoPremio === 'fixo' ? 'Ex: 150,00' : 'Ex: 2,5'}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                      />
+                    </div>
+                  </div>
+
+                  {regraError && (
+                    <p className="text-xs text-red-500 font-medium">{regraError}</p>
+                  )}
+
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      onClick={handleSalvarRegra}
+                      className="px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-colors"
+                    >
+                      {editingId ? 'Salvar alterações' : '+ Adicionar Regra'}
+                    </button>
+                    {editingId && (
+                      <button
+                        onClick={() => { setEditingId(null); setRegraForm({ produto: '', tipoPremio: 'fixo', valorPremio: '' }); setRegraError(null); }}
+                        className="px-4 py-2 rounded-lg border border-slate-300 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tabela de regras */}
+                {regrasLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500" />
+                  </div>
+                ) : regras.length > 0 && (
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr style={{ background: 'linear-gradient(to right, #1e1b4b, #1e3a8a)' }} className="text-white">
+                          <th className="px-4 py-3 text-left font-semibold">Produto</th>
+                          <th className="px-4 py-3 text-left font-semibold">Tipo de Prêmio</th>
+                          <th className="px-4 py-3 text-left font-semibold">Valor / Percentual</th>
+                          <th className="px-4 py-3 text-center font-semibold w-24">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {regras.map((r, idx) => (
+                          <tr key={r.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                            <td className="px-4 py-3 text-slate-800 font-medium">{r.produto}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                r.tipoPremio === 'fixo'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}>
+                                {r.tipoPremio === 'fixo' ? 'Valor fixo (R$)' : 'Percentual (%)'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-700">
+                              {r.tipoPremio === 'fixo' ? `R$ ${r.valorPremio}` : `${r.valorPremio}%`}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => handleEditarRegra(r)}
+                                  className="text-slate-400 hover:text-indigo-600 transition-colors"
+                                  title="Editar"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => setDeletingId(r.id)}
+                                  className="text-slate-400 hover:text-red-500 transition-colors"
+                                  title="Remover"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmar exclusão de regra */}
+      {deletingId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-slate-800">Remover regra?</h3>
+              <button onClick={() => setDeletingId(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <h2 className="text-xl font-bold text-slate-700 mb-2">Cadastro de Remuneração</h2>
-            <p className="text-slate-500 text-sm">Esta seção está sendo desenvolvida.</p>
+            <p className="text-sm text-slate-500 mb-6">
+              A regra <strong>{regras.find(r => r.id === deletingId)?.produto}</strong> será removida permanentemente.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeletingId(null)}
+                className="flex-1 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleDeletarRegra(deletingId)}
+                className="flex-1 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+              >
+                Remover
+              </button>
+            </div>
           </div>
         </div>
       )}
