@@ -143,6 +143,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   // set of months (1-12) that have imported data for vendasYear
   const [vendasMonthsWithData, setVendasMonthsWithData] = useState<Set<number>>(new Set());
   const [vendasMonthsChecking, setVendasMonthsChecking] = useState(false);
+  type VendasInnerTab = 'tabela' | 'resumo-novos' | 'resumo-usados';
+  const [vendasInnerTab, setVendasInnerTab] = useState<VendasInnerTab>('tabela');
 
   const loadMes = useCallback(async () => {
     setLoading(true);
@@ -554,8 +556,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       {/* ── SEÇÃO: Vendas / Vendas de Financiamento e Produtos ── */}
       {activeSection === 'vendas' && vendasSubTab === 'vendas' && (
         <>
-          {/* Barra de filtros */}
-          <div className="bg-white border-b border-slate-200 px-6 py-2 flex items-center gap-3 flex-wrap">
+          {/* Barra de filtros (ano + meses) */}
+          <div className="bg-white border-b border-slate-200 px-6 py-2 flex items-center gap-3 flex-wrap shrink-0">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ANO</span>
             <select
               value={vendasYear}
@@ -596,93 +598,133 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             )}
           </div>
 
-          {/* Conteúdo */}
-          <div className="flex-1 p-6 overflow-hidden">
-            {vendasLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-              </div>
-            ) : !vendasData || vendasData.rows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 gap-3">
-                <div className="p-5 rounded-full bg-slate-100">
-                  <BarChart2 className="w-12 h-12 text-slate-300" />
-                </div>
-                <p className="text-slate-500 text-sm font-medium">
-                  {vendasMonthsWithData.size === 0
-                    ? 'Nenhum arquivo importado para este ano. Importe os dados na aba Importar Dados.'
-                    : 'Nenhum dado disponível para o mês selecionado.'}
-                </p>
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                {/* Meta */}
-                <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
-                  <div className="text-xs text-slate-500">
-                    <span className="font-medium text-slate-700">{vendasData.rows.length}</span> registro(s) ·{' '}
-                    {MONTHS[vendasMonth - 1]}/{vendasYear}
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    Arquivo: {vendasData.fileName}
-                  </div>
-                </div>
+          {/* Sub-abas internas */}
+          <div className="bg-white border-b border-slate-200 px-6 flex items-end gap-1 shrink-0">
+            {(['tabela', 'resumo-novos', 'resumo-usados'] as const).map(tab => {
+              const labels: Record<string, string> = {
+                'tabela': 'Tabela de Vendas',
+                'resumo-novos': 'Resumo Vendas Novos',
+                'resumo-usados': 'Resumo Vendas Usados',
+              };
+              const isActive = vendasInnerTab === tab;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setVendasInnerTab(tab)}
+                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                    isActive
+                      ? 'border-blue-600 text-blue-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  {labels[tab]}
+                </button>
+              );
+            })}
+          </div>
 
-                {/* Tabela */}
-                <div className="overflow-auto max-h-[calc(100vh-280px)]">
-                  <table className="w-full text-xs border-collapse min-w-max">
-                    <thead className="sticky top-0 z-10">
-                      <tr className="bg-blue-700 text-white">
-                        <th className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-blue-600 w-10">#</th>
-                        {VENDAS_COLS.map((col, idx) => (
-                          <th key={idx} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-blue-600 last:border-r-0">
-                            {col}
-                          </th>
+          {/* Conteúdo da sub-aba */}
+          <div className="flex-1 p-6 overflow-hidden">
+
+            {/* Tabela de Vendas */}
+            {vendasInnerTab === 'tabela' && (
+              vendasLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                </div>
+              ) : !vendasData || vendasData.rows.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-64 gap-3">
+                  <div className="p-5 rounded-full bg-slate-100">
+                    <BarChart2 className="w-12 h-12 text-slate-300" />
+                  </div>
+                  <p className="text-slate-500 text-sm font-medium">
+                    {vendasMonthsWithData.size === 0
+                      ? 'Nenhum arquivo importado para este ano. Importe os dados na aba Importar Dados.'
+                      : 'Nenhum dado disponível para o mês selecionado.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                  <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                    <div className="text-xs text-slate-500">
+                      <span className="font-medium text-slate-700">{vendasData.rows.length}</span> registro(s) ·{' '}
+                      {MONTHS[vendasMonth - 1]}/{vendasYear}
+                    </div>
+                    <div className="text-xs text-slate-400">Arquivo: {vendasData.fileName}</div>
+                  </div>
+                  <div className="overflow-auto max-h-[calc(100vh-320px)]">
+                    <table className="w-full text-xs border-collapse min-w-max">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-blue-700 text-white">
+                          <th className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-blue-600 w-10">#</th>
+                          {VENDAS_COLS.map((col, idx) => (
+                            <th key={idx} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-blue-600 last:border-r-0">
+                              {col}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vendasData.rows.map((row, rowIdx) => (
+                          <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                            <td className="px-3 py-2 text-slate-400 border-r border-slate-100 font-mono">{rowIdx + 1}</td>
+                            {VENDAS_COLS.map((col, colIdx) => {
+                              const cellVal = col === TOTAL_COMISSOES_COL
+                                ? fmtBRL(calcTotalComissoes(row))
+                                : (row[col] !== null && row[col] !== undefined && row[col] !== '' ? String(row[col]) : '');
+                              return (
+                                <td key={colIdx} className="px-3 py-2 text-slate-700 border-r border-slate-100 last:border-r-0 whitespace-nowrap">
+                                  {cellVal}
+                                </td>
+                              );
+                            })}
+                          </tr>
                         ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {vendasData.rows.map((row, rowIdx) => (
-                        <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                          <td className="px-3 py-2 text-slate-400 border-r border-slate-100 font-mono">{rowIdx + 1}</td>
+                      </tbody>
+                      <tfoot className="sticky bottom-0 z-10">
+                        <tr className="bg-blue-900 text-white font-bold">
+                          <td className="px-3 py-2.5 border-r border-blue-800 whitespace-nowrap text-xs">Total</td>
                           {VENDAS_COLS.map((col, colIdx) => {
-                            const cellVal = col === TOTAL_COMISSOES_COL
-                              ? fmtBRL(calcTotalComissoes(row))
-                              : (row[col] !== null && row[col] !== undefined && row[col] !== '' ? String(row[col]) : '');
+                            const val = vendasTotals[col];
+                            const isCount = COUNT_GT0_COLS.has(col) || col === SPF_COL;
                             return (
-                              <td key={colIdx} className="px-3 py-2 text-slate-700 border-r border-slate-100 last:border-r-0 whitespace-nowrap">
-                                {cellVal}
+                              <td key={colIdx} className="px-3 py-2.5 border-r border-blue-800 last:border-r-0 whitespace-nowrap text-right text-xs">
+                                {val !== '' ? (
+                                  isCount ? <span className="text-blue-200">{val} reg.</span> : val
+                                ) : ''}
                               </td>
                             );
                           })}
                         </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="sticky bottom-0 z-10">
-                      <tr className="bg-blue-900 text-white font-bold">
-                        <td className="px-3 py-2.5 border-r border-blue-800 whitespace-nowrap text-xs">Total</td>
-                        {VENDAS_COLS.map((col, colIdx) => {
-                          const val = vendasTotals[col];
-                          const isCount = COUNT_GT0_COLS.has(col) || col === SPF_COL;
-                          return (
-                            <td
-                              key={colIdx}
-                              className="px-3 py-2.5 border-r border-blue-800 last:border-r-0 whitespace-nowrap text-right text-xs"
-                            >
-                              {val !== '' ? (
-                                isCount ? (
-                                  <span className="text-blue-200">{val} reg.</span>
-                                ) : (
-                                  val
-                                )
-                              ) : ''}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    </tfoot>
-                  </table>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
+              )
+            )}
+
+            {/* Resumo Vendas Novos */}
+            {vendasInnerTab === 'resumo-novos' && (
+              <div className="flex flex-col items-center justify-center h-64 gap-3">
+                <div className="p-5 rounded-full bg-blue-50">
+                  <BarChart2 className="w-12 h-12 text-blue-300" />
+                </div>
+                <p className="text-slate-500 text-sm font-medium">Resumo Vendas Novos</p>
+                <p className="text-slate-400 text-xs">Em construção</p>
               </div>
             )}
+
+            {/* Resumo Vendas Usados */}
+            {vendasInnerTab === 'resumo-usados' && (
+              <div className="flex flex-col items-center justify-center h-64 gap-3">
+                <div className="p-5 rounded-full bg-blue-50">
+                  <BarChart2 className="w-12 h-12 text-blue-300" />
+                </div>
+                <p className="text-slate-500 text-sm font-medium">Resumo Vendas Usados</p>
+                <p className="text-slate-400 text-xs">Em construção</p>
+              </div>
+            )}
+
           </div>
         </>
       )}
