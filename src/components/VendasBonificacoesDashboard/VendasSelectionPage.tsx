@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Layers, Car, X, Lock, Sparkles } from 'lucide-react';
+import { Shield, Layers, Car, X, Lock, Sparkles, Banknote } from 'lucide-react';
 import { useAuth } from '@/contexts/useAuth';
 import type { VendasSubModuleId } from '@/lib/authTypes';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
@@ -12,7 +12,7 @@ const PELICULAS_SUBS: VendasSubModuleId[] = ['peliculas.tabela', 'peliculas.anal
 const ESTETICA_SUBS: VendasSubModuleId[] = ['estetica.tabela', 'estetica.analise'];
 
 interface VendasSelectionPageProps {
-  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf') => void;
+  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks') => void;
   onChangeBrand: () => void;
 }
 
@@ -132,6 +132,21 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
                 Central de Vendas VW
               </h2>
               <BaseDateBadge dateKey="base_date:central_vendas_vw" />
+            </div>
+          </button>
+
+          {/* Card — Financiamento Banco Volks */}
+          <button
+            onClick={() => onSelect('financiamento-banco-volks')}
+            className="flex-1 bg-white rounded-2xl border-2 border-blue-400 shadow-md hover:shadow-xl hover:border-blue-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-blue-50 group-hover:bg-blue-100 transition-colors">
+              <Banknote className="w-10 h-10 text-blue-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Financiamento Banco Volks
+              </h2>
             </div>
           </button>
 
