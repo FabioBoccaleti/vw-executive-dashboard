@@ -396,7 +396,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       {/* Header escuro com navegação integrada */}
-      <header className="bg-slate-800 px-6 py-3 flex items-center justify-between shadow-md shrink-0">
+      <header className="print-hidden bg-slate-800 px-6 py-3 flex items-center justify-between shadow-md shrink-0">
         <div>
           <h1 className="text-sm font-bold text-white leading-tight">Financiamento Banco Volks</h1>
           <p className="text-xs text-slate-400 mt-0.5">Demonstrativo de Vendas e Bonificações</p>
@@ -439,7 +439,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
         <div className="bg-white border-b border-slate-200 px-6 flex items-end gap-1 shrink-0">
           <button
             onClick={() => setVendasSubTab('importar')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`print-hidden flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               vendasSubTab === 'importar'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
@@ -618,7 +618,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       {activeSection === 'vendas' && vendasSubTab === 'vendas' && (
         <>
           {/* Barra de filtros (ano + meses) */}
-          <div className="bg-white border-b border-slate-200 px-6 py-2 flex items-center gap-3 flex-wrap shrink-0">
+          <div className="print-hidden bg-white border-b border-slate-200 px-6 py-2 flex items-center gap-3 flex-wrap shrink-0">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ANO</span>
             <select
               value={vendasYear}
@@ -660,7 +660,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
           </div>
 
           {/* Sub-abas internas */}
-          <div className="bg-white border-b border-slate-200 px-6 flex items-end gap-1 shrink-0">
+          <div className="print-hidden bg-white border-b border-slate-200 px-6 flex items-end gap-1 shrink-0">
             {(['tabela', 'resumo-novos', 'resumo-usados', 'resumo-total', 'demonstrativo'] as const).map(tab => {
               const labels: Record<string, string> = {
                 'tabela': 'Tabela de Vendas',
@@ -965,8 +965,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                   <table className="w-full text-[9px] border-collapse">
                     <thead>
                       <tr className="bg-blue-800 text-white">
-                        <th className="px-1.5 py-1 text-left border border-blue-700 w-5">#</th>
-                        {DEMO_COLS.map((c, i) => <th key={i} className="px-1.5 py-1 text-center border border-blue-700 whitespace-nowrap font-semibold">{c}</th>)}
+                        <th className="px-1 py-1 text-left border border-blue-700 w-5">#</th>
+                        {DEMO_COLS.map((c, i) => <th key={i} className="px-1 py-1 text-center border border-blue-700 font-semibold leading-tight" style={{ maxWidth: 70, wordBreak: 'break-word' }}>{c}</th>)}
                       </tr>
                     </thead>
                     <tbody>
