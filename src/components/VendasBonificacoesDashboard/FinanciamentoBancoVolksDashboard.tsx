@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, Trash2, FileSpreadsheet, BarChart2, ClipboardList, Pencil, X, Percent } from 'lucide-react';
+import { Upload, Trash2, FileSpreadsheet, BarChart2, ClipboardList, Pencil, X, Percent, Printer } from 'lucide-react';
 import {
   getFinanciamentoMes,
   setFinanciamentoMes,
@@ -903,14 +903,138 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             })()}
 
             {/* Demonstrativo de Pagamento */}
-            {vendasInnerTab === 'demonstrativo' && (
-              <div className="flex flex-col items-center justify-center h-64 gap-3">
-                <div className="p-5 rounded-full bg-slate-100">
-                  <BarChart2 className="w-12 h-12 text-slate-300" />
+            {vendasInnerTab === 'demonstrativo' && (() => {
+              const allRows = vendasData?.rows ?? [];
+              if (vendasLoading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
+              if (allRows.length === 0) return (
+                <div className="flex flex-col items-center justify-center h-64 gap-3">
+                  <div className="p-5 rounded-full bg-slate-100"><BarChart2 className="w-12 h-12 text-slate-300" /></div>
+                  <p className="text-slate-500 text-sm font-medium">Nenhum registro para o mês selecionado.</p>
                 </div>
-                <p className="text-slate-500 text-sm font-medium">Demonstrativo de Pagamento</p>
-              </div>
-            )}
+              );
+
+              const VEND_COL = 'Vendedor CDC, PPS AV, GE, SEGUROS';
+              const mesBaseMonth = vendasMonth === 1 ? 12 : vendasMonth - 1;
+              const mesBaseYear = vendasMonth === 1 ? vendasYear - 1 : vendasYear;
+              const vendors = [...new Map(allRows.map(r => [String(r[VEND_COL] ?? '').trim(), true] as [string, boolean])).keys()].filter(v => v);
+
+              const DEMO_COLS = [
+                'Chassi', 'Valor Financiado', 'Comissão Financiamento',
+                'SPF Basico', 'SPF Normal', 'SPF Plus',
+                'Valor Pacote PRTG', 'Valor Seguro GE GM', 'Valor Prepaid Services á Vista',
+                'Valor Prepaid Services', 'Valor Franquia', 'Valor GAP', 'Valor AP',
+              ];
+
+              const getCell = (row: Record<string, unknown>, col: string): string => {
+                if (col === 'Chassi') return String(row['Chassi'] ?? '');
+                if (col === 'Valor Financiado') { const v = parseNum(row['Valor Financiado']); return v !== 0 ? fmtBRL(v) : ''; }
+                if (col === 'Comissão Financiamento') { const v = calcTotalComissoes(row); return v !== 0 ? fmtBRL(v) : ''; }
+                if (col === 'SPF Basico') return /basico|básico/i.test(String(row[SPF_COL] ?? '')) ? '1' : '';
+                if (col === 'SPF Normal') return /normal/i.test(String(row[SPF_COL] ?? '')) ? '1' : '';
+                if (col === 'SPF Plus') return /plus/i.test(String(row[SPF_COL] ?? '')) ? '1' : '';
+                if (col === 'Valor Pacote PRTG') return parseNum(row['Valor Pacote PRTG']) > 0 ? '1' : '';
+                if (col === 'Valor Seguro GE GM') return parseNum(row['Valor Seguro GE GM']) > 0 ? '1' : '';
+                if (col === 'Valor Prepaid Services á Vista') return parseNum(row['Valor Prepaid Services á Vista']) > 0 ? '1' : '';
+                if (col === 'Valor Prepaid Services') return parseNum(row['Valor Prepaid Services']) > 0 ? '1' : '';
+                if (col === 'Valor Franquia') return parseNum(row['Valor Franquia \u2013 GO']) > 0 ? '1' : '';
+                if (col === 'Valor GAP') return parseNum(row['Valor GAP \u2013 GO']) > 0 ? '1' : '';
+                if (col === 'Valor AP') return parseNum(row['Valor AP \u2013 GO']) > 0 ? '1' : '';
+                return '';
+              };
+
+              const getFooter = (rows: Record<string, unknown>[], col: string): string => {
+                if (col === 'Chassi') return rows.length + ' reg.';
+                if (col === 'Valor Financiado') return fmtBRL(rows.reduce((a, r) => a + parseNum(r['Valor Financiado']), 0));
+                if (col === 'Comissão Financiamento') return fmtBRL(rows.reduce((a, r) => a + calcTotalComissoes(r), 0));
+                if (col === 'SPF Basico') return String(rows.filter(r => /basico|básico/i.test(String(r[SPF_COL] ?? ''))).length);
+                if (col === 'SPF Normal') return String(rows.filter(r => /normal/i.test(String(r[SPF_COL] ?? ''))).length);
+                if (col === 'SPF Plus') return String(rows.filter(r => /plus/i.test(String(r[SPF_COL] ?? ''))).length);
+                if (col === 'Valor Pacote PRTG') return String(rows.filter(r => parseNum(r['Valor Pacote PRTG']) > 0).length);
+                if (col === 'Valor Seguro GE GM') return String(rows.filter(r => parseNum(r['Valor Seguro GE GM']) > 0).length);
+                if (col === 'Valor Prepaid Services á Vista') return String(rows.filter(r => parseNum(r['Valor Prepaid Services á Vista']) > 0).length);
+                if (col === 'Valor Prepaid Services') return String(rows.filter(r => parseNum(r['Valor Prepaid Services']) > 0).length);
+                if (col === 'Valor Franquia') return String(rows.filter(r => parseNum(r['Valor Franquia \u2013 GO']) > 0).length);
+                if (col === 'Valor GAP') return String(rows.filter(r => parseNum(r['Valor GAP \u2013 GO']) > 0).length);
+                if (col === 'Valor AP') return String(rows.filter(r => parseNum(r['Valor AP \u2013 GO']) > 0).length);
+                return '';
+              };
+
+              const renderTable = (rows: Record<string, unknown>[], title: string) => (
+                <div className="mb-4">
+                  <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wide mb-1">{title}</p>
+                  <table className="w-full text-[9px] border-collapse">
+                    <thead>
+                      <tr className="bg-blue-800 text-white">
+                        <th className="px-1.5 py-1 text-left border border-blue-700 w-5">#</th>
+                        {DEMO_COLS.map((c, i) => <th key={i} className="px-1.5 py-1 text-center border border-blue-700 whitespace-nowrap font-semibold">{c}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, ri) => (
+                        <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                          <td className="px-1.5 py-0.5 border border-slate-200 text-slate-400 font-mono">{ri + 1}</td>
+                          {DEMO_COLS.map((col, ci) => (
+                            <td key={ci} className="px-1.5 py-0.5 border border-slate-200 text-center text-slate-700">{getCell(row, col)}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-blue-900 text-white font-bold">
+                        <td className="px-1.5 py-1 border border-blue-800">Total</td>
+                        {DEMO_COLS.map((col, i) => (
+                          <td key={i} className="px-1.5 py-1 border border-blue-800 text-center">{getFooter(rows, col)}</td>
+                        ))}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              );
+
+              return (
+                <div className="overflow-auto max-h-[calc(100vh-280px)]">
+                  <style>{`
+                    @media print {
+                      @page { size: A4 landscape; margin: 1cm; }
+                      .demo-page { page-break-after: always; }
+                      .demo-page:last-of-type { page-break-after: avoid; }
+                      .print-hidden { display: none !important; }
+                    }
+                  `}</style>
+                  <div className="print-hidden flex justify-end mb-3 sticky top-0 bg-white z-10 py-2 border-b border-slate-100">
+                    <button
+                      onClick={() => window.print()}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Printer className="w-4 h-4" />
+                      Imprimir
+                    </button>
+                  </div>
+                  {vendors.map((vendor, vi) => {
+                    const vendorRows = allRows.filter(r => String(r[VEND_COL] ?? '').trim() === vendor);
+                    const novos = vendorRows.filter(r => !String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
+                    const usados = vendorRows.filter(r => String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
+                    return (
+                      <div key={vi} className="demo-page bg-white border border-slate-200 rounded-xl p-5 mb-4">
+                        <div className="text-center pb-2 mb-3 border-b border-slate-200">
+                          <p className="text-sm font-bold text-slate-800">Sorana VW</p>
+                          <p className="text-xs font-semibold text-slate-700">Remuneração Produção Banco Volks</p>
+                        </div>
+                        <div className="flex justify-between items-center mb-4 text-xs text-slate-600">
+                          <div><span className="font-semibold">Vendedor:</span> {vendor}</div>
+                          <div className="flex gap-6">
+                            <div><span className="font-semibold">Mês de Apuração:</span> {MONTHS[vendasMonth - 1]}/{vendasYear}</div>
+                            <div><span className="font-semibold">Mês Base:</span> {MONTHS[mesBaseMonth - 1]}/{mesBaseYear}</div>
+                          </div>
+                        </div>
+                        {novos.length > 0 && renderTable(novos, 'Veículos Novos')}
+                        {usados.length > 0 && renderTable(usados, 'Veículos Usados / Semi-Novos')}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Resumo Total de Vendas */}
             {vendasInnerTab === 'resumo-total' && (() => {
