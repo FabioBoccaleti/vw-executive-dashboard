@@ -204,7 +204,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   // set of months (1-12) that have imported data for vendasYear
   const [vendasMonthsWithData, setVendasMonthsWithData] = useState<Set<number>>(new Set());
   const [vendasMonthsChecking, setVendasMonthsChecking] = useState(false);
-  type VendasInnerTab = 'tabela' | 'resumo-novos' | 'resumo-usados' | 'resumo-total';
+  type VendasInnerTab = 'tabela' | 'resumo-novos' | 'resumo-usados' | 'resumo-total' | 'demonstrativo';
   const [vendasInnerTab, setVendasInnerTab] = useState<VendasInnerTab>('tabela');
 
   const loadMes = useCallback(async () => {
@@ -661,12 +661,13 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
 
           {/* Sub-abas internas */}
           <div className="bg-white border-b border-slate-200 px-6 flex items-end gap-1 shrink-0">
-            {(['tabela', 'resumo-novos', 'resumo-usados', 'resumo-total'] as const).map(tab => {
+            {(['tabela', 'resumo-novos', 'resumo-usados', 'resumo-total', 'demonstrativo'] as const).map(tab => {
               const labels: Record<string, string> = {
                 'tabela': 'Tabela de Vendas',
                 'resumo-novos': 'Resumo Vendas Novos',
                 'resumo-usados': 'Resumo Vendas Usados',
                 'resumo-total': 'Resumo Total de Vendas',
+                'demonstrativo': 'Demonstrativo de Pagamento',
               };
               const isActive = vendasInnerTab === tab;
               return (
@@ -900,6 +901,16 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                 </div>
               );
             })()}
+
+            {/* Demonstrativo de Pagamento */}
+            {vendasInnerTab === 'demonstrativo' && (
+              <div className="flex flex-col items-center justify-center h-64 gap-3">
+                <div className="p-5 rounded-full bg-slate-100">
+                  <BarChart2 className="w-12 h-12 text-slate-300" />
+                </div>
+                <p className="text-slate-500 text-sm font-medium">Demonstrativo de Pagamento</p>
+              </div>
+            )}
 
             {/* Resumo Total de Vendas */}
             {vendasInnerTab === 'resumo-total' && (() => {
