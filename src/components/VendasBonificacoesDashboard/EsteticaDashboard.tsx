@@ -303,6 +303,10 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
   const [lockPromptId, setLockPromptId] = useState<string | null>(null);
   const [lockPassword, setLockPassword] = useState('');
   const lockInputRef = useRef<HTMLInputElement>(null);
+  // Encerrada + comissão paga: desbloqueio durante edição
+  const [encerradaUnlockedIds, setEncerradaUnlockedIds] = useState<Set<string>>(new Set());
+  const [showEncerradaLockPrompt, setShowEncerradaLockPrompt] = useState(false);
+  const [encerradaLockPassword, setEncerradaLockPassword] = useState('');
   const [deletePasswordPromptId, setDeletePasswordPromptId] = useState<string | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
   const [showRegisterModal, setShowRegisterModal] = useState(false);
@@ -420,7 +424,12 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
   };
 
   const cancelEdit = () => {
-    if (editingId) setUnlockedIds(prev => { const s = new Set(prev); s.delete(editingId); return s; });
+    if (editingId) {
+      setUnlockedIds(prev => { const s = new Set(prev); s.delete(editingId); return s; });
+      setEncerradaUnlockedIds(prev => { const s = new Set(prev); s.delete(editingId); return s; });
+    }
+    setShowEncerradaLockPrompt(false);
+    setEncerradaLockPassword('');
     setEditingId(null);
     setEditDraft(null);
   };
@@ -441,6 +450,9 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
     const updated = rows.map(r => r.id === editDraft.id ? editDraft : r);
     // Remover desbloqueio ao salvar (cadeado volta)
     setUnlockedIds(prev => { const s = new Set(prev); s.delete(editDraft.id); return s; });
+    setEncerradaUnlockedIds(prev => { const s = new Set(prev); s.delete(editDraft.id); return s; });
+    setShowEncerradaLockPrompt(false);
+    setEncerradaLockPassword('');
     setRows(updated);
     setEditingId(null);
     setEditDraft(null);
@@ -986,6 +998,9 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
                             const isDateRO = DATE_READONLY_KEYS.has(col.key);
                             // No modo "Aguardando ser Finalizado" só nfPrestador é editável
                             const isLockedInFinalizado = aguardandoFinalizado && col.key !== 'nfPrestador';
+                            // Encerrada + comissão paga: só nfPrestador editável sem senha
+                            const isEncerradaComPaga = row.situacao === 'Encerrada' && !!(row.comissaoVendedorPagaEm?.trim() || row.comissaoAcessoriosPagaEm?.trim());
+                            const isLockedInEncerrada = isEncerradaComPaga && !encerradaUnlockedIds.has(row.id) && col.key !== 'nfPrestador';
                             const isRequired = REQUIRED_KEYS.includes(col.key as keyof EsteticaRow);
                             const isMissing = isEditing && isRequired && !val?.trim();
                             const isSelector = col.key === 'produto' || col.key === 'vendedor' || col.key === 'vendedorAcessorios';
@@ -1006,7 +1021,7 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
                                 style={{ verticalAlign: 'middle' }}
                               >
                                 {isEditing ? (
-                                  isCalc || isDateRO || isLockedInFinalizado ? (
+                                  isCalc || isDateRO || isLockedInFinalizado || isLockedInEncerrada ? (
                                     <span className={`italic text-sm font-mono tabular-nums ${
                                       val && RESULTADO_KEYS.has(col.key) ? 'text-emerald-700 font-semibold' :
                                       val && col.key === RL_KEY          ? 'text-sky-700 font-semibold' :
@@ -1132,11 +1147,52 @@ export function EsteticaDashboard({ onBack, onOpenCadastros }: EsteticaDashboard
                                 </div>
                               </div>
                             ) : isEditing ? (
-                              <div className="flex items-center justify-center gap-1.5">
+                              <div className="flex items-center justify-center gap-1.5 flex-wrap">
                                 <button onClick={saveEdit} title="Salvar linha" className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white text-xs rounded-md hover:bg-indigo-700 font-semibold transition-colors">
                                   <Check className="w-3 h-3" />
                                   Salvar
                                 </button>
+                                {(row.situacao === 'Encerrada' && !!(row.comissaoVendedorPagaEm?.trim() || row.comissaoAcessoriosPagaEm?.trim()) && !encerradaUnlockedIds.has(row.id)) && (
+                                  showEncerradaLockPrompt ? (
+                                    <div className="flex flex-col items-center gap-1 py-0.5">
+                                      <p className="text-[10px] text-amber-700 font-semibold"><Lock className="w-3 h-3 inline-block mb-0.5" /> Senha para edição completa</p>
+                                      <input
+                                        type="password"
+                                        autoComplete="new-password"
+                                        value={encerradaLockPassword}
+                                        onChange={e => setEncerradaLockPassword(e.target.value)}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter') {
+                                            if (encerradaLockPassword === '1985') {
+                                              setEncerradaUnlockedIds(prev => new Set([...prev, row.id]));
+                                              setShowEncerradaLockPrompt(false); setEncerradaLockPassword('');
+                                            } else { toast.error('Senha incorreta'); setEncerradaLockPassword(''); }
+                                          }
+                                          if (e.key === 'Escape') { setShowEncerradaLockPrompt(false); setEncerradaLockPassword(''); }
+                                        }}
+                                        placeholder="Senha"
+                                        className="w-full border border-amber-300 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                      />
+                                      <div className="flex gap-1">
+                                        <button onClick={() => {
+                                          if (encerradaLockPassword === '1985') {
+                                            setEncerradaUnlockedIds(prev => new Set([...prev, row.id]));
+                                            setShowEncerradaLockPrompt(false); setEncerradaLockPassword('');
+                                          } else { toast.error('Senha incorreta'); setEncerradaLockPassword(''); }
+                                        }} className="px-2 py-0.5 bg-amber-600 text-white text-xs rounded-md hover:bg-amber-700 font-semibold">OK</button>
+                                        <button onClick={() => { setShowEncerradaLockPrompt(false); setEncerradaLockPassword(''); }} className="px-2 py-0.5 bg-slate-200 text-slate-600 text-xs rounded-md hover:bg-slate-300 font-semibold">Cancelar</button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => { setShowEncerradaLockPrompt(true); setEncerradaLockPassword(''); }}
+                                      title="Desbloquear edição completa (requer senha)"
+                                      className="p-1.5 rounded-md text-amber-600 hover:bg-amber-50 transition-colors"
+                                    >
+                                      <Lock className="w-3.5 h-3.5" />
+                                    </button>
+                                  )
+                                )}
                                 <button onClick={cancelEdit} title="Cancelar edição" className="p-1.5 rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
                                   <X className="w-3.5 h-3.5" />
                                 </button>
