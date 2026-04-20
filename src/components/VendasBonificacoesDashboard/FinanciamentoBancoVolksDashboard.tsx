@@ -71,6 +71,32 @@ const COUNT_GT0_COLS = new Set([
 
 const SPF_COL = 'Plano SPF';
 
+const RESUMO_COLS = [
+  'Vendedor CDC, PPS AV, GE, SEGUROS',
+  'Total de Comisões',
+  'Plano SPF',
+  'SPF Basico',
+  'SPF Normal',
+  'SPF Plus',
+  'Valor Pacote PRTG',
+  'Valor Seguro GE GM',
+  'Valor Prepaid Services á Vista',
+  'Valor Prepaid Services',
+  'Valor Franquia \u2013 GO',
+  'Valor GAP \u2013 GO',
+  'Valor AP \u2013 GO',
+];
+
+const RESUMO_COUNT_COLS = new Set([
+  'Valor Pacote PRTG',
+  'Valor Seguro GE GM',
+  'Valor Prepaid Services á Vista',
+  'Valor Prepaid Services',
+  'Valor Franquia \u2013 GO',
+  'Valor GAP \u2013 GO',
+  'Valor AP \u2013 GO',
+]);
+
 /** Converte valor de célula Excel (string ou number) para número */
 function parseNum(val: unknown): number {
   if (typeof val === 'number') return val;
@@ -704,26 +730,118 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             )}
 
             {/* Resumo Vendas Novos */}
-            {vendasInnerTab === 'resumo-novos' && (
-              <div className="flex flex-col items-center justify-center h-64 gap-3">
-                <div className="p-5 rounded-full bg-blue-50">
-                  <BarChart2 className="w-12 h-12 text-blue-300" />
+            {vendasInnerTab === 'resumo-novos' && (() => {
+              const rows = (vendasData?.rows ?? []).filter(r => !String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
+              if (vendasLoading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
+              if (rows.length === 0) return (
+                <div className="flex flex-col items-center justify-center h-64 gap-3">
+                  <div className="p-5 rounded-full bg-slate-100"><BarChart2 className="w-12 h-12 text-slate-300" /></div>
+                  <p className="text-slate-500 text-sm font-medium">Nenhum registro de venda nova para o mês selecionado.</p>
                 </div>
-                <p className="text-slate-500 text-sm font-medium">Resumo Vendas Novos</p>
-                <p className="text-slate-400 text-xs">Em construção</p>
-              </div>
-            )}
+              );
+              return (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                  <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-slate-700">Resumo Vendas Novos — {MONTHS[vendasMonth - 1]}/{vendasYear}</p>
+                    <span className="text-xs text-slate-400">{rows.length} registro(s)</span>
+                  </div>
+                  <div className="overflow-auto max-h-[calc(100vh-320px)]">
+                    <table className="w-full text-xs border-collapse min-w-max">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-blue-700 text-white">
+                          <th className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-blue-600 w-10">#</th>
+                          {RESUMO_COLS.map((col, i) => (
+                            <th key={i} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-blue-600 last:border-r-0">{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((row, rowIdx) => (
+                          <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                            <td className="px-3 py-2 text-slate-400 border-r border-slate-100 font-mono">{rowIdx + 1}</td>
+                            {RESUMO_COLS.map((col, colIdx) => {
+                              const val = col === TOTAL_COMISSOES_COL
+                                ? fmtBRL(calcTotalComissoes(row))
+                                : (row[col] !== null && row[col] !== undefined && row[col] !== '' ? String(row[col]) : '');
+                              return <td key={colIdx} className="px-3 py-2 text-slate-700 border-r border-slate-100 last:border-r-0 whitespace-nowrap">{val}</td>;
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="sticky bottom-0 z-10">
+                        <tr className="bg-blue-900 text-white font-bold">
+                          <td className="px-3 py-2.5 border-r border-blue-800 text-xs">Total</td>
+                          {RESUMO_COLS.map((col, i) => {
+                            let cell = '';
+                            if (col === TOTAL_COMISSOES_COL) cell = fmtBRL(rows.reduce((a, r) => a + calcTotalComissoes(r), 0));
+                            else if (col === SPF_COL) cell = rows.filter(r => String(r[col] ?? '').toUpperCase().includes('SPF')).length + ' reg.';
+                            else if (RESUMO_COUNT_COLS.has(col)) cell = rows.filter(r => parseNum(r[col]) > 0).length + ' reg.';
+                            return <td key={i} className="px-3 py-2.5 border-r border-blue-800 last:border-r-0 whitespace-nowrap text-right text-xs">{cell}</td>;
+                          })}
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Resumo Vendas Usados */}
-            {vendasInnerTab === 'resumo-usados' && (
-              <div className="flex flex-col items-center justify-center h-64 gap-3">
-                <div className="p-5 rounded-full bg-blue-50">
-                  <BarChart2 className="w-12 h-12 text-blue-300" />
+            {vendasInnerTab === 'resumo-usados' && (() => {
+              const rows = (vendasData?.rows ?? []).filter(r => String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
+              if (vendasLoading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
+              if (rows.length === 0) return (
+                <div className="flex flex-col items-center justify-center h-64 gap-3">
+                  <div className="p-5 rounded-full bg-slate-100"><BarChart2 className="w-12 h-12 text-slate-300" /></div>
+                  <p className="text-slate-500 text-sm font-medium">Nenhum registro de venda usada para o mês selecionado.</p>
                 </div>
-                <p className="text-slate-500 text-sm font-medium">Resumo Vendas Usados</p>
-                <p className="text-slate-400 text-xs">Em construção</p>
-              </div>
-            )}
+              );
+              return (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                  <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-slate-700">Resumo Vendas Usados — {MONTHS[vendasMonth - 1]}/{vendasYear}</p>
+                    <span className="text-xs text-slate-400">{rows.length} registro(s)</span>
+                  </div>
+                  <div className="overflow-auto max-h-[calc(100vh-320px)]">
+                    <table className="w-full text-xs border-collapse min-w-max">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-blue-700 text-white">
+                          <th className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-blue-600 w-10">#</th>
+                          {RESUMO_COLS.map((col, i) => (
+                            <th key={i} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-blue-600 last:border-r-0">{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((row, rowIdx) => (
+                          <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                            <td className="px-3 py-2 text-slate-400 border-r border-slate-100 font-mono">{rowIdx + 1}</td>
+                            {RESUMO_COLS.map((col, colIdx) => {
+                              const val = col === TOTAL_COMISSOES_COL
+                                ? fmtBRL(calcTotalComissoes(row))
+                                : (row[col] !== null && row[col] !== undefined && row[col] !== '' ? String(row[col]) : '');
+                              return <td key={colIdx} className="px-3 py-2 text-slate-700 border-r border-slate-100 last:border-r-0 whitespace-nowrap">{val}</td>;
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="sticky bottom-0 z-10">
+                        <tr className="bg-blue-900 text-white font-bold">
+                          <td className="px-3 py-2.5 border-r border-blue-800 text-xs">Total</td>
+                          {RESUMO_COLS.map((col, i) => {
+                            let cell = '';
+                            if (col === TOTAL_COMISSOES_COL) cell = fmtBRL(rows.reduce((a, r) => a + calcTotalComissoes(r), 0));
+                            else if (col === SPF_COL) cell = rows.filter(r => String(r[col] ?? '').toUpperCase().includes('SPF')).length + ' reg.';
+                            else if (RESUMO_COUNT_COLS.has(col)) cell = rows.filter(r => parseNum(r[col]) > 0).length + ' reg.';
+                            return <td key={i} className="px-3 py-2.5 border-r border-blue-800 last:border-r-0 whitespace-nowrap text-right text-xs">{cell}</td>;
+                          })}
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
 
           </div>
         </>
