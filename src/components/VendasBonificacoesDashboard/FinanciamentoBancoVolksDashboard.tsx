@@ -96,6 +96,42 @@ const RESUMO_COUNT_COLS = new Set([
   'Valor AP \u2013 GO',
 ]);
 
+interface VendedorAgrupado {
+  vendedor: string;
+  totalComissoes: number;
+  spfBasico: number;
+  spfNormal: number;
+  spfPlus: number;
+  counts: Record<string, number>;
+}
+
+function agruparPorVendedor(rows: Record<string, unknown>[]): VendedorAgrupado[] {
+  const VEND_COL = 'Vendedor CDC, PPS AV, GE, SEGUROS';
+  const map = new Map<string, VendedorAgrupado>();
+  for (const row of rows) {
+    const vendedor = String(row[VEND_COL] ?? '').trim() || '(sem vendedor)';
+    if (!map.has(vendedor)) {
+      map.set(vendedor, {
+        vendedor,
+        totalComissoes: 0,
+        spfBasico: 0,
+        spfNormal: 0,
+        spfPlus: 0,
+        counts: Object.fromEntries([...RESUMO_COUNT_COLS].map(c => [c, 0])),
+      });
+    }
+    const g = map.get(vendedor)!;
+    g.totalComissoes += calcTotalComissoes(row);
+    if (/basico|básico/i.test(String(row[SPF_COL] ?? ''))) g.spfBasico++;
+    if (/normal/i.test(String(row[SPF_COL] ?? ''))) g.spfNormal++;
+    if (/plus/i.test(String(row[SPF_COL] ?? ''))) g.spfPlus++;
+    for (const col of RESUMO_COUNT_COLS) {
+      if (parseNum(row[col]) > 0) g.counts[col]++;
+    }
+  }
+  return [...map.values()];
+}
+
 /** Converte valor de célula Excel (string ou number) para número */
 function parseNum(val: unknown): number {
   if (typeof val === 'number') return val;
@@ -168,7 +204,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   // set of months (1-12) that have imported data for vendasYear
   const [vendasMonthsWithData, setVendasMonthsWithData] = useState<Set<number>>(new Set());
   const [vendasMonthsChecking, setVendasMonthsChecking] = useState(false);
-  type VendasInnerTab = 'tabela' | 'resumo-novos' | 'resumo-usados';
+  type VendasInnerTab = 'tabela' | 'resumo-novos' | 'resumo-usados' | 'resumo-total';
   const [vendasInnerTab, setVendasInnerTab] = useState<VendasInnerTab>('tabela');
 
   const loadMes = useCallback(async () => {
@@ -625,11 +661,12 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
 
           {/* Sub-abas internas */}
           <div className="bg-white border-b border-slate-200 px-6 flex items-end gap-1 shrink-0">
-            {(['tabela', 'resumo-novos', 'resumo-usados'] as const).map(tab => {
+            {(['tabela', 'resumo-novos', 'resumo-usados', 'resumo-total'] as const).map(tab => {
               const labels: Record<string, string> = {
                 'tabela': 'Tabela de Vendas',
                 'resumo-novos': 'Resumo Vendas Novos',
                 'resumo-usados': 'Resumo Vendas Usados',
+                'resumo-total': 'Resumo Total de Vendas',
               };
               const isActive = vendasInnerTab === tab;
               return (
@@ -742,7 +779,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                   <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
                     <p className="text-xs font-semibold text-slate-700">Resumo Vendas Novos — {MONTHS[vendasMonth - 1]}/{vendasYear}</p>
-                    <span className="text-xs text-slate-400">{rows.length} registro(s)</span>
+                    <span className="text-xs text-slate-400">{agruparPorVendedor(rows).length} vendedor(es) · {rows.length} registro(s)</span>
                   </div>
                   <div className="overflow-auto max-h-[calc(100vh-320px)]">
                     <table className="w-full text-xs border-collapse min-w-max">
@@ -755,17 +792,18 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                         </tr>
                       </thead>
                       <tbody>
-                        {rows.map((row, rowIdx) => (
+                        {agruparPorVendedor(rows).map((g, rowIdx) => (
                           <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                             <td className="px-3 py-2 text-slate-400 border-r border-slate-100 font-mono">{rowIdx + 1}</td>
                             {RESUMO_COLS.map((col, colIdx) => {
                               let val: string;
-                              if (col === TOTAL_COMISSOES_COL) val = fmtBRL(calcTotalComissoes(row));
-                              else if (RESUMO_COUNT_COLS.has(col)) val = parseNum(row[col]) > 0 ? '1' : '';
-                              else if (col === 'SPF Basico') val = /basico|básico/i.test(String(row[SPF_COL] ?? '')) ? '1' : '';
-                              else if (col === 'SPF Normal') val = /normal/i.test(String(row[SPF_COL] ?? '')) ? '1' : '';
-                              else if (col === 'SPF Plus') val = /plus/i.test(String(row[SPF_COL] ?? '')) ? '1' : '';
-                              else val = (row[col] !== null && row[col] !== undefined && row[col] !== '' ? String(row[col]) : '');
+                              if (col === 'Vendedor CDC, PPS AV, GE, SEGUROS') val = g.vendedor;
+                              else if (col === TOTAL_COMISSOES_COL) val = g.totalComissoes !== 0 ? fmtBRL(g.totalComissoes) : '';
+                              else if (col === 'SPF Basico') val = g.spfBasico > 0 ? String(g.spfBasico) : '';
+                              else if (col === 'SPF Normal') val = g.spfNormal > 0 ? String(g.spfNormal) : '';
+                              else if (col === 'SPF Plus') val = g.spfPlus > 0 ? String(g.spfPlus) : '';
+                              else if (RESUMO_COUNT_COLS.has(col)) val = g.counts[col] > 0 ? String(g.counts[col]) : '';
+                              else val = '';
                               return <td key={colIdx} className="px-3 py-2 text-slate-700 border-r border-slate-100 last:border-r-0 whitespace-nowrap text-center">{val}</td>;
                             })}
                           </tr>
@@ -774,16 +812,19 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                       <tfoot className="sticky bottom-0 z-10">
                         <tr className="bg-blue-900 text-white font-bold">
                           <td className="px-3 py-2.5 border-r border-blue-800 text-xs">Total</td>
-                          {RESUMO_COLS.map((col, i) => {
-                            let cell = '';
-                            if (col === TOTAL_COMISSOES_COL) cell = fmtBRL(rows.reduce((a, r) => a + calcTotalComissoes(r), 0));
-                            else if (col === SPF_COL) cell = rows.filter(r => String(r[SPF_COL] ?? '').toUpperCase().includes('SPF')).length + ' reg.';
-                            else if (col === 'SPF Basico') cell = rows.filter(r => /basico|básico/i.test(String(r[SPF_COL] ?? ''))).length + ' reg.';
-                            else if (col === 'SPF Normal') cell = rows.filter(r => /normal/i.test(String(r[SPF_COL] ?? ''))).length + ' reg.';
-                            else if (col === 'SPF Plus') cell = rows.filter(r => /plus/i.test(String(r[SPF_COL] ?? ''))).length + ' reg.';
-                            else if (RESUMO_COUNT_COLS.has(col)) cell = rows.filter(r => parseNum(r[col]) > 0).length + ' reg.';
-                            return <td key={i} className="px-3 py-2.5 border-r border-blue-800 last:border-r-0 whitespace-nowrap text-right text-xs">{cell}</td>;
-                          })}
+                          {(() => {
+                            const grouped = agruparPorVendedor(rows);
+                            return RESUMO_COLS.map((col, i) => {
+                              let cell = '';
+                              if (col === 'Vendedor CDC, PPS AV, GE, SEGUROS') cell = grouped.length + ' vend.';
+                              else if (col === TOTAL_COMISSOES_COL) cell = fmtBRL(grouped.reduce((a, g) => a + g.totalComissoes, 0));
+                              else if (col === 'SPF Basico') cell = String(grouped.reduce((a, g) => a + g.spfBasico, 0));
+                              else if (col === 'SPF Normal') cell = String(grouped.reduce((a, g) => a + g.spfNormal, 0));
+                              else if (col === 'SPF Plus') cell = String(grouped.reduce((a, g) => a + g.spfPlus, 0));
+                              else if (RESUMO_COUNT_COLS.has(col)) cell = String(grouped.reduce((a, g) => a + g.counts[col], 0));
+                              return <td key={i} className="px-3 py-2.5 border-r border-blue-800 last:border-r-0 whitespace-nowrap text-right text-xs">{cell}</td>;
+                            });
+                          })()}
                         </tr>
                       </tfoot>
                     </table>
@@ -806,7 +847,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                   <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
                     <p className="text-xs font-semibold text-slate-700">Resumo Vendas Usados — {MONTHS[vendasMonth - 1]}/{vendasYear}</p>
-                    <span className="text-xs text-slate-400">{rows.length} registro(s)</span>
+                    <span className="text-xs text-slate-400">{agruparPorVendedor(rows).length} vendedor(es) · {rows.length} registro(s)</span>
                   </div>
                   <div className="overflow-auto max-h-[calc(100vh-320px)]">
                     <table className="w-full text-xs border-collapse min-w-max">
@@ -819,17 +860,18 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                         </tr>
                       </thead>
                       <tbody>
-                        {rows.map((row, rowIdx) => (
+                        {agruparPorVendedor(rows).map((g, rowIdx) => (
                           <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                             <td className="px-3 py-2 text-slate-400 border-r border-slate-100 font-mono">{rowIdx + 1}</td>
                             {RESUMO_COLS.map((col, colIdx) => {
                               let val: string;
-                              if (col === TOTAL_COMISSOES_COL) val = fmtBRL(calcTotalComissoes(row));
-                              else if (RESUMO_COUNT_COLS.has(col)) val = parseNum(row[col]) > 0 ? '1' : '';
-                              else if (col === 'SPF Basico') val = /basico|básico/i.test(String(row[SPF_COL] ?? '')) ? '1' : '';
-                              else if (col === 'SPF Normal') val = /normal/i.test(String(row[SPF_COL] ?? '')) ? '1' : '';
-                              else if (col === 'SPF Plus') val = /plus/i.test(String(row[SPF_COL] ?? '')) ? '1' : '';
-                              else val = (row[col] !== null && row[col] !== undefined && row[col] !== '' ? String(row[col]) : '');
+                              if (col === 'Vendedor CDC, PPS AV, GE, SEGUROS') val = g.vendedor;
+                              else if (col === TOTAL_COMISSOES_COL) val = g.totalComissoes !== 0 ? fmtBRL(g.totalComissoes) : '';
+                              else if (col === 'SPF Basico') val = g.spfBasico > 0 ? String(g.spfBasico) : '';
+                              else if (col === 'SPF Normal') val = g.spfNormal > 0 ? String(g.spfNormal) : '';
+                              else if (col === 'SPF Plus') val = g.spfPlus > 0 ? String(g.spfPlus) : '';
+                              else if (RESUMO_COUNT_COLS.has(col)) val = g.counts[col] > 0 ? String(g.counts[col]) : '';
+                              else val = '';
                               return <td key={colIdx} className="px-3 py-2 text-slate-700 border-r border-slate-100 last:border-r-0 whitespace-nowrap text-center">{val}</td>;
                             })}
                           </tr>
@@ -838,16 +880,87 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                       <tfoot className="sticky bottom-0 z-10">
                         <tr className="bg-blue-900 text-white font-bold">
                           <td className="px-3 py-2.5 border-r border-blue-800 text-xs">Total</td>
-                          {RESUMO_COLS.map((col, i) => {
-                            let cell = '';
-                            if (col === TOTAL_COMISSOES_COL) cell = fmtBRL(rows.reduce((a, r) => a + calcTotalComissoes(r), 0));
-                            else if (col === SPF_COL) cell = rows.filter(r => String(r[SPF_COL] ?? '').toUpperCase().includes('SPF')).length + ' reg.';
-                            else if (col === 'SPF Basico') cell = rows.filter(r => /basico|básico/i.test(String(r[SPF_COL] ?? ''))).length + ' reg.';
-                            else if (col === 'SPF Normal') cell = rows.filter(r => /normal/i.test(String(r[SPF_COL] ?? ''))).length + ' reg.';
-                            else if (col === 'SPF Plus') cell = rows.filter(r => /plus/i.test(String(r[SPF_COL] ?? ''))).length + ' reg.';
-                            else if (RESUMO_COUNT_COLS.has(col)) cell = rows.filter(r => parseNum(r[col]) > 0).length + ' reg.';
-                            return <td key={i} className="px-3 py-2.5 border-r border-blue-800 last:border-r-0 whitespace-nowrap text-right text-xs">{cell}</td>;
-                          })}
+                          {(() => {
+                            const grouped = agruparPorVendedor(rows);
+                            return RESUMO_COLS.map((col, i) => {
+                              let cell = '';
+                              if (col === 'Vendedor CDC, PPS AV, GE, SEGUROS') cell = grouped.length + ' vend.';
+                              else if (col === TOTAL_COMISSOES_COL) cell = fmtBRL(grouped.reduce((a, g) => a + g.totalComissoes, 0));
+                              else if (col === 'SPF Basico') cell = String(grouped.reduce((a, g) => a + g.spfBasico, 0));
+                              else if (col === 'SPF Normal') cell = String(grouped.reduce((a, g) => a + g.spfNormal, 0));
+                              else if (col === 'SPF Plus') cell = String(grouped.reduce((a, g) => a + g.spfPlus, 0));
+                              else if (RESUMO_COUNT_COLS.has(col)) cell = String(grouped.reduce((a, g) => a + g.counts[col], 0));
+                              return <td key={i} className="px-3 py-2.5 border-r border-blue-800 last:border-r-0 whitespace-nowrap text-right text-xs">{cell}</td>;
+                            });
+                          })()}
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Resumo Total de Vendas */}
+            {vendasInnerTab === 'resumo-total' && (() => {
+              const rows = vendasData?.rows ?? [];
+              if (vendasLoading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
+              if (rows.length === 0) return (
+                <div className="flex flex-col items-center justify-center h-64 gap-3">
+                  <div className="p-5 rounded-full bg-slate-100"><BarChart2 className="w-12 h-12 text-slate-300" /></div>
+                  <p className="text-slate-500 text-sm font-medium">Nenhum registro para o mês selecionado.</p>
+                </div>
+              );
+              return (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                  <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-slate-700">Resumo Total de Vendas — {MONTHS[vendasMonth - 1]}/{vendasYear}</p>
+                    <span className="text-xs text-slate-400">{agruparPorVendedor(rows).length} vendedor(es) · {rows.length} registro(s)</span>
+                  </div>
+                  <div className="overflow-auto max-h-[calc(100vh-320px)]">
+                    <table className="w-full text-xs border-collapse min-w-max">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-blue-700 text-white">
+                          <th className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-blue-600 w-10">#</th>
+                          {RESUMO_COLS.map((col, i) => (
+                            <th key={i} className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-blue-600 last:border-r-0">{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {agruparPorVendedor(rows).map((g, rowIdx) => (
+                          <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                            <td className="px-3 py-2 text-slate-400 border-r border-slate-100 font-mono">{rowIdx + 1}</td>
+                            {RESUMO_COLS.map((col, colIdx) => {
+                              let val: string;
+                              if (col === 'Vendedor CDC, PPS AV, GE, SEGUROS') val = g.vendedor;
+                              else if (col === TOTAL_COMISSOES_COL) val = g.totalComissoes !== 0 ? fmtBRL(g.totalComissoes) : '';
+                              else if (col === 'SPF Basico') val = g.spfBasico > 0 ? String(g.spfBasico) : '';
+                              else if (col === 'SPF Normal') val = g.spfNormal > 0 ? String(g.spfNormal) : '';
+                              else if (col === 'SPF Plus') val = g.spfPlus > 0 ? String(g.spfPlus) : '';
+                              else if (RESUMO_COUNT_COLS.has(col)) val = g.counts[col] > 0 ? String(g.counts[col]) : '';
+                              else val = '';
+                              return <td key={colIdx} className="px-3 py-2 text-slate-700 border-r border-slate-100 last:border-r-0 whitespace-nowrap text-center">{val}</td>;
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="sticky bottom-0 z-10">
+                        <tr className="bg-blue-900 text-white font-bold">
+                          <td className="px-3 py-2.5 border-r border-blue-800 text-xs">Total</td>
+                          {(() => {
+                            const grouped = agruparPorVendedor(rows);
+                            return RESUMO_COLS.map((col, i) => {
+                              let cell = '';
+                              if (col === 'Vendedor CDC, PPS AV, GE, SEGUROS') cell = grouped.length + ' vend.';
+                              else if (col === TOTAL_COMISSOES_COL) cell = fmtBRL(grouped.reduce((a, g) => a + g.totalComissoes, 0));
+                              else if (col === 'SPF Basico') cell = String(grouped.reduce((a, g) => a + g.spfBasico, 0));
+                              else if (col === 'SPF Normal') cell = String(grouped.reduce((a, g) => a + g.spfNormal, 0));
+                              else if (col === 'SPF Plus') cell = String(grouped.reduce((a, g) => a + g.spfPlus, 0));
+                              else if (RESUMO_COUNT_COLS.has(col)) cell = String(grouped.reduce((a, g) => a + g.counts[col], 0));
+                              return <td key={i} className="px-3 py-2.5 border-r border-blue-800 last:border-r-0 whitespace-nowrap text-right text-xs">{cell}</td>;
+                            });
+                          })()}
                         </tr>
                       </tfoot>
                     </table>
