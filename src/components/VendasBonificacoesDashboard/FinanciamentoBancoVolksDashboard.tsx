@@ -252,12 +252,11 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       .finally(() => setVendasLoading(false));
   }, [activeSection, vendasYear, vendasMonth]);
 
-  // Carrega regras de remuneração
+  // Carrega regras de remuneração (sempre ao montar, pois são usadas no demonstrativo)
   useEffect(() => {
-    if (activeSection !== 'cadastro') return;
     setRegrasLoading(true);
     loadRemuneracaoRegras().then(r => setRegras(r)).finally(() => setRegrasLoading(false));
-  }, [activeSection]);
+  }, []);
 
   async function handleSalvarRegra() {
     if (!regraForm.produto.trim()) { setRegraError('Informe o nome do produto.'); return; }
@@ -960,6 +959,58 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                 return '';
               };
 
+              // ── Cálculo de Remuneração ──
+              const normProd = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+              interface DemoProdutoConfig {
+                label: string;
+                tipo: 'comissao' | 'premio';
+                getBase: (rows: Record<string, unknown>[]) => number;
+                isMonetaryBase: boolean; // true = base é R$ (Financiamento), false = quantidade
+                match: (n: string) => boolean;
+              }
+              const DEMO_PRODUTOS_CONFIG: DemoProdutoConfig[] = [
+                { label: 'Financiamento', tipo: 'comissao', isMonetaryBase: true, getBase: (rows) => rows.reduce((a, r) => a + calcTotalComissoes(r), 0), match: (n) => n.includes('retorno') },
+                { label: 'SPF Basico', tipo: 'premio', isMonetaryBase: false, getBase: (rows) => rows.filter(r => /basico|básico/i.test(String(r[SPF_COL] ?? ''))).length, match: (n) => n.includes('spf basico') || n.includes('spf b') },
+                { label: 'SPF Normal', tipo: 'premio', isMonetaryBase: false, getBase: (rows) => rows.filter(r => /normal/i.test(String(r[SPF_COL] ?? ''))).length, match: (n) => n.includes('spf') && n.includes('normal') },
+                { label: 'SPF Plus', tipo: 'premio', isMonetaryBase: false, getBase: (rows) => rows.filter(r => /plus/i.test(String(r[SPF_COL] ?? ''))).length, match: (n) => n.includes('spf') && n.includes('plus') },
+                { label: 'PRTG', tipo: 'premio', isMonetaryBase: false, getBase: (rows) => rows.filter(r => parseNum(r['Valor Pacote PRTG']) > 0).length, match: (n) => n.includes('prtg') },
+                { label: 'Garantia Estendida', tipo: 'premio', isMonetaryBase: false, getBase: (rows) => rows.filter(r => parseNum(r['Valor Seguro GE GM']) > 0).length, match: (n) => n.includes('garantia') },
+                { label: 'Revisão Planejada', tipo: 'premio', isMonetaryBase: false, getBase: (rows) => rows.reduce((a, r) => a + (parseNum(r['Valor Prepaid Services á Vista']) > 0 ? 1 : 0) + (parseNum(r['Valor Prepaid Services']) > 0 ? 1 : 0), 0), match: (n) => n.includes('revisao') || n.includes('planejada') || n.includes('prepaid') },
+                { label: 'Seguro Franquia', tipo: 'premio', isMonetaryBase: false, getBase: (rows) => rows.filter(r => parseNum(r['Valor Franquia \u2013 GO']) > 0).length, match: (n) => n.includes('franquia') },
+                { label: 'Seguro GAP', tipo: 'premio', isMonetaryBase: false, getBase: (rows) => rows.filter(r => parseNum(r['Valor GAP \u2013 GO']) > 0).length, match: (n) => n.includes('gap') },
+                { label: 'Seguro AP', tipo: 'premio', isMonetaryBase: false, getBase: (rows) => rows.filter(r => parseNum(r['Valor AP \u2013 GO']) > 0).length, match: (n) => !n.includes('gap') && (n === 'ap' || n === 'seguro ap' || n.endsWith(' ap') || n.startsWith('ap ')) },
+              ];
+
+              interface RemuneracaoLinha {
+                label: string;
+                tipo: 'comissao' | 'premio';
+                baseNovos: number;
+                baseUsados: number;
+                valorNovos: number;
+                valorUsados: number;
+                total: number;
+                isMonetaryBase: boolean;
+                premioDisplay: string;
+                hasRegra: boolean;
+              }
+
+              const calcRemuneracaoLinhas = (novosRows: Record<string, unknown>[], usadosRows: Record<string, unknown>[]): RemuneracaoLinha[] => {
+                return DEMO_PRODUTOS_CONFIG.map(cfg => {
+                  const regra = regras.find(r => cfg.match(normProd(r.produto)));
+                  const baseN = cfg.getBase(novosRows);
+                  const baseU = cfg.getBase(usadosRows);
+                  if (!regra) {
+                    return { label: cfg.label, tipo: cfg.tipo, baseNovos: baseN, baseUsados: baseU, valorNovos: 0, valorUsados: 0, total: 0, isMonetaryBase: cfg.isMonetaryBase, premioDisplay: '—', hasRegra: false };
+                  }
+                  const premio = parseNum(regra.valorPremio);
+                  const calc = (base: number) => regra.tipoPremio === 'percentual' ? base * premio / 100 : base * premio;
+                  const valorN = calc(baseN);
+                  const valorU = calc(baseU);
+                  const premioDisplay = regra.tipoPremio === 'percentual' ? `${regra.valorPremio}%` : `R$ ${regra.valorPremio}`;
+                  return { label: cfg.label, tipo: cfg.tipo, baseNovos: baseN, baseUsados: baseU, valorNovos: valorN, valorUsados: valorU, total: valorN + valorU, isMonetaryBase: cfg.isMonetaryBase, premioDisplay, hasRegra: true };
+                });
+              };
+
               const renderTable = (rows: Record<string, unknown>[], title: string) => (
                 <div className="mb-4">
                   <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wide mb-1">{title}</p>
@@ -1042,6 +1093,100 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                         </div>
                         {novos.length > 0 && renderTable(novos, 'Veículos Novos')}
                         {usados.length > 0 && renderTable(usados, 'Veículos Usados / Semi-Novos')}
+                        {/* Resumo de Remuneração */}
+                        {(() => {
+                          const linhas = calcRemuneracaoLinhas(novos, usados);
+                          const comissoes = linhas.filter(l => l.tipo === 'comissao');
+                          const premios = linhas.filter(l => l.tipo === 'premio');
+                          const subComissaoN = comissoes.reduce((a, l) => a + l.valorNovos, 0);
+                          const subComissaoU = comissoes.reduce((a, l) => a + l.valorUsados, 0);
+                          const subComissaoT = subComissaoN + subComissaoU;
+                          const subPremioN = premios.reduce((a, l) => a + l.valorNovos, 0);
+                          const subPremioU = premios.reduce((a, l) => a + l.valorUsados, 0);
+                          const subPremioT = subPremioN + subPremioU;
+                          const totalNovos = subComissaoN + subPremioN;
+                          const totalUsados = subComissaoU + subPremioU;
+                          const totalGeral = totalNovos + totalUsados;
+
+                          const renderLinhas = (grupo: RemuneracaoLinha[]) => grupo.map((l, i) => (
+                            <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                              <td className="px-2 py-1 border border-slate-200 font-medium text-slate-700 pl-4">{l.label}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-center text-slate-500">{l.hasRegra ? l.premioDisplay : <span className="text-amber-500 font-semibold">sem regra</span>}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-center text-slate-600">
+                                {l.baseNovos !== 0 ? (l.isMonetaryBase ? 'R$ ' + fmtBRL(l.baseNovos) : String(l.baseNovos)) : '—'}
+                              </td>
+                              <td className="px-2 py-1 border border-slate-200 text-right font-medium text-slate-700">
+                                {l.valorNovos !== 0 ? 'R$ ' + fmtBRL(l.valorNovos) : '—'}
+                              </td>
+                              <td className="px-2 py-1 border border-slate-200 text-center text-slate-600">
+                                {l.baseUsados !== 0 ? (l.isMonetaryBase ? 'R$ ' + fmtBRL(l.baseUsados) : String(l.baseUsados)) : '—'}
+                              </td>
+                              <td className="px-2 py-1 border border-slate-200 text-right font-medium text-slate-700">
+                                {l.valorUsados !== 0 ? 'R$ ' + fmtBRL(l.valorUsados) : '—'}
+                              </td>
+                              <td className="px-2 py-1 border border-slate-200 text-right font-bold text-slate-800 bg-slate-50">
+                                {l.total !== 0 ? 'R$ ' + fmtBRL(l.total) : '—'}
+                              </td>
+                            </tr>
+                          ));
+
+                          return (
+                            <div className="mt-3 border border-slate-300 rounded-lg overflow-hidden">
+                              <div className="bg-slate-800 text-white px-3 py-1.5 flex items-center justify-between">
+                                <p className="text-[10px] font-bold uppercase tracking-wide">Resumo de Remuneração</p>
+                                <p className="text-[10px] text-slate-300">Total a Receber: <span className="font-bold text-white">R$ {fmtBRL(totalGeral)}</span></p>
+                              </div>
+                              <table className="w-full text-[9px] border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-100 text-slate-600">
+                                    <th className="px-2 py-1 text-left border border-slate-200 font-semibold">Produto</th>
+                                    <th className="px-2 py-1 text-center border border-slate-200 font-semibold">Regra</th>
+                                    <th className="px-2 py-1 text-center border border-slate-200 font-semibold">Base Novos</th>
+                                    <th className="px-2 py-1 text-right border border-slate-200 font-semibold">Valor Novos</th>
+                                    <th className="px-2 py-1 text-center border border-slate-200 font-semibold">Base Usados</th>
+                                    <th className="px-2 py-1 text-right border border-slate-200 font-semibold">Valor Usados</th>
+                                    <th className="px-2 py-1 text-right border border-slate-200 font-semibold bg-slate-200">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {/* Grupo: Comissão */}
+                                  <tr className="bg-emerald-700 text-white">
+                                    <td className="px-2 py-1 border border-emerald-600 font-bold text-[9px] uppercase tracking-wide" colSpan={7}>Comissão</td>
+                                  </tr>
+                                  {renderLinhas(comissoes)}
+                                  <tr className="bg-emerald-50 text-emerald-900 font-bold">
+                                    <td className="px-2 py-1 border border-emerald-200 pl-4" colSpan={3}>Subtotal Comissão</td>
+                                    <td className="px-2 py-1 border border-emerald-200 text-right">{subComissaoN !== 0 ? 'R$ ' + fmtBRL(subComissaoN) : '—'}</td>
+                                    <td className="px-2 py-1 border border-emerald-200 text-center">—</td>
+                                    <td className="px-2 py-1 border border-emerald-200 text-right">{subComissaoU !== 0 ? 'R$ ' + fmtBRL(subComissaoU) : '—'}</td>
+                                    <td className="px-2 py-1 border border-emerald-200 text-right">R$ {fmtBRL(subComissaoT)}</td>
+                                  </tr>
+                                  {/* Grupo: Prêmios */}
+                                  <tr className="bg-blue-700 text-white">
+                                    <td className="px-2 py-1 border border-blue-600 font-bold text-[9px] uppercase tracking-wide" colSpan={7}>Prêmios</td>
+                                  </tr>
+                                  {renderLinhas(premios)}
+                                  <tr className="bg-blue-50 text-blue-900 font-bold">
+                                    <td className="px-2 py-1 border border-blue-200 pl-4" colSpan={3}>Subtotal Prêmios</td>
+                                    <td className="px-2 py-1 border border-blue-200 text-right">{subPremioN !== 0 ? 'R$ ' + fmtBRL(subPremioN) : '—'}</td>
+                                    <td className="px-2 py-1 border border-blue-200 text-center">—</td>
+                                    <td className="px-2 py-1 border border-blue-200 text-right">{subPremioU !== 0 ? 'R$ ' + fmtBRL(subPremioU) : '—'}</td>
+                                    <td className="px-2 py-1 border border-blue-200 text-right">R$ {fmtBRL(subPremioT)}</td>
+                                  </tr>
+                                </tbody>
+                                <tfoot>
+                                  <tr className="bg-slate-800 text-white font-bold text-[9px]">
+                                    <td className="px-2 py-1.5 border border-slate-700" colSpan={3}>TOTAL A RECEBER</td>
+                                    <td className="px-2 py-1.5 border border-slate-700 text-right">R$ {fmtBRL(totalNovos)}</td>
+                                    <td className="px-2 py-1.5 border border-slate-700 text-center">—</td>
+                                    <td className="px-2 py-1.5 border border-slate-700 text-right">R$ {fmtBRL(totalUsados)}</td>
+                                    <td className="px-2 py-1.5 border border-slate-700 text-right">R$ {fmtBRL(totalGeral)}</td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })}
