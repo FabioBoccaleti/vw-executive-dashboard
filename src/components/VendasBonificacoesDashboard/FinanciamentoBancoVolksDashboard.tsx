@@ -921,8 +921,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
               const DEMO_COLS = [
                 'Chassi', 'Valor Financiado', 'Comissão Financiamento',
                 'SPF Basico', 'SPF Normal', 'SPF Plus',
-                'Valor Pacote PRTG', 'Valor Seguro GE GM', 'Valor Prepaid Services á Vista',
-                'Valor Prepaid Services', 'Valor Franquia', 'Valor GAP', 'Valor AP',
+                'PRTG', 'Garantia Estendida', 'Revisão Planejada',
+                'Seguro Franquia', 'Seguro GAP', 'Seguro AP',
               ];
 
               const getCell = (row: Record<string, unknown>, col: string): string => {
@@ -932,13 +932,15 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                 if (col === 'SPF Basico') return /basico|básico/i.test(String(row[SPF_COL] ?? '')) ? '1' : '';
                 if (col === 'SPF Normal') return /normal/i.test(String(row[SPF_COL] ?? '')) ? '1' : '';
                 if (col === 'SPF Plus') return /plus/i.test(String(row[SPF_COL] ?? '')) ? '1' : '';
-                if (col === 'Valor Pacote PRTG') return parseNum(row['Valor Pacote PRTG']) > 0 ? '1' : '';
-                if (col === 'Valor Seguro GE GM') return parseNum(row['Valor Seguro GE GM']) > 0 ? '1' : '';
-                if (col === 'Valor Prepaid Services á Vista') return parseNum(row['Valor Prepaid Services á Vista']) > 0 ? '1' : '';
-                if (col === 'Valor Prepaid Services') return parseNum(row['Valor Prepaid Services']) > 0 ? '1' : '';
-                if (col === 'Valor Franquia') return parseNum(row['Valor Franquia \u2013 GO']) > 0 ? '1' : '';
-                if (col === 'Valor GAP') return parseNum(row['Valor GAP \u2013 GO']) > 0 ? '1' : '';
-                if (col === 'Valor AP') return parseNum(row['Valor AP \u2013 GO']) > 0 ? '1' : '';
+                if (col === 'PRTG') return parseNum(row['Valor Pacote PRTG']) > 0 ? '1' : '';
+                if (col === 'Garantia Estendida') return parseNum(row['Valor Seguro GE GM']) > 0 ? '1' : '';
+                if (col === 'Revisão Planejada') {
+                  const count = (parseNum(row['Valor Prepaid Services á Vista']) > 0 ? 1 : 0) + (parseNum(row['Valor Prepaid Services']) > 0 ? 1 : 0);
+                  return count !== 0 ? String(count) : '';
+                }
+                if (col === 'Seguro Franquia') return parseNum(row['Valor Franquia \u2013 GO']) > 0 ? '1' : '';
+                if (col === 'Seguro GAP') return parseNum(row['Valor GAP \u2013 GO']) > 0 ? '1' : '';
+                if (col === 'Seguro AP') return parseNum(row['Valor AP \u2013 GO']) > 0 ? '1' : '';
                 return '';
               };
 
@@ -949,13 +951,12 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                 if (col === 'SPF Basico') return String(rows.filter(r => /basico|básico/i.test(String(r[SPF_COL] ?? ''))).length);
                 if (col === 'SPF Normal') return String(rows.filter(r => /normal/i.test(String(r[SPF_COL] ?? ''))).length);
                 if (col === 'SPF Plus') return String(rows.filter(r => /plus/i.test(String(r[SPF_COL] ?? ''))).length);
-                if (col === 'Valor Pacote PRTG') return String(rows.filter(r => parseNum(r['Valor Pacote PRTG']) > 0).length);
-                if (col === 'Valor Seguro GE GM') return String(rows.filter(r => parseNum(r['Valor Seguro GE GM']) > 0).length);
-                if (col === 'Valor Prepaid Services á Vista') return String(rows.filter(r => parseNum(r['Valor Prepaid Services á Vista']) > 0).length);
-                if (col === 'Valor Prepaid Services') return String(rows.filter(r => parseNum(r['Valor Prepaid Services']) > 0).length);
-                if (col === 'Valor Franquia') return String(rows.filter(r => parseNum(r['Valor Franquia \u2013 GO']) > 0).length);
-                if (col === 'Valor GAP') return String(rows.filter(r => parseNum(r['Valor GAP \u2013 GO']) > 0).length);
-                if (col === 'Valor AP') return String(rows.filter(r => parseNum(r['Valor AP \u2013 GO']) > 0).length);
+                if (col === 'PRTG') return String(rows.filter(r => parseNum(r['Valor Pacote PRTG']) > 0).length);
+                if (col === 'Garantia Estendida') return String(rows.filter(r => parseNum(r['Valor Seguro GE GM']) > 0).length);
+                if (col === 'Revisão Planejada') return String(rows.reduce((a, r) => a + (parseNum(r['Valor Prepaid Services á Vista']) > 0 ? 1 : 0) + (parseNum(r['Valor Prepaid Services']) > 0 ? 1 : 0), 0));
+                if (col === 'Seguro Franquia') return String(rows.filter(r => parseNum(r['Valor Franquia \u2013 GO']) > 0).length);
+                if (col === 'Seguro GAP') return String(rows.filter(r => parseNum(r['Valor GAP \u2013 GO']) > 0).length);
+                if (col === 'Seguro AP') return String(rows.filter(r => parseNum(r['Valor AP \u2013 GO']) > 0).length);
                 return '';
               };
 
@@ -992,12 +993,23 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
               );
 
               return (
-                <div className="overflow-auto max-h-[calc(100vh-280px)]">
+                <div className="overflow-auto max-h-[calc(100vh-280px)] print:overflow-visible print:max-h-none">
                   <style>{`
                     @media print {
                       @page { size: A4 landscape; margin: 1cm; }
-                      .demo-page { page-break-after: always; }
-                      .demo-page:last-of-type { page-break-after: avoid; }
+                      body * { visibility: hidden; }
+                      .demo-print-area, .demo-print-area * { visibility: visible; }
+                      .demo-print-area { position: absolute; top: 0; left: 0; width: 100%; }
+                      .demo-page {
+                        page-break-after: always;
+                        break-after: page;
+                        page-break-inside: avoid;
+                        break-inside: avoid;
+                      }
+                      .demo-page:last-of-type {
+                        page-break-after: avoid;
+                        break-after: avoid;
+                      }
                       .print-hidden { display: none !important; }
                     }
                   `}</style>
@@ -1010,6 +1022,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                       Imprimir
                     </button>
                   </div>
+                  <div className="demo-print-area">
                   {vendors.map((vendor, vi) => {
                     const vendorRows = allRows.filter(r => String(r[VEND_COL] ?? '').trim() === vendor);
                     const novos = vendorRows.filter(r => !String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
@@ -1032,6 +1045,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               );
             })()}
