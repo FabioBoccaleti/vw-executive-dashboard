@@ -1187,6 +1187,17 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                             </div>
                           );
                         })()}
+                        {/* Campos de Assinatura */}
+                        <div className="mt-6 pt-4 border-t border-slate-200">
+                          <div className="grid grid-cols-4 gap-6">
+                            {['Gerência Comercial', 'Diretoria Comercial', 'Diretoria', 'Financeiro'].map((cargo) => (
+                              <div key={cargo} className="flex flex-col items-center gap-1">
+                                <div className="w-full border-b border-slate-400" style={{ height: 40 }} />
+                                <p className="text-[9px] font-semibold text-slate-600 text-center">{cargo}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
