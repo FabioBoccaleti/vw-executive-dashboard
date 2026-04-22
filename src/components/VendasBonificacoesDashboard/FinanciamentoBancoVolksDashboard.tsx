@@ -1043,7 +1043,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
 
               const renderTable = (rows: Record<string, unknown>[], title: string) => (
                 <div className="mb-4">
-                  <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wide mb-1">{title}</p>
+                  <p className="text-[10px] font-bold text-slate-800 uppercase tracking-wide mb-1">{title}</p>
                   <table className="w-full text-[9px] border-collapse">
                     <thead>
                       <tr className="bg-blue-800 text-white">
@@ -1054,9 +1054,9 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                     <tbody>
                       {rows.map((row, ri) => (
                         <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                          <td className="px-1.5 py-0.5 border border-slate-200 text-slate-400 font-mono">{ri + 1}</td>
+                          <td className="px-1.5 py-0.5 border border-slate-200 text-slate-800 font-mono">{ri + 1}</td>
                           {DEMO_COLS.map((col, ci) => (
-                            <td key={ci} className="px-1.5 py-0.5 border border-slate-200 text-center text-slate-700">{getCell(row, col)}</td>
+                            <td key={ci} className="px-1.5 py-0.5 border border-slate-200 text-center text-slate-800">{getCell(row, col)}</td>
                           ))}
                         </tr>
                       ))}
@@ -1092,6 +1092,28 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                         break-after: avoid;
                       }
                       .print-hidden { display: none !important; }
+                      /* Forçar cor escura em toda área impressa */
+                      .demo-print-area * { color: #1e293b !important; }
+                      /* Forçar impressão de fundos coloridos */
+                      .demo-print-area tr, .demo-print-area td, .demo-print-area th {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                      }
+                      /* Restaurar branco onde o fundo é escuro */
+                      .demo-print-area .bg-blue-800 *,
+                      .demo-print-area .bg-blue-900 *,
+                      .demo-print-area .bg-slate-800 *,
+                      .demo-print-area .bg-emerald-700 *,
+                      .demo-print-area .bg-blue-700 * { color: #ffffff !important; }
+                      /* Manter cores semânticas específicas */
+                      .demo-print-area .text-emerald-700 { color: #047857 !important; }
+                      .demo-print-area .text-emerald-900 { color: #064e3b !important; }
+                      .demo-print-area .text-blue-900 { color: #1e3a8a !important; }
+                      .demo-print-area .text-amber-700 { color: #b45309 !important; }
+                      .demo-print-area .text-amber-500 { color: #f59e0b !important; }
+                      /* Bordas das tabelas na mesma cor do texto */
+                      .demo-print-area td,
+                      .demo-print-area th { border-color: #1e293b !important; }
                     }
                   `}</style>
                   <div className="print-hidden flex justify-end mb-3 sticky top-0 bg-white z-10 py-2 border-b border-slate-100">
@@ -1103,7 +1125,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                       Imprimir
                     </button>
                   </div>
-                  <div className="demo-print-area">
+                  <div className="demo-print-area text-slate-800">
                   {vendors.map((vendor, vi) => {
                     const vendorRows = allRows.filter(r => String(r[VEND_COL] ?? '').trim() === vendor);
                     const novos = vendorRows.filter(r => !String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
@@ -1114,7 +1136,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                           <p className="text-sm font-bold text-slate-800">Sorana VW</p>
                           <p className="text-xs font-semibold text-slate-700">Remuneração Produção Banco Volks</p>
                         </div>
-                        <div className="flex justify-between items-center mb-4 text-xs text-slate-600">
+                        <div className="flex justify-between items-center mb-4 text-xs text-slate-800">
                           <div><span className="font-semibold">Vendedor:</span> {vendor}</div>
                           <div className="flex gap-6">
                             <div><span className="font-semibold">Mês de Apuração:</span> {MONTHS[vendasMonth - 1]}/{vendasYear}</div>
@@ -1140,18 +1162,18 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
 
                           const renderLinhas = (grupo: RemuneracaoLinha[]) => grupo.map((l, i) => (
                             <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                              <td className="px-2 py-1 border border-slate-200 font-medium text-slate-700 pl-4">{l.label}</td>
-                              <td className="px-2 py-1 border border-slate-200 text-center text-slate-500">{l.hasRegra ? l.premioDisplay : <span className="text-amber-500 font-semibold">sem regra</span>}</td>
-                              <td className="px-2 py-1 border border-slate-200 text-center text-slate-600">
+                              <td className="px-2 py-1 border border-slate-200 font-medium text-slate-800 pl-4">{l.label}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-center text-slate-800">{l.hasRegra ? l.premioDisplay : <span className="text-amber-500 font-semibold">sem regra</span>}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-center text-slate-800">
                                 {l.baseNovos !== 0 ? (l.isMonetaryBase ? 'R$ ' + fmtBRL(l.baseNovos) : String(l.baseNovos)) : '—'}
                               </td>
-                              <td className="px-2 py-1 border border-slate-200 text-right font-medium text-slate-700">
+                              <td className="px-2 py-1 border border-slate-200 text-right font-medium text-slate-800">
                                 {l.valorNovos !== 0 ? 'R$ ' + fmtBRL(l.valorNovos) : '—'}
                               </td>
-                              <td className="px-2 py-1 border border-slate-200 text-center text-slate-600">
+                              <td className="px-2 py-1 border border-slate-200 text-center text-slate-800">
                                 {l.baseUsados !== 0 ? (l.isMonetaryBase ? 'R$ ' + fmtBRL(l.baseUsados) : String(l.baseUsados)) : '—'}
                               </td>
-                              <td className="px-2 py-1 border border-slate-200 text-right font-medium text-slate-700">
+                              <td className="px-2 py-1 border border-slate-200 text-right font-medium text-slate-800">
                                 {l.valorUsados !== 0 ? 'R$ ' + fmtBRL(l.valorUsados) : '—'}
                               </td>
                               <td className="px-2 py-1 border border-slate-200 text-right font-bold text-slate-800 bg-slate-50">
@@ -1168,7 +1190,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                               </div>
                               <table className="w-full text-[9px] border-collapse">
                                 <thead>
-                                  <tr className="bg-slate-100 text-slate-600">
+                                  <tr className="bg-slate-100 text-slate-800">
                                     <th className="px-2 py-1 text-left border border-slate-200 font-semibold">Produto</th>
                                     <th className="px-2 py-1 text-center border border-slate-200 font-semibold">Regra</th>
                                     <th className="px-2 py-1 text-center border border-slate-200 font-semibold">Base Novos</th>
@@ -1223,7 +1245,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                             {['Gerência Comercial', 'Diretoria Comercial', 'Diretoria', 'Financeiro'].map((cargo) => (
                               <div key={cargo} className="flex flex-col items-center gap-1">
                                 <div className="w-full border-b border-slate-400" style={{ height: 40 }} />
-                                <p className="text-[9px] font-semibold text-slate-600 text-center">{cargo}</p>
+                                <p className="text-[9px] font-semibold text-slate-800 text-center">{cargo}</p>
                               </div>
                             ))}
                           </div>
@@ -1259,14 +1281,14 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                         <tbody>
                           {resumoVendedores.map((v, i) => (
                             <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                              <td className="px-2 py-1 border border-slate-200 text-slate-400 text-center font-mono">{i + 1}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-slate-800 text-center font-mono">{i + 1}</td>
                               <td className="px-2 py-1 border border-slate-200 font-semibold text-slate-800">{v.vendedor}</td>
                               <td className="px-2 py-1 border border-slate-200 text-right font-medium text-emerald-700 bg-emerald-50">{v.comissaoFinanciamento !== 0 ? 'R$ ' + fmtBRL(v.comissaoFinanciamento) : '—'}</td>
-                              <td className="px-2 py-1 border border-slate-200 text-right text-slate-700">{v.comissaoNovos !== 0 ? 'R$ ' + fmtBRL(v.comissaoNovos) : '—'}</td>
-                              <td className="px-2 py-1 border border-slate-200 text-right text-slate-700">{v.comissaoUsados !== 0 ? 'R$ ' + fmtBRL(v.comissaoUsados) : '—'}</td>
-                              <td className="px-2 py-1 border border-slate-200 text-right text-slate-700">{v.premioNovos !== 0 ? 'R$ ' + fmtBRL(v.premioNovos) : '—'}</td>
-                              <td className="px-2 py-1 border border-slate-200 text-right text-slate-700">{v.premioUsados !== 0 ? 'R$ ' + fmtBRL(v.premioUsados) : '—'}</td>
-                              <td className="px-2 py-1 border border-slate-200 text-right font-bold text-slate-900 bg-slate-50">{v.total !== 0 ? 'R$ ' + fmtBRL(v.total) : '—'}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-right text-slate-800">{v.comissaoNovos !== 0 ? 'R$ ' + fmtBRL(v.comissaoNovos) : '—'}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-right text-slate-800">{v.comissaoUsados !== 0 ? 'R$ ' + fmtBRL(v.comissaoUsados) : '—'}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-right text-slate-800">{v.premioNovos !== 0 ? 'R$ ' + fmtBRL(v.premioNovos) : '—'}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-right text-slate-800">{v.premioUsados !== 0 ? 'R$ ' + fmtBRL(v.premioUsados) : '—'}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-right font-bold text-slate-800 bg-slate-50">{v.total !== 0 ? 'R$ ' + fmtBRL(v.total) : '—'}</td>
                               <td className="px-2 py-1 border border-slate-200 text-right font-bold text-amber-700 bg-amber-50">{v.comissaoFinanciamento !== 0 ? v.pct.toFixed(1) + '%' : '—'}</td>
                             </tr>
                           ))}
