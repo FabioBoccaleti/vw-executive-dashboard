@@ -205,6 +205,7 @@ export function RegistroVendasDashboard() {
   const [showVPecasSeg, setShowVPecasSeg]           = useState(false);
   const [showVPecasML, setShowVPecasML]             = useState(false);
   const [showVPecasEP, setShowVPecasEP]             = useState(false);
+  const [showGuia, setShowGuia]                     = useState(false);
 
   // Carrega dados ao trocar de aba
   useEffect(() => {
@@ -547,7 +548,7 @@ export function RegistroVendasDashboard() {
           {SUB_TABS.map(({ id, label }) => (
             <button
               key={id}
-              onClick={() => { setActiveTab(id); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowVPecasEP(false); }}
+              onClick={() => { setActiveTab(id); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowVPecasEP(false); setShowGuia(false); }}
               className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
                 !showVPecas && !showVPecasItem && !showVPecasSeg && !showVPecasML && !showVPecasEP && activeTab === id
                   ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'

@@ -21,18 +21,18 @@ const TODAS_ABAS = [
   'Importar PDF',
   'Tabela de Dados',
   'Registro de Vendas',
-  'Bonus Varejo',
-  'Bonus Trade IN',
+  'Bônus Varejo',
+  'Bônus Trade IN',
   'Juros Rotativo',
-  'V. Pecas',
-  'Veiculos Novos',
-  'Veiculos VD / Frotista',
-  'Veiculos Usados',
-  'V. Pecas (Registro)',
-  'Itens de Pecas',
-  'Pecas Seg. Balcao',
-  'Pecas Mercado Livre',
-  'Pecas E-Pecas',
+  'V. Peças',
+  'Veículos Novos',
+  'Veículos VD / Frotista',
+  'Veículos Usados',
+  'V. Peças (Registro)',
+  'Itens de Peças',
+  'Peças Seg. Balcão',
+  'Peças Mercado Livre',
+  'Peças E-Peças',
 ];
 
 const STORAGE_KEY = 'vw-guia-relatorios-v1';
@@ -77,20 +77,20 @@ function CardLeitura({ r, onEdit, onDelete }: { r: Relatorio; onEdit: () => void
         <div className="px-5 pb-5 border-t border-slate-100 grid gap-4 pt-4">
           <div>
             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5"><MapPin className="w-3.5 h-3.5" /> Onde Gerar</div>
-            <p className="text-sm text-slate-700 bg-slate-50 rounded-lg px-3 py-2 font-mono whitespace-pre-wrap">{r.ondeGerar || <span className="text-slate-400 italic">nao preenchido</span>}</p>
+            <p className="text-sm text-slate-700 bg-slate-50 rounded-lg px-3 py-2 font-mono whitespace-pre-wrap">{r.ondeGerar || <span className="text-slate-400 italic">não preenchido</span>}</p>
           </div>
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5"><Hash className="w-3.5 h-3.5" /> Transacoes</div>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5"><Hash className="w-3.5 h-3.5" /> Transações</div>
             <div className="flex flex-wrap gap-1.5">
               {r.transacoes.filter(Boolean).map((t, i) => <span key={i} className="text-xs font-mono bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-md">{t}</span>)}
-              {!r.transacoes.filter(Boolean).length && <span className="text-slate-400 italic text-sm">nao preenchido</span>}
+              {!r.transacoes.filter(Boolean).length && <span className="text-slate-400 italic text-sm">não preenchido</span>}
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5"><Settings className="w-3.5 h-3.5" /> Parametros</div>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5"><Settings className="w-3.5 h-3.5" /> Parâmetros</div>
             <ul className="space-y-1">
               {r.parametros.filter(Boolean).map((p, i) => <li key={i} className="text-sm text-slate-700 flex items-start gap-2"><span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-slate-300 flex-shrink-0" />{p}</li>)}
-              {!r.parametros.filter(Boolean).length && <span className="text-slate-400 italic text-sm">nao preenchido</span>}
+              {!r.parametros.filter(Boolean).length && <span className="text-slate-400 italic text-sm">não preenchido</span>}
             </ul>
           </div>
           <div>
@@ -102,7 +102,7 @@ function CardLeitura({ r, onEdit, onDelete }: { r: Relatorio; onEdit: () => void
                   {p}
                 </li>
               ))}
-              {!r.passos.filter(Boolean).length && <span className="text-slate-400 italic text-sm">nao preenchido</span>}
+              {!r.passos.filter(Boolean).length && <span className="text-slate-400 italic text-sm">não preenchido</span>}
             </ol>
           </div>
         </div>
@@ -126,7 +126,7 @@ function CardEdicao({ r, onSave, onCancel }: { r: Relatorio; onSave: (updated: R
   return (
     <div className="bg-blue-50 border-2 border-blue-300 rounded-xl shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-blue-200 flex items-center justify-between gap-3">
-        <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">Editando relatorio</span>
+        <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">Editando relatório</span>
         <div className="flex gap-2">
           <button onClick={() => onSave(draft)} className="flex items-center gap-1.5 text-xs font-semibold bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"><Save className="w-3.5 h-3.5" /> Salvar</button>
           <button onClick={onCancel} className="flex items-center gap-1.5 text-xs font-semibold border border-slate-300 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-white transition-colors"><X className="w-3.5 h-3.5" /> Cancelar</button>
@@ -149,16 +149,16 @@ function CardEdicao({ r, onSave, onCancel }: { r: Relatorio; onSave: (updated: R
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Nome do Relatorio</label>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Nome do Relatório</label>
             <input value={draft.nome} onChange={e => setDraft(d => ({ ...d, nome: e.target.value }))} placeholder="Ex: Espelho de Vendas" className={inputCls} />
           </div>
         </div>
         <div>
           <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1"><MapPin className="w-3 h-3" /> Onde Gerar</label>
-          <input value={draft.ondeGerar} onChange={e => setDraft(d => ({ ...d, ondeGerar: e.target.value }))} placeholder="Ex: DMS > Relatorios > Vendas > Espelho" className={inputCls} />
+          <input value={draft.ondeGerar} onChange={e => setDraft(d => ({ ...d, ondeGerar: e.target.value }))} placeholder="Ex: DMS > Relatórios > Vendas > Espelho" className={inputCls} />
         </div>
         <div>
-          <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2"><Hash className="w-3 h-3" /> Transacoes</label>
+          <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2"><Hash className="w-3 h-3" /> Transações</label>
           <div className="flex flex-col gap-2">
             {draft.transacoes.map((t, i) => (
               <div key={i} className="flex gap-2">
@@ -166,19 +166,19 @@ function CardEdicao({ r, onSave, onCancel }: { r: Relatorio; onSave: (updated: R
                 <button onClick={() => removeItem('transacoes', i)} className="text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"><X className="w-4 h-4" /></button>
               </div>
             ))}
-            <button onClick={() => addItem('transacoes')} className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium mt-1"><Plus className="w-3.5 h-3.5" /> Adicionar transacao</button>
+            <button onClick={() => addItem('transacoes')} className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium mt-1"><Plus className="w-3.5 h-3.5" /> Adicionar transação</button>
           </div>
         </div>
         <div>
-          <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2"><Settings className="w-3 h-3" /> Parametros</label>
+          <label className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2"><Settings className="w-3 h-3" /> Parâmetros</label>
           <div className="flex flex-col gap-2">
             {draft.parametros.map((p, i) => (
               <div key={i} className="flex gap-2">
-                <input value={p} onChange={e => updateList('parametros', i, e.target.value)} placeholder="Ex: Data inicio: primeiro dia do mes" className={inputCls} />
+                <input value={p} onChange={e => updateList('parametros', i, e.target.value)} placeholder="Ex: Data início: primeiro dia do mês" className={inputCls} />
                 <button onClick={() => removeItem('parametros', i)} className="text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"><X className="w-4 h-4" /></button>
               </div>
             ))}
-            <button onClick={() => addItem('parametros')} className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium mt-1"><Plus className="w-3.5 h-3.5" /> Adicionar parametro</button>
+            <button onClick={() => addItem('parametros')} className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium mt-1"><Plus className="w-3.5 h-3.5" /> Adicionar parâmetro</button>
           </div>
         </div>
         <div>
@@ -208,7 +208,7 @@ export function GuiaRelatoriosPage({ filterAbas }: { filterAbas?: string[] } = {
 
   const ordemAtiva = filterAbas ?? [
     'Importar PDF', 'Tabela de Dados', 'Registro de Vendas',
-    'Bonus Varejo', 'Bonus Trade IN', 'Juros Rotativo', 'V. Pecas',
+    'Bônus Varejo', 'Bônus Trade IN', 'Juros Rotativo', 'V. Peças',
   ];
 
   const baseRelatorios = filterAbas
@@ -261,12 +261,12 @@ export function GuiaRelatoriosPage({ filterAbas }: { filterAbas?: string[] } = {
             <BookOpen className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-800">Guia de Relatorios</h2>
-            <p className="text-xs text-slate-500">Clique no lapis para editar qualquer relatorio</p>
+          <h2 className="text-base font-bold text-slate-800">Guia de Relatórios</h2>
+          <p className="text-xs text-slate-500">Clique no lápis para editar qualquer relatório</p>
           </div>
         </div>
         <button onClick={handleAdd} className="flex items-center gap-2 text-sm font-semibold bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-          <PlusCircle className="w-4 h-4" /> Novo Relatorio
+          <PlusCircle className="w-4 h-4" /> Novo Relatório
         </button>
       </div>
 
@@ -296,7 +296,7 @@ export function GuiaRelatoriosPage({ filterAbas }: { filterAbas?: string[] } = {
         {filtrados.length === 0 && (
           <div className="text-center py-16 text-slate-400 text-sm flex flex-col items-center gap-3">
             <BookOpen className="w-10 h-10 text-slate-200" />
-            <span>Nenhum relatorio encontrado. Clique em <strong>Novo Relatorio</strong> para adicionar.</span>
+            <span>Nenhum relatório encontrado. Clique em <strong>Novo Relatório</strong> para adicionar.</span>
           </div>
         )}
       </div>
