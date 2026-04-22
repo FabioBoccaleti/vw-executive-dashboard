@@ -903,6 +903,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
 
             {/* Demonstrativo de Pagamento */}
             {vendasInnerTab === 'demonstrativo' && (() => {
+              try {
               const allRows = vendasData?.rows ?? [];
               if (vendasLoading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
               if (allRows.length === 0) return (
@@ -1010,6 +1011,35 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                   return { label: cfg.label, tipo: cfg.tipo, baseNovos: baseN, baseUsados: baseU, valorNovos: valorN, valorUsados: valorU, total: valorN + valorU, isMonetaryBase: cfg.isMonetaryBase, premioDisplay, hasRegra: true };
                 });
               };
+
+              // ── Pré-cálculo do resumo geral (para a última página) ──
+              const resumoVendedores = vendors.map(vendor => {
+                const vendorRows = allRows.filter(r => String(r[VEND_COL] ?? '').trim() === vendor);
+                const novos = vendorRows.filter(r => !String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
+                const usados = vendorRows.filter(r => String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
+                const linhas = calcRemuneracaoLinhas(novos, usados);
+                const comissoes = linhas.filter(l => l.tipo === 'comissao');
+                const premios = linhas.filter(l => l.tipo === 'premio');
+                const comissaoFinanciamento = vendorRows.reduce((a, r) => a + calcTotalComissoes(r), 0);
+                const total = linhas.reduce((a, l) => a + l.total, 0);
+                return {
+                  vendedor: vendor,
+                  comissaoFinanciamento,
+                  comissaoNovos: comissoes.reduce((a, l) => a + l.valorNovos, 0),
+                  comissaoUsados: comissoes.reduce((a, l) => a + l.valorUsados, 0),
+                  premioNovos: premios.reduce((a, l) => a + l.valorNovos, 0),
+                  premioUsados: premios.reduce((a, l) => a + l.valorUsados, 0),
+                  total,
+                  pct: comissaoFinanciamento !== 0 ? (total / comissaoFinanciamento) * 100 : 0,
+                };
+              });
+              const resumoTotalComissaoFinanciamento = resumoVendedores.reduce((a, v) => a + v.comissaoFinanciamento, 0);
+              const resumoTotalComissaoNovos = resumoVendedores.reduce((a, v) => a + v.comissaoNovos, 0);
+              const resumoTotalComissaoUsados = resumoVendedores.reduce((a, v) => a + v.comissaoUsados, 0);
+              const resumoTotalPremioNovos = resumoVendedores.reduce((a, v) => a + v.premioNovos, 0);
+              const resumoTotalPremioUsados = resumoVendedores.reduce((a, v) => a + v.premioUsados, 0);
+              const resumoTotalGlobal = resumoVendedores.reduce((a, v) => a + v.total, 0);
+              const resumoTotalPct = resumoTotalComissaoFinanciamento !== 0 ? (resumoTotalGlobal / resumoTotalComissaoFinanciamento) * 100 : 0;
 
               const renderTable = (rows: Record<string, unknown>[], title: string) => (
                 <div className="mb-4">
@@ -1201,9 +1231,80 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                       </div>
                     );
                   })}
+
+                  {/* ── Página Final: Resumo Geral de Remuneração ── */}
+                  {vendors.length > 0 && (
+                    <div className="demo-page bg-white border border-slate-200 rounded-xl p-5 mb-4">
+                      {/* Cabeçalho */}
+                      <div className="text-center pb-2 mb-4 border-b border-slate-200">
+                        <p className="text-sm font-bold text-slate-800">Sorana VW</p>
+                        <p className="text-xs font-semibold text-slate-700">Resumo Geral de Remuneração</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{MONTHS[vendasMonth - 1]}/{vendasYear}</p>
+                      </div>
+                      {/* Tabela resumo */}
+                      <table className="w-full text-[9px] border-collapse">
+                        <thead>
+                          <tr className="bg-slate-800 text-white">
+                            <th className="px-2 py-1.5 text-center border border-slate-700 w-6">#</th>
+                            <th className="px-2 py-1.5 text-left border border-slate-700">Vendedor</th>
+                            <th className="px-2 py-1.5 text-right border border-slate-700 bg-emerald-800">Comissão Financiamento</th>
+                            <th className="px-2 py-1.5 text-right border border-slate-700">Comissão Vendedor Novos</th>
+                            <th className="px-2 py-1.5 text-right border border-slate-700">Comissão Vendedor Usados</th>
+                            <th className="px-2 py-1.5 text-right border border-slate-700">Prêmio Vendedor Novos</th>
+                            <th className="px-2 py-1.5 text-right border border-slate-700">Prêmio Vendedor Usados</th>
+                            <th className="px-2 py-1.5 text-right border border-slate-700 bg-slate-600">Total</th>
+                            <th className="px-2 py-1.5 text-right border border-slate-700 bg-amber-700">%</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {resumoVendedores.map((v, i) => (
+                            <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                              <td className="px-2 py-1 border border-slate-200 text-slate-400 text-center font-mono">{i + 1}</td>
+                              <td className="px-2 py-1 border border-slate-200 font-semibold text-slate-800">{v.vendedor}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-right font-medium text-emerald-700 bg-emerald-50">{v.comissaoFinanciamento !== 0 ? 'R$ ' + fmtBRL(v.comissaoFinanciamento) : '—'}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-right text-slate-700">{v.comissaoNovos !== 0 ? 'R$ ' + fmtBRL(v.comissaoNovos) : '—'}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-right text-slate-700">{v.comissaoUsados !== 0 ? 'R$ ' + fmtBRL(v.comissaoUsados) : '—'}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-right text-slate-700">{v.premioNovos !== 0 ? 'R$ ' + fmtBRL(v.premioNovos) : '—'}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-right text-slate-700">{v.premioUsados !== 0 ? 'R$ ' + fmtBRL(v.premioUsados) : '—'}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-right font-bold text-slate-900 bg-slate-50">{v.total !== 0 ? 'R$ ' + fmtBRL(v.total) : '—'}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-right font-bold text-amber-700 bg-amber-50">{v.comissaoFinanciamento !== 0 ? v.pct.toFixed(1) + '%' : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-slate-800 text-white font-bold text-[9px]">
+                            <td className="px-2 py-1.5 border border-slate-700 text-center">{resumoVendedores.length}</td>
+                            <td className="px-2 py-1.5 border border-slate-700">TOTAL</td>
+                            <td className="px-2 py-1.5 border border-slate-700 text-right bg-emerald-900">R$ {fmtBRL(resumoTotalComissaoFinanciamento)}</td>
+                            <td className="px-2 py-1.5 border border-slate-700 text-right">R$ {fmtBRL(resumoTotalComissaoNovos)}</td>
+                            <td className="px-2 py-1.5 border border-slate-700 text-right">R$ {fmtBRL(resumoTotalComissaoUsados)}</td>
+                            <td className="px-2 py-1.5 border border-slate-700 text-right">R$ {fmtBRL(resumoTotalPremioNovos)}</td>
+                            <td className="px-2 py-1.5 border border-slate-700 text-right">R$ {fmtBRL(resumoTotalPremioUsados)}</td>
+                            <td className="px-2 py-1.5 border border-slate-700 text-right">R$ {fmtBRL(resumoTotalGlobal)}</td>
+                            <td className="px-2 py-1.5 border border-slate-700 text-right bg-amber-800">{resumoTotalPct.toFixed(1)}%</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                      {/* Observação */}
+                      <p className="mt-4 text-[9px] text-slate-500 italic">
+                        <span className="font-semibold not-italic text-slate-600">Observação:</span> A venda dos produtos contribuem para o índice de remuneração.
+                      </p>
+                    </div>
+                  )}
+
                   </div>
                 </div>
               );
+              } catch (err) {
+                return (
+                  <div className="flex flex-col items-center justify-center h-64 gap-3 p-6">
+                    <p className="text-red-600 font-semibold text-sm">Erro ao renderizar o Demonstrativo:</p>
+                    <pre className="text-xs text-red-500 bg-red-50 p-3 rounded border border-red-200 max-w-lg overflow-auto whitespace-pre-wrap">
+                      {String(err)}
+                    </pre>
+                  </div>
+                );
+              }
             })()}
 
             {/* Resumo Total de Vendas */}
