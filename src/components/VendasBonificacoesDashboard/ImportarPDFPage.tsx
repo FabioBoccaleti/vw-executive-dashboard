@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag, TrendingUp, BarChart2, TrendingDown } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag, TrendingUp, BarChart2, TrendingDown, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -16,6 +16,7 @@ import { VendasUsadoAnalise } from './VendasUsadoAnalise';
 import { VendasDiretaAnalise } from './VendasDiretaAnalise';
 import VPecasAnalise from './VPecasAnalise';
 import VServicosAnalise from './VServicosAnalise';
+import { GuiaRelatoriosPage } from './GuiaRelatoriosPage';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
 import type { TabelaDadosRow } from './tabelaDadosStorage';
 
@@ -444,7 +445,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mainView, setMainView] = useState<'cadastros' | 'registros' | 'financeiro' | 'vendas' | 'analises'>('analises');
   const [analiseTab, setAnaliseTab] = useState<'novos' | 'usados' | 'direta' | 'pecas' | 'oficina'>('novos');
-  const [activeTab, setActiveTab] = useState<'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros'>('importar');
+  const [activeTab, setActiveTab] = useState<'guia' | 'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros'>('importar');
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
   const [registroFilterYear, setRegistroFilterYear] = useState<number>(new Date().getFullYear());
   const [registroFilterMonth, setRegistroFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
@@ -602,7 +603,18 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
 
       {/* Sub-abas — apenas na visão Registros */}
       {mainView === 'registros' && (
-      <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0">
+      <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('guia')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'guia'
+              ? 'border-blue-500 text-blue-700 bg-blue-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          Guia de Relatórios
+        </button>
         <button
           onClick={() => setActiveTab('importar')}
           className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -723,6 +735,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
       {mainView === 'vendas' && <VendasResultadoDashboard />}
 
       {/* Aba: Registro de Vendas */}
+      {mainView === 'registros' && activeTab === 'guia' && <GuiaRelatoriosPage />}
       {mainView === 'registros' && activeTab === 'registro' && <RegistroVendasDashboard />}
       {mainView === 'registros' && activeTab === 'bonus' && <BonusVarejoDashboard />}
       {mainView === 'registros' && activeTab === 'tradein' && <BonusTradeInDashboard />}

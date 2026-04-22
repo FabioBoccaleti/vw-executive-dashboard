@@ -2348,7 +2348,7 @@ export function VendasDiretaAnalise() {
                             <p className="font-semibold text-indigo-700">{fmtBRLF(v.lb)}</p>
                           </div>
                           <div>
-                            <p className="text-slate-400 text-[10px]">Rem. Vendedor</p>
+                            <p className="text-slate-400 text-[10px]">Custo Rem. Vendedor</p>
                             <p className="font-semibold text-slate-600">{fmtBRLF(v.remVendedor)}</p>
                           </div>
                         </div>
@@ -2364,7 +2364,7 @@ export function VendasDiretaAnalise() {
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="bg-slate-50 border-b border-slate-200">
-                            {['#', 'Vendedor', 'Vol.', '% Grupo', 'Com. Líquida', 'Resultado', 'Margem', 'Rem. Vendedor'].map(h => (
+                            {['#', 'Vendedor', 'Vol.', '% Grupo', 'Com. Líquida', 'Resultado', 'Margem', 'Custo Rem. Vendedor'].map(h => (
                               <th key={h} className={`px-3 py-2.5 text-slate-500 font-semibold ${h === 'Vendedor' ? 'text-left' : 'text-right'}`}>{h}</th>
                             ))}
                           </tr>
