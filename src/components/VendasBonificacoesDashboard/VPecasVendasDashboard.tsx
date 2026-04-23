@@ -6,6 +6,8 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { kvGet, kvSet } from '@/lib/kvClient';
 import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from './vPecasStorage';
+import { loadTaxaMLRows } from './taxaMercadoLivreStorage';
+import type { TaxaMLRow } from './taxaMercadoLivreStorage';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function n(v: string | undefined): number {
@@ -81,13 +83,13 @@ interface PecasCalc {
   resultado: number;
 }
 
-function calcPecasRow(d: Record<string, string>, ov: PecasOverride): PecasCalc {
+function calcPecasRow(d: Record<string, string>, ov: PecasOverride, autoTaxaML?: number): PecasCalc {
   const valorVenda = n(d['LIQ_NOTA_FISCAL']);
   const icms       = n(d['VAL_ICMS']);
   const pis        = n(d['VAL_PIS']);
   const cofins     = n(d['VAL_COFINS']);
   const difal      = n(d['VAL_ICMS_PARTIL_UF_DEST']) + n(d['VAL_ICMS_COMB_POBREZA']);
-  const taxaML     = n(ov.taxaML);
+  const taxaML     = autoTaxaML !== undefined ? autoTaxaML : n(ov.taxaML);
   const taxaEPecas = n(ov.taxaEPecas);
   const recLiq     = valorVenda - icms - pis - cofins - difal - taxaML - taxaEPecas;
   const custo      = n(d['TOT_CUSTO_MEDIO']);
@@ -251,6 +253,7 @@ async function exportPecasExcel(
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function VPecasVendasDashboard() {
   const [allRows, setAllRows] = useState<VPecasRow[]>([]);
+  const [taxaMLRows, setTaxaMLRows] = useState<TaxaMLRow[]>([]);
   const [overrides, setOverrides] = useState<Record<string, PecasOverride>>({});
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
@@ -258,10 +261,11 @@ export default function VPecasVendasDashboard() {
   const [annotationDraft, setAnnotationDraft] = useState('');
 
   useEffect(() => {
-    Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows(), loadOverrides()]).then(([rows, devol, ov]) => {
+    Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows(), loadOverrides(), loadTaxaMLRows()]).then(([rows, devol, ov, taxaRows]) => {
       const combined = [...rows, ...devol];
       setAllRows(combined.filter(r => r.data['SERIE_NOTA_FISCAL'] !== 'RPS'));
       setOverrides(ov);
+      setTaxaMLRows(taxaRows as TaxaMLRow[]);
     });
   }, []);
 
@@ -296,6 +300,25 @@ export default function VPecasVendasDashboard() {
     });
   }, [allRows, filterYear, filterMonth]);
 
+  // Lookup Taxa ML: TITULO -> TaxaMLRow (mesmo período)
+  const taxaMLLookup = useMemo(() => {
+    const periodo = filterMonth !== null
+      ? `${filterYear}-${String(filterMonth).padStart(2, '0')}`
+      : null;
+    const filtered = periodo
+      ? taxaMLRows.filter(r => r.periodoImport === periodo)
+      : taxaMLRows.filter(r => {
+          const p = r.periodoImport?.split('-').map(Number);
+          return p && p[0] === filterYear;
+        });
+    const map = new Map<string, TaxaMLRow>();
+    filtered.forEach(r => {
+      const titulo = r.data['TITULO'];
+      if (titulo) map.set(titulo, r);
+    });
+    return map;
+  }, [taxaMLRows, filterYear, filterMonth]);
+
   async function updateOverride(key: string, field: keyof PecasOverride, value: string) {
     const updated = { ...overrides, [key]: { ...(overrides[key] ?? emptyOv()), [field]: value } };
     setOverrides(updated);
@@ -313,13 +336,16 @@ export default function VPecasVendasDashboard() {
     filteredRows.forEach(r => {
       const d = r.data;
       const ov = overrides[ovKey(d)] ?? emptyOv();
-      const c = calcPecasRow(d, ov);
+      const taxaMLMatch = taxaMLLookup.get(d['NUMERO_NOTA_FISCAL']);
+      const tituloVal   = taxaMLMatch?.data['VAL_TITULO'] ?? '';
+      const autoTaxaML  = tituloVal ? n(d['LIQ_NOTA_FISCAL']) - n(tituloVal) : 0;
+      const c = calcPecasRow(d, ov, autoTaxaML);
       valorVenda  += n(d['LIQ_NOTA_FISCAL']);
       icms        += n(d['VAL_ICMS']);
       pis         += n(d['VAL_PIS']);
       cofins      += n(d['VAL_COFINS']);
       difal       += c.difal;
-      taxaML      += n(ov.taxaML);
+      taxaML      += autoTaxaML;
       taxaEPecas  += n(ov.taxaEPecas);
       recLiq      += c.recLiq;
       custo       += n(d['TOT_CUSTO_MEDIO']);
@@ -331,7 +357,7 @@ export default function VPecasVendasDashboard() {
     });
     const lucroBrutoPct = recLiq !== 0 ? (lucroBruto / recLiq) * 100 : 0;
     return { valorVenda, icms, pis, cofins, difal, taxaML, taxaEPecas, recLiq, custo, lucroBruto, lucroBrutoPct, comissao, dsr, provisoes, resultado };
-  }, [filteredRows, overrides]);
+  }, [filteredRows, overrides, taxaMLLookup]);
 
   // ─── Scroll sync (barra horizontal fixa) ─────────────────────────────────────
   const tableRef     = useRef<HTMLDivElement>(null);
@@ -484,7 +510,10 @@ export default function VPecasVendasDashboard() {
                 const d = row.data;
                 const key = ovKey(d);
                 const ov = overrides[key] ?? emptyOv();
-                const c = calcPecasRow(d, ov);
+                const taxaMLMatch = taxaMLLookup.get(d['NUMERO_NOTA_FISCAL']);
+                const tituloVal   = taxaMLMatch?.data['VAL_TITULO'] ?? '';
+                const autoTaxaML  = tituloVal ? n(d['LIQ_NOTA_FISCAL']) - n(tituloVal) : 0;
+                const c = calcPecasRow(d, ov, autoTaxaML);
                 const bg = row.highlight ? 'bg-yellow-50' : ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
                 const td = `${bg} border-b border-slate-100 align-middle`;
                 const tdR = `${td} text-right`;
@@ -517,7 +546,7 @@ export default function VPecasVendasDashboard() {
                     <td className={`${tdR} px-2 min-w-[100px]`}><CalcCell value={c.difal} /></td>
                     {/* DEDUÇÕES EXTRAS */}
                     <td className={`${tdR} px-2 min-w-[120px]`}>
-                      <EditCell value={ov.taxaML} type="currency" onSave={v => updateOverride(key, 'taxaML', v)} />
+                      <CalcCell value={autoTaxaML} />
                     </td>
                     <td className={`${tdR} px-2 min-w-[110px]`}>
                       <EditCell value={ov.taxaEPecas} type="currency" onSave={v => updateOverride(key, 'taxaEPecas', v)} />
