@@ -76,6 +76,9 @@ function buildRegistroMap(regs: RegistroVendasRow[]): Map<string, RegistroVendas
 }
 
 // ─── Cálculos derivados ───────────────────────────────────────────────────────
+// ─── Regra: vendedor sem comissão em Usados ───────────────────────────────────
+const VENDEDOR_SEM_COMISSAO_USADOS = 'THIAGO DE OLIVEIRA DOMINGOS';
+
 // ─── Helper DSR ───────────────────────────────────────────────────────────────
 function getDsrPct(configs: VendasDsrConfig[], dateStr: string): number {
   let ano: number | null = null, mes: number | null = null;
@@ -92,6 +95,7 @@ function getDsrPct(configs: VendasDsrConfig[], dateStr: string): number {
 }
 
 function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false, aliquotaBonPct = 0, dsrPct = 0) {
+  const isSemComissao      = isUsados && (r.vendedor ?? '').trim().toUpperCase() === VENDEDOR_SEM_COMISSAO_USADOS;
   const comissaoBruta      = isDireta ? n(r.valorVenda) * n(r.pctComissao) / 100 : 0;
   const impostosBase       = isUsados ? calcImpostosUsados(n(r.valorVenda), n(r.valorCusto)) : n(r.impostos);
   const recLiq             = isDireta ? comissaoBruta - impostosBase : n(r.valorVenda) - impostosBase;
@@ -105,9 +109,10 @@ function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false, aliq
   const impostosBonificacoes = !isDireta && !isUsados ? bonuses * (aliquotaBonPct / 100) : 0;
   const lucroComBon        = (isDireta ? recLiq : lucroBruto) + bonuses - (!isDireta && !isUsados ? impostosBonificacoes : 0);
   const lucroComBonPct     = recLiq !== 0 ? (lucroComBon / recLiq) * 100 : 0;
-  const dsr                = n(r.comissaoVenda) * dsrPct / 100;
+  const comissaoParaCalc   = isSemComissao ? 0 : n(r.comissaoVenda);
+  const dsr                = comissaoParaCalc * dsrPct / 100;
   // Provisões: Férias(base/12) + 13°(base/12) + 1/3 Férias(base/36) = base * 7/36
-  const baseProvEnc        = n(r.comissaoVenda) + dsr;
+  const baseProvEnc        = comissaoParaCalc + dsr;
   const provisoes          = baseProvEnc * (7 / 36);
   // Encargos: (base + provisões) * 35,8%  (27,8% INSS + 8% FGTS)
   const encargos           = (baseProvEnc + provisoes) * 0.358;
@@ -116,7 +121,7 @@ function calcRow(r: VendasResultadoRow, isDireta = false, isUsados = false, aliq
                            - (isDireta ? 0 : n(r.jurosEstoque))
                            - (!isUsados ? n(r.ciDesconto) + n(r.cortesiaEmplacamento) : 0)
                            - (isUsados ? n(r.cortesiaTransferencia) : 0)
-                           - n(r.comissaoVenda) - dsr
+                           - comissaoParaCalc - dsr
                            - provisoes - encargos - n(r.outrasDespesas);
   const resultadoPct       = recLiq !== 0 ? (resultado / recLiq) * 100 : 0;
   return { comissaoBruta, impostosBase, recLiq, comissaoLiquidaPct, impostosBonus, impostosTradeIn, lucroBruto, lucroBrutoPct, impostosBonificacoes, lucroComBon, lucroComBonPct, dsr, provisoes, encargos, resultado, resultadoPct };
@@ -257,6 +262,8 @@ function applyComissaoAutoFill(
   const vendorMonthCounts = buildVendorMonthCounts(rows);
   return rows.map(row => {
     if (row.comissaoVenda !== '') return row;
+    // Vendedor sem comissão nos usados não recebe auto-fill
+    if (isUsados && (row.vendedor ?? '').trim().toUpperCase() === VENDEDOR_SEM_COMISSAO_USADOS) return row;
     const vv = n(row.valorVenda);
     if (vv === 0) return row;
     const recLiq = isUsados ? vv - calcImpostosUsados(vv, n(row.valorCusto)) : vv - n(row.impostos);
@@ -544,7 +551,9 @@ async function exportToExcel(rows: VendasResultadoRow[], sheetName: string, file
       n(row.valorVenda), c.impostosBase, c.recLiq,
       n(row.valorCusto), n(row.bonusVarejo), c.lucroBruto, c.lucroBrutoPct,
       n(row.recBlindagem), n(row.recFinanciamento), n(row.recDespachante),
-      n(row.jurosEstoque), n(row.cortesiaTransferencia), n(row.comissaoVenda), n(row.dsr),
+      n(row.jurosEstoque), n(row.cortesiaTransferencia),
+      (row.vendedor ?? '').trim().toUpperCase() === VENDEDOR_SEM_COMISSAO_USADOS ? 0 : n(row.comissaoVenda),
+      c.dsr,
       c.provisoes, c.encargos, n(row.outrasDespesas),
       c.resultado, c.resultadoPct,
     ] : [
@@ -868,18 +877,24 @@ export default function VendasResultadoDashboard() {
     const totCiDesconto            = isUsados ? 0 : sum('ciDesconto');
     const totCortesiaEmplacamento  = isUsados ? 0 : sum('cortesiaEmplacamento');
     const totCortesiaTransferencia = isUsados ? sum('cortesiaTransferencia') : 0;
-    const totComissaoVenda         = sum('comissaoVenda');
+    const totComissaoVenda         = filteredRows.reduce((acc, r) => {
+      if (isUsados && (r.vendedor ?? '').trim().toUpperCase() === VENDEDOR_SEM_COMISSAO_USADOS) return acc;
+      return acc + n(r.comissaoVenda);
+    }, 0);
     const totDsr                   = filteredRows.reduce((acc, r) => {
+      if (isUsados && (r.vendedor ?? '').trim().toUpperCase() === VENDEDOR_SEM_COMISSAO_USADOS) return acc;
       const pct = getDsrPct(dsrConfigs, r.dataVenda);
       return acc + n(r.comissaoVenda) * pct / 100;
     }, 0);
     const totProvisoes             = filteredRows.reduce((acc, r) => {
+      if (isUsados && (r.vendedor ?? '').trim().toUpperCase() === VENDEDOR_SEM_COMISSAO_USADOS) return acc;
       const pct = getDsrPct(dsrConfigs, r.dataVenda);
       const dsr = n(r.comissaoVenda) * pct / 100;
       const base = n(r.comissaoVenda) + dsr;
       return acc + base * (7 / 36);
     }, 0);
     const totEncargos              = filteredRows.reduce((acc, r) => {
+      if (isUsados && (r.vendedor ?? '').trim().toUpperCase() === VENDEDOR_SEM_COMISSAO_USADOS) return acc;
       const pct = getDsrPct(dsrConfigs, r.dataVenda);
       const dsr = n(r.comissaoVenda) * pct / 100;
       const base = n(r.comissaoVenda) + dsr;
