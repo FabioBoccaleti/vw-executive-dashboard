@@ -8,6 +8,8 @@ import { kvGet, kvSet } from '@/lib/kvClient';
 import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from './vPecasStorage';
 import { loadTaxaMLRows } from './taxaMercadoLivreStorage';
 import type { TaxaMLRow } from './taxaMercadoLivreStorage';
+import { loadTaxaEPecasRows } from './taxaEPecasStorage';
+import type { TaxaEPecasRow } from './taxaEPecasStorage';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function n(v: string | undefined): number {
@@ -83,14 +85,14 @@ interface PecasCalc {
   resultado: number;
 }
 
-function calcPecasRow(d: Record<string, string>, ov: PecasOverride, autoTaxaML?: number): PecasCalc {
+function calcPecasRow(d: Record<string, string>, ov: PecasOverride, autoTaxaML?: number, autoTaxaEP?: number): PecasCalc {
   const valorVenda = n(d['LIQ_NOTA_FISCAL']);
   const icms       = n(d['VAL_ICMS']);
   const pis        = n(d['VAL_PIS']);
   const cofins     = n(d['VAL_COFINS']);
   const difal      = n(d['VAL_ICMS_PARTIL_UF_DEST']) + n(d['VAL_ICMS_COMB_POBREZA']);
   const taxaML     = autoTaxaML !== undefined ? autoTaxaML : n(ov.taxaML);
-  const taxaEPecas = n(ov.taxaEPecas);
+  const taxaEPecas = autoTaxaEP !== undefined ? autoTaxaEP : n(ov.taxaEPecas);
   const recLiq     = valorVenda - icms - pis - cofins - difal - taxaML - taxaEPecas;
   const custo      = n(d['TOT_CUSTO_MEDIO']);
   const lucroBruto = recLiq - custo;
@@ -166,6 +168,8 @@ function ReadCell({ value, currency }: { value: string; currency?: boolean }) {
 async function exportPecasExcel(
   rows: VPecasRow[],
   overrides: Record<string, PecasOverride>,
+  taxaMLLookup: Map<string, TaxaMLRow>,
+  taxaEPLookup: Map<string, number>,
   sheetName: string,
   filename: string,
 ) {
@@ -214,13 +218,18 @@ async function exportPecasExcel(
   rows.forEach((row, ri) => {
     const d = row.data;
     const ov = overrides[ovKey(d)] ?? emptyOv();
-    const c = calcPecasRow(d, ov);
+    const taxaMLMatch = taxaMLLookup.get(d['NUMERO_NOTA_FISCAL']);
+    const tituloValML = taxaMLMatch?.data['VAL_TITULO'] ?? '';
+    const autoTaxaML  = tituloValML ? n(d['LIQ_NOTA_FISCAL']) - n(tituloValML) : 0;
+    const epSum       = taxaEPLookup.get(d['NUMERO_NOTA_FISCAL']) ?? 0;
+    const autoTaxaEP  = epSum > 0 ? n(d['LIQ_NOTA_FISCAL']) - epSum : 0;
+    const c = calcPecasRow(d, ov, autoTaxaML, autoTaxaEP);
     const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF5F3FF';
     const vals = [
       d['NUMERO_NOTA_FISCAL'], d['SERIE_NOTA_FISCAL'], d['TIPO_TRANSACAO'], d['DTA_DOCUMENTO'],
       d['DEPARTAMENTO'], d['NOME_VENDEDOR'], ov.condPgto, d['NOME_CLIENTE'], d['CIDADE'], d['ESTADO'],
       n(d['LIQ_NOTA_FISCAL']), n(d['VAL_ICMS']), n(d['VAL_PIS']), n(d['VAL_COFINS']), c.difal,
-      n(ov.taxaML), n(ov.taxaEPecas), c.recLiq,
+      autoTaxaML, autoTaxaEP, c.recLiq,
       n(d['TOT_CUSTO_MEDIO']), c.lucroBruto, c.lucroBrutoPct,
       n(ov.comissao), n(ov.dsr), n(ov.provisoes), c.resultado,
     ];
@@ -254,6 +263,7 @@ async function exportPecasExcel(
 export default function VPecasVendasDashboard() {
   const [allRows, setAllRows] = useState<VPecasRow[]>([]);
   const [taxaMLRows, setTaxaMLRows] = useState<TaxaMLRow[]>([]);
+  const [taxaEPRows, setTaxaEPRows] = useState<TaxaEPecasRow[]>([]);
   const [overrides, setOverrides] = useState<Record<string, PecasOverride>>({});
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
@@ -261,11 +271,12 @@ export default function VPecasVendasDashboard() {
   const [annotationDraft, setAnnotationDraft] = useState('');
 
   useEffect(() => {
-    Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows(), loadOverrides(), loadTaxaMLRows()]).then(([rows, devol, ov, taxaRows]) => {
+    Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows(), loadOverrides(), loadTaxaMLRows(), loadTaxaEPecasRows()]).then(([rows, devol, ov, taxaRows, taxaEPRws]) => {
       const combined = [...rows, ...devol];
       setAllRows(combined.filter(r => r.data['SERIE_NOTA_FISCAL'] !== 'RPS'));
       setOverrides(ov);
       setTaxaMLRows(taxaRows as TaxaMLRow[]);
+      setTaxaEPRows(taxaEPRws as TaxaEPecasRow[]);
     });
   }, []);
 
@@ -319,6 +330,25 @@ export default function VPecasVendasDashboard() {
     return map;
   }, [taxaMLRows, filterYear, filterMonth]);
 
+  // Lookup Taxa E-Peças: TITULO -> soma VAL_TITULO (mesmo período)
+  const taxaEPLookup = useMemo(() => {
+    const periodo = filterMonth !== null
+      ? `${filterYear}-${String(filterMonth).padStart(2, '0')}`
+      : null;
+    const filtered = periodo
+      ? taxaEPRows.filter(r => r.periodoImport === periodo)
+      : taxaEPRows.filter(r => {
+          const p = r.periodoImport?.split('-').map(Number);
+          return p && p[0] === filterYear;
+        });
+    const map = new Map<string, number>();
+    filtered.forEach(r => {
+      const titulo = r.data['TITULO'];
+      if (titulo) map.set(titulo, (map.get(titulo) ?? 0) + n(r.data['VAL_TITULO']));
+    });
+    return map;
+  }, [taxaEPRows, filterYear, filterMonth]);
+
   async function updateOverride(key: string, field: keyof PecasOverride, value: string) {
     const updated = { ...overrides, [key]: { ...(overrides[key] ?? emptyOv()), [field]: value } };
     setOverrides(updated);
@@ -337,16 +367,18 @@ export default function VPecasVendasDashboard() {
       const d = r.data;
       const ov = overrides[ovKey(d)] ?? emptyOv();
       const taxaMLMatch = taxaMLLookup.get(d['NUMERO_NOTA_FISCAL']);
-      const tituloVal   = taxaMLMatch?.data['VAL_TITULO'] ?? '';
-      const autoTaxaML  = tituloVal ? n(d['LIQ_NOTA_FISCAL']) - n(tituloVal) : 0;
-      const c = calcPecasRow(d, ov, autoTaxaML);
+      const tituloValML = taxaMLMatch?.data['VAL_TITULO'] ?? '';
+      const autoTaxaML  = tituloValML ? n(d['LIQ_NOTA_FISCAL']) - n(tituloValML) : 0;
+      const epSum       = taxaEPLookup.get(d['NUMERO_NOTA_FISCAL']) ?? 0;
+      const autoTaxaEP  = epSum > 0 ? n(d['LIQ_NOTA_FISCAL']) - epSum : 0;
+      const c = calcPecasRow(d, ov, autoTaxaML, autoTaxaEP);
       valorVenda  += n(d['LIQ_NOTA_FISCAL']);
       icms        += n(d['VAL_ICMS']);
       pis         += n(d['VAL_PIS']);
       cofins      += n(d['VAL_COFINS']);
       difal       += c.difal;
       taxaML      += autoTaxaML;
-      taxaEPecas  += n(ov.taxaEPecas);
+      taxaEPecas  += autoTaxaEP;
       recLiq      += c.recLiq;
       custo       += n(d['TOT_CUSTO_MEDIO']);
       lucroBruto  += c.lucroBruto;
@@ -357,7 +389,7 @@ export default function VPecasVendasDashboard() {
     });
     const lucroBrutoPct = recLiq !== 0 ? (lucroBruto / recLiq) * 100 : 0;
     return { valorVenda, icms, pis, cofins, difal, taxaML, taxaEPecas, recLiq, custo, lucroBruto, lucroBrutoPct, comissao, dsr, provisoes, resultado };
-  }, [filteredRows, overrides, taxaMLLookup]);
+  }, [filteredRows, overrides, taxaMLLookup, taxaEPLookup]);
 
   // ─── Scroll sync (barra horizontal fixa) ─────────────────────────────────────
   const tableRef     = useRef<HTMLDivElement>(null);
@@ -418,7 +450,7 @@ export default function VPecasVendasDashboard() {
               try {
                 const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
                 const sheetName = `Vendas de Peças - ${monthLabel}-${filterYear}`.slice(0, 31);
-                await exportPecasExcel(filteredRows, overrides, sheetName, `vendas_pecas_${filterYear}_${monthLabel}.xlsx`);
+                await exportPecasExcel(filteredRows, overrides, taxaMLLookup, taxaEPLookup, sheetName, `vendas_pecas_${filterYear}_${monthLabel}.xlsx`);
                 toast.success('Arquivo Excel gerado!');
               } catch (err) {
                 toast.error(`Erro ao gerar Excel: ${String(err)}`);
@@ -511,9 +543,11 @@ export default function VPecasVendasDashboard() {
                 const key = ovKey(d);
                 const ov = overrides[key] ?? emptyOv();
                 const taxaMLMatch = taxaMLLookup.get(d['NUMERO_NOTA_FISCAL']);
-                const tituloVal   = taxaMLMatch?.data['VAL_TITULO'] ?? '';
-                const autoTaxaML  = tituloVal ? n(d['LIQ_NOTA_FISCAL']) - n(tituloVal) : 0;
-                const c = calcPecasRow(d, ov, autoTaxaML);
+                const tituloValML = taxaMLMatch?.data['VAL_TITULO'] ?? '';
+                const autoTaxaML  = tituloValML ? n(d['LIQ_NOTA_FISCAL']) - n(tituloValML) : 0;
+                const epSum       = taxaEPLookup.get(d['NUMERO_NOTA_FISCAL']) ?? 0;
+                const autoTaxaEP  = epSum > 0 ? n(d['LIQ_NOTA_FISCAL']) - epSum : 0;
+                const c = calcPecasRow(d, ov, autoTaxaML, autoTaxaEP);
                 const bg = row.highlight ? 'bg-yellow-50' : ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
                 const td = `${bg} border-b border-slate-100 align-middle`;
                 const tdR = `${td} text-right`;
@@ -549,7 +583,7 @@ export default function VPecasVendasDashboard() {
                       <CalcCell value={autoTaxaML} />
                     </td>
                     <td className={`${tdR} px-2 min-w-[110px]`}>
-                      <EditCell value={ov.taxaEPecas} type="currency" onSave={v => updateOverride(key, 'taxaEPecas', v)} />
+                      <CalcCell value={autoTaxaEP} />
                     </td>
                     {/* REC. LÍQUIDA */}
                     <td className={`${tdR} px-2 min-w-[120px]`}><CalcCell value={c.recLiq} /></td>
