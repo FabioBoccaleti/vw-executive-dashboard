@@ -29,10 +29,12 @@ interface PecasOverride {
   comissao: string;
   dsr: string;
   provisoes: string;
+  notaFiscal: string;
+  valorTitulo: string;
 }
 
 function emptyOv(): PecasOverride {
-  return { condPgto: '', taxaML: '', taxaEPecas: '', comissao: '', dsr: '', provisoes: '' };
+  return { condPgto: '', taxaML: '', taxaEPecas: '', comissao: '', dsr: '', provisoes: '', notaFiscal: '', valorTitulo: '' };
 }
 
 async function loadOverrides(): Promise<Record<string, PecasOverride>> {
@@ -182,9 +184,10 @@ async function exportPecasExcel(
     'Taxa Mercado Livre', 'Taxa E-Peças', 'Receita Líquida',
     'Custo Médio', 'Lucro Bruto', '% Lucro Bruto',
     'Comissão', 'DSR', 'Provisões', 'Resultado Líquido Venda',
+    'Nota Fiscal (Adic.)', 'Valor do Título',
   ];
 
-  const colWidths = [12, 8, 12, 12, 16, 18, 20, 22, 14, 8, 20, 14, 14, 14, 14, 18, 14, 18, 14, 14, 12, 14, 14, 14, 20];
+  const colWidths = [12, 8, 12, 12, 16, 18, 20, 22, 14, 8, 20, 14, 14, 14, 14, 18, 14, 18, 14, 14, 12, 14, 14, 14, 20, 18, 18];
   ws.columns = colWidths.map(w => ({ width: w }));
 
   const today = new Date().toLocaleDateString('pt-BR');
@@ -222,10 +225,11 @@ async function exportPecasExcel(
       n(ov.taxaML), n(ov.taxaEPecas), c.recLiq,
       n(d['TOT_CUSTO_MEDIO']), c.lucroBruto, c.lucroBrutoPct,
       n(ov.comissao), n(ov.dsr), n(ov.provisoes), c.resultado,
+      ov.notaFiscal, n(ov.valorTitulo),
     ];
     const dr = ws.addRow(vals);
     dr.height = 17;
-    const currencyCols = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 23, 24, 25];
+    const currencyCols = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 23, 24, 25, 27];
     const pctCols = [21];
     dr.eachCell({ includeEmpty: true }, (cell, ci) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
@@ -423,7 +427,7 @@ export default function VPecasMercadoLivreVendasDashboard() {
           className="flex-1 overflow-auto"
           style={{ minHeight: 0 }}
         >
-          <table className="w-full border-separate border-spacing-0 text-xs" style={{ minWidth: 2800 }}>
+          <table className="w-full border-separate border-spacing-0 text-xs" style={{ minWidth: 3100 }}>
             <thead className="sticky top-0 z-10">
               {/* Grupos de cabeçalho */}
               <tr>
@@ -434,7 +438,8 @@ export default function VPecasMercadoLivreVendasDashboard() {
                 <th colSpan={3}  className="bg-teal-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-teal-600">CUSTO / LUCRO BRUTO</th>
                 <th colSpan={3}  className="bg-orange-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-orange-600">DESPESAS</th>
                 <th colSpan={1}  className="bg-slate-800 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-700">RESULTADO</th>
-                <th className="bg-slate-600 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide">AÇÕES</th>
+                <th className="bg-slate-600 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-500">AÇÕES</th>
+                <th colSpan={2}   className="bg-violet-800 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-l-4 border-l-violet-950">DADOS ADICIONAIS</th>
               </tr>
               {/* Colunas */}
               <tr className="text-[10px] font-bold text-white">
@@ -468,13 +473,16 @@ export default function VPecasMercadoLivreVendasDashboard() {
                 ))}
                 {/* RESULTADO */}
                 <th className="bg-slate-800 px-3 py-2 text-right whitespace-nowrap border-b border-slate-700 border-r border-slate-700">Resultado Líq.</th>
-                <th className="bg-slate-600 px-3 py-2 text-center whitespace-nowrap border-b border-slate-500 sticky right-0">Ações</th>
+                <th className="bg-slate-600 px-3 py-2 text-center whitespace-nowrap border-b border-slate-500 border-r border-slate-500">Ações</th>
+                {/* DADOS ADICIONAIS */}
+                <th className="bg-violet-800 px-3 py-2 text-left whitespace-nowrap border-b border-violet-700 border-r border-violet-700 border-l-4 border-l-violet-950">Nota Fiscal</th>
+                <th className="bg-violet-800 px-3 py-2 text-right whitespace-nowrap border-b border-violet-700">Valor do Título</th>
               </tr>
             </thead>
             <tbody>
               {filteredRows.length === 0 && (
                 <tr>
-                  <td colSpan={26} className="text-center py-16 text-slate-300 text-sm">
+                  <td colSpan={28} className="text-center py-16 text-slate-300 text-sm">
                     Nenhum registro — importe dados de Peças Mercado Livre na aba Registros
                   </td>
                 </tr>
@@ -540,7 +548,7 @@ export default function VPecasMercadoLivreVendasDashboard() {
                     {/* RESULTADO */}
                     <td className={`${tdR} px-2 min-w-[120px]`}><CalcCell value={c.resultado} negative /></td>
                     {/* AÇÕES */}
-                    <td className={`${td} px-2 text-center sticky right-0 bg-white border-l border-slate-100 min-w-[80px]`}>
+                    <td className={`${td} px-2 text-center border-l border-slate-100 min-w-[80px]`}>
                       <div className="flex items-center justify-center gap-1">
                         <button
                           title="Destacar"
@@ -557,6 +565,13 @@ export default function VPecasMercadoLivreVendasDashboard() {
                           <MessageSquare className="w-3.5 h-3.5" />
                         </button>
                       </div>
+                    </td>
+                    {/* DADOS ADICIONAIS */}
+                    <td className={`${td} px-2 min-w-[130px] border-l-4 border-l-violet-300`}>
+                      <EditCell value={ov.notaFiscal} type="text" onSave={v => updateOverride(key, 'notaFiscal', v)} />
+                    </td>
+                    <td className={`${tdR} px-2 min-w-[130px]`}>
+                      <EditCell value={ov.valorTitulo} type="currency" onSave={v => updateOverride(key, 'valorTitulo', v)} />
                     </td>
                   </tr>
                 );
@@ -582,6 +597,8 @@ export default function VPecasMercadoLivreVendasDashboard() {
                   <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.dsr)}</td>
                   <td className="px-2 py-2 text-right font-mono text-red-300">R$ {fmt(totals.provisoes)}</td>
                   <td className={`px-2 py-2 text-right font-mono ${totals.resultado >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.resultado)}</td>
+                  <td className="px-2 py-2" />
+                  <td className="px-2 py-2 border-l-4 border-l-violet-600" />
                   <td className="px-2 py-2" />
                 </tr>
               </tfoot>
