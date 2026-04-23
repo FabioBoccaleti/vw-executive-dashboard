@@ -168,6 +168,7 @@ function ReadCell({ value, currency }: { value: string; currency?: boolean }) {
 async function exportPecasExcel(
   rows: VPecasRow[],
   overrides: Record<string, PecasOverride>,
+  taxaEPLookup: Map<string, number>,
   sheetName: string,
   filename: string,
 ) {
@@ -217,16 +218,19 @@ async function exportPecasExcel(
   rows.forEach((row, ri) => {
     const d = row.data;
     const ov = overrides[ovKey(d)] ?? emptyOv();
-    const c = calcPecasRow(d, ov);
+    const tituloSum   = taxaEPLookup.get(d['NUMERO_NOTA_FISCAL']) ?? 0;
+    const tituloNF    = tituloSum > 0 ? d['NUMERO_NOTA_FISCAL'] : '';
+    const autoTaxaEP  = tituloSum > 0 ? n(d['LIQ_NOTA_FISCAL']) - tituloSum : 0;
+    const c = calcPecasRow(d, ov, autoTaxaEP);
     const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF0FDFA';
     const vals = [
       d['NUMERO_NOTA_FISCAL'], d['SERIE_NOTA_FISCAL'], d['TIPO_TRANSACAO'], d['DTA_DOCUMENTO'],
       d['DEPARTAMENTO'], d['NOME_VENDEDOR'], ov.condPgto, d['NOME_CLIENTE'], d['CIDADE'], d['ESTADO'],
       n(d['LIQ_NOTA_FISCAL']), n(d['VAL_ICMS']), n(d['VAL_PIS']), n(d['VAL_COFINS']), c.difal,
-      n(ov.taxaML), n(ov.taxaEPecas), c.recLiq,
+      n(ov.taxaML), autoTaxaEP, c.recLiq,
       n(d['TOT_CUSTO_MEDIO']), c.lucroBruto, c.lucroBrutoPct,
       n(ov.comissao), n(ov.dsr), n(ov.provisoes), c.resultado,
-      '', 0,
+      tituloNF, tituloSum,
     ];
     const dr = ws.addRow(vals);
     dr.height = 17;
@@ -315,10 +319,10 @@ export default function VPecasEPecasVendasDashboard() {
           const p = r.periodoImport?.split('-').map(Number);
           return p && p[0] === filterYear;
         });
-    const map = new Map<string, TaxaEPecasRow>();
+    const map = new Map<string, number>();
     filtered.forEach(r => {
       const titulo = r.data['TITULO'];
-      if (titulo) map.set(titulo, r);
+      if (titulo) map.set(titulo, (map.get(titulo) ?? 0) + n(r.data['VAL_TITULO']));
     });
     return map;
   }, [taxaEPRows, filterYear, filterMonth]);
@@ -340,9 +344,8 @@ export default function VPecasEPecasVendasDashboard() {
     filteredRows.forEach(r => {
       const d = r.data;
       const ov = overrides[ovKey(d)] ?? emptyOv();
-      const taxaEPMatch = taxaEPLookup.get(d['NUMERO_NOTA_FISCAL']);
-      const tituloVal   = taxaEPMatch?.data['VAL_TITULO'] ?? '';
-      const autoTaxaEP  = tituloVal ? n(d['LIQ_NOTA_FISCAL']) - n(tituloVal) : 0;
+      const tituloSum  = taxaEPLookup.get(d['NUMERO_NOTA_FISCAL']) ?? 0;
+      const autoTaxaEP = tituloSum > 0 ? n(d['LIQ_NOTA_FISCAL']) - tituloSum : 0;
       const c = calcPecasRow(d, ov, autoTaxaEP);
       valorVenda  += n(d['LIQ_NOTA_FISCAL']);
       icms        += n(d['VAL_ICMS']);
@@ -360,7 +363,7 @@ export default function VPecasEPecasVendasDashboard() {
       resultado   += c.resultado;
     });
     const lucroBrutoPct = recLiq !== 0 ? (lucroBruto / recLiq) * 100 : 0;
-    const totalValTitulo = Array.from(taxaEPLookup.values()).reduce((acc, r) => acc + n(r.data['VAL_TITULO']), 0);
+    const totalValTitulo = Array.from(taxaEPLookup.values()).reduce((acc, v) => acc + v, 0);
     return { valorVenda, icms, pis, cofins, difal, taxaML, taxaEPecas, recLiq, custo, lucroBruto, lucroBrutoPct, comissao, dsr, provisoes, resultado, totalValTitulo };
   }, [filteredRows, overrides, taxaEPLookup]);
 
@@ -423,7 +426,7 @@ export default function VPecasEPecasVendasDashboard() {
               try {
                 const monthLabel = filterMonth ? MONTHS[filterMonth - 1] : 'Ano-todo';
                 const sheetName = `Peças E-Peças - ${monthLabel}-${filterYear}`.slice(0, 31);
-                await exportPecasExcel(filteredRows, overrides, sheetName, `vendas_pecas_epecos_${filterYear}_${monthLabel}.xlsx`);
+                await exportPecasExcel(filteredRows, overrides, taxaEPLookup, sheetName, `vendas_pecas_epecos_${filterYear}_${monthLabel}.xlsx`);
                 toast.success('Arquivo Excel gerado!');
               } catch (err) {
                 toast.error(`Erro ao gerar Excel: ${String(err)}`);
@@ -517,10 +520,9 @@ export default function VPecasEPecasVendasDashboard() {
                 const d = row.data;
                 const key = ovKey(d);
                 const ov = overrides[key] ?? emptyOv();
-                const taxaEPMatch = taxaEPLookup.get(d['NUMERO_NOTA_FISCAL']);
-                const tituloNF  = taxaEPMatch?.data['TITULO'] ?? '';
-                const tituloVal = taxaEPMatch?.data['VAL_TITULO'] ?? '';
-                const autoTaxaEP = tituloVal ? n(d['LIQ_NOTA_FISCAL']) - n(tituloVal) : 0;
+                const tituloSum  = taxaEPLookup.get(d['NUMERO_NOTA_FISCAL']) ?? 0;
+                const tituloNF   = tituloSum > 0 ? d['NUMERO_NOTA_FISCAL'] : '';
+                const autoTaxaEP = tituloSum > 0 ? n(d['LIQ_NOTA_FISCAL']) - tituloSum : 0;
                 const c = calcPecasRow(d, ov, autoTaxaEP);
                 const bg = row.highlight ? 'bg-yellow-50' : ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
                 const td = `${bg} border-b border-slate-100 align-middle`;
@@ -601,7 +603,7 @@ export default function VPecasEPecasVendasDashboard() {
                       <ReadCell value={tituloNF} />
                     </td>
                     <td className={`${tdR} px-2 min-w-[130px]`}>
-                      <ReadCell value={tituloVal} currency />
+                      <ReadCell value={tituloSum > 0 ? String(tituloSum) : ''} currency />
                     </td>
                   </tr>
                 );
