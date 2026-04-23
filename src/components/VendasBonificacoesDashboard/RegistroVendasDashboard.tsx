@@ -6,6 +6,7 @@ import { VPecasItemDashboard } from './VPecasItemDashboard';
 import { VPecasSeguradoraDashboard } from './VPecasSeguradoraDashboard';
 import { VPecasMercadoLivreDashboard } from './VPecasMercadoLivreDashboard';
 import { TaxaMercadoLivreDashboard } from './TaxaMercadoLivreDashboard';
+import { TaxaEPecasDashboard } from './TaxaEPecasDashboard';
 import { VPecasEPecasDashboard } from './VPecasEPecasDashboard';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -206,18 +207,19 @@ export function RegistroVendasDashboard() {
   const [showVPecasSeg, setShowVPecasSeg]           = useState(false);
   const [showVPecasML, setShowVPecasML]             = useState(false);
   const [showTaxaML, setShowTaxaML]               = useState(false);
+  const [showTaxaEP, setShowTaxaEP]               = useState(false);
   const [showVPecasEP, setShowVPecasEP]             = useState(false);
   const [showGuia, setShowGuia]                     = useState(false);
 
   // Carrega dados ao trocar de aba
   useEffect(() => {
-    if (showVPecas || showVPecasItem || showVPecasSeg || showVPecasML || showTaxaML || showVPecasEP) { setLoading(false); return; }
+    if (showVPecas || showVPecasItem || showVPecasSeg || showVPecasML || showTaxaML || showTaxaEP || showVPecasEP) { setLoading(false); return; }
     setLoading(true);
     loadRegistroRows(activeTab).then(data => {
       setRows(data);
       setLoading(false);
     });
-  }, [activeTab, showVPecas, showVPecasItem, showVPecasSeg, showVPecasML, showTaxaML, showVPecasEP]);
+  }, [activeTab, showVPecas, showVPecasItem, showVPecasSeg, showVPecasML, showTaxaML, showTaxaEP, showVPecasEP]);
 
   // Anos disponíveis
   const availableYears = useMemo(() => {
@@ -530,7 +532,7 @@ export function RegistroVendasDashboard() {
       )}
 
       {/* Barra superior — Importar TXT (apenas veículos, alimenta as 3 abas) */}
-      {!showVPecas && !showVPecasItem && !showVPecasSeg && !showGuia && (
+      {!showVPecas && !showVPecasItem && !showVPecasSeg && !showGuia && !showTaxaEP && (
       <div className="bg-white border-b border-slate-100 px-6 py-3 flex items-center gap-3 flex-shrink-0">
         <Button
           size="sm"
@@ -550,9 +552,9 @@ export function RegistroVendasDashboard() {
           {SUB_TABS.map(({ id, label }) => (
             <button
               key={id}
-              onClick={() => { setActiveTab(id); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowTaxaML(false); setShowVPecasEP(false); setShowGuia(false); }}
+              onClick={() => { setActiveTab(id); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowTaxaML(false); setShowTaxaEP(false); setShowVPecasEP(false); setShowGuia(false); }}
               className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-                !showVPecas && !showVPecasItem && !showVPecasSeg && !showVPecasML && !showTaxaML && !showVPecasEP && activeTab === id
+                !showVPecas && !showVPecasItem && !showVPecasSeg && !showVPecasML && !showTaxaML && !showTaxaEP && !showVPecasEP && activeTab === id
                   ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
               }`}
@@ -561,9 +563,9 @@ export function RegistroVendasDashboard() {
             </button>
           ))}
           <button
-            onClick={() => { setShowVPecas(true); setShowVPecasItem(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowTaxaML(false); setShowVPecasEP(false); }}
+            onClick={() => { setShowVPecas(true); setShowVPecasItem(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowTaxaML(false); setShowTaxaEP(false); setShowVPecasEP(false); }}
             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
-              showVPecas && !showVPecasItem && !showVPecasSeg && !showVPecasML && !showTaxaML && !showVPecasEP
+              showVPecas && !showVPecasItem && !showVPecasSeg && !showVPecasML && !showTaxaML && !showTaxaEP && !showVPecasEP
                 ? 'border-violet-500 text-violet-700 bg-violet-50/50'
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
             }`}
@@ -572,7 +574,7 @@ export function RegistroVendasDashboard() {
             V. Peças
           </button>
           <button
-            onClick={() => { setShowVPecasItem(true); setShowVPecas(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowTaxaML(false); setShowVPecasEP(false); }}
+            onClick={() => { setShowVPecasItem(true); setShowVPecas(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowTaxaML(false); setShowTaxaEP(false); setShowVPecasEP(false); }}
             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
               showVPecasItem
                 ? 'border-teal-500 text-teal-700 bg-teal-50/50'
@@ -583,7 +585,7 @@ export function RegistroVendasDashboard() {
             Itens de Peças
           </button>
           <button
-            onClick={() => { setShowVPecasSeg(true); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasML(false); setShowTaxaML(false); setShowVPecasEP(false); }}
+            onClick={() => { setShowVPecasSeg(true); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasML(false); setShowTaxaML(false); setShowTaxaEP(false); setShowVPecasEP(false); }}
             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
               showVPecasSeg
                 ? 'border-sky-500 text-sky-700 bg-sky-50/50'
@@ -594,7 +596,7 @@ export function RegistroVendasDashboard() {
             Peças Seg. Balcão
           </button>
           <button
-            onClick={() => { setShowVPecasML(true); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowTaxaML(false); setShowVPecasEP(false); }}
+            onClick={() => { setShowVPecasML(true); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowTaxaML(false); setShowTaxaEP(false); setShowVPecasEP(false); }}
             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
               showVPecasML
                 ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
@@ -605,7 +607,7 @@ export function RegistroVendasDashboard() {
             Peças Mercado Livre
           </button>
           <button
-            onClick={() => { setShowTaxaML(true); setShowVPecasML(false); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowVPecasEP(false); }}
+            onClick={() => { setShowTaxaML(true); setShowVPecasML(false); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowTaxaEP(false); setShowVPecasEP(false); }}
             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
               showTaxaML
                 ? 'border-orange-500 text-orange-700 bg-orange-50/50'
@@ -616,7 +618,7 @@ export function RegistroVendasDashboard() {
             Taxa Mercado Livre
           </button>
           <button
-            onClick={() => { setShowVPecasEP(true); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowTaxaML(false); }}
+            onClick={() => { setShowVPecasEP(true); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowTaxaML(false); setShowTaxaEP(false); }}
             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
               showVPecasEP
                 ? 'border-indigo-500 text-indigo-700 bg-indigo-50/50'
@@ -627,7 +629,18 @@ export function RegistroVendasDashboard() {
             Peças E-Peças
           </button>
           <button
-            onClick={() => { setShowGuia(true); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowTaxaML(false); setShowVPecasEP(false); }}
+            onClick={() => { setShowTaxaEP(true); setShowVPecasEP(false); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowTaxaML(false); setShowGuia(false); }}
+            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+              showTaxaEP
+                ? 'border-teal-500 text-teal-700 bg-teal-50/50'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            Taxa E-Peças
+          </button>
+          <button
+            onClick={() => { setShowGuia(true); setShowVPecas(false); setShowVPecasItem(false); setShowVPecasSeg(false); setShowVPecasML(false); setShowTaxaML(false); setShowTaxaEP(false); setShowVPecasEP(false); }}
             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
               showGuia
                 ? 'border-blue-500 text-blue-700 bg-blue-50/50'
@@ -638,7 +651,7 @@ export function RegistroVendasDashboard() {
             Guia de Relatórios
           </button>
         </div>
-        {!showVPecas && !showVPecasItem && !showVPecasSeg && !showVPecasML && !showTaxaML && !showVPecasEP && !showGuia && (
+        {!showVPecas && !showVPecasItem && !showVPecasSeg && !showVPecasML && !showTaxaML && !showTaxaEP && !showVPecasEP && !showGuia && (
         <div className="flex items-center gap-2 py-1.5">
           <Button
             size="sm"
@@ -709,6 +722,12 @@ export function RegistroVendasDashboard() {
         </div>
       )}
 
+      {showTaxaEP && (
+        <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+          <TaxaEPecasDashboard />
+        </div>
+      )}
+
       {showGuia && (
         <GuiaRelatoriosPage filterAbas={[
           'Veículos Novos',
@@ -720,11 +739,12 @@ export function RegistroVendasDashboard() {
           'Peças Mercado Livre',
           'Taxa Mercado Livre',
           'Peças E-Peças',
+          'Taxa E-Peças',
         ]} />
       )}
 
       {/* Filtro Ano / Mês — apenas veículos */}
-      {!showVPecas && !showVPecasItem && !showVPecasSeg && !showVPecasML && !showTaxaML && !showVPecasEP && !showGuia && (<>
+      {!showVPecas && !showVPecasItem && !showVPecasSeg && !showVPecasML && !showTaxaML && !showTaxaEP && !showVPecasEP && !showGuia && (<>
       <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
         <div className="relative mr-2">
