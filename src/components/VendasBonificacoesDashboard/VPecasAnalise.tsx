@@ -12,6 +12,11 @@ import VPecasComparativo from './VPecasComparativo';
 import VPecasItemSeguradoraAnalise from './VPecasItemSeguradoraAnalise';
 import VPecasMercadoLivreAnalise from './VPecasMercadoLivreAnalise';
 import VPecasEPecasAnalise from './VPecasEPecasAnalise';
+import { kvGet } from '@/lib/kvClient';
+import { loadTaxaMLRows } from './taxaMercadoLivreStorage';
+import type { TaxaMLRow } from './taxaMercadoLivreStorage';
+import { loadTaxaEPecasRows } from './taxaEPecasStorage';
+import type { TaxaEPecasRow } from './taxaEPecasStorage';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
 const MS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -83,9 +88,42 @@ function getDia(row: VPecasRow): number {
   return 0;
 }
 
+// ─── Taxas ML / E-Peças (mesmo contexto da tabela de vendas) ─────────────────
+const PECAS_OV_KEY = 'vendas_pecas_vendas_ov';
+interface PecasOverride { condPgto: string; taxaML: string; taxaEPecas: string; comissao: string; dsr: string; provisoes: string; }
+function emptyOv(): PecasOverride { return { condPgto: '', taxaML: '', taxaEPecas: '', comissao: '', dsr: '', provisoes: '' }; }
+function ovKey(d: Record<string, string>): string {
+  return `${d['NUMERO_NOTA_FISCAL'] ?? ''}_${d['SERIE_NOTA_FISCAL'] ?? ''}_${d['DTA_DOCUMENTO'] ?? ''}`;
+}
+interface TaxaContext { mlMap: Map<string, TaxaMLRow>; epMap: Map<string, number>; ovs: Record<string, PecasOverride>; }
+function buildTaxaContext(mlRows: TaxaMLRow[], epRows: TaxaEPecasRow[], ovs: Record<string, PecasOverride>, yr: number, mo: number | null): TaxaContext {
+  const periodo = mo !== null ? `${yr}-${String(mo).padStart(2, '0')}` : null;
+  const filtML = periodo ? mlRows.filter(r => r.periodoImport === periodo) : mlRows.filter(r => { const p = r.periodoImport?.split('-').map(Number); return p && p[0] === yr; });
+  const filtEP = periodo ? epRows.filter(r => r.periodoImport === periodo) : epRows.filter(r => { const p = r.periodoImport?.split('-').map(Number); return p && p[0] === yr; });
+  const mlMap = new Map<string, TaxaMLRow>();
+  filtML.forEach(r => { const t = r.data['TITULO']; if (t) mlMap.set(t, r); });
+  const epMap = new Map<string, number>();
+  filtEP.forEach(r => { const t = r.data['TITULO']; if (t) epMap.set(t, (epMap.get(t) ?? 0) + n(r.data['VAL_TITULO'])); });
+  return { mlMap, epMap, ovs };
+}
+function rowTaxa(d: Record<string, string>, ctx: TaxaContext): { taxaML: number; taxaEP: number } {
+  const nf    = d['NUMERO_NOTA_FISCAL'];
+  const liqNF = n(d['LIQ_NOTA_FISCAL']);
+  const ov    = ctx.ovs[ovKey(d)] ?? emptyOv();
+  const mlRow = ctx.mlMap.get(nf);
+  const tituloValML = mlRow?.data['VAL_TITULO'] ?? '';
+  const autoTaxaML  = tituloValML ? liqNF - n(tituloValML) : undefined;
+  const epSum       = ctx.epMap.get(nf) ?? 0;
+  const autoTaxaEP  = epSum > 0 ? liqNF - epSum : undefined;
+  return {
+    taxaML: autoTaxaML !== undefined ? autoTaxaML : n(ov.taxaML),
+    taxaEP: autoTaxaEP !== undefined ? autoTaxaEP : n(ov.taxaEPecas),
+  };
+}
+
 // ─── Cálculo por linha ────────────────────────────────────────────────────────
-interface Calc { valorVenda: number; icms: number; pis: number; cofins: number; difal: number; totalImpostos: number; recLiq: number; custo: number; lucroBruto: number; lucroBrutoPct: number; }
-function calcPecas(d: Record<string, string>): Calc {
+interface Calc { valorVenda: number; icms: number; pis: number; cofins: number; difal: number; totalImpostos: number; recLiq: number; custo: number; taxaML: number; taxaEP: number; lucroBruto: number; lucroBrutoPct: number; }
+function calcPecas(d: Record<string, string>, taxaML = 0, taxaEP = 0): Calc {
   const valorVenda = n(d['LIQ_NOTA_FISCAL']);
   const icms       = n(d['VAL_ICMS']);
   const pis        = n(d['VAL_PIS']);
@@ -94,21 +132,23 @@ function calcPecas(d: Record<string, string>): Calc {
   const totalImpostos = icms + pis + cofins + difal;
   const recLiq     = valorVenda - totalImpostos;
   const custo      = n(d['TOT_CUSTO_MEDIO']);
-  const lucroBruto = recLiq - custo;
+  const lucroBruto = recLiq - taxaML - taxaEP - custo;
   const lucroBrutoPct = recLiq !== 0 ? (lucroBruto / recLiq) * 100 : 0;
-  return { valorVenda, icms, pis, cofins, difal, totalImpostos, recLiq, custo, lucroBruto, lucroBrutoPct };
+  return { valorVenda, icms, pis, cofins, difal, totalImpostos, recLiq, custo, taxaML, taxaEP, lucroBruto, lucroBrutoPct };
 }
 
 // ─── Agregador ────────────────────────────────────────────────────────────────
-interface Agg { nfs: number; valorVenda: number; icms: number; pis: number; cofins: number; difal: number; totalImpostos: number; recLiq: number; custo: number; lucroBruto: number; lbPct: number; }
-function agg(rows: VPecasRow[]): Agg {
-  let nfs = 0, valorVenda = 0, icms = 0, pis = 0, cofins = 0, difal = 0, totalImpostos = 0, recLiq = 0, custo = 0, lucroBruto = 0;
+interface Agg { nfs: number; valorVenda: number; icms: number; pis: number; cofins: number; difal: number; totalImpostos: number; recLiq: number; custo: number; taxaML: number; taxaEP: number; lucroBruto: number; lbPct: number; }
+function agg(rows: VPecasRow[], ctx?: TaxaContext): Agg {
+  let nfs = 0, valorVenda = 0, icms = 0, pis = 0, cofins = 0, difal = 0, totalImpostos = 0, recLiq = 0, custo = 0, taxaML = 0, taxaEP = 0, lucroBruto = 0;
   for (const r of rows) {
-    const c = calcPecas(r.data);
+    const taxa = ctx ? rowTaxa(r.data, ctx) : { taxaML: 0, taxaEP: 0 };
+    const c = calcPecas(r.data, taxa.taxaML, taxa.taxaEP);
     nfs++; valorVenda += c.valorVenda; icms += c.icms; pis += c.pis; cofins += c.cofins;
-    difal += c.difal; totalImpostos += c.totalImpostos; recLiq += c.recLiq; custo += c.custo; lucroBruto += c.lucroBruto;
+    difal += c.difal; totalImpostos += c.totalImpostos; recLiq += c.recLiq; custo += c.custo;
+    taxaML += taxa.taxaML; taxaEP += taxa.taxaEP; lucroBruto += c.lucroBruto;
   }
-  return { nfs, valorVenda, icms, pis, cofins, difal, totalImpostos, recLiq, custo, lucroBruto, lbPct: recLiq ? lucroBruto / recLiq * 100 : 0 };
+  return { nfs, valorVenda, icms, pis, cofins, difal, totalImpostos, recLiq, custo, taxaML, taxaEP, lucroBruto, lbPct: recLiq ? lucroBruto / recLiq * 100 : 0 };
 }
 
 // ─── Sub-componentes UI ───────────────────────────────────────────────────────
@@ -230,6 +270,18 @@ export default function VPecasAnalise() {
   const [dailySelTrans, setDailySelTrans] = useState<string>('Todos');
   const [pecasPivotGroupBy, setPecasPivotGroupBy] = useState<'dept' | 'trans'>('dept');
   const [pecasPivotMetric,  setPecasPivotMetric]  = useState<'recBruta' | 'lbPct' | 'resPct'>('recBruta');
+  const [taxaMLRows, setTaxaMLRows] = useState<TaxaMLRow[]>([]);
+  const [taxaEPRows, setTaxaEPRows] = useState<TaxaEPecasRow[]>([]);
+  const [overrides,  setOverrides]  = useState<Record<string, PecasOverride>>({});
+
+  useEffect(() => { loadTaxaMLRows().then(setTaxaMLRows); }, []);
+  useEffect(() => { loadTaxaEPecasRows().then(setTaxaEPRows); }, []);
+  useEffect(() => {
+    kvGet(PECAS_OV_KEY).then(data => {
+      if (data && typeof data === 'object' && !Array.isArray(data))
+        setOverrides(data as Record<string, PecasOverride>);
+    });
+  }, []);
 
   useEffect(() => {
     loadVPecasItemRows().then(setAllItemRows);
@@ -270,8 +322,19 @@ export default function VPecasAnalise() {
     return allRows.filter(r => getYr(r) === py && getMo(r) === pm);
   }, [allRows, month, year]);
 
-  const metrics     = useMemo(() => agg(filteredRows), [filteredRows]);
-  const prevMetrics = useMemo(() => agg(prevRows),    [prevRows]);
+  const taxaContext = useMemo(
+    () => buildTaxaContext(taxaMLRows, taxaEPRows, overrides, year, month),
+    [taxaMLRows, taxaEPRows, overrides, year, month],
+  );
+  const prevTaxaContext = useMemo(() => {
+    if (month === null) return buildTaxaContext(taxaMLRows, taxaEPRows, overrides, year - 1, null);
+    const pm = month === 1 ? 12 : month - 1;
+    const py = month === 1 ? year - 1 : year;
+    return buildTaxaContext(taxaMLRows, taxaEPRows, overrides, py, pm);
+  }, [taxaMLRows, taxaEPRows, overrides, year, month]);
+
+  const metrics     = useMemo(() => agg(filteredRows, taxaContext),     [filteredRows, taxaContext]);
+  const prevMetrics = useMemo(() => agg(prevRows,     prevTaxaContext), [prevRows,     prevTaxaContext]);
 
   const delta = (cur: number, prev: number) =>
     prev !== 0 ? ((cur - prev) / Math.abs(prev)) * 100 : undefined;
@@ -361,11 +424,12 @@ export default function VPecasAnalise() {
 
   // ─── 1. Evolução Mensal ────────────────────────────────────────────────────
   const monthlyData = useMemo(() => MS.map((label, i) => {
-    const m  = i + 1;
-    const mr = yearRows.filter(r => getMo(r) === m);
-    const a  = agg(mr);
+    const m   = i + 1;
+    const mr  = yearRows.filter(r => getMo(r) === m);
+    const ctx = buildTaxaContext(taxaMLRows, taxaEPRows, overrides, year, m);
+    const a   = agg(mr, ctx);
     return { label, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct };
-  }), [yearRows]);
+  }), [yearRows, taxaMLRows, taxaEPRows, overrides, year]);
 
   // ─── 2. Por Departamento ──────────────────────────────────────────────────
   const deptData = useMemo(() => {
@@ -375,10 +439,10 @@ export default function VPecasAnalise() {
       map.set(k, [...(map.get(k) ?? []), r]);
     }
     return [...map.entries()].map(([name, rows]) => {
-      const a = agg(rows);
+      const a = agg(rows, taxaContext);
       return { name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct };
     }).sort((a, b) => b[deptMetric] - a[deptMetric]);
-  }, [filteredRows, deptMetric]);
+  }, [filteredRows, deptMetric, taxaContext]);
 
   const deptDonut = useMemo(() => {
     const total = deptData.reduce((s, d) => s + d.valorVenda, 0);
@@ -404,7 +468,8 @@ export default function VPecasAnalise() {
       const g = groupKey(r);
       const mo = getMo(r);
       if (!raw[g][mo]) raw[g][mo] = { rb: 0, rl: 0, lb: 0 };
-      const c = calcPecas(r.data);
+      const taxa = rowTaxa(r.data, taxaContext);
+      const c = calcPecas(r.data, taxa.taxaML, taxa.taxaEP);
       raw[g][mo].rb += c.valorVenda;
       raw[g][mo].rl += c.recLiq;
       raw[g][mo].lb += c.lucroBruto;
@@ -463,10 +528,10 @@ export default function VPecasAnalise() {
       map.set(k, [...(map.get(k) ?? []), r]);
     }
     return [...map.entries()].map(([name, rows]) => {
-      const a = agg(rows);
+      const a = agg(rows, taxaContext);
       return { name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct };
     }).sort((a, b) => b[vendorSort] - a[vendorSort]);
-  }, [filteredRows, vendorSort, vendorDept]);
+  }, [filteredRows, vendorSort, vendorDept, taxaContext]);
 
   const vendorMax = useMemo(() => Math.max(...vendorData.map(v => v[vendorSort]), 1), [vendorData, vendorSort]);
 
@@ -478,10 +543,10 @@ export default function VPecasAnalise() {
       map.set(k, [...(map.get(k) ?? []), r]);
     }
     return [...map.entries()].map(([name, rows]) => {
-      const a = agg(rows);
+      const a = agg(rows, taxaContext);
       return { name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct };
     }).sort((a, b) => b[estadoMetric] - a[estadoMetric]).slice(0, 20);
-  }, [filteredRows, estadoMetric]);
+  }, [filteredRows, estadoMetric, taxaContext]);
 
   // ─── 5. Composição Impostos ───────────────────────────────────────────────
   const impostosData = useMemo(() => {
@@ -513,10 +578,10 @@ export default function VPecasAnalise() {
       else map.set(k, { rows: [r], cidade: r.data['CIDADE'] ?? '', estado: r.data['ESTADO'] ?? '' });
     }
     return [...map.entries()].map(([name, { rows, cidade, estado }]) => {
-      const a = agg(rows);
+      const a = agg(rows, taxaContext);
       return { name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct, cidade, estado };
     }).sort((a, b) => b[clienteMetric] - a[clienteMetric]).slice(0, 15);
-  }, [filteredRows, clienteMetric, clienteDept]);
+  }, [filteredRows, clienteMetric, clienteDept, taxaContext]);
 
   const clienteMax = useMemo(() => Math.max(...clienteData.map(c => c[clienteMetric]), 1), [clienteData, clienteMetric]);
 
@@ -532,7 +597,7 @@ export default function VPecasAnalise() {
       map.set(k, [...(map.get(k) ?? []), r]);
     }
     return [...map.entries()].map(([dept, rows]) => {
-      const calcs = rows.map(r => calcPecas(r.data));
+      const calcs = rows.map(r => { const taxa = rowTaxa(r.data, taxaContext); return calcPecas(r.data, taxa.taxaML, taxa.taxaEP); });
       const total    = calcs.length;
       const withPrej = calcs.filter(c => c.lucroBruto < 0);
       const pct      = (arr: typeof calcs) => total > 0 ? arr.length / total * 100 : 0;
@@ -554,7 +619,7 @@ export default function VPecasAnalise() {
   }, [filteredRows]);
 
   const globalDeptRisk = useMemo(() => {
-    const allCalcs = filteredRows.map(r => calcPecas(r.data));
+    const allCalcs = filteredRows.map(r => { const taxa = rowTaxa(r.data, taxaContext); return calcPecas(r.data, taxa.taxaML, taxa.taxaEP); });
     const total    = allCalcs.length;
     const withPrej = allCalcs.filter(c => c.lucroBruto < 0);
     const sumPrej  = withPrej.reduce((s, c) => s + c.lucroBruto, 0);
@@ -585,7 +650,8 @@ export default function VPecasAnalise() {
       : base;
     return source
       .map(r => {
-        const c = calcPecas(r.data);
+        const taxa = rowTaxa(r.data, taxaContext);
+        const c = calcPecas(r.data, taxa.taxaML, taxa.taxaEP);
         return {
           nf:        r.data['NUMERO_NOTA_FISCAL']?.trim() || '—',
           serie:     r.data['SERIE_NOTA_FISCAL']?.trim() || '',
@@ -611,10 +677,10 @@ export default function VPecasAnalise() {
       map.set(k, [...(map.get(k) ?? []), r]);
     }
     return [...map.entries()].map(([name, rows]) => {
-      const a = agg(rows);
+      const a = agg(rows, taxaContext);
       return { name: transacaoName(name), code: name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct };
     }).sort((a, b) => b.valorVenda - a.valorVenda);
-  }, [filteredRows]);
+  }, [filteredRows, taxaContext]);
 
   // ─── Itens de Peças ─────────────────────────────────────────────────────────────────────────
   const filteredItemRows = useMemo(() =>
@@ -815,7 +881,7 @@ export default function VPecasAnalise() {
 
       {analiseTab === 'nfs' && <>
       {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
         <KpiCard label="Total de NFs" value={metrics.nfs.toLocaleString('pt-BR')} accent={VIOLET}
           delta={month !== null ? delta(metrics.nfs, prevMetrics.nfs) : undefined} />
         <KpiCard label="Receita Bruta" value={fmtBRL(metrics.valorVenda)} color="text-violet-700" accent={VIOLET}
@@ -824,6 +890,8 @@ export default function VPecasAnalise() {
           sub={metrics.valorVenda ? fmtPct(metrics.totalImpostos / metrics.valorVenda * 100) + ' da receita' : undefined} />
         <KpiCard label="Receita Líquida" value={fmtBRL(metrics.recLiq)} color="text-emerald-700" accent={EMERALD}
           delta={month !== null ? delta(metrics.recLiq, prevMetrics.recLiq) : undefined} />
+        <KpiCard label="Taxa ML / E-Peças" value={fmtBRL(metrics.taxaML + metrics.taxaEP)} color="text-indigo-600" accent="#6366f1"
+          sub={metrics.recLiq ? fmtPct((metrics.taxaML + metrics.taxaEP) / metrics.recLiq * 100) + ' da Rec. Líq.' : undefined} />
         <KpiCard label="Custo Médio" value={fmtBRL(metrics.custo)} accent="#94a3b8"
           sub={metrics.recLiq ? fmtPct(metrics.custo / metrics.recLiq * 100) + ' da rec. liq.' : undefined} />
         <KpiCard
