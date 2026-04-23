@@ -7,6 +7,8 @@ import { saveAs } from 'file-saver';
 import { kvGet, kvSet } from '@/lib/kvClient';
 import { loadVPecasMLRows, loadVPecasMLDevolucaoRows } from './vPecasMercadoLivreStorage';
 import type { VPecasMLRow as VPecasRow } from './vPecasMercadoLivreStorage';
+import { loadTaxaMLRows } from './taxaMercadoLivreStorage';
+import type { TaxaMLRow } from './taxaMercadoLivreStorage';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function n(v: string | undefined): number {
@@ -29,12 +31,10 @@ interface PecasOverride {
   comissao: string;
   dsr: string;
   provisoes: string;
-  notaFiscal: string;
-  valorTitulo: string;
 }
 
 function emptyOv(): PecasOverride {
-  return { condPgto: '', taxaML: '', taxaEPecas: '', comissao: '', dsr: '', provisoes: '', notaFiscal: '', valorTitulo: '' };
+  return { condPgto: '', taxaML: '', taxaEPecas: '', comissao: '', dsr: '', provisoes: '' };
 }
 
 async function loadOverrides(): Promise<Record<string, PecasOverride>> {
@@ -225,7 +225,7 @@ async function exportPecasExcel(
       n(ov.taxaML), n(ov.taxaEPecas), c.recLiq,
       n(d['TOT_CUSTO_MEDIO']), c.lucroBruto, c.lucroBrutoPct,
       n(ov.comissao), n(ov.dsr), n(ov.provisoes), c.resultado,
-      ov.notaFiscal, n(ov.valorTitulo),
+      '', 0, // Nota Fiscal / Valor do Título — preenchidos no render
     ];
     const dr = ws.addRow(vals);
     dr.height = 17;
@@ -256,6 +256,7 @@ async function exportPecasExcel(
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function VPecasMercadoLivreVendasDashboard() {
   const [allRows, setAllRows] = useState<VPecasRow[]>([]);
+  const [taxaMLRows, setTaxaMLRows] = useState<TaxaMLRow[]>([]);
   const [overrides, setOverrides] = useState<Record<string, PecasOverride>>({});
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
@@ -263,10 +264,11 @@ export default function VPecasMercadoLivreVendasDashboard() {
   const [annotationDraft, setAnnotationDraft] = useState('');
 
   useEffect(() => {
-    Promise.all([loadVPecasMLRows(), loadVPecasMLDevolucaoRows(), loadOverrides()]).then(([rows, devol, ov]) => {
+    Promise.all([loadVPecasMLRows(), loadVPecasMLDevolucaoRows(), loadOverrides(), loadTaxaMLRows()]).then(([rows, devol, ov, taxaRows]) => {
       const combined = [...rows, ...devol];
       setAllRows(combined.filter(r => r.data['SERIE_NOTA_FISCAL'] !== 'RPS'));
       setOverrides(ov);
+      setTaxaMLRows(taxaRows as TaxaMLRow[]);
     });
   }, []);
 
@@ -300,6 +302,18 @@ export default function VPecasMercadoLivreVendasDashboard() {
       return true;
     });
   }, [allRows, filterYear, filterMonth]);
+
+  // Taxa ML filtrada pelo mesmo período, para lookup por posição
+  const taxaMLFiltered = useMemo(() => {
+    const periodo = filterMonth !== null
+      ? `${filterYear}-${String(filterMonth).padStart(2, '0')}`
+      : null;
+    if (periodo) return taxaMLRows.filter(r => r.periodoImport === periodo);
+    return taxaMLRows.filter(r => {
+      const p = r.periodoImport?.split('-').map(Number);
+      return p && p[0] === filterYear;
+    });
+  }, [taxaMLRows, filterYear, filterMonth]);
 
   async function updateOverride(key: string, field: keyof PecasOverride, value: string) {
     const updated = { ...overrides, [key]: { ...(overrides[key] ?? emptyOv()), [field]: value } };
@@ -335,8 +349,9 @@ export default function VPecasMercadoLivreVendasDashboard() {
       resultado   += c.resultado;
     });
     const lucroBrutoPct = recLiq !== 0 ? (lucroBruto / recLiq) * 100 : 0;
-    return { valorVenda, icms, pis, cofins, difal, taxaML, taxaEPecas, recLiq, custo, lucroBruto, lucroBrutoPct, comissao, dsr, provisoes, resultado };
-  }, [filteredRows, overrides]);
+    const totalValTitulo = taxaMLFiltered.reduce((acc, r) => acc + n(r.data['VAL_TITULO']), 0);
+    return { valorVenda, icms, pis, cofins, difal, taxaML, taxaEPecas, recLiq, custo, lucroBruto, lucroBrutoPct, comissao, dsr, provisoes, resultado, totalValTitulo };
+  }, [filteredRows, overrides, taxaMLFiltered]);
 
   // ─── Scroll sync (barra horizontal fixa) ─────────────────────────────────────
   const tableRef       = useRef<HTMLDivElement>(null);
@@ -492,6 +507,9 @@ export default function VPecasMercadoLivreVendasDashboard() {
                 const key = ovKey(d);
                 const ov = overrides[key] ?? emptyOv();
                 const c = calcPecasRow(d, ov);
+                const taxaRow = taxaMLFiltered[ri];
+                const tituloNF = taxaRow?.data['TITULO'] ?? '';
+                const tituloVal = taxaRow?.data['VAL_TITULO'] ?? '';
                 const bg = row.highlight ? 'bg-yellow-50' : ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
                 const td = `${bg} border-b border-slate-100 align-middle`;
                 const tdR = `${td} text-right`;
@@ -568,10 +586,10 @@ export default function VPecasMercadoLivreVendasDashboard() {
                     </td>
                     {/* DADOS ADICIONAIS */}
                     <td className={`${td} px-2 min-w-[130px] border-l-4 border-l-violet-300`}>
-                      <EditCell value={ov.notaFiscal} type="text" onSave={v => updateOverride(key, 'notaFiscal', v)} />
+                      <ReadCell value={tituloNF} />
                     </td>
                     <td className={`${tdR} px-2 min-w-[130px]`}>
-                      <EditCell value={ov.valorTitulo} type="currency" onSave={v => updateOverride(key, 'valorTitulo', v)} />
+                      <ReadCell value={tituloVal} currency />
                     </td>
                   </tr>
                 );
@@ -599,7 +617,7 @@ export default function VPecasMercadoLivreVendasDashboard() {
                   <td className={`px-2 py-2 text-right font-mono ${totals.resultado >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.resultado)}</td>
                   <td className="px-2 py-2" />
                   <td className="px-2 py-2 border-l-4 border-l-violet-600" />
-                  <td className="px-2 py-2" />
+                  <td className="px-2 py-2 text-right font-mono text-violet-300">R$ {fmt(totals.totalValTitulo)}</td>
                 </tr>
               </tfoot>
             )}
