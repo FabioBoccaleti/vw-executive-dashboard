@@ -514,7 +514,7 @@ export default function VPecasMercadoLivreAnalise() {
             <Tooltip content={<TipBRL />} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <Bar dataKey="valorVenda" name="Rec. Bruta" fill={ORANGE} fillOpacity={0.35} radius={[2, 2, 0, 0]} />
-            <Bar dataKey="taxaML"     name="Taxa ML"    fill={ORANGE_D} fillOpacity={0.9} radius={[2, 2, 0, 0]} />
+            <Bar dataKey="taxaML"     name="Taxa ML"    fill="#ef4444" fillOpacity={0.9} radius={[2, 2, 0, 0]} />
             <Bar dataKey="recLiq"     name="Rec. Líq."  fill={EMERALD} fillOpacity={0.85} radius={[2, 2, 0, 0]} />
             <Bar dataKey="lucroBruto" name="Lucro Bruto" fill="#a78bfa" fillOpacity={0.85} radius={[2, 2, 0, 0]} />
             {showPrevYear && <Bar dataKey="prevRecLiq" name={`Rec. Líq. ${prevYear}`} fill={EMERALD} fillOpacity={0.3} radius={[2, 2, 0, 0]} />}
@@ -531,8 +531,8 @@ export default function VPecasMercadoLivreAnalise() {
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => fmtBRL(v).replace('R$\u00a0', 'R$')} width={80} />
             <Tooltip formatter={(v: number) => [fmtBRLF(v), 'Taxa ML']} />
-            <Bar dataKey="taxaML" name="Taxa ML" fill={ORANGE_D} fillOpacity={0.9} radius={[3, 3, 0, 0]}>
-              {monthlyData.map((_, i) => <Cell key={i} fill={month === i + 1 ? ORANGE : ORANGE_D} fillOpacity={month === null || month === i + 1 ? 0.9 : 0.35} />)}
+            <Bar dataKey="taxaML" name="Taxa ML" fill="#ef4444" fillOpacity={0.9} radius={[3, 3, 0, 0]}>
+              {monthlyData.map((_, i) => <Cell key={i} fill="#ef4444" fillOpacity={month === null || month === i + 1 ? 0.9 : 0.35} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
