@@ -90,9 +90,9 @@ function calcPecasRow(d: Record<string, string>, ov: PecasOverride): PecasCalc {
   const difal      = n(d['VAL_ICMS_PARTIL_UF_DEST']) + n(d['VAL_ICMS_COMB_POBREZA']);
   const taxaML     = n(ov.taxaML);
   const taxaEPecas = n(ov.taxaEPecas);
-  const recLiq     = valorVenda - icms - pis - cofins - difal - taxaML - taxaEPecas;
+  const recLiq     = valorVenda - icms - pis - cofins - difal;
   const custo      = n(d['TOT_CUSTO_MEDIO']);
-  const lucroBruto = recLiq - custo;
+  const lucroBruto = recLiq - taxaML - taxaEPecas - custo;
   const lucroBrutoPct = recLiq !== 0 ? (lucroBruto / recLiq) * 100 : 0;
   const comissao   = n(ov.comissao);
   const dsr        = n(ov.dsr);
@@ -179,7 +179,7 @@ async function exportPecasExcel(
     'Nota Fiscal', 'Série', 'Transação', 'Data da Venda', 'Departamento', 'Vendedor',
     'Cond. de Pagamento', 'Cliente', 'Cidade', 'Estado',
     'Valor Venda (Rec. Bruta)', 'ICMS', 'PIS', 'COFINS', 'Difal',
-    'Taxa Mercado Livre', 'Taxa E-Peças', 'Receita Líquida',
+    'Receita Líquida', 'Taxa Mercado Livre', 'Taxa E-Peças',
     'Custo Médio', 'Lucro Bruto', '% Lucro Bruto',
     'Comissão', 'DSR', 'Provisões', 'Resultado Líquido Venda',
   ];
@@ -219,7 +219,7 @@ async function exportPecasExcel(
       d['NUMERO_NOTA_FISCAL'], d['SERIE_NOTA_FISCAL'], d['TIPO_TRANSACAO'], d['DTA_DOCUMENTO'],
       d['DEPARTAMENTO'], d['NOME_VENDEDOR'], ov.condPgto, d['NOME_CLIENTE'], d['CIDADE'], d['ESTADO'],
       n(d['LIQ_NOTA_FISCAL']), n(d['VAL_ICMS']), n(d['VAL_PIS']), n(d['VAL_COFINS']), c.difal,
-      n(ov.taxaML), n(ov.taxaEPecas), c.recLiq,
+      c.recLiq, n(ov.taxaML), n(ov.taxaEPecas),
       n(d['TOT_CUSTO_MEDIO']), c.lucroBruto, c.lucroBrutoPct,
       n(ov.comissao), n(ov.dsr), n(ov.provisoes), c.resultado,
     ];
@@ -431,8 +431,8 @@ export default function VPecasSeguradoraVendasDashboard() {
               <tr>
                 <th colSpan={10} className="bg-slate-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-600">IDENTIFICAÇÃO</th>
                 <th colSpan={5}  className="bg-sky-800 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-sky-700">RECEITA BRUTA</th>
-                <th colSpan={2}  className="bg-indigo-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-indigo-600">DEDUÇÕES EXTRAS</th>
                 <th colSpan={1}  className="bg-emerald-800 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-emerald-700">REC. LÍQUIDA</th>
+                <th colSpan={2}  className="bg-indigo-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-indigo-600">DEDUÇÕES EXTRAS</th>
                 <th colSpan={3}  className="bg-teal-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-teal-600">CUSTO / LUCRO BRUTO</th>
                 <th colSpan={3}  className="bg-orange-700 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-orange-600">DESPESAS</th>
                 <th colSpan={1}  className="bg-slate-800 text-white text-center py-1.5 text-[10px] font-semibold tracking-wide border-r border-slate-700">RESULTADO</th>
@@ -454,12 +454,12 @@ export default function VPecasSeguradoraVendasDashboard() {
                 {['Valor Venda', 'ICMS', 'PIS', 'COFINS', 'Difal'].map((h, i) => (
                   <th key={i} className="bg-sky-800 px-3 py-2 text-right whitespace-nowrap border-b border-sky-700 border-r border-sky-700">{h}</th>
                 ))}
+                {/* REC. LÍQUIDA */}
+                <th className="bg-emerald-800 px-3 py-2 text-right whitespace-nowrap border-b border-emerald-700 border-r border-emerald-700">Rec. Líquida</th>
                 {/* DEDUÇÕES EXTRAS */}
                 {['Taxa Mercado Livre', 'Taxa E-Peças'].map((h, i) => (
                   <th key={i} className="bg-indigo-700 px-3 py-2 text-right whitespace-nowrap border-b border-indigo-600 border-r border-indigo-600">{h}</th>
                 ))}
-                {/* REC. LÍQUIDA */}
-                <th className="bg-emerald-800 px-3 py-2 text-right whitespace-nowrap border-b border-emerald-700 border-r border-emerald-700">Rec. Líquida</th>
                 {/* CUSTO / LUCRO BRUTO */}
                 {['Custo Médio', 'Lucro Bruto', 'LB %'].map((h, i) => (
                   <th key={i} className="bg-teal-700 px-3 py-2 text-right whitespace-nowrap border-b border-teal-600 border-r border-teal-600">{h}</th>
@@ -516,6 +516,8 @@ export default function VPecasSeguradoraVendasDashboard() {
                     <td className={`${tdR} px-2 min-w-[90px]`}><ReadCell value={d['VAL_PIS']} currency /></td>
                     <td className={`${tdR} px-2 min-w-[100px]`}><ReadCell value={d['VAL_COFINS']} currency /></td>
                     <td className={`${tdR} px-2 min-w-[100px]`}><CalcCell value={c.difal} /></td>
+                    {/* REC. LÍQUIDA */}
+                    <td className={`${tdR} px-2 min-w-[120px]`}><CalcCell value={c.recLiq} /></td>
                     {/* DEDUÇÕES EXTRAS */}
                     <td className={`${tdR} px-2 min-w-[120px]`}>
                       <EditCell value={ov.taxaML} type="currency" onSave={v => updateOverride(key, 'taxaML', v)} />
@@ -523,8 +525,6 @@ export default function VPecasSeguradoraVendasDashboard() {
                     <td className={`${tdR} px-2 min-w-[110px]`}>
                       <EditCell value={ov.taxaEPecas} type="currency" onSave={v => updateOverride(key, 'taxaEPecas', v)} />
                     </td>
-                    {/* REC. LÍQUIDA */}
-                    <td className={`${tdR} px-2 min-w-[120px]`}><CalcCell value={c.recLiq} /></td>
                     {/* CUSTO / LUCRO BRUTO */}
                     <td className={`${tdR} px-2 min-w-[120px]`}><ReadCell value={d['TOT_CUSTO_MEDIO']} currency /></td>
                     <td className={`${tdR} px-2 min-w-[110px]`}><CalcCell value={c.lucroBruto} negative /></td>
@@ -574,9 +574,9 @@ export default function VPecasSeguradoraVendasDashboard() {
                   <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.pis)}</td>
                   <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.cofins)}</td>
                   <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.difal)}</td>
+                  <td className={`px-2 py-2 text-right font-mono ${totals.recLiq >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.recLiq)}</td>
                   <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.taxaML)}</td>
                   <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.taxaEPecas)}</td>
-                  <td className={`px-2 py-2 text-right font-mono ${totals.recLiq >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.recLiq)}</td>
                   <td className="px-2 py-2 text-right font-mono">R$ {fmt(totals.custo)}</td>
                   <td className={`px-2 py-2 text-right font-mono ${totals.lucroBruto >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>R$ {fmt(totals.lucroBruto)}</td>
                   <td className={`px-2 py-2 text-right font-mono ${totals.lucroBrutoPct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{fmtPct(totals.lucroBrutoPct)}</td>

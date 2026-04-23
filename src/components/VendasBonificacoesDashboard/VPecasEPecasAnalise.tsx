@@ -61,7 +61,7 @@ function getMo(row: VPecasEPecasRow): number {
 // ─── Cálculo por linha ────────────────────────────────────────────────────────
 interface Calc {
   valorVenda: number; icms: number; pis: number; cofins: number; difal: number;
-  taxaEP: number; totalDeducoes: number;
+  taxaEP: number; totalImpostos: number;
   recLiq: number; custo: number; lucroBruto: number; lucroBrutoPct: number;
   comissao: number; dsr: number; provisoes: number; resultado: number;
 }
@@ -77,27 +77,27 @@ function calcRow(
   const difal         = n(d['VAL_ICMS_PARTIL_UF_DEST']) + n(d['VAL_ICMS_COMB_POBREZA']);
   const taxaML        = n(ov.taxaML);
   const taxaEP        = autoTaxaEP;
-  const totalDeducoes = icms + pis + cofins + difal + taxaML + taxaEP;
-  const recLiq        = valorVenda - totalDeducoes;
+  const totalImpostos = icms + pis + cofins + difal;
+  const recLiq        = valorVenda - totalImpostos;
   const custo         = n(d['TOT_CUSTO_MEDIO']);
-  const lucroBruto    = recLiq - custo;
+  const lucroBruto    = recLiq - taxaML - taxaEP - custo;
   const lucroBrutoPct = recLiq !== 0 ? (lucroBruto / recLiq) * 100 : 0;
   const comissao      = n(ov.comissao);
   const dsr           = n(ov.dsr);
   const provisoes     = n(ov.provisoes);
   const resultado     = lucroBruto - comissao - dsr - provisoes;
-  return { valorVenda, icms, pis, cofins, difal, taxaEP, totalDeducoes, recLiq, custo, lucroBruto, lucroBrutoPct, comissao, dsr, provisoes, resultado };
+  return { valorVenda, icms, pis, cofins, difal, taxaEP, totalImpostos, recLiq, custo, lucroBruto, lucroBrutoPct, comissao, dsr, provisoes, resultado };
 }
 
 interface Agg {
   nfs: number; valorVenda: number; icms: number; pis: number; cofins: number;
-  difal: number; taxaEP: number; totalDeducoes: number;
+  difal: number; taxaEP: number; totalImpostos: number;
   recLiq: number; custo: number; lucroBruto: number; lbPct: number;
   comissao: number; dsr: number; provisoes: number; resultado: number;
 }
 function aggRows(rows: VPecasEPecasRow[], overrides: Record<string, PecasOverride>, taxaEPLookup: Map<string, number>): Agg {
   let nfs = 0, valorVenda = 0, icms = 0, pis = 0, cofins = 0, difal = 0,
-      taxaEP = 0, totalDeducoes = 0, recLiq = 0, custo = 0, lucroBruto = 0,
+      taxaEP = 0, totalImpostos = 0, recLiq = 0, custo = 0, lucroBruto = 0,
       comissao = 0, dsr = 0, provisoes = 0, resultado = 0;
   for (const r of rows) {
     const ov      = overrides[ovKey(r.data)] ?? emptyOv();
@@ -106,11 +106,11 @@ function aggRows(rows: VPecasEPecasRow[], overrides: Record<string, PecasOverrid
     const c = calcRow(r.data, ov, autoEP);
     nfs++; valorVenda += c.valorVenda; icms += c.icms; pis += c.pis; cofins += c.cofins;
     difal += c.difal; taxaEP += c.taxaEP;
-    totalDeducoes += c.totalDeducoes; recLiq += c.recLiq; custo += c.custo;
+    totalImpostos += c.totalImpostos; recLiq += c.recLiq; custo += c.custo;
     lucroBruto += c.lucroBruto; comissao += c.comissao; dsr += c.dsr;
     provisoes += c.provisoes; resultado += c.resultado;
   }
-  return { nfs, valorVenda, icms, pis, cofins, difal, taxaEP, totalDeducoes, recLiq, custo, lucroBruto,
+  return { nfs, valorVenda, icms, pis, cofins, difal, taxaEP, totalImpostos, recLiq, custo, lucroBruto,
     lbPct: recLiq !== 0 ? lucroBruto / recLiq * 100 : 0, comissao, dsr, provisoes, resultado };
 }
 
@@ -482,8 +482,8 @@ export default function VPecasEPecasAnalise() {
         <KpiCard label="Taxa E-Peças"    value={fmtBRL(metrics.taxaEP)} color="text-red-600" accent={EP_RED}
           sub={metrics.valorVenda ? fmtPct(metrics.taxaEP / metrics.valorVenda * 100) + ' da receita' : undefined}
           delta={month !== null ? delta(metrics.taxaEP, prevMetrics.taxaEP) : undefined} />
-        <KpiCard label="Total Deduções"  value={fmtBRL(metrics.totalDeducoes)} color="text-rose-600" accent={ROSE}
-          sub={metrics.valorVenda ? fmtPct(metrics.totalDeducoes / metrics.valorVenda * 100) + ' da receita' : undefined} />
+        <KpiCard label="Total Impostos"  value={fmtBRL(metrics.totalImpostos)} color="text-rose-600" accent={ROSE}
+          sub={metrics.valorVenda ? fmtPct(metrics.totalImpostos / metrics.valorVenda * 100) + ' da receita' : undefined} />
         <KpiCard label="Receita Líquida" value={fmtBRL(metrics.recLiq)} color="text-emerald-700" accent={EMERALD}
           delta={month !== null ? delta(metrics.recLiq, prevMetrics.recLiq) : undefined} />
         <KpiCard label="Custo Médio"     value={fmtBRL(metrics.custo)} color="text-amber-700" accent={AMBER}
