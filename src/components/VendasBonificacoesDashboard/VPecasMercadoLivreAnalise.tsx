@@ -505,13 +505,13 @@ export default function VPecasMercadoLivreAnalise() {
           delta={month !== null ? delta(metrics.nfs, prevMetrics.nfs) : undefined} />
         <KpiCard label="Receita Bruta"   value={fmtBRL(metrics.valorVenda)} color="text-orange-700" accent={ORANGE}
           delta={month !== null ? delta(metrics.valorVenda, prevMetrics.valorVenda) : undefined} />
-        <KpiCard label="Taxa Mercado Livre" value={fmtBRL(metrics.taxaML)} color="text-orange-600" accent={ORANGE_D}
-          sub={metrics.valorVenda ? fmtPct(metrics.taxaML / metrics.valorVenda * 100) + ' da receita' : undefined}
-          delta={month !== null ? delta(metrics.taxaML, prevMetrics.taxaML) : undefined} />
         <KpiCard label="Total Impostos"  value={fmtBRL(metrics.totalImpostos)} color="text-rose-600" accent={ROSE}
           sub={metrics.valorVenda ? fmtPct(metrics.totalImpostos / metrics.valorVenda * 100) + ' da receita' : undefined} />
         <KpiCard label="Receita Líquida" value={fmtBRL(metrics.recLiq)} color="text-emerald-700" accent={EMERALD}
           delta={month !== null ? delta(metrics.recLiq, prevMetrics.recLiq) : undefined} />
+        <KpiCard label="Taxa Mercado Livre" value={fmtBRL(metrics.taxaML)} color="text-orange-600" accent={ORANGE_D}
+          sub={metrics.valorVenda ? fmtPct(metrics.taxaML / metrics.valorVenda * 100) + ' da receita' : undefined}
+          delta={month !== null ? delta(metrics.taxaML, prevMetrics.taxaML) : undefined} />
         <KpiCard label="Custo Médio"     value={fmtBRL(metrics.custo)} color="text-amber-700" accent={AMBER}
           sub={metrics.recLiq ? fmtPct(metrics.custo / metrics.recLiq * 100) + ' da Rec. Líq.' : undefined} />
         <KpiCard label="Lucro Bruto"     value={fmtBRL(metrics.lucroBruto)} color={metrics.lucroBruto >= 0 ? 'text-emerald-700' : 'text-rose-600'} accent={metrics.lucroBruto >= 0 ? EMERALD : ROSE}
