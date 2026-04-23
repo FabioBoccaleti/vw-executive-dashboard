@@ -11,6 +11,7 @@ import VPecasSeguradoraAnalise from './VPecasSeguradoraAnalise';
 import VPecasComparativo from './VPecasComparativo';
 import VPecasItemSeguradoraAnalise from './VPecasItemSeguradoraAnalise';
 import VPecasMercadoLivreAnalise from './VPecasMercadoLivreAnalise';
+import VPecasEPecasAnalise from './VPecasEPecasAnalise';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
 const MS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -218,7 +219,7 @@ export default function VPecasAnalise() {
   const [estadoExpanded, setEstadoExpanded] = useState(false);
   const [prejuizoExpanded, setPrejuizoExpanded] = useState(false);
   const [clienteExpanded, setClienteExpanded] = useState(false);
-  const [analiseTab, setAnaliseTab]                     = useState<'nfs' | 'itens' | 'seg' | 'itemSeg' | 'ml'>('nfs');
+  const [analiseTab, setAnaliseTab]                     = useState<'nfs' | 'itens' | 'seg' | 'itemSeg' | 'ml' | 'ep'>('nfs');
   const [allItemRows, setAllItemRows]                   = useState<VPecasItemRow[]>([]);
   const [itemPrejuizoDept, setItemPrejuizoDept]         = useState('Todos');
   const [itemPrejuizoExpanded, setItemPrejuizoExpanded] = useState(false);
@@ -803,6 +804,12 @@ export default function VPecasAnalise() {
           className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${analiseTab === 'ml' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
         >
           Análise Mercado Livre
+        </button>
+        <button
+          onClick={() => setAnaliseTab('ep')}
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${analiseTab === 'ep' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}
+        >
+          Análise E-Peças
         </button>
       </div>
 
@@ -1874,6 +1881,7 @@ export default function VPecasAnalise() {
       {analiseTab === 'seg' && <VPecasSeguradoraAnalise />}
       {analiseTab === 'itemSeg' && <VPecasItemSeguradoraAnalise />}
       {analiseTab === 'ml' && <VPecasMercadoLivreAnalise />}
+      {analiseTab === 'ep' && <VPecasEPecasAnalise />}
     </div>
   );
 }

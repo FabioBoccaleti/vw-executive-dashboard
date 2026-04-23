@@ -5,24 +5,25 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { kvGet } from '@/lib/kvClient';
-import { loadVPecasMLRows, loadVPecasMLDevolucaoRows } from './vPecasMercadoLivreStorage';
-import type { VPecasMLRow } from './vPecasMercadoLivreStorage';
-import { loadTaxaMLRows } from './taxaMercadoLivreStorage';
+import { loadVPecasEPecasRows, loadVPecasEPecasDevolucaoRows } from './vPecasEPecasStorage';
+import type { VPecasEPecasRow } from './vPecasEPecasStorage';
+import { loadTaxaEPecasRows } from './taxaEPecasStorage';
 
-// ─── Paleta laranja ───────────────────────────────────────────────────────────
+// ─── Paleta teal ──────────────────────────────────────────────────────────────
 const MS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const PALETTE = [
-  '#f97316','#0ea5e9','#10b981','#ef4444','#7c3aed','#f59e0b',
+  '#0d9488','#f97316','#10b981','#ef4444','#7c3aed','#f59e0b',
   '#e879f9','#84cc16','#06b6d4','#fb7185','#a78bfa','#fbbf24',
 ];
-const ORANGE   = '#f97316';
-const ORANGE_D = '#c2410c';
-const EMERALD  = '#10b981';
-const AMBER    = '#f59e0b';
-const ROSE     = '#f43f5e';
+const TEAL    = '#0d9488';
+const TEAL_D  = '#0f766e';
+const EP_RED  = '#ef4444';  // Taxa E-Peças em vermelho (igual ao ML)
+const EMERALD = '#10b981';
+const AMBER   = '#f59e0b';
+const ROSE    = '#f43f5e';
 
 // ─── Overrides ────────────────────────────────────────────────────────────────
-const OV_KEY = 'vendas_pecas_ml_vendas_ov';
+const OV_KEY = 'vendas_pecas_epecos_vendas_ov';
 interface PecasOverride { condPgto: string; taxaML: string; taxaEPecas: string; comissao: string; dsr: string; provisoes: string; }
 function emptyOv(): PecasOverride { return { condPgto: '', taxaML: '', taxaEPecas: '', comissao: '', dsr: '', provisoes: '' }; }
 async function loadOverrides(): Promise<Record<string, PecasOverride>> {
@@ -42,14 +43,14 @@ const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', cu
 const fmtBRLF = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtPct  = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
 
-function getYr(row: VPecasMLRow): number {
+function getYr(row: VPecasEPecasRow): number {
   if (row.periodoImport) { const [y] = row.periodoImport.split('-').map(Number); if (y > 2000) return y; }
   const d = row.data['DTA_DOCUMENTO'] ?? '';
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[2];
   if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[0];
   return 0;
 }
-function getMo(row: VPecasMLRow): number {
+function getMo(row: VPecasEPecasRow): number {
   if (row.periodoImport) { const [,m] = row.periodoImport.split('-').map(Number); if (m >= 1 && m <= 12) return m; }
   const d = row.data['DTA_DOCUMENTO'] ?? '';
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[1];
@@ -60,23 +61,23 @@ function getMo(row: VPecasMLRow): number {
 // ─── Cálculo por linha ────────────────────────────────────────────────────────
 interface Calc {
   valorVenda: number; icms: number; pis: number; cofins: number; difal: number;
-  taxaML: number; taxaEPecas: number; totalDeducoes: number;
+  taxaEP: number; totalDeducoes: number;
   recLiq: number; custo: number; lucroBruto: number; lucroBrutoPct: number;
   comissao: number; dsr: number; provisoes: number; resultado: number;
 }
 function calcRow(
   d: Record<string, string>,
   ov: PecasOverride,
-  autoTaxaML: number,
+  autoTaxaEP: number,
 ): Calc {
   const valorVenda    = n(d['LIQ_NOTA_FISCAL']);
   const icms          = n(d['VAL_ICMS']);
   const pis           = n(d['VAL_PIS']);
   const cofins        = n(d['VAL_COFINS']);
   const difal         = n(d['VAL_ICMS_PARTIL_UF_DEST']) + n(d['VAL_ICMS_COMB_POBREZA']);
-  const taxaML        = autoTaxaML;
-  const taxaEPecas    = n(ov.taxaEPecas);
-  const totalDeducoes = icms + pis + cofins + difal + taxaML + taxaEPecas;
+  const taxaML        = n(ov.taxaML);
+  const taxaEP        = autoTaxaEP;
+  const totalDeducoes = icms + pis + cofins + difal + taxaML + taxaEP;
   const recLiq        = valorVenda - totalDeducoes;
   const custo         = n(d['TOT_CUSTO_MEDIO']);
   const lucroBruto    = recLiq - custo;
@@ -85,31 +86,31 @@ function calcRow(
   const dsr           = n(ov.dsr);
   const provisoes     = n(ov.provisoes);
   const resultado     = lucroBruto - comissao - dsr - provisoes;
-  return { valorVenda, icms, pis, cofins, difal, taxaML, taxaEPecas, totalDeducoes, recLiq, custo, lucroBruto, lucroBrutoPct, comissao, dsr, provisoes, resultado };
+  return { valorVenda, icms, pis, cofins, difal, taxaEP, totalDeducoes, recLiq, custo, lucroBruto, lucroBrutoPct, comissao, dsr, provisoes, resultado };
 }
 
 interface Agg {
   nfs: number; valorVenda: number; icms: number; pis: number; cofins: number;
-  difal: number; taxaML: number; taxaEPecas: number; totalDeducoes: number;
+  difal: number; taxaEP: number; totalDeducoes: number;
   recLiq: number; custo: number; lucroBruto: number; lbPct: number;
   comissao: number; dsr: number; provisoes: number; resultado: number;
 }
-function aggRows(rows: VPecasMLRow[], overrides: Record<string, PecasOverride>, taxaMLLookup: Map<string, number>): Agg {
+function aggRows(rows: VPecasEPecasRow[], overrides: Record<string, PecasOverride>, taxaEPLookup: Map<string, number>): Agg {
   let nfs = 0, valorVenda = 0, icms = 0, pis = 0, cofins = 0, difal = 0,
-      taxaML = 0, taxaEPecas = 0, totalDeducoes = 0, recLiq = 0, custo = 0, lucroBruto = 0,
+      taxaEP = 0, totalDeducoes = 0, recLiq = 0, custo = 0, lucroBruto = 0,
       comissao = 0, dsr = 0, provisoes = 0, resultado = 0;
   for (const r of rows) {
-    const ov     = overrides[ovKey(r.data)] ?? emptyOv();
-    const epSum  = taxaMLLookup.get(r.data['NUMERO_NOTA_FISCAL']) ?? 0;
-    const autoML = epSum > 0 ? n(r.data['LIQ_NOTA_FISCAL']) - epSum : 0;
-    const c = calcRow(r.data, ov, autoML);
+    const ov      = overrides[ovKey(r.data)] ?? emptyOv();
+    const epSum   = taxaEPLookup.get(r.data['NUMERO_NOTA_FISCAL']) ?? 0;
+    const autoEP  = epSum > 0 ? n(r.data['LIQ_NOTA_FISCAL']) - epSum : 0;
+    const c = calcRow(r.data, ov, autoEP);
     nfs++; valorVenda += c.valorVenda; icms += c.icms; pis += c.pis; cofins += c.cofins;
-    difal += c.difal; taxaML += c.taxaML; taxaEPecas += c.taxaEPecas;
+    difal += c.difal; taxaEP += c.taxaEP;
     totalDeducoes += c.totalDeducoes; recLiq += c.recLiq; custo += c.custo;
     lucroBruto += c.lucroBruto; comissao += c.comissao; dsr += c.dsr;
     provisoes += c.provisoes; resultado += c.resultado;
   }
-  return { nfs, valorVenda, icms, pis, cofins, difal, taxaML, taxaEPecas, totalDeducoes, recLiq, custo, lucroBruto,
+  return { nfs, valorVenda, icms, pis, cofins, difal, taxaEP, totalDeducoes, recLiq, custo, lucroBruto,
     lbPct: recLiq !== 0 ? lucroBruto / recLiq * 100 : 0, comissao, dsr, provisoes, resultado };
 }
 
@@ -167,7 +168,7 @@ function TipBRL({ active, payload, label }: { active?: boolean; payload?: { name
   );
 }
 
-function TipTaxaML({ active, payload, label }: {
+function TipTaxaEP({ active, payload, label }: {
   active?: boolean;
   payload?: { name: string; value: number; payload: { valorVenda: number } }[];
   label?: string;
@@ -180,7 +181,7 @@ function TipTaxaML({ active, payload, label }: {
     <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[200px]">
       <p className="font-bold text-slate-700 mb-1.5">{label}</p>
       <div className="flex justify-between gap-4">
-        <span style={{ color: '#ef4444' }} className="font-medium">Taxa ML</span>
+        <span style={{ color: EP_RED }} className="font-medium">Taxa E-Peças</span>
         <span className="font-mono text-slate-700">{fmtBRLF(val)}</span>
       </div>
       {pct !== null && (
@@ -194,15 +195,15 @@ function TipTaxaML({ active, payload, label }: {
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
-export default function VPecasMercadoLivreAnalise() {
+export default function VPecasEPecasAnalise() {
   const curYear = new Date().getFullYear();
-  const [allRows, setAllRows]   = useState<VPecasMLRow[]>([]);
+  const [allRows, setAllRows]     = useState<VPecasEPecasRow[]>([]);
   const [overrides, setOverrides] = useState<Record<string, PecasOverride>>({});
   const [allTaxaRows, setAllTaxaRows] = useState<{ data: Record<string, string>; periodoImport?: string }[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [year, setYear]         = useState(curYear);
-  const [prevYear, setPrevYear] = useState(curYear - 1);
-  const [month, setMonth]       = useState<number | null>(new Date().getMonth() + 1);
+  const [loading, setLoading]     = useState(true);
+  const [year, setYear]           = useState(curYear);
+  const [prevYear, setPrevYear]   = useState(curYear - 1);
+  const [month, setMonth]         = useState<number | null>(new Date().getMonth() + 1);
 
   const [rankMetric, setRankMetric] = useState<'valorVenda' | 'recLiq' | 'lucroBruto' | 'nfs'>('valorVenda');
   const [rankExpanded, setRankExpanded] = useState(false);
@@ -212,7 +213,7 @@ export default function VPecasMercadoLivreAnalise() {
   const [lucroExpanded, setLucroExpanded] = useState(false);
 
   useEffect(() => {
-    Promise.all([loadVPecasMLRows(), loadVPecasMLDevolucaoRows(), loadOverrides(), loadTaxaMLRows()]).then(([rows, devol, ov, taxaRows]) => {
+    Promise.all([loadVPecasEPecasRows(), loadVPecasEPecasDevolucaoRows(), loadOverrides(), loadTaxaEPecasRows()]).then(([rows, devol, ov, taxaRows]) => {
       const all = [...rows, ...devol].filter(r => r.data['SERIE_NOTA_FISCAL'] !== 'RPS');
       setAllRows(all);
       setOverrides(ov);
@@ -232,8 +233,8 @@ export default function VPecasMercadoLivreAnalise() {
     return [...s].sort();
   }, [allRows, curYear]);
 
-  // ─── Taxa ML lookup: TITULO → soma VAL_TITULO (no período filtrado) ──────
-  const taxaMLLookup = useMemo(() => {
+  // ─── Taxa EP lookup: TITULO → soma VAL_TITULO (no período filtrado) ──────
+  const taxaEPLookup = useMemo(() => {
     const periodo = month !== null ? `${year}-${String(month).padStart(2, '0')}` : null;
     const filtered = periodo
       ? allTaxaRows.filter(r => r.periodoImport === periodo)
@@ -259,35 +260,8 @@ export default function VPecasMercadoLivreAnalise() {
     return allRows.filter(r => getYr(r) === py && getMo(r) === pm);
   }, [allRows, month, year]);
 
-  // lookup para ano todo (usada nos gráficos de evolução mensal)
-  const taxaMLLookupYear = useMemo(() => {
-    const filtered = allTaxaRows.filter(r => {
-      const p = r.periodoImport?.split('-').map(Number);
-      return p && p[0] === year;
-    });
-    const map = new Map<string, number>();
-    filtered.forEach(r => {
-      const titulo = r.data['TITULO'];
-      if (titulo) map.set(titulo, (map.get(titulo) ?? 0) + n(r.data['VAL_TITULO']));
-    });
-    return map;
-  }, [allTaxaRows, year]);
-
-  const taxaMLLookupPrevYear = useMemo(() => {
-    const filtered = allTaxaRows.filter(r => {
-      const p = r.periodoImport?.split('-').map(Number);
-      return p && p[0] === prevYear;
-    });
-    const map = new Map<string, number>();
-    filtered.forEach(r => {
-      const titulo = r.data['TITULO'];
-      if (titulo) map.set(titulo, (map.get(titulo) ?? 0) + n(r.data['VAL_TITULO']));
-    });
-    return map;
-  }, [allTaxaRows, prevYear]);
-
-  const metrics      = useMemo(() => aggRows(filteredRows, overrides, taxaMLLookup),    [filteredRows, overrides, taxaMLLookup]);
-  const prevMetrics  = useMemo(() => aggRows(prevMonthRows, overrides, taxaMLLookup),   [prevMonthRows, overrides, taxaMLLookup]);
+  const metrics     = useMemo(() => aggRows(filteredRows, overrides, taxaEPLookup),   [filteredRows, overrides, taxaEPLookup]);
+  const prevMetrics = useMemo(() => aggRows(prevMonthRows, overrides, taxaEPLookup),  [prevMonthRows, overrides, taxaEPLookup]);
   const delta = (cur: number, prev: number) => prev !== 0 ? ((cur - prev) / Math.abs(prev)) * 100 : undefined;
 
   // ─── 1. Evolução Mensal ────────────────────────────────────────────────────
@@ -307,23 +281,23 @@ export default function VPecasMercadoLivreAnalise() {
     const ap = aggRows(pr, overrides, lookupPM);
     return {
       label,
-      nfs: a.nfs, valorVenda: a.valorVenda, taxaML: a.taxaML, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct,
+      nfs: a.nfs, valorVenda: a.valorVenda, taxaEP: a.taxaEP, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct,
       prevValorVenda: ap.valorVenda, prevRecLiq: ap.recLiq, prevLucroBruto: ap.lucroBruto,
     };
   }), [yearRows, prevYearRows, overrides, allTaxaRows, year, prevYear]);
 
   // ─── 2. Ranking por Vendedor ──────────────────────────────────────────────
   const vendorData = useMemo(() => {
-    const map = new Map<string, VPecasMLRow[]>();
+    const map = new Map<string, VPecasEPecasRow[]>();
     for (const r of filteredRows) {
       const k = r.data['NOME_VENDEDOR']?.trim() || '(sem vendedor)';
       map.set(k, [...(map.get(k) ?? []), r]);
     }
     return [...map.entries()].map(([name, rows]) => {
-      const a = aggRows(rows, overrides, taxaMLLookup);
-      return { name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct, taxaML: a.taxaML };
+      const a = aggRows(rows, overrides, taxaEPLookup);
+      return { name, nfs: a.nfs, valorVenda: a.valorVenda, recLiq: a.recLiq, lucroBruto: a.lucroBruto, lbPct: a.lbPct, taxaEP: a.taxaEP };
     }).sort((a, b) => b[rankMetric] - a[rankMetric]);
-  }, [filteredRows, overrides, taxaMLLookup, rankMetric]);
+  }, [filteredRows, overrides, taxaEPLookup, rankMetric]);
 
   const vendorMax = useMemo(() => Math.max(...vendorData.map(s => s[rankMetric]), 1), [vendorData, rankMetric]);
 
@@ -362,46 +336,46 @@ export default function VPecasMercadoLivreAnalise() {
   // ─── 5. NFs com prejuízo ────────────────────────────────────────────────
   const prejData = useMemo(() => filteredRows.map(r => {
     const ov    = overrides[ovKey(r.data)] ?? emptyOv();
-    const epSum = taxaMLLookup.get(r.data['NUMERO_NOTA_FISCAL']) ?? 0;
-    const autoML = epSum > 0 ? n(r.data['LIQ_NOTA_FISCAL']) - epSum : 0;
-    const c = calcRow(r.data, ov, autoML);
+    const epSum = taxaEPLookup.get(r.data['NUMERO_NOTA_FISCAL']) ?? 0;
+    const autoEP = epSum > 0 ? n(r.data['LIQ_NOTA_FISCAL']) - epSum : 0;
+    const c = calcRow(r.data, ov, autoEP);
     return {
       nf:         r.data['NUMERO_NOTA_FISCAL']?.trim() || '—',
       serie:      r.data['SERIE_NOTA_FISCAL']?.trim() || '',
       vendedor:   r.data['NOME_VENDEDOR']?.trim() || '—',
       cliente:    r.data['NOME_CLIENTE']?.trim() || '—',
       valorVenda: c.valorVenda,
-      taxaML:     c.taxaML,
+      taxaEP:     c.taxaEP,
       recLiq:     c.recLiq,
       lucroBruto: c.lucroBruto,
       lbPct:      c.lucroBrutoPct,
     };
   }).filter(r => r.lucroBruto < 0).sort((a, b) => a.lucroBruto - b.lucroBruto),
-  [filteredRows, overrides, taxaMLLookup]);
+  [filteredRows, overrides, taxaEPLookup]);
 
   // ─── 6. NFs com lucro ────────────────────────────────────────────────────
   const lucroData = useMemo(() => filteredRows.map(r => {
     const ov    = overrides[ovKey(r.data)] ?? emptyOv();
-    const epSum = taxaMLLookup.get(r.data['NUMERO_NOTA_FISCAL']) ?? 0;
-    const autoML = epSum > 0 ? n(r.data['LIQ_NOTA_FISCAL']) - epSum : 0;
-    const c = calcRow(r.data, ov, autoML);
+    const epSum = taxaEPLookup.get(r.data['NUMERO_NOTA_FISCAL']) ?? 0;
+    const autoEP = epSum > 0 ? n(r.data['LIQ_NOTA_FISCAL']) - epSum : 0;
+    const c = calcRow(r.data, ov, autoEP);
     return {
       nf:         r.data['NUMERO_NOTA_FISCAL']?.trim() || '—',
       serie:      r.data['SERIE_NOTA_FISCAL']?.trim() || '',
       vendedor:   r.data['NOME_VENDEDOR']?.trim() || '—',
       cliente:    r.data['NOME_CLIENTE']?.trim() || '—',
       valorVenda: c.valorVenda,
-      taxaML:     c.taxaML,
+      taxaEP:     c.taxaEP,
       recLiq:     c.recLiq,
       lucroBruto: c.lucroBruto,
       lbPct:      c.lucroBrutoPct,
     };
   }).filter(r => r.lucroBruto > 0).sort((a, b) => b.lucroBruto - a.lucroBruto),
-  [filteredRows, overrides, taxaMLLookup]);
+  [filteredRows, overrides, taxaEPLookup]);
 
   // ─── 7. Análise de Risco por Vendedor ────────────────────────────────────
   const riskData = useMemo(() => {
-    const map = new Map<string, VPecasMLRow[]>();
+    const map = new Map<string, VPecasEPecasRow[]>();
     for (const r of filteredRows) {
       const k = r.data['NOME_VENDEDOR']?.trim() || '(sem vendedor)';
       map.set(k, [...(map.get(k) ?? []), r]);
@@ -409,9 +383,9 @@ export default function VPecasMercadoLivreAnalise() {
     return [...map.entries()].map(([name, rows]) => {
       const calcs = rows.map(r => {
         const ov = overrides[ovKey(r.data)] ?? emptyOv();
-        const epSum = taxaMLLookup.get(r.data['NUMERO_NOTA_FISCAL']) ?? 0;
-        const autoML = epSum > 0 ? n(r.data['LIQ_NOTA_FISCAL']) - epSum : 0;
-        return calcRow(r.data, ov, autoML);
+        const epSum = taxaEPLookup.get(r.data['NUMERO_NOTA_FISCAL']) ?? 0;
+        const autoEP = epSum > 0 ? n(r.data['LIQ_NOTA_FISCAL']) - epSum : 0;
+        return calcRow(r.data, ov, autoEP);
       });
       const total    = calcs.length;
       const withPrej = calcs.filter(c => c.lucroBruto < 0);
@@ -430,14 +404,14 @@ export default function VPecasMercadoLivreAnalise() {
         sumPrej,
       };
     }).sort((a, b) => b.pctPrej - a.pctPrej);
-  }, [filteredRows, overrides, taxaMLLookup]);
+  }, [filteredRows, overrides, taxaEPLookup]);
 
   const globalRisk = useMemo(() => {
     const allCalcs = filteredRows.map(r => {
       const ov = overrides[ovKey(r.data)] ?? emptyOv();
-      const epSum = taxaMLLookup.get(r.data['NUMERO_NOTA_FISCAL']) ?? 0;
-      const autoML = epSum > 0 ? n(r.data['LIQ_NOTA_FISCAL']) - epSum : 0;
-      return calcRow(r.data, ov, autoML);
+      const epSum = taxaEPLookup.get(r.data['NUMERO_NOTA_FISCAL']) ?? 0;
+      const autoEP = epSum > 0 ? n(r.data['LIQ_NOTA_FISCAL']) - epSum : 0;
+      return calcRow(r.data, ov, autoEP);
     });
     const total    = allCalcs.length;
     const withPrej = allCalcs.filter(c => c.lucroBruto < 0);
@@ -452,7 +426,7 @@ export default function VPecasMercadoLivreAnalise() {
       gt20: gt(20).length, pctGt20: pct(gt(20).length),
       gt25: gt(25).length, pctGt25: pct(gt(25).length),
     };
-  }, [filteredRows, overrides, taxaMLLookup]);
+  }, [filteredRows, overrides, taxaEPLookup]);
 
   if (loading) {
     return <div className="flex-1 flex items-center justify-center text-slate-300"><span className="text-sm animate-pulse">Carregando análises...</span></div>;
@@ -480,18 +454,18 @@ export default function VPecasMercadoLivreAnalise() {
           <select
             value={year}
             onChange={e => setYear(+e.target.value)}
-            className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-orange-400"
+            className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-teal-400"
           >
             {availYears.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <div className="flex items-center gap-1 flex-wrap">
-          <button onClick={() => setMonth(null)} className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all ${month === null ? 'bg-orange-500 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
+          <button onClick={() => setMonth(null)} className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all ${month === null ? 'bg-teal-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
             Ano todo
           </button>
           {MS.map((m, i) => (
             <button key={m} onClick={() => setMonth(i + 1)}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${month === i + 1 ? 'bg-orange-500 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${month === i + 1 ? 'bg-teal-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
               {m}
             </button>
           ))}
@@ -501,13 +475,13 @@ export default function VPecasMercadoLivreAnalise() {
 
       {/* ── KPI Cards ───────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-        <KpiCard label="Total de NFs"    value={metrics.nfs.toLocaleString('pt-BR')} accent={ORANGE}
+        <KpiCard label="Total de NFs"    value={metrics.nfs.toLocaleString('pt-BR')} accent={TEAL}
           delta={month !== null ? delta(metrics.nfs, prevMetrics.nfs) : undefined} />
-        <KpiCard label="Receita Bruta"   value={fmtBRL(metrics.valorVenda)} color="text-orange-700" accent={ORANGE}
+        <KpiCard label="Receita Bruta"   value={fmtBRL(metrics.valorVenda)} color="text-teal-700" accent={TEAL}
           delta={month !== null ? delta(metrics.valorVenda, prevMetrics.valorVenda) : undefined} />
-        <KpiCard label="Taxa Mercado Livre" value={fmtBRL(metrics.taxaML)} color="text-orange-600" accent={ORANGE_D}
-          sub={metrics.valorVenda ? fmtPct(metrics.taxaML / metrics.valorVenda * 100) + ' da receita' : undefined}
-          delta={month !== null ? delta(metrics.taxaML, prevMetrics.taxaML) : undefined} />
+        <KpiCard label="Taxa E-Peças"    value={fmtBRL(metrics.taxaEP)} color="text-red-600" accent={EP_RED}
+          sub={metrics.valorVenda ? fmtPct(metrics.taxaEP / metrics.valorVenda * 100) + ' da receita' : undefined}
+          delta={month !== null ? delta(metrics.taxaEP, prevMetrics.taxaEP) : undefined} />
         <KpiCard label="Total Deduções"  value={fmtBRL(metrics.totalDeducoes)} color="text-rose-600" accent={ROSE}
           sub={metrics.valorVenda ? fmtPct(metrics.totalDeducoes / metrics.valorVenda * 100) + ' da receita' : undefined} />
         <KpiCard label="Receita Líquida" value={fmtBRL(metrics.recLiq)} color="text-emerald-700" accent={EMERALD}
@@ -524,9 +498,9 @@ export default function VPecasMercadoLivreAnalise() {
         <SH right={
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 cursor-pointer select-none">
-              <input type="checkbox" checked={showPrevYear} onChange={e => { setShowPrevYear(e.target.checked); if (e.target.checked) setPrevYear(year - 1); }} className="accent-orange-500 w-3.5 h-3.5" />
+              <input type="checkbox" checked={showPrevYear} onChange={e => { setShowPrevYear(e.target.checked); if (e.target.checked) setPrevYear(year - 1); }} className="accent-teal-500 w-3.5 h-3.5" />
               Comparar com
-              <select value={prevYear} onChange={e => setPrevYear(+e.target.value)} onClick={e => e.stopPropagation()} className="border border-slate-200 rounded px-1.5 py-0.5 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-orange-300">
+              <select value={prevYear} onChange={e => setPrevYear(+e.target.value)} onClick={e => e.stopPropagation()} className="border border-slate-200 rounded px-1.5 py-0.5 text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-teal-300">
                 {availYears.filter(y => y !== year).map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </label>
@@ -539,26 +513,26 @@ export default function VPecasMercadoLivreAnalise() {
             <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => fmtBRL(v).replace('R$\u00a0', 'R$')} width={80} />
             <Tooltip content={<TipBRL />} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="valorVenda" name="Rec. Bruta" fill={ORANGE} fillOpacity={0.35} radius={[2, 2, 0, 0]} />
-            <Bar dataKey="taxaML"     name="Taxa ML"    fill="#ef4444" fillOpacity={0.9} radius={[2, 2, 0, 0]} />
-            <Bar dataKey="recLiq"     name="Rec. Líq."  fill={EMERALD} fillOpacity={0.85} radius={[2, 2, 0, 0]} />
-            <Bar dataKey="lucroBruto" name="Lucro Bruto" fill="#a78bfa" fillOpacity={0.85} radius={[2, 2, 0, 0]} />
+            <Bar dataKey="valorVenda" name="Rec. Bruta"   fill={TEAL}    fillOpacity={0.35} radius={[2, 2, 0, 0]} />
+            <Bar dataKey="taxaEP"     name="Taxa E-Peças" fill={EP_RED}  fillOpacity={0.9}  radius={[2, 2, 0, 0]} />
+            <Bar dataKey="recLiq"     name="Rec. Líq."    fill={EMERALD} fillOpacity={0.85} radius={[2, 2, 0, 0]} />
+            <Bar dataKey="lucroBruto" name="Lucro Bruto"  fill="#a78bfa" fillOpacity={0.85} radius={[2, 2, 0, 0]} />
             {showPrevYear && <Bar dataKey="prevRecLiq" name={`Rec. Líq. ${prevYear}`} fill={EMERALD} fillOpacity={0.3} radius={[2, 2, 0, 0]} />}
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* ── Taxa ML por Mês ─────────────────────────────────────────────────── */}
+      {/* ── Taxa E-Peças por Mês ─────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <SH>Taxa Mercado Livre por Mês — {year}</SH>
+        <SH>Taxa E-Peças por Mês — {year}</SH>
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="30%">
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => fmtBRL(v).replace('R$\u00a0', 'R$')} width={80} />
-            <Tooltip content={<TipTaxaML />} />
-            <Bar dataKey="taxaML" name="Taxa ML" fill="#ef4444" fillOpacity={0.9} radius={[3, 3, 0, 0]}>
-              {monthlyData.map((_, i) => <Cell key={i} fill="#ef4444" fillOpacity={month === null || month === i + 1 ? 0.9 : 0.35} />)}
+            <Tooltip content={<TipTaxaEP />} />
+            <Bar dataKey="taxaEP" name="Taxa E-Peças" fill={EP_RED} fillOpacity={0.9} radius={[3, 3, 0, 0]}>
+              {monthlyData.map((_, i) => <Cell key={i} fill={EP_RED} fillOpacity={month === null || month === i + 1 ? 0.9 : 0.35} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -571,7 +545,7 @@ export default function VPecasMercadoLivreAnalise() {
             <div className="flex gap-1">
               {(['valorVenda', 'recLiq', 'lucroBruto', 'nfs'] as const).map(m => (
                 <button key={m} onClick={() => setRankMetric(m)}
-                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all ${rankMetric === m ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-500 border-slate-200 hover:border-orange-300'}`}
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all ${rankMetric === m ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-500 border-slate-200 hover:border-teal-300'}`}
                 >
                   {rankLabel[m]}
                 </button>
@@ -583,7 +557,7 @@ export default function VPecasMercadoLivreAnalise() {
               <span>Vendedor</span>
               <span className="text-right">NFs</span>
               <span className="text-right">Rec. Bruta</span>
-              <span className="text-right">Taxa ML</span>
+              <span className="text-right">Taxa E-Peças</span>
               <span className="text-right">Rec. Líq.</span>
               <span className="text-right">Lucro Bruto</span>
               <span className="text-right">% Margem</span>
@@ -595,20 +569,20 @@ export default function VPecasMercadoLivreAnalise() {
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold text-slate-700 truncate">{v.name}</div>
                     <div className="h-1 bg-slate-100 rounded-full mt-0.5">
-                      <div className="h-full bg-orange-500 rounded-full" style={{ width: `${Math.min(100, (v[rankMetric] / vendorMax) * 100)}%` }} />
+                      <div className="h-full bg-teal-500 rounded-full" style={{ width: `${Math.min(100, (v[rankMetric] / vendorMax) * 100)}%` }} />
                     </div>
                   </div>
                 </div>
                 <span className="text-right text-xs font-mono text-slate-600">{v.nfs}</span>
                 <span className="text-right text-xs font-mono text-slate-600">{fmtBRL(v.valorVenda)}</span>
-                <span className="text-right text-xs font-mono text-orange-700 font-semibold">{fmtBRL(v.taxaML)}</span>
+                <span className="text-right text-xs font-mono text-red-600 font-semibold">{fmtBRL(v.taxaEP)}</span>
                 <span className="text-right text-xs font-mono text-emerald-700">{fmtBRL(v.recLiq)}</span>
                 <span className={`text-right text-xs font-mono font-semibold ${v.lucroBruto >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtBRL(v.lucroBruto)}</span>
                 <span className={`text-right text-xs font-mono font-semibold ${v.lbPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtPct(v.lbPct)}</span>
               </div>
             ))}
             {vendorData.length > 8 && (
-              <button onClick={() => setRankExpanded(e => !e)} className="flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-orange-500 transition-colors mt-1 px-2">
+              <button onClick={() => setRankExpanded(e => !e)} className="flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-teal-600 transition-colors mt-1 px-2">
                 {rankExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 {rankExpanded ? 'Mostrar menos' : `Mostrar mais (${vendorData.length - 8} vendedores)`}
               </button>
@@ -645,7 +619,7 @@ export default function VPecasMercadoLivreAnalise() {
           <div className="flex gap-1">
             {(['valorVenda', 'recLiq', 'lucroBruto'] as const).map(m => (
               <button key={m} onClick={() => setCmpMetric(m)}
-                className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all ${cmpMetric === m ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-500 border-slate-200 hover:border-orange-300'}`}
+                className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-all ${cmpMetric === m ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-500 border-slate-200 hover:border-teal-300'}`}
               >{cmpLabel[m]}</button>
             ))}
           </div>
@@ -664,21 +638,21 @@ export default function VPecasMercadoLivreAnalise() {
         </ResponsiveContainer>
       </div>
 
-      {/* ── Análise de Risco por Vendedor ─────────────────────────────────── */}
+      {/* ── Análise de Risco por Vendedor ────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-5">
         <SH>Análise de Risco — NFs com Prejuízo por Vendedor</SH>
 
         {/* KPI cards globais */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
           {([
-            { label: 'Total NFs',    value: globalRisk.total.toLocaleString('pt-BR'),      sub: '100% das NFs',                              color: 'text-slate-700', accent: '#94a3b8' },
-            { label: 'c/ Prejuízo', value: globalRisk.withPrej.toLocaleString('pt-BR'),   sub: fmtPct(globalRisk.pctPrej) + ' das NFs',     color: 'text-rose-700',  accent: '#f43f5e' },
-            { label: 'Soma Prejuízo',value: fmtBRL(globalRisk.sumPrej),                    sub: '',                                           color: 'text-rose-700',  accent: '#f43f5e' },
-            { label: 'Margem < −5%', value: globalRisk.gt5.toLocaleString('pt-BR'),       sub: fmtPct(globalRisk.pctGt5) + ' das NFs',      color: 'text-orange-600',accent: '#f97316' },
-            { label: 'Margem < −10%',value: globalRisk.gt10.toLocaleString('pt-BR'),      sub: fmtPct(globalRisk.pctGt10) + ' das NFs',     color: 'text-orange-700',accent: '#ea580c' },
-            { label: 'Margem < −15%',value: globalRisk.gt15.toLocaleString('pt-BR'),      sub: fmtPct(globalRisk.pctGt15) + ' das NFs',     color: 'text-red-600',   accent: '#dc2626' },
-            { label: 'Margem < −20%',value: globalRisk.gt20.toLocaleString('pt-BR'),      sub: fmtPct(globalRisk.pctGt20) + ' das NFs',     color: 'text-red-700',   accent: '#b91c1c' },
-            { label: 'Margem < −25%',value: globalRisk.gt25.toLocaleString('pt-BR'),      sub: fmtPct(globalRisk.pctGt25) + ' das NFs',     color: 'text-red-800',   accent: '#991b1b' },
+            { label: 'Total NFs',     value: globalRisk.total.toLocaleString('pt-BR'),    sub: '100% das NFs',                           color: 'text-slate-700', accent: '#94a3b8' },
+            { label: 'c/ Prejuízo',   value: globalRisk.withPrej.toLocaleString('pt-BR'), sub: fmtPct(globalRisk.pctPrej) + ' das NFs',  color: 'text-rose-700',  accent: '#f43f5e' },
+            { label: 'Soma Prejuízo', value: fmtBRL(globalRisk.sumPrej),                  sub: '',                                        color: 'text-rose-700',  accent: '#f43f5e' },
+            { label: 'Margem < −5%',  value: globalRisk.gt5.toLocaleString('pt-BR'),      sub: fmtPct(globalRisk.pctGt5) + ' das NFs',   color: 'text-orange-600',accent: '#f97316' },
+            { label: 'Margem < −10%', value: globalRisk.gt10.toLocaleString('pt-BR'),     sub: fmtPct(globalRisk.pctGt10) + ' das NFs',  color: 'text-orange-700',accent: '#ea580c' },
+            { label: 'Margem < −15%', value: globalRisk.gt15.toLocaleString('pt-BR'),     sub: fmtPct(globalRisk.pctGt15) + ' das NFs',  color: 'text-red-600',   accent: '#dc2626' },
+            { label: 'Margem < −20%', value: globalRisk.gt20.toLocaleString('pt-BR'),     sub: fmtPct(globalRisk.pctGt20) + ' das NFs',  color: 'text-red-700',   accent: '#b91c1c' },
+            { label: 'Margem < −25%', value: globalRisk.gt25.toLocaleString('pt-BR'),     sub: fmtPct(globalRisk.pctGt25) + ' das NFs',  color: 'text-red-800',   accent: '#991b1b' },
           ] as const).map(card => (
             <div key={card.label} className="rounded-lg border border-slate-100 px-3 py-2.5 flex flex-col gap-0.5" style={{ borderLeft: `3px solid ${card.accent}` }}>
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide leading-tight">{card.label}</span>
@@ -759,7 +733,7 @@ export default function VPecasMercadoLivreAnalise() {
                       <th className="text-left py-2 px-2 text-[10px] font-bold text-slate-400 uppercase">Vendedor</th>
                       <th className="text-left py-2 px-2 text-[10px] font-bold text-slate-400 uppercase">Cliente</th>
                       <th className="text-right py-2 px-2 text-[10px] font-bold text-slate-400 uppercase">Rec. Bruta</th>
-                      <th className="text-right py-2 px-2 text-[10px] font-bold text-orange-400 uppercase">Taxa ML</th>
+                      <th className="text-right py-2 px-2 text-[10px] font-bold text-red-400 uppercase">Taxa E-Peças</th>
                       <th className="text-right py-2 px-2 text-[10px] font-bold text-slate-400 uppercase">Rec. Líq.</th>
                       <th className="text-right py-2 px-2 text-[10px] font-bold text-slate-400 uppercase">Lucro Bruto</th>
                       <th className="text-right py-2 px-2 text-[10px] font-bold text-slate-400 uppercase">% Margem</th>
@@ -772,7 +746,7 @@ export default function VPecasMercadoLivreAnalise() {
                         <td className="py-1.5 px-2 text-slate-600">{r.vendedor}</td>
                         <td className="py-1.5 px-2 text-slate-500 max-w-[160px] truncate">{r.cliente}</td>
                         <td className="py-1.5 px-2 text-right font-mono text-slate-600">{fmtBRL(r.valorVenda)}</td>
-                        <td className="py-1.5 px-2 text-right font-mono text-orange-600 font-semibold">{r.taxaML > 0 ? fmtBRL(r.taxaML) : '—'}</td>
+                        <td className="py-1.5 px-2 text-right font-mono text-red-600 font-semibold">{r.taxaEP > 0 ? fmtBRL(r.taxaEP) : '—'}</td>
                         <td className="py-1.5 px-2 text-right font-mono text-slate-600">{fmtBRL(r.recLiq)}</td>
                         <td className="py-1.5 px-2 text-right font-mono font-bold text-rose-600">{fmtBRL(r.lucroBruto)}</td>
                         <td className="py-1.5 px-2 text-right font-mono font-bold text-rose-600">{fmtPct(r.lbPct)}</td>
@@ -809,7 +783,7 @@ export default function VPecasMercadoLivreAnalise() {
                       <th className="text-left py-2 px-2 text-[10px] font-bold text-slate-400 uppercase">Vendedor</th>
                       <th className="text-left py-2 px-2 text-[10px] font-bold text-slate-400 uppercase">Cliente</th>
                       <th className="text-right py-2 px-2 text-[10px] font-bold text-slate-400 uppercase">Rec. Bruta</th>
-                      <th className="text-right py-2 px-2 text-[10px] font-bold text-orange-400 uppercase">Taxa ML</th>
+                      <th className="text-right py-2 px-2 text-[10px] font-bold text-red-400 uppercase">Taxa E-Peças</th>
                       <th className="text-right py-2 px-2 text-[10px] font-bold text-slate-400 uppercase">Rec. Líq.</th>
                       <th className="text-right py-2 px-2 text-[10px] font-bold text-slate-400 uppercase">Lucro Bruto</th>
                       <th className="text-right py-2 px-2 text-[10px] font-bold text-slate-400 uppercase">% Margem</th>
@@ -822,7 +796,7 @@ export default function VPecasMercadoLivreAnalise() {
                         <td className="py-1.5 px-2 text-slate-600">{r.vendedor}</td>
                         <td className="py-1.5 px-2 text-slate-500 max-w-[160px] truncate">{r.cliente}</td>
                         <td className="py-1.5 px-2 text-right font-mono text-slate-600">{fmtBRL(r.valorVenda)}</td>
-                        <td className="py-1.5 px-2 text-right font-mono text-orange-600 font-semibold">{r.taxaML > 0 ? fmtBRL(r.taxaML) : '—'}</td>
+                        <td className="py-1.5 px-2 text-right font-mono text-red-600 font-semibold">{r.taxaEP > 0 ? fmtBRL(r.taxaEP) : '—'}</td>
                         <td className="py-1.5 px-2 text-right font-mono text-slate-600">{fmtBRL(r.recLiq)}</td>
                         <td className="py-1.5 px-2 text-right font-mono font-bold text-emerald-700">{fmtBRL(r.lucroBruto)}</td>
                         <td className="py-1.5 px-2 text-right font-mono font-bold text-emerald-700">{fmtPct(r.lbPct)}</td>
