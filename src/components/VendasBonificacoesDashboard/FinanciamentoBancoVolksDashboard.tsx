@@ -392,8 +392,22 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     const VEND_COL = 'Vendedor CDC, PPS AV, GE, SEGUROS';
     const CPF_COL  = 'CPF Vendedor CDC';
     const INC_COL  = 'Valor Incentivo Vendedor';
+
+    // Vendedores fixos que sempre aparecem na tabela Acelera
+    const FIXED_VENDEDORES: { vendedor: string; cpf: string }[] = [
+      { vendedor: 'ORLANDO CHODIN NETO',            cpf: '43543156888' },
+      { vendedor: 'DENNYS VIDAL CHODIN',             cpf: '37569777816' },
+      { vendedor: 'FABIANO DOS SANTOS MACHADO COTRIM', cpf: '31964331889' },
+    ];
+
     const rows = vendasData?.rows ?? [];
     const map = new Map<string, { cpf: string; incentivo: number }>();
+
+    // Insere os fixos primeiro (garante CPF correto e ordem)
+    for (const f of FIXED_VENDEDORES) {
+      map.set(f.vendedor, { cpf: f.cpf, incentivo: 0 });
+    }
+
     for (const row of rows) {
       const vendedor = String(row[VEND_COL] ?? '').trim();
       if (!vendedor) continue;
@@ -1506,26 +1520,55 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                         </tr>
                       </thead>
                       <tbody>
-                        {aceleraRows.map((row, idx) => (
-                          <tr key={row.vendedor} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                            <td className="px-3 py-2 text-slate-400 border-r border-slate-100 font-mono text-center">{idx + 1}</td>
-                            <td className="px-3 py-2 text-slate-800 font-medium border-r border-slate-100 whitespace-nowrap">{row.vendedor}</td>
-                            <td className="px-3 py-2 text-slate-600 border-r border-slate-100 whitespace-nowrap font-mono">{row.cpf || '—'}</td>
-                            <td className="px-3 py-2 text-slate-700 border-r border-slate-100 text-right whitespace-nowrap">
-                              {row.incentivo !== 0 ? `R$ ${fmtBRL(row.incentivo)}` : '—'}
-                            </td>
-                            <td className="px-2 py-1.5 border-r border-slate-100 text-center">
-                              <input
-                                type="text"
-                                value={aceleraGarantido[row.vendedor] ?? ''}
-                                onChange={e => handleGarantidoChange(row.vendedor, e.target.value)}
-                                placeholder="0,00%"
-                                className="w-full border border-slate-300 rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-amber-300 bg-amber-50 placeholder:text-slate-300"
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-center text-slate-300">—</td>
-                          </tr>
-                        ))}
+                        {(() => {
+                          // Pré-calcula totais para o % Acelera proporcional
+                          const totalIncentivo = aceleraRows.reduce((acc, r) => acc + r.incentivo, 0);
+                          const totalGarantidoPct = aceleraRows.reduce((acc, r) => {
+                            const raw = (aceleraGarantido[r.vendedor] ?? '').replace('%', '').replace(',', '.').trim();
+                            const n = parseFloat(raw);
+                            return acc + (isNaN(n) ? 0 : n);
+                          }, 0);
+                          const pctRestante = Math.max(0, 100 - totalGarantidoPct);
+
+                          return aceleraRows.map((row, idx) => {
+                            const garantidoRaw = (aceleraGarantido[row.vendedor] ?? '').trim();
+                            const temGarantido = garantidoRaw !== '' && garantidoRaw !== '0' && garantidoRaw !== '0%';
+
+                            // % Acelera: se tem garantido → usa garantido; se tem incentivo → proporcional; senão → —
+                            let pctAcelera: string | null = null;
+                            if (temGarantido) {
+                              pctAcelera = garantidoRaw;
+                            } else if (row.incentivo !== 0 && totalIncentivo !== 0) {
+                              const proporcional = (row.incentivo / totalIncentivo) * pctRestante;
+                              pctAcelera = proporcional.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+                            }
+
+                            return (
+                              <tr key={row.vendedor} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                                <td className="px-3 py-2 text-slate-400 border-r border-slate-100 font-mono text-center">{idx + 1}</td>
+                                <td className="px-3 py-2 text-slate-800 font-medium border-r border-slate-100 whitespace-nowrap">{row.vendedor}</td>
+                                <td className="px-3 py-2 text-slate-600 border-r border-slate-100 whitespace-nowrap font-mono">{row.cpf || '—'}</td>
+                                <td className="px-3 py-2 text-slate-700 border-r border-slate-100 text-right whitespace-nowrap">
+                                  {row.incentivo !== 0 ? `R$ ${fmtBRL(row.incentivo)}` : '—'}
+                                </td>
+                                <td className="px-2 py-1.5 border-r border-slate-100 text-center">
+                                  <input
+                                    type="text"
+                                    value={aceleraGarantido[row.vendedor] ?? ''}
+                                    onChange={e => handleGarantidoChange(row.vendedor, e.target.value)}
+                                    placeholder="0,00%"
+                                    className="w-full border border-slate-300 rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-amber-300 bg-amber-50 placeholder:text-slate-300"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-center text-slate-700">
+                                  {pctAcelera
+                                    ? pctAcelera
+                                    : <span className="text-slate-300">—</span>}
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
                       </tbody>
                       <tfoot className="sticky bottom-0 z-10">
                         <tr className="bg-amber-800 text-white font-bold">
@@ -1534,8 +1577,32 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                           <td className="px-3 py-2.5 border-r border-amber-700 text-right">
                             R$ {fmtBRL(aceleraRows.reduce((acc, r) => acc + r.incentivo, 0))}
                           </td>
-                          <td className="px-3 py-2.5 border-r border-amber-700" />
-                          <td className="px-3 py-2.5" />
+                          <td className="px-3 py-2.5 border-r border-amber-700 text-center">
+                            {(() => {
+                              const total = aceleraRows.reduce((acc, r) => {
+                                const raw = (aceleraGarantido[r.vendedor] ?? '').replace('%', '').replace(',', '.').trim();
+                                const n = parseFloat(raw);
+                                return acc + (isNaN(n) ? 0 : n);
+                              }, 0);
+                              return total !== 0 ? `${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : '—';
+                            })()}
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            {(() => {
+                              // Total % Acelera = soma dos garantidos + soma dos proporcionais = sempre 100% (quando há dados)
+                              const totalIncentivo = aceleraRows.reduce((acc, r) => acc + r.incentivo, 0);
+                              const totalGarantidoPct = aceleraRows.reduce((acc, r) => {
+                                const raw = (aceleraGarantido[r.vendedor] ?? '').replace('%', '').replace(',', '.').trim();
+                                const n = parseFloat(raw);
+                                return acc + (isNaN(n) ? 0 : n);
+                              }, 0);
+                              const pctRestante = Math.max(0, 100 - totalGarantidoPct);
+                              const temIncentivo = aceleraRows.some(r => r.incentivo !== 0);
+                              if (totalGarantidoPct === 0 && !temIncentivo) return '—';
+                              const totalAcelera = totalGarantidoPct + (totalIncentivo > 0 ? pctRestante : 0);
+                              return `${totalAcelera.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+                            })()}
+                          </td>
                         </tr>
                       </tfoot>
                     </table>
