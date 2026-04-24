@@ -3,54 +3,45 @@ import { Upload, FileText, Printer, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
+import { kvGet, kvSet, kvDelete } from '@/lib/kvClient';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
   import.meta.url,
 ).href;
 
-// ─── IndexedDB helpers ────────────────────────────────────────────────────────
-const DB_NAME  = 'manual_relatorios_db';
-const DB_STORE = 'manual';
-const DB_KEY   = 'pdf_data';
+// ─── KV helpers (compartilhado entre todos os usuários via Redis em produção) ─
+const KV_KEY = 'manual_relatorios:pdf';
 
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(DB_STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror   = () => reject(req.error);
-  });
+interface StoredManual { base64: string; fileName: string; }
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
 }
 
-async function savePDFToIDB(data: ArrayBuffer, fileName: string): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).put({ data, fileName }, DB_KEY);
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror    = () => { db.close(); reject(tx.error); };
-  });
+function base64ToArrayBuffer(b64: string): ArrayBuffer {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
 }
 
-async function loadPDFFromIDB(): Promise<{ data: ArrayBuffer; fileName: string } | null> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx  = db.transaction(DB_STORE, 'readonly');
-    const req = tx.objectStore(DB_STORE).get(DB_KEY);
-    req.onsuccess = () => { db.close(); resolve(req.result ?? null); };
-    req.onerror   = () => { db.close(); reject(req.error); };
-  });
+async function saveManualToKV(data: ArrayBuffer, fileName: string): Promise<void> {
+  const base64 = arrayBufferToBase64(data);
+  await kvSet(KV_KEY, { base64, fileName } satisfies StoredManual);
 }
 
-async function deletePDFFromIDB(): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).delete(DB_KEY);
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror    = () => { db.close(); reject(tx.error); };
-  });
+async function loadManualFromKV(): Promise<{ data: ArrayBuffer; fileName: string } | null> {
+  const stored = await kvGet<StoredManual>(KV_KEY);
+  if (!stored?.base64) return null;
+  return { data: base64ToArrayBuffer(stored.base64), fileName: stored.fileName };
+}
+
+async function deleteManualFromKV(): Promise<void> {
+  await kvDelete(KV_KEY);
 }
 
 // ─── Renderiza cada página do PDF como data URL JPEG ─────────────────────────
@@ -86,20 +77,19 @@ export function ManualRelatoriosPage() {
   const [loading, setLoading]             = useState(false);
   const [loadingMsg, setLoadingMsg]       = useState('Carregando...');
 
-  // Carrega do IndexedDB ao montar
+  // Carrega do KV (compartilhado entre todos os usuários) ao montar
   useEffect(() => {
     (async () => {
       try {
-        const stored = await loadPDFFromIDB();
+        const stored = await loadManualFromKV();
         if (!stored) return;
         setLoading(true);
         setLoadingMsg('Carregando manual salvo...');
-        // Passa cópia para renderPDF evitar detachment do buffer armazenado
         const pages = await renderPDF(stored.data.slice(0), setLoadingMsg);
         setFileName(stored.fileName);
         setRenderedPages(pages);
       } catch (err) {
-        console.error('[ManualRelatorios] Erro ao carregar IDB:', err);
+        console.error('[ManualRelatorios] Erro ao carregar manual:', err);
       } finally {
         setLoading(false);
       }
@@ -118,8 +108,8 @@ export function ManualRelatoriosPage() {
     setRenderedPages([]);
     try {
       const arrayBuffer = await file.arrayBuffer();
-      // Salva no IDB antes de renderizar (pdfjs pode detach o buffer)
-      await savePDFToIDB(arrayBuffer.slice(0), file.name);
+      // Salva no KV (compartilhado) antes de renderizar
+      await saveManualToKV(arrayBuffer.slice(0), file.name);
       const pages = await renderPDF(arrayBuffer.slice(0), setLoadingMsg);
       setFileName(file.name);
       setRenderedPages(pages);
@@ -134,7 +124,7 @@ export function ManualRelatoriosPage() {
   }
 
   async function handleClear() {
-    await deletePDFFromIDB();
+    await deleteManualFromKV();
     setRenderedPages([]);
     setFileName(null);
     toast.success('Manual removido.');
