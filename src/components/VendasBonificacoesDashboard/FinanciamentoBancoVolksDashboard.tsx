@@ -304,10 +304,10 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       return `<tr class="${isEven ? 'row-even' : 'row-odd'}">
         <td class="col-num" style="color:${numColor};font-weight:700">${idx + 1}</td>
         <td class="col-nome" style="font-weight:600;color:#1e293b">${row.vendedor}</td>
-        <td class="col-cpf" style="color:#475569;font-family:'Courier New',monospace;font-size:9px">${row.cpf || '—'}</td>
+        <td class="col-cpf" style="color:#475569;font-weight:600">${row.cpf || '—'}</td>
         <td class="col-inc" style="text-align:right;color:${row.incentivo !== 0 ? '#1e293b' : '#cbd5e1'}">${row.incentivo !== 0 ? 'R$&nbsp;' + fmtBRL(row.incentivo) : '—'}</td>
         <td class="col-pct" style="text-align:center;color:${hasGar ? '#b45309' : '#cbd5e1'};font-weight:${hasGar ? '700' : '400'}">${(aceleraGarantido[row.vendedor] ?? '').trim() || '—'}</td>
-        <td class="col-pct" style="text-align:center;color:${pctAcelera !== '—' ? '#0f766e' : '#cbd5e1'};font-weight:${pctAcelera !== '—' ? '700' : '400'}">${pctAcelera}</td>
+        <td class="col-pct" style="text-align:center;color:${pctAcelera !== '—' ? '#0f766e' : '#cbd5e1'};font-weight:700">${pctAcelera}</td>
       </tr>`;
     }).join('');
 
