@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, Trash2, FileSpreadsheet, BarChart2, ClipboardList, Pencil, X, Percent, Printer } from 'lucide-react';
+import { Upload, Trash2, FileSpreadsheet, BarChart2, ClipboardList, Pencil, X, Percent, Printer, Zap } from 'lucide-react';
+import { kvGet, kvSet } from '@/lib/kvClient';
 import {
   getFinanciamentoMes,
   setFinanciamentoMes,
@@ -163,7 +164,7 @@ function fmtBRL(n: number): string {
   return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 type ActiveSection = 'vendas' | 'cadastro';
-type VendasSubTab = 'importar' | 'vendas';
+type VendasSubTab = 'importar' | 'vendas' | 'acelera';
 type CadastroSection = 'remuneracao-produto';
 
 interface Props {
@@ -206,6 +207,10 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   const [vendasMonthsChecking, setVendasMonthsChecking] = useState(false);
   type VendasInnerTab = 'tabela' | 'resumo-novos' | 'resumo-usados' | 'resumo-total' | 'demonstrativo';
   const [vendasInnerTab, setVendasInnerTab] = useState<VendasInnerTab>('tabela');
+
+  // ── Aba Acelera ──
+  const [aceleraGarantido, setAceleraGarantido] = useState<Record<string, string>>({});
+  const [aceleraGarantidoLoading, setAceleraGarantidoLoading] = useState(false);
 
   const loadMes = useCallback(async () => {
     setLoading(true);
@@ -257,6 +262,21 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     setRegrasLoading(true);
     loadRemuneracaoRegras().then(r => setRegras(r)).finally(() => setRegrasLoading(false));
   }, []);
+
+  // Carrega % Garantido do KV ao entrar na aba Acelera ou mudar mês/ano
+  useEffect(() => {
+    if (vendasSubTab !== 'acelera') return;
+    setAceleraGarantidoLoading(true);
+    kvGet<Record<string, string>>(`financiamento:acelera:garantido:${vendasYear}:${vendasMonth}`)
+      .then(d => setAceleraGarantido(d ?? {}))
+      .finally(() => setAceleraGarantidoLoading(false));
+  }, [vendasSubTab, vendasYear, vendasMonth]);
+
+  async function handleGarantidoChange(vendedor: string, value: string) {
+    const next = { ...aceleraGarantido, [vendedor]: value };
+    setAceleraGarantido(next);
+    await kvSet(`financiamento:acelera:garantido:${vendasYear}:${vendasMonth}`, next);
+  }
 
   async function handleSalvarRegra() {
     if (!regraForm.produto.trim()) { setRegraError('Informe o nome do produto.'); return; }
@@ -367,6 +387,27 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     ? new Date(mesData.importedAt).toLocaleString('pt-BR')
     : null;
 
+  // ── Rows agrupados para a aba Acelera ──
+  const aceleraRows = useMemo(() => {
+    const VEND_COL = 'Vendedor CDC, PPS AV, GE, SEGUROS';
+    const CPF_COL  = 'CPF Vendedor CDC';
+    const INC_COL  = 'Valor Incentivo Vendedor';
+    const rows = vendasData?.rows ?? [];
+    const map = new Map<string, { cpf: string; incentivo: number }>();
+    for (const row of rows) {
+      const vendedor = String(row[VEND_COL] ?? '').trim();
+      if (!vendedor) continue;
+      if (!map.has(vendedor)) {
+        map.set(vendedor, {
+          cpf: String(row[CPF_COL] ?? '').trim(),
+          incentivo: 0,
+        });
+      }
+      map.get(vendedor)!.incentivo += parseNum(row[INC_COL]);
+    }
+    return [...map.entries()].map(([vendedor, d]) => ({ vendedor, cpf: d.cpf, incentivo: d.incentivo }));
+  }, [vendasData]);
+
   // ── Totais da aba Vendas ──
   const vendasTotals = useMemo<Record<string, string>>(() => {
     if (!vendasData) return {};
@@ -457,6 +498,17 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
           >
             <BarChart2 className="w-4 h-4" />
             Vendas de Financiamento e Produtos
+          </button>
+          <button
+            onClick={() => setVendasSubTab('acelera')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              vendasSubTab === 'acelera'
+                ? 'border-amber-500 text-amber-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            <Zap className="w-4 h-4" />
+            Acelera
           </button>
         </div>
       )}
@@ -614,7 +666,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       )}
 
       {/* ── SEÇÃO: Vendas / Vendas de Financiamento e Produtos ── */}
-      {activeSection === 'vendas' && vendasSubTab === 'vendas' && (
+      {activeSection === 'vendas' && (vendasSubTab === 'vendas' || vendasSubTab === 'acelera') && (
         <>
           {/* Barra de filtros (ano + meses) */}
           <div className="print-hidden bg-white border-b border-slate-200 px-6 py-2 flex items-center gap-3 flex-wrap shrink-0">
@@ -658,6 +710,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             )}
           </div>
 
+          {vendasSubTab === 'vendas' && <>
           {/* Sub-abas internas */}
           <div className="print-hidden bg-white border-b border-slate-200 px-6 flex items-end gap-1 shrink-0">
             {(['tabela', 'resumo-novos', 'resumo-usados', 'resumo-total', 'demonstrativo'] as const).map(tab => {
@@ -1409,6 +1462,89 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             })()}
 
           </div>
+          </>}
+
+          {/* ── ABA ACELERA ── */}
+          {vendasSubTab === 'acelera' && (
+            <div className="flex-1 p-6 overflow-auto">
+              {aceleraGarantidoLoading || vendasLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
+                </div>
+              ) : aceleraRows.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-64 gap-3">
+                  <div className="p-5 rounded-full bg-amber-50">
+                    <Zap className="w-12 h-12 text-amber-300" />
+                  </div>
+                  <p className="text-slate-500 text-sm font-medium">
+                    {vendasMonthsWithData.size === 0
+                      ? 'Nenhum arquivo importado para este ano. Importe os dados na aba Importar Dados.'
+                      : 'Nenhum dado disponível para o mês selecionado.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-amber-500" />
+                      <p className="text-sm font-semibold text-slate-700">
+                        Acelera — {MONTHS[vendasMonth - 1]}/{vendasYear}
+                      </p>
+                    </div>
+                    <span className="text-xs text-slate-400">{aceleraRows.length} vendedor(es)</span>
+                  </div>
+                  <div className="overflow-auto max-h-[calc(100vh-300px)]">
+                    <table className="w-full text-xs border-collapse">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-amber-600 text-white">
+                          <th className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-amber-500 w-10">#</th>
+                          <th className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-amber-500">Nome Vendedor</th>
+                          <th className="px-3 py-2.5 text-left font-semibold whitespace-nowrap border-r border-amber-500">CPF Vendedor</th>
+                          <th className="px-3 py-2.5 text-right font-semibold whitespace-nowrap border-r border-amber-500">Valor Incentivo Vendedor</th>
+                          <th className="px-3 py-2.5 text-center font-semibold whitespace-nowrap border-r border-amber-500 w-32">% Garantido</th>
+                          <th className="px-3 py-2.5 text-center font-semibold whitespace-nowrap w-28">% Acelera</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {aceleraRows.map((row, idx) => (
+                          <tr key={row.vendedor} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                            <td className="px-3 py-2 text-slate-400 border-r border-slate-100 font-mono text-center">{idx + 1}</td>
+                            <td className="px-3 py-2 text-slate-800 font-medium border-r border-slate-100 whitespace-nowrap">{row.vendedor}</td>
+                            <td className="px-3 py-2 text-slate-600 border-r border-slate-100 whitespace-nowrap font-mono">{row.cpf || '—'}</td>
+                            <td className="px-3 py-2 text-slate-700 border-r border-slate-100 text-right whitespace-nowrap">
+                              {row.incentivo !== 0 ? `R$ ${fmtBRL(row.incentivo)}` : '—'}
+                            </td>
+                            <td className="px-2 py-1.5 border-r border-slate-100 text-center">
+                              <input
+                                type="text"
+                                value={aceleraGarantido[row.vendedor] ?? ''}
+                                onChange={e => handleGarantidoChange(row.vendedor, e.target.value)}
+                                placeholder="0,00%"
+                                className="w-full border border-slate-300 rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-amber-300 bg-amber-50 placeholder:text-slate-300"
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-center text-slate-300">—</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="sticky bottom-0 z-10">
+                        <tr className="bg-amber-800 text-white font-bold">
+                          <td className="px-3 py-2.5 border-r border-amber-700 text-center">{aceleraRows.length}</td>
+                          <td className="px-3 py-2.5 border-r border-amber-700" colSpan={2}>Total</td>
+                          <td className="px-3 py-2.5 border-r border-amber-700 text-right">
+                            R$ {fmtBRL(aceleraRows.reduce((acc, r) => acc + r.incentivo, 0))}
+                          </td>
+                          <td className="px-3 py-2.5 border-r border-amber-700" />
+                          <td className="px-3 py-2.5" />
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
         </>
       )}
 
