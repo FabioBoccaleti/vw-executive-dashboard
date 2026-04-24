@@ -278,6 +278,163 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     await kvSet(`financiamento:acelera:garantido:${vendasYear}:${vendasMonth}`, next);
   }
 
+  function handlePrintAcelera() {
+    const totalIncentivo = aceleraRows.reduce((acc, r) => acc + r.incentivo, 0);
+    const totalGarantidoPct = aceleraRows.reduce((acc, r) => {
+      const raw = (aceleraGarantido[r.vendedor] ?? '').replace('%', '').replace(',', '.').trim();
+      const n = parseFloat(raw);
+      return acc + (isNaN(n) ? 0 : n);
+    }, 0);
+    const pctRestante = Math.max(0, 100 - totalGarantidoPct);
+
+    const rows = aceleraRows.map((row, idx) => {
+      const garantidoRaw = (aceleraGarantido[row.vendedor] ?? '').trim();
+      const temGarantido = garantidoRaw !== '' && garantidoRaw !== '0' && garantidoRaw !== '0%';
+      let pctAcelera = '—';
+      if (temGarantido) {
+        pctAcelera = garantidoRaw;
+      } else if (row.incentivo !== 0 && totalIncentivo !== 0) {
+        const prop = (row.incentivo / totalIncentivo) * pctRestante;
+        pctAcelera = prop.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+      }
+      const isEven = idx % 2 === 0;
+      const rowBg   = isEven ? '#ffffff' : '#fffbeb';
+      const numColor = '#d97706';
+      const hasGar  = temGarantido;
+      return `<tr class="${isEven ? 'row-even' : 'row-odd'}">
+        <td class="col-num" style="color:${numColor};font-weight:700">${idx + 1}</td>
+        <td class="col-nome" style="font-weight:600;color:#1e293b">${row.vendedor}</td>
+        <td class="col-cpf" style="color:#475569;font-family:'Courier New',monospace;font-size:9px">${row.cpf || '—'}</td>
+        <td class="col-inc" style="text-align:right;color:${row.incentivo !== 0 ? '#1e293b' : '#cbd5e1'}">${row.incentivo !== 0 ? 'R$&nbsp;' + fmtBRL(row.incentivo) : '—'}</td>
+        <td class="col-pct" style="text-align:center;color:${hasGar ? '#b45309' : '#cbd5e1'};font-weight:${hasGar ? '700' : '400'}">${(aceleraGarantido[row.vendedor] ?? '').trim() || '—'}</td>
+        <td class="col-pct" style="text-align:center;color:${pctAcelera !== '—' ? '#0f766e' : '#cbd5e1'};font-weight:${pctAcelera !== '—' ? '700' : '400'}">${pctAcelera}</td>
+      </tr>`;
+    }).join('');
+
+    const totalAcelaraDisp = (() => {
+      const temIncentivo = aceleraRows.some(r => r.incentivo !== 0);
+      if (totalGarantidoPct === 0 && !temIncentivo) return '—';
+      return (totalGarantidoPct + (totalIncentivo > 0 ? pctRestante : 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+    })();
+
+    const totalGarantidoDisp = totalGarantidoPct !== 0
+      ? totalGarantidoPct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
+      : '—';
+
+    const now = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Acelera — ${MONTHS[vendasMonth - 1]}/${vendasYear}</title>
+  <style>
+    @page { size: A4 portrait; margin: 14mm 12mm 12mm; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .no-print { display: none; }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Arial', sans-serif; font-size: 10px; color: #1e293b; background: #fff; }
+
+    /* Cabeçalho */
+    .header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid #d97706; }
+    .header-left h1 { font-size: 20px; font-weight: 800; color: #b45309; letter-spacing: -0.5px; line-height: 1; }
+    .header-left .mes { font-size: 11px; color: #64748b; margin-top: 3px; font-weight: 500; }
+    .header-right { text-align: right; font-size: 9px; color: #94a3b8; line-height: 1.6; }
+    .header-right .empresa { font-size: 11px; font-weight: 700; color: #334155; }
+
+    /* Tabela */
+    table { width: 100%; border-collapse: separate; border-spacing: 0; border-radius: 6px; overflow: hidden; border: 1px solid #e2e8f0; }
+    thead tr { background: #d97706; color: #fff; }
+    th { padding: 7px 8px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; border-right: 1px solid #b45309; }
+    th:last-child { border-right: none; }
+
+    tbody tr { border-bottom: 1px solid #f1f5f9; }
+    tbody tr.row-even { background: #ffffff; }
+    tbody tr.row-odd  { background: #fffbeb; }
+    tbody tr:last-child { border-bottom: none; }
+    td { padding: 7px 8px; border-right: 1px solid #f1f5f9; vertical-align: middle; line-height: 1.3; }
+    td:last-child { border-right: none; }
+
+    /* Linha separadora visual a cada 5 linhas */
+    tbody tr:nth-child(5n) td { border-bottom: 1.5px solid #e2e8f0; }
+
+    tfoot tr { background: #92400e; color: #fff; }
+    tfoot td { padding: 7px 8px; font-size: 10px; font-weight: 700; border-right: 1px solid #78350f; }
+    tfoot td:last-child { border-right: none; }
+
+    /* Larguras */
+    .col-num  { width: 26px; text-align: center; }
+    .col-nome { }
+    .col-cpf  { width: 92px; }
+    .col-inc  { width: 100px; }
+    .col-pct  { width: 62px; }
+
+    /* Rodapé da página */
+    .footer { margin-top: 12px; display: flex; justify-content: space-between; font-size: 8.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+    .badge { display: inline-block; background: #fef3c7; color: #b45309; border: 1px solid #fde68a; border-radius: 99px; padding: 1px 8px; font-size: 8px; font-weight: 700; letter-spacing: 0.05em; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1>Acelera</h1>
+      <p class="mes">${MONTHS[vendasMonth - 1]} / ${vendasYear} &nbsp;·&nbsp; <span class="badge">${aceleraRows.length} vendedor(es)</span></p>
+    </div>
+    <div class="header-right">
+      <p class="empresa">Sorana VW</p>
+      <p>Financiamento Banco Volks</p>
+      <p>Emitido em ${now}</p>
+    </div>
+  </div>
+
+  <table>
+    <colgroup>
+      <col class="col-num"/>
+      <col class="col-nome"/>
+      <col class="col-cpf"/>
+      <col class="col-inc"/>
+      <col class="col-pct"/>
+      <col class="col-pct"/>
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="col-num">#</th>
+        <th class="col-nome" style="text-align:left">Nome Vendedor</th>
+        <th class="col-cpf" style="text-align:left">CPF Vendedor</th>
+        <th class="col-inc" style="text-align:right">Valor Incentivo</th>
+        <th class="col-pct" style="text-align:center">% Garantido</th>
+        <th class="col-pct" style="text-align:center">% Acelera</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+    <tfoot>
+      <tr>
+        <td class="col-num" style="text-align:center">${aceleraRows.length}</td>
+        <td colspan="2">Total Geral</td>
+        <td class="col-inc" style="text-align:right">R$&nbsp;${fmtBRL(totalIncentivo)}</td>
+        <td class="col-pct" style="text-align:center">${totalGarantidoDisp}</td>
+        <td class="col-pct" style="text-align:center">${totalAcelaraDisp}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="footer">
+    <span>Acelera — ${MONTHS[vendasMonth - 1]}/${vendasYear}</span>
+    <span>Sorana VW · Financiamento Banco Volks</span>
+  </div>
+
+  <script>
+    window.onload = function() { setTimeout(function() { window.print(); }, 350); };
+  </script>
+</body>
+</html>`);
+    win.document.close();
+  }
+
   async function handleSalvarRegra() {
     if (!regraForm.produto.trim()) { setRegraError('Informe o nome do produto.'); return; }
     if (!regraForm.valorPremio.trim()) { setRegraError('Informe o valor do prêmio.'); return; }
@@ -1505,7 +1662,16 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                         Acelera — {MONTHS[vendasMonth - 1]}/{vendasYear}
                       </p>
                     </div>
-                    <span className="text-xs text-slate-400">{aceleraRows.length} vendedor(es)</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-slate-400">{aceleraRows.length} vendedor(es)</span>
+                      <button
+                        onClick={handlePrintAcelera}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        Imprimir
+                      </button>
+                    </div>
                   </div>
                   <div className="overflow-auto max-h-[calc(100vh-300px)]">
                     <table className="w-full text-xs border-collapse">
