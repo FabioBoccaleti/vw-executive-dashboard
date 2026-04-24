@@ -9,6 +9,7 @@ import { PeliculasDashboard } from '@/components/VendasBonificacoesDashboard/Pel
 import { EsteticaDashboard } from '@/components/VendasBonificacoesDashboard/EsteticaDashboard'
 import { ImportarPDFPage } from '@/components/VendasBonificacoesDashboard/ImportarPDFPage'
 import { FinanciamentoBancoVolksDashboard } from '@/components/VendasBonificacoesDashboard/FinanciamentoBancoVolksDashboard'
+import { VPecasCondicaoPagamentoDashboard } from '@/components/VendasBonificacoesDashboard/VPecasCondicaoPagamentoDashboard'
 import { FolhaSelectionPage } from '@/components/FolhaPagamentoDashboard/FolhaSelectionPage'
 import { SalariosFixosDashboard } from '@/components/FolhaPagamentoDashboard/SalariosFixosDashboard'
 import { CadastrosPage } from '@/components/CadastrosPage'
@@ -30,7 +31,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<'app' | 'admin' | 'cadastros'>(() =>
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
-  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks'>('selection')
+  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento'>('selection')
   const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo'>('selection')
   const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica'>('blindagem')
   
@@ -246,6 +247,10 @@ function AppContent() {
           />
         ) : vendasSubPage === 'financiamento-banco-volks' ? (
           <FinanciamentoBancoVolksDashboard
+            onBack={() => setVendasSubPage('selection')}
+          />
+        ) : vendasSubPage === 'vpecas-condicao-pagamento' ? (
+          <VPecasCondicaoPagamentoDashboard
             onBack={() => setVendasSubPage('selection')}
           />
         ) : (

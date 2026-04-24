@@ -187,6 +187,28 @@ function CustomTooltipMensal({ active, payload, label }: { active?: boolean; pay
   );
 }
 
+function CustomTooltipProduto({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; payload: { lucro: number; pctLucro: number } }[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-4 py-3 text-sm min-w-[240px]">
+      <p className="font-semibold text-slate-700 mb-2">Produto: {label}</p>
+      <p className="font-mono flex justify-between gap-4">
+        <span className="text-slate-600">Receita Líquida :</span>
+        <span className="text-slate-800">{fmtBRLFull(payload[0].value)}</span>
+      </p>
+      <p className="font-mono flex justify-between gap-4 mt-1">
+        <span className="text-emerald-600">Lucro Bruto :</span>
+        <span className="text-emerald-700">{fmtBRLFull(d.lucro)}</span>
+      </p>
+      <p className="font-mono flex justify-between gap-4 text-xs opacity-80">
+        <span className="text-emerald-500">% Lucro Bruto :</span>
+        <span className="text-emerald-600">{fmtPct(d.pctLucro)}</span>
+      </p>
+    </div>
+  );
+}
+
 type PeriodType = 'mes' | 'bimestre' | 'trimestre' | 'semestre' | 'anual';
 interface PeriodSlot { year: number; tipo: PeriodType; value: number; vendedor: string; }
 
@@ -312,14 +334,14 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
 
   // Receita Líquida por produto (para gráfico de barras no modo mês)
   const produtoReceitaData = useMemo(() => {
-    const map = new Map<string, { rl: number; qtd: number }>();
+    const map = new Map<string, { rl: number; qtd: number; lucro: number }>();
     filteredRows.forEach(r => {
       const key = r.produto || 'Não informado';
-      const cur = map.get(key) || { rl: 0, qtd: 0 };
-      map.set(key, { rl: cur.rl + n(r.receitaLiquida), qtd: cur.qtd + 1 });
+      const cur = map.get(key) || { rl: 0, qtd: 0, lucro: 0 };
+      map.set(key, { rl: cur.rl + n(r.receitaLiquida), qtd: cur.qtd + 1, lucro: cur.lucro + n(r.lucroBruto) });
     });
     return [...map.entries()]
-      .map(([name, v]) => ({ name, rl: v.rl, qtd: v.qtd }))
+      .map(([name, v]) => ({ name, rl: v.rl, qtd: v.qtd, lucro: v.lucro, pctLucro: v.rl > 0 ? (v.lucro / v.rl) * 100 : 0 }))
       .sort((a, b) => b.rl - a.rl);
   }, [filteredRows]);
 
@@ -736,10 +758,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                     <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
-                    <Tooltip
-                      formatter={(value: number, name: string) => [fmtBRLFull(value), name]}
-                      labelFormatter={label => `Produto: ${label}`}
-                    />
+                    <Tooltip content={<CustomTooltipProduto />} />
                     <Bar
                       dataKey="rl"
                       name="Receita Líquida"
@@ -806,10 +825,7 @@ export function PeliculasAnalise({ rows }: PeliculasAnaliseProps) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10 }} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
-                <Tooltip
-                  formatter={(value: number, name: string) => [fmtBRLFull(value), name]}
-                  labelFormatter={label => `Produto: ${label}`}
-                />
+                <Tooltip content={<CustomTooltipProduto />} />
                 <Bar
                   dataKey="rl"
                   name="Receita Líquida"

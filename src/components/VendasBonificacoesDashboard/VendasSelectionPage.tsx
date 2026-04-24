@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Layers, Car, X, Lock, Sparkles, Banknote } from 'lucide-react';
+import { Shield, Layers, Car, X, Lock, Sparkles, Banknote, Wrench } from 'lucide-react';
 import { useAuth } from '@/contexts/useAuth';
 import type { VendasSubModuleId } from '@/lib/authTypes';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
@@ -12,7 +12,7 @@ const PELICULAS_SUBS: VendasSubModuleId[] = ['peliculas.tabela', 'peliculas.anal
 const ESTETICA_SUBS: VendasSubModuleId[] = ['estetica.tabela', 'estetica.analise'];
 
 interface VendasSelectionPageProps {
-  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks') => void;
+  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento') => void;
   onChangeBrand: () => void;
 }
 
@@ -146,6 +146,21 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">
                 Financiamento Banco Volks
+              </h2>
+            </div>
+          </button>
+
+          {/* Card — Vendas Peças, Oficina e Funilaria por Condição de Pagamento */}
+          <button
+            onClick={() => onSelect('vpecas-condicao-pagamento')}
+            className="flex-1 bg-white rounded-2xl border-2 border-orange-400 shadow-md hover:shadow-xl hover:border-orange-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-orange-50 group-hover:bg-orange-100 transition-colors">
+              <Wrench className="w-10 h-10 text-orange-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Vendas Peças, Oficina e Funilaria<br />por Condição de Pagamento
               </h2>
             </div>
           </button>

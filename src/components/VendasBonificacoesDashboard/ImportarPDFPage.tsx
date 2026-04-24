@@ -17,6 +17,7 @@ import { VendasDiretaAnalise } from './VendasDiretaAnalise';
 import VPecasAnalise from './VPecasAnalise';
 import VServicosAnalise from './VServicosAnalise';
 import { GuiaRelatoriosPage } from './GuiaRelatoriosPage';
+import { ManualRelatoriosPage } from './ManualRelatoriosPage';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
 import type { TabelaDadosRow } from './tabelaDadosStorage';
 
@@ -443,7 +444,7 @@ function pdfResultsToTableRows(pages: PageResult[]): Omit<TabelaDadosRow, 'id'>[
 
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mainView, setMainView] = useState<'cadastros' | 'registros' | 'financeiro' | 'vendas' | 'analises'>('analises');
+  const [mainView, setMainView] = useState<'cadastros' | 'manual' | 'registros' | 'financeiro' | 'vendas' | 'analises'>('analises');
   const [analiseTab, setAnaliseTab] = useState<'novos' | 'usados' | 'direta' | 'pecas' | 'oficina'>('novos');
   const [activeTab, setActiveTab] = useState<'guia' | 'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros'>('importar');
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
@@ -554,6 +555,15 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
             >
               <ClipboardList className="w-3.5 h-3.5" />
               Cadastros
+            </button>
+            <button
+              onClick={() => setMainView('manual')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainView === 'manual' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Manual de Relatórios
             </button>
             <button
               onClick={() => setMainView('registros')}
@@ -686,6 +696,9 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
 
       {/* Visão Cadastros */}
       {mainView === 'cadastros' && <CadastrosVWPage />}
+
+      {/* Visão Manual de Relatórios */}
+      {mainView === 'manual' && <ManualRelatoriosPage />}
 
       {/* Visão Financeiro — placeholder */}
       {mainView === 'financeiro' && (
