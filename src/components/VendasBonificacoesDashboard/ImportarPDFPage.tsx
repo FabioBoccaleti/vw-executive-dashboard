@@ -540,7 +540,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   return (
     <div className="h-screen bg-slate-100 flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+      <header className="print:hidden bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div>
           <h1 className="text-lg font-bold text-slate-800">Central de Vendas VW</h1>
           <p className="text-xs text-slate-500 mt-0.5">Gerencie registros, importações e financeiro de vendas</p>

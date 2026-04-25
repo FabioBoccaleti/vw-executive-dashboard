@@ -276,7 +276,7 @@ export function CentralVendasResumoPage() {
         make('pecas',      'Peças',          pecasRows.length, pecasRecLiq, pecasLb,  true),
         make('oficina',    'Oficina',        oficinaRows.length,  oficinaRecLiq,  null, false),
         make('funilaria',  'Funilaria',      funitariaRows.length, funitariaRecLiq, null, false),
-        make('acessorios', 'Acessórios',     acessoriosRows.length, acessoriosRecLiq, null, false),
+        make('acessorios', 'Acessórios Serv.', acessoriosRows.length, acessoriosRecLiq, null, false),
       ];
     };
   }, [rowsNovos, rowsUsados, rowsDireta, rowsVPecas, aliqBon, diasUteis]);
@@ -443,7 +443,6 @@ export function CentralVendasResumoPage() {
             </div>
             <div className="text-right text-xs text-slate-400">
               <div>Emitido em {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
-              <div className="font-semibold text-slate-600 mt-0.5">Uso Restrito — Diretoria / Conselho</div>
             </div>
           </div>
         </div>
@@ -558,7 +557,7 @@ export function CentralVendasResumoPage() {
                     <Bar dataKey="pecas"      name="Peças"        stackId="a" fill={DEPT_COLORS.pecas} />
                     <Bar dataKey="oficina"    name="Oficina"      stackId="a" fill={DEPT_COLORS.oficina} />
                     <Bar dataKey="funilaria"  name="Funilaria"    stackId="a" fill={DEPT_COLORS.funilaria} />
-                    <Bar dataKey="acessorios" name="Acessórios"   stackId="a" fill={DEPT_COLORS.acessorios} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="acessorios" name="Acessórios Serv." stackId="a" fill={DEPT_COLORS.acessorios} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -595,7 +594,7 @@ export function CentralVendasResumoPage() {
                     <th className="text-right px-2 py-2 font-bold uppercase tracking-wide">Peças</th>
                     <th className="text-right px-2 py-2 font-bold uppercase tracking-wide">Oficina</th>
                     <th className="text-right px-2 py-2 font-bold uppercase tracking-wide">Funilaria</th>
-                    <th className="text-right px-2 py-2 font-bold uppercase tracking-wide">Acessórios</th>
+                    <th className="text-right px-2 py-2 font-bold uppercase tracking-wide">Acessórios Serv.</th>
                     <th className="text-right px-2 py-2 font-bold uppercase tracking-wide">Total</th>
                   </tr>
                 </thead>
@@ -683,6 +682,7 @@ export function CentralVendasResumoPage() {
                   <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">LB%</th>
                   <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">Rec. / Dia Útil</th>
                   <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">Mês Anterior</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">LB% Ant.</th>
                   <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">Δ R$</th>
                   <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">Δ%</th>
                 </tr>
@@ -736,6 +736,15 @@ export function CentralVendasResumoPage() {
                       <td className="px-4 py-3 text-right text-slate-500 tabular-nums">
                         {fmtBRL(prev.recLiq)}
                       </td>
+                      <td className="px-4 py-3 text-right">
+                        {prev.hasLB ? (
+                          <span className={`inline-block px-1.5 py-0.5 rounded-full text-xs font-bold border ${lbBg(prev.lbPct)}`}>
+                            {fmtPct(prev.lbPct)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
                       <td className={`px-4 py-3 text-right tabular-nums font-semibold ${delta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                         {delta >= 0 ? '+' : ''}{fmtBRL(delta)}
                       </td>
@@ -761,6 +770,8 @@ export function CentralVendasResumoPage() {
                     const subRec  = withLB.reduce((s, d) => s + d.recLiq, 0);
                     const subLb   = withLB.reduce((s, d) => s + d.lb, 0);
                     const subRecPrev = withLBPrev.reduce((s, d) => s + d.recLiq, 0);
+                    const subLbPrev = withLBPrev.reduce((s, d) => s + d.lb, 0);
+                    const subLbPctPrev = subRecPrev ? subLbPrev / subRecPrev * 100 : 0;
                     const subDelta   = subRec - subRecPrev;
                     const subDeltaPct = subRecPrev ? subDelta / subRecPrev * 100 : 0;
                     const subDia  = diasUteis > 0 ? subRec / diasUteis : 0;
@@ -779,6 +790,11 @@ export function CentralVendasResumoPage() {
                         </td>
                         <td className="px-4 py-2.5 text-right text-blue-700 tabular-nums">{fmtBRL(subDia)}</td>
                         <td className="px-4 py-2.5 text-right text-blue-600 tabular-nums">{fmtBRL(subRecPrev)}</td>
+                        <td className="px-4 py-2.5 text-right">
+                          <span className={`inline-block px-1.5 py-0.5 rounded-full text-xs font-bold border ${lbBg(subLbPctPrev)}`}>
+                            {fmtPct(subLbPctPrev)}
+                          </span>
+                        </td>
                         <td className={`px-4 py-2.5 text-right tabular-nums font-semibold text-xs ${subDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                           {subDelta >= 0 ? '+' : ''}{fmtBRL(subDelta)}
                         </td>
@@ -804,6 +820,11 @@ export function CentralVendasResumoPage() {
                   </td>
                   <td className="px-4 py-3 text-right font-bold tabular-nums">{fmtBRL(recDiaTotal)}</td>
                   <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{fmtBRL(totalRecLiqPrev)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <span className="inline-block px-1.5 py-0.5 rounded-full text-xs font-black bg-white text-slate-800">
+                      {fmtPct(totalLbPctPrev)}
+                    </span>
+                  </td>
                   <td className={`px-4 py-3 text-right font-bold tabular-nums ${deltaRecLiq >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
                     {deltaRecLiq >= 0 ? '+' : ''}{fmtBRL(deltaRecLiq)}
                   </td>
