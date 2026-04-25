@@ -18,6 +18,7 @@ import VPecasAnalise from './VPecasAnalise';
 import VServicosAnalise from './VServicosAnalise';
 import { GuiaRelatoriosPage } from './GuiaRelatoriosPage';
 import { ManualRelatoriosPage } from './ManualRelatoriosPage';
+import { CentralVendasResumoPage } from './CentralVendasResumoPage';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
 import type { TabelaDadosRow } from './tabelaDadosStorage';
 
@@ -444,7 +445,7 @@ function pdfResultsToTableRows(pages: PageResult[]): Omit<TabelaDadosRow, 'id'>[
 
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mainView, setMainView] = useState<'cadastros' | 'manual' | 'registros' | 'financeiro' | 'vendas' | 'analises'>('analises');
+  const [mainView, setMainView] = useState<'cadastros' | 'manual' | 'registros' | 'financeiro' | 'vendas' | 'analises' | 'resumo'>('analises');
   const [analiseTab, setAnaliseTab] = useState<'novos' | 'usados' | 'direta' | 'pecas' | 'oficina'>('novos');
   const [activeTab, setActiveTab] = useState<'guia' | 'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros'>('importar');
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
@@ -601,6 +602,15 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
               <BarChart2 className="w-3.5 h-3.5" />
               Análises
             </button>
+            <button
+              onClick={() => setMainView('resumo')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainView === 'resumo' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <TrendingDown className="w-3.5 h-3.5" />
+              Resumo
+            </button>
           </div>
           <button
             onClick={onBack}
@@ -743,6 +753,9 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           {analiseTab === 'oficina' && <VServicosAnalise />}
         </div>
       )}
+
+      {/* Visão Resumo Executivo */}
+      {mainView === 'resumo' && <CentralVendasResumoPage />}
 
       {/* Visão Vendas */}
       {mainView === 'vendas' && <VendasResultadoDashboard />}
