@@ -1,5 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import { kvGet, kvSet } from '@/lib/kvClient';
+import { kvGet, kvSet, kvDelete } from '@/lib/kvClient';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -46,6 +46,15 @@ export async function setVPecasRelatorio(
   data:    VPecasRelatorioData,
 ): Promise<void> {
   return kvSet(kvKey(marca, section, year, month), data);
+}
+
+export async function deleteVPecasRelatorio(
+  marca:   VPecasRelMarca,
+  section: VPecasRelSection,
+  year:    number,
+  month:   number,
+): Promise<void> {
+  await kvDelete(kvKey(marca, section, year, month));
 }
 
 // ── PDF parsing ───────────────────────────────────────────────────────────────

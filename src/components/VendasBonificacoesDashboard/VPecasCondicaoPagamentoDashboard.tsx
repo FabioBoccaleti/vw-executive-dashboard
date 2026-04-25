@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Construction, Upload, FileText, X, Loader2, CheckCircle2 } from 'lucide-react';
+import { Construction, Upload, FileText, X, Loader2, CheckCircle2, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   getVPecasRelatorio,
   setVPecasRelatorio,
+  deleteVPecasRelatorio,
   parsePdfRelatorio,
   isBRLValue,
   type VPecasRelatorioData,
   type VPecasRelMarca,
   type VPecasRelSection,
 } from './vpecasRelatoriosStorage';
+import { VPecasResumoPage } from './VPecasResumoPage';
 
 type Tab       = 'relatorios' | 'resumo';
 type Marca     = 'audi' | 'vw';
@@ -121,6 +124,10 @@ export function VPecasCondicaoPagamentoDashboard({ onBack }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver,      setDragOver]      = useState(false);
 
+  // ── Delete confirmation state ────────────────────────────────────────────
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting,          setDeleting]          = useState(false);
+
   // ── Load from KV whenever context changes ──────────────────────────────────
   useEffect(() => {
     if (activeTab !== 'relatorios') return;
@@ -200,6 +207,20 @@ export function VPecasCondicaoPagamentoDashboard({ onBack }: Props) {
     setImportStep('select');
     setImportError('');
     setPreviewData(null);
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    await deleteVPecasRelatorio(
+      activeMarca  as VPecasRelMarca,
+      activeSubRel as VPecasRelSection,
+      selYear,
+      selMonth,
+    );
+    setTableData(null);
+    setDeleting(false);
+    setDeleteConfirmOpen(false);
+    toast.success('PDF excluído com sucesso.');
   };
 
   const marcaLabel  = activeMarca === 'audi' ? 'Audi' : 'VW';
@@ -320,13 +341,22 @@ export function VPecasCondicaoPagamentoDashboard({ onBack }: Props) {
                         <span className="text-slate-300">·</span>
                         <span>{tableData.rows.length} linhas</span>
                       </div>
-                      <button
-                        onClick={openModal}
-                        className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        Substituir PDF
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setDeleteConfirmOpen(true)}
+                          className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-300 rounded px-3 py-1.5 transition-colors hover:bg-red-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Excluir PDF
+                        </button>
+                        <button
+                          onClick={openModal}
+                          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          Substituir PDF
+                        </button>
+                      </div>
                     </div>
 
                     {/* Tabela */}
@@ -426,7 +456,12 @@ export function VPecasCondicaoPagamentoDashboard({ onBack }: Props) {
 
       {/* ── ABA RESUMO ─────────────────────────────────────────────────────── */}
       {activeTab === 'resumo' && (
-        <EmDesenvolvimento label="Resumo por Condição de Pagamento" />
+        <VPecasResumoPage
+          selYear={selYear}
+          selMonth={selMonth}
+          onYearChange={setSelYear}
+          onMonthChange={setSelMonth}
+        />
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
@@ -591,6 +626,51 @@ export function VPecasCondicaoPagamentoDashboard({ onBack }: Props) {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODAL DE CONFIRMAÇÃO DE EXCLUSÃO
+      ══════════════════════════════════════════════════════════════════════ */}
+      {deleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h2 className="text-base font-bold text-slate-800">Excluir PDF</h2>
+              <button
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={deleting}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-40"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Tem certeza que deseja excluir os dados importados de{' '}
+                <strong>{marcaLabel} › {sectionLabel}</strong> referente a{' '}
+                <strong>{monthLabel}/{selYear}</strong>?
+              </p>
+              <p className="text-xs text-slate-400 mt-2">Esta ação não pode ser desfeita.</p>
+            </div>
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-200">
+              <button
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-lg transition-colors"
+              >
+                {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {deleting ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
           </div>
         </div>
       )}
