@@ -10,6 +10,8 @@ const BLINDAGEM_SUBS: VendasSubModuleId[] = [
 ];
 const PELICULAS_SUBS: VendasSubModuleId[] = ['peliculas.tabela', 'peliculas.analise'];
 const ESTETICA_SUBS: VendasSubModuleId[] = ['estetica.tabela', 'estetica.analise'];
+const FINANCIAMENTO_BV_SUBS: VendasSubModuleId[] = ['financiamento_bv.vendas', 'financiamento_bv.acelera', 'financiamento_bv.cadastro'];
+const VPECAS_COND_SUBS: VendasSubModuleId[] = ['vpecas_cond.relatorios', 'vpecas_cond.resumo'];
 
 interface VendasSelectionPageProps {
   onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento') => void;
@@ -21,6 +23,8 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
   const canBlindagem = isAdmin() || BLINDAGEM_SUBS.some(s => canAccessVendasSub(s));
   const canPeliculas = isAdmin() || PELICULAS_SUBS.some(s => canAccessVendasSub(s));
   const canEstetica  = isAdmin() || ESTETICA_SUBS.some(s => canAccessVendasSub(s));
+  const canFinanciamentoBV = isAdmin() || FINANCIAMENTO_BV_SUBS.some(s => canAccessVendasSub(s));
+  const canVPecasCond     = isAdmin() || VPECAS_COND_SUBS.some(s => canAccessVendasSub(s));
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordInput, setPasswordInput]         = useState('');
@@ -136,6 +140,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
           </button>
 
           {/* Card — Financiamento Banco Volks */}
+          {canFinanciamentoBV && (
           <button
             onClick={() => onSelect('financiamento-banco-volks')}
             className="flex-1 bg-white rounded-2xl border-2 border-blue-400 shadow-md hover:shadow-xl hover:border-blue-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
@@ -149,8 +154,10 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
               </h2>
             </div>
           </button>
+          )}
 
           {/* Card — Vendas Peças, Oficina e Funilaria por Condição de Pagamento */}
+          {canVPecasCond && (
           <button
             onClick={() => onSelect('vpecas-condicao-pagamento')}
             className="flex-1 bg-white rounded-2xl border-2 border-orange-400 shadow-md hover:shadow-xl hover:border-orange-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
@@ -164,6 +171,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
               </h2>
             </div>
           </button>
+          )}
 
         </div>
       </div>

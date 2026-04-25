@@ -15,7 +15,14 @@ export type VendasSubModuleId =
   | 'blindagem.estoque'
   | 'blindagem.notas_a_emitir'
   | 'peliculas.tabela'
-  | 'peliculas.analise';
+  | 'peliculas.analise'
+  | 'estetica.tabela'
+  | 'estetica.analise'
+  | 'financiamento_bv.vendas'
+  | 'financiamento_bv.acelera'
+  | 'financiamento_bv.cadastro'
+  | 'vpecas_cond.relatorios'
+  | 'vpecas_cond.resumo';
 export type CentralVendasVWSubModuleId =
   | 'central_vw.analises'
   | 'central_vw.vendas'

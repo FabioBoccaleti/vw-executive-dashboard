@@ -12,6 +12,7 @@ import {
   type VPecasRelSection,
 } from './vpecasRelatoriosStorage';
 import { VPecasResumoPage } from './VPecasResumoPage';
+import { useAuth } from '@/contexts/useAuth';
 
 type Tab       = 'relatorios' | 'resumo';
 type Marca     = 'audi' | 'vw';
@@ -104,7 +105,13 @@ function MonthSelector({ year, month, onYearChange, onMonthChange }: MonthSelect
 }
 
 export function VPecasCondicaoPagamentoDashboard({ onBack }: Props) {
-  const [activeTab,    setActiveTab]    = useState<Tab>('relatorios');
+  const { canAccessVendasSub, isAdmin } = useAuth();
+  const canRelatorios = isAdmin() || canAccessVendasSub('vpecas_cond.relatorios');
+  const canResumo     = isAdmin() || canAccessVendasSub('vpecas_cond.resumo');
+
+  const [activeTab,    setActiveTab]    = useState<Tab>(() =>
+    canResumo ? 'resumo' : 'relatorios'
+  );
   const [activeMarca,  setActiveMarca]  = useState<Marca>('audi');
   const [activeSubRel, setActiveSubRel] = useState<SubRelat>('pecas');
   const [selYear,      setSelYear]      = useState(CURRENT_YEAR);
@@ -127,6 +134,33 @@ export function VPecasCondicaoPagamentoDashboard({ onBack }: Props) {
   // ── Delete confirmation state ────────────────────────────────────────────
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting,          setDeleting]          = useState(false);
+
+  // ── Auto-select most recent month with data on mount ────────────────────
+  useEffect(() => {
+    const SECTIONS: VPecasRelSection[] = ['pecas', 'acessorios', 'oficina', 'funilaria'];
+    const MARCAS: VPecasRelMarca[]     = ['audi', 'vw'];
+    const currentMonth = new Date().getMonth() + 1;
+
+    (async () => {
+      // Search backwards from current month, then try previous year
+      for (let offset = 0; offset < 24; offset++) {
+        let m = currentMonth - offset;
+        let y = CURRENT_YEAR;
+        if (m <= 0) { m += 12; y = CURRENT_YEAR - 1; }
+
+        for (const marca of MARCAS) {
+          for (const sec of SECTIONS) {
+            const data = await getVPecasRelatorio(marca, sec, y, m);
+            if (data && data.rows.length > 0) {
+              setSelYear(y);
+              setSelMonth(m);
+              return;
+            }
+          }
+        }
+      }
+    })();
+  }, []);
 
   // ── Load from KV whenever context changes ──────────────────────────────────
   useEffect(() => {
@@ -240,7 +274,9 @@ export function VPecasCondicaoPagamentoDashboard({ onBack }: Props) {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-end gap-0">
-              {(['relatorios', 'resumo'] as Tab[]).map(tab => (
+              {(['relatorios', 'resumo'] as Tab[]).filter(tab =>
+                tab === 'relatorios' ? canRelatorios : canResumo
+              ).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -266,7 +302,7 @@ export function VPecasCondicaoPagamentoDashboard({ onBack }: Props) {
       </header>
 
       {/* ── ABA RELATÓRIOS ─────────────────────────────────────────────────── */}
-      {activeTab === 'relatorios' && (
+      {canRelatorios && activeTab === 'relatorios' && (
         <>
           {/* Nível 2: Audi / VW */}
           <div className="bg-white border-b border-slate-200 px-6 flex items-end gap-0 shrink-0">
@@ -455,7 +491,7 @@ export function VPecasCondicaoPagamentoDashboard({ onBack }: Props) {
       )}
 
       {/* ── ABA RESUMO ─────────────────────────────────────────────────────── */}
-      {activeTab === 'resumo' && (
+      {canResumo && activeTab === 'resumo' && (
         <VPecasResumoPage
           selYear={selYear}
           selMonth={selMonth}

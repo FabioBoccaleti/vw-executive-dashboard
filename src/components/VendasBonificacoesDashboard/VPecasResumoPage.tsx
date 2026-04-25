@@ -29,14 +29,17 @@ const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 2 + i);
 
 // ─── Paleta executiva ─────────────────────────────────────────────────────────
 const GROUP_COLORS: Record<string, string> = {
-  'Cartão':        '#6366f1',  // indigo
-  'Prazo':         '#0ea5e9',  // sky
-  'Mercado Livre': '#f59e0b',  // amber
-  'E-Peças':       '#10b981',  // emerald
-  'Seguradora':    '#f97316',  // orange
-  'Outros':        '#94a3b8',  // slate
+  'Cartão':              '#6366f1',  // indigo
+  'Prazo':               '#0ea5e9',  // sky
+  'Mercado Livre':       '#f59e0b',  // amber
+  'E-Peças':             '#10b981',  // emerald
+  'Seguradora':          '#f97316',  // orange
+  'Dinheiro':            '#22c55e',  // green
+  'Garantia/Revisão':    '#ec4899',  // pink
+  'Contra Apresentação': '#8b5cf6',  // violet
+  'Outros':              '#94a3b8',  // slate
 };
-const GROUP_ORDER = ['Cartão','Prazo','Mercado Livre','E-Peças','Seguradora','Outros'];
+const GROUP_ORDER = ['Cartão','Prazo','Mercado Livre','E-Peças','Seguradora','Dinheiro','Garantia/Revisão','Contra Apresentação','Outros'];
 
 const DEPT_COLORS: Record<VPecasRelSection, string> = {
   pecas:      '#3b82f6',
@@ -62,14 +65,28 @@ function fmtPct(n: number): string {
   return `${n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
+/** Mapeamento de nomes de exibição — apenas para o Resumo */
+const COND_DISPLAY_NAMES: Record<string, string> = {
+  '120': '120 ADIANTAMENTO DE CLIENTE',
+};
+function displayName(cond: string): string {
+  return COND_DISPLAY_NAMES[cond.trim()] ?? cond;
+}
+
 /** Classifica uma condição de pagamento no seu grupo executivo */
 function classifyGroup(cond: string): string {
   const u = cond.toUpperCase();
-  if (/CART[AÃ][OÃ]|CARTOES|CARTÕES/.test(u)) return 'Cartão';
-  if (/\d+\s*DIAS?|30\s*\/|PARCEL|DIA/.test(u))  return 'Prazo';
-  if (/MERCADO\s*LIVRE|MERC\.?\s*LIVRE/.test(u))  return 'Mercado Livre';
-  if (/E[\s-]?PE[ÇC]AS?|EPEÇAS?/.test(u))         return 'E-Peças';
-  if (/SEGURA|SEGURAD/.test(u))                    return 'Seguradora';
+  // E-Peças (inclui parcelas E-Peças) — antes do teste genérico de parcelas
+  if (/E[\s-]?PE[ÇC]AS?|EPEÇAS?/.test(u))                                   return 'E-Peças';
+  if (/CART[AÃ][OÃ]|CARTOES|CARTÕES/.test(u))                                return 'Cartão';
+  // Ticket Log → Prazo
+  if (/TICKET\s*LOG/.test(u))                                                 return 'Prazo';
+  if (/\d+\s*DIAS?|30\s*\/|\d+\/\d+|PARCEL/.test(u))                         return 'Prazo';
+  if (/MERCADO\s*LIVRE|MERC\.?\s*LIVRE/.test(u))                              return 'Mercado Livre';
+  if (/SEGURA|SEGURAD/.test(u))                                               return 'Seguradora';
+  if (/DINHEIRO|ESPECIE|ESPÉCIE|\bDIN\b/.test(u))                             return 'Dinheiro';
+  if (/GARANTIA|REVIS[AÃ]O\s*(PLANEJADA|GRATUITA)|REVIS[AÃ]O/.test(u))       return 'Garantia/Revisão';
+  if (/CONTRA\s*APRES|C\/\s*APRES/.test(u))                                   return 'Contra Apresentação';
   return 'Outros';
 }
 
@@ -647,7 +664,7 @@ function TopCondsBar({ data }: { data: CondMap }) {
         const grp = classifyGroup(cond);
         return (
           <div key={i} className="flex items-center gap-2 text-xs">
-            <span className="w-[140px] truncate text-slate-600 shrink-0" title={cond}>{cond}</span>
+            <span className="w-[140px] truncate text-slate-600 shrink-0" title={displayName(cond)}>{displayName(cond)}</span>
             <div className="flex-1 bg-slate-100 rounded-full h-2 min-w-0">
               <div
                 className="h-2 rounded-full transition-all"
@@ -786,8 +803,8 @@ function CondTable({ tableData, bundles, periodo, grandTotal, expand, onToggle }
             // rows
             ...(isOpen ? rows.map((row, ri) => (
               <tr key={`${grp}-${ri}`} className={ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
-                <td className="px-3 py-1.5 border-b border-slate-100 text-slate-700 max-w-[240px] truncate" title={row.cond}>
-                  {row.cond}
+                <td className="px-3 py-1.5 border-b border-slate-100 text-slate-700 max-w-[240px] truncate" title={displayName(row.cond)}>
+                  {displayName(row.cond)}
                 </td>
                 <td className="px-3 py-1.5 border-b border-slate-100">
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold"

@@ -292,6 +292,50 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
               ))}
             </div>
           </div>
+
+          {/* Financiamento Banco Volks */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Financiamento Banco Volks</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {(['financiamento_bv.vendas', 'financiamento_bv.acelera', 'financiamento_bv.cadastro'] as VendasSubModuleId[]).map(s => (
+                <button
+                  key={s} type="button"
+                  onClick={() => toggleVendasSub(s)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                    form.vendasSubModules.includes(s)
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 font-medium'
+                      : 'border-border bg-background text-muted-foreground hover:border-input',
+                  )}
+                >
+                  {form.vendasSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                  {VENDAS_SUB_MODULE_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Vendas Peças, Oficina e Funilaria por Condição de Pagamento */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Vendas Peças, Oficina e Funilaria por Condição de Pagamento</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {(['vpecas_cond.relatorios', 'vpecas_cond.resumo'] as VendasSubModuleId[]).map(s => (
+                <button
+                  key={s} type="button"
+                  onClick={() => toggleVendasSub(s)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                    form.vendasSubModules.includes(s)
+                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 font-medium'
+                      : 'border-border bg-background text-muted-foreground hover:border-input',
+                  )}
+                >
+                  {form.vendasSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                  {VENDAS_SUB_MODULE_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

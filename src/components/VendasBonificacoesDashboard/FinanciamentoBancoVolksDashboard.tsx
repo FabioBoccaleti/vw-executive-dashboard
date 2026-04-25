@@ -14,6 +14,7 @@ import {
   type RemuneracaoProdutoRegra,
   type TipoPremio,
 } from './financiamentoRemuneracaoStorage';
+import { useAuth } from '@/contexts/useAuth';
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -173,9 +174,17 @@ interface Props {
 
 export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { canAccessVendasSub, isAdmin } = useAuth();
+  const canVendas   = isAdmin() || canAccessVendasSub('financiamento_bv.vendas') || canAccessVendasSub('financiamento_bv.acelera');
+  const canAcelera  = isAdmin() || canAccessVendasSub('financiamento_bv.acelera');
+  const canCadastro = isAdmin() || canAccessVendasSub('financiamento_bv.cadastro');
 
-  const [activeSection, setActiveSection] = useState<ActiveSection>('vendas');
-  const [vendasSubTab, setVendasSubTab] = useState<VendasSubTab>('importar');
+  const [activeSection, setActiveSection] = useState<ActiveSection>(() =>
+    canVendas ? 'vendas' : 'cadastro'
+  );
+  const [vendasSubTab, setVendasSubTab] = useState<VendasSubTab>(() =>
+    canAcelera && !canAccessVendasSub('financiamento_bv.vendas') && !isAdmin() ? 'acelera' : 'importar'
+  );
   const [cadastroSection, setCadastroSection] = useState<CadastroSection>('remuneracao-produto');
 
   // ── Aba Importar ──
@@ -613,6 +622,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
           <p className="text-xs text-slate-400 mt-0.5">Demonstrativo de Vendas e Bonificações</p>
         </div>
         <div className="flex items-center gap-1">
+          {canVendas && (
           <button
             onClick={() => setActiveSection('vendas')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
@@ -624,6 +634,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             <BarChart2 className="w-3.5 h-3.5" />
             Vendas
           </button>
+          )}
+          {canCadastro && (
           <button
             onClick={() => setActiveSection('cadastro')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
@@ -635,6 +647,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             <ClipboardList className="w-3.5 h-3.5" />
             Cadastro
           </button>
+          )}
           <div className="w-px h-5 bg-slate-600 mx-1" />
           <button
             onClick={onBack}
@@ -646,8 +659,9 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       </header>
 
       {/* Sub-abas da seção Vendas */}
-      {activeSection === 'vendas' && (
+      {canVendas && activeSection === 'vendas' && (
         <div className="bg-white border-b border-slate-200 px-6 flex items-end gap-1 shrink-0">
+          {(isAdmin() || canAccessVendasSub('financiamento_bv.vendas')) && (
           <button
             onClick={() => setVendasSubTab('importar')}
             className={`print-hidden flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -659,6 +673,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             <FileSpreadsheet className="w-4 h-4" />
             Importar Dados
           </button>
+          )}
+          {(isAdmin() || canAccessVendasSub('financiamento_bv.vendas')) && (
           <button
             onClick={() => setVendasSubTab('vendas')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -670,6 +686,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             <BarChart2 className="w-4 h-4" />
             Vendas de Financiamento e Produtos
           </button>
+          )}
+          {canAcelera && (
           <button
             onClick={() => setVendasSubTab('acelera')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -681,11 +699,12 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             <Zap className="w-4 h-4" />
             Acelera
           </button>
+          )}
         </div>
       )}
 
       {/* ── SEÇÃO: Vendas / Importar Dados ── */}
-      {activeSection === 'vendas' && vendasSubTab === 'importar' && (
+      {canVendas && activeSection === 'vendas' && vendasSubTab === 'importar' && (
         <>
           {/* Controls */}
           <div className="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap items-center gap-3">
@@ -837,7 +856,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       )}
 
       {/* ── SEÇÃO: Vendas / Vendas de Financiamento e Produtos ── */}
-      {activeSection === 'vendas' && (vendasSubTab === 'vendas' || vendasSubTab === 'acelera') && (
+      {canVendas && activeSection === 'vendas' && (vendasSubTab === 'vendas' || vendasSubTab === 'acelera') && (
         <>
           {/* Barra de filtros (ano + meses) */}
           <div className="print-hidden bg-white border-b border-slate-200 px-6 py-2 flex items-center gap-3 flex-wrap shrink-0">
@@ -1782,7 +1801,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       )}
 
       {/* ── SEÇÃO: Cadastro de Remuneração ── */}
-      {activeSection === 'cadastro' && (
+      {canCadastro && activeSection === 'cadastro' && (
         <div className="flex-1 flex overflow-hidden">
 
           {/* Sidebar de navegação */}

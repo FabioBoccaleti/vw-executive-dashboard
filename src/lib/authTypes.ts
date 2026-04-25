@@ -39,7 +39,12 @@ export type VendasSubModuleId =
   | 'peliculas.tabela'
   | 'peliculas.analise'
   | 'estetica.tabela'
-  | 'estetica.analise';
+  | 'estetica.analise'
+  | 'financiamento_bv.vendas'
+  | 'financiamento_bv.acelera'
+  | 'financiamento_bv.cadastro'
+  | 'vpecas_cond.relatorios'
+  | 'vpecas_cond.resumo';
 
 // Subpermissões do módulo folha_pagamento
 export type FolhaSubModuleId =
@@ -85,6 +90,11 @@ export const VENDAS_SUB_MODULE_LABELS: Record<VendasSubModuleId, string> = {
   'peliculas.analise': 'Análise',
   'estetica.tabela': 'Tabela',
   'estetica.analise': 'Análise',
+  'financiamento_bv.vendas': 'Vendas',
+  'financiamento_bv.acelera': 'Acelera',
+  'financiamento_bv.cadastro': 'Cadastro',
+  'vpecas_cond.relatorios': 'Relatórios',
+  'vpecas_cond.resumo': 'Resumo',
 };
 
 export interface UserRecord {
