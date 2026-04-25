@@ -276,7 +276,7 @@ export function CentralVendasResumoPage() {
         make('pecas',      'Peças',          pecasRows.length, pecasRecLiq, pecasLb,  true),
         make('oficina',    'Oficina',        oficinaRows.length,  oficinaRecLiq,  null, false),
         make('funilaria',  'Funilaria',      funitariaRows.length, funitariaRecLiq, null, false),
-        make('acessorios', 'Acessórios Serv.', acessoriosRows.length, acessoriosRecLiq, null, false),
+        make('acessorios', 'Acessórios',       acessoriosRows.length, acessoriosRecLiq, null, false),
       ];
     };
   }, [rowsNovos, rowsUsados, rowsDireta, rowsVPecas, aliqBon, diasUteis]);
@@ -557,7 +557,7 @@ export function CentralVendasResumoPage() {
                     <Bar dataKey="pecas"      name="Peças"        stackId="a" fill={DEPT_COLORS.pecas} />
                     <Bar dataKey="oficina"    name="Oficina"      stackId="a" fill={DEPT_COLORS.oficina} />
                     <Bar dataKey="funilaria"  name="Funilaria"    stackId="a" fill={DEPT_COLORS.funilaria} />
-                    <Bar dataKey="acessorios" name="Acessórios Serv." stackId="a" fill={DEPT_COLORS.acessorios} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="acessorios" name="Acessórios"      stackId="a" fill={DEPT_COLORS.acessorios} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -594,7 +594,7 @@ export function CentralVendasResumoPage() {
                     <th className="text-right px-2 py-2 font-bold uppercase tracking-wide">Peças</th>
                     <th className="text-right px-2 py-2 font-bold uppercase tracking-wide">Oficina</th>
                     <th className="text-right px-2 py-2 font-bold uppercase tracking-wide">Funilaria</th>
-                    <th className="text-right px-2 py-2 font-bold uppercase tracking-wide">Acessórios Serv.</th>
+                    <th className="text-right px-2 py-2 font-bold uppercase tracking-wide">Acessórios</th>
                     <th className="text-right px-2 py-2 font-bold uppercase tracking-wide">Total</th>
                   </tr>
                 </thead>
