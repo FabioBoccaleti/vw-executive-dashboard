@@ -240,6 +240,15 @@ export function CentralVendasResumoPage() {
       });
       let oficinaRecLiq = 0;
       for (const r of oficinaRows) { oficinaRecLiq += calcServicosRow(r.data).recLiq; }
+      // Peças vendidas pela Oficina (não-RPS) — base para LB
+      const oficinaPecasRows = rowsVPecas.filter(r => {
+        const { yr: y, mo: m } = getYrMoVPecas(r);
+        const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
+        const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
+        return y === yr && m === mo && oficinaDepts.includes(dept) && serie !== 'RPS';
+      });
+      let oficinaPecasLb = 0, oficinaPecasRecLiq = 0;
+      for (const r of oficinaPecasRows) { const c = calcPecasRow(r.data); oficinaPecasLb += c.lb; oficinaPecasRecLiq += c.recLiq; }
 
       // — Funilaria (dept 106, 129, somente RPS/OS) —
       const funilariaDepts = ['106', '129'];
@@ -251,6 +260,15 @@ export function CentralVendasResumoPage() {
       });
       let funitariaRecLiq = 0;
       for (const r of funitariaRows) { funitariaRecLiq += calcServicosRow(r.data).recLiq; }
+      // Peças vendidas pela Funilaria (não-RPS) — base para LB
+      const funitariaPecasRows = rowsVPecas.filter(r => {
+        const { yr: y, mo: m } = getYrMoVPecas(r);
+        const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
+        const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
+        return y === yr && m === mo && funilariaDepts.includes(dept) && serie !== 'RPS';
+      });
+      let funitariaPecasLb = 0, funitariaPecasRecLiq = 0;
+      for (const r of funitariaPecasRows) { const c = calcPecasRow(r.data); funitariaPecasLb += c.lb; funitariaPecasRecLiq += c.recLiq; }
 
       // — Acessórios (dept 107, somente RPS/OS) —
       const acessoriosDepts = ['107'];
@@ -262,11 +280,21 @@ export function CentralVendasResumoPage() {
       });
       let acessoriosRecLiq = 0;
       for (const r of acessoriosRows) { acessoriosRecLiq += calcServicosRow(r.data).recLiq; }
+      // Peças vendidas pelos Acessórios (não-RPS) — base para LB
+      const acessoriosPecasRows = rowsVPecas.filter(r => {
+        const { yr: y, mo: m } = getYrMoVPecas(r);
+        const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
+        const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
+        return y === yr && m === mo && acessoriosDepts.includes(dept) && serie !== 'RPS';
+      });
+      let acessoriosPecasLb = 0, acessoriosPecasRecLiq = 0;
+      for (const r of acessoriosPecasRows) { const c = calcPecasRow(r.data); acessoriosPecasLb += c.lb; acessoriosPecasRecLiq += c.recLiq; }
 
-      const make = (id: string, label: string, vol: number, recLiq: number, lb: number | null, hasLB: boolean): DeptResult => ({
+      // lbBase: denominador do LB% (pode ser diferente de recLiq)
+      const make = (id: string, label: string, vol: number, recLiq: number, lb: number | null, hasLB: boolean, lbBase?: number): DeptResult => ({
         id, label, vol, recLiq,
         lb: hasLB ? (lb ?? 0) : NaN,
-        lbPct: hasLB && recLiq ? ((lb ?? 0) / recLiq * 100) : NaN,
+        lbPct: hasLB && (lbBase ?? recLiq) ? ((lb ?? 0) / (lbBase ?? recLiq) * 100) : NaN,
         recDia: diasUteis > 0 ? recLiq / diasUteis : 0,
         hasLB,
         ticketMedio: vol > 0 ? recLiq / vol : 0,
@@ -278,9 +306,9 @@ export function CentralVendasResumoPage() {
         make('usados',     'Usados',         usadosVol,   usadosRecLiq,   usadosLb,   true),
         make('direta',     'VD / Frotista',  diretaVol,   diretaRecLiq,   diretaLb,   true),
         make('pecas',      'Peças',          pecasRows.length, pecasRecLiq, pecasLb,  true),
-        make('oficina',    'Oficina',        oficinaRows.length,  oficinaRecLiq,  null, false),
-        make('funilaria',  'Funilaria',      funitariaRows.length, funitariaRecLiq, null, false),
-        make('acessorios', 'Acessórios',       acessoriosRows.length, acessoriosRecLiq, null, false),
+        make('oficina',    'Oficina',        oficinaRows.length,  oficinaRecLiq,  oficinaPecasLb > 0 || oficinaPecasRecLiq > 0 ? oficinaPecasLb : null,    oficinaPecasRecLiq > 0,    oficinaPecasRecLiq || undefined),
+        make('funilaria',  'Funilaria',      funitariaRows.length, funitariaRecLiq, funitariaPecasLb > 0 || funitariaPecasRecLiq > 0 ? funitariaPecasLb : null,  funitariaPecasRecLiq > 0,  funitariaPecasRecLiq || undefined),
+        make('acessorios', 'Acessórios',     acessoriosRows.length, acessoriosRecLiq, acessoriosPecasLb > 0 || acessoriosPecasRecLiq > 0 ? acessoriosPecasLb : null, acessoriosPecasRecLiq > 0, acessoriosPecasRecLiq || undefined),
       ];
     };
   }, [rowsNovos, rowsUsados, rowsDireta, rowsVPecas, aliqBon, diasUteis]);

@@ -468,7 +468,7 @@ export default function VPecasVendasDashboard() {
         <span className="mt-0.5 shrink-0">ℹ️</span>
         <span>
           <strong>Transações consideradas:</strong> todas exceto{' '}
-          <span className="font-mono">V21, U21, I21, C41, C21, V42, V29, U25, P64, P65, P66, P68, P37, P30, G23, P27, O25, ST1</span>{' '}
+          <span className="font-mono">V21, U21, I21, C41, C21, V42, V29, U25, U27, P64, P65, P66, P68, P37, P30, G23, P27, O25, ST1</span>{' '}
           e as iniciadas com <span className="font-mono">L</span>.
           Também são excluídas notas com <strong>SERIE = RPS</strong>.
         </span>
