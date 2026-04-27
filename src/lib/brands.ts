@@ -164,9 +164,9 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
   },
   aprovacao_despesas: {
     id: 'aprovacao_despesas',
-    name: 'Sistema de Gerenciamento e AprovaÃ§Ã£o de Despesas',
+    name: 'Sistema de Gerenciamento e Aprovação de Despesas',
     shortName: 'Gerenciamento',
-    fullName: 'Sistema de Gerenciamento e AprovaÃ§Ã£o de Despesas',
+    fullName: 'Sistema de Gerenciamento e Aprovação de Despesas',
     colors: {
       primary: '#059669',
       primaryHover: '#047857',
@@ -215,7 +215,7 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
   },
   vendas_bonificacoes: {
     id: 'vendas_bonificacoes',
-    name: 'Demonstrativo de Vendas e BonificaÃ§Ãµes',
+    name: 'Demonstrativo de Vendas e Bonificações',
     shortName: 'Vendas',
     colors: {
       primary: '#b45309',

@@ -967,9 +967,13 @@ export function CentralVendasResumoPage() {
       <style>{`
         @media print {
           @page { size: A4 landscape; margin: 10mm 12mm; }
-          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; overflow: visible !important; }
+          html, body { overflow: visible !important; height: auto !important; }
+          * { overflow: visible !important; scrollbar-width: none !important; }
+          *::-webkit-scrollbar { display: none !important; }
+          #resumo-executivo-print { overflow: visible !important; height: auto !important; }
           .print-hidden { display: none !important; }
-          .resumo-print-area { padding: 0 !important; gap: 12px !important; }
+          .resumo-print-area { padding: 0 !important; gap: 12px !important; overflow: visible !important; }
           .print\\:hidden { display: none !important; }
           .print\\:block { display: block !important; }
           .print\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
