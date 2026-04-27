@@ -289,8 +289,8 @@ function TabelaContratos({
             <th className="px-4 py-3 text-right font-bold bg-amber-600/20 text-amber-100">Custo Mensal</th>
             <th className="px-4 py-3 text-right font-bold">Valor Mensal</th>
             <th className="px-4 py-3 text-left font-bold">Condomínio</th>
-            <th className="px-4 py-3 text-right font-bold">IPTU Anual</th>
             <th className="px-4 py-3 text-right font-bold">IPTU/Mês</th>
+            <th className="px-4 py-3 text-right font-bold">IPTU Anual</th>
             <th className="px-4 py-3 text-left font-bold">Utilização/Rateio</th>
             <th className="px-4 py-3 text-center font-bold">Renovação</th>
             <th className={`px-4 py-3 text-left font-bold ${readOnly ? 'rounded-tr-lg' : ''}`}>Observações</th>
@@ -315,8 +315,8 @@ function TabelaContratos({
               <td className="px-4 py-3 text-right font-black text-amber-700 tabular-nums bg-amber-50">{fmtBRL(c.valorMensal + (Number(c.condominio) || 0) + c.iptuAnual / 12)}</td>
               <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">{fmtBRL(c.valorMensal)}</td>
               <td className="px-4 py-3 text-right text-slate-600 tabular-nums">{(Number(c.condominio) || 0) > 0 ? fmtBRL(Number(c.condominio)) : '—'}</td>
-              <td className="px-4 py-3 text-right text-slate-600 tabular-nums">{c.iptuAnual > 0 ? fmtBRL(c.iptuAnual) : '—'}</td>
               <td className="px-4 py-3 text-right text-slate-600 tabular-nums">{c.iptuAnual > 0 ? fmtBRL(c.iptuAnual / 12) : '—'}</td>
+              <td className="px-4 py-3 text-right text-slate-600 tabular-nums">{c.iptuAnual > 0 ? fmtBRL(c.iptuAnual) : '—'}</td>
               <td className="px-4 py-3 text-slate-600 text-xs">{c.utilizacaoRateio || '—'}</td>
               <td className="px-4 py-3 text-center"><RenovacaoBadge iso={c.dataRenovacao} /></td>
               <td className="px-4 py-3 text-slate-500 text-xs max-w-[180px] truncate" title={c.observacoes}>{c.observacoes || '—'}</td>
@@ -344,8 +344,8 @@ function TabelaContratos({
             <td className="px-4 py-2.5 text-right font-black text-amber-900 tabular-nums bg-amber-100">{fmtBRL(totalCustoMensal)}</td>
             <td className="px-4 py-2.5 text-right font-black text-amber-900 tabular-nums">{fmtBRL(totalMensal)}</td>
             <td className="px-4 py-2.5 text-right font-bold text-amber-800 tabular-nums">{totalCondominio > 0 ? fmtBRL(totalCondominio) : '—'}</td>
-            <td className="px-4 py-2.5 text-right font-bold text-amber-800 tabular-nums">{totalIptuAnual > 0 ? fmtBRL(totalIptuAnual) : '—'}</td>
             <td className="px-4 py-2.5 text-right font-bold text-amber-800 tabular-nums">{totalIptuMes > 0 ? fmtBRL(totalIptuMes) : '—'}</td>
+            <td className="px-4 py-2.5 text-right font-bold text-amber-800 tabular-nums">{totalIptuAnual > 0 ? fmtBRL(totalIptuAnual) : '—'}</td>
             <td className="px-4 py-2.5" colSpan={readOnly ? 3 : 4} />
           </tr>
         </tfoot>
@@ -474,10 +474,8 @@ export function CustosAlugueisDashboard({ onChangeBrand }: Props) {
       `<td style="text-align:right;font-weight:900;color:#b45309;background:#fffbeb;">${fmtBRL(custoMensalRow)}</td>`,
       `<td style="text-align:right;font-weight:700;">${fmtBRL(c.valorMensal)}</td>`,
       `<td style="text-align:right;">${(Number(c.condominio) || 0) > 0 ? fmtBRL(Number(c.condominio)) : '-'}</td>`,
-      `<td style="text-align:right;">${c.iptuAnual > 0 ? fmtBRL(c.iptuAnual) : '-'}</td>`,
-
-
       `<td style="text-align:right;">${c.iptuAnual > 0 ? fmtBRL(c.iptuAnual / 12) : '-'}</td>`,
+      `<td style="text-align:right;">${c.iptuAnual > 0 ? fmtBRL(c.iptuAnual) : '-'}</td>`,
       `<td>${c.utilizacaoRateio || '-'}</td>`,
       `<td>${renText(c.dataRenovacao)}</td>`,
       `<td style="color:#64748b;font-size:10px;">${c.observacoes || '-'}</td>`,
@@ -512,14 +510,14 @@ export function CustosAlugueisDashboard({ onChangeBrand }: Props) {
       + `<div class="hdr"><div><h1>Custos com Alugueis - ${tabLabel}</h1><p>Grupo Sorana - Gestao de contratos de locacao</p></div>`
       + `<div class="meta"><div>Impresso em ${dataBR} as ${horaBR}</div><div>${currentContratos.length} contrato${currentContratos.length !== 1 ? 's' : ''}</div></div></div>`
       + `<div class="kpis">${kpiRows.map(k => `<div class="kpi"><div class="lbl">${k.label}</div><div class="val">${k.value}</div></div>`).join('')}</div>`
-      + `<table><thead><tr>${empCol}<th>Local</th><th>Proprietario</th><th class="r" style="background:#92400e;color:#fff;">Custo Mensal</th><th class="r">Valor Mensal</th><th class="r">Condominio</th><th class="r">IPTU Anual</th><th>IPTU/Mes</th><th>Utilizacao/Rateio</th><th>Renovacao</th><th>Observacoes</th></tr></thead>`
+      + `<table><thead><tr>${empCol}<th>Local</th><th>Proprietario</th><th class="r" style="background:#92400e;color:#fff;">Custo Mensal</th><th class="r">Valor Mensal</th><th class="r">Condominio</th><th class="r">IPTU/Mes</th><th class="r">IPTU Anual</th><th>Utilizacao/Rateio</th><th>Renovacao</th><th>Observacoes</th></tr></thead>`
       + `<tbody>${rows}</tbody>`
       + `<tfoot><tr>${empFoot}<td colspan="2">Total (${currentContratos.length} contrato${currentContratos.length !== 1 ? 's' : ''})</td>`
       + `<td style="text-align:right;background:#fef3c7;font-weight:900;color:#92400e;">${fmtBRL(tCustoMensal)}</td>`
       + `<td style="text-align:right;">${fmtBRL(tMensal)}</td>`
       + `<td style="text-align:right;">${tCondominio > 0 ? fmtBRL(tCondominio) : '-'}</td>`
-      + `<td style="text-align:right;">${tIptu > 0 ? fmtBRL(tIptu) : '-'}</td>`
       + `<td style="text-align:right;">${tIptu > 0 ? fmtBRL(tIptu / 12) : '-'}</td>`
+      + `<td style="text-align:right;">${tIptu > 0 ? fmtBRL(tIptu) : '-'}</td>`
       + '<td colspan="3"></td></tr></tfoot></table>'
       + '<div class="footer">Grupo Sorana - Controle Financeiro - Documento gerado automaticamente</div>'
       + '<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};}' + '<' + '/script>'
