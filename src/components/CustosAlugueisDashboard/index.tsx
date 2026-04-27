@@ -276,6 +276,7 @@ function TabelaContratos({
   const totalCondominio  = contratos.reduce((s, c) => s + (Number(c.condominio) || 0), 0);
   const totalIptuAnual   = contratos.reduce((s, c) => s + c.iptuAnual, 0);
   const totalIptuMes     = totalIptuAnual / 12;
+  const totalCustoMensal = totalMensal + totalCondominio + totalIptuMes;
 
   return (
     <div className="overflow-x-auto">
@@ -285,6 +286,7 @@ function TabelaContratos({
             {!readOnly && <th className="px-4 py-3 text-left rounded-tl-lg font-bold">Empresa</th>}
             <th className={`px-4 py-3 text-left font-bold ${readOnly ? 'rounded-tl-lg' : ''}`}>Local</th>
             <th className="px-4 py-3 text-left font-bold">Proprietário</th>
+            <th className="px-4 py-3 text-right font-bold bg-amber-600/20 text-amber-100">Custo Mensal</th>
             <th className="px-4 py-3 text-right font-bold">Valor Mensal</th>
             <th className="px-4 py-3 text-left font-bold">Condomínio</th>
             <th className="px-4 py-3 text-right font-bold">IPTU Anual</th>
@@ -310,6 +312,7 @@ function TabelaContratos({
               )}
               <td className="px-4 py-3 font-semibold text-slate-800">{c.local}</td>
               <td className="px-4 py-3 text-slate-600">{c.proprietario || '—'}</td>
+              <td className="px-4 py-3 text-right font-black text-amber-700 tabular-nums bg-amber-50">{fmtBRL(c.valorMensal + (Number(c.condominio) || 0) + c.iptuAnual / 12)}</td>
               <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">{fmtBRL(c.valorMensal)}</td>
               <td className="px-4 py-3 text-right text-slate-600 tabular-nums">{(Number(c.condominio) || 0) > 0 ? fmtBRL(Number(c.condominio)) : '—'}</td>
               <td className="px-4 py-3 text-right text-slate-600 tabular-nums">{c.iptuAnual > 0 ? fmtBRL(c.iptuAnual) : '—'}</td>
@@ -338,6 +341,7 @@ function TabelaContratos({
             <td className="px-4 py-2.5 text-xs font-bold text-amber-800 uppercase tracking-wide" colSpan={2}>
               Total ({contratos.length} {contratos.length === 1 ? 'contrato' : 'contratos'})
             </td>
+            <td className="px-4 py-2.5 text-right font-black text-amber-900 tabular-nums bg-amber-100">{fmtBRL(totalCustoMensal)}</td>
             <td className="px-4 py-2.5 text-right font-black text-amber-900 tabular-nums">{fmtBRL(totalMensal)}</td>
             <td className="px-4 py-2.5 text-right font-bold text-amber-800 tabular-nums">{totalCondominio > 0 ? fmtBRL(totalCondominio) : '—'}</td>
             <td className="px-4 py-2.5 text-right font-bold text-amber-800 tabular-nums">{totalIptuAnual > 0 ? fmtBRL(totalIptuAnual) : '—'}</td>
@@ -415,9 +419,10 @@ export function CustosAlugueisDashboard({ onChangeBrand }: Props) {
   const currentContratos = tab === 'total' ? contratos : tab === 'audi' ? audis : vws;
   const empresaModal: Empresa = tab === 'audi' ? 'audi' : 'vw';
 
-  const totalMensal  = currentContratos.reduce((s, c) => s + c.valorMensal, 0);
-  const totalIptu    = currentContratos.reduce((s, c) => s + c.iptuAnual, 0);
-  const custoTotal   = totalMensal + totalIptu / 12;
+  const totalMensal      = currentContratos.reduce((s, c) => s + c.valorMensal, 0);
+  const totalCondominioKpi = currentContratos.reduce((s, c) => s + (Number(c.condominio) || 0), 0);
+  const totalIptu         = currentContratos.reduce((s, c) => s + c.iptuAnual, 0);
+  const custoTotal        = totalMensal + totalCondominioKpi + totalIptu / 12;
   const qtde         = currentContratos.length;
   const vencimentos  = currentContratos.filter(c => c.dataRenovacao && diasParaRenovacao(c.dataRenovacao) <= 90).length;
 
@@ -458,11 +463,15 @@ export function CustosAlugueisDashboard({ onChangeBrand }: Props) {
     const tMensal      = currentContratos.reduce((s, c) => s + c.valorMensal, 0);
     const tCondominio  = currentContratos.reduce((s, c) => s + (Number(c.condominio) || 0), 0);
     const tIptu        = currentContratos.reduce((s, c) => s + c.iptuAnual, 0);
+    const tCustoMensal = tMensal + tCondominio + tIptu / 12;
 
-    const rows = currentContratos.map(c => [
+    const rows = currentContratos.map(c => {
+      const custoMensalRow = c.valorMensal + (Number(c.condominio) || 0) + c.iptuAnual / 12;
+      return [
       isTotal ? `<td>${empBadge(c.empresa)}</td>` : '',
       `<td style="font-weight:600;">${c.local}</td>`,
       `<td>${c.proprietario || '-'}</td>`,
+      `<td style="text-align:right;font-weight:900;color:#b45309;background:#fffbeb;">${fmtBRL(custoMensalRow)}</td>`,
       `<td style="text-align:right;font-weight:700;">${fmtBRL(c.valorMensal)}</td>`,
       `<td style="text-align:right;">${(Number(c.condominio) || 0) > 0 ? fmtBRL(Number(c.condominio)) : '-'}</td>`,
       `<td style="text-align:right;">${c.iptuAnual > 0 ? fmtBRL(c.iptuAnual) : '-'}</td>`,
@@ -472,7 +481,8 @@ export function CustosAlugueisDashboard({ onChangeBrand }: Props) {
       `<td>${c.utilizacaoRateio || '-'}</td>`,
       `<td>${renText(c.dataRenovacao)}</td>`,
       `<td style="color:#64748b;font-size:10px;">${c.observacoes || '-'}</td>`,
-    ].join('')).map(r => `<tr>${r}</tr>`).join('');
+      ].join('');
+    }).map(r => `<tr>${r}</tr>`).join('');
 
     const empCol  = isTotal ? '<th>Empresa</th>' : '';
     const empFoot = isTotal ? '<td></td>' : '';
@@ -502,9 +512,10 @@ export function CustosAlugueisDashboard({ onChangeBrand }: Props) {
       + `<div class="hdr"><div><h1>Custos com Alugueis - ${tabLabel}</h1><p>Grupo Sorana - Gestao de contratos de locacao</p></div>`
       + `<div class="meta"><div>Impresso em ${dataBR} as ${horaBR}</div><div>${currentContratos.length} contrato${currentContratos.length !== 1 ? 's' : ''}</div></div></div>`
       + `<div class="kpis">${kpiRows.map(k => `<div class="kpi"><div class="lbl">${k.label}</div><div class="val">${k.value}</div></div>`).join('')}</div>`
-      + `<table><thead><tr>${empCol}<th>Local</th><th>Proprietario</th><th class="r">Valor Mensal</th><th class="r">Condominio</th><th class="r">IPTU Anual</th><th>IPTU/Mes</th><th>Utilizacao/Rateio</th><th>Renovacao</th><th>Observacoes</th></tr></thead>`
+      + `<table><thead><tr>${empCol}<th>Local</th><th>Proprietario</th><th class="r" style="background:#92400e;color:#fff;">Custo Mensal</th><th class="r">Valor Mensal</th><th class="r">Condominio</th><th class="r">IPTU Anual</th><th>IPTU/Mes</th><th>Utilizacao/Rateio</th><th>Renovacao</th><th>Observacoes</th></tr></thead>`
       + `<tbody>${rows}</tbody>`
       + `<tfoot><tr>${empFoot}<td colspan="2">Total (${currentContratos.length} contrato${currentContratos.length !== 1 ? 's' : ''})</td>`
+      + `<td style="text-align:right;background:#fef3c7;font-weight:900;color:#92400e;">${fmtBRL(tCustoMensal)}</td>`
       + `<td style="text-align:right;">${fmtBRL(tMensal)}</td>`
       + `<td style="text-align:right;">${tCondominio > 0 ? fmtBRL(tCondominio) : '-'}</td>`
       + `<td style="text-align:right;">${tIptu > 0 ? fmtBRL(tIptu) : '-'}</td>`
@@ -592,7 +603,7 @@ export function CustosAlugueisDashboard({ onChangeBrand }: Props) {
           <div className="grid grid-cols-4 gap-4">
             <KpiCard icon={<DollarSign className="w-5 h-5" />} label="Custo Mensal (Aluguel)" value={fmtBRL(totalMensal)} sub={`${qtde} ${qtde === 1 ? 'contrato' : 'contratos'}`} accent="#d97706" />
             <KpiCard icon={<Building2 className="w-5 h-5" />} label="IPTU Anual" value={fmtBRL(totalIptu)} sub={`≈ ${fmtBRL(totalIptu / 12)}/mês`} accent="#0f766e" />
-            <KpiCard icon={<DollarSign className="w-5 h-5" />} label="Custo Total c/ IPTU/Mês" value={fmtBRL(custoTotal)} sub="Aluguel + IPTU mensal" accent="#7c3aed" />
+            <KpiCard icon={<DollarSign className="w-5 h-5" />} label="Custo Total c/ IPTU/Mês" value={fmtBRL(custoTotal)} sub="Aluguel + Cond. + IPTU mensal" accent="#7c3aed" />
             <KpiCard icon={<Calendar className="w-5 h-5" />} label="Renovações em 90 dias" value={String(vencimentos)} sub={vencimentos > 0 ? 'contrato(s) a vencer' : 'Nenhum vencendo em breve'} accent={vencimentos > 0 ? '#dc2626' : '#059669'} />
           </div>
 
