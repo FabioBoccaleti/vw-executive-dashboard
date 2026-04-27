@@ -503,16 +503,7 @@ export function CentralVendasResumoPage() {
             delta={deltaRecLiqPct}
             sub={`vs. ${prevLabel}: ${fmtBRL(totalRecLiqPrev)}`}
           />
-          {/* LB% Consolidado */}
-          <KpiCard
-            label="Lucro Bruto % (c/ LB)"
-            value={fmtPct(totalLbPctCurrent)}
-            accent={totalLbPctCurrent >= 8 ? '#059669' : totalLbPctCurrent >= 4 ? '#d97706' : '#dc2626'}
-            delta={totalLbPctCurrent - totalLbPctPrev}
-            deltaIsAbsolute
-            deltaLabel={`pp vs. ${prevLabel}`}
-            sub={`LB R$: ${fmtBRL(totalLbCurrent)}`}
-          />
+
           {/* Receita / Dia Útil */}
           <KpiCard
             label={`Receita / Dia Útil (${diasUteis} dias)`}
@@ -834,18 +825,10 @@ export function CentralVendasResumoPage() {
                         </td>
                         <td className="px-4 py-2.5 text-right font-bold text-blue-900 tabular-nums">{fmtBRL(subRec)}</td>
                         <td className="px-4 py-2.5 text-right font-bold text-blue-800 tabular-nums">{fmtBRL(subLb)}</td>
-                        <td className="px-4 py-2.5 text-right">
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold border ${lbBg(subRec ? subLb / subRec * 100 : 0)}`}>
-                            {fmtPct(subRec ? subLb / subRec * 100 : 0)}
-                          </span>
-                        </td>
+                        <td className="px-4 py-2.5 text-right"></td>
                         <td className="px-4 py-2.5 text-right text-blue-700 tabular-nums">{fmtBRL(subDia)}</td>
                         <td className="px-4 py-2.5 text-right text-blue-600 tabular-nums">{fmtBRL(subRecPrev)}</td>
-                        <td className="px-4 py-2.5 text-right">
-                          <span className={`inline-block px-1.5 py-0.5 rounded-full text-xs font-bold border ${lbBg(subLbPctPrev)}`}>
-                            {fmtPct(subLbPctPrev)}
-                          </span>
-                        </td>
+                        <td className="px-4 py-2.5 text-right"></td>
                         <td className={`px-4 py-2.5 text-right tabular-nums font-semibold text-xs ${subDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                           {subDelta >= 0 ? '+' : ''}{fmtBRL(subDelta)}
                         </td>
@@ -864,18 +847,10 @@ export function CentralVendasResumoPage() {
                   </td>
                   <td className="px-4 py-3 text-right font-black text-base tabular-nums">{fmtBRL(totalRecLiqCurrent)}</td>
                   <td className="px-4 py-3 text-right font-bold tabular-nums">{fmtBRL(totalLbCurrent)}</td>
-                  <td className="px-4 py-3 text-right">
-                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-black bg-white text-slate-800">
-                      {fmtPct(totalLbPctCurrent)}
-                    </span>
-                  </td>
+                  <td className="px-4 py-3 text-right"></td>
                   <td className="px-4 py-3 text-right font-bold tabular-nums">{fmtBRL(recDiaTotal)}</td>
                   <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{fmtBRL(totalRecLiqPrev)}</td>
-                  <td className="px-4 py-3 text-right">
-                    <span className="inline-block px-1.5 py-0.5 rounded-full text-xs font-black bg-white text-slate-800">
-                      {fmtPct(totalLbPctPrev)}
-                    </span>
-                  </td>
+                  <td className="px-4 py-3 text-right"></td>
                   <td className={`px-4 py-3 text-right font-bold tabular-nums ${deltaRecLiq >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
                     {deltaRecLiq >= 0 ? '+' : ''}{fmtBRL(deltaRecLiq)}
                   </td>

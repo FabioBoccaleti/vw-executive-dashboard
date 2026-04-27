@@ -20,6 +20,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { useAuth } from '@/contexts/useAuth'
 import { LoginScreen } from '@/components/LoginScreen'
 import { AdminPage } from '@/components/AdminPage'
+import { CustosAlugueisDashboard } from '@/components/CustosAlugueisDashboard'
 
 function AppContent() {
   const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
@@ -259,6 +260,8 @@ function AppContent() {
             onOpenCadastros={() => { setCadastrosVariant('blindagem'); setCurrentPage('cadastros'); }}
           />
         )
+      ) : brand === 'custos_alugueis' ? (
+        <CustosAlugueisDashboard onChangeBrand={handleChangeBrand} />
       ) : (
         <VWFinancialDashboard 
           brand={brand} 

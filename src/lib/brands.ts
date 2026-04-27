@@ -1,13 +1,13 @@
-/**
- * Configuração de Marcas - Sistema Multimarcas
+﻿/**
+ * ConfiguraÃ§Ã£o de Marcas - Sistema Multimarcas
  * 
- * Este módulo gerencia as marcas disponíveis no sistema e suas configurações visuais.
+ * Este mÃ³dulo gerencia as marcas disponÃ­veis no sistema e suas configuraÃ§Ãµes visuais.
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis';
 
-// Interface de configuração visual da marca
+// Interface de configuraÃ§Ã£o visual da marca
 export interface BrandConfig {
   id: Brand;
   name: string;
@@ -35,7 +35,7 @@ export interface BrandConfig {
   };
 }
 
-// Configurações das marcas
+// ConfiguraÃ§Ãµes das marcas
 export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
   vw: {
     id: 'vw',
@@ -164,9 +164,9 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
   },
   aprovacao_despesas: {
     id: 'aprovacao_despesas',
-    name: 'Sistema de Gerenciamento e Aprovação de Despesas',
+    name: 'Sistema de Gerenciamento e AprovaÃ§Ã£o de Despesas',
     shortName: 'Gerenciamento',
-    fullName: 'Sistema de Gerenciamento e Aprovação de Despesas',
+    fullName: 'Sistema de Gerenciamento e AprovaÃ§Ã£o de Despesas',
     colors: {
       primary: '#059669',
       primaryHover: '#047857',
@@ -215,7 +215,7 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
   },
   vendas_bonificacoes: {
     id: 'vendas_bonificacoes',
-    name: 'Demonstrativo de Vendas e Bonificações',
+    name: 'Demonstrativo de Vendas e BonificaÃ§Ãµes',
     shortName: 'Vendas',
     colors: {
       primary: '#b45309',
@@ -263,16 +263,41 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-accent': '#2dd4bf',
     }
   },
+  custos_alugueis: {
+    id: 'custos_alugueis',
+    name: 'Custos com Aluguéis',
+    shortName: 'Aluguéis',
+    colors: {
+      primary: '#d97706',
+      primaryHover: '#b45309',
+      primaryLight: '#fef3c7',
+      secondary: '#f59e0b',
+      accent: '#fbbf24',
+      headerBg: 'bg-[#d97706]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#d97706] hover:bg-[#b45309]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-amber-100 dark:bg-amber-900/30',
+      badgeText: 'text-amber-800 dark:text-amber-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#d97706',
+      '--brand-primary-hover': '#b45309',
+      '--brand-primary-light': '#fef3c7',
+      '--brand-secondary': '#f59e0b',
+      '--brand-accent': '#fbbf24',
+    }
+  },
 };
 
-// Lista de marcas disponíveis (para iteração) - ordem de exibição
-export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento'];
+// Lista de marcas disponiveis
+export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis'];
 
 // Chave de armazenamento para marca selecionada
 export const SELECTED_BRAND_KEY = 'selected_brand';
 
 /**
- * Obtém a marca salva no localStorage ou retorna a padrão (VW)
+ * ObtÃ©m a marca salva no localStorage ou retorna a padrÃ£o (VW)
  */
 export function getSavedBrand(): Brand {
   if (typeof window === 'undefined') return 'vw';
@@ -291,14 +316,14 @@ export function saveBrand(brand: Brand): void {
 }
 
 /**
- * Obtém a configuração da marca
+ * ObtÃ©m a configuraÃ§Ã£o da marca
  */
 export function getBrandConfig(brand: Brand): BrandConfig {
   return BRAND_CONFIGS[brand];
 }
 
 /**
- * Aplica as variáveis CSS da marca ao documento
+ * Aplica as variÃ¡veis CSS da marca ao documento
  */
 export function applyBrandTheme(brand: Brand): void {
   const config = BRAND_CONFIGS[brand];
@@ -315,3 +340,4 @@ export function applyBrandTheme(brand: Brand): void {
 export function getStorageKey(brand: Brand, baseKey: string): string {
   return `${brand}_${baseKey}`;
 }
+

@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 
 // Tipos inline (evita importação cross-directory que pode falhar no bundler Vercel)
 export type UserRole = 'admin' | 'gestor' | 'leitura';
-export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'central_vendas_vw';
+export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'central_vendas_vw' | 'custos_alugueis';
 export type BrandId = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros';
 export type VendasSubModuleId =
   | 'blindagem.tabela'
@@ -29,7 +29,7 @@ export type CentralVendasVWSubModuleId =
   | 'central_vw.financeiro'
   | 'central_vw.registros'
   | 'central_vw.cadastros';
-export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw'];
+export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw', 'custos_alugueis'];
 export const ALL_BRANDS: BrandId[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
 
 export interface UserRecord {
