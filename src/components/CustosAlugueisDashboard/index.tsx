@@ -14,7 +14,7 @@ export interface ContratoAluguel {
   empresa: Empresa;
   local: string;
   proprietario: string;
-  condominio: string;
+  condominio: number;
   valorMensal: number;
   iptuAnual: number;
   utilizacaoRateio: string;
@@ -80,7 +80,7 @@ const EMPTY: Omit<ContratoAluguel, 'id'> = {
   empresa: 'vw',
   local: '',
   proprietario: '',
-  condominio: '',
+  condominio: 0,
   valorMensal: 0,
   iptuAnual: 0,
   utilizacaoRateio: '',
@@ -175,7 +175,16 @@ function ContratoModal({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <InputField label="Condomínio" value={form.condominio} onChange={set('condominio')} placeholder="Nome do condomínio (opcional)" />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Condomínio</label>
+              <input
+                type="text"
+                value={fmtInput(form.condominio)}
+                onChange={e => setForm(p => ({ ...p, condominio: parseNum(e.target.value) }))}
+                placeholder="0,00"
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
+              />
+            </div>
             <InputField label="Utilização / Rateio" value={form.utilizacaoRateio} onChange={set('utilizacaoRateio')} placeholder="Ex: 100% VW, Administrativo" />
           </div>
 
@@ -263,9 +272,10 @@ function TabelaContratos({
     );
   }
 
-  const totalMensal    = contratos.reduce((s, c) => s + c.valorMensal, 0);
-  const totalIptuAnual = contratos.reduce((s, c) => s + c.iptuAnual, 0);
-  const totalIptuMes   = totalIptuAnual / 12;
+  const totalMensal      = contratos.reduce((s, c) => s + c.valorMensal, 0);
+  const totalCondominio  = contratos.reduce((s, c) => s + (Number(c.condominio) || 0), 0);
+  const totalIptuAnual   = contratos.reduce((s, c) => s + c.iptuAnual, 0);
+  const totalIptuMes     = totalIptuAnual / 12;
 
   return (
     <div className="overflow-x-auto">
@@ -301,7 +311,7 @@ function TabelaContratos({
               <td className="px-4 py-3 font-semibold text-slate-800">{c.local}</td>
               <td className="px-4 py-3 text-slate-600">{c.proprietario || '—'}</td>
               <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">{fmtBRL(c.valorMensal)}</td>
-              <td className="px-4 py-3 text-slate-600">{c.condominio || '—'}</td>
+              <td className="px-4 py-3 text-right text-slate-600 tabular-nums">{(Number(c.condominio) || 0) > 0 ? fmtBRL(Number(c.condominio)) : '—'}</td>
               <td className="px-4 py-3 text-right text-slate-600 tabular-nums">{c.iptuAnual > 0 ? fmtBRL(c.iptuAnual) : '—'}</td>
               <td className="px-4 py-3 text-right text-slate-600 tabular-nums">{c.iptuAnual > 0 ? fmtBRL(c.iptuAnual / 12) : '—'}</td>
               <td className="px-4 py-3 text-slate-600 text-xs">{c.utilizacaoRateio || '—'}</td>
@@ -329,7 +339,7 @@ function TabelaContratos({
               Total ({contratos.length} {contratos.length === 1 ? 'contrato' : 'contratos'})
             </td>
             <td className="px-4 py-2.5 text-right font-black text-amber-900 tabular-nums">{fmtBRL(totalMensal)}</td>
-            <td className="px-4 py-2.5" />
+            <td className="px-4 py-2.5 text-right font-bold text-amber-800 tabular-nums">{totalCondominio > 0 ? fmtBRL(totalCondominio) : '—'}</td>
             <td className="px-4 py-2.5 text-right font-bold text-amber-800 tabular-nums">{totalIptuAnual > 0 ? fmtBRL(totalIptuAnual) : '—'}</td>
             <td className="px-4 py-2.5 text-right font-bold text-amber-800 tabular-nums">{totalIptuMes > 0 ? fmtBRL(totalIptuMes) : '—'}</td>
             <td className="px-4 py-2.5" colSpan={readOnly ? 3 : 4} />
@@ -445,16 +455,18 @@ export function CustosAlugueisDashboard({ onChangeBrand }: Props) {
       return `<span style="color:#059669;">${txt}</span>`;
     };
 
-    const tMensal = currentContratos.reduce((s, c) => s + c.valorMensal, 0);
-    const tIptu   = currentContratos.reduce((s, c) => s + c.iptuAnual, 0);
+    const tMensal      = currentContratos.reduce((s, c) => s + c.valorMensal, 0);
+    const tCondominio  = currentContratos.reduce((s, c) => s + (Number(c.condominio) || 0), 0);
+    const tIptu        = currentContratos.reduce((s, c) => s + c.iptuAnual, 0);
 
     const rows = currentContratos.map(c => [
       isTotal ? `<td>${empBadge(c.empresa)}</td>` : '',
       `<td style="font-weight:600;">${c.local}</td>`,
       `<td>${c.proprietario || '-'}</td>`,
       `<td style="text-align:right;font-weight:700;">${fmtBRL(c.valorMensal)}</td>`,
-      `<td>${c.condominio || '-'}</td>`,
+      `<td style="text-align:right;">${(Number(c.condominio) || 0) > 0 ? fmtBRL(Number(c.condominio)) : '-'}</td>`,
       `<td style="text-align:right;">${c.iptuAnual > 0 ? fmtBRL(c.iptuAnual) : '-'}</td>`,
+
 
       `<td style="text-align:right;">${c.iptuAnual > 0 ? fmtBRL(c.iptuAnual / 12) : '-'}</td>`,
       `<td>${c.utilizacaoRateio || '-'}</td>`,
@@ -490,11 +502,11 @@ export function CustosAlugueisDashboard({ onChangeBrand }: Props) {
       + `<div class="hdr"><div><h1>Custos com Alugueis - ${tabLabel}</h1><p>Grupo Sorana - Gestao de contratos de locacao</p></div>`
       + `<div class="meta"><div>Impresso em ${dataBR} as ${horaBR}</div><div>${currentContratos.length} contrato${currentContratos.length !== 1 ? 's' : ''}</div></div></div>`
       + `<div class="kpis">${kpiRows.map(k => `<div class="kpi"><div class="lbl">${k.label}</div><div class="val">${k.value}</div></div>`).join('')}</div>`
-      + `<table><thead><tr>${empCol}<th>Local</th><th>Proprietario</th><th>Valor Mensal</th><th>Condominio</th><th>IPTU Anual</th><th>IPTU/Mes</th><th>Utilizacao/Rateio</th><th>Renovacao</th><th>Observacoes</th></tr></thead>`
+      + `<table><thead><tr>${empCol}<th>Local</th><th>Proprietario</th><th class="r">Valor Mensal</th><th class="r">Condominio</th><th class="r">IPTU Anual</th><th>IPTU/Mes</th><th>Utilizacao/Rateio</th><th>Renovacao</th><th>Observacoes</th></tr></thead>`
       + `<tbody>${rows}</tbody>`
       + `<tfoot><tr>${empFoot}<td colspan="2">Total (${currentContratos.length} contrato${currentContratos.length !== 1 ? 's' : ''})</td>`
       + `<td style="text-align:right;">${fmtBRL(tMensal)}</td>`
-      + `<td></td>`
+      + `<td style="text-align:right;">${tCondominio > 0 ? fmtBRL(tCondominio) : '-'}</td>`
       + `<td style="text-align:right;">${tIptu > 0 ? fmtBRL(tIptu) : '-'}</td>`
       + `<td style="text-align:right;">${tIptu > 0 ? fmtBRL(tIptu / 12) : '-'}</td>`
       + '<td colspan="3"></td></tr></tfoot></table>'
