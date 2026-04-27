@@ -180,6 +180,7 @@ function CustomTooltip({ active, payload, label }: {
   active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string;
 }) {
   if (!active || !payload?.length) return null;
+  const total = payload.reduce((s, p) => s + (p.value ?? 0), 0);
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-3 min-w-[180px]">
       <p className="text-xs font-bold text-slate-600 mb-2">{label}</p>
@@ -192,6 +193,10 @@ function CustomTooltip({ active, payload, label }: {
           <span className="font-bold text-slate-800 tabular-nums">{fmtBRLFull(p.value)}</span>
         </div>
       ))}
+      <div className="border-t border-slate-100 mt-1.5 pt-1.5 flex items-center justify-between gap-4 text-xs">
+        <span className="font-bold text-slate-500">Total</span>
+        <span className="font-black text-slate-800 tabular-nums">{fmtBRLFull(total)}</span>
+      </div>
     </div>
   );
 }
