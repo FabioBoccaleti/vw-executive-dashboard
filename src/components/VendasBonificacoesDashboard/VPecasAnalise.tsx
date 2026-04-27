@@ -36,12 +36,16 @@ const DEPT_LABEL: Record<string, string> = {
   '104': 'Oficina',
   '106': 'Funilaria',
   '107': 'Acessórios',
+  '122': 'Oficina (int.)',
+  '129': 'Funilaria (int.)',
 };
 const DEPT_COLOR: Record<string, string> = {
   '103': '#7c3aed',  // Peças — violeta
   '104': '#f59e0b',  // Oficina — âmbar/amarelo
   '106': '#06b6d4',  // Funilaria — ciano
   '107': '#10b981',  // Acessórios — esmeralda
+  '122': '#fbbf24',  // Oficina (int.) — âmbar claro
+  '129': '#67e8f9',  // Funilaria (int.) — ciano claro
 };
 const deptName  = (code: string) => DEPT_LABEL[code] ?? code;
 const deptColor = (code: string, fallbackIdx: number) => DEPT_COLOR[code] ?? PALETTE[fallbackIdx % PALETTE.length];
@@ -125,11 +129,12 @@ function rowTaxa(d: Record<string, string>, ctx: TaxaContext): { taxaML: number;
 interface Calc { valorVenda: number; icms: number; pis: number; cofins: number; difal: number; totalImpostos: number; recLiq: number; custo: number; taxaML: number; taxaEP: number; lucroBruto: number; lucroBrutoPct: number; }
 function calcPecas(d: Record<string, string>, taxaML = 0, taxaEP = 0): Calc {
   const valorVenda = n(d['LIQ_NOTA_FISCAL']);
+  const iss        = n(d['VAL_ISS']);
   const icms       = n(d['VAL_ICMS']);
   const pis        = n(d['VAL_PIS']);
   const cofins     = n(d['VAL_COFINS']);
   const difal      = n(d['VAL_ICMS_PARTIL_UF_DEST']) + n(d['VAL_ICMS_COMB_POBREZA']);
-  const totalImpostos = icms + pis + cofins + difal;
+  const totalImpostos = iss + icms + pis + cofins + difal;
   const recLiq     = valorVenda - totalImpostos;
   const custo      = n(d['TOT_CUSTO_MEDIO']);
   const lucroBruto = recLiq - taxaML - taxaEP - custo;

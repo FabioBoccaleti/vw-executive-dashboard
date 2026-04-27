@@ -215,12 +215,13 @@ export function CentralVendasResumoPage() {
       }
       const diretaVol = diretaRows.length;
 
-      // — Peças (dept 103) —
+      // — Peças (dept 103, NFs normais — exclui RPS/OS) —
       const pecasDepts = ['103'];
       const pecasRows = rowsVPecas.filter(r => {
         const { yr: y, mo: m } = getYrMoVPecas(r);
-        const dept = r.data['DEPARTAMENTO']?.trim() ?? '';
-        return y === yr && m === mo && pecasDepts.includes(dept);
+        const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
+        const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
+        return y === yr && m === mo && pecasDepts.includes(dept) && serie !== 'RPS';
       });
       let pecasRecLiq = 0, pecasLb = 0;
       for (const r of pecasRows) {
@@ -229,32 +230,35 @@ export function CentralVendasResumoPage() {
         pecasLb     += c.lb;
       }
 
-      // — Oficina (dept 104, 122) —
+      // — Oficina (dept 104, 122, somente RPS/OS) —
       const oficinaDepts = ['104', '122'];
       const oficinaRows = rowsVPecas.filter(r => {
         const { yr: y, mo: m } = getYrMoVPecas(r);
-        const dept = r.data['DEPARTAMENTO']?.trim() ?? '';
-        return y === yr && m === mo && oficinaDepts.includes(dept);
+        const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
+        const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
+        return y === yr && m === mo && oficinaDepts.includes(dept) && serie === 'RPS';
       });
       let oficinaRecLiq = 0;
       for (const r of oficinaRows) { oficinaRecLiq += calcServicosRow(r.data).recLiq; }
 
-      // — Funilaria (dept 106, 129) —
+      // — Funilaria (dept 106, 129, somente RPS/OS) —
       const funilariaDepts = ['106', '129'];
       const funitariaRows = rowsVPecas.filter(r => {
         const { yr: y, mo: m } = getYrMoVPecas(r);
-        const dept = r.data['DEPARTAMENTO']?.trim() ?? '';
-        return y === yr && m === mo && funilariaDepts.includes(dept);
+        const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
+        const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
+        return y === yr && m === mo && funilariaDepts.includes(dept) && serie === 'RPS';
       });
       let funitariaRecLiq = 0;
       for (const r of funitariaRows) { funitariaRecLiq += calcServicosRow(r.data).recLiq; }
 
-      // — Acessórios (dept 107) —
+      // — Acessórios (dept 107, somente RPS/OS) —
       const acessoriosDepts = ['107'];
       const acessoriosRows = rowsVPecas.filter(r => {
         const { yr: y, mo: m } = getYrMoVPecas(r);
-        const dept = r.data['DEPARTAMENTO']?.trim() ?? '';
-        return y === yr && m === mo && acessoriosDepts.includes(dept);
+        const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
+        const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
+        return y === yr && m === mo && acessoriosDepts.includes(dept) && serie === 'RPS';
       });
       let acessoriosRecLiq = 0;
       for (const r of acessoriosRows) { acessoriosRecLiq += calcServicosRow(r.data).recLiq; }
@@ -326,13 +330,14 @@ export function CentralVendasResumoPage() {
     rowsVPecas
       .filter(r => { const { yr: y, mo: m } = getYrMoVPecas(r); return y === year && m === month; })
       .forEach(r => {
-        const dia = getDiaVPecas(r);
-        const dept = r.data['DEPARTAMENTO']?.trim() ?? '';
+        const dia   = getDiaVPecas(r);
+        const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
+        const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
         if (dia > 0) {
-          if (dept === '103')              map[dia].pecas      += calcPecasRow(r.data).recLiq;
-          else if (['104','122'].includes(dept)) map[dia].oficina    += calcServicosRow(r.data).recLiq;
-          else if (['106','129'].includes(dept)) map[dia].funilaria  += calcServicosRow(r.data).recLiq;
-          else if (dept === '107')         map[dia].acessorios += calcServicosRow(r.data).recLiq;
+          if (dept === '103' && serie !== 'RPS')               map[dia].pecas      += calcPecasRow(r.data).recLiq;
+          else if (['104','122'].includes(dept) && serie === 'RPS') map[dia].oficina    += calcServicosRow(r.data).recLiq;
+          else if (['106','129'].includes(dept) && serie === 'RPS') map[dia].funilaria  += calcServicosRow(r.data).recLiq;
+          else if (dept === '107'               && serie === 'RPS') map[dia].acessorios += calcServicosRow(r.data).recLiq;
         }
       });
     return Object.entries(map)
@@ -546,9 +551,27 @@ export function CentralVendasResumoPage() {
                       width={55}
                     />
                     <Tooltip
-                      formatter={(v: number, name: string) => [fmtBRL(v), name]}
-                      labelFormatter={l => `Dia ${l}`}
-                      contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 11 }}
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        const total = (payload as { value: number }[]).reduce((s, p) => s + (p.value ?? 0), 0);
+                        return (
+                          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 11, minWidth: 200 }}>
+                            <p style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>Dia {label}</p>
+                            {(payload as { name: string; value: number; color: string }[]).map((p, i) =>
+                              p.value > 0 && (
+                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 2 }}>
+                                  <span style={{ color: p.color, fontWeight: 600 }}>{p.name}</span>
+                                  <span style={{ color: '#334155', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(p.value)}</span>
+                                </div>
+                              )
+                            )}
+                            <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 6, paddingTop: 5, display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                              <span style={{ fontWeight: 700, color: '#1e293b' }}>Total</span>
+                              <span style={{ fontWeight: 700, color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(total)}</span>
+                            </div>
+                          </div>
+                        );
+                      }}
                     />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <Bar dataKey="novos"      name="Novos"        stackId="a" fill={DEPT_COLORS.novos} />
@@ -624,11 +647,11 @@ export function CentralVendasResumoPage() {
                     <td className="px-2 py-1.5 font-black uppercase text-[9px] tracking-wide">TOTAL</td>
                     {(['novos','usados','direta','pecas','oficina','funilaria','acessorios'] as const).map(k => (
                       <td key={k} className="px-2 py-1.5 text-right tabular-nums font-bold">
-                        {fmtBRL(dailyData.reduce((s, d) => s + d[k], 0))}
+                        {fmtBRL(deptsCurrent.find(d => d.id === k)?.recLiq ?? 0)}
                       </td>
                     ))}
                     <td className="px-2 py-1.5 text-right tabular-nums font-black">
-                      {fmtBRL(dailyData.reduce((s, d) => s + d.total, 0))}
+                      {fmtBRL(totalRecLiqCurrent)}
                     </td>
                   </tr>
                 </tfoot>
@@ -863,8 +886,24 @@ export function CentralVendasResumoPage() {
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
                   <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => `${v}k`} />
                   <Tooltip
-                    formatter={(v: number) => [`R$ ${v.toLocaleString('pt-BR')} mil`, '']}
-                    contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }}
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 12, minWidth: 210 }}>
+                          <p style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>{label}</p>
+                          {(payload as { name: string; value: number; color: string }[]).map((p, i) => {
+                            const monthLabel = p.name === 'Mês Atual' ? currLabel : prevLabel;
+                            const textColor  = p.name === 'Mês Atual' ? p.color : '#475569';
+                            return (
+                              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginBottom: 2 }}>
+                                <span style={{ color: textColor, fontWeight: 600 }}>{monthLabel}</span>
+                                <span style={{ color: '#1e293b', fontVariantNumeric: 'tabular-nums' }}>R$ {p.value.toLocaleString('pt-BR')} mil</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="Mês Atual" radius={[4, 4, 0, 0]}>
