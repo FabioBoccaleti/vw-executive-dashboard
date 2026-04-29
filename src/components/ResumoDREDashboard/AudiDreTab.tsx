@@ -59,30 +59,31 @@ interface DreLineConfig {
 }
 
 const DRE_LINES: DreLineConfig[] = [
-  { label: 'Quant. / Passagens',                  field: 'quant',                      isBold: false },
-  { label: '',                                      field: 'quant',                      separator: true },
-  { label: 'Receita Bruta de Vendas',              field: 'receitaBruta',               isBold: true },
-  { label: '(-) Impostos Incidentes e Devoluções', field: 'impostosDevol',              indent: true, isNegative: true },
-  { label: 'Vendas Líquidas',                      field: 'vendasLiquidas',             isSubtotal: true },
-  { label: '(-) Custos',                            field: 'custos',                     indent: true, isNegative: true },
-  { label: 'Lucro Bruto Apurado',                  field: 'lucroBruto',                 isSubtotal: true },
-  { label: 'Rendas Operacionais Líquidas',          field: 'rendasOperacionais',         indent: true },
-  { label: 'Resultado Operacional Bruto',          field: 'resultadoOperacionalBruto',  isSubtotal: true },
-  { label: '(-) Despesas com Vendas',              field: 'despesasVendas',             indent: true, isNegative: true },
-  { label: 'MARGEM DE CONTRIBUIÇÃO',               field: 'margemContribuicao',         isTotal: true },
-  { label: '',                                      field: 'margemContribuicao',         separator: true },
-  { label: '(-) Despesas com Pessoal',             field: 'despPessoal',                indent: true, isNegative: true },
-  { label: '(-) Despesas com Serviços de Terceiros', field: 'despServTerceiros',        indent: true, isNegative: true },
-  { label: '(-) Despesas com Ocupação',            field: 'despOcupacao',               indent: true, isNegative: true },
-  { label: '(-) Despesas com Funcionamento',       field: 'despFuncionamento',          indent: true, isNegative: true },
-  { label: 'TOTAL DAS DESPESAS FIXAS',             field: 'totalDespesasFixas',         isTotal: true },
-  { label: '',                                      field: 'totalDespesasFixas',         separator: true },
-  { label: 'Resultado Antes do Financeiro',        field: 'resultadoAntesFinanceiro',   isSubtotal: true },
-  { label: '(+) Receitas Financeiras',             field: 'receitasFinanceiras',        indent: true },
-  { label: '(-) Despesas Financeiras',             field: 'despesasFinanceiras',        indent: true, isNegative: true },
-  { label: 'Resultado Antes dos Impostos',         field: 'resultadoAntesImpostos',     isSubtotal: true },
-  { label: '(-) I.R. e C.S.',                      field: 'irCs',                       indent: true, isNegative: true },
-  { label: 'RESULTADO LÍQUIDO NO PERÍODO',         field: 'resultadoLiquido',           isTotal: true },
+  { label: 'Volume de Vendas',                           field: 'quant',                         isBold: false },
+  { label: '',                                            field: 'quant',                         separator: true },
+  { label: 'Receita Operacional Líquida',                field: 'receitaOperacionalLiquida',      isBold: true },
+  { label: '(-) Custo Operacional da Receita',           field: 'custoOperacionalReceita',        indent: true, isNegative: true },
+  { label: 'Lucro (Prejuízo) Operacional Bruto',         field: 'lucroPrejOperacionalBruto',      isSubtotal: true },
+  { label: 'Outras Receitas Operacionais',               field: 'outrasReceitasOperacionais',     indent: true },
+  { label: '(-) Outras Despesas Operacionais',           field: 'outrasDespesasOperacionais',     indent: true, isNegative: true },
+  { label: 'MARGEM DE CONTRIBUIÇÃO',                     field: 'margemContribuicao',             isTotal: true },
+  { label: '',                                            field: 'margemContribuicao',             separator: true },
+  { label: '(-) Despesas c/ Pessoal',                    field: 'despPessoal',                    indent: true, isNegative: true },
+  { label: '(-) Despesas c/ Serv. de Terceiros',         field: 'despServTerceiros',              indent: true, isNegative: true },
+  { label: '(-) Despesas c/ Ocupação',                   field: 'despOcupacao',                   indent: true, isNegative: true },
+  { label: '(-) Despesas c/ Funcionamento',              field: 'despFuncionamento',              indent: true, isNegative: true },
+  { label: '(-) Despesas c/ Vendas',                     field: 'despVendas',                     indent: true, isNegative: true },
+  { label: 'LUCRO (PREJUÍZO) OPERACIONAL LÍQUIDO',       field: 'lucroPrejOperacionalLiquido',    isTotal: true },
+  { label: '',                                            field: 'lucroPrejOperacionalLiquido',    separator: true },
+  { label: 'Amortizações e Depreciações',                field: 'amortizacoesDepreciacoes',       indent: true, isNegative: true },
+  { label: 'Outras Receitas Financeiras',                field: 'outrasReceitasFinanceiras',      indent: true },
+  { label: '(-) Despesas Financeiras Não Operacional',   field: 'despFinanceirasNaoOperacional',  indent: true, isNegative: true },
+  { label: '(-) Despesas Não Operacionais',              field: 'despesasNaoOperacionais',        indent: true, isNegative: true },
+  { label: 'Outras Rendas Não Operacionais',             field: 'outrasRendasNaoOperacionais',    indent: true },
+  { label: 'Lucro (Prejuízo) Antes dos Impostos',        field: 'lucroPrejAntesImpostos',         isSubtotal: true },
+  { label: '(-) Provisões IRPJ e C.S.',                  field: 'provisoesIrpjCs',                indent: true, isNegative: true },
+  { label: '(-) Participações',                          field: 'participacoes',                  indent: true, isNegative: true },
+  { label: 'LUCRO LÍQUIDO DO EXERCÍCIO',                 field: 'lucroLiquidoExercicio',          isTotal: true },
 ];
 
 // ─── Departamentos ─────────────────────────────────────────────────────────────
@@ -514,7 +515,7 @@ function AjustesTable({
   data: DreAudiRow;
 }) {
   const deptList = DEPTS.map(d => data[d.key]);
-  const totalLiquido = sumDepts(deptList, 'resultadoLiquido');
+  const totalLiquido = sumDepts(deptList, 'lucroLiquidoExercicio');
 
   const icmsSt = parseFloat(ajustes.icmsSt.replace(/\./g, '').replace(',', '.')) || 0;
   const honorarios = parseFloat(ajustes.honorariosAdvogados.replace(/\./g, '').replace(',', '.')) || 0;
@@ -538,7 +539,7 @@ function AjustesTable({
           </thead>
           <tbody>
             <tr className="border-b border-slate-100 bg-slate-800 text-white font-bold">
-              <td className="px-4 py-1.5">Resultado Líquido no Período</td>
+              <td className="px-4 py-1.5">Lucro Líquido do Exercício</td>
               <td className="px-3 py-1.5 text-right">{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
               <td className="px-3 py-1.5 text-right bg-slate-700">{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
             </tr>

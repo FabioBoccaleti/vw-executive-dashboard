@@ -7,27 +7,28 @@ const key = (year: number, month: number) =>
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export interface DreAudiDept {
-  quant: string;
-  receitaBruta: string;
-  impostosDevol: string;
-  vendasLiquidas: string;
-  custos: string;
-  lucroBruto: string;
-  rendasOperacionais: string;
-  resultadoOperacionalBruto: string;
-  despesasVendas: string;
-  margemContribuicao: string;
-  despPessoal: string;
-  despServTerceiros: string;
-  despOcupacao: string;
-  despFuncionamento: string;
-  totalDespesasFixas: string;
-  resultadoAntesFinanceiro: string;
-  receitasFinanceiras: string;
-  despesasFinanceiras: string;
-  resultadoAntesImpostos: string;
-  irCs: string;
-  resultadoLiquido: string;
+  quant: string;                        // VOLUME DE VENDAS
+  receitaOperacionalLiquida: string;    // RECEITA OPERACIONAL LIQUIDA
+  custoOperacionalReceita: string;      // CUSTO OPERACIONAL DA RECEITA
+  lucroPrejOperacionalBruto: string;    // LUCRO (PREJUÍZO) OPERACIONAL BRUTO
+  outrasReceitasOperacionais: string;   // OUTRAS RECEITAS OPERACIONAIS
+  outrasDespesasOperacionais: string;   // OUTRAS DESPESAS OPERACIONAIS
+  margemContribuicao: string;           // MARGEM DE CONTRIBUIÇÃO
+  despPessoal: string;                  // DESPESAS C/ PESSOAL
+  despServTerceiros: string;            // DESPESAS C/ SERV. DE TERCEIROS
+  despOcupacao: string;                 // DESPESAS C/ OCUPAÇÃO
+  despFuncionamento: string;            // DESPESAS C/ FUNCIONAMENTO
+  despVendas: string;                   // DESPESAS C/ VENDAS
+  lucroPrejOperacionalLiquido: string;  // LUCRO (PREJUÍZO) OPERACIONAL LÍQUIDO
+  amortizacoesDepreciacoes: string;     // AMORTIZAÇÕES E DEPRECIAÇÕES
+  outrasReceitasFinanceiras: string;    // OUTRAS RECEITAS FINANCEIRAS
+  despFinanceirasNaoOperacional: string;// DESPESAS FINANCEIRAS NÃO OPERACIONAL
+  despesasNaoOperacionais: string;      // DESPESAS NÃO OPERACIONAIS
+  outrasRendasNaoOperacionais: string;  // OUTRAS RENDAS NÃO OPERACIONAIS
+  lucroPrejAntesImpostos: string;       // LUCRO (PREJUÍZO) ANTES IMPOSTOS
+  provisoesIrpjCs: string;              // PROVISÕES IRPJ E C.S.
+  participacoes: string;                // PARTICIPAÇÕES
+  lucroLiquidoExercicio: string;        // LUCRO LÍQUIDO DO EXERCÍCIO
 }
 
 export interface DreAudiRow {
@@ -52,26 +53,27 @@ export interface DreAudiRow {
 function emptyDept(): DreAudiDept {
   return {
     quant: '',
-    receitaBruta: '',
-    impostosDevol: '',
-    vendasLiquidas: '',
-    custos: '',
-    lucroBruto: '',
-    rendasOperacionais: '',
-    resultadoOperacionalBruto: '',
-    despesasVendas: '',
+    receitaOperacionalLiquida: '',
+    custoOperacionalReceita: '',
+    lucroPrejOperacionalBruto: '',
+    outrasReceitasOperacionais: '',
+    outrasDespesasOperacionais: '',
     margemContribuicao: '',
     despPessoal: '',
     despServTerceiros: '',
     despOcupacao: '',
     despFuncionamento: '',
-    totalDespesasFixas: '',
-    resultadoAntesFinanceiro: '',
-    receitasFinanceiras: '',
-    despesasFinanceiras: '',
-    resultadoAntesImpostos: '',
-    irCs: '',
-    resultadoLiquido: '',
+    despVendas: '',
+    lucroPrejOperacionalLiquido: '',
+    amortizacoesDepreciacoes: '',
+    outrasReceitasFinanceiras: '',
+    despFinanceirasNaoOperacional: '',
+    despesasNaoOperacionais: '',
+    outrasRendasNaoOperacionais: '',
+    lucroPrejAntesImpostos: '',
+    provisoesIrpjCs: '',
+    participacoes: '',
+    lucroLiquidoExercicio: '',
   };
 }
 
