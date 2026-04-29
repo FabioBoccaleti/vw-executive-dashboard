@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis';
 
 // Interface de configuraÃ§Ã£o visual da marca
 export interface BrandConfig {
@@ -110,6 +110,31 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-primary-light': '#fce8ec',
       '--brand-secondary': '#4a4a4a',
       '--brand-accent': '#e2001a',
+    }
+  },
+  resumo_dre: {
+    id: 'resumo_dre',
+    name: 'Resumo DRE',
+    shortName: 'Resumo DRE',
+    colors: {
+      primary: '#0f766e',
+      primaryHover: '#0d6b63',
+      primaryLight: '#f0fdfa',
+      secondary: '#14b8a6',
+      accent: '#2dd4bf',
+      headerBg: 'bg-[#0f766e]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#0f766e] hover:bg-[#0d6b63]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-teal-100 dark:bg-teal-900/30',
+      badgeText: 'text-teal-800 dark:text-teal-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#0f766e',
+      '--brand-primary-hover': '#0d6b63',
+      '--brand-primary-light': '#f0fdfa',
+      '--brand-secondary': '#14b8a6',
+      '--brand-accent': '#2dd4bf',
     }
   },
   vw_outros: {

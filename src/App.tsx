@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/useAuth'
 import { LoginScreen } from '@/components/LoginScreen'
 import { AdminPage } from '@/components/AdminPage'
 import { CustosAlugueisDashboard } from '@/components/CustosAlugueisDashboard'
+import { ResumoDREDashboard } from '@/components/ResumoDREDashboard'
 
 function AppContent() {
   const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
@@ -66,7 +67,7 @@ function AppContent() {
     }
   }, [])
   
-  const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros']
+  const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'vw_outros', 'audi_outros']
 
   const handleBrandSelect = async (selectedBrand: Brand) => {
     saveBrand(selectedBrand)
@@ -262,6 +263,8 @@ function AppContent() {
         )
       ) : brand === 'custos_alugueis' ? (
         <CustosAlugueisDashboard onChangeBrand={handleChangeBrand} />
+      ) : brand === 'resumo_dre' ? (
+        <ResumoDREDashboard onChangeBrand={handleChangeBrand} />
       ) : (
         <VWFinancialDashboard 
           brand={brand} 

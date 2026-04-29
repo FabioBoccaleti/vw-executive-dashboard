@@ -7,7 +7,7 @@ import { PasswordDialog } from '@/components/PasswordDialog';
 import { useAuth } from '@/contexts/useAuth';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
 
-const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
+const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'vw_outros', 'audi_outros'];
 const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis'];
 const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despesas'];
 
@@ -157,7 +157,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
               </CardContent>
 
               {demonstrativoExpanded && (
-                <div className="px-3 pb-4 grid grid-cols-5 gap-2 animate-in fade-in slide-in-from-top-2 duration-300 border-t border-slate-100 pt-3">
+                <div className="px-3 pb-4 grid grid-cols-6 gap-2 animate-in fade-in slide-in-from-top-2 duration-300 border-t border-slate-100 pt-3">
                   {allowedDemoBrands.map((brand) => {
                     const config = BRAND_CONFIGS[brand];
                     const isSelected = selectedBrand === brand;
