@@ -3,9 +3,63 @@
   margin: 0.8cm 0.7cm;
 }
 
+/* ─── Impede auto dark mode do Edge/Chrome ─────────────────────────────────── */
+:root {
+  color-scheme: only light;
+}
+
+/* ─── Cores DRE — usa gradient para bypassar o algoritmo de dark mode ──────── */
+/* Aplicado em todos os media (tela + impressão) para garantir preview correto */
+.dre-header-red,
+.dre-row-total {
+  background-image: linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%) !important;
+  background-color: #bb0a30 !important;
+  color: #ffffff !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  forced-color-adjust: none !important;
+}
+
+.dre-cell-total {
+  background-image: linear-gradient(to bottom, #9a0827 0%, #9a0827 100%) !important;
+  background-color: #9a0827 !important;
+  color: #ffffff !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  forced-color-adjust: none !important;
+}
+
+/* Reforço explícito quando dark mode está ativo */
+@media (prefers-color-scheme: dark) {
+  .dre-header-red,
+  .dre-row-total {
+    background-image: linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%) !important;
+    background-color: #bb0a30 !important;
+    color: #ffffff !important;
+  }
+  .dre-cell-total {
+    background-image: linear-gradient(to bottom, #9a0827 0%, #9a0827 100%) !important;
+    background-color: #9a0827 !important;
+    color: #ffffff !important;
+  }
+}
+
+/* ─── Regras de impressão ───────────────────────────────────────────────────── */
 @media print {
+  html, body {
+    color-scheme: only light !important;
+    forced-color-adjust: none !important;
+  }
+
   body > * { display: none !important; }
   #print-root { display: block !important; }
+
+  html, body, #print-root, #print-root * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    forced-color-adjust: none !important;
+    color-scheme: only light !important;
+  }
 
   #print-root {
     counter-reset: page;
@@ -30,5 +84,18 @@
     margin-top: 4px;
     font-size: 7pt;
     color: #64748b;
+  }
+
+  .dre-header-red,
+  .dre-row-total {
+    background-image: linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%) !important;
+    background-color: #bb0a30 !important;
+    color: #ffffff !important;
+  }
+
+  .dre-cell-total {
+    background-image: linear-gradient(to bottom, #9a0827 0%, #9a0827 100%) !important;
+    background-color: #9a0827 !important;
+    color: #ffffff !important;
   }
 }

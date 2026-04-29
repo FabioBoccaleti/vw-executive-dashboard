@@ -13,6 +13,7 @@
 }
 
 :root {
+  color-scheme: only light;
   --background: oklch(0.98 0.005 240);
   --foreground: oklch(0.25 0.01 260);
 

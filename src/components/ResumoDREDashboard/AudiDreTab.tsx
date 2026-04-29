@@ -894,7 +894,20 @@ function PrintableReport({
   const prevPeriods = getPrevPeriods(year, month, 3);
 
   return (
-    <div style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ fontFamily: 'Inter, sans-serif', colorScheme: 'only light' as any }}>
+      {/* Injeta regras de cor diretamente no conteúdo imprimível */}
+      <style>{`
+        #print-root, #print-root * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+          forced-color-adjust: none !important;
+          color-scheme: light !important;
+        }
+        .dre-header-red { background-color: #bb0a30 !important; color: white !important; }
+        .dre-row-total   { background-color: #bb0a30 !important; color: white !important; }
+        .dre-cell-total  { background-color: #9a0827 !important; color: white !important; }
+      `}</style>
 
       {/* ── Página 1: Resumo Geral ── */}
       <div className="print-page">
@@ -932,7 +945,7 @@ function PrintableReport({
 // ── Cabeçalho padrão de cada página ─────────────────────────────────────────
 function PrintHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div style={{ backgroundColor: '#bb0a30', color: 'white', padding: '6px 12px', marginBottom: '0' }}>
+    <div className="dre-header-red" style={{ backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'white', padding: '6px 12px', marginBottom: '0' } as React.CSSProperties}>
       <div style={{ fontWeight: 700, fontSize: '10pt' }}>{title}</div>
       <div style={{ fontSize: '7.5pt', opacity: 0.8 }}>{subtitle}</div>
     </div>
@@ -973,8 +986,14 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
             const totalVal = isQuant
               ? (() => { const t = deptList.reduce((s, dep) => s + (parseInt(dep.quant) || 0), 0); return t > 0 ? t.toString() : '—'; })()
               : (() => { const s = sumDepts(deptList, line.field); return s ? fmtNum(s) : '—'; })();
+            const rowStyle: React.CSSProperties = line.isTotal
+              ? { backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'white', borderBottom: '1px solid #f1f5f9' }
+              : { backgroundColor: rowBg, color: rowColor, borderBottom: '1px solid #f1f5f9' };
+            const totalCellStyle: React.CSSProperties = line.isTotal
+              ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827', color: 'white' }
+              : { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#334155' };
             return (
-              <tr key={idx} style={{ backgroundColor: rowBg, color: rowColor, borderBottom: '1px solid #f1f5f9' }}>
+              <tr key={idx} className={line.isTotal ? 'dre-row-total' : ''} style={rowStyle}>
                 <td style={{ padding: `2px ${line.indent ? '16px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
                 {DEPTS.map(d => {
                   const val = data[d.key][line.field];
@@ -983,7 +1002,7 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
                     : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
                   return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{display}</td>;
                 })}
-                <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: line.isTotal ? '#9a0827' : '#f8fafc', color: line.isTotal ? 'white' : '#334155' }}>{totalVal}</td>
+                <td className={line.isTotal ? 'dre-cell-total' : ''} style={totalCellStyle}>{totalVal}</td>
               </tr>
             );
           })}
@@ -1046,8 +1065,14 @@ function PrintDeptTable({
               ? (() => { const t = allDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0); return t > 0 ? t.toString() : '—'; })()
               : (() => { const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0); return t !== 0 ? t.toLocaleString('pt-BR') : '—'; })();
 
+            const deptRowStyle: React.CSSProperties = line.isTotal
+              ? { backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'white', borderBottom: '1px solid #f1f5f9' }
+              : { backgroundColor: rowBg, color: rowColor, borderBottom: '1px solid #f1f5f9' };
+            const deptTotalCellStyle: React.CSSProperties = line.isTotal
+              ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827', color: 'white' }
+              : { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#334155' };
             return (
-              <tr key={idx} style={{ backgroundColor: rowBg, color: rowColor, borderBottom: '1px solid #f1f5f9' }}>
+              <tr key={idx} className={line.isTotal ? 'dre-row-total' : ''} style={deptRowStyle}>
                 <td style={{ padding: `2px ${line.indent ? '14px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
                 {prevDepts.map((pd, pi) => {
                   const v = pd[line.field]; const num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
@@ -1060,7 +1085,7 @@ function PrintDeptTable({
                     : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')}
                 </td>
                 <td style={{ textAlign: 'right', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', color: line.isTotal ? 'rgba(255,255,255,0.7)' : '#64748b', fontSize: '6.5pt' }}>{varMM || '—'}</td>
-                <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: line.isTotal ? '#9a0827' : '#f8fafc', color: line.isTotal ? 'white' : '#334155' }}>{totalStr}</td>
+                <td className={line.isTotal ? 'dre-cell-total' : ''} style={deptTotalCellStyle}>{totalStr}</td>
               </tr>
             );
           })}
@@ -1094,13 +1119,13 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
         </thead>
         <tbody>
           {/* Lucro Líquido */}
-          <tr style={{ backgroundColor: '#bb0a30', color: 'white', borderBottom: '1px solid #9a0827' }}>
+          <tr className="dre-row-total" style={{ backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'white', borderBottom: '1px solid #9a0827' }}>
             <td style={{ padding: '2px 6px', fontWeight: 700 }}>Lucro Líquido do Exercício</td>
             {DEPTS.map(d => {
               const v = data[d.key].lucroLiquidoExercicio;
               return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{v ? fmtNum(v) : '—'}</td>;
             })}
-            <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#9a0827' }}>{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
+            <td className="dre-cell-total" style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827' }}>{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
           </tr>
           {/* Linhas dinâmicas */}
           {data.ajustes.map((row, i) => {
@@ -1120,7 +1145,7 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
             );
           })}
           {/* Resultado Ajustado */}
-          <tr style={{ backgroundColor: '#bb0a30', color: 'white' }}>
+          <tr className="dre-row-total" style={{ backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'white' }}>
             <td style={{ padding: '3px 6px', fontWeight: 700 }}>RESULTADO DO PERÍODO AJUSTADO</td>
             {DEPTS.map(d => {
               const liq = parseVal(data[d.key].lucroLiquidoExercicio);
@@ -1128,7 +1153,7 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
               const total = liq + adj;
               return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{total !== 0 ? total.toLocaleString('pt-BR') : '—'}</td>;
             })}
-            <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#9a0827' }}>
+            <td className="dre-cell-total" style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827' }}>
               {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}
             </td>
           </tr>
