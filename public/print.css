@@ -1,0 +1,34 @@
+@page {
+  size: A4 landscape;
+  margin: 0.8cm 0.7cm;
+}
+
+@media print {
+  body > * { display: none !important; }
+  #print-root { display: block !important; }
+
+  #print-root {
+    counter-reset: page;
+    font-family: Inter, sans-serif;
+  }
+
+  .print-page {
+    counter-increment: page;
+    page-break-after: always;
+    page-break-inside: avoid;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .print-page:last-child {
+    page-break-after: auto;
+  }
+
+  .print-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 7pt;
+    color: #64748b;
+  }
+}

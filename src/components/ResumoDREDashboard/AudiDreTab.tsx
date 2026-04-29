@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Save, Loader2, RefreshCw, Trash2, Plus } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Save, Loader2, RefreshCw, Trash2, Plus, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   loadDreAudi,
@@ -383,6 +384,15 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
           Sincronizado com Dashboard Executivo
         </div>
 
+        {/* Botão Imprimir PDF */}
+        <button
+          onClick={() => window.print()}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors my-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 mr-1"
+        >
+          <Printer className="w-3.5 h-3.5" />
+          Imprimir PDF
+        </button>
+
         {/* Botão Salvar (apenas ajustes) */}
         <button
           disabled={!dirty || saving}
@@ -443,6 +453,19 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
           />
         )}
       </div>
+
+      {/* ── Portal de Impressão ─────────────────────────────────────────── */}
+      {typeof document !== 'undefined' && document.getElementById('print-root') &&
+        createPortal(
+          <PrintableReport
+            data={data}
+            prevData={prevData}
+            year={year}
+            month={month}
+          />,
+          document.getElementById('print-root')!
+        )
+      }
     </div>
   );
 }
@@ -848,6 +871,269 @@ function AjustesTable({
           Adicionar linha
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── Célula Editável ──────────────────────────────────────────────────────────
+
+// ─── Relatório Imprimível ─────────────────────────────────────────────────────
+
+function PrintableReport({
+  data,
+  prevData,
+  year,
+  month,
+}: {
+  data: DreAudiRow;
+  prevData: DreAudiRow[];
+  year: number;
+  month: number;
+}) {
+  const deptList = DEPTS.map(d => data[d.key]);
+  const prevPeriods = getPrevPeriods(year, month, 3);
+
+  return (
+    <div style={{ fontFamily: 'Inter, sans-serif' }}>
+
+      {/* ── Página 1: Resumo Geral ── */}
+      <div className="print-page">
+        <PrintResumoTable data={data} deptList={deptList} year={year} month={month} />
+        <PrintFooter label="Resumo Geral" page={1} total={8} />
+      </div>
+
+      {/* ── Páginas 2–7: Departamentos ── */}
+      {DEPTS.map((d, i) => {
+        const prevDepts = prevData.map(row => row[d.key]);
+        return (
+          <div key={d.key} className="print-page">
+            <PrintDeptTable
+              deptLabel={d.label}
+              dept={data[d.key]}
+              prevDepts={prevDepts}
+              prevPeriods={prevPeriods}
+              year={year}
+              month={month}
+            />
+            <PrintFooter label={d.label} page={i + 2} total={8} />
+          </div>
+        );
+      })}
+
+      {/* ── Página 8: Ajustes ── */}
+      <div className="print-page">
+        <PrintAjustesTable data={data} year={year} month={month} />
+        <PrintFooter label="Ajustes" page={8} total={8} />
+      </div>
+    </div>
+  );
+}
+
+// ── Cabeçalho padrão de cada página ─────────────────────────────────────────
+function PrintHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div style={{ backgroundColor: '#bb0a30', color: 'white', padding: '6px 12px', marginBottom: '0' }}>
+      <div style={{ fontWeight: 700, fontSize: '10pt' }}>{title}</div>
+      <div style={{ fontSize: '7.5pt', opacity: 0.8 }}>{subtitle}</div>
+    </div>
+  );
+}
+
+// ── Rodapé com número de página ───────────────────────────────────────────────
+function PrintFooter({ label, page, total }: { label: string; page: number; total: number }) {
+  return (
+    <div className="print-footer" style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '7pt', color: '#64748b' }}>
+      <span>{label}</span>
+      <span>Página {page} de {total}</span>
+    </div>
+  );
+}
+
+// ── Tabela Resumo Geral (impressão) ──────────────────────────────────────────
+function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; deptList: DreAudiDept[]; year: number; month: number }) {
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+      <PrintHeader title="AUDI LAPA/PINHEIROS" subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} />
+      <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 600, color: '#475569', width: '18%' }}>Descrição</th>
+            {DEPTS.map(d => (
+              <th key={d.key} style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#bb0a30', width: '11%' }}>{d.label}</th>
+            ))}
+            <th style={{ textAlign: 'center', padding: '3px 6px', fontWeight: 700, color: '#334155', backgroundColor: '#f1f5f9', width: '10%' }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {DRE_LINES.map((line, idx) => {
+            if (line.separator) return <tr key={idx}><td colSpan={8} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
+            const isQuant = line.field === 'quant' && idx === 0;
+            const rowBg = line.isTotal ? '#bb0a30' : line.isSubtotal ? '#f1f5f9' : 'transparent';
+            const rowColor = line.isTotal ? 'white' : line.isSubtotal ? '#334155' : '#475569';
+            const totalVal = isQuant
+              ? (() => { const t = deptList.reduce((s, dep) => s + (parseInt(dep.quant) || 0), 0); return t > 0 ? t.toString() : '—'; })()
+              : (() => { const s = sumDepts(deptList, line.field); return s ? fmtNum(s) : '—'; })();
+            return (
+              <tr key={idx} style={{ backgroundColor: rowBg, color: rowColor, borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: `2px ${line.indent ? '16px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
+                {DEPTS.map(d => {
+                  const val = data[d.key][line.field];
+                  const display = isQuant
+                    ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
+                    : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
+                  return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{display}</td>;
+                })}
+                <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: line.isTotal ? '#9a0827' : '#f8fafc', color: line.isTotal ? 'white' : '#334155' }}>{totalVal}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Tabela por Departamento (impressão) ──────────────────────────────────────
+function PrintDeptTable({
+  deptLabel, dept, prevDepts, prevPeriods, year, month,
+}: {
+  deptLabel: string;
+  dept: DreAudiDept;
+  prevDepts: DreAudiDept[];
+  prevPeriods: { year: number; month: number }[];
+  year: number;
+  month: number;
+}) {
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+      <PrintHeader title={`Audi Lapa/Pinheiros — ${deptLabel}`} subtitle={`${MONTHS[month - 1]} de ${year}`} />
+      <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 600, color: '#475569', width: '28%' }}>Descrição</th>
+            {prevPeriods.map(p => (
+              <th key={`${p.year}-${p.month}`} style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#94a3b8', width: '14%' }}>
+                {MONTHS[p.month - 1]}/{p.year}
+              </th>
+            ))}
+            <th style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 700, color: '#334155', width: '14%' }}>{MONTHS[month - 1]}/{year}</th>
+            <th style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#475569', width: '10%', borderLeft: '1px solid #e2e8f0' }}>Var. M/M</th>
+            <th style={{ textAlign: 'center', padding: '3px 6px', fontWeight: 700, color: '#334155', backgroundColor: '#f1f5f9', width: '14%' }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {DRE_LINES.map((line, idx) => {
+            if (line.separator) return <tr key={idx}><td colSpan={7} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
+            const isQuant = line.field === 'quant' && idx === 0;
+            const rowBg = line.isTotal ? '#bb0a30' : line.isSubtotal ? '#f1f5f9' : 'transparent';
+            const rowColor = line.isTotal ? 'white' : line.isSubtotal ? '#334155' : '#475569';
+
+            const prevDept = prevDepts[prevDepts.length - 1];
+            let varMM = '';
+            if (prevDept) {
+              if (isQuant) {
+                const cur = parseInt(String(dept[line.field])) || 0;
+                const prv = parseInt(String(prevDept[line.field])) || 0;
+                if (prv !== 0) { const pct = ((cur - prv) / Math.abs(prv)) * 100; varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
+              } else {
+                const cur = parseVal(dept[line.field]); const prv = parseVal(prevDept[line.field]);
+                if (prv !== 0) { const pct = ((cur - prv) / Math.abs(prv)) * 100; varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
+              }
+            }
+
+            const allDepts = [...prevDepts, dept];
+            const totalStr = isQuant
+              ? (() => { const t = allDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0); return t > 0 ? t.toString() : '—'; })()
+              : (() => { const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0); return t !== 0 ? t.toLocaleString('pt-BR') : '—'; })();
+
+            return (
+              <tr key={idx} style={{ backgroundColor: rowBg, color: rowColor, borderBottom: '1px solid #f1f5f9' }}>
+                <td style={{ padding: `2px ${line.indent ? '14px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
+                {prevDepts.map((pd, pi) => {
+                  const v = pd[line.field]; const num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
+                  const display = isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
+                  return <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', color: line.isTotal ? 'rgba(255,255,255,0.7)' : '#94a3b8' }}>{display}</td>;
+                })}
+                <td style={{ textAlign: 'right', padding: '2px 4px' }}>
+                  {isQuant
+                    ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—')
+                    : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')}
+                </td>
+                <td style={{ textAlign: 'right', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', color: line.isTotal ? 'rgba(255,255,255,0.7)' : '#64748b', fontSize: '6.5pt' }}>{varMM || '—'}</td>
+                <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: line.isTotal ? '#9a0827' : '#f8fafc', color: line.isTotal ? 'white' : '#334155' }}>{totalStr}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Tabela de Ajustes (impressão) ─────────────────────────────────────────────
+function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: number; month: number }) {
+  const deptList = DEPTS.map(d => data[d.key]);
+  const totalLiquido = sumDepts(deptList, 'lucroLiquidoExercicio');
+  const totalLiqNum = parseVal(totalLiquido);
+  const rowTotals = data.ajustes.map(row => DEPTS.reduce((s, d) => s + parseVal(row.values[d.key]), 0));
+  const totalAjustes = rowTotals.reduce((s, v) => s + v, 0);
+  const totalAjustado = totalLiqNum + totalAjustes;
+
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+      <PrintHeader title="AUDI LAPA/PINHEIROS" subtitle={`${MONTHS[month - 1]} de ${year} — Ajustes`} />
+      <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 600, color: '#475569', width: '22%' }}>Descrição</th>
+            {DEPTS.map(d => (
+              <th key={d.key} style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#bb0a30', width: '11%' }}>{d.label}</th>
+            ))}
+            <th style={{ textAlign: 'center', padding: '3px 6px', fontWeight: 700, color: '#334155', backgroundColor: '#f1f5f9', width: '10%' }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {/* Lucro Líquido */}
+          <tr style={{ backgroundColor: '#bb0a30', color: 'white', borderBottom: '1px solid #9a0827' }}>
+            <td style={{ padding: '2px 6px', fontWeight: 700 }}>Lucro Líquido do Exercício</td>
+            {DEPTS.map(d => {
+              const v = data[d.key].lucroLiquidoExercicio;
+              return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{v ? fmtNum(v) : '—'}</td>;
+            })}
+            <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#9a0827' }}>{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
+          </tr>
+          {/* Linhas dinâmicas */}
+          {data.ajustes.map((row, i) => {
+            const rTotal = rowTotals[i];
+            return (
+              <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#475569' }}>
+                <td style={{ padding: '2px 14px' }}>{row.label || '—'}</td>
+                {DEPTS.map(d => (
+                  <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>
+                    {parseVal(row.values[d.key]) !== 0 ? parseVal(row.values[d.key]).toLocaleString('pt-BR') : '—'}
+                  </td>
+                ))}
+                <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#334155' }}>
+                  {rTotal !== 0 ? rTotal.toLocaleString('pt-BR') : '—'}
+                </td>
+              </tr>
+            );
+          })}
+          {/* Resultado Ajustado */}
+          <tr style={{ backgroundColor: '#bb0a30', color: 'white' }}>
+            <td style={{ padding: '3px 6px', fontWeight: 700 }}>RESULTADO DO PERÍODO AJUSTADO</td>
+            {DEPTS.map(d => {
+              const liq = parseVal(data[d.key].lucroLiquidoExercicio);
+              const adj = data.ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0);
+              const total = liq + adj;
+              return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{total !== 0 ? total.toLocaleString('pt-BR') : '—'}</td>;
+            })}
+            <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#9a0827' }}>
+              {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }
