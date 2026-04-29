@@ -43,15 +43,46 @@ export interface DreAudiRow {
   funilaria: DreAudiDept;
   adm: DreAudiDept;
 
-  // Ajustes esporádicos (Página 8) — por departamento
-  ajustes: {
-    novos:     { icmsSt: string; honorariosAdvogados: string };
-    usados:    { icmsSt: string; honorariosAdvogados: string };
-    pecas:     { icmsSt: string; honorariosAdvogados: string };
-    oficina:   { icmsSt: string; honorariosAdvogados: string };
-    funilaria: { icmsSt: string; honorariosAdvogados: string };
-    adm:       { icmsSt: string; honorariosAdvogados: string };
+  // Ajustes esporádicos (Página 8) — linhas dinâmicas
+  ajustes: AjusteRow[];
+}
+
+// ─── Ajuste Row ───────────────────────────────────────────────────────────────
+
+export interface AjusteRow {
+  id: string;
+  label: string;
+  values: {
+    novos: string; usados: string; pecas: string;
+    oficina: string; funilaria: string; adm: string;
   };
+}
+
+const EMPTY_AJUSTE_VALUES = { novos: '', usados: '', pecas: '', oficina: '', funilaria: '', adm: '' };
+
+export const DEFAULT_AJUSTE_ROWS: AjusteRow[] = [
+  { id: 'icmsSt',     label: '(-) ICMS ST recebido do fabricante',          values: { ...EMPTY_AJUSTE_VALUES } },
+  { id: 'honorarios', label: '(+) Honorários advogados s/ ICMS ST recebido', values: { ...EMPTY_AJUSTE_VALUES } },
+];
+
+/** Migra o formato antigo (objeto por dept) para o novo (array de linhas). */
+export function migrateAjustes(raw: unknown): AjusteRow[] {
+  if (Array.isArray(raw)) return raw as AjusteRow[];
+  // Formato legado: { novos: { icmsSt, honorariosAdvogados }, ... }
+  const depts = ['novos', 'usados', 'pecas', 'oficina', 'funilaria', 'adm'] as const;
+  const legacy = raw as Record<string, { icmsSt?: string; honorariosAdvogados?: string }>;
+  return [
+    {
+      id: 'icmsSt',
+      label: '(-) ICMS ST recebido do fabricante',
+      values: Object.fromEntries(depts.map(d => [d, legacy?.[d]?.icmsSt ?? ''])) as AjusteRow['values'],
+    },
+    {
+      id: 'honorarios',
+      label: '(+) Honorários advogados s/ ICMS ST recebido',
+      values: Object.fromEntries(depts.map(d => [d, legacy?.[d]?.honorariosAdvogados ?? ''])) as AjusteRow['values'],
+    },
+  ];
 }
 
 function emptyDept(): DreAudiDept {
@@ -90,14 +121,7 @@ export function createEmptyDreAudiRow(year: number, month: number): DreAudiRow {
     oficina: emptyDept(),
     funilaria: emptyDept(),
     adm: emptyDept(),
-    ajustes: {
-      novos:     { icmsSt: '', honorariosAdvogados: '' },
-      usados:    { icmsSt: '', honorariosAdvogados: '' },
-      pecas:     { icmsSt: '', honorariosAdvogados: '' },
-      oficina:   { icmsSt: '', honorariosAdvogados: '' },
-      funilaria: { icmsSt: '', honorariosAdvogados: '' },
-      adm:       { icmsSt: '', honorariosAdvogados: '' },
-    },
+    ajustes: DEFAULT_AJUSTE_ROWS.map(r => ({ ...r, values: { ...r.values } })),
   };
 }
 

@@ -1,12 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Save, Loader2, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Save, Loader2, RefreshCw, Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   loadDreAudi,
   saveDreAudi,
   createEmptyDreAudiRow,
+  migrateAjustes,
+  DEFAULT_AJUSTE_ROWS,
   type DreAudiRow,
   type DreAudiDept,
+  type AjusteRow,
 } from './dreAudiStorage';
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import type { Department } from '@/lib/dataStorage';
@@ -213,13 +216,24 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
         dreLookup[deptKey][y] = dre;
       }
 
+      // Verifica se um DreAudiDept tem algum valor preenchido pelo usuário
+      function hasDeptData(dept: DreAudiDept): boolean {
+        return Object.values(dept).some(v => v !== '');
+      }
+
       function buildRow(y: number, m: number, kvRow: DreAudiRow | null): DreAudiRow {
         const row = createEmptyDreAudiRow(y, m);
         for (const d of DEPTS) {
-          row[d.key] = buildDeptFromDREData(dreLookup[d.key]?.[y] ?? null, m - 1);
+          if (kvRow && hasDeptData(kvRow[d.key])) {
+            // Usuário já editou/salvou — usa dados do KV
+            row[d.key] = kvRow[d.key];
+          } else {
+            // Pré-preenche do Dashboard Executivo como sugestão
+            row[d.key] = buildDeptFromDREData(dreLookup[d.key]?.[y] ?? null, m - 1);
+          }
         }
         if (kvRow) {
-          row.ajustes = kvRow.ajustes;
+          row.ajustes = migrateAjustes(kvRow.ajustes);
         }
         return row;
       }
@@ -230,7 +244,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
     });
   }, [year, month]);
 
-  // ── Save (somente ajustes) ──────────────────────────────────────────────────
+  // ── Save ─────────────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
     if (!data) return;
     setSaving(true);
@@ -238,17 +252,69 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
     setSaving(false);
     if (ok) {
       setDirty(false);
-      toast.success('Ajustes salvos com sucesso!');
+      toast.success('Dados salvos com sucesso!');
     } else {
       toast.error('Erro ao salvar. Tente novamente.');
     }
   }, [data]);
 
-  const handleAjusteChange = useCallback(
-    (dept: DeptKey, field: 'icmsSt' | 'honorariosAdvogados', value: string) => {
+  // ── Edição de célula de departamento ────────────────────────────────────────────
+  const handleCellChange = useCallback(
+    (dept: DeptKey, field: keyof DreAudiDept, value: string) => {
       setData(prev => {
         if (!prev) return prev;
-        return { ...prev, ajustes: { ...prev.ajustes, [dept]: { ...prev.ajustes[dept], [field]: value } } };
+        return { ...prev, [dept]: { ...prev[dept], [field]: value } };
+      });
+      setDirty(true);
+    },
+    []
+  );
+
+  const handleAjusteChange = useCallback(
+    (rowId: string, dept: DeptKey, value: string) => {
+      setData(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          ajustes: prev.ajustes.map(r =>
+            r.id === rowId ? { ...r, values: { ...r.values, [dept]: value } } : r
+          ),
+        };
+      });
+      setDirty(true);
+    },
+    []
+  );
+
+  const handleAjusteLabel = useCallback(
+    (rowId: string, label: string) => {
+      setData(prev => {
+        if (!prev) return prev;
+        return { ...prev, ajustes: prev.ajustes.map(r => r.id === rowId ? { ...r, label } : r) };
+      });
+      setDirty(true);
+    },
+    []
+  );
+
+  const handleAddAjusteRow = useCallback(() => {
+    const newRow: AjusteRow = {
+      id: `custom_${Date.now()}`,
+      label: '',
+      values: { novos: '', usados: '', pecas: '', oficina: '', funilaria: '', adm: '' },
+    };
+    setData(prev => {
+      if (!prev) return prev;
+      return { ...prev, ajustes: [...prev.ajustes, newRow] };
+    });
+    setDirty(true);
+  }, []);
+
+  const handleDeleteAjusteRow = useCallback(
+    (rowId: string) => {
+      setData(prev => {
+        if (!prev) return prev;
+        return { ...prev, ajustes: prev.ajustes.filter(r => r.id !== rowId) };
       });
       setDirty(true);
     },
@@ -306,7 +372,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
               : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
-          Ajustes Esporádicos
+          Ajustes
         </button>
 
         <div className="flex-1" />
@@ -328,7 +394,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
           }`}
         >
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          {saving ? 'Salvando...' : 'Salvar ajustes'}
+          {saving ? 'Salvando...' : 'Salvar'}
         </button>
       </div>
 
@@ -358,13 +424,23 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
               prevPeriods={getPrevPeriods(year, month, 3)}
               year={year}
               month={month}
+              onChange={(field, value) => handleCellChange(d.key, field, value)}
             />
           ) : null
         )}
 
         {/* AJUSTES */}
         {(activeSection as string) === 'ajustes' && (
-          <AjustesTable ajustes={data.ajustes} onChange={handleAjusteChange} data={data} year={year} month={month} />
+          <AjustesTable
+            ajustes={data.ajustes}
+            onChange={handleAjusteChange}
+            onLabelChange={handleAjusteLabel}
+            onAdd={handleAddAjusteRow}
+            onDelete={handleDeleteAjusteRow}
+            data={data}
+            year={year}
+            month={month}
+          />
         )}
       </div>
     </div>
@@ -412,13 +488,13 @@ function ResumoTable({
               }
               const isQuant = line.field === 'quant' && idx === 0;
               const rowClass = line.isTotal
-                ? 'bg-slate-800 text-white font-bold'
+                ? 'text-white font-bold'
                 : line.isSubtotal
                 ? 'bg-slate-100 font-semibold text-slate-700'
                 : 'hover:bg-slate-50 text-slate-600';
 
               return (
-                <tr key={idx} className={`border-b border-slate-100 ${rowClass}`}>
+                <tr key={idx} className={`border-b border-slate-100 ${rowClass}`} style={line.isTotal ? {backgroundColor:'#bb0a30'} : undefined}>
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''} ${line.isTotal ? 'text-white' : ''}`}>
                     {line.label}
                   </td>
@@ -434,7 +510,7 @@ function ResumoTable({
                     );
                   })}
                   {/* Total */}
-                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'bg-slate-700 text-white' : 'bg-slate-50 text-slate-700'}`}>
+                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-slate-700'}`} style={line.isTotal ? {backgroundColor:'#9a0827'} : undefined}>
                     {isQuant
                       ? (() => {
                           const t = deptList.reduce((s, dep) => s + (parseInt(dep.quant) || 0), 0);
@@ -467,6 +543,7 @@ function DeptTable({
   prevPeriods,
   year,
   month,
+  onChange,
 }: {
   deptKey: DeptKey;
   deptLabel: string;
@@ -476,6 +553,7 @@ function DeptTable({
   prevPeriods: { year: number; month: number }[];
   year: number;
   month: number;
+  onChange: (field: keyof DreAudiDept, value: string) => void;
 }) {
   const totalCols = 1 + prevPeriods.length + 1 + 1 + 1; // desc + prev + atual + total + %H
   return (
@@ -508,7 +586,7 @@ function DeptTable({
               }
               const isQuant = line.field === 'quant' && idx === 0;
               const rowClass = line.isTotal
-                ? 'bg-slate-800 text-white font-bold'
+                ? 'text-white font-bold'
                 : line.isSubtotal
                 ? 'bg-slate-100 font-semibold text-slate-700'
                 : 'hover:bg-slate-50 text-slate-600';
@@ -546,7 +624,7 @@ function DeptTable({
               }
 
               return (
-                <tr key={idx} className={`border-b border-slate-100 ${rowClass}`}>
+                <tr key={idx} className={`border-b border-slate-100 ${rowClass}`} style={line.isTotal ? {backgroundColor:'#bb0a30'} : undefined}>
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
                   {prevDepts.map((pd, pi) => {
                     const v = pd[line.field];
@@ -555,21 +633,24 @@ function DeptTable({
                       ? (num > 0 ? num.toString() : '—')
                       : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
                     return (
-                      <td key={pi} className={`px-3 py-1.5 text-right ${line.isTotal ? 'text-slate-300' : 'text-slate-400'}`}>
+                      <td key={pi} className={`px-3 py-1.5 text-right ${line.isTotal ? 'text-red-200' : 'text-slate-400'}`}>
                         {display}
                       </td>
                     );
                   })}
-                  <td className="px-3 py-1.5 text-right">
-                    {isQuant
-                      ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—')
-                      : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')
-                    }
+                  <td className="px-2 py-1 text-right">
+                    <EditableCell
+                      value={dept[line.field]}
+                      onChange={v => onChange(line.field, v)}
+                      isTotal={line.isTotal}
+                      isNegative={line.isNegative}
+                      isQuant={isQuant}
+                    />
                   </td>
-                  <td className={`px-2 py-1.5 text-right text-[0.68rem] border-l border-slate-200 ${line.isTotal ? 'text-slate-300' : 'text-slate-500'}`}>
+                  <td className={`px-2 py-1.5 text-right text-[0.68rem] border-l border-slate-200 ${line.isTotal ? 'text-red-200' : 'text-slate-500'}`}>
                     {varMM || '—'}
                   </td>
-                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'bg-slate-700 text-white' : 'bg-slate-50 text-slate-700'}`}>
+                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-slate-700'}`} style={line.isTotal ? {backgroundColor:'#9a0827'} : undefined}>
                     {totalStr}
                   </td>
                 </tr>
@@ -587,37 +668,73 @@ function DeptTable({
 function AjustesTable({
   ajustes,
   onChange,
+  onLabelChange,
+  onAdd,
+  onDelete,
   data,
   year,
   month,
 }: {
-  ajustes: DreAudiRow['ajustes'];
-  onChange: (dept: DeptKey, field: 'icmsSt' | 'honorariosAdvogados', value: string) => void;
+  ajustes: AjusteRow[];
+  onChange: (rowId: string, dept: DeptKey, value: string) => void;
+  onLabelChange: (rowId: string, label: string) => void;
+  onAdd: () => void;
+  onDelete: (rowId: string) => void;
   data: DreAudiRow;
   year: number;
   month: number;
 }) {
+  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+  const [labelDraft, setLabelDraft] = useState('');
+  const prevLen = useRef(ajustes.length);
+
+  // Ao adicionar nova linha com label vazio, inicia edição automaticamente
+  useEffect(() => {
+    if (ajustes.length > prevLen.current) {
+      const last = ajustes[ajustes.length - 1];
+      if (!last.label) {
+        setEditingLabelId(last.id);
+        setLabelDraft('');
+      }
+    }
+    prevLen.current = ajustes.length;
+  }, [ajustes]);
+
+  function startEditLabel(row: AjusteRow) {
+    setEditingLabelId(row.id);
+    setLabelDraft(row.label);
+  }
+
+  function confirmLabel() {
+    if (editingLabelId !== null) {
+      onLabelChange(editingLabelId, labelDraft);
+      setEditingLabelId(null);
+    }
+  }
+
   const deptList = DEPTS.map(d => data[d.key]);
   const totalLiquido = sumDepts(deptList, 'lucroLiquidoExercicio');
-
-  // Totais por linha
-  const totalIcmsSt = DEPTS.reduce((s, d) => s + parseVal(ajustes[d.key].icmsSt), 0);
-  const totalHonorarios = DEPTS.reduce((s, d) => s + parseVal(ajustes[d.key].honorariosAdvogados), 0);
   const totalLiqNum = parseVal(totalLiquido);
-  const totalAjustado = totalLiqNum - totalIcmsSt + totalHonorarios;
 
-  const colSpan = DEPTS.length + 2; // desc + depts + total
+  // Total de cada linha de ajuste
+  const rowTotals = ajustes.map(row => ({
+    id: row.id,
+    total: DEPTS.reduce((s, d) => s + parseVal(row.values[d.key]), 0),
+  }));
+  const totalAjustes = rowTotals.reduce((s, r) => s + r.total, 0);
+  const totalAjustado = totalLiqNum + totalAjustes;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="bg-[#bb0a30] text-white px-6 py-3">
         <h2 className="font-bold text-base">AUDI LAPA/PINHEIROS</h2>
-        <p className="text-xs text-red-200 mt-0.5">{MONTHS[month - 1]} de {year} — Ajustes Esporádicos</p>
+        <p className="text-xs text-red-200 mt-0.5">{MONTHS[month - 1]} de {year} — Ajustes</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="w-7 px-1" />
               <th className="text-left px-4 py-2.5 font-semibold text-slate-600 w-52 min-w-[13rem]">Descrição</th>
               {DEPTS.map(d => (
                 <th key={d.key} className="text-center px-3 py-2.5 font-semibold min-w-[8rem] text-[#bb0a30]">
@@ -628,8 +745,9 @@ function AjustesTable({
             </tr>
           </thead>
           <tbody>
-            {/* Lucro Líquido do Exercício */}
+            {/* Lucro Líquido do Exercício (fixo, sem excluir) */}
             <tr className="border-b border-red-900 text-white font-bold" style={{backgroundColor:'#bb0a30'}}>
+              <td className="w-7" />
               <td className="px-4 py-1.5">Lucro Líquido do Exercício</td>
               {DEPTS.map(d => {
                 const v = data[d.key].lucroLiquidoExercicio;
@@ -644,50 +762,71 @@ function AjustesTable({
               </td>
             </tr>
 
-            {/* ICMS ST */}
-            <tr className="border-b border-slate-100 hover:bg-slate-50 text-slate-600">
-              <td className="px-4 py-1.5 pl-7">(-) ICMS ST recebido do fabricante</td>
-              {DEPTS.map(d => (
-                <td key={d.key} className="px-2 py-1 text-right">
-                  <EditableCell
-                    value={ajustes[d.key].icmsSt}
-                    onChange={v => onChange(d.key, 'icmsSt', v)}
-                    isNegative
-                  />
-                </td>
-              ))}
-              <td className="px-3 py-1.5 text-right bg-slate-50 text-slate-700 font-semibold">
-                {totalIcmsSt !== 0 ? totalIcmsSt.toLocaleString('pt-BR') : '—'}
-              </td>
-            </tr>
+            {/* Linhas dinâmicas de ajuste */}
+            {ajustes.map((row) => {
+              const rowTotal = rowTotals.find(r => r.id === row.id)?.total ?? 0;
+              return (
+                <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 text-slate-600 group">
+                  {/* Botão excluir */}
+                  <td className="w-7 px-1 text-center">
+                    <button
+                      onClick={() => onDelete(row.id)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-600 p-0.5 rounded"
+                      title="Excluir linha"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </td>
+                  {/* Descrição editável */}
+                  <td className="px-4 py-1 pl-7">
+                    {editingLabelId === row.id ? (
+                      <input
+                        autoFocus
+                        className="w-full border border-[#bb0a30] rounded px-2 py-0.5 text-xs outline-none"
+                        value={labelDraft}
+                        onChange={e => setLabelDraft(e.target.value)}
+                        onBlur={confirmLabel}
+                        onKeyDown={e => { if (e.key === 'Enter') confirmLabel(); if (e.key === 'Escape') setEditingLabelId(null); }}
+                        placeholder="Descrição da linha..."
+                      />
+                    ) : (
+                      <span
+                        className="cursor-text hover:text-slate-800 transition-colors"
+                        title="Clique para editar descrição"
+                        onClick={() => startEditLabel(row)}
+                      >
+                        {row.label || <span className="text-slate-300 italic">Clique para editar...</span>}
+                      </span>
+                    )}
+                  </td>
+                  {/* Valores por departamento */}
+                  {DEPTS.map(d => (
+                    <td key={d.key} className="px-2 py-1 text-right">
+                      <EditableCell
+                        value={row.values[d.key]}
+                        onChange={v => onChange(row.id, d.key, v)}
+                      />
+                    </td>
+                  ))}
+                  {/* Total da linha */}
+                  <td className="px-3 py-1.5 text-right bg-slate-50 text-slate-700 font-semibold">
+                    {rowTotal !== 0 ? rowTotal.toLocaleString('pt-BR') : '—'}
+                  </td>
+                </tr>
+              );
+            })}
 
-            {/* Honorários */}
-            <tr className="border-b border-slate-100 hover:bg-slate-50 text-slate-600">
-              <td className="px-4 py-1.5 pl-7">(+) Honorários advogados s/ ICMS ST recebido</td>
-              {DEPTS.map(d => (
-                <td key={d.key} className="px-2 py-1 text-right">
-                  <EditableCell
-                    value={ajustes[d.key].honorariosAdvogados}
-                    onChange={v => onChange(d.key, 'honorariosAdvogados', v)}
-                  />
-                </td>
-              ))}
-              <td className="px-3 py-1.5 text-right bg-slate-50 text-slate-700 font-semibold">
-                {totalHonorarios !== 0 ? totalHonorarios.toLocaleString('pt-BR') : '—'}
-              </td>
-            </tr>
-
-            {/* Resultado Ajustado */}
+            {/* Resultado Ajustado (calculado) */}
             <tr className="text-white font-bold" style={{backgroundColor:'#bb0a30'}}>
+              <td className="w-7" />
               <td className="px-4 py-2">RESULTADO DO PERÍODO AJUSTADO</td>
               {DEPTS.map(d => {
                 const liq = parseVal(data[d.key].lucroLiquidoExercicio);
-                const icms = parseVal(ajustes[d.key].icmsSt);
-                const hon = parseVal(ajustes[d.key].honorariosAdvogados);
-                const ajustado = liq - icms + hon;
+                const adj = ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0);
+                const total = liq + adj;
                 return (
                   <td key={d.key} className="px-3 py-2 text-right">
-                    {ajustado !== 0 ? ajustado.toLocaleString('pt-BR') : '—'}
+                    {total !== 0 ? total.toLocaleString('pt-BR') : '—'}
                   </td>
                 );
               })}
@@ -697,6 +836,17 @@ function AjustesTable({
             </tr>
           </tbody>
         </table>
+      </div>
+
+      {/* Botão Adicionar linha */}
+      <div className="px-4 py-2 border-t border-slate-100">
+        <button
+          onClick={onAdd}
+          className="flex items-center gap-1.5 text-xs text-[#bb0a30] hover:text-[#9a0827] font-medium transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Adicionar linha
+        </button>
       </div>
     </div>
   );
