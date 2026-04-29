@@ -399,7 +399,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
           onClick={handleSave}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors my-1.5 ${
             dirty
-              ? 'bg-[#bb0a30] text-white hover:bg-[#990826]'
+              ? 'bg-[#bb0a30] text-black hover:bg-[#990826]'
               : 'bg-slate-100 text-slate-400 cursor-not-allowed'
           }`}
         >
@@ -486,9 +486,9 @@ function ResumoTable({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       {/* Cabeçalho */}
-      <div className="bg-[#bb0a30] text-white px-6 py-3">
+      <div className="bg-[#bb0a30] text-black px-6 py-3">
         <h2 className="font-bold text-base">AUDI LAPA/PINHEIROS</h2>
-        <p className="text-xs text-red-200 mt-0.5">{MONTHS[month - 1]} de {year} — Demonstrativo de Resultados</p>
+        <p className="text-xs mt-0.5">{MONTHS[month - 1]} de {year} — Demonstrativo de Resultados</p>
       </div>
 
       <div className="overflow-x-auto">
@@ -511,14 +511,14 @@ function ResumoTable({
               }
               const isQuant = line.field === 'quant' && idx === 0;
               const rowClass = line.isTotal
-                ? 'text-white font-bold'
+                ? 'text-black font-bold'
                 : line.isSubtotal
-                ? 'bg-slate-100 font-semibold text-slate-700'
-                : 'hover:bg-slate-50 text-slate-600';
+                ? 'bg-slate-100 font-semibold text-black'
+                : 'hover:bg-slate-50 text-black';
 
               return (
                 <tr key={idx} className={`border-b border-slate-100 ${rowClass}`} style={line.isTotal ? {backgroundColor:'#bb0a30'} : undefined}>
-                  <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''} ${line.isTotal ? 'text-white' : ''}`}>
+                  <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>
                     {line.label}
                   </td>
                   {DEPTS.map((d) => {
@@ -533,7 +533,7 @@ function ResumoTable({
                     );
                   })}
                   {/* Total */}
-                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-slate-700'}`} style={line.isTotal ? {backgroundColor:'#9a0827'} : undefined}>
+                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-black' : 'bg-slate-50 text-black'}`} style={line.isTotal ? {backgroundColor:'#9a0827'} : undefined}>
                     {isQuant
                       ? (() => {
                           const t = deptList.reduce((s, dep) => s + (parseInt(dep.quant) || 0), 0);
@@ -581,7 +581,7 @@ function DeptTable({
   const totalCols = 1 + prevPeriods.length + 1 + 1 + 1; // desc + prev + atual + total + %H
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="px-6 py-3 text-white font-bold flex items-center gap-3 bg-[#bb0a30]">
+      <div className="px-6 py-3 text-black font-bold flex items-center gap-3 bg-[#bb0a30]">
         <span className="text-base">Audi Lapa/Pinheiros — {deptLabel}</span>
         <span className="text-xs opacity-75 font-normal">{MONTHS[month - 1]}/{year}</span>
       </div>
@@ -609,10 +609,10 @@ function DeptTable({
               }
               const isQuant = line.field === 'quant' && idx === 0;
               const rowClass = line.isTotal
-                ? 'text-white font-bold'
+                ? 'text-black font-bold'
                 : line.isSubtotal
-                ? 'bg-slate-100 font-semibold text-slate-700'
-                : 'hover:bg-slate-50 text-slate-600';
+                ? 'bg-slate-100 font-semibold text-black'
+                : 'hover:bg-slate-50 text-black';
 
               // Var. M/M: mês atual vs mês imediatamente anterior (prevDepts[2])
               const prevDept = prevDepts[prevDepts.length - 1];
@@ -656,7 +656,7 @@ function DeptTable({
                       ? (num > 0 ? num.toString() : '—')
                       : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
                     return (
-                      <td key={pi} className={`px-3 py-1.5 text-right ${line.isTotal ? 'text-red-200' : 'text-slate-400'}`}>
+                      <td key={pi} className={`px-3 py-1.5 text-right ${line.isTotal ? 'text-black' : 'text-black'}`}>
                         {display}
                       </td>
                     );
@@ -670,10 +670,10 @@ function DeptTable({
                       isQuant={isQuant}
                     />
                   </td>
-                  <td className={`px-2 py-1.5 text-right text-[0.68rem] border-l border-slate-200 ${line.isTotal ? 'text-red-200' : 'text-slate-500'}`}>
+                  <td className={`px-2 py-1.5 text-right text-[0.68rem] border-l border-slate-200 text-black`}>
                     {varMM || '—'}
                   </td>
-                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-slate-700'}`} style={line.isTotal ? {backgroundColor:'#9a0827'} : undefined}>
+                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-black' : 'bg-slate-50 text-black'}`} style={line.isTotal ? {backgroundColor:'#9a0827'} : undefined}>
                     {totalStr}
                   </td>
                 </tr>
@@ -749,9 +749,9 @@ function AjustesTable({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="bg-[#bb0a30] text-white px-6 py-3">
+      <div className="bg-[#bb0a30] text-black px-6 py-3">
         <h2 className="font-bold text-base">AUDI LAPA/PINHEIROS</h2>
-        <p className="text-xs text-red-200 mt-0.5">{MONTHS[month - 1]} de {year} — Ajustes</p>
+        <p className="text-xs mt-0.5">{MONTHS[month - 1]} de {year} — Ajustes</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -769,7 +769,7 @@ function AjustesTable({
           </thead>
           <tbody>
             {/* Lucro Líquido do Exercício (fixo, sem excluir) */}
-            <tr className="border-b border-red-900 text-white font-bold" style={{backgroundColor:'#bb0a30'}}>
+            <tr className="border-b border-red-900 text-black font-bold" style={{backgroundColor:'#bb0a30'}}>
               <td className="w-7" />
               <td className="px-4 py-1.5">Lucro Líquido do Exercício</td>
               {DEPTS.map(d => {
@@ -840,7 +840,7 @@ function AjustesTable({
             })}
 
             {/* Resultado Ajustado (calculado) */}
-            <tr className="text-white font-bold" style={{backgroundColor:'#bb0a30'}}>
+            <tr className="text-black font-bold" style={{backgroundColor:'#bb0a30'}}>
               <td className="w-7" />
               <td className="px-4 py-2">RESULTADO DO PERÍODO AJUSTADO</td>
               {DEPTS.map(d => {
@@ -904,9 +904,9 @@ function PrintableReport({
           forced-color-adjust: none !important;
           color-scheme: light !important;
         }
-        .dre-header-red { background-color: #bb0a30 !important; color: white !important; }
-        .dre-row-total   { background-color: #bb0a30 !important; color: white !important; }
-        .dre-cell-total  { background-color: #9a0827 !important; color: white !important; }
+        .dre-header-red { background-color: #bb0a30 !important; color: black !important; }
+        .dre-row-total   { background-color: #bb0a30 !important; color: black !important; }
+        .dre-cell-total  { background-color: #9a0827 !important; color: black !important; }
       `}</style>
 
       {/* ── Página 1: Resumo Geral ── */}
@@ -945,7 +945,7 @@ function PrintableReport({
 // ── Cabeçalho padrão de cada página ─────────────────────────────────────────
 function PrintHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="dre-header-red" style={{ backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'white', padding: '6px 12px', marginBottom: '0' } as React.CSSProperties}>
+    <div className="dre-header-red" style={{ backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'black', padding: '6px 12px', marginBottom: '0' } as React.CSSProperties}>
       <div style={{ fontWeight: 700, fontSize: '10pt' }}>{title}</div>
       <div style={{ fontSize: '7.5pt', opacity: 0.8 }}>{subtitle}</div>
     </div>
@@ -970,11 +970,11 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
       <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
         <thead>
           <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 600, color: '#475569', width: '18%' }}>Descrição</th>
+            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 600, color: '#111111', width: '18%' }}>Descrição</th>
             {DEPTS.map(d => (
-              <th key={d.key} style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#bb0a30', width: '11%' }}>{d.label}</th>
+              <th key={d.key} style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#111111', width: '11%' }}>{d.label}</th>
             ))}
-            <th style={{ textAlign: 'center', padding: '3px 6px', fontWeight: 700, color: '#334155', backgroundColor: '#f1f5f9', width: '10%' }}>Total</th>
+            <th style={{ textAlign: 'center', padding: '3px 6px', fontWeight: 700, color: '#111111', backgroundColor: '#f1f5f9', width: '10%' }}>Total</th>
           </tr>
         </thead>
         <tbody>
@@ -982,16 +982,16 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
             if (line.separator) return <tr key={idx}><td colSpan={8} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
             const isQuant = line.field === 'quant' && idx === 0;
             const rowBg = line.isTotal ? '#bb0a30' : line.isSubtotal ? '#f1f5f9' : 'transparent';
-            const rowColor = line.isTotal ? 'white' : line.isSubtotal ? '#334155' : '#475569';
+            const rowColor = line.isTotal ? 'black' : '#111111';
             const totalVal = isQuant
               ? (() => { const t = deptList.reduce((s, dep) => s + (parseInt(dep.quant) || 0), 0); return t > 0 ? t.toString() : '—'; })()
               : (() => { const s = sumDepts(deptList, line.field); return s ? fmtNum(s) : '—'; })();
             const rowStyle: React.CSSProperties = line.isTotal
-              ? { backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'white', borderBottom: '1px solid #f1f5f9' }
+              ? { backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'black', borderBottom: '1px solid #f1f5f9' }
               : { backgroundColor: rowBg, color: rowColor, borderBottom: '1px solid #f1f5f9' };
             const totalCellStyle: React.CSSProperties = line.isTotal
-              ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827', color: 'white' }
-              : { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#334155' };
+              ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827', color: 'black' }
+              : { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111111' };
             return (
               <tr key={idx} className={line.isTotal ? 'dre-row-total' : ''} style={rowStyle}>
                 <td style={{ padding: `2px ${line.indent ? '16px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
@@ -1029,15 +1029,15 @@ function PrintDeptTable({
       <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
         <thead>
           <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 600, color: '#475569', width: '28%' }}>Descrição</th>
+            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 600, color: '#111111', width: '28%' }}>Descrição</th>
             {prevPeriods.map(p => (
-              <th key={`${p.year}-${p.month}`} style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#94a3b8', width: '14%' }}>
+              <th key={`${p.year}-${p.month}`} style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#111111', width: '14%' }}>
                 {MONTHS[p.month - 1]}/{p.year}
               </th>
             ))}
-            <th style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 700, color: '#334155', width: '14%' }}>{MONTHS[month - 1]}/{year}</th>
-            <th style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#475569', width: '10%', borderLeft: '1px solid #e2e8f0' }}>Var. M/M</th>
-            <th style={{ textAlign: 'center', padding: '3px 6px', fontWeight: 700, color: '#334155', backgroundColor: '#f1f5f9', width: '14%' }}>Total</th>
+            <th style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 700, color: '#111111', width: '14%' }}>{MONTHS[month - 1]}/{year}</th>
+            <th style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#111111', width: '10%', borderLeft: '1px solid #e2e8f0' }}>Var. M/M</th>
+            <th style={{ textAlign: 'center', padding: '3px 6px', fontWeight: 700, color: '#111111', backgroundColor: '#f1f5f9', width: '14%' }}>Total</th>
           </tr>
         </thead>
         <tbody>
@@ -1045,7 +1045,7 @@ function PrintDeptTable({
             if (line.separator) return <tr key={idx}><td colSpan={7} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
             const isQuant = line.field === 'quant' && idx === 0;
             const rowBg = line.isTotal ? '#bb0a30' : line.isSubtotal ? '#f1f5f9' : 'transparent';
-            const rowColor = line.isTotal ? 'white' : line.isSubtotal ? '#334155' : '#475569';
+            const rowColor = line.isTotal ? 'black' : '#111111';
 
             const prevDept = prevDepts[prevDepts.length - 1];
             let varMM = '';
@@ -1066,25 +1066,25 @@ function PrintDeptTable({
               : (() => { const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0); return t !== 0 ? t.toLocaleString('pt-BR') : '—'; })();
 
             const deptRowStyle: React.CSSProperties = line.isTotal
-              ? { backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'white', borderBottom: '1px solid #f1f5f9' }
+              ? { backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'black', borderBottom: '1px solid #f1f5f9' }
               : { backgroundColor: rowBg, color: rowColor, borderBottom: '1px solid #f1f5f9' };
             const deptTotalCellStyle: React.CSSProperties = line.isTotal
-              ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827', color: 'white' }
-              : { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#334155' };
+              ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827', color: 'black' }
+              : { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111111' };
             return (
               <tr key={idx} className={line.isTotal ? 'dre-row-total' : ''} style={deptRowStyle}>
                 <td style={{ padding: `2px ${line.indent ? '14px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
                 {prevDepts.map((pd, pi) => {
                   const v = pd[line.field]; const num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
                   const display = isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
-                  return <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', color: line.isTotal ? 'rgba(255,255,255,0.7)' : '#94a3b8' }}>{display}</td>;
+                  return <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', color: '#111111' }}>{display}</td>;
                 })}
                 <td style={{ textAlign: 'right', padding: '2px 4px' }}>
                   {isQuant
                     ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—')
                     : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')}
                 </td>
-                <td style={{ textAlign: 'right', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', color: line.isTotal ? 'rgba(255,255,255,0.7)' : '#64748b', fontSize: '6.5pt' }}>{varMM || '—'}</td>
+                <td style={{ textAlign: 'right', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', color: '#111111', fontSize: '6.5pt' }}>{varMM || '—'}</td>
                 <td className={line.isTotal ? 'dre-cell-total' : ''} style={deptTotalCellStyle}>{totalStr}</td>
               </tr>
             );
@@ -1110,16 +1110,16 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
       <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
         <thead>
           <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 600, color: '#475569', width: '22%' }}>Descrição</th>
+            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 600, color: '#111111', width: '22%' }}>Descrição</th>
             {DEPTS.map(d => (
-              <th key={d.key} style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#bb0a30', width: '11%' }}>{d.label}</th>
+              <th key={d.key} style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#111111', width: '11%' }}>{d.label}</th>
             ))}
-            <th style={{ textAlign: 'center', padding: '3px 6px', fontWeight: 700, color: '#334155', backgroundColor: '#f1f5f9', width: '10%' }}>Total</th>
+            <th style={{ textAlign: 'center', padding: '3px 6px', fontWeight: 700, color: '#111111', backgroundColor: '#f1f5f9', width: '10%' }}>Total</th>
           </tr>
         </thead>
         <tbody>
           {/* Lucro Líquido */}
-          <tr className="dre-row-total" style={{ backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'white', borderBottom: '1px solid #9a0827' }}>
+          <tr className="dre-row-total" style={{ backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'black', borderBottom: '1px solid #9a0827' }}>
             <td style={{ padding: '2px 6px', fontWeight: 700 }}>Lucro Líquido do Exercício</td>
             {DEPTS.map(d => {
               const v = data[d.key].lucroLiquidoExercicio;
@@ -1131,21 +1131,21 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
           {data.ajustes.map((row, i) => {
             const rTotal = rowTotals[i];
             return (
-              <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#475569' }}>
+              <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#111111' }}>
                 <td style={{ padding: '2px 14px' }}>{row.label || '—'}</td>
                 {DEPTS.map(d => (
                   <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>
                     {parseVal(row.values[d.key]) !== 0 ? parseVal(row.values[d.key]).toLocaleString('pt-BR') : '—'}
                   </td>
                 ))}
-                <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#334155' }}>
+                <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111111' }}>
                   {rTotal !== 0 ? rTotal.toLocaleString('pt-BR') : '—'}
                 </td>
               </tr>
             );
           })}
           {/* Resultado Ajustado */}
-          <tr className="dre-row-total" style={{ backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'white' }}>
+          <tr className="dre-row-total" style={{ backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'black' }}>
             <td style={{ padding: '3px 6px', fontWeight: 700 }}>RESULTADO DO PERÍODO AJUSTADO</td>
             {DEPTS.map(d => {
               const liq = parseVal(data[d.key].lucroLiquidoExercicio);
@@ -1214,7 +1214,7 @@ function EditableCell({
       title="Clique para editar"
       className={`block w-full text-right cursor-pointer rounded px-1 py-0.5 hover:bg-yellow-50 hover:ring-1 hover:ring-yellow-200 transition-colors min-w-[5rem] ${
         isNeg ? 'text-red-600' : ''
-      } ${isTotal ? (isNeg ? 'text-red-300' : 'text-white') : ''} ${!value ? 'text-slate-300' : ''}`}
+      } ${isTotal ? (isNeg ? 'text-red-700' : 'text-black') : ''} ${!value ? 'text-slate-300' : ''}`}
     >
       {display || (isQuant ? '—' : '—')}
     </span>
