@@ -494,14 +494,14 @@ function ResumoTable({
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left px-4 py-2.5 font-semibold text-slate-600 w-52 min-w-[13rem]">Descrição</th>
+            <tr className="bg-slate-200 border-b-2 border-[#bb0a30]">
+              <th className="text-left px-4 py-3 font-bold text-slate-800 text-sm w-52 min-w-[13rem]">Descrição</th>
               {DEPTS.map(d => (
-                <th key={d.key} className="text-center px-3 py-2.5 font-semibold min-w-[8rem] text-[#bb0a30]">
+                <th key={d.key} className="text-center px-3 py-3 font-bold text-sm min-w-[8rem] text-slate-800">
                   {d.label}
                 </th>
               ))}
-              <th className="text-center px-3 py-2.5 font-bold text-slate-700 min-w-[8rem] bg-slate-100">Total</th>
+              <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[8rem] bg-slate-300">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -588,18 +588,18 @@ function DeptTable({
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left px-4 py-2.5 font-semibold text-slate-600 w-52 min-w-[13rem]">Descrição</th>
+            <tr className="bg-slate-200 border-b-2 border-[#bb0a30]">
+              <th className="text-left px-4 py-3 font-bold text-sm text-slate-800 w-52 min-w-[13rem]">Descrição</th>
               {prevPeriods.map(p => (
-                <th key={`${p.year}-${p.month}`} className="text-center px-3 py-2.5 font-semibold text-slate-400 min-w-[8rem]">
+                <th key={`${p.year}-${p.month}`} className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[8rem]">
                   {MONTHS[p.month - 1]}/{p.year}
                 </th>
               ))}
-              <th className="text-center px-3 py-2.5 font-semibold text-slate-700 min-w-[8rem]">
+              <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[8rem]">
                 {MONTHS[month - 1]}/{year}
               </th>
-              <th className="text-center px-2 py-2.5 font-bold text-slate-600 min-w-[5.5rem] bg-slate-50 border-l border-slate-200">Var. M/M</th>
-              <th className="text-center px-3 py-2.5 font-bold text-slate-700 min-w-[8rem] bg-slate-100">Total</th>
+              <th className="text-center px-2 py-3 font-bold text-sm text-slate-800 min-w-[5.5rem] bg-slate-300 border-l border-slate-400">Var. M/M</th>
+              <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[8rem] bg-slate-300">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -969,12 +969,12 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
       <PrintHeader title="AUDI LAPA/PINHEIROS" subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} />
       <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
         <thead>
-          <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 600, color: '#111111', width: '18%' }}>Descrição</th>
+          <tr style={{ backgroundColor: '#e2e8f0', borderBottom: '2px solid #bb0a30' }}>
+            <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 700, color: '#111111', fontSize: '9pt', width: '18%' }}>Descrição</th>
             {DEPTS.map(d => (
-              <th key={d.key} style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#111111', width: '11%' }}>{d.label}</th>
+              <th key={d.key} style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111111', fontSize: '9pt', width: '11%' }}>{d.label}</th>
             ))}
-            <th style={{ textAlign: 'center', padding: '3px 6px', fontWeight: 700, color: '#111111', backgroundColor: '#f1f5f9', width: '10%' }}>Total</th>
+            <th style={{ textAlign: 'center', padding: '4px 6px', fontWeight: 700, color: '#111111', fontSize: '9pt', backgroundColor: '#cbd5e1', width: '10%' }}>Total</th>
           </tr>
         </thead>
         <tbody>
@@ -1028,16 +1028,16 @@ function PrintDeptTable({
       <PrintHeader title={`Audi Lapa/Pinheiros — ${deptLabel}`} subtitle={`${MONTHS[month - 1]} de ${year}`} />
       <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
         <thead>
-          <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 600, color: '#111111', width: '28%' }}>Descrição</th>
+          <tr style={{ backgroundColor: '#e2e8f0', borderBottom: '2px solid #bb0a30' }}>
+            <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 700, color: '#111111', fontSize: '9pt', width: '28%' }}>Descrição</th>
             {prevPeriods.map(p => (
-              <th key={`${p.year}-${p.month}`} style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#111111', width: '14%' }}>
+              <th key={`${p.year}-${p.month}`} style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111111', fontSize: '9pt', width: '14%' }}>
                 {MONTHS[p.month - 1]}/{p.year}
               </th>
             ))}
-            <th style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 700, color: '#111111', width: '14%' }}>{MONTHS[month - 1]}/{year}</th>
-            <th style={{ textAlign: 'center', padding: '3px 4px', fontWeight: 600, color: '#111111', width: '10%', borderLeft: '1px solid #e2e8f0' }}>Var. M/M</th>
-            <th style={{ textAlign: 'center', padding: '3px 6px', fontWeight: 700, color: '#111111', backgroundColor: '#f1f5f9', width: '14%' }}>Total</th>
+            <th style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111111', fontSize: '9pt', width: '14%' }}>{MONTHS[month - 1]}/{year}</th>
+            <th style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111111', fontSize: '9pt', width: '10%', borderLeft: '1px solid #94a3b8' }}>Var. M/M</th>
+            <th style={{ textAlign: 'center', padding: '4px 6px', fontWeight: 700, color: '#111111', fontSize: '9pt', backgroundColor: '#cbd5e1', width: '14%' }}>Total</th>
           </tr>
         </thead>
         <tbody>
