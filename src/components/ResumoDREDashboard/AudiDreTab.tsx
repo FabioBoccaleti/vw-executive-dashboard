@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Save, Loader2 } from 'lucide-react';
+import { Save, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   loadDreAudi,
@@ -8,6 +8,8 @@ import {
   type DreAudiRow,
   type DreAudiDept,
 } from './dreAudiStorage';
+import { loadDREDataAsync } from '@/lib/dbStorage';
+import type { Department } from '@/lib/dataStorage';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +101,67 @@ const DEPTS: { key: DeptKey; label: string; color: string }[] = [
   { key: 'adm',      label: 'Administração',        color: '#64748b' },
 ];
 
+// Mapeamento DeptKey → Department do Dashboard Executivo
+const DEPT_KEY_TO_DEPT: Record<DeptKey, Department> = {
+  novos:     'novos',
+  usados:    'usados',
+  pecas:     'pecas',
+  oficina:   'oficina',
+  funilaria: 'funilaria',
+  adm:       'administracao',
+};
+
+// Mapeamento descricao → campo DreAudiDept
+const DESCRICAO_TO_FIELD: Record<string, keyof DreAudiDept> = {
+  'VOLUME DE VENDAS':                      'quant',
+  'RECEITA OPERACIONAL LIQUIDA':           'receitaOperacionalLiquida',
+  'CUSTO OPERACIONAL DA RECEITA':          'custoOperacionalReceita',
+  'LUCRO (PREJUIZO) OPERACIONAL BRUTO':   'lucroPrejOperacionalBruto',
+  'OUTRAS RECEITAS OPERACIONAIS':          'outrasReceitasOperacionais',
+  'OUTRAS DESPESAS OPERACIONAIS':          'outrasDespesasOperacionais',
+  'MARGEM DE CONTRIBUIÇÃO':               'margemContribuicao',
+  'MARGEM DE CONTRIBUICAO':               'margemContribuicao',
+  'DESPESAS C/ PESSOAL':                  'despPessoal',
+  'DESPESAS C/ SERV. DE TERCEIROS':       'despServTerceiros',
+  'DESPESAS C/ OCUPAÇÃO':                 'despOcupacao',
+  'DESPESAS C/ OCUPACAO':                 'despOcupacao',
+  'DESPESAS C/ FUNCIONAMENTO':            'despFuncionamento',
+  'DESPESAS C/ VENDAS':                   'despVendas',
+  'LUCRO (PREJUIZO) OPERACIONAL LIQUIDO': 'lucroPrejOperacionalLiquido',
+  'AMORTIZAÇÕES E DEPRECIAÇÕES':          'amortizacoesDepreciacoes',
+  'AMORTIZACOES E DEPRECIACOES':          'amortizacoesDepreciacoes',
+  'OUTRAS RECEITAS FINANCEIRAS':          'outrasReceitasFinanceiras',
+  'DESPESAS FINANCEIRAS NÃO OPERACIONAL': 'despFinanceirasNaoOperacional',
+  'DESPESAS FINANCEIRAS NAO OPERACIONAL': 'despFinanceirasNaoOperacional',
+  'DESPESAS NÃO OPERACIONAIS':            'despesasNaoOperacionais',
+  'DESPESAS NAO OPERACIONAIS':            'despesasNaoOperacionais',
+  'OUTRAS RENDAS NÃO OPERACIONAIS':       'outrasRendasNaoOperacionais',
+  'OUTRAS RENDAS NAO OPERACIONAIS':       'outrasRendasNaoOperacionais',
+  'LUCRO (PREJUIZO) ANTES IMPOSTOS':      'lucroPrejAntesImpostos',
+  'PROVISÕES IRPJ E C.S.':               'provisoesIrpjCs',
+  'PROVISOES IRPJ E C.S.':               'provisoesIrpjCs',
+  'PARTICIPAÇÕES':                        'participacoes',
+  'PARTICIPACOES':                        'participacoes',
+  'LUCRO LIQUIDO DO EXERCICIO':           'lucroLiquidoExercicio',
+};
+
+function buildDeptFromDREData(dreData: any[] | null, monthIndex: number): DreAudiDept {
+  const dept = createEmptyDreAudiRow(0, 0).novos;
+  if (!dreData) return dept;
+  for (const line of dreData) {
+    const descKey = ((line.descricao as string) || (line.label as string) || '').toUpperCase().trim();
+    const field = DESCRICAO_TO_FIELD[descKey];
+    if (field) {
+      const meses: number[] = line.meses || line.values || [];
+      const val = meses[monthIndex];
+      if (val !== undefined && val !== null && val !== 0) {
+        dept[field] = val.toString();
+      }
+    }
+  }
+  return dept;
+}
+
 // ─── Componente ──────────────────────────────────────────────────────────────
 
 interface AudiDreTabProps {
@@ -120,23 +183,54 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
     setLoading(true);
     setDirty(false);
     const periods = getPrevPeriods(year, month, 3);
-    Promise.all([
+    const allPeriods = [...periods, { year, month }];
+    const uniqueYears = [...new Set(allPeriods.map(p => p.year))] as Array<2024 | 2025 | 2026 | 2027>;
+
+    // Busca DRE do Dashboard Executivo para cada dept × ano (em paralelo)
+    const deptDrePromises = DEPTS.flatMap(d =>
+      uniqueYears.map(y =>
+        loadDREDataAsync(y, DEPT_KEY_TO_DEPT[d.key], 'audi')
+          .then(dre => ({ deptKey: d.key as DeptKey, year: y, dre }))
+      )
+    );
+
+    // Busca ajustes do KV (Resumo DRE)
+    const ajustesPromises = [
       loadDreAudi(year, month),
-      loadDreAudi(periods[0].year, periods[0].month),
-      loadDreAudi(periods[1].year, periods[1].month),
-      loadDreAudi(periods[2].year, periods[2].month),
-    ]).then(([current, p0, p1, p2]) => {
-      setData(current ?? createEmptyDreAudiRow(year, month));
-      setPrevData([
-        p0 ?? createEmptyDreAudiRow(periods[0].year, periods[0].month),
-        p1 ?? createEmptyDreAudiRow(periods[1].year, periods[1].month),
-        p2 ?? createEmptyDreAudiRow(periods[2].year, periods[2].month),
-      ]);
+      ...periods.map(p => loadDreAudi(p.year, p.month)),
+    ];
+
+    Promise.all([
+      Promise.all(ajustesPromises),
+      Promise.all(deptDrePromises),
+    ]).then(([ajustesResults, dreResults]) => {
+      const [currentAjustes, ...prevAjustesArr] = ajustesResults;
+
+      // Monta lookup: deptKey → year → DREData
+      const dreLookup: Record<string, Record<number, any[] | null>> = {};
+      for (const { deptKey, year: y, dre } of dreResults) {
+        dreLookup[deptKey] ??= {};
+        dreLookup[deptKey][y] = dre;
+      }
+
+      function buildRow(y: number, m: number, kvRow: DreAudiRow | null): DreAudiRow {
+        const row = createEmptyDreAudiRow(y, m);
+        for (const d of DEPTS) {
+          row[d.key] = buildDeptFromDREData(dreLookup[d.key]?.[y] ?? null, m - 1);
+        }
+        if (kvRow) {
+          row.ajustes = kvRow.ajustes;
+        }
+        return row;
+      }
+
+      setData(buildRow(year, month, currentAjustes ?? null));
+      setPrevData(periods.map((p, i) => buildRow(p.year, p.month, prevAjustesArr[i] ?? null)));
       setLoading(false);
     });
   }, [year, month]);
 
-  // ── Save ────────────────────────────────────────────────────────────────────
+  // ── Save (somente ajustes) ──────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
     if (!data) return;
     setSaving(true);
@@ -144,29 +238,17 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
     setSaving(false);
     if (ok) {
       setDirty(false);
-      toast.success('Dados salvos com sucesso!');
+      toast.success('Ajustes salvos com sucesso!');
     } else {
       toast.error('Erro ao salvar. Tente novamente.');
     }
   }, [data]);
 
-  // ── Edição de célula ────────────────────────────────────────────────────────
-  const handleCellChange = useCallback(
-    (dept: DeptKey, field: keyof DreAudiDept, value: string) => {
-      setData(prev => {
-        if (!prev) return prev;
-        return { ...prev, [dept]: { ...prev[dept], [field]: value } };
-      });
-      setDirty(true);
-    },
-    []
-  );
-
   const handleAjusteChange = useCallback(
-    (field: 'icmsSt' | 'honorariosAdvogados', value: string) => {
+    (dept: DeptKey, field: 'icmsSt' | 'honorariosAdvogados', value: string) => {
       setData(prev => {
         if (!prev) return prev;
-        return { ...prev, ajustes: { ...prev.ajustes, [field]: value } };
+        return { ...prev, ajustes: { ...prev.ajustes, [dept]: { ...prev.ajustes[dept], [field]: value } } };
       });
       setDirty(true);
     },
@@ -229,7 +311,13 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
 
         <div className="flex-1" />
 
-        {/* Botão Salvar */}
+        {/* Badge de sincronização */}
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[0.65rem] font-medium mr-2">
+          <RefreshCw className="w-3 h-3" />
+          Sincronizado com Dashboard Executivo
+        </div>
+
+        {/* Botão Salvar (apenas ajustes) */}
         <button
           disabled={!dirty || saving}
           onClick={handleSave}
@@ -240,7 +328,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
           }`}
         >
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          {saving ? 'Salvando...' : 'Salvar'}
+          {saving ? 'Salvando...' : 'Salvar ajustes'}
         </button>
       </div>
 
@@ -252,7 +340,6 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
           <ResumoTable
             data={data}
             deptList={deptList}
-            onCellChange={handleCellChange}
             year={year}
             month={month}
           />
@@ -271,14 +358,13 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
               prevPeriods={getPrevPeriods(year, month, 3)}
               year={year}
               month={month}
-              onChange={(field, value) => handleCellChange(d.key, field, value)}
             />
           ) : null
         )}
 
         {/* AJUSTES */}
         {(activeSection as string) === 'ajustes' && (
-          <AjustesTable ajustes={data.ajustes} onChange={handleAjusteChange} data={data} />
+          <AjustesTable ajustes={data.ajustes} onChange={handleAjusteChange} data={data} year={year} month={month} />
         )}
       </div>
     </div>
@@ -290,13 +376,11 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
 function ResumoTable({
   data,
   deptList,
-  onCellChange,
   year,
   month,
 }: {
   data: DreAudiRow;
   deptList: DreAudiDept[];
-  onCellChange: (dept: DeptKey, field: keyof DreAudiDept, value: string) => void;
   year: number;
   month: number;
 }) {
@@ -338,17 +422,17 @@ function ResumoTable({
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''} ${line.isTotal ? 'text-white' : ''}`}>
                     {line.label}
                   </td>
-                  {DEPTS.map((d, di) => (
-                    <td key={d.key} className="px-2 py-1 text-right">
-                      <EditableCell
-                        value={data[d.key][line.field]}
-                        onChange={v => onCellChange(d.key, line.field, v)}
-                        isTotal={line.isTotal}
-                        isNegative={line.isNegative}
-                        isQuant={isQuant}
-                      />
-                    </td>
-                  ))}
+                  {DEPTS.map((d) => {
+                    const val = data[d.key][line.field];
+                    const display = isQuant
+                      ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
+                      : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
+                    return (
+                      <td key={d.key} className="px-3 py-1.5 text-right">
+                        {display}
+                      </td>
+                    );
+                  })}
                   {/* Total */}
                   <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'bg-slate-700 text-white' : 'bg-slate-50 text-slate-700'}`}>
                     {isQuant
@@ -383,7 +467,6 @@ function DeptTable({
   prevPeriods,
   year,
   month,
-  onChange,
 }: {
   deptKey: DeptKey;
   deptLabel: string;
@@ -393,7 +476,6 @@ function DeptTable({
   prevPeriods: { year: number; month: number }[];
   year: number;
   month: number;
-  onChange: (field: keyof DreAudiDept, value: string) => void;
 }) {
   const totalCols = 1 + prevPeriods.length + 1 + 1 + 1; // desc + prev + atual + total + %H
   return (
@@ -478,14 +560,11 @@ function DeptTable({
                       </td>
                     );
                   })}
-                  <td className="px-2 py-1 text-right">
-                    <EditableCell
-                      value={dept[line.field]}
-                      onChange={v => onChange(line.field, v)}
-                      isTotal={line.isTotal}
-                      isNegative={line.isNegative}
-                      isQuant={isQuant}
-                    />
+                  <td className="px-3 py-1.5 text-right">
+                    {isQuant
+                      ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—')
+                      : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')
+                    }
                   </td>
                   <td className={`px-2 py-1.5 text-right text-[0.68rem] border-l border-slate-200 ${line.isTotal ? 'text-slate-300' : 'text-slate-500'}`}>
                     {varMM || '—'}
@@ -509,76 +588,111 @@ function AjustesTable({
   ajustes,
   onChange,
   data,
+  year,
+  month,
 }: {
   ajustes: DreAudiRow['ajustes'];
-  onChange: (field: 'icmsSt' | 'honorariosAdvogados', value: string) => void;
+  onChange: (dept: DeptKey, field: 'icmsSt' | 'honorariosAdvogados', value: string) => void;
   data: DreAudiRow;
+  year: number;
+  month: number;
 }) {
   const deptList = DEPTS.map(d => data[d.key]);
   const totalLiquido = sumDepts(deptList, 'lucroLiquidoExercicio');
 
-  const icmsSt = parseFloat(ajustes.icmsSt.replace(/\./g, '').replace(',', '.')) || 0;
-  const honorarios = parseFloat(ajustes.honorariosAdvogados.replace(/\./g, '').replace(',', '.')) || 0;
-  const totalLiqNum = parseFloat(totalLiquido.replace(/\./g, '').replace(',', '.')) || 0;
-  const resultadoAjustado = totalLiqNum - icmsSt + honorarios;
+  // Totais por linha
+  const totalIcmsSt = DEPTS.reduce((s, d) => s + parseVal(ajustes[d.key].icmsSt), 0);
+  const totalHonorarios = DEPTS.reduce((s, d) => s + parseVal(ajustes[d.key].honorariosAdvogados), 0);
+  const totalLiqNum = parseVal(totalLiquido);
+  const totalAjustado = totalLiqNum - totalIcmsSt + totalHonorarios;
+
+  const colSpan = DEPTS.length + 2; // desc + depts + total
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="bg-slate-700 text-white px-6 py-3">
-        <h2 className="font-bold text-base">AJUSTES NO RESULTADO DO MÊS</h2>
-        <p className="text-xs text-slate-300 mt-0.5">Despesas e Receitas Esporádicas</p>
+      <div className="bg-[#bb0a30] text-white px-6 py-3">
+        <h2 className="font-bold text-base">AUDI LAPA/PINHEIROS</h2>
+        <p className="text-xs text-red-200 mt-0.5">{MONTHS[month - 1]} de {year} — Ajustes Esporádicos</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left px-4 py-2.5 font-semibold text-slate-600 w-80">Descrição</th>
-              <th className="text-center px-3 py-2.5 font-semibold text-slate-600 min-w-[9rem]">Adm.</th>
-              <th className="text-center px-3 py-2.5 font-bold text-slate-700 min-w-[9rem] bg-slate-100">Total</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-slate-600 w-52 min-w-[13rem]">Descrição</th>
+              {DEPTS.map(d => (
+                <th key={d.key} className="text-center px-3 py-2.5 font-semibold min-w-[8rem] text-[#bb0a30]">
+                  {d.label}
+                </th>
+              ))}
+              <th className="text-center px-3 py-2.5 font-bold text-slate-700 min-w-[8rem] bg-slate-100">Total</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b border-slate-100 bg-slate-800 text-white font-bold">
+            {/* Lucro Líquido do Exercício */}
+            <tr className="border-b border-red-900 text-white font-bold" style={{backgroundColor:'#bb0a30'}}>
               <td className="px-4 py-1.5">Lucro Líquido do Exercício</td>
-              <td className="px-3 py-1.5 text-right">{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
-              <td className="px-3 py-1.5 text-right bg-slate-700">{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
+              {DEPTS.map(d => {
+                const v = data[d.key].lucroLiquidoExercicio;
+                return (
+                  <td key={d.key} className="px-3 py-1.5 text-right">
+                    {v ? fmtNum(v) : '—'}
+                  </td>
+                );
+              })}
+              <td className="px-3 py-1.5 text-right" style={{backgroundColor:'#9a0827'}}>
+                {totalLiquido ? fmtNum(totalLiquido) : '—'}
+              </td>
             </tr>
+
+            {/* ICMS ST */}
             <tr className="border-b border-slate-100 hover:bg-slate-50 text-slate-600">
               <td className="px-4 py-1.5 pl-7">(-) ICMS ST recebido do fabricante</td>
-              <td className="px-2 py-1 text-right">
-                <EditableCell
-                  value={ajustes.icmsSt}
-                  onChange={v => onChange('icmsSt', v)}
-                  isNegative
-                />
-              </td>
+              {DEPTS.map(d => (
+                <td key={d.key} className="px-2 py-1 text-right">
+                  <EditableCell
+                    value={ajustes[d.key].icmsSt}
+                    onChange={v => onChange(d.key, 'icmsSt', v)}
+                    isNegative
+                  />
+                </td>
+              ))}
               <td className="px-3 py-1.5 text-right bg-slate-50 text-slate-700 font-semibold">
-                {ajustes.icmsSt ? fmtNum(ajustes.icmsSt) : '—'}
+                {totalIcmsSt !== 0 ? totalIcmsSt.toLocaleString('pt-BR') : '—'}
               </td>
             </tr>
+
+            {/* Honorários */}
             <tr className="border-b border-slate-100 hover:bg-slate-50 text-slate-600">
               <td className="px-4 py-1.5 pl-7">(+) Honorários advogados s/ ICMS ST recebido</td>
-              <td className="px-2 py-1 text-right">
-                <EditableCell
-                  value={ajustes.honorariosAdvogados}
-                  onChange={v => onChange('honorariosAdvogados', v)}
-                />
-              </td>
+              {DEPTS.map(d => (
+                <td key={d.key} className="px-2 py-1 text-right">
+                  <EditableCell
+                    value={ajustes[d.key].honorariosAdvogados}
+                    onChange={v => onChange(d.key, 'honorariosAdvogados', v)}
+                  />
+                </td>
+              ))}
               <td className="px-3 py-1.5 text-right bg-slate-50 text-slate-700 font-semibold">
-                {ajustes.honorariosAdvogados ? fmtNum(ajustes.honorariosAdvogados) : '—'}
+                {totalHonorarios !== 0 ? totalHonorarios.toLocaleString('pt-BR') : '—'}
               </td>
             </tr>
-            <tr className="bg-slate-800 text-white font-bold">
+
+            {/* Resultado Ajustado */}
+            <tr className="text-white font-bold" style={{backgroundColor:'#bb0a30'}}>
               <td className="px-4 py-2">RESULTADO DO PERÍODO AJUSTADO</td>
-              <td className="px-3 py-2 text-right">
-                {resultadoAjustado !== 0
-                  ? resultadoAjustado.toLocaleString('pt-BR')
-                  : '—'}
-              </td>
-              <td className="px-3 py-2 text-right bg-slate-700">
-                {resultadoAjustado !== 0
-                  ? resultadoAjustado.toLocaleString('pt-BR')
-                  : '—'}
+              {DEPTS.map(d => {
+                const liq = parseVal(data[d.key].lucroLiquidoExercicio);
+                const icms = parseVal(ajustes[d.key].icmsSt);
+                const hon = parseVal(ajustes[d.key].honorariosAdvogados);
+                const ajustado = liq - icms + hon;
+                return (
+                  <td key={d.key} className="px-3 py-2 text-right">
+                    {ajustado !== 0 ? ajustado.toLocaleString('pt-BR') : '—'}
+                  </td>
+                );
+              })}
+              <td className="px-3 py-2 text-right" style={{backgroundColor:'#9a0827'}}>
+                {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}
               </td>
             </tr>
           </tbody>

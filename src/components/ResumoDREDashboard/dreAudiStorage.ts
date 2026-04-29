@@ -43,10 +43,14 @@ export interface DreAudiRow {
   funilaria: DreAudiDept;
   adm: DreAudiDept;
 
-  // Ajustes esporádicos (Página 8)
+  // Ajustes esporádicos (Página 8) — por departamento
   ajustes: {
-    icmsSt: string;
-    honorariosAdvogados: string;
+    novos:     { icmsSt: string; honorariosAdvogados: string };
+    usados:    { icmsSt: string; honorariosAdvogados: string };
+    pecas:     { icmsSt: string; honorariosAdvogados: string };
+    oficina:   { icmsSt: string; honorariosAdvogados: string };
+    funilaria: { icmsSt: string; honorariosAdvogados: string };
+    adm:       { icmsSt: string; honorariosAdvogados: string };
   };
 }
 
@@ -86,7 +90,14 @@ export function createEmptyDreAudiRow(year: number, month: number): DreAudiRow {
     oficina: emptyDept(),
     funilaria: emptyDept(),
     adm: emptyDept(),
-    ajustes: { icmsSt: '', honorariosAdvogados: '' },
+    ajustes: {
+      novos:     { icmsSt: '', honorariosAdvogados: '' },
+      usados:    { icmsSt: '', honorariosAdvogados: '' },
+      pecas:     { icmsSt: '', honorariosAdvogados: '' },
+      oficina:   { icmsSt: '', honorariosAdvogados: '' },
+      funilaria: { icmsSt: '', honorariosAdvogados: '' },
+      adm:       { icmsSt: '', honorariosAdvogados: '' },
+    },
   };
 }
 
