@@ -31,6 +31,20 @@ function sumDepts(depts: DreAudiDept[], field: keyof DreAudiDept): string {
   return total.toLocaleString('pt-BR');
 }
 
+function getPrevPeriods(year: number, month: number, count: number): { year: number; month: number }[] {
+  const periods: { year: number; month: number }[] = [];
+  let y = year, m = month;
+  for (let i = 0; i < count; i++) {
+    m--; if (m < 1) { m = 12; y--; }
+    periods.unshift({ year: y, month: m });
+  }
+  return periods;
+}
+
+function parseVal(v: string | number): number {
+  return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
+}
+
 // ─── Linhas da tabela ──────────────────────────────────────────────────────────
 
 interface DreLineConfig {
@@ -98,13 +112,25 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
   const [saving, setSaving]   = useState(false);
   const [dirty, setDirty]     = useState(false);
   const [activeSection, setActiveSection] = useState<'resumo' | DeptKey>('resumo');
+  const [prevData, setPrevData] = useState<DreAudiRow[]>([]);
 
   // ── Load ────────────────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
     setDirty(false);
-    loadDreAudi(year, month).then(row => {
-      setData(row ?? createEmptyDreAudiRow(year, month));
+    const periods = getPrevPeriods(year, month, 3);
+    Promise.all([
+      loadDreAudi(year, month),
+      loadDreAudi(periods[0].year, periods[0].month),
+      loadDreAudi(periods[1].year, periods[1].month),
+      loadDreAudi(periods[2].year, periods[2].month),
+    ]).then(([current, p0, p1, p2]) => {
+      setData(current ?? createEmptyDreAudiRow(year, month));
+      setPrevData([
+        p0 ?? createEmptyDreAudiRow(periods[0].year, periods[0].month),
+        p1 ?? createEmptyDreAudiRow(periods[1].year, periods[1].month),
+        p2 ?? createEmptyDreAudiRow(periods[2].year, periods[2].month),
+      ]);
       setLoading(false);
     });
   }, [year, month]);
@@ -240,6 +266,8 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
               deptLabel={d.label}
               deptColor={d.color}
               dept={data[d.key]}
+              prevDepts={prevData.map(row => row[d.key])}
+              prevPeriods={getPrevPeriods(year, month, 3)}
               year={year}
               month={month}
               onChange={(field, value) => handleCellChange(d.key, field, value)}
@@ -350,6 +378,8 @@ function DeptTable({
   deptLabel,
   deptColor,
   dept,
+  prevDepts,
+  prevPeriods,
   year,
   month,
   onChange,
@@ -358,13 +388,13 @@ function DeptTable({
   deptLabel: string;
   deptColor: string;
   dept: DreAudiDept;
+  prevDepts: DreAudiDept[];
+  prevPeriods: { year: number; month: number }[];
   year: number;
   month: number;
   onChange: (field: keyof DreAudiDept, value: string) => void;
 }) {
-  // Para o detalhe por departamento mostramos Jan, Fev, Mar e Total no Ano
-  // Por enquanto só o mês atual fica editável — os meses anteriores virão
-  // dos dados salvos (lidos no futuro pelo componente pai)
+  const totalCols = 1 + prevPeriods.length + 1 + 1 + 1; // desc + prev + atual + total + %H
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="px-6 py-3 text-white font-bold flex items-center gap-3 bg-[#bb0a30]">
@@ -376,16 +406,22 @@ function DeptTable({
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="text-left px-4 py-2.5 font-semibold text-slate-600 w-52 min-w-[13rem]">Descrição</th>
-              <th className="text-center px-3 py-2.5 font-semibold text-slate-600 min-w-[8rem]">
+              {prevPeriods.map(p => (
+                <th key={`${p.year}-${p.month}`} className="text-center px-3 py-2.5 font-semibold text-slate-400 min-w-[8rem]">
+                  {MONTHS[p.month - 1]}/{p.year}
+                </th>
+              ))}
+              <th className="text-center px-3 py-2.5 font-semibold text-slate-700 min-w-[8rem]">
                 {MONTHS[month - 1]}/{year}
               </th>
-              <th className="text-center px-3 py-2.5 font-semibold text-slate-400 min-w-[6rem]">% H</th>
+              <th className="text-center px-2 py-2.5 font-bold text-slate-600 min-w-[5.5rem] bg-slate-50 border-l border-slate-200">Var. M/M</th>
+              <th className="text-center px-3 py-2.5 font-bold text-slate-700 min-w-[8rem] bg-slate-100">Total</th>
             </tr>
           </thead>
           <tbody>
             {DRE_LINES.map((line, idx) => {
               if (line.separator) {
-                return <tr key={idx}><td colSpan={3} className="h-px bg-slate-100" /></tr>;
+                return <tr key={idx}><td colSpan={totalCols} className="h-px bg-slate-100" /></tr>;
               }
               const isQuant = line.field === 'quant' && idx === 0;
               const rowClass = line.isTotal
@@ -394,16 +430,53 @@ function DeptTable({
                 ? 'bg-slate-100 font-semibold text-slate-700'
                 : 'hover:bg-slate-50 text-slate-600';
 
-              // % H sobre Vendas Líquidas
-              const vendasLiq = parseFloat(dept.vendasLiquidas.replace(/\./g, '').replace(',', '.')) || 0;
-              const val = parseFloat(String(dept[line.field]).replace(/\./g, '').replace(',', '.'));
-              const pctH = vendasLiq !== 0 && !isNaN(val) && !isQuant
-                ? ((val / vendasLiq) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
-                : '';
+              // Var. M/M: mês atual vs mês imediatamente anterior (prevDepts[2])
+              const prevDept = prevDepts[prevDepts.length - 1];
+              let varMM = '';
+              if (prevDept) {
+                if (isQuant) {
+                  const cur = parseInt(String(dept[line.field])) || 0;
+                  const prv = parseInt(String(prevDept[line.field])) || 0;
+                  if (prv !== 0) {
+                    const pct = ((cur - prv) / Math.abs(prv)) * 100;
+                    varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+                  }
+                } else {
+                  const cur = parseVal(dept[line.field]);
+                  const prv = parseVal(prevDept[line.field]);
+                  if (prv !== 0) {
+                    const pct = ((cur - prv) / Math.abs(prv)) * 100;
+                    varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+                  }
+                }
+              }
+
+              // Total = soma dos meses anteriores + mês atual
+              const allDepts = [...prevDepts, dept];
+              let totalStr: string;
+              if (isQuant) {
+                const t = allDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0);
+                totalStr = t > 0 ? t.toString() : '—';
+              } else {
+                const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0);
+                totalStr = t !== 0 ? t.toLocaleString('pt-BR') : '—';
+              }
 
               return (
                 <tr key={idx} className={`border-b border-slate-100 ${rowClass}`}>
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
+                  {prevDepts.map((pd, pi) => {
+                    const v = pd[line.field];
+                    const num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
+                    const display = isQuant
+                      ? (num > 0 ? num.toString() : '—')
+                      : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
+                    return (
+                      <td key={pi} className={`px-3 py-1.5 text-right ${line.isTotal ? 'text-slate-300' : 'text-slate-400'}`}>
+                        {display}
+                      </td>
+                    );
+                  })}
                   <td className="px-2 py-1 text-right">
                     <EditableCell
                       value={dept[line.field]}
@@ -413,8 +486,11 @@ function DeptTable({
                       isQuant={isQuant}
                     />
                   </td>
-                  <td className={`px-3 py-1.5 text-right text-slate-400 ${line.isTotal ? 'text-slate-300' : ''}`}>
-                    {pctH}
+                  <td className={`px-2 py-1.5 text-right text-[0.68rem] border-l border-slate-200 ${line.isTotal ? 'text-slate-300' : 'text-slate-500'}`}>
+                    {varMM || '—'}
+                  </td>
+                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'bg-slate-700 text-white' : 'bg-slate-50 text-slate-700'}`}>
+                    {totalStr}
                   </td>
                 </tr>
               );
