@@ -95,18 +95,7 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
             </select>
           </div>
 
-          {/* Dias úteis */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Dias Úteis</label>
-            <input
-              type="number"
-              min={1}
-              max={31}
-              value={diasUteis}
-              onChange={e => setDiasUteis(Math.max(1, Number(e.target.value)))}
-              className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 w-16 text-center focus:outline-none focus:ring-2 focus:ring-teal-300"
-            />
-          </div>
+
         </div>
       </div>
 

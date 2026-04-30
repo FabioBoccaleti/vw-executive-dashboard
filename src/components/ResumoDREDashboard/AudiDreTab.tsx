@@ -608,6 +608,7 @@ function DeptTable({
                 return <tr key={idx}><td colSpan={totalCols} className="h-px bg-slate-100" /></tr>;
               }
               const isQuant = line.field === 'quant' && idx === 0;
+              const isAdmROL = deptKey === 'adm' && line.field === 'receitaOperacionalLiquida';
               const rowClass = line.isTotal
                 ? 'text-black font-bold'
                 : line.isSubtotal
@@ -625,7 +626,7 @@ function DeptTable({
                     const pct = ((cur - prv) / Math.abs(prv)) * 100;
                     varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
                   }
-                } else {
+                } else if (!isAdmROL) {
                   const cur = parseVal(dept[line.field]);
                   const prv = parseVal(prevDept[line.field]);
                   if (prv !== 0) {
@@ -641,6 +642,8 @@ function DeptTable({
               if (isQuant) {
                 const t = allDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0);
                 totalStr = t > 0 ? t.toString() : '—';
+              } else if (isAdmROL) {
+                totalStr = '0,00';
               } else {
                 const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0);
                 totalStr = t !== 0 ? t.toLocaleString('pt-BR') : '—';
@@ -652,7 +655,9 @@ function DeptTable({
                   {prevDepts.map((pd, pi) => {
                     const v = pd[line.field];
                     const num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
-                    const display = isQuant
+                    const display = isAdmROL
+                      ? '0,00'
+                      : isQuant
                       ? (num > 0 ? num.toString() : '—')
                       : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
                     return (
@@ -662,13 +667,16 @@ function DeptTable({
                     );
                   })}
                   <td className="px-2 py-1 text-right">
-                    <EditableCell
-                      value={dept[line.field]}
-                      onChange={v => onChange(line.field, v)}
-                      isTotal={line.isTotal}
-                      isNegative={line.isNegative}
-                      isQuant={isQuant}
-                    />
+                    {isAdmROL
+                      ? <span className="block w-full text-right px-1 py-0.5 min-w-[5rem]">0,00</span>
+                      : <EditableCell
+                          value={dept[line.field]}
+                          onChange={v => onChange(line.field, v)}
+                          isTotal={line.isTotal}
+                          isNegative={line.isNegative}
+                          isQuant={isQuant}
+                        />
+                    }
                   </td>
                   <td className={`px-2 py-1.5 text-right text-[0.68rem] border-l border-slate-200 text-black`}>
                     {varMM || '—'}
@@ -922,6 +930,7 @@ function PrintableReport({
           <div key={d.key} className="print-page">
             <PrintDeptTable
               deptLabel={d.label}
+              deptKey={d.key}
               dept={data[d.key]}
               prevDepts={prevDepts}
               prevPeriods={prevPeriods}
@@ -1014,9 +1023,10 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
 
 // ── Tabela por Departamento (impressão) ──────────────────────────────────────
 function PrintDeptTable({
-  deptLabel, dept, prevDepts, prevPeriods, year, month,
+  deptLabel, deptKey, dept, prevDepts, prevPeriods, year, month,
 }: {
   deptLabel: string;
+  deptKey: DeptKey;
   dept: DreAudiDept;
   prevDepts: DreAudiDept[];
   prevPeriods: { year: number; month: number }[];
@@ -1044,6 +1054,7 @@ function PrintDeptTable({
           {DRE_LINES.map((line, idx) => {
             if (line.separator) return <tr key={idx}><td colSpan={7} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
             const isQuant = line.field === 'quant' && idx === 0;
+            const isAdmROL = deptKey === 'adm' && line.field === 'receitaOperacionalLiquida';
             const rowBg = line.isTotal ? '#bb0a30' : line.isSubtotal ? '#f1f5f9' : 'transparent';
             const rowColor = line.isTotal ? 'black' : '#111111';
 
@@ -1054,7 +1065,7 @@ function PrintDeptTable({
                 const cur = parseInt(String(dept[line.field])) || 0;
                 const prv = parseInt(String(prevDept[line.field])) || 0;
                 if (prv !== 0) { const pct = ((cur - prv) / Math.abs(prv)) * 100; varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
-              } else {
+              } else if (!isAdmROL) {
                 const cur = parseVal(dept[line.field]); const prv = parseVal(prevDept[line.field]);
                 if (prv !== 0) { const pct = ((cur - prv) / Math.abs(prv)) * 100; varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
               }
@@ -1063,6 +1074,8 @@ function PrintDeptTable({
             const allDepts = [...prevDepts, dept];
             const totalStr = isQuant
               ? (() => { const t = allDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0); return t > 0 ? t.toString() : '—'; })()
+              : isAdmROL
+              ? '0,00'
               : (() => { const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0); return t !== 0 ? t.toLocaleString('pt-BR') : '—'; })();
 
             const deptRowStyle: React.CSSProperties = line.isTotal
@@ -1076,11 +1089,15 @@ function PrintDeptTable({
                 <td style={{ padding: `2px ${line.indent ? '14px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
                 {prevDepts.map((pd, pi) => {
                   const v = pd[line.field]; const num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
-                  const display = isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
+                  const display = isAdmROL
+                    ? '0,00'
+                    : isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
                   return <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', color: '#111111' }}>{display}</td>;
                 })}
                 <td style={{ textAlign: 'right', padding: '2px 4px' }}>
-                  {isQuant
+                  {isAdmROL
+                    ? '0,00'
+                    : isQuant
                     ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—')
                     : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')}
                 </td>
