@@ -115,7 +115,7 @@ function calcPecasRow(d: Record<string, string>): { recLiq: number; lb: number; 
 }
 
 function calcServicosRow(d: Record<string, string>): { recLiq: number } {
-  const valorVenda    = n(d['LIQ_NOTA_FISCAL']);
+  const valorVenda    = n(d['LIQ_NOTA_FISCAL']) + n(d['VAL_PIS_ST']) + n(d['VAL_COFINS_ST']) + n(d['VAL_CSLL']);
   const iss           = n(d['VAL_ISS']);
   const icms          = n(d['VAL_ICMS']);
   const pis           = n(d['VAL_PIS']);
