@@ -68,7 +68,7 @@ interface Calc {
   recLiq: number;
 }
 function calcRow(d: Record<string, string>): Calc {
-  const valorVenda    = n(d['LIQ_NOTA_FISCAL']);
+  const valorVenda    = n(d['LIQ_NOTA_FISCAL']) + n(d['VAL_PIS_ST']) + n(d['VAL_COFINS_ST']) + n(d['VAL_CSLL']);
   const iss           = n(d['VAL_ISS']);
   const icms          = n(d['VAL_ICMS']);
   const pis           = n(d['VAL_PIS']);
@@ -357,7 +357,7 @@ function ServicoPanel({ rows, color, depts }: { rows: VPecasRow[]; color: string
       let nfsServicos = 0;
       for (const r of dayRows) {
         const t = r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)';
-        byTipo[t] = (byTipo[t] ?? 0) + n(r.data['LIQ_NOTA_FISCAL']);
+        byTipo[t] = (byTipo[t] ?? 0) + n(r.data['LIQ_NOTA_FISCAL']) + n(r.data['VAL_PIS_ST']) + n(r.data['VAL_COFINS_ST']) + n(r.data['VAL_CSLL']);
         nfsServicos++;
       }
       for (const t of tipos) cumByTipo[t] += byTipo[t] ?? 0;
@@ -394,7 +394,7 @@ function ServicoPanel({ rows, color, depts }: { rows: VPecasRow[]; color: string
       let nfsServicos = 0;
       for (const r of moRows) {
         const t = r.data['TIPO_TRANSACAO']?.trim() || '(sem tipo)';
-        byTipo[t] = (byTipo[t] ?? 0) + n(r.data['LIQ_NOTA_FISCAL']);
+        byTipo[t] = (byTipo[t] ?? 0) + n(r.data['LIQ_NOTA_FISCAL']) + n(r.data['VAL_PIS_ST']) + n(r.data['VAL_COFINS_ST']) + n(r.data['VAL_CSLL']);
         nfsServicos++;
       }
       for (const t of tipos) cumByTipo[t] += byTipo[t] ?? 0;

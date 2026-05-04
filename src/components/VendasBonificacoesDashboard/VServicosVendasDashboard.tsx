@@ -74,6 +74,7 @@ function rowPeriod(row: VPecasRow): { year: number; month: number } | null {
 
 // ─── Cálculos por linha ───────────────────────────────────────────────────────
 interface ServicosCalc {
+  valorVenda: number;
   iss: number;
   difal: number;
   recLiq: number;
@@ -83,7 +84,7 @@ interface ServicosCalc {
 }
 
 function calcServicosRow(d: Record<string, string>, ov: ServicosOverride): ServicosCalc {
-  const valorVenda = n(d['LIQ_NOTA_FISCAL']);
+  const valorVenda = n(d['LIQ_NOTA_FISCAL']) + n(d['VAL_PIS_ST']) + n(d['VAL_COFINS_ST']) + n(d['VAL_CSLL']);
   const iss        = n(d['VAL_ISS']);
   const icms       = n(d['VAL_ICMS']);
   const pis        = n(d['VAL_PIS']);
@@ -99,7 +100,7 @@ function calcServicosRow(d: Record<string, string>, ov: ServicosOverride): Servi
   const dsr        = n(ov.dsr);
   const provisoes  = n(ov.provisoes);
   const resultado  = lucroBruto - comissao - dsr - provisoes;
-  return { iss, difal, recLiq, lucroBruto, lucroBrutoPct, resultado };
+  return { valorVenda, iss, difal, recLiq, lucroBruto, lucroBrutoPct, resultado };
 }
 
 // ─── CalcCell ─────────────────────────────────────────────────────────────────
@@ -219,7 +220,7 @@ async function exportServicosExcel(
     const vals = [
       d['NUMERO_NOTA_FISCAL'], d['SERIE_NOTA_FISCAL'], d['TIPO_TRANSACAO'], d['DTA_DOCUMENTO'],
       d['DEPARTAMENTO'], d['NOME_VENDEDOR'], ov.condPgto, d['NOME_CLIENTE'], d['CIDADE'], d['ESTADO'],
-      n(d['LIQ_NOTA_FISCAL']), c.iss, n(d['VAL_ICMS']), n(d['VAL_PIS']), n(d['VAL_COFINS']), c.difal,
+      c.valorVenda, c.iss, n(d['VAL_ICMS']), n(d['VAL_PIS']), n(d['VAL_COFINS']), c.difal,
       c.recLiq, n(ov.taxaML), n(ov.taxaEPecas),
       n(d['TOT_CUSTO_MEDIO']), c.lucroBruto, c.lucroBrutoPct,
       n(ov.comissao), n(ov.dsr), n(ov.provisoes), c.resultado,
@@ -315,7 +316,7 @@ export default function VServicosVendasDashboard() {
       const d = r.data;
       const ov = overrides[ovKey(d)] ?? emptyOv();
       const c = calcServicosRow(d, ov);
-      valorVenda  += n(d['LIQ_NOTA_FISCAL']);
+      valorVenda  += n(d['LIQ_NOTA_FISCAL']) + n(d['VAL_PIS_ST']) + n(d['VAL_COFINS_ST']) + n(d['VAL_CSLL']);
       iss         += c.iss;
       icms        += n(d['VAL_ICMS']);
       pis         += n(d['VAL_PIS']);
@@ -510,7 +511,7 @@ export default function VServicosVendasDashboard() {
                     <td className={`${td} px-2 min-w-[110px]`}><ReadCell value={d['CIDADE']} /></td>
                     <td className={`${td} px-2 min-w-[60px]`}><ReadCell value={d['ESTADO']} /></td>
                     {/* RECEITA BRUTA — com ISS */}
-                    <td className={`${tdR} px-2 min-w-[120px]`}><ReadCell value={d['LIQ_NOTA_FISCAL']} currency /></td>
+                    <td className={`${tdR} px-2 min-w-[120px]`}><CalcCell value={c.valorVenda} /></td>
                     <td className={`${tdR} px-2 min-w-[100px]`}><ReadCell value={d['VAL_ISS']} currency /></td>
                     <td className={`${tdR} px-2 min-w-[100px]`}><ReadCell value={d['VAL_ICMS']} currency /></td>
                     <td className={`${tdR} px-2 min-w-[90px]`}><ReadCell value={d['VAL_PIS']} currency /></td>
