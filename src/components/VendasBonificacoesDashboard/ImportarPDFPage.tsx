@@ -19,6 +19,7 @@ import VServicosAnalise from './VServicosAnalise';
 import { GuiaRelatoriosPage } from './GuiaRelatoriosPage';
 import { ManualRelatoriosPage } from './ManualRelatoriosPage';
 import { CentralVendasResumoPage } from './CentralVendasResumoPage';
+import { ProvisaoPIVDashboard } from './ProvisaoPIVDashboard';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
 import type { TabelaDadosRow } from './tabelaDadosStorage';
 
@@ -451,6 +452,9 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
   const [registroFilterYear, setRegistroFilterYear] = useState<number>(new Date().getFullYear());
   const [registroFilterMonth, setRegistroFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [financeiroTab, setFinanceiroTab] = useState<'provisao-piv'>('provisao-piv');
+  const [pivFilterYear, setPivFilterYear] = useState<number>(new Date().getFullYear());
+  const [pivFilterMonth, setPivFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [pages, setPages] = useState<PageResult[] | null>(null);
   const [openPages, setOpenPages] = useState<Set<number>>(new Set([1]));
   const [loading, setLoading] = useState(false);
@@ -710,13 +714,74 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
       {/* Visão Manual de Relatórios */}
       {mainView === 'manual' && <ManualRelatoriosPage />}
 
-      {/* Visão Financeiro — placeholder */}
+      {/* Visão Financeiro */}
       {mainView === 'financeiro' && (
-        <div className="flex-1 flex items-center justify-center text-slate-300">
-          <div className="flex flex-col items-center gap-3">
-            <Banknote className="w-12 h-12" />
-            <span className="text-sm">Em desenvolvimento</span>
+        <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+          {/* Sub-tabs */}
+          <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0">
+            <button
+              onClick={() => setFinanceiroTab('provisao-piv')}
+              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                financeiroTab === 'provisao-piv'
+                  ? 'border-blue-500 text-blue-700 bg-blue-50/50'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Banknote className="w-4 h-4" />
+              Provisão PIV
+            </button>
           </div>
+
+          {/* Seletor de Ano/Mês — Provisão PIV */}
+          {financeiroTab === 'provisao-piv' && (
+            <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+              <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
+                <div className="relative mr-2">
+                  <select
+                    value={pivFilterYear}
+                    onChange={e => setPivFilterYear(Number(e.target.value))}
+                    className="appearance-none text-sm font-bold text-slate-700 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+                  >
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                </div>
+                <div className="w-px h-5 bg-slate-200 mr-1" />
+                <button
+                  onClick={() => setPivFilterMonth(null)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    pivFilterMonth === null ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                  }`}
+                >
+                  Ano todo
+                </button>
+                {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((name, idx) => {
+                  const m = idx + 1;
+                  const isActive = pivFilterMonth === m;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => setPivFilterMonth(m)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Conteúdo Provisão PIV */}
+              <ProvisaoPIVDashboard
+                filterYear={pivFilterYear}
+                filterMonth={pivFilterMonth}
+              />
+            </div>
+          )}
         </div>
       )}
 
