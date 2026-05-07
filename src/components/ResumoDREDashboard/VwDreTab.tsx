@@ -113,12 +113,12 @@ const DEPTS: { key: DeptKey; label: string; color: string }[] = [
 // Mapeamento DeptKey → Department do Dashboard Executivo
 const DEPT_KEY_TO_DEPT: Partial<Record<DeptKey, Department>> = {
   novos:     'novos',
+  direta:    'vendaDireta',
   usados:    'usados',
   pecas:     'pecas',
   oficina:   'oficina',
   funilaria: 'funilaria',
   adm:       'administracao',
-  // 'direta' não tem equivalente direto no Dashboard Executivo → entrada manual
 };
 
 // Mapeamento descricao → campo DreVwDept
@@ -560,8 +560,11 @@ function ResumoTable({ data, deptList, year, month }: {
                 <tr key={idx} className={`border-b border-slate-100 ${rowClass}`} style={rowStyle}>
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
                   {DEPTS.map(d => {
+                    const isAdmROL = d.key === 'adm' && line.field === 'receitaOperacionalLiquida';
                     const val = data[d.key][line.field];
-                    const display = isQuant
+                    const display = isAdmROL
+                      ? '0,00'
+                      : isQuant
                       ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
                       : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
                     return <td key={d.key} className="px-3 py-1.5 text-right">{display}</td>;
@@ -572,7 +575,13 @@ function ResumoTable({ data, deptList, year, month }: {
                   >
                     {isQuant
                       ? (() => { const t = deptList.reduce((s, dep) => s + (parseInt(dep.quant) || 0), 0); return t > 0 ? t.toString() : '—'; })()
-                      : (() => { const s = sumDepts(deptList, line.field); return s ? fmtNum(s) : '—'; })()
+                      : (() => {
+                          const t = DEPTS.reduce((s, d) => {
+                            if (d.key === 'adm' && line.field === 'receitaOperacionalLiquida') return s;
+                            return s + parseVal(data[d.key][line.field]);
+                          }, 0);
+                          return t !== 0 ? t.toLocaleString('pt-BR') : '—';
+                        })()
                     }
                   </td>
                 </tr>
