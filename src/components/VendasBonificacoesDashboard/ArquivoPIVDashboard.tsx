@@ -353,8 +353,10 @@ function parseDataRowFromText(line: string): ArquivoPivRow | null {
   // recalculamos o valor esperado. Se diferir < 2% do OCR, preferimos o valor calculado.
   // O PDF usa truncamento (floor) nos centavos, não arredondamento.
   // Ex: 148.849 × 1.5% = 2.232,735 → trunca → 2.232,73 (não 2.232,74)
+  // O epsilon 1e-9 corrige imprecisão de ponto flutuante binário:
+  // Ex: 212.270 × 0.5% = 1061.3499999999999 em float → sem epsilon truncaria para 1061,34 errado.
   const calcBRL = (n: number): string => {
-    const truncated = Math.floor(n * 100) / 100;
+    const truncated = Math.floor(n * 100 + 1e-9) / 100;
     const [int, dec] = truncated.toFixed(2).split('.');
     return `R$ ${int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${dec}`;
   };
