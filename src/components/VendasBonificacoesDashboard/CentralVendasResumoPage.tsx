@@ -409,6 +409,19 @@ export function CentralVendasResumoPage() {
   const prevLabel = `${MONTHS_SHORT[prevMonth - 1]}/${prevYear}`;
   const currLabel = `${MONTHS_LABEL[month - 1]}/${year}`;
 
+  const handlePrint = () => {
+    const printArea = document.querySelector<HTMLElement>('.resumo-print-area');
+    const printRoot = document.getElementById('print-root');
+    if (printArea && printRoot) {
+      // Copia o conteúdo para #print-root (único elemento visível na impressão via print.css)
+      printRoot.innerHTML = printArea.outerHTML;
+      window.print();
+      printRoot.innerHTML = '';
+    } else {
+      window.print();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -456,7 +469,7 @@ export function CentralVendasResumoPage() {
         </div>
         <div className="flex-1" />
         <button
-          onClick={() => window.print()}
+          onClick={handlePrint}
           className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-semibold hover:bg-slate-700 transition-colors"
         >
           <Printer className="w-3.5 h-3.5" />
