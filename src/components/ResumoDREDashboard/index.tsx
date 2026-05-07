@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Construction, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { AudiDreTab } from './AudiDreTab';
 import { VwDreTab } from './VwDreTab';
+import { ConsolidadoDreTab } from './ConsolidadoDreTab';
 
 interface ResumoDREDashboardProps {
   onChangeBrand: () => void;
@@ -92,6 +93,7 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
               onChange={e => setMonth(Number(e.target.value))}
               className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-300"
             >
+              <option value={0}>Ano Completo</option>
               {MONTHS_LABEL.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
             </select>
           </div>
@@ -107,28 +109,7 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
         ) : activeTab === 'audi' ? (
           <AudiDreTab year={year} month={month} diasUteis={diasUteis} />
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center space-y-5 max-w-md px-6">
-              <div className="flex justify-center">
-                <div
-                  className="p-6 rounded-full"
-                  style={{ backgroundColor: `${activeTabConfig.color}18` }}
-                >
-                  <Construction
-                    className="w-14 h-14"
-                    style={{ color: activeTabConfig.color }}
-                  />
-                </div>
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-slate-800 mb-2">Em Desenvolvimento</h2>
-                <p className="text-slate-500 text-sm leading-relaxed">
-                  O painel <strong>{activeTabConfig.label}</strong> do Resumo DRE está sendo
-                  construído e estará disponível em breve.
-                </p>
-              </div>
-            </div>
-          </div>
+          <ConsolidadoDreTab year={year} month={month} diasUteis={diasUteis} />
         )}
       </div>
 

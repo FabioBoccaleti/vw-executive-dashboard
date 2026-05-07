@@ -1,23 +1,26 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Save, Loader2, RefreshCw, Trash2, Plus, Printer } from 'lucide-react';
-import { toast } from 'sonner';
+import { Loader2, RefreshCw, Printer } from 'lucide-react';
 import {
   loadDreVw,
-  saveDreVw,
   createEmptyDreVwRow,
   migrateVwAjustes,
-  DEFAULT_VW_AJUSTE_ROWS,
   type DreVwRow,
   type DreVwDept,
   type VwAjusteRow,
 } from './dreVwStorage';
+import {
+  loadDreAudi,
+  migrateAjustes,
+  type DreAudiRow,
+  type DreAudiDept,
+} from './dreAudiStorage';
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import type { Department } from '@/lib/dataStorage';
 
-// ─── Cor principal VW ─────────────────────────────────────────────────────────
-const VW_COLOR     = '#001e50'; // azul VW
-const VW_COLOR_DRK = '#001238'; // azul mais escuro (célula total)
+// ─── Cor principal Consolidado ────────────────────────────────────────────────
+const CON_COLOR     = '#7c3aed'; // lilás
+const CON_COLOR_DRK = '#5b21b6'; // lilás mais escuro (célula total)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,7 +35,7 @@ function fmtNum(v: string): string {
   return n.toLocaleString('pt-BR');
 }
 
-function sumDepts(depts: DreVwDept[], field: keyof DreVwDept): string {
+function sumDeptsArr(depts: DreVwDept[], field: keyof DreVwDept): string {
   const total = depts.reduce((acc, d) => {
     const v = parseFloat(String(d[field]).replace(/\./g, '').replace(',', '.'));
     return acc + (isNaN(v) ? 0 : v);
@@ -51,11 +54,11 @@ function getPrevPeriods(year: number, month: number, count: number): { year: num
   return periods;
 }
 
-function parseVal(v: string | number): number {
-  return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
+function parseVal(v: string | number | undefined): number {
+  return parseFloat(String(v ?? '').replace(/\./g, '').replace(',', '.')) || 0;
 }
 
-// ─── Linhas da tabela (idênticas à Audi) ─────────────────────────────────────
+// ─── Linhas da tabela DRE ─────────────────────────────────────────────────────
 
 interface DreLineConfig {
   label: string;
@@ -64,7 +67,6 @@ interface DreLineConfig {
   isSubtotal?: boolean;
   isTotal?: boolean;
   indent?: boolean;
-  isNegative?: boolean;
   separator?: boolean;
 }
 
@@ -72,56 +74,121 @@ const DRE_LINES: DreLineConfig[] = [
   { label: 'Volume de Vendas',                           field: 'quant' },
   { label: '',                                            field: 'quant',                         separator: true },
   { label: 'Receita Operacional Líquida',                field: 'receitaOperacionalLiquida',      isBold: true },
-  { label: '(-) Custo Operacional da Receita',           field: 'custoOperacionalReceita',        indent: true, isNegative: true },
+  { label: '(-) Custo Operacional da Receita',           field: 'custoOperacionalReceita',        indent: true },
   { label: 'Lucro (Prejuízo) Operacional Bruto',         field: 'lucroPrejOperacionalBruto',      isSubtotal: true },
   { label: 'Outras Receitas Operacionais',               field: 'outrasReceitasOperacionais',     indent: true },
-  { label: '(-) Outras Despesas Operacionais',           field: 'outrasDespesasOperacionais',     indent: true, isNegative: true },
+  { label: '(-) Outras Despesas Operacionais',           field: 'outrasDespesasOperacionais',     indent: true },
   { label: 'MARGEM DE CONTRIBUIÇÃO',                     field: 'margemContribuicao',             isTotal: true },
   { label: '',                                            field: 'margemContribuicao',             separator: true },
-  { label: '(-) Despesas c/ Pessoal',                    field: 'despPessoal',                    indent: true, isNegative: true },
-  { label: '(-) Despesas c/ Serv. de Terceiros',         field: 'despServTerceiros',              indent: true, isNegative: true },
-  { label: '(-) Despesas c/ Ocupação',                   field: 'despOcupacao',                   indent: true, isNegative: true },
-  { label: '(-) Despesas c/ Funcionamento',              field: 'despFuncionamento',              indent: true, isNegative: true },
-  { label: '(-) Despesas c/ Vendas',                     field: 'despVendas',                     indent: true, isNegative: true },
+  { label: '(-) Despesas c/ Pessoal',                    field: 'despPessoal',                    indent: true },
+  { label: '(-) Despesas c/ Serv. de Terceiros',         field: 'despServTerceiros',              indent: true },
+  { label: '(-) Despesas c/ Ocupação',                   field: 'despOcupacao',                   indent: true },
+  { label: '(-) Despesas c/ Funcionamento',              field: 'despFuncionamento',              indent: true },
+  { label: '(-) Despesas c/ Vendas',                     field: 'despVendas',                     indent: true },
   { label: 'LUCRO (PREJUÍZO) OPERACIONAL LÍQUIDO',       field: 'lucroPrejOperacionalLiquido',    isTotal: true },
   { label: '',                                            field: 'lucroPrejOperacionalLiquido',    separator: true },
-  { label: 'Amortizações e Depreciações',                field: 'amortizacoesDepreciacoes',       indent: true, isNegative: true },
+  { label: 'Amortizações e Depreciações',                field: 'amortizacoesDepreciacoes',       indent: true },
   { label: 'Outras Receitas Financeiras',                field: 'outrasReceitasFinanceiras',      indent: true },
-  { label: '(-) Despesas Financeiras Não Operacional',   field: 'despFinanceirasNaoOperacional',  indent: true, isNegative: true },
-  { label: '(-) Despesas Não Operacionais',              field: 'despesasNaoOperacionais',        indent: true, isNegative: true },
+  { label: '(-) Despesas Financeiras Não Operacional',   field: 'despFinanceirasNaoOperacional',  indent: true },
+  { label: '(-) Despesas Não Operacionais',              field: 'despesasNaoOperacionais',        indent: true },
   { label: 'Outras Rendas Não Operacionais',             field: 'outrasRendasNaoOperacionais',    indent: true },
   { label: 'Lucro (Prejuízo) Antes dos Impostos',        field: 'lucroPrejAntesImpostos',         isSubtotal: true },
-  { label: '(-) Provisões IRPJ e C.S.',                  field: 'provisoesIrpjCs',                indent: true, isNegative: true },
-  { label: '(-) Participações',                          field: 'participacoes',                  indent: true, isNegative: true },
+  { label: '(-) Provisões IRPJ e C.S.',                  field: 'provisoesIrpjCs',                indent: true },
+  { label: '(-) Participações',                          field: 'participacoes',                  indent: true },
   { label: 'LUCRO LÍQUIDO DO EXERCÍCIO',                 field: 'lucroLiquidoExercicio',          isTotal: true },
 ];
 
-// ─── Departamentos VW ─────────────────────────────────────────────────────────
+// ─── Departamentos Consolidado ────────────────────────────────────────────────
 
 type DeptKey = 'novos' | 'usados' | 'direta' | 'pecas' | 'oficina' | 'funilaria' | 'adm';
 
 const DEPTS: { key: DeptKey; label: string; color: string }[] = [
-  { key: 'novos',     label: 'Veículos Novos',         color: '#1d4ed8' },
-  { key: 'direta',    label: 'Venda Direta',           color: '#0891b2' },
-  { key: 'usados',    label: 'Veículos Usados',        color: '#7c3aed' },
-  { key: 'pecas',     label: 'Peças e Acessórios',     color: '#059669' },
-  { key: 'oficina',   label: 'Oficina / Assist. Técnica', color: '#d97706' },
-  { key: 'funilaria', label: 'Funilaria',              color: '#db2777' },
-  { key: 'adm',       label: 'Administração',          color: '#64748b' },
+  { key: 'novos',     label: 'Veículos Novos',             color: '#1d4ed8' },
+  { key: 'direta',    label: 'Venda Direta (VW)',          color: '#0891b2' },
+  { key: 'usados',    label: 'Veículos Usados',            color: '#7c3aed' },
+  { key: 'pecas',     label: 'Peças e Acessórios',         color: '#059669' },
+  { key: 'oficina',   label: 'Oficina / Assist. Técnica',  color: '#d97706' },
+  { key: 'funilaria', label: 'Funilaria',                  color: '#db2777' },
+  { key: 'adm',       label: 'Administração',              color: '#64748b' },
 ];
 
-// Mapeamento DeptKey → Department do Dashboard Executivo
-const DEPT_KEY_TO_DEPT: Partial<Record<DeptKey, Department>> = {
+// Mapeamento DeptKey → Department para sincronização via DREDataAsync
+const DEPT_TO_DEPT_KEY: Partial<Record<DeptKey, Department>> = {
   novos:     'novos',
   usados:    'usados',
   pecas:     'pecas',
   oficina:   'oficina',
   funilaria: 'funilaria',
   adm:       'administracao',
-  // 'direta' não tem equivalente direto no Dashboard Executivo → entrada manual
 };
 
-// Mapeamento descricao → campo DreVwDept
+// ─── Lógica de Consolidação ───────────────────────────────────────────────────
+
+const DEPT_FIELDS: (keyof DreVwDept)[] = [
+  'quant','receitaOperacionalLiquida','custoOperacionalReceita',
+  'lucroPrejOperacionalBruto','outrasReceitasOperacionais','outrasDespesasOperacionais',
+  'margemContribuicao','despPessoal','despServTerceiros','despOcupacao','despFuncionamento',
+  'despVendas','lucroPrejOperacionalLiquido','amortizacoesDepreciacoes',
+  'outrasReceitasFinanceiras','despFinanceirasNaoOperacional','despesasNaoOperacionais',
+  'outrasRendasNaoOperacionais','lucroPrejAntesImpostos','provisoesIrpjCs',
+  'participacoes','lucroLiquidoExercicio',
+];
+
+function sumDept(vw: DreVwDept, audi: DreAudiDept | null): DreVwDept {
+  const result = { ...vw };
+  for (const field of DEPT_FIELDS) {
+    const v = parseVal(vw[field]);
+    const a = audi ? parseVal((audi as Record<string, string>)[field] ?? '') : 0;
+    const total = v + a;
+    result[field] = total !== 0 ? total.toString() : '';
+  }
+  return result;
+}
+
+function consolidateRows(vwRow: DreVwRow, audiRow: DreAudiRow | null): DreVwRow {
+  // Combina ajustes dos dois (same ID → soma; ID único → mantém)
+  const allIds = new Set([
+    ...vwRow.ajustes.map(r => r.id),
+    ...(audiRow?.ajustes ?? []).map(r => r.id),
+  ]);
+  const consolidatedAjustes: VwAjusteRow[] = Array.from(allIds).map(id => {
+    const vwA = vwRow.ajustes.find(r => r.id === id);
+    const audA = audiRow?.ajustes.find(r => r.id === id);
+    const label = vwA?.label ?? audA?.label ?? '';
+    function s(a?: string, b?: string) {
+      const t = parseVal(a) + parseVal(b);
+      return t !== 0 ? t.toString() : '';
+    }
+    return {
+      id,
+      label,
+      values: {
+        novos:     s(vwA?.values.novos,     audA?.values.novos),
+        usados:    s(vwA?.values.usados,    audA?.values.usados),
+        direta:    vwA?.values.direta ?? '',
+        pecas:     s(vwA?.values.pecas,     audA?.values.pecas),
+        oficina:   s(vwA?.values.oficina,   audA?.values.oficina),
+        funilaria: s(vwA?.values.funilaria, audA?.values.funilaria),
+        adm:       s(vwA?.values.adm,       audA?.values.adm),
+      },
+    };
+  });
+
+  return {
+    periodo: vwRow.periodo,
+    novos:     sumDept(vwRow.novos,     audiRow?.novos     ?? null),
+    usados:    sumDept(vwRow.usados,    audiRow?.usados    ?? null),
+    direta:    vwRow.direta,  // VW only
+    pecas:     sumDept(vwRow.pecas,     audiRow?.pecas     ?? null),
+    oficina:   sumDept(vwRow.oficina,   audiRow?.oficina   ?? null),
+    funilaria: sumDept(vwRow.funilaria, audiRow?.funilaria ?? null),
+    adm:       sumDept(vwRow.adm,       audiRow?.adm       ?? null),
+    ajustes: consolidatedAjustes,
+  };
+}
+
+// ─── Mapeamento descricao → campo (para DREDataAsync) ─────────────────────────
+
 const DESCRICAO_TO_FIELD: Record<string, keyof DreVwDept> = {
   'VOLUME DE VENDAS':                      'quant',
   'RECEITA OPERACIONAL LIQUIDA':           'receitaOperacionalLiquida',
@@ -172,19 +239,21 @@ function buildDeptFromDREData(dreData: any[] | null, monthIndex: number): DreVwD
   return dept;
 }
 
-// ─── Componente Principal ────────────────────────────────────────────────────
-
-interface VwDreTabProps {
-  year: number;
-  month: number;
-  diasUteis: number;
+function hasDeptData(dept: DreVwDept): boolean {
+  return Object.values(dept).some(v => v !== '');
 }
 
-export function VwDreTab({ year, month }: VwDreTabProps) {
+// ─── Componente Principal ────────────────────────────────────────────────────
+
+interface ConsolidadoDreTabProps {
+  year: number;
+  month: number;
+  diasUteis?: number;
+}
+
+export function ConsolidadoDreTab({ year, month }: ConsolidadoDreTabProps) {
   const [data, setData]       = useState<DreVwRow | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
-  const [dirty, setDirty]     = useState(false);
   const [activeSection, setActiveSection] = useState<'resumo' | DeptKey | 'ajustes'>('resumo');
   const [prevData, setPrevData] = useState<DreVwRow[]>([]);
   const [annualView, setAnnualView] = useState<'anual' | 'mensal'>('anual');
@@ -192,35 +261,55 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
     Array.from({ length: 12 }, (_, i) => createEmptyDreVwRow(0, i + 1))
   );
 
-  // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
-    setDirty(false);
 
     // ── MODO ANUAL ────────────────────────────────────────────────────────────
     if (month === 0) {
       const yr = year as 2024 | 2025 | 2026 | 2027;
-      const syncable = DEPTS.filter(d => DEPT_KEY_TO_DEPT[d.key]);
+      const syncable = DEPTS.filter(d => DEPT_TO_DEPT_KEY[d.key]);
       Promise.all([
         Promise.all(Array.from({ length: 12 }, (_, i) => loadDreVw(year, i + 1))),
-        Promise.all(syncable.map(d =>
-          loadDREDataAsync(yr, DEPT_KEY_TO_DEPT[d.key]!, 'vw')
-            .then(dre => ({ deptKey: d.key as DeptKey, dre }))
-        )),
-      ]).then(([kvResults, dreResults]) => {
-        const dreLk: Record<string, any[] | null> = {};
-        for (const { deptKey, dre } of dreResults) dreLk[deptKey] = dre;
-        function hasData(dept: DreVwDept) { return Object.values(dept).some(v => v !== ''); }
-        function buildMRow(m: number, kv: DreVwRow | null): DreVwRow {
+        Promise.all(Array.from({ length: 12 }, (_, i) => loadDreAudi(year, i + 1))),
+        Promise.all(syncable.flatMap(d => [
+          loadDREDataAsync(yr, DEPT_TO_DEPT_KEY[d.key]!, 'vw').then(dre => ({ brand: 'vw' as const, deptKey: d.key as DeptKey, dre })),
+          loadDREDataAsync(yr, DEPT_TO_DEPT_KEY[d.key]!, 'audi').then(dre => ({ brand: 'audi' as const, deptKey: d.key as DeptKey, dre })),
+        ])),
+      ]).then(([vwKvs, audiKvs, dreResults]) => {
+        const dreLk: Record<string, Record<string, any[] | null>> = {};
+        for (const { brand, deptKey, dre } of dreResults) {
+          dreLk[brand] ??= {};
+          dreLk[brand][deptKey] = dre;
+        }
+        function buildVwMonth(m: number, kv: DreVwRow | null): DreVwRow {
           const row = createEmptyDreVwRow(year, m);
           for (const d of DEPTS) {
-            if (kv && hasData(kv[d.key])) row[d.key] = kv[d.key];
-            else if (dreLk[d.key]) row[d.key] = buildDeptFromDREData(dreLk[d.key], m - 1);
+            if (!DEPT_TO_DEPT_KEY[d.key]) { if (kv) row[d.key] = kv[d.key]; continue; }
+            if (kv && hasDeptData(kv[d.key])) row[d.key] = kv[d.key];
+            else if (dreLk['vw']?.[d.key]) row[d.key] = buildDeptFromDREData(dreLk['vw'][d.key], m - 1);
           }
           if (kv) row.ajustes = migrateVwAjustes(kv.ajustes);
           return row;
         }
-        const monthRows = kvResults.map((kv, i) => buildMRow(i + 1, kv ?? null));
+        function buildAudiMonth(m: number, kv: DreAudiRow | null): DreAudiRow | null {
+          const hasAny = syncable.some(d => dreLk['audi']?.[d.key]);
+          if (!kv && !hasAny) return null;
+          const row: DreAudiRow = kv
+            ? { ...kv, ajustes: migrateAjustes(kv.ajustes) }
+            : { periodo: `${year}-${String(m).padStart(2,'0')}`, novos: emptyAudiDept(), usados: emptyAudiDept(), pecas: emptyAudiDept(), oficina: emptyAudiDept(), funilaria: emptyAudiDept(), adm: emptyAudiDept(), ajustes: [] };
+          const audiDepts = ['novos','usados','pecas','oficina','funilaria','adm'] as const;
+          for (const dk of audiDepts) {
+            if (!kv || !hasDeptData(row[dk] as unknown as DreVwDept)) {
+              if (dreLk['audi']?.[dk]) (row[dk] as any) = buildDeptFromDREData(dreLk['audi'][dk], m - 1);
+            }
+          }
+          return row;
+        }
+        const monthRows = Array.from({ length: 12 }, (_, i) => {
+          const vwRow   = buildVwMonth(i + 1, vwKvs[i] ?? null);
+          const audiRow = buildAudiMonth(i + 1, audiKvs[i] ?? null);
+          return consolidateRows(vwRow, audiRow);
+        });
         setAllMonthRows(monthRows);
         const summed = createEmptyDreVwRow(year, 0);
         for (const row of monthRows) {
@@ -247,140 +336,107 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
     const allPeriods = [...periods, { year, month }];
     const uniqueYears = [...new Set(allPeriods.map(p => p.year))] as Array<2024 | 2025 | 2026 | 2027>;
 
-    // Depts que têm equivalente no Dashboard Executivo VW
-    const syncableDepts = DEPTS.filter(d => DEPT_KEY_TO_DEPT[d.key]);
+    const syncableDepts = DEPTS.filter(d => DEPT_TO_DEPT_KEY[d.key]);
 
+    // Carrega DRE data do Dashboard Executivo para VW e Audi (fallback)
     const deptDrePromises = syncableDepts.flatMap(d =>
-      uniqueYears.map(y =>
-        loadDREDataAsync(y, DEPT_KEY_TO_DEPT[d.key]!, 'vw')
-          .then(dre => ({ deptKey: d.key as DeptKey, year: y, dre }))
-      )
+      uniqueYears.flatMap(y => [
+        loadDREDataAsync(y, DEPT_TO_DEPT_KEY[d.key]!, 'vw')
+          .then(dre => ({ brand: 'vw' as const, deptKey: d.key as DeptKey, year: y, dre })),
+        loadDREDataAsync(y, DEPT_TO_DEPT_KEY[d.key]!, 'audi')
+          .then(dre => ({ brand: 'audi' as const, deptKey: d.key as DeptKey, year: y, dre })),
+      ])
     );
 
-    const ajustesPromises = [
-      loadDreVw(year, month),
-      ...periods.map(p => loadDreVw(p.year, p.month)),
-    ];
+    // Carrega KV de VW e Audi para período atual e períodos anteriores
+    const vwPromises   = allPeriods.map(p => loadDreVw(p.year, p.month));
+    const audiPromises = allPeriods.map(p => loadDreAudi(p.year, p.month));
 
     Promise.all([
-      Promise.all(ajustesPromises),
+      Promise.all(vwPromises),
+      Promise.all(audiPromises),
       Promise.all(deptDrePromises),
-    ]).then(([ajustesResults, dreResults]) => {
-      const [currentAjustes, ...prevAjustesArr] = ajustesResults;
-
-      const dreLookup: Record<string, Record<number, any[] | null>> = {};
-      for (const { deptKey, year: y, dre } of dreResults) {
-        dreLookup[deptKey] ??= {};
-        dreLookup[deptKey][y] = dre;
+    ]).then(([vwResults, audiResults, dreResults]) => {
+      // Montar lookup de DRE data: brand → deptKey → year → data
+      const dreLookup: Record<string, Record<string, Record<number, any[] | null>>> = {};
+      for (const { brand, deptKey, year: y, dre } of dreResults) {
+        dreLookup[brand] ??= {};
+        dreLookup[brand][deptKey] ??= {};
+        dreLookup[brand][deptKey][y] = dre;
       }
 
-      function hasDeptData(dept: DreVwDept): boolean {
-        return Object.values(dept).some(v => v !== '');
-      }
-
-      function buildRow(y: number, m: number, kvRow: DreVwRow | null): DreVwRow {
+      function buildVwRow(y: number, m: number, kvRow: DreVwRow | null): DreVwRow {
         const row = createEmptyDreVwRow(y, m);
         for (const d of DEPTS) {
+          if (!DEPT_TO_DEPT_KEY[d.key]) { // 'direta' → VW only, usa KV direto
+            if (kvRow) row[d.key] = kvRow[d.key];
+            continue;
+          }
           if (kvRow && hasDeptData(kvRow[d.key])) {
             row[d.key] = kvRow[d.key];
-          } else if (dreLookup[d.key]?.[y]) {
-            row[d.key] = buildDeptFromDREData(dreLookup[d.key][y], m - 1);
+          } else if (dreLookup['vw']?.[d.key]?.[y]) {
+            row[d.key] = buildDeptFromDREData(dreLookup['vw'][d.key][y], m - 1);
           }
         }
-        if (kvRow) {
-          row.ajustes = migrateVwAjustes(kvRow.ajustes);
+        if (kvRow) row.ajustes = migrateVwAjustes(kvRow.ajustes);
+        return row;
+      }
+
+      function buildAudiRow(y: number, m: number, kvRow: DreAudiRow | null): DreAudiRow | null {
+        if (!kvRow) {
+          // Tenta construir com DRE data
+          const hasSomeDreData = syncableDepts.some(
+            d => dreLookup['audi']?.[d.key]?.[y]
+          );
+          if (!hasSomeDreData) return null;
+        }
+        // Cria row base a partir do KV ou vazio
+        const row: DreAudiRow = kvRow
+          ? {
+              ...kvRow,
+              ajustes: migrateAjustes(kvRow.ajustes),
+            }
+          : {
+              periodo: `${y}-${String(m).padStart(2, '0')}`,
+              novos: emptyAudiDept(), usados: emptyAudiDept(), pecas: emptyAudiDept(),
+              oficina: emptyAudiDept(), funilaria: emptyAudiDept(), adm: emptyAudiDept(),
+              ajustes: [],
+            };
+        // Fallback para DRE data para depts sem KV
+        const audiDepts = ['novos', 'usados', 'pecas', 'oficina', 'funilaria', 'adm'] as const;
+        for (const dk of audiDepts) {
+          if (!kvRow || !hasDeptData(row[dk] as unknown as DreVwDept)) {
+            if (dreLookup['audi']?.[dk]?.[y]) {
+              (row[dk] as any) = buildDeptFromDREData(dreLookup['audi'][dk][y], m - 1);
+            }
+          }
         }
         return row;
       }
 
-      setData(buildRow(year, month, currentAjustes ?? null));
-      setPrevData(periods.map((p, i) => buildRow(p.year, p.month, prevAjustesArr[i] ?? null)));
+      const [currentVw,   ...prevVwArr]   = vwResults;
+      const [currentAudi, ...prevAudiArr] = audiResults;
+
+      const currentVwRow   = buildVwRow(year, month, currentVw ?? null);
+      const currentAudiRow = buildAudiRow(year, month, currentAudi ?? null);
+      setData(consolidateRows(currentVwRow, currentAudiRow));
+
+      const prevRows = periods.map((p, i) => {
+        const vwRow   = buildVwRow(p.year, p.month, prevVwArr[i] ?? null);
+        const audiRow = buildAudiRow(p.year, p.month, prevAudiArr[i] ?? null);
+        return consolidateRows(vwRow, audiRow);
+      });
+      setPrevData(prevRows);
       setLoading(false);
     });
   }, [year, month]);
-
-  // ── Save ──────────────────────────────────────────────────────────────────
-  const handleSave = useCallback(async () => {
-    if (!data) return;
-    setSaving(true);
-    const ok = await saveDreVw(data);
-    setSaving(false);
-    if (ok) {
-      setDirty(false);
-      toast.success('Dados salvos com sucesso!');
-    } else {
-      toast.error('Erro ao salvar. Tente novamente.');
-    }
-  }, [data]);
-
-  const handleCellChange = useCallback(
-    (dept: DeptKey, field: keyof DreVwDept, value: string) => {
-      setData(prev => {
-        if (!prev) return prev;
-        return { ...prev, [dept]: { ...prev[dept], [field]: value } };
-      });
-      setDirty(true);
-    },
-    []
-  );
-
-  const handleAjusteChange = useCallback(
-    (rowId: string, dept: DeptKey, value: string) => {
-      setData(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          ajustes: prev.ajustes.map(r =>
-            r.id === rowId ? { ...r, values: { ...r.values, [dept]: value } } : r
-          ),
-        };
-      });
-      setDirty(true);
-    },
-    []
-  );
-
-  const handleAjusteLabel = useCallback(
-    (rowId: string, label: string) => {
-      setData(prev => {
-        if (!prev) return prev;
-        return { ...prev, ajustes: prev.ajustes.map(r => r.id === rowId ? { ...r, label } : r) };
-      });
-      setDirty(true);
-    },
-    []
-  );
-
-  const handleAddAjusteRow = useCallback(() => {
-    const newRow: VwAjusteRow = {
-      id: `custom_${Date.now()}`,
-      label: '',
-      values: { novos: '', usados: '', direta: '', pecas: '', oficina: '', funilaria: '', adm: '' },
-    };
-    setData(prev => {
-      if (!prev) return prev;
-      return { ...prev, ajustes: [...prev.ajustes, newRow] };
-    });
-    setDirty(true);
-  }, []);
-
-  const handleDeleteAjusteRow = useCallback(
-    (rowId: string) => {
-      setData(prev => {
-        if (!prev) return prev;
-        return { ...prev, ajustes: prev.ajustes.filter(r => r.id !== rowId) };
-      });
-      setDirty(true);
-    },
-    []
-  );
 
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center py-20">
         <div className="flex flex-col items-center gap-3 text-slate-400">
           <Loader2 className="w-8 h-8 animate-spin" />
-          <span className="text-sm">Carregando dados...</span>
+          <span className="text-sm">Carregando dados consolidados...</span>
         </div>
       </div>
     );
@@ -393,16 +449,15 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
   return (
     <div className="flex flex-col gap-0 flex-1">
 
-      {/* ── Sub-navegação de seções ─────────────────────────────────────── */}
+      {/* ── Sub-navegação ────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-1 overflow-x-auto">
         <button
           onClick={() => setActiveSection('resumo')}
-          className={`px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors ${
-            activeSection === 'resumo'
-              ? `border-[${VW_COLOR}] text-[${VW_COLOR}]`
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-          style={activeSection === 'resumo' ? { borderBottomColor: VW_COLOR, color: VW_COLOR } : {}}
+          className="px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors"
+          style={activeSection === 'resumo'
+            ? { borderBottomColor: CON_COLOR, color: CON_COLOR }
+            : { borderBottomColor: 'transparent', color: '#64748b' }
+          }
         >
           Resumo Geral
         </button>
@@ -410,20 +465,22 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
           <button
             key={d.key}
             onClick={() => setActiveSection(d.key)}
-            className={`px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors ${
-              activeSection === d.key
-                ? 'border-transparent'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-            style={activeSection === d.key ? { borderBottomColor: VW_COLOR, color: VW_COLOR } : {}}
+            className="px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors"
+            style={activeSection === d.key
+              ? { borderBottomColor: CON_COLOR, color: CON_COLOR }
+              : { borderBottomColor: 'transparent', color: '#64748b' }
+            }
           >
             {d.label}
           </button>
         ))}
         <button
           onClick={() => setActiveSection('ajustes')}
-          className="px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors border-transparent text-slate-500 hover:text-slate-700"
-          style={activeSection === 'ajustes' ? { borderBottomColor: VW_COLOR, color: VW_COLOR } : {}}
+          className="px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors"
+          style={activeSection === 'ajustes'
+            ? { borderBottomColor: CON_COLOR, color: CON_COLOR }
+            : { borderBottomColor: 'transparent', color: '#64748b' }
+          }
         >
           Ajustes
         </button>
@@ -431,32 +488,18 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
         <div className="flex-1" />
 
         {/* Badge de sincronização */}
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[0.65rem] font-medium mr-2">
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-50 text-violet-700 text-[0.65rem] font-medium mr-2">
           <RefreshCw className="w-3 h-3" />
-          Sincronizado com Dashboard Executivo
+          VW + Audi consolidados
         </div>
 
         {/* Botão Imprimir PDF */}
         <button
           onClick={() => window.print()}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors my-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 mr-1"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors my-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200"
         >
           <Printer className="w-3.5 h-3.5" />
           Imprimir PDF
-        </button>
-
-        {/* Botão Salvar */}
-        <button
-          disabled={!dirty || saving}
-          onClick={handleSave}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors my-1.5"
-          style={dirty
-            ? { backgroundColor: VW_COLOR, color: 'white' }
-            : { backgroundColor: '#f1f5f9', color: '#94a3b8', cursor: 'not-allowed' }
-          }
-        >
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          {saving ? 'Salvando...' : 'Salvar'}
         </button>
       </div>
 
@@ -472,38 +515,29 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
               <button
                 onClick={() => setAnnualView('anual')}
                 className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors"
-                style={annualView === 'anual' ? { backgroundColor: VW_COLOR, color: 'white' } : { backgroundColor: '#f1f5f9', color: '#64748b' }}
+                style={annualView === 'anual' ? { backgroundColor: CON_COLOR, color: 'white' } : { backgroundColor: '#f1f5f9', color: '#64748b' }}
               >Resultado Anual</button>
               <button
                 onClick={() => setAnnualView('mensal')}
                 className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors"
-                style={annualView === 'mensal' ? { backgroundColor: VW_COLOR, color: 'white' } : { backgroundColor: '#f1f5f9', color: '#64748b' }}
+                style={annualView === 'mensal' ? { backgroundColor: CON_COLOR, color: 'white' } : { backgroundColor: '#f1f5f9', color: '#64748b' }}
               >Evolução Mensal</button>
             </div>
             {annualView === 'anual' && <ResumoTable data={data} deptList={deptList} year={year} month={0} />}
-            {annualView === 'mensal' && <VwEvolucaoMensalTable allMonthRows={allMonthRows} year={year} />}
+            {annualView === 'mensal' && <ConEvolucaoMensalTable allMonthRows={allMonthRows} year={year} />}
           </div>
         )}
 
         {DEPTS.map(d =>
           activeSection === d.key ? (
             month === 0
-              ? <VwDeptEvolucaoTable key={d.key} deptKey={d.key} deptLabel={d.label} allMonthRows={allMonthRows} year={year} />
-              : <DeptTable key={d.key} deptKey={d.key} deptLabel={d.label} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getPrevPeriods(year, month, 3)} year={year} month={month} onChange={(field, value) => handleCellChange(d.key, field, value)} />
+              ? <ConDeptEvolucaoTable key={d.key} deptKey={d.key} deptLabel={d.label} allMonthRows={allMonthRows} year={year} />
+              : <DeptTable key={d.key} deptLabel={d.label} deptKey={d.key} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getPrevPeriods(year, month, 3)} year={year} month={month} />
           ) : null
         )}
 
         {activeSection === 'ajustes' && (
-          <AjustesTable
-            ajustes={data.ajustes}
-            onChange={handleAjusteChange}
-            onLabelChange={handleAjusteLabel}
-            onAdd={handleAddAjusteRow}
-            onDelete={handleDeleteAjusteRow}
-            data={data}
-            year={year}
-            month={month}
-          />
+          <AjustesTable data={data} year={year} month={month} />
         )}
       </div>
 
@@ -518,22 +552,36 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
   );
 }
 
+// ─── Helpers de estrutura vazia ───────────────────────────────────────────────
+
+function emptyAudiDept(): DreAudiDept {
+  return {
+    quant: '', receitaOperacionalLiquida: '', custoOperacionalReceita: '',
+    lucroPrejOperacionalBruto: '', outrasReceitasOperacionais: '', outrasDespesasOperacionais: '',
+    margemContribuicao: '', despPessoal: '', despServTerceiros: '', despOcupacao: '',
+    despFuncionamento: '', despVendas: '', lucroPrejOperacionalLiquido: '',
+    amortizacoesDepreciacoes: '', outrasReceitasFinanceiras: '', despFinanceirasNaoOperacional: '',
+    despesasNaoOperacionais: '', outrasRendasNaoOperacionais: '', lucroPrejAntesImpostos: '',
+    provisoesIrpjCs: '', participacoes: '', lucroLiquidoExercicio: '',
+  };
+}
+
 // ─── Tabela Resumo Geral ──────────────────────────────────────────────────────
 
 function ResumoTable({ data, deptList, year, month }: {
   data: DreVwRow; deptList: DreVwDept[]; year: number; month: number;
 }) {
-  const NCOLS = DEPTS.length + 2; // desc + depts + total
+  const NCOLS = DEPTS.length + 2;
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="text-white px-6 py-3" style={{ backgroundColor: VW_COLOR }}>
-        <h2 className="font-bold text-base">VW NORTE</h2>
+      <div className="text-white px-6 py-3" style={{ backgroundColor: CON_COLOR }}>
+        <h2 className="font-bold text-base">CONSOLIDADO — VW + AUDI</h2>
         <p className="text-xs mt-0.5 opacity-80">{month === 0 ? `Ano ${year}` : `${MONTHS[month - 1]} de ${year}`} — Demonstrativo de Resultados</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-slate-200" style={{ borderBottom: `2px solid ${VW_COLOR}` }}>
+            <tr className="bg-slate-200" style={{ borderBottom: `2px solid ${CON_COLOR}` }}>
               <th className="text-left px-4 py-3 font-bold text-slate-800 text-sm w-52 min-w-[13rem]">Descrição</th>
               {DEPTS.map(d => (
                 <th key={d.key} className="text-center px-3 py-3 font-bold text-sm min-w-[8rem] text-slate-800">
@@ -549,7 +597,7 @@ function ResumoTable({ data, deptList, year, month }: {
                 return <tr key={idx}><td colSpan={NCOLS} className="h-px bg-slate-100" /></tr>;
               }
               const isQuant = line.field === 'quant' && idx === 0;
-              const rowStyle = line.isTotal ? { backgroundColor: VW_COLOR } : undefined;
+              const rowStyle = line.isTotal ? { backgroundColor: CON_COLOR } : undefined;
               const rowClass = line.isTotal
                 ? 'text-white font-bold'
                 : line.isSubtotal
@@ -568,11 +616,11 @@ function ResumoTable({ data, deptList, year, month }: {
                   })}
                   <td
                     className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-black'}`}
-                    style={line.isTotal ? { backgroundColor: VW_COLOR_DRK } : undefined}
+                    style={line.isTotal ? { backgroundColor: CON_COLOR_DRK } : undefined}
                   >
                     {isQuant
                       ? (() => { const t = deptList.reduce((s, dep) => s + (parseInt(dep.quant) || 0), 0); return t > 0 ? t.toString() : '—'; })()
-                      : (() => { const s = sumDepts(deptList, line.field); return s ? fmtNum(s) : '—'; })()
+                      : (() => { const s = sumDeptsArr(deptList, line.field); return s ? fmtNum(s) : '—'; })()
                     }
                   </td>
                 </tr>
@@ -587,24 +635,26 @@ function ResumoTable({ data, deptList, year, month }: {
 
 // ─── Tabela por Departamento ──────────────────────────────────────────────────
 
-function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, month, onChange }: {
-  deptKey: DeptKey; deptLabel: string;
+function DeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year, month }: {
+  deptLabel: string; deptKey: DeptKey;
   dept: DreVwDept; prevDepts: DreVwDept[];
   prevPeriods: { year: number; month: number }[];
   year: number; month: number;
-  onChange: (field: keyof DreVwDept, value: string) => void;
 }) {
   const totalCols = 1 + prevPeriods.length + 1 + 1 + 1;
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="px-6 py-3 text-white font-bold flex items-center gap-3" style={{ backgroundColor: VW_COLOR }}>
-        <span className="text-base">VW Norte — {deptLabel}</span>
-        <span className="text-xs opacity-75 font-normal">{month === 0 ? `Ano ${year}` : `${MONTHS[month - 1]}/${year}`}</span>
+      <div className="px-6 py-3 text-white font-bold flex items-center gap-3" style={{ backgroundColor: CON_COLOR }}>
+        <span className="text-base">Consolidado — {deptLabel}</span>
+        <span className="text-xs opacity-75 font-normal">{MONTHS[month - 1]}/{year}</span>
+        {deptKey === 'direta' && (
+          <span className="text-[0.65rem] opacity-75 font-normal ml-1">(VW Norte somente)</span>
+        )}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-slate-200" style={{ borderBottom: `2px solid ${VW_COLOR}` }}>
+            <tr className="bg-slate-200" style={{ borderBottom: `2px solid ${CON_COLOR}` }}>
               <th className="text-left px-4 py-3 font-bold text-sm text-slate-800 w-52 min-w-[13rem]">Descrição</th>
               {prevPeriods.map(p => (
                 <th key={`${p.year}-${p.month}`} className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[8rem]">
@@ -624,8 +674,7 @@ function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, mon
                 return <tr key={idx}><td colSpan={totalCols} className="h-px bg-slate-100" /></tr>;
               }
               const isQuant = line.field === 'quant' && idx === 0;
-              const isAdmROL = deptKey === 'adm' && line.field === 'receitaOperacionalLiquida';
-              const rowStyle = line.isTotal ? { backgroundColor: VW_COLOR } : undefined;
+              const rowStyle = line.isTotal ? { backgroundColor: CON_COLOR } : undefined;
               const rowClass = line.isTotal
                 ? 'text-white font-bold'
                 : line.isSubtotal
@@ -639,8 +688,8 @@ function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, mon
                   const cur = parseInt(String(dept[line.field])) || 0;
                   const prv = parseInt(String(prevDept[line.field])) || 0;
                   if (prv !== 0) { const pct = ((cur - prv) / Math.abs(prv)) * 100; varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
-                } else if (!isAdmROL) {
-                  const cur = parseVal(dept[line.field]); const prv = parseVal(prevDept[line.field]);
+                } else {
+                  const cur = parseVal(dept[line.field]), prv = parseVal(prevDept[line.field]);
                   if (prv !== 0) { const pct = ((cur - prv) / Math.abs(prv)) * 100; varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
                 }
               }
@@ -650,8 +699,6 @@ function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, mon
               if (isQuant) {
                 const t = allDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0);
                 totalStr = t > 0 ? t.toString() : '—';
-              } else if (isAdmROL) {
-                totalStr = '0,00';
               } else {
                 const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0);
                 totalStr = t !== 0 ? t.toLocaleString('pt-BR') : '—';
@@ -663,19 +710,19 @@ function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, mon
                   {prevDepts.map((pd, pi) => {
                     const v = pd[line.field];
                     const num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
-                    const display = isAdmROL ? '0,00' : isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
+                    const display = isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
                     return <td key={pi} className="px-3 py-1.5 text-right">{display}</td>;
                   })}
-                  <td className="px-2 py-1 text-right">
-                    {isAdmROL
-                      ? <span className="block w-full text-right px-1 py-0.5 min-w-[5rem]">0,00</span>
-                      : <EditableCell value={dept[line.field]} onChange={v => onChange(line.field, v)} isTotal={line.isTotal} isNegative={line.isNegative} isQuant={isQuant} />
+                  <td className="px-3 py-1.5 text-right">
+                    {isQuant
+                      ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—')
+                      : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')
                     }
                   </td>
                   <td className="px-2 py-1.5 text-right text-[0.68rem] border-l border-slate-200">{varMM || '—'}</td>
                   <td
                     className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-black'}`}
-                    style={line.isTotal ? { backgroundColor: VW_COLOR_DRK } : undefined}
+                    style={line.isTotal ? { backgroundColor: CON_COLOR_DRK } : undefined}
                   >
                     {totalStr}
                   </td>
@@ -689,53 +736,29 @@ function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, mon
   );
 }
 
-// ─── Tabela de Ajustes ────────────────────────────────────────────────────────
+// ─── Tabela de Ajustes (somente leitura) ─────────────────────────────────────
 
-function AjustesTable({ ajustes, onChange, onLabelChange, onAdd, onDelete, data, year, month }: {
-  ajustes: VwAjusteRow[];
-  onChange: (rowId: string, dept: DeptKey, value: string) => void;
-  onLabelChange: (rowId: string, label: string) => void;
-  onAdd: () => void;
-  onDelete: (rowId: string) => void;
-  data: DreVwRow;
-  year: number; month: number;
-}) {
-  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
-  const [labelDraft, setLabelDraft] = useState('');
-  const prevLen = useRef(ajustes.length);
-
-  useEffect(() => {
-    if (ajustes.length > prevLen.current) {
-      const last = ajustes[ajustes.length - 1];
-      if (!last.label) { setEditingLabelId(last.id); setLabelDraft(''); }
-    }
-    prevLen.current = ajustes.length;
-  }, [ajustes]);
-
-  function startEditLabel(row: VwAjusteRow) { setEditingLabelId(row.id); setLabelDraft(row.label); }
-  function confirmLabel() { if (editingLabelId !== null) { onLabelChange(editingLabelId, labelDraft); setEditingLabelId(null); } }
-
+function AjustesTable({ data, year, month }: { data: DreVwRow; year: number; month: number }) {
   const deptList = DEPTS.map(d => data[d.key]);
-  const totalLiquido = sumDepts(deptList, 'lucroLiquidoExercicio');
+  const totalLiquido = sumDeptsArr(deptList, 'lucroLiquidoExercicio');
   const totalLiqNum = parseVal(totalLiquido);
-  const rowTotals = ajustes.map(row => ({ id: row.id, total: DEPTS.reduce((s, d) => s + parseVal(row.values[d.key]), 0) }));
-  const totalAjustes = rowTotals.reduce((s, r) => s + r.total, 0);
+  const rowTotals = data.ajustes.map(row => DEPTS.reduce((s, d) => s + parseVal(row.values[d.key]), 0));
+  const totalAjustes = rowTotals.reduce((s, v) => s + v, 0);
   const totalAjustado = totalLiqNum + totalAjustes;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="text-white px-6 py-3" style={{ backgroundColor: VW_COLOR }}>
-        <h2 className="font-bold text-base">VW NORTE</h2>
+      <div className="text-white px-6 py-3" style={{ backgroundColor: CON_COLOR }}>
+        <h2 className="font-bold text-base">CONSOLIDADO — VW + AUDI</h2>
         <p className="text-xs mt-0.5 opacity-80">{month === 0 ? `Ano ${year}` : `${MONTHS[month - 1]} de ${year}`} — Ajustes</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="w-7 px-1" />
               <th className="text-left px-4 py-2.5 font-semibold text-slate-600 w-52 min-w-[13rem]">Descrição</th>
               {DEPTS.map(d => (
-                <th key={d.key} className="text-center px-3 py-2.5 font-semibold min-w-[8rem]" style={{ color: VW_COLOR }}>
+                <th key={d.key} className="text-center px-3 py-2.5 font-semibold min-w-[8rem]" style={{ color: CON_COLOR }}>
                   {d.label}
                 </th>
               ))}
@@ -743,69 +766,42 @@ function AjustesTable({ ajustes, onChange, onLabelChange, onAdd, onDelete, data,
             </tr>
           </thead>
           <tbody>
-            {/* Lucro Líquido do Exercício */}
-            <tr className="text-white font-bold" style={{ backgroundColor: VW_COLOR }}>
-              <td className="w-7" />
+            <tr className="text-white font-bold" style={{ backgroundColor: CON_COLOR }}>
               <td className="px-4 py-1.5">Lucro Líquido do Exercício</td>
               {DEPTS.map(d => {
                 const v = data[d.key].lucroLiquidoExercicio;
                 return <td key={d.key} className="px-3 py-1.5 text-right">{v ? fmtNum(v) : '—'}</td>;
               })}
-              <td className="px-3 py-1.5 text-right text-white" style={{ backgroundColor: VW_COLOR_DRK }}>
+              <td className="px-3 py-1.5 text-right text-white" style={{ backgroundColor: CON_COLOR_DRK }}>
                 {totalLiquido ? fmtNum(totalLiquido) : '—'}
               </td>
             </tr>
 
-            {/* Linhas dinâmicas */}
-            {ajustes.map(row => {
-              const rowTotal = rowTotals.find(r => r.id === row.id)?.total ?? 0;
+            {data.ajustes.map((row, i) => {
+              const rTotal = rowTotals[i];
               return (
-                <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50 text-slate-600 group">
-                  <td className="w-7 px-1 text-center">
-                    <button onClick={() => onDelete(row.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-red-600 p-0.5 rounded" title="Excluir linha">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </td>
-                  <td className="px-4 py-1 pl-7">
-                    {editingLabelId === row.id ? (
-                      <input
-                        autoFocus
-                        className="w-full border rounded px-2 py-0.5 text-xs outline-none"
-                        style={{ borderColor: VW_COLOR }}
-                        value={labelDraft}
-                        onChange={e => setLabelDraft(e.target.value)}
-                        onBlur={confirmLabel}
-                        onKeyDown={e => { if (e.key === 'Enter') confirmLabel(); if (e.key === 'Escape') setEditingLabelId(null); }}
-                        placeholder="Descrição da linha..."
-                      />
-                    ) : (
-                      <span className="cursor-text hover:text-slate-800 transition-colors" title="Clique para editar" onClick={() => startEditLabel(row)}>
-                        {row.label || <span className="text-slate-300 italic">Clique para editar...</span>}
-                      </span>
-                    )}
-                  </td>
+                <tr key={row.id} className="border-b border-slate-100 text-slate-600">
+                  <td className="px-4 py-1.5 pl-7">{row.label || '—'}</td>
                   {DEPTS.map(d => (
-                    <td key={d.key} className="px-2 py-1 text-right">
-                      <EditableCell value={row.values[d.key]} onChange={v => onChange(row.id, d.key, v)} />
+                    <td key={d.key} className="px-3 py-1.5 text-right">
+                      {parseVal(row.values[d.key]) !== 0 ? parseVal(row.values[d.key]).toLocaleString('pt-BR') : '—'}
                     </td>
                   ))}
                   <td className="px-3 py-1.5 text-right bg-slate-50 text-slate-700 font-semibold">
-                    {rowTotal !== 0 ? rowTotal.toLocaleString('pt-BR') : '—'}
+                    {rTotal !== 0 ? rTotal.toLocaleString('pt-BR') : '—'}
                   </td>
                 </tr>
               );
             })}
 
-            {/* Resultado Ajustado */}
-            <tr className="text-white font-bold" style={{ backgroundColor: VW_COLOR }}>
-              <td className="w-7" />
+            <tr className="text-white font-bold" style={{ backgroundColor: CON_COLOR }}>
               <td className="px-4 py-2">RESULTADO DO PERÍODO AJUSTADO</td>
               {DEPTS.map(d => {
                 const liq = parseVal(data[d.key].lucroLiquidoExercicio);
-                const adj = ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0);
+                const adj = data.ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0);
                 return <td key={d.key} className="px-3 py-2 text-right">{(liq + adj) !== 0 ? (liq + adj).toLocaleString('pt-BR') : '—'}</td>;
               })}
-              <td className="px-3 py-2 text-right text-white" style={{ backgroundColor: VW_COLOR_DRK }}>
+              <td className="px-3 py-2 text-right text-white" style={{ backgroundColor: CON_COLOR_DRK }}>
                 {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}
               </td>
             </tr>
@@ -813,55 +809,15 @@ function AjustesTable({ ajustes, onChange, onLabelChange, onAdd, onDelete, data,
         </table>
       </div>
       <div className="px-4 py-2 border-t border-slate-100">
-        <button onClick={onAdd} className="flex items-center gap-1.5 text-xs font-medium transition-colors" style={{ color: VW_COLOR }}>
-          <Plus className="w-3.5 h-3.5" />
-          Adicionar linha
-        </button>
+        <p className="text-[0.7rem] text-slate-400 italic">Os ajustes são calculados automaticamente com base nos dados salvos em VW e Audi.</p>
       </div>
     </div>
   );
 }
 
-// ─── Célula Editável ──────────────────────────────────────────────────────────
-
-function EditableCell({ value, onChange, isTotal = false, isNegative = false, isQuant = false }: {
-  value: string; onChange: (v: string) => void;
-  isTotal?: boolean; isNegative?: boolean; isQuant?: boolean;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
-  const numVal = parseFloat(value.replace(/\./g, '').replace(',', '.'));
-  const isNeg = !isNaN(numVal) && numVal < 0;
-  const display = value ? fmtNum(value) : '';
-
-  function commitEdit() { onChange(draft); setEditing(false); }
-
-  if (editing) {
-    return (
-      <input
-        autoFocus value={draft}
-        onChange={e => setDraft(e.target.value)}
-        onBlur={commitEdit}
-        onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
-        className={`w-full text-right bg-yellow-50 border border-yellow-300 rounded px-1 py-0.5 outline-none text-xs ${isTotal ? 'text-slate-800' : ''}`}
-      />
-    );
-  }
-
-  return (
-    <span
-      onClick={() => { setDraft(value); setEditing(true); }}
-      title="Clique para editar"
-      className={`block w-full text-right cursor-pointer rounded px-1 py-0.5 hover:bg-yellow-50 hover:ring-1 hover:ring-yellow-200 transition-colors min-w-[5rem] ${isNeg ? 'text-red-600' : ''} ${isTotal ? (isNeg ? 'text-red-700' : '') : ''} ${!value ? 'text-slate-300' : ''}`}
-    >
-      {display || '—'}
-    </span>
-  );
-}
-
 // ─── Evolução Mensal (Anual) ─────────────────────────────────────────────────
 
-function VwEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreVwRow[]; year: number }) {
+function ConEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreVwRow[]; year: number }) {
   const monthlyTotals = allMonthRows.map(row =>
     Object.fromEntries(DEPT_FIELDS.map(f => [
       f, DEPTS.reduce((s, d) => s + parseVal(row[d.key][f]), 0)
@@ -873,14 +829,14 @@ function VwEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreVwRow[
   const NCOLS = 14;
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="text-white px-6 py-3" style={{ backgroundColor: VW_COLOR }}>
-        <h2 className="font-bold text-base">VW NORTE</h2>
+      <div className="text-white px-6 py-3" style={{ backgroundColor: CON_COLOR }}>
+        <h2 className="font-bold text-base">CONSOLIDADO — VW + AUDI</h2>
         <p className="text-xs mt-0.5 opacity-80">Ano {year} — Evolução Mensal (todos os departamentos)</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-slate-200" style={{ borderBottom: `2px solid ${VW_COLOR}` }}>
+            <tr className="bg-slate-200" style={{ borderBottom: `2px solid ${CON_COLOR}` }}>
               <th className="text-left px-4 py-3 font-bold text-slate-800 text-sm w-44 min-w-[11rem]">Descrição</th>
               {MONTHS.map((m, i) => <th key={i} className="text-center px-2 py-3 font-bold text-sm text-slate-800 min-w-[5.5rem]">{m.slice(0,3)}</th>)}
               <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[7rem] bg-slate-300">Total Acum.</th>
@@ -892,13 +848,13 @@ function VwEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreVwRow[
               const isQuant = line.field === 'quant' && idx === 0;
               const rowClass = line.isTotal ? 'text-white font-bold' : line.isSubtotal ? 'bg-slate-100 font-semibold text-black' : 'hover:bg-slate-50 text-black';
               return (
-                <tr key={idx} className={`border-b border-slate-100 ${rowClass}`} style={line.isTotal ? { backgroundColor: VW_COLOR } : undefined}>
+                <tr key={idx} className={`border-b border-slate-100 ${rowClass}`} style={line.isTotal ? { backgroundColor: CON_COLOR } : undefined}>
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
                   {monthlyTotals.map((mt, mi) => {
                     const val = mt[line.field] ?? 0;
                     return <td key={mi} className="px-2 py-1.5 text-right">{isQuant ? (Math.round(val) > 0 ? Math.round(val).toString() : '—') : (val !== 0 ? val.toLocaleString('pt-BR') : '—')}</td>;
                   })}
-                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: VW_COLOR_DRK } : undefined}>
+                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: CON_COLOR_DRK } : undefined}>
                     {(() => { const v = annualTotal[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—'); })()}
                   </td>
                 </tr>
@@ -911,7 +867,7 @@ function VwEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreVwRow[
   );
 }
 
-function VwDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
+function ConDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
   deptKey: DeptKey; deptLabel: string; allMonthRows: DreVwRow[]; year: number;
 }) {
   const isAdm = deptKey === 'adm';
@@ -921,14 +877,14 @@ function VwDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
   const NCOLS = 15;
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="text-white px-6 py-3" style={{ backgroundColor: VW_COLOR }}>
-        <h2 className="font-bold text-base">VW Norte — {deptLabel}</h2>
+      <div className="text-white px-6 py-3" style={{ backgroundColor: CON_COLOR }}>
+        <h2 className="font-bold text-base">Consolidado — {deptLabel}</h2>
         <p className="text-xs mt-0.5 opacity-80">Ano {year} — Evolução Mensal</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-slate-200" style={{ borderBottom: `2px solid ${VW_COLOR}` }}>
+            <tr className="bg-slate-200" style={{ borderBottom: `2px solid ${CON_COLOR}` }}>
               <th className="text-left px-4 py-3 font-bold text-slate-800 text-sm w-44 min-w-[11rem]">Descrição</th>
               {MONTHS.map((m, i) => <th key={i} className="text-center px-2 py-3 font-bold text-sm text-slate-800 min-w-[5.5rem]">{m.slice(0,3)}</th>)}
               <th className="text-center px-2 py-3 font-bold text-sm text-slate-800 min-w-[5.5rem] bg-slate-300 border-l border-slate-400">Var. M/M</th>
@@ -946,14 +902,14 @@ function VwDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
               let varMM = '';
               if (prevVal !== 0 && !isAdmROL) { const pct = ((lastVal - prevVal) / Math.abs(prevVal)) * 100; varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
               return (
-                <tr key={idx} className={`border-b border-slate-100 ${rowClass}`} style={line.isTotal ? { backgroundColor: VW_COLOR } : undefined}>
+                <tr key={idx} className={`border-b border-slate-100 ${rowClass}`} style={line.isTotal ? { backgroundColor: CON_COLOR } : undefined}>
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
                   {allMonthRows.map((row, mi) => {
                     const v = isAdmROL ? 0 : isQuant ? (parseInt(String(row[deptKey][line.field])) || 0) : parseVal(row[deptKey][line.field]);
                     return <td key={mi} className="px-2 py-1.5 text-right">{isAdmROL ? '0,00' : isQuant ? (v > 0 ? v.toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—')}</td>;
                   })}
                   <td className="px-2 py-1.5 text-right text-[0.68rem] border-l border-slate-200">{varMM || '—'}</td>
-                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: VW_COLOR_DRK } : undefined}>
+                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: CON_COLOR_DRK } : undefined}>
                     {(() => { const v = isAdmROL ? 0 : annualTotals[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—'); })()}
                   </td>
                 </tr>
@@ -973,7 +929,7 @@ function PrintableReport({ data, prevData, year, month }: {
 }) {
   const deptList = DEPTS.map(d => data[d.key]);
   const prevPeriods = getPrevPeriods(year, month, 3);
-  const totalPages = DEPTS.length + 2; // 1 resumo + N depts + 1 ajustes
+  const totalPages = DEPTS.length + 2;
 
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', colorScheme: 'only light' as any }}>
@@ -985,18 +941,16 @@ function PrintableReport({ data, prevData, year, month }: {
           forced-color-adjust: none !important;
           color-scheme: light !important;
         }
-        .vw-header   { background-color: ${VW_COLOR} !important; color: white !important; }
-        .vw-row-total { background-color: ${VW_COLOR} !important; color: white !important; }
-        .vw-cell-total { background-color: ${VW_COLOR_DRK} !important; color: white !important; }
+        .con-header    { background-color: ${CON_COLOR} !important; color: white !important; }
+        .con-row-total { background-color: ${CON_COLOR} !important; color: white !important; }
+        .con-cell-total{ background-color: ${CON_COLOR_DRK} !important; color: white !important; }
       `}</style>
 
-      {/* Página 1: Resumo */}
       <div className="print-page">
         <PrintResumoTable data={data} deptList={deptList} year={year} month={month} />
         <PrintFooter label="Resumo Geral" page={1} total={totalPages} />
       </div>
 
-      {/* Páginas 2…N: Departamentos */}
       {DEPTS.map((d, i) => (
         <div key={d.key} className="print-page">
           <PrintDeptTable
@@ -1012,7 +966,6 @@ function PrintableReport({ data, prevData, year, month }: {
         </div>
       ))}
 
-      {/* Última página: Ajustes */}
       <div className="print-page">
         <PrintAjustesTable data={data} year={year} month={month} />
         <PrintFooter label="Ajustes" page={totalPages} total={totalPages} />
@@ -1023,7 +976,7 @@ function PrintableReport({ data, prevData, year, month }: {
 
 function PrintHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="vw-header" style={{ backgroundImage: `linear-gradient(to bottom, ${VW_COLOR} 0%, ${VW_COLOR} 100%)`, backgroundColor: VW_COLOR, color: 'white', padding: '6px 12px', marginBottom: '0' } as React.CSSProperties}>
+    <div className="con-header" style={{ backgroundImage: `linear-gradient(to bottom, ${CON_COLOR} 0%, ${CON_COLOR} 100%)`, backgroundColor: CON_COLOR, color: 'white', padding: '6px 12px', marginBottom: '0' } as React.CSSProperties}>
       <div style={{ fontWeight: 700, fontSize: '10pt' }}>{title}</div>
       <div style={{ fontSize: '7.5pt', opacity: 0.8 }}>{subtitle}</div>
     </div>
@@ -1043,10 +996,10 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreVwRow; dep
   const NCOLS = DEPTS.length + 2;
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-      <PrintHeader title="VW NORTE" subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} />
+      <PrintHeader title="CONSOLIDADO — VW + AUDI" subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} />
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
         <thead>
-          <tr style={{ backgroundColor: '#e2e8f0', borderBottom: `2px solid ${VW_COLOR}` }}>
+          <tr style={{ backgroundColor: '#e2e8f0', borderBottom: `2px solid ${CON_COLOR}` }}>
             <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 700, color: '#111', width: '18%' }}>Descrição</th>
             {DEPTS.map(d => (
               <th key={d.key} style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111', width: '11%' }}>{d.label}</th>
@@ -1059,25 +1012,25 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreVwRow; dep
             if (line.separator) return <tr key={idx}><td colSpan={NCOLS} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
             const isQuant = line.field === 'quant' && idx === 0;
             const rowStyle: React.CSSProperties = line.isTotal
-              ? { backgroundImage: `linear-gradient(to bottom, ${VW_COLOR} 0%, ${VW_COLOR} 100%)`, backgroundColor: VW_COLOR, color: 'white', borderBottom: '1px solid #f1f5f9' }
+              ? { backgroundImage: `linear-gradient(to bottom, ${CON_COLOR} 0%, ${CON_COLOR} 100%)`, backgroundColor: CON_COLOR, color: 'white', borderBottom: '1px solid #f1f5f9' }
               : { backgroundColor: line.isSubtotal ? '#f1f5f9' : 'transparent', color: '#111', borderBottom: '1px solid #f1f5f9' };
             return (
-              <tr key={idx} className={line.isTotal ? 'vw-row-total' : ''} style={rowStyle}>
+              <tr key={idx} className={line.isTotal ? 'con-row-total' : ''} style={rowStyle}>
                 <td style={{ padding: `2px ${line.indent ? '14px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
                 {DEPTS.map(d => {
                   const val = data[d.key][line.field];
                   const display = isQuant ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—') : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
                   return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{display}</td>;
                 })}
-                <td className={line.isTotal ? 'vw-cell-total' : ''}
+                <td className={line.isTotal ? 'con-cell-total' : ''}
                   style={line.isTotal
-                    ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${VW_COLOR_DRK} 0%, ${VW_COLOR_DRK} 100%)`, backgroundColor: VW_COLOR_DRK, color: 'white' }
+                    ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${CON_COLOR_DRK} 0%, ${CON_COLOR_DRK} 100%)`, backgroundColor: CON_COLOR_DRK, color: 'white' }
                     : { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111' }
                   }
                 >
                   {isQuant
                     ? (() => { const t = deptList.reduce((s, dep) => s + (parseInt(dep.quant) || 0), 0); return t > 0 ? t.toString() : '—'; })()
-                    : (() => { const s = sumDepts(deptList, line.field); return s ? fmtNum(s) : '—'; })()
+                    : (() => { const s = sumDeptsArr(deptList, line.field); return s ? fmtNum(s) : '—'; })()
                   }
                 </td>
               </tr>
@@ -1097,10 +1050,13 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
 }) {
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-      <PrintHeader title={`VW NORTE — ${deptLabel}`} subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} />
+      <PrintHeader
+        title={`CONSOLIDADO — ${deptLabel}${deptKey === 'direta' ? ' (VW somente)' : ''}`}
+        subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`}
+      />
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
         <thead>
-          <tr style={{ backgroundColor: '#e2e8f0', borderBottom: `2px solid ${VW_COLOR}` }}>
+          <tr style={{ backgroundColor: '#e2e8f0', borderBottom: `2px solid ${CON_COLOR}` }}>
             <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 700, color: '#111', width: '22%' }}>Descrição</th>
             {prevPeriods.map(p => (
               <th key={`${p.year}-${p.month}`} style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111', width: '12%' }}>
@@ -1116,46 +1072,42 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
           {DRE_LINES.map((line, idx) => {
             if (line.separator) return <tr key={idx}><td colSpan={7} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
             const isQuant = line.field === 'quant' && idx === 0;
-            const isAdmROL = deptKey === 'adm' && line.field === 'receitaOperacionalLiquida';
             const rowStyle: React.CSSProperties = line.isTotal
-              ? { backgroundImage: `linear-gradient(to bottom, ${VW_COLOR} 0%, ${VW_COLOR} 100%)`, backgroundColor: VW_COLOR, color: 'white', borderBottom: '1px solid #f1f5f9' }
+              ? { backgroundImage: `linear-gradient(to bottom, ${CON_COLOR} 0%, ${CON_COLOR} 100%)`, backgroundColor: CON_COLOR, color: 'white', borderBottom: '1px solid #f1f5f9' }
               : { backgroundColor: line.isSubtotal ? '#f1f5f9' : 'transparent', color: '#111', borderBottom: '1px solid #f1f5f9' };
 
             const prevDept = prevDepts[prevDepts.length - 1];
             let varMM = '';
             if (prevDept) {
-              if (isQuant) {
-                const cur = parseInt(String(dept[line.field])) || 0, prv = parseInt(String(prevDept[line.field])) || 0;
-                if (prv !== 0) { const pct = ((cur - prv) / Math.abs(prv)) * 100; varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
-              } else if (!isAdmROL) {
-                const cur = parseVal(dept[line.field]), prv = parseVal(prevDept[line.field]);
-                if (prv !== 0) { const pct = ((cur - prv) / Math.abs(prv)) * 100; varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
-              }
+              const cur = isQuant ? (parseInt(String(dept[line.field])) || 0) : parseVal(dept[line.field]);
+              const prv = isQuant ? (parseInt(String(prevDept[line.field])) || 0) : parseVal(prevDept[line.field]);
+              if (prv !== 0) { const pct = ((cur - prv) / Math.abs(prv)) * 100; varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
             }
 
             const allDepts = [...prevDepts, dept];
             const totalStr = isQuant
               ? (() => { const t = allDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0); return t > 0 ? t.toString() : '—'; })()
-              : isAdmROL ? '0,00'
               : (() => { const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0); return t !== 0 ? t.toLocaleString('pt-BR') : '—'; })();
 
-            const totalCellStyle: React.CSSProperties = line.isTotal
-              ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${VW_COLOR_DRK} 0%, ${VW_COLOR_DRK} 100%)`, backgroundColor: VW_COLOR_DRK, color: 'white' }
-              : { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111' };
-
             return (
-              <tr key={idx} className={line.isTotal ? 'vw-row-total' : ''} style={rowStyle}>
+              <tr key={idx} className={line.isTotal ? 'con-row-total' : ''} style={rowStyle}>
                 <td style={{ padding: `2px ${line.indent ? '14px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
                 {prevDepts.map((pd, pi) => {
                   const v = pd[line.field], num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
-                  const display = isAdmROL ? '0,00' : isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
-                  return <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', color: '#111' }}>{display}</td>;
+                  return <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', color: '#111' }}>{isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—')}</td>;
                 })}
                 <td style={{ textAlign: 'right', padding: '2px 4px' }}>
-                  {isAdmROL ? '0,00' : isQuant ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—') : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')}
+                  {isQuant ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—') : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')}
                 </td>
                 <td style={{ textAlign: 'right', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', color: '#111', fontSize: '6.5pt' }}>{varMM || '—'}</td>
-                <td className={line.isTotal ? 'vw-cell-total' : ''} style={totalCellStyle}>{totalStr}</td>
+                <td className={line.isTotal ? 'con-cell-total' : ''}
+                  style={line.isTotal
+                    ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${CON_COLOR_DRK} 0%, ${CON_COLOR_DRK} 100%)`, backgroundColor: CON_COLOR_DRK, color: 'white' }
+                    : { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111' }
+                  }
+                >
+                  {totalStr}
+                </td>
               </tr>
             );
           })}
@@ -1167,15 +1119,14 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
 
 function PrintAjustesTable({ data, year, month }: { data: DreVwRow; year: number; month: number }) {
   const deptList = DEPTS.map(d => data[d.key]);
-  const totalLiquido = sumDepts(deptList, 'lucroLiquidoExercicio');
+  const totalLiquido = sumDeptsArr(deptList, 'lucroLiquidoExercicio');
   const totalLiqNum = parseVal(totalLiquido);
   const rowTotals = data.ajustes.map(row => DEPTS.reduce((s, d) => s + parseVal(row.values[d.key]), 0));
-  const totalAjustes = rowTotals.reduce((s, v) => s + v, 0);
-  const totalAjustado = totalLiqNum + totalAjustes;
+  const totalAjustado = totalLiqNum + rowTotals.reduce((s, v) => s + v, 0);
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-      <PrintHeader title="VW NORTE" subtitle={`${MONTHS[month - 1]} de ${year} — Ajustes`} />
+      <PrintHeader title="CONSOLIDADO — VW + AUDI" subtitle={`${MONTHS[month - 1]} de ${year} — Ajustes`} />
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
         <thead>
           <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
@@ -1187,36 +1138,22 @@ function PrintAjustesTable({ data, year, month }: { data: DreVwRow; year: number
           </tr>
         </thead>
         <tbody>
-          <tr className="vw-row-total" style={{ backgroundImage: `linear-gradient(to bottom, ${VW_COLOR} 0%, ${VW_COLOR} 100%)`, backgroundColor: VW_COLOR, color: 'white', borderBottom: `1px solid ${VW_COLOR_DRK}` }}>
+          <tr className="con-row-total" style={{ backgroundImage: `linear-gradient(to bottom, ${CON_COLOR} 0%, ${CON_COLOR} 100%)`, backgroundColor: CON_COLOR, color: 'white' }}>
             <td style={{ padding: '2px 6px', fontWeight: 700 }}>Lucro Líquido do Exercício</td>
-            {DEPTS.map(d => {
-              const v = data[d.key].lucroLiquidoExercicio;
-              return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{v ? fmtNum(v) : '—'}</td>;
-            })}
-            <td className="vw-cell-total" style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${VW_COLOR_DRK} 0%, ${VW_COLOR_DRK} 100%)`, backgroundColor: VW_COLOR_DRK }}>{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
+            {DEPTS.map(d => { const v = data[d.key].lucroLiquidoExercicio; return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{v ? fmtNum(v) : '—'}</td>; })}
+            <td className="con-cell-total" style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${CON_COLOR_DRK} 0%, ${CON_COLOR_DRK} 100%)`, backgroundColor: CON_COLOR_DRK }}>{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
           </tr>
-          {data.ajustes.map((row, i) => {
-            const rTotal = rowTotals[i];
-            return (
-              <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#111' }}>
-                <td style={{ padding: '2px 14px' }}>{row.label || '—'}</td>
-                {DEPTS.map(d => (
-                  <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{parseVal(row.values[d.key]) !== 0 ? parseVal(row.values[d.key]).toLocaleString('pt-BR') : '—'}</td>
-                ))}
-                <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111' }}>{rTotal !== 0 ? rTotal.toLocaleString('pt-BR') : '—'}</td>
-              </tr>
-            );
-          })}
-          <tr className="vw-row-total" style={{ backgroundImage: `linear-gradient(to bottom, ${VW_COLOR} 0%, ${VW_COLOR} 100%)`, backgroundColor: VW_COLOR, color: 'white' }}>
+          {data.ajustes.map((row, i) => (
+            <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#111' }}>
+              <td style={{ padding: '2px 14px' }}>{row.label || '—'}</td>
+              {DEPTS.map(d => <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{parseVal(row.values[d.key]) !== 0 ? parseVal(row.values[d.key]).toLocaleString('pt-BR') : '—'}</td>)}
+              <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111' }}>{rowTotals[i] !== 0 ? rowTotals[i].toLocaleString('pt-BR') : '—'}</td>
+            </tr>
+          ))}
+          <tr className="con-row-total" style={{ backgroundImage: `linear-gradient(to bottom, ${CON_COLOR} 0%, ${CON_COLOR} 100%)`, backgroundColor: CON_COLOR, color: 'white' }}>
             <td style={{ padding: '3px 6px', fontWeight: 700 }}>RESULTADO DO PERÍODO AJUSTADO</td>
-            {DEPTS.map(d => {
-              const liq = parseVal(data[d.key].lucroLiquidoExercicio);
-              const adj = data.ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0);
-              return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{(liq + adj) !== 0 ? (liq + adj).toLocaleString('pt-BR') : '—'}</td>;
-            })}
-            <td className="vw-cell-total" style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${VW_COLOR_DRK} 0%, ${VW_COLOR_DRK} 100%)`, backgroundColor: VW_COLOR_DRK }}>
-              {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}
-            </td>
+            {DEPTS.map(d => { const liq = parseVal(data[d.key].lucroLiquidoExercicio); const adj = data.ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0); return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{(liq + adj) !== 0 ? (liq + adj).toLocaleString('pt-BR') : '—'}</td>; })}
+            <td className="con-cell-total" style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${CON_COLOR_DRK} 0%, ${CON_COLOR_DRK} 100%)`, backgroundColor: CON_COLOR_DRK }}>{totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}</td>
           </tr>
         </tbody>
       </table>

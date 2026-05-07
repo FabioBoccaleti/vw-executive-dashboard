@@ -51,6 +51,16 @@ function parseVal(v: string | number): number {
   return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
 }
 
+const DEPT_FIELDS: (keyof DreAudiDept)[] = [
+  'quant','receitaOperacionalLiquida','custoOperacionalReceita',
+  'lucroPrejOperacionalBruto','outrasReceitasOperacionais','outrasDespesasOperacionais',
+  'margemContribuicao','despPessoal','despServTerceiros','despOcupacao','despFuncionamento',
+  'despVendas','lucroPrejOperacionalLiquido','amortizacoesDepreciacoes',
+  'outrasReceitasFinanceiras','despFinanceirasNaoOperacional','despesasNaoOperacionais',
+  'outrasRendasNaoOperacionais','lucroPrejAntesImpostos','provisoesIrpjCs',
+  'participacoes','lucroLiquidoExercicio',
+];
+
 // ─── Linhas da tabela ──────────────────────────────────────────────────────────
 
 interface DreLineConfig {
@@ -181,11 +191,60 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
   const [dirty, setDirty]     = useState(false);
   const [activeSection, setActiveSection] = useState<'resumo' | DeptKey>('resumo');
   const [prevData, setPrevData] = useState<DreAudiRow[]>([]);
+  const [annualView, setAnnualView] = useState<'anual' | 'mensal'>('anual');
+  const [allMonthRows, setAllMonthRows] = useState<DreAudiRow[]>(
+    Array.from({ length: 12 }, (_, i) => createEmptyDreAudiRow(0, i + 1))
+  );
 
   // ── Load ────────────────────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
     setDirty(false);
+
+    // ── MODO ANUAL ────────────────────────────────────────────────────────────
+    if (month === 0) {
+      const yr = year as 2024 | 2025 | 2026 | 2027;
+      Promise.all([
+        Promise.all(Array.from({ length: 12 }, (_, i) => loadDreAudi(year, i + 1))),
+        Promise.all(DEPTS.map(d =>
+          loadDREDataAsync(yr, DEPT_KEY_TO_DEPT[d.key], 'audi')
+            .then(dre => ({ deptKey: d.key as DeptKey, dre }))
+        )),
+      ]).then(([kvResults, dreResults]) => {
+        const dreLk: Record<string, any[] | null> = {};
+        for (const { deptKey, dre } of dreResults) dreLk[deptKey] = dre;
+        function hasData(dept: DreAudiDept) { return Object.values(dept).some(v => v !== ''); }
+        function buildMRow(m: number, kv: DreAudiRow | null): DreAudiRow {
+          const row = createEmptyDreAudiRow(year, m);
+          for (const d of DEPTS) {
+            row[d.key] = (kv && hasData(kv[d.key])) ? kv[d.key] : buildDeptFromDREData(dreLk[d.key] ?? null, m - 1);
+          }
+          if (kv) row.ajustes = migrateAjustes(kv.ajustes);
+          return row;
+        }
+        const monthRows = kvResults.map((kv, i) => buildMRow(i + 1, kv ?? null));
+        setAllMonthRows(monthRows);
+        const summed = createEmptyDreAudiRow(year, 0);
+        for (const row of monthRows) {
+          for (const d of DEPTS) {
+            for (const f of DEPT_FIELDS) {
+              const t = parseVal(summed[d.key][f]) + parseVal(row[d.key][f]);
+              if (t !== 0) summed[d.key][f] = t.toString();
+            }
+          }
+          for (const adj of row.ajustes) {
+            const ex = summed.ajustes.find(a => a.id === adj.id);
+            if (ex) { for (const d of DEPTS) { const t = parseVal(ex.values[d.key]) + parseVal(adj.values[d.key]); if (t !== 0) ex.values[d.key] = t.toString(); } }
+            else summed.ajustes.push({ ...adj, values: { ...adj.values } });
+          }
+        }
+        setData(summed);
+        setLoading(false);
+      });
+      return;
+    }
+
+    // ── MODO MENSAL ───────────────────────────────────────────────────────────
     const periods = getPrevPeriods(year, month, 3);
     const allPeriods = [...periods, { year, month }];
     const uniqueYears = [...new Set(allPeriods.map(p => p.year))] as Array<2024 | 2025 | 2026 | 2027>;
@@ -411,31 +470,35 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
       {/* ── Conteúdo ────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-auto p-6">
 
-        {/* RESUMO GERAL — todas as colunas */}
-        {activeSection === 'resumo' && (
-          <ResumoTable
-            data={data}
-            deptList={deptList}
-            year={year}
-            month={month}
-          />
+        {/* RESUMO GERAL */}
+        {activeSection === 'resumo' && month !== 0 && (
+          <ResumoTable data={data} deptList={deptList} year={year} month={month} />
+        )}
+        {activeSection === 'resumo' && month === 0 && (
+          <div className="flex flex-col gap-4">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setAnnualView('anual')}
+                className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors"
+                style={annualView === 'anual' ? { backgroundColor: '#bb0a30', color: 'white' } : { backgroundColor: '#f1f5f9', color: '#64748b' }}
+              >Resultado Anual</button>
+              <button
+                onClick={() => setAnnualView('mensal')}
+                className="px-4 py-2 rounded-lg text-xs font-semibold transition-colors"
+                style={annualView === 'mensal' ? { backgroundColor: '#bb0a30', color: 'white' } : { backgroundColor: '#f1f5f9', color: '#64748b' }}
+              >Evolução Mensal</button>
+            </div>
+            {annualView === 'anual' && <ResumoTable data={data} deptList={deptList} year={year} month={0} />}
+            {annualView === 'mensal' && <AudiEvolucaoMensalTable allMonthRows={allMonthRows} year={year} />}
+          </div>
         )}
 
         {/* DETALHE POR DEPARTAMENTO */}
         {DEPTS.map(d =>
           activeSection === d.key ? (
-            <DeptTable
-              key={d.key}
-              deptKey={d.key}
-              deptLabel={d.label}
-              deptColor={d.color}
-              dept={data[d.key]}
-              prevDepts={prevData.map(row => row[d.key])}
-              prevPeriods={getPrevPeriods(year, month, 3)}
-              year={year}
-              month={month}
-              onChange={(field, value) => handleCellChange(d.key, field, value)}
-            />
+            month === 0
+              ? <AudiDeptEvolucaoTable key={d.key} deptKey={d.key} deptLabel={d.label} allMonthRows={allMonthRows} year={year} />
+              : <DeptTable key={d.key} deptKey={d.key} deptLabel={d.label} deptColor={d.color} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getPrevPeriods(year, month, 3)} year={year} month={month} onChange={(field, value) => handleCellChange(d.key, field, value)} />
           ) : null
         )}
 
@@ -488,7 +551,7 @@ function ResumoTable({
       {/* Cabeçalho */}
       <div className="bg-[#bb0a30] text-black px-6 py-3">
         <h2 className="font-bold text-base">AUDI LAPA/PINHEIROS</h2>
-        <p className="text-xs mt-0.5">{MONTHS[month - 1]} de {year} — Demonstrativo de Resultados</p>
+        <p className="text-xs mt-0.5">{month === 0 ? `Ano ${year}` : `${MONTHS[month - 1]} de ${year}`} — Demonstrativo de Resultados</p>
       </div>
 
       <div className="overflow-x-auto">
@@ -759,7 +822,7 @@ function AjustesTable({
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="bg-[#bb0a30] text-black px-6 py-3">
         <h2 className="font-bold text-base">AUDI LAPA/PINHEIROS</h2>
-        <p className="text-xs mt-0.5">{MONTHS[month - 1]} de {year} — Ajustes</p>
+        <p className="text-xs mt-0.5">{month === 0 ? `Ano ${year}` : `${MONTHS[month - 1]} de ${year}`} — Ajustes</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -878,6 +941,114 @@ function AjustesTable({
           <Plus className="w-3.5 h-3.5" />
           Adicionar linha
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Evolução Mensal (Anual) ─────────────────────────────────────────────────
+
+function AudiEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreAudiRow[]; year: number }) {
+  const monthlyTotals = allMonthRows.map(row =>
+    Object.fromEntries(DEPT_FIELDS.map(f => [
+      f, DEPTS.reduce((s, d) => s + parseVal(row[d.key][f]), 0)
+    ])) as Record<keyof DreAudiDept, number>
+  );
+  const annualTotal = Object.fromEntries(DEPT_FIELDS.map(f => [
+    f, monthlyTotals.reduce((s, mt) => s + (mt[f] ?? 0), 0)
+  ])) as Record<keyof DreAudiDept, number>;
+  const NCOLS = 14;
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-[#bb0a30] text-white px-6 py-3">
+        <h2 className="font-bold text-base">AUDI LAPA/PINHEIROS</h2>
+        <p className="text-xs mt-0.5 opacity-80">Ano {year} — Evolução Mensal (todos os departamentos)</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-slate-200 border-b-2 border-[#bb0a30]">
+              <th className="text-left px-4 py-3 font-bold text-slate-800 text-sm w-44 min-w-[11rem]">Descrição</th>
+              {MONTHS.map((m, i) => <th key={i} className="text-center px-2 py-3 font-bold text-sm text-slate-800 min-w-[5.5rem]">{m.slice(0,3)}</th>)}
+              <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[7rem] bg-slate-300">Total Acum.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {DRE_LINES.map((line, idx) => {
+              if (line.separator) return <tr key={idx}><td colSpan={NCOLS} className="h-px bg-slate-100" /></tr>;
+              const isQuant = line.field === 'quant' && idx === 0;
+              const rowClass = line.isTotal ? 'text-black font-bold' : line.isSubtotal ? 'bg-slate-100 font-semibold text-black' : 'hover:bg-slate-50 text-black';
+              return (
+                <tr key={idx} className={`border-b border-slate-100 ${rowClass}`} style={line.isTotal ? { backgroundColor: '#bb0a30', color: 'white' } : undefined}>
+                  <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
+                  {monthlyTotals.map((mt, mi) => {
+                    const val = mt[line.field] ?? 0;
+                    const display = isQuant ? (Math.round(val) > 0 ? Math.round(val).toString() : '—') : (val !== 0 ? val.toLocaleString('pt-BR') : '—');
+                    return <td key={mi} className="px-2 py-1.5 text-right">{display}</td>;
+                  })}
+                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? '' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: '#9a0827' } : undefined}>
+                    {(() => { const v = annualTotal[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—'); })()}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function AudiDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
+  deptKey: DeptKey; deptLabel: string; allMonthRows: DreAudiRow[]; year: number;
+}) {
+  const isAdm = deptKey === 'adm';
+  const annualTotals = Object.fromEntries(DEPT_FIELDS.map(f => [
+    f, allMonthRows.reduce((s, row) => s + parseVal(row[deptKey][f]), 0)
+  ])) as Record<keyof DreAudiDept, number>;
+  const NCOLS = 15;
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-[#bb0a30] text-white px-6 py-3">
+        <h2 className="font-bold text-base">Audi Lapa/Pinheiros — {deptLabel}</h2>
+        <p className="text-xs mt-0.5 opacity-80">Ano {year} — Evolução Mensal</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-slate-200 border-b-2 border-[#bb0a30]">
+              <th className="text-left px-4 py-3 font-bold text-slate-800 text-sm w-44 min-w-[11rem]">Descrição</th>
+              {MONTHS.map((m, i) => <th key={i} className="text-center px-2 py-3 font-bold text-sm text-slate-800 min-w-[5.5rem]">{m.slice(0,3)}</th>)}
+              <th className="text-center px-2 py-3 font-bold text-sm text-slate-800 min-w-[5.5rem] bg-slate-300 border-l border-slate-400">Var. M/M</th>
+              <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[7rem] bg-slate-300">Total Anual</th>
+            </tr>
+          </thead>
+          <tbody>
+            {DRE_LINES.map((line, idx) => {
+              if (line.separator) return <tr key={idx}><td colSpan={NCOLS} className="h-px bg-slate-100" /></tr>;
+              const isQuant = line.field === 'quant' && idx === 0;
+              const isAdmROL = isAdm && line.field === 'receitaOperacionalLiquida';
+              const rowClass = line.isTotal ? 'text-black font-bold' : line.isSubtotal ? 'bg-slate-100 font-semibold text-black' : 'hover:bg-slate-50 text-black';
+              const lastVal = parseVal(allMonthRows[allMonthRows.length - 1]?.[deptKey]?.[line.field]);
+              const prevVal = parseVal(allMonthRows[allMonthRows.length - 2]?.[deptKey]?.[line.field]);
+              let varMM = '';
+              if (prevVal !== 0 && !isAdmROL) { const pct = ((lastVal - prevVal) / Math.abs(prevVal)) * 100; varMM = (pct >= 0 ? '+' : '') + pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'; }
+              return (
+                <tr key={idx} className={`border-b border-slate-100 ${rowClass}`} style={line.isTotal ? { backgroundColor: '#bb0a30', color: 'white' } : undefined}>
+                  <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
+                  {allMonthRows.map((row, mi) => {
+                    const v = isAdmROL ? 0 : isQuant ? (parseInt(String(row[deptKey][line.field])) || 0) : parseVal(row[deptKey][line.field]);
+                    return <td key={mi} className="px-2 py-1.5 text-right">{isAdmROL ? '0,00' : isQuant ? (v > 0 ? v.toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—')}</td>;
+                  })}
+                  <td className="px-2 py-1.5 text-right text-[0.68rem] border-l border-slate-200">{varMM || '—'}</td>
+                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? '' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: '#9a0827' } : undefined}>
+                    {(() => { const v = isAdmROL ? 0 : annualTotals[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—'); })()}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
