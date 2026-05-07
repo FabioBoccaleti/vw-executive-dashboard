@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker as createTesseractWorker } from 'tesseract.js';
-import { Upload, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Upload, FileText, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
@@ -409,6 +411,138 @@ async function parseArquivoPIV(
   return { data, debugLines };
 }
 
+// ─── Exportação Excel ────────────────────────────────────────────────────────
+async function exportToExcel(data: ArquivoPivData): Promise<void> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Sorana Executive Dashboard';
+  wb.created = new Date();
+
+  const mes = data.header.mesApurado || data.periodoKey || '';
+  const ws = wb.addWorksheet('PIV', {
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 2 }],
+    properties: { tabColor: { argb: 'FF4F46E5' } },
+  });
+
+  const COLS = [
+    { label: 'Mês',                  key: 'mes',                       type: 'text',     width: 6  },
+    { label: 'Chassi',               key: 'chassi',                    type: 'text',     width: 20 },
+    { label: 'Model Group',          key: 'modelGroup',                type: 'text',     width: 16 },
+    { label: 'Preço Público',        key: 'precoPublico',              type: 'currency', width: 16 },
+    { label: 'Crit. Atacado',        key: 'critAtacado',               type: 'number',   width: 12 },
+    { label: 'Dir. Bônus Atacado',   key: 'direitoBonusAtacado',       type: 'text',     width: 14 },
+    { label: 'Motivo Atacado',       key: 'motivoPenalizacaoAtacado',  type: 'text',     width: 14 },
+    { label: 'Valor Bônus Atacado',  key: 'valorBonusAtacado',         type: 'currency', width: 16 },
+    { label: 'Crit. Satisfação',     key: 'critSatisfacao',            type: 'number',   width: 13 },
+    { label: 'Dir. Bônus Satisf.',   key: 'direitoBonusSatisfacao',    type: 'text',     width: 14 },
+    { label: 'Motivo Satisf.',       key: 'motivoPenalizacaoSatisfacao', type: 'text',   width: 14 },
+    { label: 'Valor Bônus Satisf.',  key: 'valorBonusSatisfacao',      type: 'currency', width: 16 },
+    { label: 'Data Fat.',            key: 'dataFaturamentoAtacado',    type: 'date',     width: 12 },
+    { label: 'Data Venda',           key: 'dataVendaVarejo',           type: 'date',     width: 12 },
+    { label: 'Data Empl.',           key: 'dataEmplacamento',          type: 'date',     width: 12 },
+    { label: 'Cidade/Estado',        key: 'cidadeEstado',              type: 'text',     width: 20 },
+  ] as const;
+
+  ws.columns = COLS.map(c => ({ width: c.width }));
+
+  const BRL_FMT = '"R$"\ #,##0.00';
+  const BTHIN = { style: 'thin' as const, color: { argb: 'FFE2E8F0' } };
+  const today = new Date().toLocaleDateString('pt-BR');
+
+  // Linha de título
+  const titleRow = ws.addRow([`Arquivo PIV — ${mes} — ${today}`]);
+  ws.mergeCells(1, 1, 1, COLS.length);
+  titleRow.height = 28;
+  titleRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E1B4B' } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+  });
+
+  // Linha de cabeçalho
+  const headerRow = ws.addRow(COLS.map(c => c.label));
+  headerRow.height = 34;
+  headerRow.eachCell((cell, ci) => {
+    const col = COLS[ci - 1];
+    const isAtacado  = ci >= 5 && ci <= 8;
+    const isSatisf   = ci >= 9 && ci <= 12;
+    const fgColor = isAtacado ? 'FF3730A3' : isSatisf ? 'FF5B21B6' : 'FF334155';
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fgColor } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 9.5 };
+    cell.alignment = { vertical: 'middle', horizontal: col.type === 'currency' ? 'right' : 'center', wrapText: true };
+  });
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: COLS.length } };
+
+  // Linhas de dados
+  data.rows.forEach((row, ri) => {
+    const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF5F3FF';
+    const values = COLS.map(col => {
+      const v = String((row as unknown as Record<string, unknown>)[col.key] ?? '');
+      if (col.type === 'currency') return parseCurrency(v) || null;
+      if (col.type === 'number')   return parseFloat(v) || null;
+      if (col.type === 'date' && /^\d{2}\/\d{2}\/\d{4}$/.test(v)) {
+        const [d, m, y] = v.split('/');
+        return new Date(+y, +m - 1, +d);
+      }
+      return v || '';
+    });
+    const dr = ws.addRow(values);
+    dr.height = 17;
+    dr.eachCell({ includeEmpty: true }, (cell, ci) => {
+      const col = COLS[ci - 1];
+      const isAtacado = ci >= 5 && ci <= 8;
+      const isSatisf  = ci >= 9 && ci <= 12;
+      const bgFg = isAtacado ? 'FFEEF2FF' : isSatisf ? 'FFF5F3FF' : bg;
+      cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgFg } };
+      cell.border = { top: BTHIN, bottom: BTHIN, left: BTHIN, right: BTHIN };
+      if (!col) return;
+      if (col.type === 'currency') {
+        cell.numFmt    = BRL_FMT;
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.font      = { size: 9.5, name: 'Courier New' };
+      } else if (col.type === 'date') {
+        if (cell.value instanceof Date) cell.numFmt = 'DD/MM/YYYY';
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.font      = { size: 9.5 };
+      } else if (col.type === 'number') {
+        cell.numFmt    = '0.00';
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.font      = { size: 9.5 };
+      } else {
+        cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        cell.font      = { size: 9.5 };
+      }
+    });
+  });
+
+  // Linha de total
+  const totalAtacado = data.rows.reduce((s, r) => s + parseCurrency(r.valorBonusAtacado), 0);
+  const totalSatisf  = data.rows.reduce((s, r) => s + parseCurrency(r.valorBonusSatisfacao), 0);
+  const totalRow = ws.addRow([
+    '', '', `${data.rows.length} veículos`, '',
+    '', '', '', totalAtacado || null,
+    '', '', '', totalSatisf  || null,
+    '', '', '', '',
+  ]);
+  totalRow.height = 20;
+  totalRow.eachCell({ includeEmpty: true }, (cell, ci) => {
+    cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    cell.border = { top: { style: 'medium', color: { argb: 'FF94A3B8' } } };
+    cell.font   = { bold: true, size: 9.5 };
+    if (ci === 8 || ci === 12) {
+      cell.numFmt    = BRL_FMT;
+      cell.alignment = { horizontal: 'right', vertical: 'middle' };
+      cell.font      = { bold: true, size: 9.5, name: 'Courier New', color: { argb: ci === 8 ? 'FF3730A3' : 'FF5B21B6' } };
+    }
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  const safeMes = mes.replace(/[/\\]/g, '-');
+  saveAs(
+    new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    `ArquivoPIV_${safeMes}.xlsx`,
+  );
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 interface Props { filterYear: number; filterMonth: number | null; }
 
@@ -418,9 +552,18 @@ export function ArquivoPIVDashboard({ filterYear, filterMonth }: Props) {
   const [loading, setLoading]     = useState(true);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState('');
-  const [resumoExp, setResumoExp] = useState(false);
+  const [resumoExp, setResumoExp]   = useState(false);
   const [debugLines, setDebugLines] = useState<string[]>([]);
   const [showDebug, setShowDebug]   = useState(false);
+  const [exporting, setExporting]   = useState(false);
+
+  const handleExport = async () => {
+    if (!data) return;
+    setExporting(true);
+    try { await exportToExcel(data); }
+    catch (err) { console.error(err); toast.error('Erro ao gerar Excel.'); }
+    finally { setExporting(false); }
+  };
 
   const pk = periodoKey(filterYear, filterMonth);
 
@@ -490,6 +633,18 @@ export function ArquivoPIVDashboard({ filterYear, filterMonth }: Props) {
           >
             {showDebug ? 'Ocultar debug' : 'Ver texto extraído'}
           </button>
+        )}
+        {data && !importing && (
+          <Button
+            onClick={handleExport}
+            disabled={exporting}
+            size="sm"
+            variant="outline"
+            className="flex items-center gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {exporting ? 'Gerando...' : 'Exportar Excel'}
+          </Button>
         )}
         {data && !importing && (
           <div className="flex items-center gap-2 text-xs text-slate-500">
