@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { AudiDreTab } from './AudiDreTab';
+import { AudiGraficosTab } from './AudiGraficosTab';
 import { VwDreTab } from './VwDreTab';
 import { ConsolidadoDreTab } from './ConsolidadoDreTab';
 
@@ -8,12 +9,13 @@ interface ResumoDREDashboardProps {
   onChangeBrand: () => void;
 }
 
-type TabId = 'vw' | 'audi' | 'consolidado';
+type TabId = 'vw' | 'audi' | 'consolidado' | 'audi-graficos';
 
 const TABS: { id: TabId; label: string; color: string; activeColor: string }[] = [
-  { id: 'vw',          label: 'VW',          color: '#001e50', activeColor: '#001e50' },
-  { id: 'audi',        label: 'Audi',        color: '#bb0a30', activeColor: '#bb0a30' },
-  { id: 'consolidado', label: 'Consolidado', color: '#7c3aed', activeColor: '#7c3aed' },
+  { id: 'vw',           label: 'VW',           color: '#001e50', activeColor: '#001e50' },
+  { id: 'audi',         label: 'Audi',         color: '#bb0a30', activeColor: '#bb0a30' },
+  { id: 'audi-graficos',label: 'Audi Gráficos',color: '#bb0a30', activeColor: '#9a0827' },
+  { id: 'consolidado',  label: 'Consolidado',  color: '#7c3aed', activeColor: '#7c3aed' },
 ];
 
 const MONTHS_LABEL = [
@@ -108,6 +110,8 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
           <VwDreTab year={year} month={month} diasUteis={diasUteis} />
         ) : activeTab === 'audi' ? (
           <AudiDreTab year={year} month={month} diasUteis={diasUteis} />
+        ) : activeTab === 'audi-graficos' ? (
+          <AudiGraficosTab year={year} month={month} />
         ) : (
           <ConsolidadoDreTab year={year} month={month} diasUteis={diasUteis} />
         )}
