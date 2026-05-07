@@ -253,9 +253,9 @@ function DonutPanel({
     .filter(d => d.value > 0);
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
-      <div className="px-4 py-2.5" style={{ backgroundColor: AUDI_COLOR }}>
-        <p className="text-white font-bold text-xs">{title}</p>
-        <p className="text-white/70 text-[0.6rem] mt-0.5">{subtitle}</p>
+      <div className="px-4 py-2.5 border-b border-slate-100" style={{ borderLeft: `4px solid ${AUDI_COLOR}` }}>
+        <p className="text-xs font-semibold text-slate-700">{title}</p>
+        <p className="text-[0.6rem] text-slate-400 mt-0.5">{subtitle}</p>
       </div>
       <div className="p-2">
         {data.length === 0
@@ -466,12 +466,14 @@ export function AudiGraficosTab({ year, month }: Props) {
         </div>
 
         {/* ── Painel Duplo: Waterfall Mês | Acumulado ─────────────────────── */}
+        <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider">Resultado do Período</p>
         <div className="flex gap-4">
           <WaterfallPanel row={mesRow}   title={`DRE — ${mesLabel}`}   subtitle={`Resultado do mês · ${deptLabel}`}   deptFilter={deptFilter} />
           <WaterfallPanel row={accumRow} title={`DRE — ${accumLabel}`} subtitle={`Acumulado · ${deptLabel}`}           deptFilter={deptFilter} />
         </div>
 
         {/* ── Donuts Receita por Dept (só Consolidado) ────────────────────── */}
+        <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider">Composição</p>
         {deptFilter === 'consolidado' && (
           <div className="flex gap-4">
             <DonutPanel row={mesRow}   field="receitaOperacionalLiquida" title={`Receita por Dept — ${mesLabel}`}   subtitle="Composição da Receita Líquida" deptFilter={deptFilter} />
@@ -482,9 +484,9 @@ export function AudiGraficosTab({ year, month }: Props) {
         {/* ── Donuts Despesas Mês | Acumulado ─────────────────────────────── */}
         <div className="flex gap-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
-            <div className="px-4 py-2.5" style={{ backgroundColor: AUDI_COLOR }}>
-              <p className="text-white font-bold text-xs">Composição de Despesas — {mesLabel}</p>
-              <p className="text-white/70 text-[0.6rem] mt-0.5">{deptLabel}</p>
+            <div className="px-4 py-2.5 border-b border-slate-100" style={{ borderLeft: `4px solid ${AUDI_COLOR}` }}>
+              <p className="text-xs font-semibold text-slate-700">Composição de Despesas — {mesLabel}</p>
+              <p className="text-[0.6rem] text-slate-400 mt-0.5">{deptLabel}</p>
             </div>
             <div className="p-2">
               <ResponsiveContainer width="100%" height={220}>
@@ -499,9 +501,9 @@ export function AudiGraficosTab({ year, month }: Props) {
             </div>
           </div>
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
-            <div className="px-4 py-2.5" style={{ backgroundColor: AUDI_COLOR }}>
-              <p className="text-white font-bold text-xs">Composição de Despesas — {accumLabel}</p>
-              <p className="text-white/70 text-[0.6rem] mt-0.5">{deptLabel}</p>
+            <div className="px-4 py-2.5 border-b border-slate-100" style={{ borderLeft: `4px solid ${AUDI_COLOR}` }}>
+              <p className="text-xs font-semibold text-slate-700">Composição de Despesas — {accumLabel}</p>
+              <p className="text-[0.6rem] text-slate-400 mt-0.5">{deptLabel}</p>
             </div>
             <div className="p-2">
               <ResponsiveContainer width="100%" height={220}>
@@ -517,54 +519,61 @@ export function AudiGraficosTab({ year, month }: Props) {
           </div>
         </div>
 
-        {/* ── Barras Receita/Margem/Lucro por dept ────────────────────────── */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3" style={{ backgroundColor: AUDI_COLOR }}>
-            <p className="text-white font-bold text-sm">Receita · Margem · Lucro por Departamento</p>
-            <p className="text-white/70 text-[0.65rem] mt-0.5">{mesLabel} vs {accumLabel}</p>
+        {/* ── Por Departamento ────────────────────────────────────────────── */}
+        <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider">Por Departamento</p>
+        <div className="flex gap-4">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
+            <div className="px-4 py-2.5 border-b border-slate-100" style={{ borderLeft: `4px solid ${AUDI_COLOR}` }}>
+              <p className="text-xs font-semibold text-slate-700">Receita por Departamento</p>
+              <p className="text-[0.6rem] text-slate-400 mt-0.5">{mesLabel} vs {accumLabel}</p>
+            </div>
+            <div className="p-4">
+              <ResponsiveContainer width="100%" height={210}>
+                <BarChart data={barByDept} margin={{ top: 5, right: 8, left: 5, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#374151' }} />
+                  <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <Tooltip formatter={(v: number) => fmtBRL(v)} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                  <Bar dataKey="receitaMes" name={mesLabel} radius={[3,3,0,0]}>
+                    {barByDept.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Bar>
+                  <Bar dataKey="receitaAcum" name={accumLabel} radius={[3,3,0,0]}>
+                    {barByDept.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={0.4} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-          <div className="p-4">
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={barByDept} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#374151' }} />
-                <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                <Tooltip content={({ active, payload, label }) => {
-                  if (!active || !payload?.length) return null;
-                  return (
-                    <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-3 text-xs">
-                      <p className="font-bold text-slate-700 mb-2">{label}</p>
-                      {payload.map((p: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between gap-4">
-                          <span className="flex items-center gap-1.5 text-slate-500">
-                            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.fill }} />
-                            {p.name}
-                          </span>
-                          <span className={`font-semibold ${p.value < 0 ? 'text-red-500' : 'text-slate-800'}`}>{fmtBRL(p.value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                }} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="receitaMes"  name={`Receita ${mesLabel}`}   fill="#3b82f6" radius={[2,2,0,0]} />
-                <Bar dataKey="receitaAcum" name={`Receita ${accumLabel}`} fill="#93c5fd" radius={[2,2,0,0]} />
-                <Bar dataKey="margemMes"   name={`Margem ${mesLabel}`}    fill="#22c55e" radius={[2,2,0,0]} />
-                <Bar dataKey="margemAcum"  name={`Margem ${accumLabel}`}  fill="#86efac" radius={[2,2,0,0]} />
-                <Bar dataKey="lucroMes"    name={`Lucro ${mesLabel}`}     fill={AUDI_COLOR} radius={[2,2,0,0]} />
-                <Bar dataKey="lucroAcum"   name={`Lucro ${accumLabel}`}   fill={AUDI_COLOR_DRK} radius={[2,2,0,0]} />
-                <ReferenceLine y={0} stroke="#cbd5e1" />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
+            <div className="px-4 py-2.5 border-b border-slate-100" style={{ borderLeft: `4px solid ${AUDI_COLOR}` }}>
+              <p className="text-xs font-semibold text-slate-700">Lucro Líquido por Departamento</p>
+              <p className="text-[0.6rem] text-slate-400 mt-0.5">{mesLabel} vs {accumLabel}</p>
+            </div>
+            <div className="p-4">
+              <ResponsiveContainer width="100%" height={210}>
+                <BarChart data={barByDept} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                  <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#374151' }} width={60} />
+                  <Tooltip formatter={(v: number) => fmtBRL(v)} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                  <Bar dataKey="lucroMes"  name={mesLabel}   fill={AUDI_COLOR}     radius={[0,3,3,0]} />
+                  <Bar dataKey="lucroAcum" name={accumLabel} fill={AUDI_COLOR_DRK} fillOpacity={0.6} radius={[0,3,3,0]} />
+                  <ReferenceLine x={0} stroke="#cbd5e1" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
         {/* ── Evolução Mensal ──────────────────────────────────────────────── */}
-        {evolucao.length > 1 && (
+        {evolucao.length > 1 && (<>
+          <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider">Tendência</p>
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-3" style={{ backgroundColor: AUDI_COLOR }}>
-              <p className="text-white font-bold text-sm">Evolução Mensal</p>
-              <p className="text-white/70 text-[0.65rem] mt-0.5">Jan–{MONTHS_SHORT[selIdx]}/{year} · {deptLabel}</p>
+            <div className="px-4 py-2.5 border-b border-slate-100" style={{ borderLeft: `4px solid ${AUDI_COLOR}` }}>
+              <p className="text-xs font-semibold text-slate-700">Evolução Mensal</p>
+              <p className="text-[0.6rem] text-slate-400 mt-0.5">Jan–{MONTHS_SHORT[selIdx]}/{year} · {deptLabel}</p>
             </div>
             <div className="p-4">
               <ResponsiveContainer width="100%" height={220}>
@@ -598,7 +607,7 @@ export function AudiGraficosTab({ year, month }: Props) {
               </ResponsiveContainer>
             </div>
           </div>
-        )}
+        </>)}
 
       </div>
     </div>
