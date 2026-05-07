@@ -174,13 +174,22 @@ function normalizeOCRLine(line: string): string {
     // Sem consumir o dígito seguinte (usa lookahead)
     .replace(/\bRS§\s*/g, 'R$ ')
     .replace(/R\$§\s*/g, 'R$ ')
-    .replace(/\bR[S§58]\$\s*/g, 'R$ ')
-    .replace(/\bR[S§58]\s*(?=\d)/g, 'R$ ')
+    .replace(/\bR[S§58E]\$\s*/g, 'R$ ')
+    .replace(/\bR[S§58E]\s*(?=\d)/g, 'R$ ')    // RS, R§, R8, RE + dígito → R$
     // R$ correto mas grudado no número (sem espaço): "R$562" → "R$ 562"
     .replace(/R\$(?=\d)/g, 'R$ ')
 
+    // ── 1c. Ponto no lugar da vírgula no preço com critério colado: ─────────────────
+    // "R$119.990.00 150" → "R$119.990,00 150"  (dois pontos no preço)
+    .replace(/(\d{1,3}\.\d{3})\.00(\s+(?:150|050))/g, '$1,00$2')
+    // "R$ 167.990.00150" → "R$ 167.990,00 150"
+    .replace(/(\d{1,3}\.\d{3})\.00(150|050)\b/g, '$1,00 $2')
+
     // ── 2. Vírgula e ponto trocados pelo OCR: "R$ 2,579.25" → "R$ 2.579,25" ─────────
     .replace(/R\$\s*(\d{1,3}),(\d{3})\.(\d{2})\b/g, 'R$ $1.$2,$3')
+
+    // ── 2b. Dois pontos no lugar de ponto decimal: "R$ 2:37240" → "R$ 2.372,40" ──────
+    .replace(/R\$ (\d+):(\d+)/g, 'R$ $1.$2')
 
     // ── 3. Espaço no lugar da vírgula decimal: "R$ 1.458 45" → "R$ 1.458,45" ─────────
     .replace(/R\$\s*(\d+\.\d{3})\s+(\d{2})\b/g, 'R$ $1,$2')
@@ -430,7 +439,7 @@ async function parseArquivoPIV(
     }
   }
 
-  const debugLines = textLines.slice(0, 150).map((l, i) => `[${i}] ${l}`);
+  const debugLines = textLines.map((l, i) => `[${i}] ${l}`);
   console.log('[ArquivoPIV] Debug linhas:', debugLines);
   console.log('[ArquivoPIV] Header:', header);
   console.log('[ArquivoPIV] Rows:', rows.length);
@@ -700,9 +709,20 @@ export function ArquivoPIVDashboard({ filterYear, filterMonth }: Props) {
 
       {/* Painel de debug */}
       {showDebug && debugLines.length > 0 && (
-        <div className="bg-slate-900 text-green-300 text-[10px] font-mono px-4 py-3 flex-shrink-0 max-h-56 overflow-y-auto border-b border-slate-700">
-          <p className="text-slate-500 mb-1 text-[9px] uppercase tracking-wide">Texto extraído (primeiras 60 linhas)</p>
-          {debugLines.map((l, i) => <div key={i}>{l}</div>)}
+        <div className="bg-slate-900 text-green-300 text-[10px] font-mono px-4 py-3 flex-shrink-0 max-h-72 overflow-y-auto border-b border-slate-700">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-slate-400 text-[9px] uppercase tracking-wide">Texto extraído do PDF — {debugLines.length} linhas</p>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(debugLines.join('\n'));
+                toast.success('Texto copiado para a área de transferência!');
+              }}
+              className="text-[9px] bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-0.5 rounded"
+            >
+              Copiar tudo
+            </button>
+          </div>
+          {debugLines.map((l, i) => <div key={i} className="hover:bg-slate-800 px-1 rounded">{l}</div>)}
         </div>
       )}
 
