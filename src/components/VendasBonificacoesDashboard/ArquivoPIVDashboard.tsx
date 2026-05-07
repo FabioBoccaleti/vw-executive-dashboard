@@ -185,10 +185,23 @@ function normalizeOCRLine(line: string): string {
     // "R$ 167.990.00150" → "R$ 167.990,00 150"
     .replace(/(\d{1,3}\.\d{3})\.00(150|050)\b/g, '$1,00 $2')
 
+    // ── 1d. Bônus de satisfação colado na data: "R$ 10126513022026" → "R$ 101265 13/02/2026" ─
+    // OCR juntou os 6 dígitos do bônus com os 8 dígitos da data DDMMYYYY sem separação
+    .replace(
+      /R\$ (\d{5,6})((?:0[1-9]|[12]\d|3[01])(?:0[1-9]|1[0-2])202\d)\b/g,
+      (_, bonus, date) => {
+        const d = date.slice(0,2), m = date.slice(2,4), y = date.slice(4);
+        return `R$ ${bonus} ${d}/${m}/${y}`;
+      }
+    )
+
     // ── 2. Vírgula e ponto trocados pelo OCR: "R$ 2,579.25" → "R$ 2.579,25" ─────────
     .replace(/R\$\s*(\d{1,3}),(\d{3})\.(\d{2})\b/g, 'R$ $1.$2,$3')
 
-    // ── 2b. Dois pontos no lugar de ponto decimal: "R$ 2:37240" → "R$ 2.372,40" ──────
+    // ── 2b. Dois pontos como separador decimal ────────────────────────────────────────
+    // "R$ 2.672:35" (colon após milhar) → "R$ 2.672,35"
+    .replace(/R\$ ([\d.]+):(\d{2})\b(?![,\d])/g, 'R$ $1,$2')
+    // "R$ 2:37240" (colon no início) → "R$ 2.37240" (para regras subsequentes)
     .replace(/R\$ (\d+):(\d+)/g, 'R$ $1.$2')
 
     // ── 3. Espaço no lugar da vírgula decimal: "R$ 1.458 45" → "R$ 1.458,45" ─────────
@@ -372,18 +385,28 @@ function parseDataRowFromText(line: string): ArquivoPivRow | null {
   const precoVal = parseCurrency(precoPublico);
   if (precoVal > 0) {
     const critAtacadoNum = parseFloat(critAtacado);
-    if (critAtacadoNum > 0 && valAtacado) {
+    if (critAtacadoNum > 0) {
       const expected = precoVal * (critAtacadoNum / 100);
-      const ocr      = parseCurrency(valAtacado);
-      if (ocr > 0 && Math.abs(expected - ocr) / expected < 0.02) {
+      if (valAtacado) {
+        // Corrige erros de dígito OCR até 20% de desvio (cobre desde 0.01 até 1 dígito errado)
+        const ocr = parseCurrency(valAtacado);
+        if (ocr > 0 && Math.abs(expected - ocr) / expected < 0.20) {
+          valAtacado = calcBRL(expected);
+        }
+      } else if (/^sim$/i.test(dirAtacado)) {
+        // Bônus garantido (Sim) mas OCR não parseável → força pelo cálculo
         valAtacado = calcBRL(expected);
       }
     }
     const critSatNum = parseFloat(critSatisfacao);
-    if (critSatNum > 0 && valSatisf) {
+    if (critSatNum > 0) {
       const expected = precoVal * (critSatNum / 100);
-      const ocr      = parseCurrency(valSatisf);
-      if (ocr > 0 && Math.abs(expected - ocr) / expected < 0.02) {
+      if (valSatisf) {
+        const ocr = parseCurrency(valSatisf);
+        if (ocr > 0 && Math.abs(expected - ocr) / expected < 0.20) {
+          valSatisf = calcBRL(expected);
+        }
+      } else if (/^sim$/i.test(dirSatisf)) {
         valSatisf = calcBRL(expected);
       }
     }
