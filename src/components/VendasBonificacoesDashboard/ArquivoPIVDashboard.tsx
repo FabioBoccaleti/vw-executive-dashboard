@@ -164,14 +164,20 @@ function normalizeOCRLine(line: string): string {
     .replace(/(,\d{2})(150|050)\b/g, '$1 $2')
 
     // ── 1b. Critério colado ao preço sem vírgula: "119.99000150" → "119.990,00 150" ──
-    // Formato: NNN.NNN00150 ou NNNNNN00150 → inserir ,00 e espaço antes do critério
     .replace(/(\d{2,3}\.\d{3})00(150|050)\b/g, '$1,00 $2')
     .replace(/(\d{5,6})00(150|050)\b/g, (_, n, c) => {
-      // n é o valor inteiro (ex: 173950 → R$ 173.950,00)
-      // NÃO divide por 100 — os dois zeros já são os centavos capturados separadamente
       const s = n.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
       return `${s},00 ${c}`;
     })
+
+    // ── 4. Símbolo R$ corrompido — DEVE VIR ANTES das regras de formato (2,3,3b) ──────
+    // Sem consumir o dígito seguinte (usa lookahead)
+    .replace(/\bRS§\s*/g, 'R$ ')
+    .replace(/R\$§\s*/g, 'R$ ')
+    .replace(/\bR[S§58]\$\s*/g, 'R$ ')
+    .replace(/\bR[S§58]\s*(?=\d)/g, 'R$ ')
+    // R$ correto mas grudado no número (sem espaço): "R$562" → "R$ 562"
+    .replace(/R\$(?=\d)/g, 'R$ ')
 
     // ── 2. Vírgula e ponto trocados pelo OCR: "R$ 2,579.25" → "R$ 2.579,25" ─────────
     .replace(/R\$\s*(\d{1,3}),(\d{3})\.(\d{2})\b/g, 'R$ $1.$2,$3')
@@ -180,44 +186,35 @@ function normalizeOCRLine(line: string): string {
     .replace(/R\$\s*(\d+\.\d{3})\s+(\d{2})\b/g, 'R$ $1,$2')
 
     // ── 3b. Vírgula omitida após ponto de milhar: "R$ 2.60925" → "R$ 2.609,25" ───────
-    // Padrão: X.NNN sem vírgula → os 2 últimos dígitos são os centavos
     .replace(/R\$\s*(\d{1,3})\.(\d{3})(\d{2})\b(?![,.\d])/g, 'R$ $1.$2,$3')
 
-    // ── 4. Símbolo R$ corrompido — sem consumir o dígito seguinte (usa lookahead) ───────
-    .replace(/\bRS§\s*/g, 'R$ ')            // RS§NNN  → R$ NNN
-    .replace(/R\$§\s*/g, 'R$ ')             // R$§NNN  → R$ NNN
-    .replace(/\bR[S§58]\$\s*/g, 'R$ ')      // RS$, R§$ etc. → R$ 
-    .replace(/\bR[S§58]\s*(?=\d)/g, 'R$ ')  // RS7, R§7, R87 → R$ 7 (não consome o dígito)
-    // R$ correto mas grudado no número (sem espaço): "R$562" → "R$ 562"
-    .replace(/R\$(?=\d)/g, 'R$ ')
+    // ── 3c. Dois pontos (X.YY.ZZ): "R$ 1.00.70" → "R$ 1.000,70" ────────────────────
+    // OCR omitiu dígito do milhar e trocou vírgula por ponto
+    .replace(/R\$ (\d{1,3})\.(\d{2})\.(\d{2})\b(?![,.\d])/g, 'R$ $1.0$2,$3')
 
-    // ── 4b. Preço sem pontuação (7 dígitos = sig.00 cents): "R$ 9536000" → "R$ 95.360,00"
+    // ── 4b. Preço sem pontuação: "R$ 9536000" → "R$ 95.360,00" ──────────────────────
     .replace(/R\$ (\d{4,6})00\b(?![,.\d])/g, (_, n) => {
       const s = n.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
       return `R$ ${s},00`;
     })
 
     // ── 5. Ponto no lugar da vírgula decimal ─────────────────────────────────────────
-    // "R$ 1022.40" ou "R$ 599.95" → vírgula (NÃO afeta valores que já têm vírgula)
-    // 5a. Formato X.XXX.XX (ponto milhar + ponto decimal): "R$ 1.014.75" → "R$ 1.014,75"
+    // 5a. X.XXX.XX → X.XXX,XX
     .replace(/R\$ (\d{1,3}\.\d{3})\.(\d{2})\b(?![,.\d])/g, 'R$ $1,$2')
-    // 5b. Formato 1–4 dígitos + ponto decimal: "R$ 1022.40", "R$ 887.45" → vírgula
+    // 5b. NNNN.NN → NNNN,NN
     .replace(/R\$ (\d{1,4})\.(\d{2})\b(?![,.\d])/g, 'R$ $1,$2')
 
     // ── 6. Vírgula completamente omitida: "R$ 67295" → "R$ 672,95" ───────────────────
     .replace(/R\$ (\d{5,6})\b(?![,.\d])/g, (_, n) => `R$ ${n.slice(0, -2)},${n.slice(-2)}`)
 
     // ── 7. Vírgula decimal omitida no preço com ponto de milhar ──────────────────────
-    // "R$ 119.99000" → "R$ 119.990,00" (apenas quando seguido de espaço ou fim)
     .replace(/(\d{2,3}\.\d{3})00\b(?!\s*\d)/g, '$1,00')
 
     // ── 7b. Bônus com 5 dígitos (OCR inseriu dígito extra): "R$ 25546,10" → "R$ 2.546,10"
-    // Qualquer valor de 5 dígitos entre R$5.000–R$50.000 é suspeito para bônus.
-    // Remove o dígito da posição 1 (ponto de inserção OCR mais comum).
     .replace(/R\$ (\d{5}),(\d{2})\b/g, (full, n, cents) => {
       const val = parseInt(n, 10);
       if (val > 4999 && val < 50000) {
-        const candidate = n[0] + n.slice(2); // remove dígito na posição 1
+        const candidate = n[0] + n.slice(2);
         const candVal = parseInt(candidate, 10);
         if (candVal >= 300 && candVal <= 5000) {
           const s = candVal.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -243,7 +240,7 @@ function normalizeOCRLine(line: string): string {
       return full;
     })
 
-    // ── 8. Datas sem separador: "14012026" → "14/01/2026" ────────────────────────────────
+    // ── 8. Datas sem separador: "14012026" → "14/01/2026" ────────────────────────────
     .replace(/\b(\d{2})(\d{2})(\d{4})\b(?![-/])/g, (full, d, m, y) => {
       const day = parseInt(d, 10), mon = parseInt(m, 10), yr = parseInt(y, 10);
       if (day >= 1 && day <= 31 && mon >= 1 && mon <= 12 && yr >= 2020 && yr <= 2030)
@@ -263,9 +260,17 @@ function normalizeOCRLine(line: string): string {
 function parseDataRowFromText(line: string): ArquivoPivRow | null {
   line = normalizeOCRLine(line);
 
-  const vinMatch = line.match(/\b(9B[A-Z0-9]{15})\b/i);
+  // VIN = 17 chars no padrão, mas OCR pode omitir ou inserir 1 char → aceita 15–18.
+  // Aceita qualquer fabricante: 9BW (Brasil), 8AN/SAN (Argentina), 3VW/3WS/3WIN (México/DE).
+  // Case-insensitive para capturar OCR com letra minúscula (ex: "3WSTe5N...").
+  const vinMatch = line.match(/\b([A-Z0-9]{15,18})\b/i);
   if (!vinMatch) return null;
-  const chassi      = vinMatch[1].toUpperCase();
+  // Sanidade: deve ter letras E dígitos (exclui sequências puramente numéricas ou textuais)
+  const vin = vinMatch[1].toUpperCase();
+  if (!/[A-Z]/.test(vin) || !/[0-9]/.test(vin)) return null;
+  // Sanidade extra: deve ter ao menos 4 letras (evita falsos positivos como preços/datas)
+  if ((vin.match(/[A-Z]/g) || []).length < 4) return null;
+  const chassi      = vin;
   const beforeVin   = line.slice(0, vinMatch.index!).trim();
   const monthMatch  = beforeVin.match(/(\d{1,2})\s*$/);
   const mes         = monthMatch ? monthMatch[1] : '';
