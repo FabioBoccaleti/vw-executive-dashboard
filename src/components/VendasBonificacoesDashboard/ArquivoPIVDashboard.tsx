@@ -155,9 +155,21 @@ function extractCriterioSat(textLines: string[]): ArquivoPivCriterioSat {
 
 function normalizeOCRLine(line: string): string {
   return line
-    // ── 1. Critério colado nos centavos do preço: "119.990,00150" → "119.990,00 150" ──
-    // Deve vir PRIMEIRO, antes de "150"→"1.50", para que o 150 fique isolado
+    // ── 0. Chassi OCR: "0BW..." → "9BW..." (OCR confunde 9 com 0 no VIN) ────────────
+    .replace(/\b0(BW[A-Z0-9]{14})\b/gi, '9$1')
+
+    // ── 1a. Critério colado ao preço com vírgula: "119.990,00150" → "119.990,00 150" ─
     .replace(/(,\d{2})(150|050)\b/g, '$1 $2')
+
+    // ── 1b. Critério colado ao preço sem vírgula: "119.99000150" → "119.990,00 150" ──
+    // Formato: NNN.NNN00150 ou NNNNNN00150 → inserir ,00 e espaço antes do critério
+    .replace(/(\d{2,3}\.\d{3})00(150|050)\b/g, '$1,00 $2')
+    .replace(/(\d{5,6})00(150|050)\b/g, (_, n, c) => {
+      // n é o valor inteiro (ex: 173950 → R$ 173.950,00)
+      // NÃO divide por 100 — os dois zeros já são os centavos capturados separadamente
+      const s = n.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      return `${s},00 ${c}`;
+    })
 
     // ── 2. Vírgula e ponto trocados pelo OCR: "R$ 2,579.25" → "R$ 2.579,25" ─────────
     .replace(/R\$\s*(\d{1,3}),(\d{3})\.(\d{2})\b/g, 'R$ $1.$2,$3')
@@ -165,27 +177,79 @@ function normalizeOCRLine(line: string): string {
     // ── 3. Espaço no lugar da vírgula decimal: "R$ 1.458 45" → "R$ 1.458,45" ─────────
     .replace(/R\$\s*(\d+\.\d{3})\s+(\d{2})\b/g, 'R$ $1,$2')
 
-    // ── 4. Símbolo R$ corrompido (RS / R§ / R8 / R5) ─────────────────────────────────
-    .replace(/\bR[S§58]\s+(\d)/g, 'R$ $1')
-    .replace(/\bR[S§58](\d)/g, 'R$ $1')
-    .replace(/R\$§/g, 'R$ ')
-    // R$ correto mas grudado no número (sem espaço)
-    .replace(/R\$(\d)/g, 'R$ $1')
+    // ── 3b. Vírgula omitida após ponto de milhar: "R$ 2.60925" → "R$ 2.609,25" ───────
+    // Padrão: X.NNN sem vírgula → os 2 últimos dígitos são os centavos
+    .replace(/R\$\s*(\d{1,3})\.(\d{3})(\d{2})\b(?![,.\d])/g, 'R$ $1.$2,$3')
 
-    // ── 5. Ponto no lugar da vírgula decimal (após fix de símbolo já adicionou espaço) ─
-    // Padrão: "R$ 599.95" (1-3 dígitos, ponto, 2 dígitos) → "R$ 599,95"
-    // NÃO afeta "R$ 1.799,85" (3 dígitos antes do ponto = milhar, seguido de vírgula)
-    .replace(/R\$ (\d{1,3})\.(\d{2})\b(?![,.\d])/g, 'R$ $1,$2')
+    // ── 4. Símbolo R$ corrompido — sem consumir o dígito seguinte (usa lookahead) ───────
+    .replace(/\bRS§\s*/g, 'R$ ')            // RS§NNN  → R$ NNN
+    .replace(/R\$§\s*/g, 'R$ ')             // R$§NNN  → R$ NNN
+    .replace(/\bR[S§58]\$\s*/g, 'R$ ')      // RS$, R§$ etc. → R$ 
+    .replace(/\bR[S§58]\s*(?=\d)/g, 'R$ ')  // RS7, R§7, R87 → R$ 7 (não consome o dígito)
+    // R$ correto mas grudado no número (sem espaço): "R$562" → "R$ 562"
+    .replace(/R\$(?=\d)/g, 'R$ ')
+
+    // ── 4b. Preço sem pontuação (7 dígitos = sig.00 cents): "R$ 9536000" → "R$ 95.360,00"
+    .replace(/R\$ (\d{4,6})00\b(?![,.\d])/g, (_, n) => {
+      const s = n.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      return `R$ ${s},00`;
+    })
+
+    // ── 5. Ponto no lugar da vírgula decimal ─────────────────────────────────────────
+    // "R$ 1022.40" ou "R$ 599.95" → vírgula (NÃO afeta valores que já têm vírgula)
+    // 5a. Formato X.XXX.XX (ponto milhar + ponto decimal): "R$ 1.014.75" → "R$ 1.014,75"
+    .replace(/R\$ (\d{1,3}\.\d{3})\.(\d{2})\b(?![,.\d])/g, 'R$ $1,$2')
+    // 5b. Formato 1–4 dígitos + ponto decimal: "R$ 1022.40", "R$ 887.45" → vírgula
+    .replace(/R\$ (\d{1,4})\.(\d{2})\b(?![,.\d])/g, 'R$ $1,$2')
 
     // ── 6. Vírgula completamente omitida: "R$ 67295" → "R$ 672,95" ───────────────────
-    // Apenas 5-6 dígitos puros (sem ponto/vírgula), que não sejam parte de número maior
     .replace(/R\$ (\d{5,6})\b(?![,.\d])/g, (_, n) => `R$ ${n.slice(0, -2)},${n.slice(-2)}`)
 
     // ── 7. Vírgula decimal omitida no preço com ponto de milhar ──────────────────────
-    // "R$ 119.99000" → "R$ 119.990,00"
+    // "R$ 119.99000" → "R$ 119.990,00" (apenas quando seguido de espaço ou fim)
     .replace(/(\d{2,3}\.\d{3})00\b(?!\s*\d)/g, '$1,00')
 
-    // ── 8. Critério decimal isolado ──────────────────────────────────────────────────
+    // ── 7b. Bônus com 5 dígitos (OCR inseriu dígito extra): "R$ 25546,10" → "R$ 2.546,10"
+    // Qualquer valor de 5 dígitos entre R$5.000–R$50.000 é suspeito para bônus.
+    // Remove o dígito da posição 1 (ponto de inserção OCR mais comum).
+    .replace(/R\$ (\d{5}),(\d{2})\b/g, (full, n, cents) => {
+      const val = parseInt(n, 10);
+      if (val > 4999 && val < 50000) {
+        const candidate = n[0] + n.slice(2); // remove dígito na posição 1
+        const candVal = parseInt(candidate, 10);
+        if (candVal >= 300 && candVal <= 5000) {
+          const s = candVal.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+          return `R$ ${s},${cents}`;
+        }
+      }
+      return full;
+    })
+
+    // ── 8a. Datas com "0" no lugar de "/": "220012026" → "22/01/2026" ──────────────────
+    .replace(/\b(\d{2})0(\d{2})0(\d{4})\b/g, (full, d, m, y) => {
+      const day = parseInt(d, 10), mon = parseInt(m, 10), yr = parseInt(y, 10);
+      if (day >= 1 && day <= 31 && mon >= 1 && mon <= 12 && yr >= 2020 && yr <= 2030)
+        return `${d}/${m}/${y}`;
+      return full;
+    })
+
+    // ── 8b. Data parcialmente colada: "2301/2026" → "23/01/2026" ─────────────────────
+    .replace(/\b(\d{2})(\d{2})\/(\d{4})\b/g, (full, d, m, y) => {
+      const day = parseInt(d, 10), mon = parseInt(m, 10), yr = parseInt(y, 10);
+      if (day >= 1 && day <= 31 && mon >= 1 && mon <= 12 && yr >= 2020 && yr <= 2030)
+        return `${d}/${m}/${y}`;
+      return full;
+    })
+
+    // ── 8. Datas sem separador: "14012026" → "14/01/2026" ────────────────────────────────
+    .replace(/\b(\d{2})(\d{2})(\d{4})\b(?![-/])/g, (full, d, m, y) => {
+      const day = parseInt(d, 10), mon = parseInt(m, 10), yr = parseInt(y, 10);
+      if (day >= 1 && day <= 31 && mon >= 1 && mon <= 12 && yr >= 2020 && yr <= 2030)
+        return `${d}/${m}/${y}`;
+      return full;
+    })
+
+    // ── 9. Critério decimal isolado ──────────────────────────────────────────────────
     .replace(/(?<![.,\d])150(?![.,\d])/g, '1.50')
     .replace(/(?<![.,\d])050(?![.,\d])/g, '0.50')
     .replace(/\b1,50\b/g, '1.50')
@@ -318,10 +382,16 @@ async function parseArquivoPIV(
   const rows: ArquivoPivRow[] = [];
   for (const line of textLines) {
     const row = parseDataRowFromText(line);
-    if (row) rows.push(row);
+    if (row) {
+      // Log diagnóstico: satisfação vazia mas dir.bônus = Sim
+      if (/^sim$/i.test(row.direitoBonusSatisfacao) && !row.valorBonusSatisfacao) {
+        console.warn('[ArquivoPIV DIAG] Satisfação em branco — chassi:', row.chassi, '| linha normalizada:', normalizeOCRLine(line));
+      }
+      rows.push(row);
+    }
   }
 
-  const debugLines = textLines.slice(0, 80).map((l, i) => `[${i}] ${l}`);
+  const debugLines = textLines.slice(0, 150).map((l, i) => `[${i}] ${l}`);
   console.log('[ArquivoPIV] Debug linhas:', debugLines);
   console.log('[ArquivoPIV] Header:', header);
   console.log('[ArquivoPIV] Rows:', rows.length);
