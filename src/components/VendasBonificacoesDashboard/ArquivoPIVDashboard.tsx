@@ -388,10 +388,14 @@ function parseDataRowFromText(line: string): ArquivoPivRow | null {
     if (critAtacadoNum > 0) {
       const expected = precoVal * (critAtacadoNum / 100);
       if (valAtacado) {
-        // Corrige erros de dígito OCR até 20% de desvio (cobre desde 0.01 até 1 dígito errado)
         const ocr = parseCurrency(valAtacado);
-        if (ocr > 0 && Math.abs(expected - ocr) / expected < 0.20) {
-          valAtacado = calcBRL(expected);
+        if (ocr > 0) {
+          const diff = Math.abs(expected - ocr) / expected;
+          // Se dirAtacado='Sim': bônus é determinístico (preço × critério), sempre recalcula.
+          // Se dirAtacado='Não': corrige apenas erros leves de OCR (< 20%).
+          if (diff < 0.20 || /^sim$/i.test(dirAtacado)) {
+            valAtacado = calcBRL(expected);
+          }
         }
       } else if (/^sim$/i.test(dirAtacado)) {
         // Bônus garantido (Sim) mas OCR não parseável → força pelo cálculo
@@ -403,8 +407,11 @@ function parseDataRowFromText(line: string): ArquivoPivRow | null {
       const expected = precoVal * (critSatNum / 100);
       if (valSatisf) {
         const ocr = parseCurrency(valSatisf);
-        if (ocr > 0 && Math.abs(expected - ocr) / expected < 0.20) {
-          valSatisf = calcBRL(expected);
+        if (ocr > 0) {
+          const diff = Math.abs(expected - ocr) / expected;
+          if (diff < 0.20 || /^sim$/i.test(dirSatisf)) {
+            valSatisf = calcBRL(expected);
+          }
         }
       } else if (/^sim$/i.test(dirSatisf)) {
         valSatisf = calcBRL(expected);
