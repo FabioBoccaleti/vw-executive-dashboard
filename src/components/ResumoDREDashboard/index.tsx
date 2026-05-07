@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Construction, ArrowLeft } from 'lucide-react';
 import { AudiDreTab } from './AudiDreTab';
+import { VwDreTab } from './VwDreTab';
 
 interface ResumoDREDashboardProps {
   onChangeBrand: () => void;
@@ -101,7 +102,9 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
 
       {/* ── Conteúdo da aba ─────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {activeTab === 'audi' ? (
+        {activeTab === 'vw' ? (
+          <VwDreTab year={year} month={month} diasUteis={diasUteis} />
+        ) : activeTab === 'audi' ? (
           <AudiDreTab year={year} month={month} diasUteis={diasUteis} />
         ) : (
           <div className="flex-1 flex items-center justify-center">
