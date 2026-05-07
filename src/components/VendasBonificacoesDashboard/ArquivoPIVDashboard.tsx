@@ -348,6 +348,36 @@ function parseDataRowFromText(line: string): ArquivoPivRow | null {
     motivoPenalizacaoAtacado    = '';
   }
 
+  // ── Validação por cálculo (detecta erros de dígito OCR) ──────────────────
+  // OCR pode misler um dígito (ex: 869 → 860). Como preço × critério é determinístico,
+  // recalculamos o valor esperado. Se diferir < 2% do OCR, preferimos o valor calculado.
+  // O PDF usa truncamento (floor) nos centavos, não arredondamento.
+  // Ex: 148.849 × 1.5% = 2.232,735 → trunca → 2.232,73 (não 2.232,74)
+  const calcBRL = (n: number): string => {
+    const truncated = Math.floor(n * 100) / 100;
+    const [int, dec] = truncated.toFixed(2).split('.');
+    return `R$ ${int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${dec}`;
+  };
+  const precoVal = parseCurrency(precoPublico);
+  if (precoVal > 0) {
+    const critAtacadoNum = parseFloat(critAtacado);
+    if (critAtacadoNum > 0 && valAtacado) {
+      const expected = precoVal * (critAtacadoNum / 100);
+      const ocr      = parseCurrency(valAtacado);
+      if (ocr > 0 && Math.abs(expected - ocr) / expected < 0.02) {
+        valAtacado = calcBRL(expected);
+      }
+    }
+    const critSatNum = parseFloat(critSatisfacao);
+    if (critSatNum > 0 && valSatisf) {
+      const expected = precoVal * (critSatNum / 100);
+      const ocr      = parseCurrency(valSatisf);
+      if (ocr > 0 && Math.abs(expected - ocr) / expected < 0.02) {
+        valSatisf = calcBRL(expected);
+      }
+    }
+  }
+
   return {
     id: crypto.randomUUID(),
     mes, chassi, modelGroup,
