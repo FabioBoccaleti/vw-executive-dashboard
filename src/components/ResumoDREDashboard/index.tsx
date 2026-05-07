@@ -3,19 +3,23 @@ import { ArrowLeft } from 'lucide-react';
 import { AudiDreTab } from './AudiDreTab';
 import { AudiGraficosTab } from './AudiGraficosTab';
 import { VwDreTab } from './VwDreTab';
+import { VwGraficosTab } from './VwGraficosTab';
 import { ConsolidadoDreTab } from './ConsolidadoDreTab';
+import { ConsolidadoGraficosTab } from './ConsolidadoGraficosTab';
 
 interface ResumoDREDashboardProps {
   onChangeBrand: () => void;
 }
 
-type TabId = 'vw' | 'audi' | 'consolidado' | 'audi-graficos';
+type TabId = 'vw' | 'audi' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos';
 
 const TABS: { id: TabId; label: string; color: string; activeColor: string }[] = [
-  { id: 'vw',           label: 'VW',           color: '#001e50', activeColor: '#001e50' },
-  { id: 'audi',         label: 'Audi',         color: '#bb0a30', activeColor: '#bb0a30' },
-  { id: 'audi-graficos',label: 'Audi Gráficos',color: '#bb0a30', activeColor: '#9a0827' },
-  { id: 'consolidado',  label: 'Consolidado',  color: '#7c3aed', activeColor: '#7c3aed' },
+  { id: 'vw',                    label: 'VW',                    color: '#001e50', activeColor: '#001e50' },
+  { id: 'vw-graficos',           label: 'VW Gráficos',           color: '#001e50', activeColor: '#001233' },
+  { id: 'audi',                  label: 'Audi',                  color: '#bb0a30', activeColor: '#bb0a30' },
+  { id: 'audi-graficos',         label: 'Audi Gráficos',         color: '#bb0a30', activeColor: '#9a0827' },
+  { id: 'consolidado',           label: 'Consolidado',           color: '#7c3aed', activeColor: '#7c3aed' },
+  { id: 'consolidado-graficos',  label: 'Consol. Gráficos',      color: '#7c3aed', activeColor: '#5b21b6' },
 ];
 
 const MONTHS_LABEL = [
@@ -108,12 +112,16 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {activeTab === 'vw' ? (
           <VwDreTab year={year} month={month} diasUteis={diasUteis} />
+        ) : activeTab === 'vw-graficos' ? (
+          <VwGraficosTab year={year} month={month} />
         ) : activeTab === 'audi' ? (
           <AudiDreTab year={year} month={month} diasUteis={diasUteis} />
         ) : activeTab === 'audi-graficos' ? (
           <AudiGraficosTab year={year} month={month} />
-        ) : (
+        ) : activeTab === 'consolidado' ? (
           <ConsolidadoDreTab year={year} month={month} diasUteis={diasUteis} />
+        ) : (
+          <ConsolidadoGraficosTab year={year} month={month} />
         )}
       </div>
 
