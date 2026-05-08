@@ -143,19 +143,31 @@ function accumulate(rows: DreVwRow[], upToIdx: number): DreVwRow {
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({
-  label, mesValue, accumValue, delta, isVolume = false, isPct = false,
+  label, mesValue, accumValue, delta, isVolume = false, isPct = false, isAnual = false,
 }: {
   label: string; mesValue: number; accumValue: number;
-  delta?: number; isVolume?: boolean; isPct?: boolean;
+  delta?: number; isVolume?: boolean; isPct?: boolean; isAnual?: boolean;
 }) {
-  const hasDelta = delta !== undefined && !isNaN(delta) && isFinite(delta);
+  const hasDelta = !isAnual && delta !== undefined && !isNaN(delta) && isFinite(delta);
   const isPos    = hasDelta && delta! > 0;
   const isNeg    = hasDelta && delta! < 0;
   const isZero   = hasDelta && delta! === 0;
+  void isNeg;
   const fmt = (v: number) => isPct
     ? v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'
     : isVolume ? Math.round(v).toLocaleString('pt-BR') : fmtK(v);
 
+  if (isAnual) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col gap-1.5 min-w-0">
+        <span className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider leading-tight">{label}</span>
+        <div className="flex items-baseline gap-1.5">
+          <span className={`text-2xl font-extrabold tracking-tight ${accumValue < 0 ? 'text-red-600' : 'text-slate-800'}`}>{fmt(accumValue)}</span>
+        </div>
+        <span className="text-[0.6rem] text-slate-400 font-medium">acumulado anual</span>
+      </div>
+    );
+  }
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col gap-1.5 min-w-0">
       <span className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider leading-tight">{label}</span>
@@ -413,10 +425,14 @@ export function VwGraficosTab({ year, month }: Props) {
   const despAcum = buildDespData(accumRow);
   const deptLabel = deptFilter === 'consolidado' ? 'Todos os depts.' : DEPTS.find(d => d.key === deptFilter)?.label ?? '';
 
+  const isAnual = month === 0;
+
   const semaforoData = DEPTS.map(d => {
-    const lucro     = parseVal(mesRow[d.key].lucroLiquidoExercicio);
+    const lucro     = isAnual ? parseVal(accumRow[d.key].lucroLiquidoExercicio) : parseVal(mesRow[d.key].lucroLiquidoExercicio);
     const lucroPrev = prevRow ? parseVal(prevRow[d.key].lucroLiquidoExercicio) : 0;
-    const status    = lucro > 0 && lucro >= lucroPrev ? 'verde' : lucro > 0 ? 'amarelo' : 'vermelho';
+    const status    = isAnual
+      ? (lucro > 0 ? 'verde' : 'vermelho')
+      : (lucro > 0 && lucro >= lucroPrev ? 'verde' : lucro > 0 ? 'amarelo' : 'vermelho');
     return { ...d, lucro, status };
   });
 
@@ -446,7 +462,9 @@ export function VwGraficosTab({ year, month }: Props) {
 
         {/* ── Semáforo ────────────────────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider mb-3">Saúde dos Departamentos — {mesLabel}</p>
+          <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            {isAnual ? `Saúde dos Departamentos — Acumulado ${year}` : `Saúde dos Departamentos — ${mesLabel}`}
+          </p>
           <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
             {semaforoData.map(d => (
               <div key={d.key} className="flex flex-col items-center gap-1.5">
@@ -457,7 +475,10 @@ export function VwGraficosTab({ year, month }: Props) {
               </div>
             ))}
           </div>
-          <p className="text-[0.6rem] text-slate-400 mt-2">🟢 Positivo e crescendo · 🟡 Positivo mas caindo · 🔴 Negativo</p>
+          {isAnual
+            ? <p className="text-[0.6rem] text-slate-400 mt-2">🟢 Positivo · 🔴 Negativo</p>
+            : <p className="text-[0.6rem] text-slate-400 mt-2">🟢 Positivo e crescendo · 🟡 Positivo mas caindo · 🔴 Negativo</p>
+          }
         </div>
 
         {/* ── Pills filtro ─────────────────────────────────────────────────── */}
@@ -479,32 +500,38 @@ export function VwGraficosTab({ year, month }: Props) {
 
         {/* ── KPI Cards ───────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KpiCard label="Volume de Vendas"       mesValue={mesVolume}    accumValue={accVolume}    delta={delta(mesVolume,   prevVolume)}   isVolume />
-          <KpiCard label="Receita Líquida"        mesValue={mesReceita}   accumValue={accReceita}   delta={delta(mesReceita,  prevReceita)} />
-          <KpiCard label="Margem de Contribuição" mesValue={mesMargemC}   accumValue={accMargemC}   delta={delta(mesMargemC,  prevMargemC)} />
-          <KpiCard label="% Margem s/ Receita"    mesValue={mesPctMargem} accumValue={accumPctMargem} isPct />
-          <KpiCard label="Despesas Totais"        mesValue={mesDesp}      accumValue={accDesp}      delta={delta(mesDesp,     prevDesp)} />
-          <KpiCard label="Lucro Líquido"          mesValue={mesLucroLiq}  accumValue={accLucroLiq}  delta={delta(mesLucroLiq, prevLucroLiq)} />
+          <KpiCard label="Volume de Vendas"       mesValue={mesVolume}    accumValue={accVolume}    delta={delta(mesVolume,   prevVolume)}   isVolume isAnual={isAnual} />
+          <KpiCard label="Receita Líquida"        mesValue={mesReceita}   accumValue={accReceita}   delta={delta(mesReceita,  prevReceita)} isAnual={isAnual} />
+          <KpiCard label="Margem de Contribuição" mesValue={mesMargemC}   accumValue={accMargemC}   delta={delta(mesMargemC,  prevMargemC)} isAnual={isAnual} />
+          <KpiCard label="% Margem s/ Receita"    mesValue={mesPctMargem} accumValue={accumPctMargem} isPct isAnual={isAnual} />
+          <KpiCard label="Despesas Totais"        mesValue={mesDesp}      accumValue={accDesp}      delta={delta(mesDesp,     prevDesp)} isAnual={isAnual} />
+          <KpiCard label="Lucro Líquido"          mesValue={mesLucroLiq}  accumValue={accLucroLiq}  delta={delta(mesLucroLiq, prevLucroLiq)} isAnual={isAnual} />
         </div>
 
         {/* ── RESULTADO DO PERÍODO ─────────────────────────────────────────── */}
         <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider">Resultado do Período</p>
-        <div className="flex gap-4">
-          <WaterfallPanel row={mesRow}   title={`DRE — ${mesLabel}`}   subtitle={`Resultado do mês · ${deptLabel}`}   deptFilter={deptFilter} />
-          <WaterfallPanel row={accumRow} title={`DRE — ${accumLabel}`} subtitle={`Acumulado · ${deptLabel}`}           deptFilter={deptFilter} />
-        </div>
+        {isAnual ? (
+          <div className="flex gap-4">
+            <WaterfallPanel row={accumRow} title={`DRE — ${accumLabel}`} subtitle={`Acumulado · ${deptLabel}`} deptFilter={deptFilter} />
+          </div>
+        ) : (
+          <div className="flex gap-4">
+            <WaterfallPanel row={mesRow}   title={`DRE — ${mesLabel}`}   subtitle={`Resultado do mês · ${deptLabel}`}   deptFilter={deptFilter} />
+            <WaterfallPanel row={accumRow} title={`DRE — ${accumLabel}`} subtitle={`Acumulado · ${deptLabel}`}           deptFilter={deptFilter} />
+          </div>
+        )}
 
         {/* ── COMPOSIÇÃO ──────────────────────────────────────────────────── */}
         <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider">Composição</p>
         {deptFilter === 'consolidado' && (
           <div className="flex gap-4">
-            <DonutPanel row={mesRow}   field="receitaOperacionalLiquida" title={`Receita por Dept — ${mesLabel}`}   subtitle="Composição da Receita Líquida" deptFilter={deptFilter} />
+            {!isAnual && <DonutPanel row={mesRow} field="receitaOperacionalLiquida" title={`Receita por Dept — ${mesLabel}`} subtitle="Composição da Receita Líquida" deptFilter={deptFilter} />}
             <DonutPanel row={accumRow} field="receitaOperacionalLiquida" title={`Receita por Dept — ${accumLabel}`} subtitle="Composição da Receita Líquida" deptFilter={deptFilter} />
           </div>
         )}
         <div className="flex gap-4">
-          {/* Despesas Mês */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
+          {/* Despesas Mês (oculto no Ano Completo) */}
+          {!isAnual && <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
             <div className="px-4 py-2.5 border-b border-slate-100" style={{ borderLeft: `4px solid ${VW_COLOR}` }}>
               <p className="text-xs font-semibold text-slate-700">Composição de Despesas — {mesLabel}</p>
               <p className="text-[0.6rem] text-slate-400 mt-0.5">{deptLabel}</p>
@@ -532,7 +559,7 @@ export function VwGraficosTab({ year, month }: Props) {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </div>}
           {/* Despesas Acumulado */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
             <div className="px-4 py-2.5 border-b border-slate-100" style={{ borderLeft: `4px solid ${VW_COLOR}` }}>
@@ -572,7 +599,7 @@ export function VwGraficosTab({ year, month }: Props) {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
             <div className="px-4 py-2.5 border-b border-slate-100" style={{ borderLeft: `4px solid ${VW_COLOR}` }}>
               <p className="text-xs font-semibold text-slate-700">Receita por Departamento</p>
-              <p className="text-[0.6rem] text-slate-400 mt-0.5">{mesLabel} vs {accumLabel}</p>
+              <p className="text-[0.6rem] text-slate-400 mt-0.5">{isAnual ? accumLabel : `${mesLabel} vs ${accumLabel}`}</p>
             </div>
             <div className="p-4">
               <ResponsiveContainer width="100%" height={210}>
@@ -582,11 +609,13 @@ export function VwGraficosTab({ year, month }: Props) {
                   <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                   <Tooltip formatter={(v: number) => fmtBRL(v)} />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
-                  <Bar dataKey="receitaMes" name={mesLabel} radius={[3,3,0,0]}>
-                    {barByDept.map((d, i) => <Cell key={i} fill={d.color} />)}
-                  </Bar>
+                  {!isAnual && (
+                    <Bar dataKey="receitaMes" name={mesLabel} radius={[3,3,0,0]}>
+                      {barByDept.map((d, i) => <Cell key={i} fill={d.color} />)}
+                    </Bar>
+                  )}
                   <Bar dataKey="receitaAcum" name={accumLabel} radius={[3,3,0,0]}>
-                    {barByDept.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={0.4} />)}
+                    {barByDept.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={isAnual ? 1 : 0.4} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -596,7 +625,7 @@ export function VwGraficosTab({ year, month }: Props) {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
             <div className="px-4 py-2.5 border-b border-slate-100" style={{ borderLeft: `4px solid ${VW_COLOR}` }}>
               <p className="text-xs font-semibold text-slate-700">Lucro Líquido por Departamento</p>
-              <p className="text-[0.6rem] text-slate-400 mt-0.5">{mesLabel} vs {accumLabel}</p>
+              <p className="text-[0.6rem] text-slate-400 mt-0.5">{isAnual ? accumLabel : `${mesLabel} vs ${accumLabel}`}</p>
             </div>
             <div className="p-4">
               <ResponsiveContainer width="100%" height={210}>
@@ -606,8 +635,8 @@ export function VwGraficosTab({ year, month }: Props) {
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#374151' }} width={60} />
                   <Tooltip formatter={(v: number) => fmtBRL(v)} />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
-                  <Bar dataKey="lucroMes"  name={mesLabel}   fill={VW_COLOR}     radius={[0,3,3,0]} />
-                  <Bar dataKey="lucroAcum" name={accumLabel} fill={VW_COLOR_DRK} fillOpacity={0.6} radius={[0,3,3,0]} />
+                  {!isAnual && <Bar dataKey="lucroMes" name={mesLabel} fill={VW_COLOR} radius={[0,3,3,0]} />}
+                  <Bar dataKey="lucroAcum" name={accumLabel} fill={isAnual ? VW_COLOR : VW_COLOR_DRK} fillOpacity={isAnual ? 1 : 0.6} radius={[0,3,3,0]} />
                   <ReferenceLine x={0} stroke="#cbd5e1" />
                 </BarChart>
               </ResponsiveContainer>
