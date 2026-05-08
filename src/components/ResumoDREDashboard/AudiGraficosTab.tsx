@@ -389,6 +389,8 @@ export function AudiGraficosTab({ year, month }: Props) {
   const accumPctMargem = accReceita  !== 0 ? (accMargemC  / accReceita)  * 100 : 0;
 
   // ── Dados para gráficos ───────────────────────────────────────────────────────
+  const isAnual = month === 0;
+
   const barByDept = deptList.map(d => ({
     name: d.shortLabel, color: d.color,
     receitaMes:   d.key === 'adm' ? 0 : parseVal(mesRow[d.key].receitaOperacionalLiquida),
@@ -400,13 +402,16 @@ export function AudiGraficosTab({ year, month }: Props) {
   }));
 
   let _rAcum = 0, _mAcum = 0, _lAcum = 0;
-  const evolucao = allMonthRows.slice(0, selIdx + 1).map((row, i) => {
+  const evolucaoAll = allMonthRows.slice(0, selIdx + 1).map((row, i) => {
     const receita = sumField(row, 'receitaOperacionalLiquida',  deptFilter);
     const margem  = sumField(row, 'margemContribuicao',          deptFilter);
     const lucro   = sumField(row, 'lucroLiquidoExercicio',       deptFilter);
     _rAcum += receita; _mAcum += margem; _lAcum += lucro;
     return { mes: MONTHS_SHORT[i], receita, margem, lucro, receitaAcum: _rAcum, margemAcum: _mAcum, lucroAcum: _lAcum };
   });
+  const evolucao = isAnual
+    ? evolucaoAll.filter(e => e.receita !== 0 || e.lucro !== 0 || e.margem !== 0)
+    : evolucaoAll;
 
   const buildDespData = (row: DreAudiRow) => [
     { name: 'Pessoal',   value: Math.abs(deptList.reduce((s, d) => s + parseVal(row[d.key].despPessoal), 0)),         color: '#ef4444' },
@@ -421,7 +426,6 @@ export function AudiGraficosTab({ year, month }: Props) {
   const deptLabel = deptFilter === 'consolidado' ? 'Todos os depts.' : DEPTS.find(d => d.key === deptFilter)?.label ?? '';
 
   // ── Semáforo ──────────────────────────────────────────────────────────────────
-  const isAnual = month === 0;
   const semaforoData = DEPTS.map(d => {
     const lucro     = isAnual ? parseVal(accumRow[d.key].lucroLiquidoExercicio) : parseVal(mesRow[d.key].lucroLiquidoExercicio);
     const lucroPrev = prevRow ? parseVal(prevRow[d.key].lucroLiquidoExercicio) : 0;
