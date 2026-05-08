@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { kvKeys } from '@/lib/kvClient';
 import { ArrowLeft } from 'lucide-react';
 import { AudiDreTab } from './AudiDreTab';
 import { AudiGraficosTab } from './AudiGraficosTab';
@@ -35,6 +36,18 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
   const [year,       setYear]       = useState(CURRENT_YEAR);
   const [month,      setMonth]      = useState(CURRENT_MONTH);
   const [diasUteis,  setDiasUteis]  = useState(22);
+
+  // Ao montar, detecta automaticamente o último mês com dados alimentados no VW DRE
+  useEffect(() => {
+    kvKeys('resumo_dre:vw:*').then(keys => {
+      const yearStr = String(CURRENT_YEAR);
+      const months = keys
+        .filter(k => k.includes(`:${yearStr}-`))
+        .map(k => { const m = k.match(/(\d{4})-(\d{2})$/); return m ? parseInt(m[2]) : 0; })
+        .filter(m => m >= 1 && m <= 12);
+      if (months.length > 0) setMonth(Math.max(...months));
+    }).catch(() => {});
+  }, []);
 
   const activeTabConfig = TABS.find(t => t.id === activeTab)!;
   const YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2];

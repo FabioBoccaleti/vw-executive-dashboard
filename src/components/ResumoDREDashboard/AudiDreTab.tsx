@@ -585,8 +585,11 @@ function ResumoTable({
                     {line.label}
                   </td>
                   {DEPTS.map((d) => {
+                    const isAdmROL = d.key === 'adm' && line.field === 'receitaOperacionalLiquida';
                     const val = data[d.key][line.field];
-                    const display = isQuant
+                    const display = isAdmROL
+                      ? '0,00'
+                      : isQuant
                       ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
                       : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
                     return (
@@ -603,8 +606,11 @@ function ResumoTable({
                           return t > 0 ? t.toString() : '—';
                         })()
                       : (() => {
-                          const s = sumDepts(deptList, line.field);
-                          return s ? fmtNum(s) : '—';
+                          const t = DEPTS.reduce((s, d) => {
+                            if (d.key === 'adm' && line.field === 'receitaOperacionalLiquida') return s;
+                            return s + parseVal(data[d.key][line.field]);
+                          }, 0);
+                          return t !== 0 ? t.toLocaleString('pt-BR') : '—';
                         })()
                     }
                   </td>
@@ -662,7 +668,7 @@ function DeptTable({
                 {MONTHS[month - 1]}/{year}
               </th>
               <th className="text-center px-2 py-3 font-bold text-sm text-slate-800 min-w-[5.5rem] bg-slate-300 border-l border-slate-400">Var. M/M</th>
-              <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[8rem] bg-slate-300">Total</th>
+              <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[8rem] bg-slate-300">Total {year}</th>
             </tr>
           </thead>
           <tbody>
@@ -699,16 +705,18 @@ function DeptTable({
                 }
               }
 
-              // Total = soma dos meses anteriores + mês atual
+              // Total = soma apenas dos meses do ano vigente
               const allDepts = [...prevDepts, dept];
+              const allPeriodsWithCurrent = [...prevPeriods, { year, month }];
+              const yearDepts = allDepts.filter((_, i) => allPeriodsWithCurrent[i].year === year);
               let totalStr: string;
               if (isQuant) {
-                const t = allDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0);
+                const t = yearDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0);
                 totalStr = t > 0 ? t.toString() : '—';
               } else if (isAdmROL) {
                 totalStr = '0,00';
               } else {
-                const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0);
+                const t = yearDepts.reduce((s, d) => s + parseVal(d[line.field]), 0);
                 totalStr = t !== 0 ? t.toLocaleString('pt-BR') : '—';
               }
 

@@ -624,7 +624,7 @@ function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, mon
                 {MONTHS[month - 1]}/{year}
               </th>
               <th className="text-center px-2 py-3 font-bold text-sm text-slate-800 min-w-[5.5rem] bg-slate-300 border-l border-slate-400">Var. M/M</th>
-              <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[8rem] bg-slate-300">Total</th>
+              <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[8rem] bg-slate-300">Total {year}</th>
             </tr>
           </thead>
           <tbody>
@@ -655,14 +655,16 @@ function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, mon
               }
 
               const allDepts = [...prevDepts, dept];
+              const allPeriodsWithCurrent = [...prevPeriods, { year, month }];
+              const yearDepts = allDepts.filter((_, i) => allPeriodsWithCurrent[i].year === year);
               let totalStr: string;
               if (isQuant) {
-                const t = allDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0);
+                const t = yearDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0);
                 totalStr = t > 0 ? t.toString() : '—';
               } else if (isAdmROL) {
                 totalStr = '0,00';
               } else {
-                const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0);
+                const t = yearDepts.reduce((s, d) => s + parseVal(d[line.field]), 0);
                 totalStr = t !== 0 ? t.toLocaleString('pt-BR') : '—';
               }
 

@@ -116,6 +116,7 @@ const DEPTS: { key: DeptKey; label: string; color: string }[] = [
 const DEPT_TO_DEPT_KEY: Partial<Record<DeptKey, Department>> = {
   novos:     'novos',
   usados:    'usados',
+  direta:    'vendaDireta',
   pecas:     'pecas',
   oficina:   'oficina',
   funilaria: 'funilaria',
@@ -608,8 +609,11 @@ function ResumoTable({ data, deptList, year, month }: {
                 <tr key={idx} className={`border-b border-slate-100 ${rowClass}`} style={rowStyle}>
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
                   {DEPTS.map(d => {
+                    const isAdmROL = d.key === 'adm' && line.field === 'receitaOperacionalLiquida';
                     const val = data[d.key][line.field];
-                    const display = isQuant
+                    const display = isAdmROL
+                      ? '0,00'
+                      : isQuant
                       ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
                       : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
                     return <td key={d.key} className="px-3 py-1.5 text-right">{display}</td>;
@@ -620,7 +624,13 @@ function ResumoTable({ data, deptList, year, month }: {
                   >
                     {isQuant
                       ? (() => { const t = deptList.reduce((s, dep) => s + (parseInt(dep.quant) || 0), 0); return t > 0 ? t.toString() : '—'; })()
-                      : (() => { const s = sumDeptsArr(deptList, line.field); return s ? fmtNum(s) : '—'; })()
+                      : (() => {
+                          const t = DEPTS.reduce((s, d) => {
+                            if (d.key === 'adm' && line.field === 'receitaOperacionalLiquida') return s;
+                            return s + parseVal(data[d.key][line.field]);
+                          }, 0);
+                          return t !== 0 ? t.toLocaleString('pt-BR') : '—';
+                        })()
                     }
                   </td>
                 </tr>
@@ -665,7 +675,7 @@ function DeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year, mon
                 {MONTHS[month - 1]}/{year}
               </th>
               <th className="text-center px-2 py-3 font-bold text-sm text-slate-800 min-w-[5.5rem] bg-slate-300 border-l border-slate-400">Var. M/M</th>
-              <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[8rem] bg-slate-300">Total</th>
+              <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[8rem] bg-slate-300">Total {year}</th>
             </tr>
           </thead>
           <tbody>
@@ -695,12 +705,14 @@ function DeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year, mon
               }
 
               const allDepts = [...prevDepts, dept];
+              const allPeriodsWithCurrent = [...prevPeriods, { year, month }];
+              const yearDepts = allDepts.filter((_, i) => allPeriodsWithCurrent[i].year === year);
               let totalStr: string;
               if (isQuant) {
-                const t = allDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0);
+                const t = yearDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0);
                 totalStr = t > 0 ? t.toString() : '—';
               } else {
-                const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0);
+                const t = yearDepts.reduce((s, d) => s + parseVal(d[line.field]), 0);
                 totalStr = t !== 0 ? t.toLocaleString('pt-BR') : '—';
               }
 
