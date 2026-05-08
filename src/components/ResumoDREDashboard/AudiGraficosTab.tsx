@@ -399,12 +399,14 @@ export function AudiGraficosTab({ year, month }: Props) {
     lucroAcum:    parseVal(accumRow[d.key].lucroLiquidoExercicio),
   }));
 
-  const evolucao = allMonthRows.slice(0, selIdx + 1).map((row, i) => ({
-    mes:     MONTHS_SHORT[i],
-    receita: sumField(row, 'receitaOperacionalLiquida',  deptFilter),
-    margem:  sumField(row, 'margemContribuicao',          deptFilter),
-    lucro:   sumField(row, 'lucroLiquidoExercicio',       deptFilter),
-  }));
+  let _rAcum = 0, _mAcum = 0, _lAcum = 0;
+  const evolucao = allMonthRows.slice(0, selIdx + 1).map((row, i) => {
+    const receita = sumField(row, 'receitaOperacionalLiquida',  deptFilter);
+    const margem  = sumField(row, 'margemContribuicao',          deptFilter);
+    const lucro   = sumField(row, 'lucroLiquidoExercicio',       deptFilter);
+    _rAcum += receita; _mAcum += margem; _lAcum += lucro;
+    return { mes: MONTHS_SHORT[i], receita, margem, lucro, receitaAcum: _rAcum, margemAcum: _mAcum, lucroAcum: _lAcum };
+  });
 
   const buildDespData = (row: DreAudiRow) => [
     { name: 'Pessoal',   value: Math.abs(deptList.reduce((s, d) => s + parseVal(row[d.key].despPessoal), 0)),         color: '#ef4444' },
@@ -659,8 +661,16 @@ export function AudiGraficosTab({ year, month }: Props) {
                   <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                   <Tooltip content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
+                    const d = payload[0].payload;
+                    const mesIdx = MONTHS_SHORT.indexOf(label as string);
+                    const accumHeader = mesIdx > 0 ? `Acum. Jan\u2013${label}` : `Acum. ${label}`;
+                    const accumKeys = [
+                      { key: 'receitaAcum', name: 'Receita Líquida',     stroke: payload[0]?.stroke },
+                      { key: 'margemAcum',  name: 'Margem Contribuição', stroke: payload[1]?.stroke },
+                      { key: 'lucroAcum',   name: 'Lucro Líquido',       stroke: payload[2]?.stroke },
+                    ];
                     return (
-                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-3 text-xs">
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-3 text-xs min-w-[210px]">
                         <p className="font-bold text-slate-700 mb-2">{label}</p>
                         {payload.map((p: any, i: number) => (
                           <div key={i} className="flex items-center justify-between gap-4">
@@ -671,6 +681,18 @@ export function AudiGraficosTab({ year, month }: Props) {
                             <span className={`font-semibold ${p.value < 0 ? 'text-red-500' : 'text-slate-800'}`}>{fmtBRL(p.value)}</span>
                           </div>
                         ))}
+                        <div className="border-t border-slate-100 mt-2 pt-2">
+                          <p className="text-[0.65rem] text-slate-400 mb-1.5 font-semibold uppercase tracking-wide">{accumHeader}</p>
+                          {accumKeys.map((ak, i) => (
+                            <div key={i} className="flex items-center justify-between gap-4">
+                              <span className="flex items-center gap-1.5 text-slate-500">
+                                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ak.stroke }} />
+                                {ak.name}
+                              </span>
+                              <span className={`font-semibold ${d[ak.key] < 0 ? 'text-red-500' : 'text-slate-800'}`}>{fmtBRL(d[ak.key])}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     );
                   }} />

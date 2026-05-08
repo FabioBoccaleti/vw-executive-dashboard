@@ -191,17 +191,28 @@ function accumulateAudi(rows: DreAudiRow[], upToIdx: number): DreAudiRow {
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({
-  label, mesValue, accumValue, delta, isVolume = false, isPct = false,
+  label, mesValue, accumValue, delta, isVolume = false, isPct = false, isAnual = false,
 }: {
   label: string; mesValue: number; accumValue: number;
-  delta?: number; isVolume?: boolean; isPct?: boolean;
+  delta?: number; isVolume?: boolean; isPct?: boolean; isAnual?: boolean;
 }) {
-  const hasDelta = delta !== undefined && !isNaN(delta) && isFinite(delta);
+  const hasDelta = !isAnual && delta !== undefined && !isNaN(delta) && isFinite(delta);
   const isPos    = hasDelta && delta! > 0;
   const isZero   = hasDelta && delta! === 0;
   const fmt = (v: number) => isPct
     ? v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'
     : isVolume ? Math.round(v).toLocaleString('pt-BR') : fmtK(v);
+  if (isAnual) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col gap-1.5 min-w-0">
+        <span className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider leading-tight">{label}</span>
+        <div className="flex items-baseline gap-1.5">
+          <span className={`text-2xl font-extrabold tracking-tight ${accumValue < 0 ? 'text-red-600' : 'text-slate-800'}`}>{fmt(accumValue)}</span>
+        </div>
+        <span className="text-[0.6rem] text-slate-400 font-medium">acumulado anual</span>
+      </div>
+    );
+  }
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col gap-1.5 min-w-0">
       <span className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider leading-tight">{label}</span>
@@ -264,6 +275,45 @@ function WaterfallPanel({ vwRow, audiRow, title, subtitle }: { vwRow: DreVwRow; 
           <span className="flex items-center gap-1"><span className="w-2.5 h-2 rounded-sm bg-green-500 inline-block" />Positivo</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2 rounded-sm bg-red-500 inline-block" />Negativo</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2 rounded-sm inline-block" style={{ backgroundColor: CON_COLOR }} />Lucro Líq.</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Waterfall por Marca (Ano Completo) ───────────────────────────────────────
+
+function WaterfallBrandPanel({ data, title, subtitle, brandColor }: {
+  data: { label: string; value: number }[];
+  title: string; subtitle: string; brandColor: string;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
+      <div className="px-4 py-2.5" style={{ backgroundColor: brandColor }}>
+        <p className="text-white font-bold text-xs">{title}</p>
+        <p className="text-white/70 text-[0.6rem] mt-0.5">{subtitle}</p>
+      </div>
+      <div className="p-3">
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 24 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} angle={-20} textAnchor="end" interval={0} />
+            <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#94a3b8' }} width={48} />
+            <Tooltip content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              const v = payload[0]?.value as number;
+              return <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-2.5 text-xs"><p className="font-bold text-slate-700 mb-1">{label}</p><p className={`font-semibold text-base ${v < 0 ? 'text-red-500' : 'text-emerald-600'}`}>{fmtBRL(v)}</p></div>;
+            }} />
+            <Bar dataKey="value" radius={[4,4,0,0]} name="Valor">
+              {data.map((d, i) => <Cell key={i} fill={d.value >= 0 ? (i === data.length - 1 ? brandColor : '#22c55e') : '#ef4444'} />)}
+            </Bar>
+            <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1.5} />
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="flex justify-center gap-4 text-[0.6rem] text-slate-400 mt-1">
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2 rounded-sm bg-green-500 inline-block" />Positivo</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2 rounded-sm bg-red-500 inline-block" />Negativo</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2 rounded-sm inline-block" style={{ backgroundColor: brandColor }} />Lucro Líq.</span>
         </div>
       </div>
     </div>
@@ -481,18 +531,24 @@ export function ConsolidadoGraficosTab({ year, month }: Props) {
     },
   ];
 
+  // Modo Ano Completo
+  const isAnual = month === 0;
+
   // Evolução mensal — VW, Audi, Total
   const maxIdx = Math.min(vwRows.length, audiRows.length, selIdx + 1);
-  const evolucao = Array.from({ length: maxIdx }, (_, i) => {
+  let _vwAcum = 0, _auAcum = 0, _totAcum = 0;
+  const evolucaoAll = Array.from({ length: maxIdx }, (_, i) => {
     const vw = vwRows[i]   ?? createEmptyDreVwRow(year, i + 1);
     const au = audiRows[i] ?? createEmptyDreAudiRow(year, i + 1);
-    return {
-      mes:    MONTHS_SHORT[i],
-      vw:     sumVwRow(vw,   'lucroLiquidoExercicio'),
-      audi:   sumAudiRow(au, 'lucroLiquidoExercicio'),
-      total:  sumConsolidado(vw, au, 'lucroLiquidoExercicio'),
-    };
+    const vwVal  = sumVwRow(vw,   'lucroLiquidoExercicio');
+    const auVal  = sumAudiRow(au, 'lucroLiquidoExercicio');
+    const totVal = sumConsolidado(vw, au, 'lucroLiquidoExercicio');
+    _vwAcum += vwVal; _auAcum += auVal; _totAcum += totVal;
+    return { mes: MONTHS_SHORT[i], vw: vwVal, audi: auVal, total: totVal, vwAcum: _vwAcum, audiAcum: _auAcum, totalAcum: _totAcum };
   });
+  const evolucao = isAnual
+    ? evolucaoAll.filter(e => e.vw !== 0 || e.audi !== 0)
+    : evolucaoAll;
 
   // Semáforo VW + Audi
   const semaforoVw = VW_DEPTS.map(d => {
@@ -507,6 +563,39 @@ export function ConsolidadoGraficosTab({ year, month }: Props) {
     return { key: `au-${d.key}`, shortLabel: `Audi ${d.shortLabel}`, lucro, brandColor: AUDI_BRAND_COLOR,
       status: lucro > 0 && lucro >= lucroPrev ? 'verde' : lucro > 0 ? 'amarelo' : 'vermelho' };
   });
+
+  // ── Dados adicionais modo Ano Completo ────────────────────────────────
+  // Semáforo anual (acumulado, sem amarelo)
+  const semaforoVwAnual = VW_DEPTS.map(d => {
+    const lucro = parseVal(vwAccum[d.key].lucroLiquidoExercicio);
+    return { key: `vw-${d.key}`, shortLabel: `VW ${d.shortLabel}`, lucro,
+      status: lucro > 0 ? 'verde' : 'vermelho' };
+  });
+  const semaforoAudiAnual = AUDI_DEPTS.map(d => {
+    const lucro = parseVal(auAccum[d.key].lucroLiquidoExercicio);
+    return { key: `au-${d.key}`, shortLabel: `Audi ${d.shortLabel}`, lucro,
+      status: lucro > 0 ? 'verde' : 'vermelho' };
+  });
+
+  // Waterfall por marca (acumulado anual)
+  const vwWfData = WF_STEPS.map(s => ({ label: s.label, value: sumVwRow(vwAccum, s.field as keyof DreVwDept) }));
+  const auWfData = WF_STEPS.map(s => ({ label: s.label, value: sumAudiRow(auAccum, s.field as keyof DreAudiDept) }));
+
+  // Despesas por marca — acumulado anual
+  const despVwAcum = [
+    { name: 'Pessoal',   value: Math.abs(VW_DEPTS.reduce((s,d) => s+parseVal(vwAccum[d.key].despPessoal),0)),         color: '#ef4444' },
+    { name: 'Terceiros', value: Math.abs(VW_DEPTS.reduce((s,d) => s+parseVal(vwAccum[d.key].despServTerceiros),0)),   color: '#f97316' },
+    { name: 'Ocupação',  value: Math.abs(VW_DEPTS.reduce((s,d) => s+parseVal(vwAccum[d.key].despOcupacao),0)),        color: '#eab308' },
+    { name: 'Funciona.', value: Math.abs(VW_DEPTS.reduce((s,d) => s+parseVal(vwAccum[d.key].despFuncionamento),0)),   color: '#8b5cf6' },
+    { name: 'Vendas',    value: Math.abs(VW_DEPTS.reduce((s,d) => s+parseVal(vwAccum[d.key].despVendas),0)),          color: '#06b6d4' },
+  ].filter(d => d.value > 0);
+  const despAudiAcum = [
+    { name: 'Pessoal',   value: Math.abs(AUDI_DEPTS.reduce((s,d) => s+parseVal(auAccum[d.key].despPessoal),0)),       color: '#ef4444' },
+    { name: 'Terceiros', value: Math.abs(AUDI_DEPTS.reduce((s,d) => s+parseVal(auAccum[d.key].despServTerceiros),0)), color: '#f97316' },
+    { name: 'Ocupação',  value: Math.abs(AUDI_DEPTS.reduce((s,d) => s+parseVal(auAccum[d.key].despOcupacao),0)),      color: '#eab308' },
+    { name: 'Funciona.', value: Math.abs(AUDI_DEPTS.reduce((s,d) => s+parseVal(auAccum[d.key].despFuncionamento),0)), color: '#8b5cf6' },
+    { name: 'Vendas',    value: Math.abs(AUDI_DEPTS.reduce((s,d) => s+parseVal(auAccum[d.key].despVendas),0)),        color: '#06b6d4' },
+  ].filter(d => d.value > 0);
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50">
@@ -534,13 +623,15 @@ export function ConsolidadoGraficosTab({ year, month }: Props) {
 
         {/* ── Semáforo ────────────────────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider mb-3">Saúde dos Departamentos — {mesLabel}</p>
+          <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            {isAnual ? `Saúde dos Departamentos — Acumulado ${year}` : `Saúde dos Departamentos — ${mesLabel}`}
+          </p>
           <div className="mb-2">
             <p className="text-[0.6rem] font-semibold uppercase tracking-wider mb-2" style={{ color: VW_BRAND_COLOR }}>VW Norte</p>
             <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-              {semaforoVw.map(d => (
+              {(isAnual ? semaforoVwAnual : semaforoVw).map(d => (
                 <div key={d.key} className="flex flex-col items-center gap-1">
-                  <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: d.status === 'verde' ? '#22c55e' : d.status === 'amarelo' ? '#eab308' : '#ef4444' }} />
+                  <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: d.status === 'verde' ? '#22c55e' : (d as any).status === 'amarelo' ? '#eab308' : '#ef4444' }} />
                   <span className="text-[0.6rem] font-semibold text-slate-600 text-center leading-tight">{d.shortLabel.replace('VW ', '')}</span>
                   <span className={`text-[0.55rem] font-bold ${d.lucro >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmtK(d.lucro)}</span>
                 </div>
@@ -550,42 +641,54 @@ export function ConsolidadoGraficosTab({ year, month }: Props) {
           <div className="border-t border-slate-100 pt-2 mt-1">
             <p className="text-[0.6rem] font-semibold uppercase tracking-wider mb-2" style={{ color: AUDI_BRAND_COLOR }}>Audi</p>
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-              {semaforoAudi.map(d => (
+              {(isAnual ? semaforoAudiAnual : semaforoAudi).map(d => (
                 <div key={d.key} className="flex flex-col items-center gap-1">
-                  <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: d.status === 'verde' ? '#22c55e' : d.status === 'amarelo' ? '#eab308' : '#ef4444' }} />
+                  <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: d.status === 'verde' ? '#22c55e' : (d as any).status === 'amarelo' ? '#eab308' : '#ef4444' }} />
                   <span className="text-[0.6rem] font-semibold text-slate-600 text-center leading-tight">{d.shortLabel.replace('Audi ', '')}</span>
                   <span className={`text-[0.55rem] font-bold ${d.lucro >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmtK(d.lucro)}</span>
                 </div>
               ))}
             </div>
           </div>
-          <p className="text-[0.6rem] text-slate-400 mt-2">🟢 Positivo e crescendo · 🟡 Positivo mas caindo · 🔴 Negativo</p>
+          {isAnual
+            ? <p className="text-[0.6rem] text-slate-400 mt-2">🟢 Positivo · 🔴 Negativo</p>
+            : <p className="text-[0.6rem] text-slate-400 mt-2">🟢 Positivo e crescendo · 🟡 Positivo mas caindo · 🔴 Negativo</p>
+          }
         </div>
 
         {/* ── KPI Cards ───────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KpiCard label="Volume de Vendas"       mesValue={mesVolume}    accumValue={accVolume}    delta={delta(mesVolume,   prevVolume)}   isVolume />
-          <KpiCard label="Receita Líquida"        mesValue={mesReceita}   accumValue={accReceita}   delta={delta(mesReceita,  prevReceita)} />
-          <KpiCard label="Margem de Contribuição" mesValue={mesMargemC}   accumValue={accMargemC}   delta={delta(mesMargemC,  prevMargemC)} />
-          <KpiCard label="% Margem s/ Receita"    mesValue={mesPctMargem} accumValue={accumPctMargem} isPct />
-          <KpiCard label="Despesas Totais"        mesValue={mesDesp}      accumValue={accDesp}      delta={delta(mesDesp,     prevDesp)} />
-          <KpiCard label="Lucro Líquido"          mesValue={mesLucroLiq}  accumValue={accLucroLiq}  delta={delta(mesLucroLiq, prevLucroLiq)} />
+          <KpiCard label="Volume de Vendas"       mesValue={mesVolume}    accumValue={accVolume}    delta={delta(mesVolume,   prevVolume)}   isVolume isAnual={isAnual} />
+          <KpiCard label="Receita Líquida"        mesValue={mesReceita}   accumValue={accReceita}   delta={delta(mesReceita,  prevReceita)} isAnual={isAnual} />
+          <KpiCard label="Margem de Contribuição" mesValue={mesMargemC}   accumValue={accMargemC}   delta={delta(mesMargemC,  prevMargemC)} isAnual={isAnual} />
+          <KpiCard label="% Margem s/ Receita"    mesValue={mesPctMargem} accumValue={accumPctMargem} isPct isAnual={isAnual} />
+          <KpiCard label="Despesas Totais"        mesValue={mesDesp}      accumValue={accDesp}      delta={delta(mesDesp,     prevDesp)} isAnual={isAnual} />
+          <KpiCard label="Lucro Líquido"          mesValue={mesLucroLiq}  accumValue={accLucroLiq}  delta={delta(mesLucroLiq, prevLucroLiq)} isAnual={isAnual} />
         </div>
 
         {/* ── RESULTADO DO PERÍODO ─────────────────────────────────────────── */}
         <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider">Resultado do Período</p>
-        <div className="flex gap-4">
-          <WaterfallPanel vwRow={vwMes}   audiRow={auMes}   title={`DRE — ${mesLabel}`}   subtitle="Resultado do mês · VW + Audi" />
-          <WaterfallPanel vwRow={vwAccum} audiRow={auAccum} title={`DRE — ${accumLabel}`} subtitle="Acumulado · VW + Audi" />
-        </div>
+        {isAnual ? (
+          <div className="flex gap-4">
+            <WaterfallBrandPanel data={vwWfData} title={`DRE VW Norte — ${accumLabel}`} subtitle="Acumulado · VW Norte" brandColor={VW_BRAND_COLOR} />
+            <WaterfallBrandPanel data={auWfData} title={`DRE Audi — ${accumLabel}`} subtitle="Acumulado · Audi" brandColor={AUDI_BRAND_COLOR} />
+          </div>
+        ) : (
+          <div className="flex gap-4">
+            <WaterfallPanel vwRow={vwMes}   audiRow={auMes}   title={`DRE — ${mesLabel}`}   subtitle="Resultado do mês · VW + Audi" />
+            <WaterfallPanel vwRow={vwAccum} audiRow={auAccum} title={`DRE — ${accumLabel}`} subtitle="Acumulado · VW + Audi" />
+          </div>
+        )}
 
         {/* ── COMPOSIÇÃO POR MARCA ─────────────────────────────────────────── */}
         <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider">Composição por Marca</p>
         {/* Receita VW por dept */}
-        <div className="flex gap-4">
-          <DonutMarca data={vwReceitaMes}  title={`Receita VW por Dept — ${mesLabel}`}   subtitle="Composição da Receita Líquida VW" brandColor={VW_BRAND_COLOR} />
-          <DonutMarca data={auReceitaMes}  title={`Receita Audi por Dept — ${mesLabel}`} subtitle="Composição da Receita Líquida Audi" brandColor={AUDI_BRAND_COLOR} />
-        </div>
+        {!isAnual && (
+          <div className="flex gap-4">
+            <DonutMarca data={vwReceitaMes}  title={`Receita VW por Dept — ${mesLabel}`}   subtitle="Composição da Receita Líquida VW" brandColor={VW_BRAND_COLOR} />
+            <DonutMarca data={auReceitaMes}  title={`Receita Audi por Dept — ${mesLabel}`} subtitle="Composição da Receita Líquida Audi" brandColor={AUDI_BRAND_COLOR} />
+          </div>
+        )}
         <div className="flex gap-4">
           <DonutMarca data={vwReceitaAcum}  title={`Receita VW por Dept — ${accumLabel}`}   subtitle="Composição da Receita Líquida VW" brandColor={VW_BRAND_COLOR} />
           <DonutMarca data={auReceitaAcum}  title={`Receita Audi por Dept — ${accumLabel}`} subtitle="Composição da Receita Líquida Audi" brandColor={AUDI_BRAND_COLOR} />
@@ -593,8 +696,17 @@ export function ConsolidadoGraficosTab({ year, month }: Props) {
 
         {/* Despesas consolidadas */}
         <div className="flex gap-4">
-          <DonutMarca data={despMes}  title={`Composição de Despesas — ${mesLabel}`}   subtitle="Consolidado VW + Audi" brandColor={CON_COLOR} />
-          <DonutMarca data={despAcum} title={`Composição de Despesas — ${accumLabel}`} subtitle="Consolidado VW + Audi" brandColor={CON_COLOR} />
+          {isAnual ? (
+            <>
+              <DonutMarca data={despVwAcum}   title={`Composição Despesas VW — ${accumLabel}`}   subtitle="VW Norte" brandColor={VW_BRAND_COLOR} />
+              <DonutMarca data={despAudiAcum} title={`Composição Despesas Audi — ${accumLabel}`} subtitle="Audi" brandColor={AUDI_BRAND_COLOR} />
+            </>
+          ) : (
+            <>
+              <DonutMarca data={despMes}  title={`Composição de Despesas — ${mesLabel}`}   subtitle="Consolidado VW + Audi" brandColor={CON_COLOR} />
+              <DonutMarca data={despAcum} title={`Composição de Despesas — ${accumLabel}`} subtitle="Consolidado VW + Audi" brandColor={CON_COLOR} />
+            </>
+          )}
         </div>
 
         {/* ── POR MARCA ────────────────────────────────────────────────────── */}
@@ -604,7 +716,7 @@ export function ConsolidadoGraficosTab({ year, month }: Props) {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
             <div className="px-4 py-2.5 border-b border-slate-100" style={{ borderLeft: `4px solid ${CON_COLOR}` }}>
               <p className="text-xs font-semibold text-slate-700">Receita por Marca</p>
-              <p className="text-[0.6rem] text-slate-400 mt-0.5">{mesLabel} vs {accumLabel}</p>
+              <p className="text-[0.6rem] text-slate-400 mt-0.5">{isAnual ? accumLabel : `${mesLabel} vs ${accumLabel}`}</p>
             </div>
             <div className="p-4">
               <ResponsiveContainer width="100%" height={210}>
@@ -614,11 +726,13 @@ export function ConsolidadoGraficosTab({ year, month }: Props) {
                   <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                   <Tooltip formatter={(v: number) => fmtBRL(v)} />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
-                  <Bar dataKey="receitaMes"  name={mesLabel}   radius={[3,3,0,0]}>
-                    {barMarcas.map((d, i) => <Cell key={i} fill={d.color} />)}
-                  </Bar>
+                  {!isAnual && (
+                    <Bar dataKey="receitaMes" name={mesLabel} radius={[3,3,0,0]}>
+                      {barMarcas.map((d, i) => <Cell key={i} fill={d.color} />)}
+                    </Bar>
+                  )}
                   <Bar dataKey="receitaAcum" name={accumLabel} radius={[3,3,0,0]}>
-                    {barMarcas.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={0.4} />)}
+                    {barMarcas.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={isAnual ? 1 : 0.4} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -628,7 +742,7 @@ export function ConsolidadoGraficosTab({ year, month }: Props) {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-1">
             <div className="px-4 py-2.5 border-b border-slate-100" style={{ borderLeft: `4px solid ${CON_COLOR}` }}>
               <p className="text-xs font-semibold text-slate-700">Lucro Líquido por Marca</p>
-              <p className="text-[0.6rem] text-slate-400 mt-0.5">{mesLabel} vs {accumLabel}</p>
+              <p className="text-[0.6rem] text-slate-400 mt-0.5">{isAnual ? accumLabel : `${mesLabel} vs ${accumLabel}`}</p>
             </div>
             <div className="p-4">
               <ResponsiveContainer width="100%" height={210}>
@@ -638,11 +752,13 @@ export function ConsolidadoGraficosTab({ year, month }: Props) {
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} width={50} />
                   <Tooltip formatter={(v: number) => fmtBRL(v)} />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
-                  <Bar dataKey="lucroMes"  name={mesLabel}   radius={[0,3,3,0]}>
-                    {barMarcas.map((d, i) => <Cell key={i} fill={d.color} />)}
-                  </Bar>
+                  {!isAnual && (
+                    <Bar dataKey="lucroMes" name={mesLabel} radius={[0,3,3,0]}>
+                      {barMarcas.map((d, i) => <Cell key={i} fill={d.color} />)}
+                    </Bar>
+                  )}
                   <Bar dataKey="lucroAcum" name={accumLabel} radius={[0,3,3,0]}>
-                    {barMarcas.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={0.5} />)}
+                    {barMarcas.map((d, i) => <Cell key={i} fill={d.color} fillOpacity={isAnual ? 1 : 0.5} />)}
                   </Bar>
                   <ReferenceLine x={0} stroke="#cbd5e1" />
                 </BarChart>
@@ -667,8 +783,16 @@ export function ConsolidadoGraficosTab({ year, month }: Props) {
                   <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                   <Tooltip content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
+                    const d = payload[0].payload;
+                    const mesIdx = MONTHS_SHORT.indexOf(label as string);
+                    const accumHeader = mesIdx > 0 ? `Acum. Jan\u2013${label}` : `Acum. ${label}`;
+                    const accumKeys = [
+                      { key: 'vwAcum',    name: 'VW Norte',    stroke: payload[0]?.stroke },
+                      { key: 'audiAcum',  name: 'Audi',        stroke: payload[1]?.stroke },
+                      { key: 'totalAcum', name: 'Consolidado', stroke: payload[2]?.stroke },
+                    ];
                     return (
-                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-3 text-xs">
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-3 text-xs min-w-[210px]">
                         <p className="font-bold text-slate-700 mb-2">{label}</p>
                         {payload.map((p: any, i: number) => (
                           <div key={i} className="flex items-center justify-between gap-4">
@@ -679,6 +803,18 @@ export function ConsolidadoGraficosTab({ year, month }: Props) {
                             <span className={`font-semibold ${p.value < 0 ? 'text-red-500' : 'text-slate-800'}`}>{fmtBRL(p.value)}</span>
                           </div>
                         ))}
+                        <div className="border-t border-slate-100 mt-2 pt-2">
+                          <p className="text-[0.65rem] text-slate-400 mb-1.5 font-semibold uppercase tracking-wide">{accumHeader}</p>
+                          {accumKeys.map((ak, i) => (
+                            <div key={i} className="flex items-center justify-between gap-4">
+                              <span className="flex items-center gap-1.5 text-slate-500">
+                                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ak.stroke }} />
+                                {ak.name}
+                              </span>
+                              <span className={`font-semibold ${d[ak.key] < 0 ? 'text-red-500' : 'text-slate-800'}`}>{fmtBRL(d[ak.key])}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     );
                   }} />
