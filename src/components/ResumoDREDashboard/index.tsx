@@ -122,7 +122,7 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
       </div>
 
       {/* ── Conteúdo da aba ─────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {activeTab === 'vw' ? (
           <VwDreTab year={year} month={month} diasUteis={diasUteis} />
         ) : activeTab === 'vw-graficos' ? (

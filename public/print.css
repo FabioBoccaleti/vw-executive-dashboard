@@ -51,6 +51,7 @@
     forced-color-adjust: none !important;
   }
 
+  .scroll-progress-track { display: none !important; }
   body > * { display: none !important; }
   #print-root { display: block !important; }
 

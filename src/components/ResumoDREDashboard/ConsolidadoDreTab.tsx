@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, RefreshCw, Printer } from 'lucide-react';
+import { ScrollProgressBar } from './ScrollProgressBar';
 import {
   loadDreVw,
   createEmptyDreVwRow,
@@ -261,6 +262,7 @@ export function ConsolidadoDreTab({ year, month }: ConsolidadoDreTabProps) {
   const [allMonthRows, setAllMonthRows] = useState<DreVwRow[]>(
     Array.from({ length: 12 }, (_, i) => createEmptyDreVwRow(0, i + 1))
   );
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -448,7 +450,8 @@ export function ConsolidadoDreTab({ year, month }: ConsolidadoDreTabProps) {
   const deptList = DEPTS.map(d => data[d.key]);
 
   return (
-    <div className="flex flex-col gap-0 flex-1">
+    <div className="flex flex-col gap-0 flex-1 min-h-0">
+      <ScrollProgressBar scrollRef={scrollContainerRef} color={CON_COLOR} />
 
       {/* ── Sub-navegação ────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-1 overflow-x-auto">
@@ -505,7 +508,8 @@ export function ConsolidadoDreTab({ year, month }: ConsolidadoDreTabProps) {
       </div>
 
       {/* ── Conteúdo ─────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-auto p-6">
+      <ScrollProgressBar scrollRef={scrollContainerRef} color="#7c3aed" />
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto p-6 min-h-0">
 
         {activeSection === 'resumo' && month !== 0 && (
           <ResumoTable data={data} deptList={deptList} year={year} month={month} />

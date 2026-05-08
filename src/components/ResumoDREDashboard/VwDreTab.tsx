@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Save, Loader2, RefreshCw, Trash2, Plus, Printer } from 'lucide-react';
 import { toast } from 'sonner';
+import { ScrollProgressBar } from './ScrollProgressBar';
 import {
   loadDreVw,
   saveDreVw,
@@ -191,6 +192,7 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
   const [allMonthRows, setAllMonthRows] = useState<DreVwRow[]>(
     Array.from({ length: 12 }, (_, i) => createEmptyDreVwRow(0, i + 1))
   );
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -391,7 +393,8 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
   const deptList = DEPTS.map(d => data[d.key]);
 
   return (
-    <div className="flex flex-col gap-0 flex-1">
+    <div className="flex flex-col gap-0 flex-1 min-h-0">
+      <ScrollProgressBar scrollRef={scrollContainerRef} color={VW_COLOR} />
 
       {/* ── Sub-navegação de seções ─────────────────────────────────────── */}
       <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-1 overflow-x-auto">
@@ -461,7 +464,7 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
       </div>
 
       {/* ── Conteúdo ─────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-auto p-6">
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto p-6 min-h-0">
 
         {activeSection === 'resumo' && month !== 0 && (
           <ResumoTable data={data} deptList={deptList} year={year} month={month} />
