@@ -97,6 +97,18 @@ const DRE_LINES: DreLineConfig[] = [
   { label: 'LUCRO LÍQUIDO DO EXERCÍCIO',                 field: 'lucroLiquidoExercicio',          isTotal: true },
 ];
 
+// ─── Campos de departamento (para somar no modo anual) ───────────────────────
+
+const DEPT_FIELDS: (keyof DreVwDept)[] = [
+  'quant','receitaOperacionalLiquida','custoOperacionalReceita',
+  'lucroPrejOperacionalBruto','outrasReceitasOperacionais','outrasDespesasOperacionais',
+  'margemContribuicao','despPessoal','despServTerceiros','despOcupacao','despFuncionamento',
+  'despVendas','lucroPrejOperacionalLiquido','amortizacoesDepreciacoes',
+  'outrasReceitasFinanceiras','despFinanceirasNaoOperacional','despesasNaoOperacionais',
+  'outrasRendasNaoOperacionais','lucroPrejAntesImpostos','provisoesIrpjCs',
+  'participacoes','lucroLiquidoExercicio',
+];
+
 // ─── Departamentos VW ─────────────────────────────────────────────────────────
 
 type DeptKey = 'novos' | 'usados' | 'direta' | 'pecas' | 'oficina' | 'funilaria' | 'adm';
