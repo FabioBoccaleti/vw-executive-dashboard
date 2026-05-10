@@ -23,6 +23,8 @@ const VW_COLOR     = '#001e50';
 const VW_COLOR_DRK = '#001238';
 const AUDI_COLOR     = '#bb0a30';
 const AUDI_COLOR_DRK = '#9a0827';
+const CON_COLOR     = '#7c3aed';
+const CON_COLOR_DRK = '#5b21b6';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -287,7 +289,7 @@ interface MensalDreTabProps {
 }
 
 export function MensalDreTab({ year }: MensalDreTabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'vw' | 'audi'>('vw');
+  const [activeSubTab, setActiveSubTab] = useState<'vw' | 'audi' | 'consolidado'>('vw');
   const [loadingVw, setLoadingVw]       = useState(true);
   const [loadingAudi, setLoadingAudi]   = useState(true);
 
@@ -399,7 +401,19 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
     });
   }, [year]);
 
-  const loading = activeSubTab === 'vw' ? loadingVw : loadingAudi;
+  // Consolidado = soma de VW + Audi por mês
+  const consolidadoMonthData = Array.from({ length: 12 }, (_, mi) => ({
+    totals: Object.fromEntries(
+      DEPT_FIELDS.map(f => [
+        f,
+        (vwMonthData[mi]?.totals[f] ?? 0) + (audiMonthData[mi]?.totals[f] ?? 0),
+      ])
+    ) as Record<keyof DreVwDept, number>,
+  }));
+
+  const loading = activeSubTab === 'consolidado'
+    ? loadingVw || loadingAudi
+    : activeSubTab === 'vw' ? loadingVw : loadingAudi;
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -427,6 +441,17 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
         >
           Audi Mensal
         </button>
+        <button
+          onClick={() => setActiveSubTab('consolidado')}
+          className="px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors"
+          style={
+            activeSubTab === 'consolidado'
+              ? { borderBottomColor: CON_COLOR, color: CON_COLOR }
+              : { borderBottomColor: 'transparent', color: '#64748b' }
+          }
+        >
+          Consolidado Mensal
+        </button>
       </div>
 
       {/* Conteúdo */}
@@ -446,13 +471,21 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
             colorDrk={VW_COLOR_DRK}
             monthRows={vwMonthData}
           />
-        ) : (
+        ) : activeSubTab === 'audi' ? (
           <EvolucaoMensalTable
             title="AUDI LAPA/PINHEIROS"
             subtitle={`Ano ${year} — Evolução Mensal (todos os departamentos)`}
             color={AUDI_COLOR}
             colorDrk={AUDI_COLOR_DRK}
             monthRows={audiMonthData}
+          />
+        ) : (
+          <EvolucaoMensalTable
+            title="CONSOLIDADO — VW + AUDI"
+            subtitle={`Ano ${year} — Evolução Mensal (todos os departamentos)`}
+            color={CON_COLOR}
+            colorDrk={CON_COLOR_DRK}
+            monthRows={consolidadoMonthData}
           />
         )}
       </div>
