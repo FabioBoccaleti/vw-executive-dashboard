@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Car, Building2, Activity } from 'lucide-react';
+import { Car, Building2, Copy, CheckCircle2 } from 'lucide-react';
 import { AnaliseDespesasSubPage } from './AnaliseDespesasSubPage';
 import type { AnaliseBrand } from './analiseDespesasStorage';
+import { saveAnaliseDespesasTipos } from './analiseDespesasStorage';
+import { loadDespesasTipos } from '@/components/FluxoCaixaDashboard/despesasStorage';
 
 type SubPage = null | AnaliseBrand;
 
@@ -11,6 +13,26 @@ interface AnaliseDespesasDashboardProps {
 
 export function AnaliseDespesasDashboard({ onChangeBrand }: AnaliseDespesasDashboardProps) {
   const [subPage, setSubPage] = useState<SubPage>(null);
+  const [copying, setCopying] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopyTipos() {
+    setCopying(true);
+    setCopied(false);
+    try {
+      const tipos = await loadDespesasTipos();
+      await Promise.all([
+        saveAnaliseDespesasTipos('vw', tipos),
+        saveAnaliseDespesasTipos('audi', tipos),
+      ]);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch (err) {
+      console.error('Erro ao copiar tipos:', err);
+    } finally {
+      setCopying(false);
+    }
+  }
 
   if (subPage !== null) {
     return (
@@ -29,12 +51,32 @@ export function AnaliseDespesasDashboard({ onChangeBrand }: AnaliseDespesasDashb
           <h1 className="text-lg font-bold text-slate-800">Análise Evolutiva de Despesas</h1>
           <p className="text-xs text-slate-500 mt-0.5">Selecione o módulo desejado</p>
         </div>
-        <button
-          onClick={onChangeBrand}
-          className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
-        >
-          ← Voltar ao menu
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCopyTipos}
+            disabled={copying}
+            className="flex items-center gap-1.5 text-xs border rounded px-3 py-1.5 transition-colors disabled:opacity-50"
+            style={
+              copied
+                ? { borderColor: '#16a34a', color: '#16a34a', background: '#f0fdf4' }
+                : { borderColor: '#cbd5e1', color: '#64748b', background: 'white' }
+            }
+            title="Copia os tipos de despesa cadastrados no Fluxo de Caixa para VW e Audi"
+          >
+            {copied ? (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            ) : (
+              <Copy className="w-3.5 h-3.5" />
+            )}
+            {copied ? 'Tipos copiados!' : copying ? 'Copiando…' : 'Copiar tipos do Fluxo de Caixa'}
+          </button>
+          <button
+            onClick={onChangeBrand}
+            className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
+          >
+            ← Voltar ao menu
+          </button>
+        </div>
       </header>
 
       {/* Cards */}
