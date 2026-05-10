@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Loader2, Printer } from 'lucide-react';
 import {
   loadDreVw,
   createEmptyDreVwRow,
@@ -452,6 +453,16 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
         >
           Consolidado Mensal
         </button>
+
+        <div className="flex-1" />
+
+        <button
+          onClick={() => window.print()}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors my-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200"
+        >
+          <Printer className="w-3.5 h-3.5" />
+          Imprimir PDF
+        </button>
       </div>
 
       {/* Conteúdo */}
@@ -489,6 +500,173 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
           />
         )}
       </div>
+
+      {/* Portal de Impressão */}
+      {typeof document !== 'undefined' && document.getElementById('print-root') &&
+        createPortal(
+          <PrintableMensalReport
+            year={year}
+            vwMonthData={vwMonthData}
+            audiMonthData={audiMonthData}
+            consolidadoMonthData={consolidadoMonthData}
+          />,
+          document.getElementById('print-root')!
+        )
+      }
+    </div>
+  );
+}
+
+// ─── Relatório Imprimível ─────────────────────────────────────────────────────
+
+type MonthTotals = { totals: Record<keyof DreVwDept, number> };
+
+function PrintableMensalReport({ year, vwMonthData, audiMonthData, consolidadoMonthData }: {
+  year: number;
+  vwMonthData: MonthTotals[];
+  audiMonthData: MonthTotals[];
+  consolidadoMonthData: MonthTotals[];
+}) {
+  return (
+    <div style={{ fontFamily: 'Inter, sans-serif', colorScheme: 'only light' as any }}>
+      <style>{`
+        #print-root, #print-root * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          forced-color-adjust: none !important;
+          color-scheme: light !important;
+        }
+      `}</style>
+
+      {/* Página 1: VW Mensal */}
+      <div className="print-page">
+        <PrintMensalTable
+          title="VW NORTE"
+          subtitle={`Ano ${year} — Evolução Mensal (todos os departamentos)`}
+          color={VW_COLOR}
+          colorDrk={VW_COLOR_DRK}
+          monthRows={vwMonthData}
+        />
+      </div>
+
+      {/* Página 2: Audi Mensal */}
+      <div className="print-page">
+        <PrintMensalTable
+          title="AUDI LAPA/PINHEIROS"
+          subtitle={`Ano ${year} — Evolução Mensal (todos os departamentos)`}
+          color={AUDI_COLOR}
+          colorDrk={AUDI_COLOR_DRK}
+          monthRows={audiMonthData}
+        />
+      </div>
+
+      {/* Página 3: Consolidado Mensal */}
+      <div className="print-page">
+        <PrintMensalTable
+          title="CONSOLIDADO — VW + AUDI"
+          subtitle={`Ano ${year} — Evolução Mensal (todos os departamentos)`}
+          color={CON_COLOR}
+          colorDrk={CON_COLOR_DRK}
+          monthRows={consolidadoMonthData}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PrintMensalTable({ title, subtitle, color, colorDrk, monthRows }: {
+  title: string;
+  subtitle: string;
+  color: string;
+  colorDrk: string;
+  monthRows: MonthTotals[];
+}) {
+  const annualTotal = Object.fromEntries(
+    DEPT_FIELDS.map(f => [f, monthRows.reduce((s, mr) => s + (mr.totals[f] ?? 0), 0)])
+  ) as Record<keyof DreVwDept, number>;
+
+  const NCOLS = 14;
+
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{
+        backgroundColor: color,
+        backgroundImage: `linear-gradient(to bottom, ${color} 0%, ${color} 100%)`,
+        color: 'white',
+        padding: '6px 12px',
+      }}>
+        <div style={{ fontWeight: 700, fontSize: '10pt' }}>{title}</div>
+        <div style={{ fontSize: '7.5pt', opacity: 0.8 }}>{subtitle}</div>
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7pt' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#e2e8f0', borderBottom: `2px solid ${color}` }}>
+            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 700, color: '#111', width: '18%' }}>Descrição</th>
+            {MONTHS_SHORT.map((m, i) => (
+              <th key={i} style={{ textAlign: 'center', padding: '3px 3px', fontWeight: 700, color: '#111', width: '5.5%' }}>{m}</th>
+            ))}
+            <th style={{ textAlign: 'center', padding: '3px 5px', fontWeight: 700, color: '#111', backgroundColor: '#cbd5e1', width: '7%' }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {DRE_LINES.map((line, idx) => {
+            if (line.separator) {
+              return <tr key={idx}><td colSpan={NCOLS} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
+            }
+
+            const isQuant = line.field === 'quant' && idx === 0;
+            const rowStyle: React.CSSProperties = line.isTotal
+              ? {
+                  backgroundImage: `linear-gradient(to bottom, ${color} 0%, ${color} 100%)`,
+                  backgroundColor: color,
+                  color: 'white',
+                  borderBottom: `1px solid ${colorDrk}`,
+                }
+              : {
+                  backgroundColor: line.isSubtotal ? '#f1f5f9' : 'transparent',
+                  color: '#111',
+                  borderBottom: '1px solid #f1f5f9',
+                };
+
+            const annualVal = annualTotal[line.field] ?? 0;
+
+            return (
+              <tr key={idx} style={rowStyle}>
+                <td style={{
+                  padding: `2px ${line.indent ? '12px' : '6px'}`,
+                  fontWeight: line.isTotal || line.isSubtotal ? 700 : 400,
+                }}>
+                  {line.label}
+                </td>
+                {monthRows.map((mr, mi) => {
+                  const val = mr.totals[line.field] ?? 0;
+                  const display = isQuant
+                    ? (Math.round(val) > 0 ? Math.round(val).toString() : '—')
+                    : (val !== 0 ? val.toLocaleString('pt-BR') : '—');
+                  return (
+                    <td key={mi} style={{ textAlign: 'right', padding: '2px 3px' }}>{display}</td>
+                  );
+                })}
+                <td style={line.isTotal
+                  ? {
+                      textAlign: 'right', padding: '2px 5px', fontWeight: 700,
+                      backgroundImage: `linear-gradient(to bottom, ${colorDrk} 0%, ${colorDrk} 100%)`,
+                      backgroundColor: colorDrk, color: 'white',
+                    }
+                  : { textAlign: 'right', padding: '2px 5px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111' }
+                }>
+                  {isQuant
+                    ? (Math.round(annualVal) > 0 ? Math.round(annualVal).toString() : '—')
+                    : (annualVal !== 0 ? annualVal.toLocaleString('pt-BR') : '—')
+                  }
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
