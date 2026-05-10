@@ -113,12 +113,16 @@ function grupo5Leaves(accounts: Record<string, { valDeb: number; valCred: number
     .map((k) => ({ conta: k, valor: accounts[k].valDeb - accounts[k].valCred }));
 }
 
-async function loadPeriodData(tipo: PeriodoTipo, sel: PeriodoSel): Promise<Record<string, number> | null> {
+async function loadPeriodData(
+  tipo: PeriodoTipo,
+  sel: PeriodoSel,
+  loadRaw: (year: number, month: number) => Promise<{ rawText: string } | null>,
+): Promise<Record<string, number> | null> {
   const months = getMonths(tipo, sel.index);
   const aggregated: Record<string, { valDeb: number; valCred: number }> = {};
   let hasAny = false;
   for (const month of months) {
-    const raw = await loadFluxoCaixaRaw(sel.year, month);
+    const raw = await loadRaw(sel.year, month);
     if (!raw?.rawText) continue;
     hasAny = true;
     const accounts = parseGrupo5(raw.rawText);
@@ -170,6 +174,9 @@ interface GraficosDespesasProps {
   initialTipos: Record<string, string>;
   fmtBRL: (v: number, compact?: boolean) => string;
   onVoltar: () => void;
+  /** Override de storage — quando fornecido, usa em vez do FluxoCaixa */
+  loadRawFn?: (year: number, month: number) => Promise<{ rawText: string } | null>;
+  loadTiposFn?: () => Promise<Record<string, string>>;
 }
 
 export function GraficosDespesas({
@@ -182,6 +189,8 @@ export function GraficosDespesas({
   initialTipos,
   fmtBRL,
   onVoltar,
+  loadRawFn,
+  loadTiposFn,
 }: GraficosDespesasProps) {
   const [periodoTipo, setPeriodoTipo] = useState<PeriodoTipo>(initialPeriodoTipo);
   const [periodoA, setPeriodoA] = useState<PeriodoSel>(initialPeriodoA);
@@ -226,9 +235,10 @@ export function GraficosDespesas({
     setLoading(true);
     setError(null);
     try {
+      const resolvedLoadRaw = loadRawFn ?? loadFluxoCaixaRaw;
       const [rawA, rawB] = await Promise.all([
-        loadPeriodData(periodoTipo, periodoA),
-        loadPeriodData(periodoTipo, periodoB),
+        loadPeriodData(periodoTipo, periodoA, resolvedLoadRaw),
+        loadPeriodData(periodoTipo, periodoB, resolvedLoadRaw),
       ]);
       if (!rawA && !rawB) {
         setError('Nenhum balancete encontrado para os períodos selecionados.');

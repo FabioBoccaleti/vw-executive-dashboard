@@ -146,9 +146,17 @@ interface DespesasTabProps {
   selectedMonth?: number;
   selectedYear?: number;
   ytdAccountsSums?: Record<string, number>;
+  /** Override de storage para uso fora do FluxoCaixa (ex: Análise Evolutiva de Despesas) */
+  storageOverrides?: {
+    loadTipos?: () => Promise<Record<string, string>>;
+    saveTipos?: (t: Record<string, string>) => Promise<void>;
+    loadMultiple?: (year: number, months: number[]) => Promise<Record<number, string>>;
+    loadIndex?: () => Promise<Record<string, boolean>>;
+    loadRaw?: (year: number, month: number) => Promise<{ rawText: string } | null>;
+  };
 }
 
-export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setShowTabela, despesasView = 'normal', setDespesasView, selectedMonth = 0, selectedYear = new Date().getFullYear(), ytdAccountsSums }: DespesasTabProps) {
+export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setShowTabela, despesasView = 'normal', setDespesasView, selectedMonth = 0, selectedYear = new Date().getFullYear(), ytdAccountsSums, storageOverrides }: DespesasTabProps) {
   const accounts = data.accounts as Record<string, any>;
   const rows = grupo5Leaves(accounts);
 
@@ -162,9 +170,11 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
 
   // Carrega tipos ao montar
   useEffect(() => {
-    loadDespesasTipos()
+    const fn = storageOverrides?.loadTipos ?? loadDespesasTipos;
+    fn()
       .then(setTipos)
       .finally(() => setLoadingTipos(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleTipoChange = useCallback(
@@ -175,11 +185,13 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
         if (saveTimeout.current) clearTimeout(saveTimeout.current);
         saveTimeout.current = setTimeout(() => {
           setSaving(true);
-          saveDespesasTipos(next).finally(() => setSaving(false));
+          const saveFn = storageOverrides?.saveTipos ?? saveDespesasTipos;
+          saveFn(next).finally(() => setSaving(false));
         }, 800);
         return next;
       });
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
@@ -246,7 +258,13 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
   const ytdLabel = canShowYTD ? `Jan – ${YTD_MS[selectedMonth]}/${yr2}` : '';
 
   if (showCharts) {
-    return <DespesasCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
+    return <DespesasCharts
+      selectedYear={selectedYear}
+      selectedMonth={selectedMonth}
+      onClose={() => setShowCharts(false)}
+      loadMultipleFn={storageOverrides?.loadMultiple}
+      loadIndexFn={storageOverrides?.loadIndex}
+    />;
   }
 
   if (despesasView === 'comparativo') {
@@ -260,7 +278,11 @@ export function DespesasTab({ data, fmtBRL, SectionTitle, KPI, showTabela, setSh
             ← Voltar para Despesas
           </button>
         )}
-        <ComparativoDespesas fmtBRL={fmtBRL} />
+        <ComparativoDespesas
+          fmtBRL={fmtBRL}
+          loadRawFn={storageOverrides?.loadRaw}
+          loadTiposFn={storageOverrides?.loadTipos}
+        />
       </div>
     );
   }

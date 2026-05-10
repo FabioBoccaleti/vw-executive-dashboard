@@ -25,10 +25,16 @@ interface ChartItem {
   values: Record<number, number>;
 }
 
+type LoadMultipleFn = (year: number, months: number[]) => Promise<Record<number, string>>;
+type LoadIndexFn = () => Promise<Record<string, boolean>>;
+
 interface Props {
   selectedYear: number;
   selectedMonth: number;
   onClose: () => void;
+  /** Override de storage — quando fornecido, usa em vez do FluxoCaixa */
+  loadMultipleFn?: LoadMultipleFn;
+  loadIndexFn?: LoadIndexFn;
 }
 
 const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -118,7 +124,7 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
-export function DespesasCharts({ selectedYear, selectedMonth, onClose }: Props) {
+export function DespesasCharts({ selectedYear, selectedMonth, onClose, loadMultipleFn, loadIndexFn }: Props) {
   const [loading, setLoading] = useState(true);
   const [charts, setCharts] = useState<ChartItem[]>([]);
   const [totalData, setTotalData] = useState<Record<number, number>>({});
@@ -128,9 +134,12 @@ export function DespesasCharts({ selectedYear, selectedMonth, onClose }: Props) 
   const [compareCharts, setCompareCharts] = useState<ChartItem[]>([]);
   const [compareTotalData, setCompareTotalData] = useState<Record<number, number>>({});
 
+  const resolvedLoadIndex: LoadIndexFn = loadIndexFn ?? loadFluxoCaixaIndex;
+  const resolvedLoadMultiple: LoadMultipleFn = loadMultipleFn ?? loadMultipleMonthsRaw;
+
   useEffect(() => {
     (async () => {
-      const idx = await loadFluxoCaixaIndex();
+      const idx = await resolvedLoadIndex();
       const years = new Set<number>();
       for (const key of Object.keys(idx)) {
         const y = parseInt(key.split('_')[0]);
@@ -138,11 +147,12 @@ export function DespesasCharts({ selectedYear, selectedMonth, onClose }: Props) 
       }
       setAvailableYears(Array.from(years).sort((a, b) => b - a));
     })();
-  }, [selectedYear]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear, resolvedLoadIndex]);
 
   const loadYearData = useCallback(async (year: number, upToMonth: number) => {
     const months = Array.from({ length: upToMonth }, (_, i) => i + 1);
-    const rawMap = await loadMultipleMonthsRaw(year, months);
+    const rawMap = await resolvedLoadMultiple(year, months);
 
     // Parse each month and collect all descriptions
     const monthAccs: Record<number, Record<string, AccData>> = {};
@@ -195,7 +205,8 @@ export function DespesasCharts({ selectedYear, selectedMonth, onClose }: Props) 
     }
 
     return { charts: chartItems, totals };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedLoadMultiple]);
 
   // Load main year
   useEffect(() => {

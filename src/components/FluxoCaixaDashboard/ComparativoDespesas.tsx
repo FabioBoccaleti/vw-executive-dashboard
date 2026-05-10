@@ -23,6 +23,9 @@ interface PeriodoSel {
 
 interface ComparativoDespesasProps {
   fmtBRL: (v: number, compact?: boolean) => string;
+  /** Override de storage — quando fornecido, usa em vez do FluxoCaixa */
+  loadRawFn?: (year: number, month: number) => Promise<{ rawText: string } | null>;
+  loadTiposFn?: () => Promise<Record<string, string>>;
 }
 
 // ─── Opções de período ────────────────────────────────────────────────────────
@@ -129,14 +132,15 @@ function grupo5Leaves(
 /** Carrega e agrega dados do grupo 5 para um período, retornando conta→valor */
 async function loadPeriodData(
   tipo: PeriodoTipo,
-  sel: PeriodoSel
+  sel: PeriodoSel,
+  loadRaw: (year: number, month: number) => Promise<{ rawText: string } | null>,
 ): Promise<Record<string, number> | null> {
   const months = getMonths(tipo, sel.index);
   const aggregated: Record<string, { valDeb: number; valCred: number }> = {};
   let hasAny = false;
 
   for (const month of months) {
-    const raw = await loadFluxoCaixaRaw(sel.year, month);
+    const raw = await loadRaw(sel.year, month);
     if (!raw?.rawText) continue;
     hasAny = true;
     const accounts = parseGrupo5(raw.rawText);
@@ -161,7 +165,7 @@ async function loadPeriodData(
 const SELECT_CLASS =
   'appearance-none bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer';
 
-export function ComparativoDespesas({ fmtBRL }: ComparativoDespesasProps) {
+export function ComparativoDespesas({ fmtBRL, loadRawFn, loadTiposFn }: ComparativoDespesasProps) {
   const [periodoTipo, setPeriodoTipo] = useState<PeriodoTipo>('mensal');
   const [grupo1Id, setGrupo1Id] = useState<string>(GRUPOS_CONFIG[0].id);
   const [grupo2Id, setGrupo2Id] = useState<string>('');
@@ -189,10 +193,12 @@ export function ComparativoDespesas({ fmtBRL }: ComparativoDespesasProps) {
     setError(null);
     setHasResult(false);
     try {
+      const resolvedLoadRaw = loadRawFn ?? loadFluxoCaixaRaw;
+      const resolvedLoadTipos = loadTiposFn ?? loadDespesasTipos;
       const [tiposMap, rawA, rawB] = await Promise.all([
-        loadDespesasTipos(),
-        loadPeriodData(periodoTipo, periodoA),
-        loadPeriodData(periodoTipo, periodoB),
+        resolvedLoadTipos(),
+        loadPeriodData(periodoTipo, periodoA, resolvedLoadRaw),
+        loadPeriodData(periodoTipo, periodoB, resolvedLoadRaw),
       ]);
 
       setTipos(tiposMap);
@@ -281,6 +287,8 @@ export function ComparativoDespesas({ fmtBRL }: ComparativoDespesasProps) {
         initialTipos={tipos}
         fmtBRL={fmtBRL}
         onVoltar={() => setShowGraficos(false)}
+        loadRawFn={loadRawFn}
+        loadTiposFn={loadTiposFn}
       />
     );
   }
