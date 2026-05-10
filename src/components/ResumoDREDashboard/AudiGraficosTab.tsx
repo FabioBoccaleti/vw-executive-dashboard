@@ -291,6 +291,12 @@ function DonutPanel({
                   );
                 }} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                {total > 0 && (
+                  <text x="50%" y="46%" textAnchor="middle" dominantBaseline="middle">
+                    <tspan x="50%" dy="-7" style={{ fontSize: 9, fill: '#94a3b8', fontWeight: 500 }}>Total</tspan>
+                    <tspan x="50%" dy="14" style={{ fontSize: 10, fill: '#334155', fontWeight: 700 }}>R$ {fmtBRL(total)}</tspan>
+                  </text>
+                )}
               </PieChart>
             </ResponsiveContainer>
         }
@@ -571,6 +577,12 @@ export function AudiGraficosTab({ year, month }: Props) {
                     );
                   }} />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                  {despMes.reduce((s, d) => s + d.value, 0) > 0 && (
+                    <text x="50%" y="46%" textAnchor="middle" dominantBaseline="middle">
+                      <tspan x="50%" dy="-7" style={{ fontSize: 9, fill: '#94a3b8', fontWeight: 500 }}>Total</tspan>
+                      <tspan x="50%" dy="14" style={{ fontSize: 10, fill: '#334155', fontWeight: 700 }}>R$ {fmtBRL(despMes.reduce((s, d) => s + d.value, 0))}</tspan>
+                    </text>
+                  )}
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -609,6 +621,12 @@ export function AudiGraficosTab({ year, month }: Props) {
                     );
                   }} />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                  {despAcum.reduce((s, d) => s + d.value, 0) > 0 && (
+                    <text x="50%" y="46%" textAnchor="middle" dominantBaseline="middle">
+                      <tspan x="50%" dy="-7" style={{ fontSize: 9, fill: '#94a3b8', fontWeight: 500 }}>Total</tspan>
+                      <tspan x="50%" dy="14" style={{ fontSize: 10, fill: '#334155', fontWeight: 700 }}>R$ {fmtBRL(despAcum.reduce((s, d) => s + d.value, 0))}</tspan>
+                    </text>
+                  )}
                 </PieChart>
               </ResponsiveContainer>
             </div>

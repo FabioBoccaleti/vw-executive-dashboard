@@ -352,6 +352,12 @@ function DonutMarca({ data, title, subtitle, brandColor }: { data: { name: strin
                   return <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-2.5 text-xs"><p className="font-bold text-slate-700 mb-1">{p.name}</p><p className="text-slate-600">R$ {fmtBRL(p.value as number)}</p><p className="font-semibold" style={{ color: p.payload.color }}>{pct}% do total</p></div>;
                 }} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                {total > 0 && (
+                  <text x="50%" y="46%" textAnchor="middle" dominantBaseline="middle">
+                    <tspan x="50%" dy="-7" style={{ fontSize: 9, fill: '#94a3b8', fontWeight: 500 }}>Total</tspan>
+                    <tspan x="50%" dy="14" style={{ fontSize: 10, fill: '#334155', fontWeight: 700 }}>R$ {fmtBRL(total)}</tspan>
+                  </text>
+                )}
               </PieChart>
             </ResponsiveContainer>
         }
