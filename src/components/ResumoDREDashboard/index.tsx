@@ -10,12 +10,13 @@ import { ConsolidadoDreTab } from './ConsolidadoDreTab';
 import { ConsolidadoGraficosTab } from './ConsolidadoGraficosTab';
 import { MensalDreTab } from './MensalDreTab';
 import { SaidasCaixaTab } from './SaidasCaixaTab';
+import { EndividamentoDRETab } from './EndividamentoDRETab';
 
 interface ResumoDREDashboardProps {
   onChangeBrand: () => void;
 }
 
-type TabId = 'vw' | 'audi' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos' | 'mensal' | 'saidas-caixa';
+type TabId = 'vw' | 'audi' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos' | 'mensal' | 'saidas-caixa' | 'endividamento-dre';
 
 const TABS: { id: TabId; label: string; color: string; activeColor: string }[] = [
   { id: 'vw',                    label: 'VW',                    color: '#001e50', activeColor: '#001e50' },
@@ -26,6 +27,7 @@ const TABS: { id: TabId; label: string; color: string; activeColor: string }[] =
   { id: 'consolidado-graficos',  label: 'Consol. Gráficos',      color: '#7c3aed', activeColor: '#5b21b6' },
   { id: 'mensal',                label: 'Mensal',                color: '#0f766e', activeColor: '#0d6660' },
   { id: 'saidas-caixa',          label: 'Saídas de Caixa',       color: '#dc2626', activeColor: '#b91c1c' },
+  { id: 'endividamento-dre',     label: 'Endividamento',          color: '#0284c7', activeColor: '#0369a1' },
 ];
 
 const MONTHS_LABEL = [
@@ -176,8 +178,10 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
           <ConsolidadoGraficosTab year={year} month={month} />
         ) : activeTab === 'mensal' ? (
           <MensalDreTab year={year} />
-        ) : (
+        ) : activeTab === 'saidas-caixa' ? (
           <SaidasCaixaTab year={year} month={month} />
+        ) : (
+          <EndividamentoDRETab year={year} month={month} />
         )}
       </div>
 
