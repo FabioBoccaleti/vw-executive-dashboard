@@ -194,7 +194,12 @@ export function AnaliseDespesasSubPage({ brand, onBack }: AnaliseDespesasSubPage
     if (!file) return;
     setError(null);
     try {
-      const text = await file.text();
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+        reader.readAsText(file, 'latin1');
+      });
       const validLines = text.split('\n').filter((l) => l.split(';').length >= 7);
       if (validLines.length === 0) {
         setError(
