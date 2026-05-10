@@ -336,7 +336,8 @@ export function ConsolidadoDreTab({ year, month }: ConsolidadoDreTabProps) {
 
     // ── MODO MENSAL ───────────────────────────────────────────────────────────
     const periods = getPrevPeriods(year, month, 3);
-    const allPeriods = [...periods, { year, month }];
+    // Período atual PRIMEIRO para que currentVw/currentAudi sejam o índice 0
+    const allPeriods = [{ year, month }, ...periods];
     const uniqueYears = [...new Set(allPeriods.map(p => p.year))] as Array<2024 | 2025 | 2026 | 2027>;
 
     const syncableDepts = DEPTS.filter(d => DEPT_TO_DEPT_KEY[d.key]);
