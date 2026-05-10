@@ -9,12 +9,13 @@ import { VwGraficosTab } from './VwGraficosTab';
 import { ConsolidadoDreTab } from './ConsolidadoDreTab';
 import { ConsolidadoGraficosTab } from './ConsolidadoGraficosTab';
 import { MensalDreTab } from './MensalDreTab';
+import { SaidasCaixaTab } from './SaidasCaixaTab';
 
 interface ResumoDREDashboardProps {
   onChangeBrand: () => void;
 }
 
-type TabId = 'vw' | 'audi' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos' | 'mensal';
+type TabId = 'vw' | 'audi' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos' | 'mensal' | 'saidas-caixa';
 
 const TABS: { id: TabId; label: string; color: string; activeColor: string }[] = [
   { id: 'vw',                    label: 'VW',                    color: '#001e50', activeColor: '#001e50' },
@@ -24,6 +25,7 @@ const TABS: { id: TabId; label: string; color: string; activeColor: string }[] =
   { id: 'consolidado',           label: 'Consolidado',           color: '#7c3aed', activeColor: '#7c3aed' },
   { id: 'consolidado-graficos',  label: 'Consol. Gráficos',      color: '#7c3aed', activeColor: '#5b21b6' },
   { id: 'mensal',                label: 'Mensal',                color: '#0f766e', activeColor: '#0d6660' },
+  { id: 'saidas-caixa',          label: 'Saídas de Caixa',       color: '#dc2626', activeColor: '#b91c1c' },
 ];
 
 const MONTHS_LABEL = [
@@ -172,8 +174,10 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
           <ConsolidadoDreTab year={year} month={month} diasUteis={diasUteis} />
         ) : activeTab === 'consolidado-graficos' ? (
           <ConsolidadoGraficosTab year={year} month={month} />
-        ) : (
+        ) : activeTab === 'mensal' ? (
           <MensalDreTab year={year} />
+        ) : (
+          <SaidasCaixaTab year={year} month={month} />
         )}
       </div>
 

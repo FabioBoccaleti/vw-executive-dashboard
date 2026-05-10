@@ -1,7 +1,7 @@
-import { Wallet } from 'lucide-react';
+import { Wallet, UserCheck } from 'lucide-react';
 
 interface FolhaSelectionPageProps {
-  onSelect: (option: 'salarios_fixo') => void;
+  onSelect: (option: 'salarios_fixo' | 'remuneracoes_pj') => void;
   onChangeBrand: () => void;
 }
 
@@ -37,6 +37,21 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">
                 Salários Fixo
+              </h2>
+            </div>
+          </button>
+
+          {/* Card — Remunerações PJ */}
+          <button
+            onClick={() => onSelect('remuneracoes_pj')}
+            className="flex-1 max-w-xs mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-teal-50 group-hover:bg-teal-100 transition-colors">
+              <UserCheck className="w-10 h-10 text-teal-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Remunerações PJ
               </h2>
             </div>
           </button>
