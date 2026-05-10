@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BRAND_CONFIGS, type Brand } from '@/lib/brands';
-import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, TrendingUp, Settings, LogOut, Users, Home } from 'lucide-react';
+import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, TrendingUp, Settings, LogOut, Users, Home, Activity } from 'lucide-react';
 import { PasswordDialog } from '@/components/PasswordDialog';
 import { useAuth } from '@/contexts/useAuth';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
 
 const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'vw_outros', 'audi_outros'];
-const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis'];
+const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas'];
 const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despesas'];
 
 interface BrandSelectorProps {
@@ -27,14 +27,16 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
   const showVendasBonificacoes   = canAccessModule('vendas_bonificacoes');
   const showFolhaPagamento       = canAccessModule('folha_pagamento');
   const showCustosAlugueis       = canAccessModule('custos_alugueis');
+  const showAnaliseDespesas      = canAccessModule('analise_evolutiva_despesas');
 
   const allowedDemoBrands = DEMONSTRATIVO_BRANDS.filter(b => canAccessBrand(b as any));
   const allowedDirectBrands = DIRECT_BRANDS.filter(b => {
-    if (b === 'aprovacao_despesas')   return showDespesas;
-    if (b === 'fluxo_caixa')          return showFluxoCaixa;
-    if (b === 'vendas_bonificacoes')  return showVendasBonificacoes;
-    if (b === 'folha_pagamento')      return showFolhaPagamento;
-    if (b === 'custos_alugueis')      return showCustosAlugueis;
+    if (b === 'aprovacao_despesas')          return showDespesas;
+    if (b === 'fluxo_caixa')                  return showFluxoCaixa;
+    if (b === 'vendas_bonificacoes')          return showVendasBonificacoes;
+    if (b === 'folha_pagamento')              return showFolhaPagamento;
+    if (b === 'custos_alugueis')              return showCustosAlugueis;
+    if (b === 'analise_evolutiva_despesas')   return showAnaliseDespesas;
     return false;
   });
 
@@ -74,13 +76,14 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
   };
 
   const getBrandIcon = (brand: Brand, size = 'w-8 h-8') => {
-    if (brand === 'consolidado')          return <Layers className={size} />;
-    if (brand === 'aprovacao_despesas')   return <CheckCircle className={size} />;
-    if (brand === 'fluxo_caixa')          return <DollarSign className={size} />;
-    if (brand === 'vendas_bonificacoes')  return <TrendingUp className={size} />;
-    if (brand === 'folha_pagamento')      return <Users className={size} />;
-    if (brand === 'custos_alugueis')      return <Home className={size} />;
-    if (brand.includes('vw'))             return <Car className={size} />;
+    if (brand === 'consolidado')                    return <Layers className={size} />;
+    if (brand === 'aprovacao_despesas')              return <CheckCircle className={size} />;
+    if (brand === 'fluxo_caixa')                     return <DollarSign className={size} />;
+    if (brand === 'vendas_bonificacoes')             return <TrendingUp className={size} />;
+    if (brand === 'folha_pagamento')                 return <Users className={size} />;
+    if (brand === 'custos_alugueis')                 return <Home className={size} />;
+    if (brand === 'analise_evolutiva_despesas')      return <Activity className={size} />;
+    if (brand.includes('vw'))                        return <Car className={size} />;
     return <Building2 className={size} />;
   };
 

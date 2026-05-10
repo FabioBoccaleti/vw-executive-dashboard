@@ -22,6 +22,7 @@ import { LoginScreen } from '@/components/LoginScreen'
 import { AdminPage } from '@/components/AdminPage'
 import { CustosAlugueisDashboard } from '@/components/CustosAlugueisDashboard'
 import { ResumoDREDashboard } from '@/components/ResumoDREDashboard'
+import { AnaliseDespesasDashboard } from '@/components/AnaliseDespesasDashboard'
 
 function AppContent() {
   const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
@@ -263,6 +264,8 @@ function AppContent() {
         )
       ) : brand === 'custos_alugueis' ? (
         <CustosAlugueisDashboard onChangeBrand={handleChangeBrand} />
+      ) : brand === 'analise_evolutiva_despesas' ? (
+        <AnaliseDespesasDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'resumo_dre' ? (
         <ResumoDREDashboard onChangeBrand={handleChangeBrand} />
       ) : (
