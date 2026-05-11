@@ -141,20 +141,19 @@ export function AnaliseDespesasSubPage({ brand, onBack }: AnaliseDespesasSubPage
       loadAnaliseDespesasRaw(brand, year, month) as Promise<{ rawText: string } | null>,
   };
 
-  // ── Computa YTD (Jan → mês anterior) ─────────────────────────────────────
+  // ── Computa YTD (Jan → mês selecionado, inclusive) ───────────────────────
   async function computeYtd(year: number, month: number) {
-    if (month <= 1) {
+    if (month <= 0) {
       setYtdAccountsSums({});
       return;
     }
-    const months = Array.from({ length: month - 1 }, (_, i) => i + 1);
+    const months = Array.from({ length: month }, (_, i) => i + 1);
     const rawMap = await loadMultipleMonthsAnaliseDespesas(brand, year, months);
     const sums: Record<string, number> = {};
     for (const rawText of Object.values(rawMap)) {
       const parsed = parseBalancete(rawText);
       for (const [k, acc] of Object.entries(parsed.accounts)) {
-        if (!k.startsWith('5.')) continue;
-        sums[k] = (sums[k] ?? 0) + acc.saldoAtual;
+        sums[k] = (sums[k] ?? 0) + (acc.valCred - acc.valDeb);
       }
     }
     setYtdAccountsSums(sums);
