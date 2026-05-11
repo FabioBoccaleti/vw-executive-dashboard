@@ -39,6 +39,11 @@ function parseVal(v: string | number | undefined): number {
   return parseFloat(String(v ?? '').replace(/\./g, '').replace(',', '.')) || 0;
 }
 
+function pctStr(val: number, rol: number): string {
+  if (!rol) return '—';
+  return ((val / rol) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+}
+
 // ─── Linhas da tabela ─────────────────────────────────────────────────────────
 
 interface DreLineConfig {
@@ -47,6 +52,7 @@ interface DreLineConfig {
   isSubtotal?: boolean;
   isTotal?: boolean;
   indent?: boolean;
+  isPct?: boolean;
   separator?: boolean;
 }
 
@@ -59,6 +65,7 @@ const DRE_LINES: DreLineConfig[] = [
   { label: 'Outras Receitas Operacionais',               field: 'outrasReceitasOperacionais',     indent: true },
   { label: '(-) Outras Despesas Operacionais',           field: 'outrasDespesasOperacionais',     indent: true },
   { label: 'MARGEM DE CONTRIBUIÇÃO',                     field: 'margemContribuicao',             isTotal: true },
+  { label: '% MARGEM DE CONTRIBUIÇÃO',                   field: 'margemContribuicao',             isPct: true },
   { label: '',                                            field: 'margemContribuicao',             separator: true },
   { label: '(-) Despesas c/ Pessoal',                    field: 'despPessoal',                    indent: true },
   { label: '(-) Despesas c/ Serv. de Terceiros',         field: 'despServTerceiros',              indent: true },
@@ -66,6 +73,7 @@ const DRE_LINES: DreLineConfig[] = [
   { label: '(-) Despesas c/ Funcionamento',              field: 'despFuncionamento',              indent: true },
   { label: '(-) Despesas c/ Vendas',                     field: 'despVendas',                     indent: true },
   { label: 'LUCRO (PREJUÍZO) OPERACIONAL LÍQUIDO',       field: 'lucroPrejOperacionalLiquido',    isTotal: true },
+  { label: '% LUCRO (PREJUÍZO) OPERACIONAL LÍQUIDO',     field: 'lucroPrejOperacionalLiquido',    isPct: true },
   { label: '',                                            field: 'lucroPrejOperacionalLiquido',    separator: true },
   { label: 'Amortizações e Depreciações',                field: 'amortizacoesDepreciacoes',       indent: true },
   { label: 'Outras Receitas Financeiras',                field: 'outrasReceitasFinanceiras',      indent: true },
@@ -76,6 +84,7 @@ const DRE_LINES: DreLineConfig[] = [
   { label: '(-) Provisões IRPJ e C.S.',                  field: 'provisoesIrpjCs',                indent: true },
   { label: '(-) Participações',                          field: 'participacoes',                  indent: true },
   { label: 'LUCRO LÍQUIDO DO EXERCÍCIO',                 field: 'lucroLiquidoExercicio',          isTotal: true },
+  { label: '% LUCRO LÍQUIDO DO EXERCÍCIO',               field: 'lucroLiquidoExercicio',          isPct: true },
 ];
 
 const DEPT_FIELDS: (keyof DreVwDept)[] = [
@@ -239,6 +248,13 @@ function EvolucaoMensalTable({ title, subtitle, color, colorDrk, monthRows }: Ev
               if (line.separator) {
                 return <tr key={idx}><td colSpan={NCOLS} className="h-px bg-slate-100" /></tr>;
               }
+              if (line.isPct) return (
+                <tr key={idx} className="border-b border-slate-100 bg-slate-50/50 text-slate-500">
+                  <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic">{line.label}</td>
+                  {monthRows.map((mr, mi) => <td key={mi} className="px-2 py-0.5 text-right text-[0.68rem] italic">{pctStr(mr.totals[line.field] ?? 0, mr.totals.receitaOperacionalLiquida ?? 0)}</td>)}
+                  <td className="px-3 py-0.5 text-right bg-slate-50 text-[0.68rem] italic font-medium">{pctStr(annualTotal[line.field] ?? 0, annualTotal.receitaOperacionalLiquida ?? 0)}</td>
+                </tr>
+              );
 
               const isQuant = line.field === 'quant' && idx === 0;
               const rowStyle = line.isTotal ? { backgroundColor: color } : undefined;
@@ -615,6 +631,13 @@ function PrintMensalTable({ title, subtitle, color, colorDrk, monthRows }: {
             if (line.separator) {
               return <tr key={idx}><td colSpan={NCOLS} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
             }
+            if (line.isPct) return (
+              <tr key={idx} style={{ backgroundColor: '#f8fafc', color: '#64748b', borderBottom: '1px solid #f1f5f9', fontStyle: 'italic' }}>
+                <td style={{ padding: '2px 14px', fontSize: '6.5pt' }}>{line.label}</td>
+                {monthRows.map((mr, mi) => <td key={mi} style={{ textAlign: 'right', padding: '2px 3px', fontSize: '6.5pt' }}>{pctStr(mr.totals[line.field] ?? 0, mr.totals.receitaOperacionalLiquida ?? 0)}</td>)}
+                <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#374151', fontSize: '6.5pt' }}>{pctStr(annualTotal[line.field] ?? 0, annualTotal.receitaOperacionalLiquida ?? 0)}</td>
+              </tr>
+            );
 
             const isQuant = line.field === 'quant' && idx === 0;
             const rowStyle: React.CSSProperties = line.isTotal

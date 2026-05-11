@@ -56,6 +56,11 @@ function parseVal(v: string | number): number {
   return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
 }
 
+function pctStr(val: number, rol: number): string {
+  if (!rol) return '—';
+  return ((val / rol) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+}
+
 // ─── Linhas da tabela (idênticas à Audi) ─────────────────────────────────────
 
 interface DreLineConfig {
@@ -66,6 +71,7 @@ interface DreLineConfig {
   isTotal?: boolean;
   indent?: boolean;
   isNegative?: boolean;
+  isPct?: boolean;
   separator?: boolean;
 }
 
@@ -78,6 +84,7 @@ const DRE_LINES: DreLineConfig[] = [
   { label: 'Outras Receitas Operacionais',               field: 'outrasReceitasOperacionais',     indent: true },
   { label: '(-) Outras Despesas Operacionais',           field: 'outrasDespesasOperacionais',     indent: true, isNegative: true },
   { label: 'MARGEM DE CONTRIBUIÇÃO',                     field: 'margemContribuicao',             isTotal: true },
+  { label: '% MARGEM DE CONTRIBUIÇÃO',                   field: 'margemContribuicao',             isPct: true },
   { label: '',                                            field: 'margemContribuicao',             separator: true },
   { label: '(-) Despesas c/ Pessoal',                    field: 'despPessoal',                    indent: true, isNegative: true },
   { label: '(-) Despesas c/ Serv. de Terceiros',         field: 'despServTerceiros',              indent: true, isNegative: true },
@@ -85,6 +92,7 @@ const DRE_LINES: DreLineConfig[] = [
   { label: '(-) Despesas c/ Funcionamento',              field: 'despFuncionamento',              indent: true, isNegative: true },
   { label: '(-) Despesas c/ Vendas',                     field: 'despVendas',                     indent: true, isNegative: true },
   { label: 'LUCRO (PREJUÍZO) OPERACIONAL LÍQUIDO',       field: 'lucroPrejOperacionalLiquido',    isTotal: true },
+  { label: '% LUCRO (PREJUÍZO) OPERACIONAL LÍQUIDO',     field: 'lucroPrejOperacionalLiquido',    isPct: true },
   { label: '',                                            field: 'lucroPrejOperacionalLiquido',    separator: true },
   { label: 'Amortizações e Depreciações',                field: 'amortizacoesDepreciacoes',       indent: true, isNegative: true },
   { label: 'Outras Receitas Financeiras',                field: 'outrasReceitasFinanceiras',      indent: true },
@@ -95,6 +103,7 @@ const DRE_LINES: DreLineConfig[] = [
   { label: '(-) Provisões IRPJ e C.S.',                  field: 'provisoesIrpjCs',                indent: true, isNegative: true },
   { label: '(-) Participações',                          field: 'participacoes',                  indent: true, isNegative: true },
   { label: 'LUCRO LÍQUIDO DO EXERCÍCIO',                 field: 'lucroLiquidoExercicio',          isTotal: true },
+  { label: '% LUCRO LÍQUIDO DO EXERCÍCIO',               field: 'lucroLiquidoExercicio',          isPct: true },
 ];
 
 // ─── Campos de departamento (para somar no modo anual) ───────────────────────
@@ -563,6 +572,17 @@ function ResumoTable({ data, deptList, year, month }: {
               if (line.separator) {
                 return <tr key={idx}><td colSpan={NCOLS} className="h-px bg-slate-100" /></tr>;
               }
+              if (line.isPct) {
+                const _rT = DEPTS.reduce((s, d) => d.key === 'adm' ? s : s + parseVal(data[d.key].receitaOperacionalLiquida), 0);
+                const _vT = DEPTS.reduce((s, d) => d.key === 'adm' ? s : s + parseVal(data[d.key][line.field]), 0);
+                return (
+                  <tr key={idx} className="border-b border-slate-100 bg-slate-50/50 text-slate-500">
+                    <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic">{line.label}</td>
+                    {DEPTS.map(d => <td key={d.key} className="px-3 py-0.5 text-right text-[0.68rem] italic">{pctStr(parseVal(data[d.key][line.field]), parseVal(data[d.key].receitaOperacionalLiquida))}</td>)}
+                    <td className="px-3 py-0.5 text-right bg-slate-50 text-[0.68rem] italic font-medium">{pctStr(_vT, _rT)}</td>
+                  </tr>
+                );
+              }
               const isQuant = line.field === 'quant' && idx === 0;
               const rowStyle = line.isTotal ? { backgroundColor: VW_COLOR } : undefined;
               const rowClass = line.isTotal
@@ -646,6 +666,22 @@ function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, mon
             {DRE_LINES.map((line, idx) => {
               if (line.separator) {
                 return <tr key={idx}><td colSpan={totalCols} className="h-px bg-slate-100" /></tr>;
+              }
+              if (line.isPct) {
+                const _allD = [...prevDepts, dept];
+                const _allP = [...prevPeriods, { year, month }];
+                const _yrD = _allD.filter((_, i) => _allP[i].year === year);
+                const _val = _yrD.reduce((s, d) => s + parseVal(d[line.field]), 0);
+                const _rol = _yrD.reduce((s, d) => s + parseVal(d.receitaOperacionalLiquida), 0);
+                return (
+                  <tr key={idx} className="border-b border-slate-100 bg-slate-50/50 text-slate-500">
+                    <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic">{line.label}</td>
+                    {prevDepts.map((pd, pi) => <td key={pi} className="px-3 py-0.5 text-right text-[0.68rem] italic">{pctStr(parseVal(pd[line.field]), parseVal(pd.receitaOperacionalLiquida))}</td>)}
+                    <td className="px-2 py-0.5 text-right text-[0.68rem] italic">{pctStr(parseVal(dept[line.field]), parseVal(dept.receitaOperacionalLiquida))}</td>
+                    <td className="px-2 py-0.5 text-right text-[0.68rem] border-l border-slate-200">—</td>
+                    <td className="px-3 py-0.5 text-right bg-slate-50 text-[0.68rem] italic font-medium">{pctStr(_val, _rol)}</td>
+                  </tr>
+                );
               }
               const isQuant = line.field === 'quant' && idx === 0;
               const isAdmROL = deptKey === 'adm' && line.field === 'receitaOperacionalLiquida';
@@ -915,6 +951,13 @@ function VwEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreVwRow[
           <tbody>
             {DRE_LINES.map((line, idx) => {
               if (line.separator) return <tr key={idx}><td colSpan={NCOLS} className="h-px bg-slate-100" /></tr>;
+              if (line.isPct) return (
+                <tr key={idx} className="border-b border-slate-100 bg-slate-50/50 text-slate-500">
+                  <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic">{line.label}</td>
+                  {monthlyTotals.map((mt, mi) => <td key={mi} className="px-2 py-0.5 text-right text-[0.68rem] italic">{pctStr(mt[line.field] ?? 0, mt.receitaOperacionalLiquida ?? 0)}</td>)}
+                  <td className="px-3 py-0.5 text-right bg-slate-50 text-[0.68rem] italic font-medium">{pctStr(annualTotal[line.field] ?? 0, annualTotal.receitaOperacionalLiquida ?? 0)}</td>
+                </tr>
+              );
               const isQuant = line.field === 'quant' && idx === 0;
               const rowClass = line.isTotal ? 'text-white font-bold' : line.isSubtotal ? 'bg-slate-100 font-semibold text-black' : 'hover:bg-slate-50 text-black';
               return (
@@ -964,6 +1007,14 @@ function VwDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
           <tbody>
             {DRE_LINES.map((line, idx) => {
               if (line.separator) return <tr key={idx}><td colSpan={NCOLS} className="h-px bg-slate-100" /></tr>;
+              if (line.isPct) return (
+                <tr key={idx} className="border-b border-slate-100 bg-slate-50/50 text-slate-500">
+                  <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic">{line.label}</td>
+                  {allMonthRows.map((row, mi) => <td key={mi} className="px-2 py-0.5 text-right text-[0.68rem] italic">{isAdm ? '—' : pctStr(parseVal(row[deptKey][line.field]), parseVal(row[deptKey].receitaOperacionalLiquida))}</td>)}
+                  <td className="px-2 py-0.5 text-right text-[0.68rem] border-l border-slate-200">—</td>
+                  <td className="px-3 py-0.5 text-right bg-slate-50 text-[0.68rem] italic font-medium">{isAdm ? '—' : pctStr(annualTotals[line.field] ?? 0, annualTotals.receitaOperacionalLiquida ?? 0)}</td>
+                </tr>
+              );
               const isQuant = line.field === 'quant' && idx === 0;
               const isAdmROL = isAdm && line.field === 'receitaOperacionalLiquida';
               const rowClass = line.isTotal ? 'text-white font-bold' : line.isSubtotal ? 'bg-slate-100 font-semibold text-black' : 'hover:bg-slate-50 text-black';
@@ -1083,6 +1134,17 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreVwRow; dep
         <tbody>
           {DRE_LINES.map((line, idx) => {
             if (line.separator) return <tr key={idx}><td colSpan={NCOLS} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
+            if (line.isPct) {
+              const _rT = DEPTS.reduce((s, d) => d.key === 'adm' ? s : s + parseVal(data[d.key].receitaOperacionalLiquida), 0);
+              const _vT = DEPTS.reduce((s, d) => d.key === 'adm' ? s : s + parseVal(data[d.key][line.field]), 0);
+              return (
+                <tr key={idx} style={{ backgroundColor: '#f8fafc', color: '#64748b', borderBottom: '1px solid #f1f5f9', fontStyle: 'italic' }}>
+                  <td style={{ padding: '2px 14px', fontSize: '6.5pt' }}>{line.label}</td>
+                  {DEPTS.map(d => <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px', fontSize: '6.5pt' }}>{pctStr(parseVal(data[d.key][line.field]), parseVal(data[d.key].receitaOperacionalLiquida))}</td>)}
+                  <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#374151', fontSize: '6.5pt' }}>{pctStr(_vT, _rT)}</td>
+                </tr>
+              );
+            }
             const isQuant = line.field === 'quant' && idx === 0;
             const rowStyle: React.CSSProperties = line.isTotal
               ? { backgroundImage: `linear-gradient(to bottom, ${VW_COLOR} 0%, ${VW_COLOR} 100%)`, backgroundColor: VW_COLOR, color: 'white', borderBottom: '1px solid #f1f5f9' }
@@ -1141,6 +1203,18 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
         <tbody>
           {DRE_LINES.map((line, idx) => {
             if (line.separator) return <tr key={idx}><td colSpan={7} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
+            if (line.isPct) {
+              const _isAdm = deptKey === 'adm';
+              return (
+                <tr key={idx} style={{ backgroundColor: '#f8fafc', color: '#64748b', borderBottom: '1px solid #f1f5f9', fontStyle: 'italic' }}>
+                  <td style={{ padding: '2px 14px', fontSize: '6.5pt' }}>{line.label}</td>
+                  {prevDepts.map((pd, pi) => <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', fontSize: '6.5pt' }}>{_isAdm ? '—' : pctStr(parseVal(pd[line.field]), parseVal(pd.receitaOperacionalLiquida))}</td>)}
+                  <td style={{ textAlign: 'right', padding: '2px 4px', fontSize: '6.5pt' }}>{_isAdm ? '—' : pctStr(parseVal(dept[line.field]), parseVal(dept.receitaOperacionalLiquida))}</td>
+                  <td style={{ textAlign: 'right', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', fontSize: '6.5pt' }}>—</td>
+                  <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#374151', fontSize: '6.5pt' }}>—</td>
+                </tr>
+              );
+            }
             const isQuant = line.field === 'quant' && idx === 0;
             const isAdmROL = deptKey === 'adm' && line.field === 'receitaOperacionalLiquida';
             const rowStyle: React.CSSProperties = line.isTotal
