@@ -18,22 +18,22 @@ const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function parseG5Leaves(text: string): Record<string, { desc: string; saldoAtual: number }> {
+function parseG5Leaves(text: string): Record<string, { desc: string; valor: number }> {
   const lines = text.split('\n').filter(l => l.trim());
-  const all: Record<string, { desc: string; saldoAtual: number }> = {};
+  const all: Record<string, { desc: string; valor: number }> = {};
   for (const line of lines) {
     const parts = line.split(';');
     if (parts.length < 7) continue;
-    const [nivel, conta, desc, , , , saldoAtual] = parts;
+    const [nivel, conta, desc, , valDeb, valCred] = parts;
     if (nivel?.trim() === 'T') continue;
     const id = conta?.trim();
     if (!id || !id.startsWith('5.')) continue;
     const parse = (v: string) => parseFloat((v || '0').trim().replace(/\./g, '').replace(',', '.')) || 0;
-    all[id] = { desc: desc?.trim() || id, saldoAtual: parse(saldoAtual) };
+    all[id] = { desc: desc?.trim() || id, valor: parse(valDeb) - parse(valCred) };
   }
   // Filtra apenas folhas (sem filhos)
   const keys = Object.keys(all);
-  const result: Record<string, { desc: string; saldoAtual: number }> = {};
+  const result: Record<string, { desc: string; valor: number }> = {};
   for (const k of keys) {
     if (!keys.some(o => o !== k && o.startsWith(k + '.'))) result[k] = all[k];
   }
@@ -50,7 +50,7 @@ function buildTipoSums(
     for (const [conta, acc] of Object.entries(leaves)) {
       const label = tiposMap[conta]?.trim() || acc.desc;
       if (!label) continue;
-      result[label] = (result[label] ?? 0) + Math.abs(acc.saldoAtual);
+      result[label] = (result[label] ?? 0) + Math.abs(acc.valor);
     }
   }
   return result;
