@@ -55,7 +55,8 @@ export type FolhaSubModuleId =
   | 'folha.relacao'
   | 'folha.audi'
   | 'folha.vw'
-  | 'folha.total';
+  | 'folha.total'
+  | 'folha.pj';
 
 export const FOLHA_SUB_MODULE_LABELS: Record<FolhaSubModuleId, string> = {
   'folha.analise': 'Análise',
@@ -63,6 +64,7 @@ export const FOLHA_SUB_MODULE_LABELS: Record<FolhaSubModuleId, string> = {
   'folha.audi':   'Audi',
   'folha.vw':     'VW',
   'folha.total':  'Total',
+  'folha.pj':     'Remunerações PJ',
 };
 
 // Subpermissões do módulo central_vendas_vw

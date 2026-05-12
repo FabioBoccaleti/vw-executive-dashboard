@@ -12,6 +12,7 @@ import { FinanciamentoBancoVolksDashboard } from '@/components/VendasBonificacoe
 import { VPecasCondicaoPagamentoDashboard } from '@/components/VendasBonificacoesDashboard/VPecasCondicaoPagamentoDashboard'
 import { FolhaSelectionPage } from '@/components/FolhaPagamentoDashboard/FolhaSelectionPage'
 import { SalariosFixosDashboard } from '@/components/FolhaPagamentoDashboard/SalariosFixosDashboard'
+import { RemuneracoesPJDashboard } from '@/components/FolhaPagamentoDashboard/RemuneracoesPJDashboard'
 import { CadastrosPage } from '@/components/CadastrosPage'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
@@ -228,33 +229,7 @@ function AppContent() {
         ) : folhaSubPage === 'salarios_fixo' ? (
           <SalariosFixosDashboard onBack={() => setFolhaSubPage('selection')} />
         ) : folhaSubPage === 'remuneracoes_pj' ? (
-          <div className="min-h-screen bg-slate-100 flex flex-col">
-            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
-              <div>
-                <h1 className="text-lg font-bold text-slate-800">Remunerações PJ</h1>
-                <p className="text-xs text-slate-500 mt-0.5">Folha de Pagamento</p>
-              </div>
-              <button
-                onClick={() => setFolhaSubPage('selection')}
-                className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
-              >
-                ← Voltar
-              </button>
-            </header>
-            <div className="flex-1 flex items-center justify-center p-8">
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 flex flex-col items-center gap-5 max-w-md w-full text-center">
-                <div className="p-5 rounded-full bg-orange-50">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 21H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/><path d="m12 7 4 4-4 4"/><path d="M8 12h8"/><path d="M18 2h2a2 2 0 0 1 2 2v2"/><path d="M22 8v2"/><path d="M22 14v2"/><path d="M22 20v2"/><path d="M18 22h2"/></svg>
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-700 mb-2">Em desenvolvimento</h2>
-                  <p className="text-sm text-slate-500 leading-relaxed">
-                    A aba <strong>Remunerações PJ</strong> está sendo desenvolvida e em breve estará disponível.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <RemuneracoesPJDashboard onBack={() => setFolhaSubPage('selection')} />
         ) : null
       ) : brand === 'vendas_bonificacoes' ? (
         vendasSubPage === 'selection' ? (
