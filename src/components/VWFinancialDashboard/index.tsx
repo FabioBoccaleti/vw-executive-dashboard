@@ -5287,17 +5287,18 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                       <div className="p-6">
                         <ChartContainer config={{}} className="h-[350px] w-full">
                           <ComposedChart data={dynamicMonths.map((month, index) => {
-                            const vendas = [295637, 226990, 152428, 231056, 186334, 224765, 274123, 261008, 177273, 146230, 161814, 107544];
-                            const lucros = [36424, 24968, 14607, 24554, 16823, 23176, 7967, 1135, 3679, 6500, 5067, 6230];
+                            const vendas = sharedMetricsData.mercadoLivre?.vendas || [];
+                            const lucros = sharedMetricsData.mercadoLivre?.lucro || [];
                             
-                            const vendaAtual = vendas[index];
-                            const vendaAnterior = index > 0 ? vendas[index - 1] : vendaAtual;
-                            const variacaoMesAnt = index > 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
-                            const margem = (lucros[index] / vendaAtual) * 100;
+                            const vendaAtual = vendas[index] ?? 0;
+                            const vendaAnterior = index > 0 ? (vendas[index - 1] ?? vendaAtual) : vendaAtual;
+                            const variacaoMesAnt = index > 0 && vendaAnterior !== 0 ? ((vendaAtual - vendaAnterior) / vendaAnterior) * 100 : 0;
+                            const margem = vendaAtual !== 0 ? ((lucros[index] ?? 0) / vendaAtual) * 100 : 0;
                             
                             return {
                               month,
                               receitaLiquida: vendaAtual,
+                              lucroBruto: lucros[index] ?? 0,
                               margem: margem,
                               variacaoMesAnt: variacaoMesAnt
                             };
@@ -5335,9 +5336,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
                               content={({ active, payload }) => {
                                 if (active && payload && payload.length) {
                                   const data = payload[0].payload;
-                                  const lucros = [36424, 24968, 14607, 24554, 16823, 23176, 7967, 1135, 3679, 6500, 5067, 6230];
-                                  const monthIndex = metricsData.months.indexOf(data.month);
-                                  const lucroBruto = lucros[monthIndex];
+                                  const lucroBruto = data.lucroBruto ?? 0;
                                   
                                   return (
                                     <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-xl border-2 border-slate-200 dark:border-slate-700">
