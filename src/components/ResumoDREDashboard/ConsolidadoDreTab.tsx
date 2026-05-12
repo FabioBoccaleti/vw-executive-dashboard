@@ -1099,7 +1099,7 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreVwRow; dep
                 {DEPTS.map(d => {
                   const val = data[d.key][line.field];
                   const display = isQuant ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—') : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
-                  return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{display}</td>;
+                  return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{display}</td>;
                 })}
                 <td className={line.isTotal ? 'con-cell-total' : ''}
                   style={line.isTotal
@@ -1185,12 +1185,12 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
                 <td style={{ padding: `2px ${line.indent ? '14px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
                 {prevDepts.map((pd, pi) => {
                   const v = pd[line.field], num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
-                  return <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', color: '#111' }}>{isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—')}</td>;
+                  return <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', color: line.isTotal ? 'white' : '#111', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—')}</td>;
                 })}
-                <td style={{ textAlign: 'right', padding: '2px 4px' }}>
+                <td style={{ textAlign: 'right', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>
                   {isQuant ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—') : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')}
                 </td>
-                <td style={{ textAlign: 'right', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', color: '#111', fontSize: '6.5pt' }}>{varMM || '—'}</td>
+                <td style={{ textAlign: 'right', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', color: line.isTotal ? 'white' : '#111', fontSize: '6.5pt' }}>{varMM || '—'}</td>
                 <td className={line.isTotal ? 'con-cell-total' : ''}
                   style={line.isTotal
                     ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${CON_COLOR_DRK} 0%, ${CON_COLOR_DRK} 100%)`, backgroundColor: CON_COLOR_DRK, color: 'white' }
@@ -1231,7 +1231,7 @@ function PrintAjustesTable({ data, year, month }: { data: DreVwRow; year: number
         <tbody>
           <tr className="con-row-total" style={{ backgroundImage: `linear-gradient(to bottom, ${CON_COLOR} 0%, ${CON_COLOR} 100%)`, backgroundColor: CON_COLOR, color: 'white' }}>
             <td style={{ padding: '2px 6px', fontWeight: 700 }}>Lucro Líquido do Exercício</td>
-            {DEPTS.map(d => { const v = data[d.key].lucroLiquidoExercicio; return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{v ? fmtNum(v) : '—'}</td>; })}
+            {DEPTS.map(d => { const v = data[d.key].lucroLiquidoExercicio; return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 700 }}>{v ? fmtNum(v) : '—'}</td>; })}
             <td className="con-cell-total" style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${CON_COLOR_DRK} 0%, ${CON_COLOR_DRK} 100%)`, backgroundColor: CON_COLOR_DRK }}>{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
           </tr>
           {data.ajustes.map((row, i) => (
@@ -1243,7 +1243,7 @@ function PrintAjustesTable({ data, year, month }: { data: DreVwRow; year: number
           ))}
           <tr className="con-row-total" style={{ backgroundImage: `linear-gradient(to bottom, ${CON_COLOR} 0%, ${CON_COLOR} 100%)`, backgroundColor: CON_COLOR, color: 'white' }}>
             <td style={{ padding: '3px 6px', fontWeight: 700 }}>RESULTADO DO PERÍODO AJUSTADO</td>
-            {DEPTS.map(d => { const liq = parseVal(data[d.key].lucroLiquidoExercicio); const adj = data.ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0); return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{(liq + adj) !== 0 ? (liq + adj).toLocaleString('pt-BR') : '—'}</td>; })}
+            {DEPTS.map(d => { const liq = parseVal(data[d.key].lucroLiquidoExercicio); const adj = data.ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0); return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 700 }}>{(liq + adj) !== 0 ? (liq + adj).toLocaleString('pt-BR') : '—'}</td>; })}
             <td className="con-cell-total" style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${CON_COLOR_DRK} 0%, ${CON_COLOR_DRK} 100%)`, backgroundColor: CON_COLOR_DRK }}>{totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}</td>
           </tr>
         </tbody>

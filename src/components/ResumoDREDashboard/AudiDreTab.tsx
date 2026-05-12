@@ -1253,7 +1253,7 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
                   const display = isQuant
                     ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
                     : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
-                  return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{display}</td>;
+                  return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{display}</td>;
                 })}
                 <td className={line.isTotal ? 'dre-cell-total' : ''} style={totalCellStyle}>{totalVal}</td>
               </tr>
@@ -1348,9 +1348,9 @@ function PrintDeptTable({
                   const display = isAdmROL
                     ? '0,00'
                     : isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
-                  return <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', color: '#111111' }}>{display}</td>;
+                  return <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', color: '#111111', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{display}</td>;
                 })}
-                <td style={{ textAlign: 'right', padding: '2px 4px' }}>
+                <td style={{ textAlign: 'right', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>
                   {isAdmROL
                     ? '0,00'
                     : isQuant
@@ -1396,7 +1396,7 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
             <td style={{ padding: '2px 6px', fontWeight: 700 }}>Lucro Líquido do Exercício</td>
             {DEPTS.map(d => {
               const v = data[d.key].lucroLiquidoExercicio;
-              return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{v ? fmtNum(v) : '—'}</td>;
+              return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 700 }}>{v ? fmtNum(v) : '—'}</td>;
             })}
             <td className="dre-cell-total" style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827' }}>{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
           </tr>
@@ -1424,7 +1424,7 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
               const liq = parseVal(data[d.key].lucroLiquidoExercicio);
               const adj = data.ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0);
               const total = liq + adj;
-              return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>{total !== 0 ? total.toLocaleString('pt-BR') : '—'}</td>;
+              return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 700 }}>{total !== 0 ? total.toLocaleString('pt-BR') : '—'}</td>;
             })}
             <td className="dre-cell-total" style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827' }}>
               {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}
