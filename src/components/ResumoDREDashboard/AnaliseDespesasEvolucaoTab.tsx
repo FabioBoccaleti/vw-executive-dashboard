@@ -7,6 +7,7 @@ import {
 import {
   loadMultipleMonthsAnaliseDespesas,
   loadAnaliseDespesasTipos,
+  loadAnaliseDespesasIndex,
   type AnaliseBrand,
 } from '@/components/AnaliseDespesasDashboard/analiseDespesasStorage';
 
@@ -87,16 +88,36 @@ function EvolucaoContent({ brand, year, month }: { brand: AnaliseBrand; year: nu
   const [loading, setLoading]   = useState(true);
   const [rows, setRows]         = useState<Row[]>([]);
   const [hasData, setHasData]   = useState(false);
+  // Mês efetivo: detectado automaticamente (mais recente com dados), cai no month do seletor
+  const [effectiveMonth, setEffectiveMonth] = useState<number>(month);
 
   const brandColor  = brand === 'vw' ? VW_COLOR : AUDI_COLOR;
   const prevYear    = year - 1;
-  const monthsList  = month === 0
-    ? Array.from({ length: 12 }, (_, i) => i + 1)
-    : Array.from({ length: month }, (_, i) => i + 1);
 
-  const lastMonthIdx  = month === 0 ? 11 : month - 1;
-  const accumLabel     = month === 0 ? `Jan–Dez/${year}`     : `Jan–${MONTHS_SHORT[lastMonthIdx]}/${year}`;
-  const accumLabelPrev = month === 0 ? `Jan–Dez/${prevYear}` : `Jan–${MONTHS_SHORT[lastMonthIdx]}/${prevYear}`;
+  // Detecta o mês mais recente com dados importados para essa marca/ano
+  useEffect(() => {
+    loadAnaliseDespesasIndex(brand).then(index => {
+      const yearStr = String(year);
+      const months = Object.keys(index)
+        .filter(k => k.startsWith(yearStr + '_'))
+        .map(k => parseInt(k.split('_')[1]))
+        .filter(m => m >= 1 && m <= 12);
+      if (months.length > 0) {
+        setEffectiveMonth(Math.max(...months));
+      } else {
+        setEffectiveMonth(month);
+      }
+    });
+  }, [brand, year]);
+
+  const activeMonth = effectiveMonth;
+  const monthsList  = activeMonth === 0
+    ? Array.from({ length: 12 }, (_, i) => i + 1)
+    : Array.from({ length: activeMonth }, (_, i) => i + 1);
+
+  const lastMonthIdx  = activeMonth === 0 ? 11 : activeMonth - 1;
+  const accumLabel     = activeMonth === 0 ? `Jan–Dez/${year}`     : `Jan–${MONTHS_SHORT[lastMonthIdx]}/${year}`;
+  const accumLabelPrev = activeMonth === 0 ? `Jan–Dez/${prevYear}` : `Jan–${MONTHS_SHORT[lastMonthIdx]}/${prevYear}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -125,7 +146,7 @@ function EvolucaoContent({ brand, year, month }: { brand: AnaliseBrand; year: nu
     });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [brand, year, month]);
+  }, [brand, year, effectiveMonth]);
 
   if (loading) {
     return (
