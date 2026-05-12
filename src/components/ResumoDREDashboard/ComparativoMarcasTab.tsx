@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Printer } from 'lucide-react';
 import {
   loadDreVw,
   createEmptyDreVwRow,
@@ -295,14 +295,57 @@ function ResultadoTab({ year, month }: { year: number; month: number }) {
   const NCOLS = 5; // Descrição | VW | Audi | Var R$ | Var %
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div id="comparativo-marcas-print-area" className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       {/* Cabeçalho */}
       <div
-        className="px-6 py-3 text-white font-bold flex items-center gap-3"
+        className="px-6 py-3 text-white font-bold flex items-center justify-between"
         style={{ background: `linear-gradient(135deg, ${VW_COLOR} 50%, ${AUDI_COLOR} 100%)` }}
       >
-        <span className="text-base">Comparativo de Marcas — Resultado</span>
-        <span className="text-xs opacity-75 font-normal">{periodLabel}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-base">Comparativo de Marcas — Resultado</span>
+          <span className="text-xs opacity-75 font-normal">{periodLabel}</span>
+        </div>
+        <button
+          onClick={() => {
+            const area = document.getElementById('comparativo-marcas-print-area');
+            const root = document.getElementById('print-root');
+            if (area && root) {
+              const clone = area.cloneNode(true) as HTMLElement;
+              clone.querySelectorAll('.no-print').forEach(el => el.remove());
+              root.innerHTML = clone.outerHTML;
+
+              const style = document.createElement('style');
+              style.id = 'comparativo-print-override';
+              style.textContent = `
+                @page { size: A4 landscape; margin: 0.4cm !important; }
+                #print-root {
+                  zoom: 0.82;
+                  font-family: Inter, sans-serif;
+                }
+                #print-root, #print-root * {
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                  forced-color-adjust: none !important;
+                  color-scheme: light !important;
+                }
+              `;
+              document.head.appendChild(style);
+
+              window.onafterprint = () => {
+                document.head.removeChild(style);
+                root.innerHTML = '';
+                window.onafterprint = null;
+              };
+              window.print();
+            } else {
+              window.print();
+            }
+          }}
+          className="no-print flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/20 hover:bg-white/30 transition-colors"
+        >
+          <Printer className="w-3.5 h-3.5" />
+          Imprimir PDF
+        </button>
       </div>
 
       <div className="overflow-x-auto">

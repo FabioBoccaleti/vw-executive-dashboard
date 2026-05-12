@@ -79,6 +79,10 @@
     page-break-after: auto;
   }
 
+  .no-print {
+    display: none !important;
+  }
+
   .print-footer {
     display: flex;
     justify-content: space-between;

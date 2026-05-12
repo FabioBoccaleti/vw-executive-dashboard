@@ -45,7 +45,7 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
   const CURRENT_YEAR  = new Date().getFullYear();
   const CURRENT_MONTH = new Date().getMonth() + 1;
 
-  const [activeTab,  setActiveTab]  = useState<TabId>('vw');
+  const [activeTab,  setActiveTab]  = useState<TabId>('comparativo-marcas');
   const [year,       setYear]       = useState(CURRENT_YEAR);
   const [month,      setMonth]      = useState(CURRENT_MONTH);
   const [diasUteis,  setDiasUteis]  = useState(22);
