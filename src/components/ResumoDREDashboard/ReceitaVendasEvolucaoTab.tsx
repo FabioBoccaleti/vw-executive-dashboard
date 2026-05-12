@@ -6,6 +6,8 @@ import {
 } from 'recharts';
 import { loadDreVw, type DreVwRow } from './dreVwStorage';
 import { loadDreAudi, type DreAudiRow } from './dreAudiStorage';
+import { loadDREDataAsync } from '@/lib/dbStorage';
+import type { Department } from '@/lib/dataStorage';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -41,6 +43,24 @@ const CON_DEPTS: DeptConfig[] = [
 
 type SubBrand = 'vw' | 'audi' | 'consolidado';
 
+// Mapeamento deptKey → Department (para loadDREDataAsync)
+const VW_DEPT_TO_DEPT: Record<string, Department> = {
+  novos:     'novos',
+  direta:    'vendaDireta',
+  usados:    'usados',
+  pecas:     'pecas',
+  oficina:   'oficina',
+  funilaria: 'funilaria',
+};
+
+const AUDI_DEPT_TO_DEPT: Record<string, Department> = {
+  novos:     'novos',
+  usados:    'usados',
+  pecas:     'pecas',
+  oficina:   'oficina',
+  funilaria: 'funilaria',
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function parseVal(v: string | number | undefined | null): number {
@@ -60,7 +80,21 @@ function fmtK(v: number): string {
   return fmtBRL(v);
 }
 
-function getROL(row: DreVwRow | DreAudiRow | null, deptKey: string): number {
+/** Extrai ROL do resultado de loadDREDataAsync para um dado mês (0-based). */
+function extractROL(dreLines: any[] | null, monthIdx: number): number {
+  if (!dreLines) return 0;
+  for (const line of dreLines) {
+    const desc = ((line.descricao as string) || (line.label as string) || '').toUpperCase().trim();
+    if (desc === 'RECEITA OPERACIONAL LIQUIDA') {
+      const meses: number[] = line.meses || line.values || [];
+      return meses[monthIdx] ?? 0;
+    }
+  }
+  return 0;
+}
+
+/** ROL do KV manual (DreVwRow/DreAudiRow) para um dept. */
+function getKvROL(row: DreVwRow | DreAudiRow | null, deptKey: string): number {
   if (!row) return 0;
   const dept = (row as Record<string, any>)[deptKey];
   if (!dept) return 0;
@@ -77,27 +111,65 @@ interface Props {
 export function ReceitaVendasEvolucaoTab({ year, month }: Props) {
   const [subBrand, setSubBrand] = useState<SubBrand>('vw');
   const [loading, setLoading] = useState(true);
+
+  // KV manual (por mês, 0-based index)
   const [vwCurr,   setVwCurr]   = useState<(DreVwRow   | null)[]>([]);
   const [vwPrev,   setVwPrev]   = useState<(DreVwRow   | null)[]>([]);
   const [audiCurr, setAudiCurr] = useState<(DreAudiRow | null)[]>([]);
   const [audiPrev, setAudiPrev] = useState<(DreAudiRow | null)[]>([]);
 
-  const prevYear   = year - 1;
-  const upToMonth  = month === 0 ? 12 : month;
+  // DRE async (dashboard executivo) — por deptKey: { curr, prev }
+  type DreLines = any[] | null;
+  const [vwAsync,   setVwAsync]   = useState<Record<string, { curr: DreLines; prev: DreLines }>>({});
+  const [audiAsync, setAudiAsync] = useState<Record<string, { curr: DreLines; prev: DreLines }>>({});
+
+  const prevYear  = year - 1;
+  const upToMonth = month === 0 ? 12 : month;
 
   useEffect(() => {
     setLoading(true);
     const months12 = Array.from({ length: 12 }, (_, i) => i + 1);
+    const yr     = year     as 2024 | 2025 | 2026 | 2027;
+    const prevYr = prevYear as 2024 | 2025 | 2026 | 2027;
+
+    const vwDeptKeys   = Object.keys(VW_DEPT_TO_DEPT);
+    const audiDeptKeys = Object.keys(AUDI_DEPT_TO_DEPT);
+
     Promise.all([
+      // KV por mês
       Promise.all(months12.map(m => loadDreVw(year, m))),
       Promise.all(months12.map(m => loadDreVw(prevYear, m))),
       Promise.all(months12.map(m => loadDreAudi(year, m))),
       Promise.all(months12.map(m => loadDreAudi(prevYear, m))),
-    ]).then(([vc, vp, ac, ap]) => {
+      // DRE async por dept (ano atual)
+      Promise.all(vwDeptKeys.map(k =>
+        loadDREDataAsync(yr, VW_DEPT_TO_DEPT[k], 'vw').then(d => ({ key: k, d }))
+      )),
+      Promise.all(vwDeptKeys.map(k =>
+        loadDREDataAsync(prevYr, VW_DEPT_TO_DEPT[k], 'vw').then(d => ({ key: k, d }))
+      )),
+      Promise.all(audiDeptKeys.map(k =>
+        loadDREDataAsync(yr, AUDI_DEPT_TO_DEPT[k], 'audi').then(d => ({ key: k, d }))
+      )),
+      Promise.all(audiDeptKeys.map(k =>
+        loadDREDataAsync(prevYr, AUDI_DEPT_TO_DEPT[k], 'audi').then(d => ({ key: k, d }))
+      )),
+    ]).then(([vc, vp, ac, ap, vwCurrAsync, vwPrevAsync, audiCurrAsync, audiPrevAsync]) => {
       setVwCurr(vc);
       setVwPrev(vp);
       setAudiCurr(ac);
       setAudiPrev(ap);
+
+      const vwMap: Record<string, { curr: DreLines; prev: DreLines }> = {};
+      for (const { key, d } of vwCurrAsync) vwMap[key] = { curr: d, prev: null };
+      for (const { key, d } of vwPrevAsync)  vwMap[key] = { ...vwMap[key], prev: d };
+      setVwAsync(vwMap);
+
+      const audiMap: Record<string, { curr: DreLines; prev: DreLines }> = {};
+      for (const { key, d } of audiCurrAsync) audiMap[key] = { curr: d, prev: null };
+      for (const { key, d } of audiPrevAsync)  audiMap[key] = { ...audiMap[key], prev: d };
+      setAudiAsync(audiMap);
+
       setLoading(false);
     });
   }, [year, prevYear]);
@@ -106,16 +178,33 @@ export function ReceitaVendasEvolucaoTab({ year, month }: Props) {
   const brandColor     = subBrand === 'vw' ? '#001e50' : subBrand === 'audi' ? '#bb0a30' : '#7c3aed';
   const brandColorDark = subBrand === 'vw' ? '#001238' : subBrand === 'audi' ? '#9a0827' : '#5b21b6';
 
+  function getVwROL(mIdx: number, deptKey: string, usePrev: boolean): number {
+    const kv = usePrev ? vwPrev[mIdx] : vwCurr[mIdx];
+    const kvVal = getKvROL(kv ?? null, deptKey);
+    if (kvVal !== 0) return kvVal;
+    const async_ = usePrev ? vwAsync[deptKey]?.prev : vwAsync[deptKey]?.curr;
+    return extractROL(async_ ?? null, mIdx);
+  }
+
+  function getAudiROL(mIdx: number, deptKey: string, usePrev: boolean): number {
+    const kv = usePrev ? audiPrev[mIdx] : audiCurr[mIdx];
+    const kvVal = getKvROL(kv ?? null, deptKey);
+    if (kvVal !== 0) return kvVal;
+    const async_ = usePrev ? audiAsync[deptKey]?.prev : audiAsync[deptKey]?.curr;
+    return extractROL(async_ ?? null, mIdx);
+  }
+
   function getCurr(mIdx: number, deptKey: string): number {
-    if (subBrand === 'vw')   return getROL(vwCurr[mIdx]   ?? null, deptKey);
-    if (subBrand === 'audi') return getROL(audiCurr[mIdx] ?? null, deptKey);
-    return getROL(vwCurr[mIdx] ?? null, deptKey) + getROL(audiCurr[mIdx] ?? null, deptKey);
+    if (subBrand === 'vw')   return getVwROL(mIdx, deptKey, false);
+    if (subBrand === 'audi') return getAudiROL(mIdx, deptKey, false);
+    // consolidado — deptKey 'direta' só existe no VW
+    return getVwROL(mIdx, deptKey, false) + (deptKey !== 'direta' ? getAudiROL(mIdx, deptKey, false) : 0);
   }
 
   function getPrev(mIdx: number, deptKey: string): number {
-    if (subBrand === 'vw')   return getROL(vwPrev[mIdx]   ?? null, deptKey);
-    if (subBrand === 'audi') return getROL(audiPrev[mIdx] ?? null, deptKey);
-    return getROL(vwPrev[mIdx] ?? null, deptKey) + getROL(audiPrev[mIdx] ?? null, deptKey);
+    if (subBrand === 'vw')   return getVwROL(mIdx, deptKey, true);
+    if (subBrand === 'audi') return getAudiROL(mIdx, deptKey, true);
+    return getVwROL(mIdx, deptKey, true) + (deptKey !== 'direta' ? getAudiROL(mIdx, deptKey, true) : 0);
   }
 
   const ytdIdxs   = Array.from({ length: upToMonth }, (_, i) => i); // 0-based
