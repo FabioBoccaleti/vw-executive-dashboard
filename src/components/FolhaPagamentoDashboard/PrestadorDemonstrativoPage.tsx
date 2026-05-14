@@ -113,6 +113,8 @@ function DemonstrativoTable({
   lanc,
   year,
   month,
+  dreYear,
+  dreMonth,
   editing,
   onItemChange,
   onAddItem,
@@ -125,6 +127,8 @@ function DemonstrativoTable({
   lanc: LancamentoPJ;
   year: number;
   month: number;
+  dreYear: number;
+  dreMonth: number;
   editing: boolean;
   onItemChange: (idx: number, patch: Partial<LancamentoItem>) => void;
   onAddItem: () => void;
@@ -285,9 +289,9 @@ function DemonstrativoTable({
                         {item.valorBaseCalculo != null && item.valorBaseCalculo !== 0 ? (
                           <>
                             <div className="text-sm font-medium text-slate-700 tabular-nums">{fmtBRL(item.valorBaseCalculo)}</div>
-                            {shortLabel && (
-                              <div className="text-[10px] text-slate-500" title={item.baseCalculoLabel}>{shortLabel}</div>
-                            )}
+                            <div className="text-[10px] text-slate-700 mt-0.5">
+                              {MONTHS_SHORT[dreMonth - 1]}/{String(dreYear).slice(-2)}
+                            </div>
                           </>
                         ) : (
                           <span className="text-slate-400 text-sm">—</span>
@@ -917,6 +921,8 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
               lanc={lanc}
               year={year}
               month={month}
+              dreYear={month === 1 ? year - 1 : year}
+              dreMonth={month === 1 ? 12 : month - 1}
               editing={editing}
               isAdmin={isAdmin}
               onItemChange={handleItemChange}
