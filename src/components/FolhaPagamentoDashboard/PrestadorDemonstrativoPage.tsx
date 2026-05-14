@@ -504,12 +504,14 @@ interface PrestadorDemonstrativoPageProps {
   prestador: PrestadorPJ;
   isAdmin: boolean;
   onBack: () => void;
+  initialYear?: number;
+  initialMonth?: number;
 }
 
-export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack }: PrestadorDemonstrativoPageProps) {
+export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initialYear, initialMonth }: PrestadorDemonstrativoPageProps) {
   const now = new Date();
-  const [year,  setYear]  = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year,  setYear]  = useState(initialYear  ?? now.getFullYear());
+  const [month, setMonth] = useState(initialMonth ?? now.getMonth() + 1);
 
   const [lanc,    setLanc]    = useState<LancamentoPJ | null>(null);
   const [loading, setLoading] = useState(true);
