@@ -287,6 +287,42 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     await kvSet(`financiamento:acelera:garantido:${vendasYear}:${vendasMonth}`, next);
   }
 
+  function handlePrintDemonstrativo() {
+    const printArea = document.querySelector<HTMLElement>('.demo-print-area');
+    if (!printArea) return;
+    const content = printArea.innerHTML;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Demonstrativo de Pagamento \u2014 ${MONTHS[vendasMonth - 1]}/${vendasYear}</title>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <style>
+    @page { size: A4 landscape; margin: 1cm; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .demo-page {
+        page-break-after: always; break-after: page;
+        page-break-inside: avoid; break-inside: avoid;
+      }
+      .demo-page:last-of-type { page-break-after: avoid; break-after: avoid; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    }
+    body { font-family: Arial, sans-serif; }
+  </style>
+</head>
+<body class="bg-white p-4">
+  ${content}
+  <script>
+    window.onload = function() { setTimeout(function() { window.print(); }, 800); };
+  <\/script>
+</body>
+</html>`);
+    win.document.close();
+  }
+
   function handlePrintAcelera() {
     const totalIncentivo = aceleraRows.reduce((acc, r) => acc + r.incentivo, 0);
     const totalGarantidoPct = aceleraRows.reduce((acc, r) => {
@@ -1361,7 +1397,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                   `}</style>
                   <div className="print-hidden flex justify-end mb-3 sticky top-0 bg-white z-10 py-2 border-b border-slate-100">
                     <button
-                      onClick={() => window.print()}
+                      onClick={handlePrintDemonstrativo}
                       className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       <Printer className="w-4 h-4" />
