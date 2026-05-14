@@ -53,6 +53,10 @@ export interface PrestadorPJ {
   itens: ItemRemuneracao[];
   /** Tem direito a Prêmio Adicional */
   temPremio?: boolean;
+  /** Percentual do Prêmio Adicional */
+  percentualPremio?: number;
+  /** IDs dos itens que compõem a base do Prêmio por padrão */
+  itensPremioIds?: string[];
   /** ordem de exibição */
   ordem?: number;
 }
@@ -81,6 +85,8 @@ export interface LancamentoPJ {
   dataPagamento?: string; // DD/MM/AAAA
   itens: LancamentoItem[];
   observacaoGeral?: string;
+  /** IDs dos itens que compõem a base do Prêmio neste mês (snapshot editável) */
+  itensPremioIds?: string[];
 }
 
 // ─── Chaves KV ────────────────────────────────────────────────────────────────
@@ -254,11 +260,21 @@ export function buildLancamentoVazio(
   year: number,
   month: number,
 ): LancamentoPJ {
+  const itensPremioIds = prestador.itensPremioIds ?? [];
+  const pct = prestador.percentualPremio ?? 0;
+  // valor inicial do prêmio = soma dos itens fixos marcados * pct / 100
+  // (os variáveis ainda não têm base neste ponto, serão recalculados no useEffect do DRE)
+  const baseFixa = prestador.itens
+    .filter(it => itensPremioIds.includes(it.id) && it.tipo === 'fixa')
+    .reduce((s, it) => s + (it.valorBase ?? 0), 0);
+  const valorPremioInicial = Math.round(baseFixa * pct / 100 * 100) / 100;
+
   return {
     prestadorId: prestador.id,
     year,
     month,
     status: 'pendente',
+    itensPremioIds,
     itens: [
       ...prestador.itens.map(item => ({
         itemId: item.id,
@@ -277,7 +293,8 @@ export function buildLancamentoVazio(
         itemId: 'premio_adicional',
         descricao: 'Prêmio Adicional',
         tipo: 'premio' as TipoRemuneracao,
-        valor: 0,
+        valor: valorPremioInicial,
+        ...(prestador.percentualPremio != null && { percentualUsado: prestador.percentualPremio }),
       }] : []),
     ],
   };

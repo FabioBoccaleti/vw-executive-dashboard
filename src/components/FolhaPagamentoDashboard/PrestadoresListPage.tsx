@@ -29,6 +29,16 @@ const TIPO_LABEL: Record<TipoRemuneracao, string> = { fixa: 'Fixa', variavel: 'V
 
 const BASE_CALCULO_OPTIONS = Object.entries(BASE_CALCULO_LABELS) as [BaseCalculoVariavel, string][];
 
+// Auto-preenchimento de base ao selecionar descrição de departamento
+const DESCRICAO_TO_BASE: Record<string, BaseCalculoVariavel> = {
+  'Lucro Operacional Veic. Novos Varejo': 'lucro_novos',
+  'Lucro Operacional Veic. Novos VD / Direta': 'lucro_vd_direta',
+  'Lucro Operacional Veic. Usados': 'lucro_usados',
+  'Lucro Operacional Peças': 'lucro_pecas',
+  'Lucro Operacional Oficina': 'lucro_oficina',
+  'Lucro Operacional Funilaria': 'lucro_funilaria',
+};
+
 function newItem(): ItemRemuneracao {
   return { id: crypto.randomUUID(), descricao: '', tipo: 'fixa', valorBase: 0 };
 }
@@ -60,6 +70,8 @@ function PrestadorDialog({
       brand: initial?.brand ?? 'vw',
       dataInicio: initial?.dataInicio ?? '',
       temPremio: initial?.temPremio ?? false,
+      percentualPremio: initial?.percentualPremio ?? undefined,
+      itensPremioIds: initial?.itensPremioIds ?? [],
     }
   );
   const [itens, setItens] = useState<ItemRemuneracao[]>(
@@ -196,26 +208,76 @@ function PrestadorDialog({
           </div>
 
           {/* Toggle Prêmio Adicional */}
-          <label className="flex items-center gap-3 cursor-pointer select-none">
-            <div
-              onClick={() => setForm(prev => ({ ...prev, temPremio: !prev.temPremio }))}
-              className={`relative w-10 h-5 rounded-full transition-colors ${
-                form.temPremio ? 'bg-purple-600' : 'bg-slate-300'
-              }`}
-            >
-              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                form.temPremio ? 'translate-x-5' : 'translate-x-0'
-              }`} />
-            </div>
-            <span className="text-sm text-slate-700 font-medium">
-              Tem direito a Prêmio Adicional
-            </span>
-            {form.temPremio && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold border border-purple-200">
-                linha adicionada no demonstrativo
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <div
+                onClick={() => setForm(prev => ({ ...prev, temPremio: !prev.temPremio }))}
+                className={`relative w-10 h-5 rounded-full transition-colors ${
+                  form.temPremio ? 'bg-purple-600' : 'bg-slate-300'
+                }`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                  form.temPremio ? 'translate-x-5' : 'translate-x-0'
+                }`} />
+              </div>
+              <span className="text-sm text-slate-700 font-medium">
+                Tem direito a Prêmio Adicional
               </span>
+            </label>
+            {form.temPremio && (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={form.percentualPremio ?? ''}
+                  onChange={e => setForm(prev => ({ ...prev, percentualPremio: parseFloat(e.target.value) || undefined }))}
+                  className="w-20 border border-purple-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  placeholder="0,00"
+                />
+                <span className="text-xs text-slate-500">%</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold border border-purple-200">
+                  linha adicionada no demonstrativo
+                </span>
+              </div>
             )}
-          </label>
+          </div>
+
+          {/* Seleção de itens que compõem a base do prêmio */}
+          {form.temPremio && itens.length > 0 && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 flex flex-col gap-2">
+              <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider">Base do Prêmio — itens incidentes</p>
+              <div className="flex flex-wrap gap-2">
+                {itens.filter(it => it.descricao).map(it => {
+                  const marcado = (form.itensPremioIds ?? []).includes(it.id);
+                  return (
+                    <button
+                      key={it.id}
+                      type="button"
+                      onClick={() => setForm(prev => ({
+                        ...prev,
+                        itensPremioIds: marcado
+                          ? (prev.itensPremioIds ?? []).filter(id => id !== it.id)
+                          : [...(prev.itensPremioIds ?? []), it.id],
+                      }))}
+                      className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+                        marcado
+                          ? 'bg-purple-600 text-white border-purple-600'
+                          : 'bg-white text-slate-500 border-slate-300 hover:border-purple-400 hover:text-purple-600'
+                      }`}
+                    >
+                      {it.descricao}
+                      {marcado && form.percentualPremio != null && (
+                        <span className="text-[10px] font-bold opacity-80">P {form.percentualPremio}%</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-purple-500">Clique para marcar os itens cujo valor entra na base de cálculo do Prêmio.</p>
+            </div>
+          )}
 
           {/* Itens de remuneração */}
           <div>
@@ -282,7 +344,14 @@ function PrestadorDialog({
 
                     <select
                       value={item.descricao}
-                      onChange={e => updateItem(item.id, { descricao: e.target.value })}
+                      onChange={e => {
+                        const desc = e.target.value;
+                        const autoBase = DESCRICAO_TO_BASE[desc];
+                        updateItem(item.id, {
+                          descricao: desc,
+                          ...(autoBase ? { tipo: 'variavel', baseCalculo: autoBase } : {}),
+                        });
+                      }}
                       className="flex-1 border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
                     >
                       <option value="">Selecione a descrição...</option>

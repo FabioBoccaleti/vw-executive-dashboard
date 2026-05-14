@@ -114,6 +114,7 @@ function DemonstrativoTable({
   onItemChange,
   onAddItem,
   onRemoveItem,
+  onPremioToggle,
   isAdmin,
 }: {
   prestador: PrestadorPJ;
@@ -124,6 +125,7 @@ function DemonstrativoTable({
   onItemChange: (idx: number, patch: Partial<LancamentoItem>) => void;
   onAddItem: () => void;
   onRemoveItem: (idx: number) => void;
+  onPremioToggle: (itemId: string) => void;
   isAdmin: boolean;
 }) {
   const total = totalLancamento(lanc);
@@ -194,15 +196,37 @@ function DemonstrativoTable({
               <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
                 {/* Descrição */}
                 <td className="px-6 py-3">
-                  {editing && isAdmin ? (
-                    <input
-                      value={item.descricao}
-                      onChange={e => onItemChange(idx, { descricao: e.target.value })}
-                      className="w-full border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
-                    />
-                  ) : (
-                    <span className="text-sm text-slate-800">{item.descricao}</span>
-                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {editing && isAdmin ? (
+                      <input
+                        value={item.descricao}
+                        onChange={e => onItemChange(idx, { descricao: e.target.value })}
+                        className="w-full border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                      />
+                    ) : (
+                      <span className="text-sm text-slate-800">{item.descricao}</span>
+                    )}
+                    {/* Tag P% — visível se o item está na base do prêmio */}
+                    {prestador.temPremio && item.tipo !== 'premio' && (() => {
+                      const marcado = (lanc.itensPremioIds ?? []).includes(item.itemId);
+                      const pctPremio = prestador.percentualPremio;
+                      if (!marcado && !editing) return null;
+                      return (
+                        <button
+                          type="button"
+                          title={marcado ? 'Incide no Prêmio Adicional — clique para remover' : 'Clique para incluir na base do Prêmio'}
+                          onClick={() => editing && isAdmin && onPremioToggle(item.itemId)}
+                          className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors ${
+                            marcado
+                              ? 'bg-purple-600 text-white border-purple-600 ' + (editing && isAdmin ? 'cursor-pointer hover:bg-purple-700' : 'cursor-default')
+                              : 'bg-white text-purple-400 border-purple-300 cursor-pointer hover:bg-purple-50'
+                          }`}
+                        >
+                          P{pctPremio != null ? ` ${pctPremio}%` : ''}
+                        </button>
+                      );
+                    })()}
+                  </div>
                 </td>
 
                 {/* Tipo / % */}
@@ -225,6 +249,11 @@ function DemonstrativoTable({
                     {item.tipo === 'variavel' && pct == null && (
                       <span className="text-[10px] text-slate-400 italic">sem %</span>
                     )}
+                    {item.tipo === 'premio' && pct != null && (
+                      <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded-full px-2 py-0.5">
+                        {pct}%
+                      </span>
+                    )}
                   </div>
                 </td>
 
@@ -243,6 +272,18 @@ function DemonstrativoTable({
                         <span className="text-slate-400 text-sm">—</span>
                       )}
                     </div>
+                  ) : item.tipo === 'premio' ? (
+                    (() => {
+                      const marcados = lanc.itensPremioIds ?? [];
+                      const soma = lanc.itens
+                        .filter(it => marcados.includes(it.itemId))
+                        .reduce((s, it) => s + (it.valor || 0), 0);
+                      return soma > 0 ? (
+                        <div className="text-right text-sm font-medium text-purple-700 tabular-nums">{fmtBRL(soma)}</div>
+                      ) : (
+                        <span className="text-slate-300 text-sm block text-right">—</span>
+                      );
+                    })()
                   ) : (
                     <span className="text-slate-300 text-sm block text-right">—</span>
                   )}
@@ -521,6 +562,26 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack }: Prest
     setDirty(true);
   }
 
+  function handlePremioToggle(itemId: string) {
+    setLanc(prev => {
+      if (!prev) return prev;
+      const atual = prev.itensPremioIds ?? [];
+      const marcado = atual.includes(itemId);
+      const novosIds = marcado ? atual.filter(id => id !== itemId) : [...atual, itemId];
+      // Recalcula o valor do prêmio com base nos itens marcados
+      const pct = prestador.percentualPremio ?? 0;
+      const baseValor = prev.itens
+        .filter(it => novosIds.includes(it.itemId))
+        .reduce((s, it) => s + (it.valor || 0), 0);
+      const valorPremio = Math.round(baseValor * pct / 100 * 100) / 100;
+      const itens = prev.itens.map(it =>
+        it.itemId === 'premio_adicional' ? { ...it, valor: valorPremio } : it
+      );
+      return { ...prev, itensPremioIds: novosIds, itens };
+    });
+    setDirty(true);
+  }
+
   function handleRemoveItem(idx: number) {
     setLanc(prev => {
       if (!prev) return prev;
@@ -708,6 +769,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack }: Prest
               onItemChange={handleItemChange}
               onAddItem={handleAddItem}
               onRemoveItem={handleRemoveItem}
+              onPremioToggle={handlePremioToggle}
             />
 
             {showHistorico && (
