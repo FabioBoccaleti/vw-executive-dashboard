@@ -490,6 +490,19 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack }: Prest
     ]).then(([existing, dreRow]) => {
       const base = existing ?? buildLancamentoVazio(prestador, year, month);
 
+      // Sincroniza tipo e percentualUsado do cadastro atual (caso prestador tenha mudado o item)
+      base.itens = base.itens.map(item => {
+        const prestItem = prestador.itens.find(pi => pi.id === item.itemId);
+        if (!prestItem) return item;
+        return {
+          ...item,
+          tipo: prestItem.tipo,
+          ...(prestItem.tipo === 'variavel' && {
+            percentualUsado: item.percentualUsado ?? prestItem.percentual,
+          }),
+        };
+      });
+
       // Preenche valorBaseCalculo de itens variáveis a partir do DRE
       if (dreRow) {
         base.itens = base.itens.map(item => {
