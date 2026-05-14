@@ -301,13 +301,25 @@ function DemonstrativoTable({
                   ) : item.tipo === 'premio' ? (
                     (() => {
                       const marcados = lanc.itensPremioIds ?? [];
-                      const soma = lanc.itens
+                      const somaItens = lanc.itens
                         .filter(it => marcados.includes(it.itemId))
                         .reduce((s, it) => s + (it.valor || 0), 0);
-                      return soma > 0 ? (
-                        <div className="text-right text-sm font-medium text-purple-700 tabular-nums">{fmtBRL(soma)}</div>
-                      ) : (
-                        <span className="text-slate-300 text-sm block text-right">—</span>
+                      const deducao = prestador.deducaoBasePremio ?? 0;
+                      const baseReal = Math.max(0, somaItens - deducao);
+                      if (somaItens === 0) {
+                        return <span className="text-slate-300 text-sm block text-right">—</span>;
+                      }
+                      if (deducao <= 0) {
+                        return (
+                          <div className="text-right text-sm font-medium text-purple-700 tabular-nums">{fmtBRL(somaItens)}</div>
+                        );
+                      }
+                      return (
+                        <div className="text-right flex flex-col gap-0.5">
+                          <div className="text-xs text-slate-700 tabular-nums">{fmtBRL(somaItens)}</div>
+                          <div className="text-xs text-red-500 tabular-nums">− {fmtBRL(deducao)}</div>
+                          <div className="text-sm font-semibold text-purple-700 tabular-nums border-t border-purple-200 pt-0.5">{fmtBRL(baseReal)}</div>
+                        </div>
                       );
                     })()
                   ) : (
@@ -671,11 +683,13 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
       const atual = prev.itensPremioIds ?? [];
       const marcado = atual.includes(itemId);
       const novosIds = marcado ? atual.filter(id => id !== itemId) : [...atual, itemId];
-      // Recalcula o valor do prêmio com base nos itens marcados
+      // Recalcula o valor do prêmio com base nos itens marcados e dedução
       const pct = prestador.percentualPremio ?? 0;
-      const baseValor = prev.itens
+      const somaItens = prev.itens
         .filter(it => novosIds.includes(it.itemId))
         .reduce((s, it) => s + (it.valor || 0), 0);
+      const deducao = prestador.deducaoBasePremio ?? 0;
+      const baseValor = Math.max(0, somaItens - deducao);
       const valorPremio = Math.round(baseValor * pct / 100 * 100) / 100;
       const itens = prev.itens.map(it =>
         it.itemId === 'premio_adicional' ? { ...it, valor: valorPremio } : it

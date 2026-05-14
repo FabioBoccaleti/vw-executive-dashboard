@@ -57,6 +57,8 @@ export interface PrestadorPJ {
   percentualPremio?: number;
   /** IDs dos itens que compõem a base do Prêmio por padrão */
   itensPremioIds?: string[];
+  /** Valor fixo (R$) a deduzir da base de cálculo do Prêmio Adicional */
+  deducaoBasePremio?: number;
   /** ordem de exibição */
   ordem?: number;
 }

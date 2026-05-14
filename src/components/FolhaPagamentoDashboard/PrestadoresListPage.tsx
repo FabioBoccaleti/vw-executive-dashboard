@@ -72,6 +72,7 @@ function PrestadorDialog({
       temPremio: initial?.temPremio ?? false,
       percentualPremio: initial?.percentualPremio ?? undefined,
       itensPremioIds: initial?.itensPremioIds ?? [],
+      deducaoBasePremio: initial?.deducaoBasePremio ?? undefined,
     }
   );
   const [itens, setItens] = useState<ItemRemuneracao[]>(
@@ -240,6 +241,22 @@ function PrestadorDialog({
                 <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold border border-purple-200">
                   linha adicionada no demonstrativo
                 </span>
+              </div>
+            )}
+            {form.temPremio && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500">Dedução da base:</span>
+                <span className="text-xs text-slate-400">R$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.deducaoBasePremio ?? ''}
+                  onChange={e => setForm(prev => ({ ...prev, deducaoBasePremio: parseFloat(e.target.value) || undefined }))}
+                  className="w-32 border border-purple-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  placeholder="0,00"
+                />
+                <span className="text-xs text-slate-400 italic">(opcional)</span>
               </div>
             )}
           </div>
