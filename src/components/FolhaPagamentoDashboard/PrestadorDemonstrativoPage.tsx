@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Printer, Check, Save, Loader2, Plus, Trash2, X, History, FileText, PenLine, CheckCircle, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Printer, Check, Save, Loader2, Plus, Trash2, X, History, FileText, PenLine, CheckCircle, ShieldCheck, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { kvGet } from '@/lib/kvClient';
 import { useAuth } from '@/contexts/useAuth';
@@ -532,8 +532,10 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
     loading: boolean;
     erro: string | null;
   } | null>(null);
+  const [reabrirDialog, setReopenDialog] = useState<{ senha: string; erro: string | null } | null>(null);
 
   const ambasAssinadas = !!(lanc?.assinaturas?.financeiro && lanc?.assinaturas?.rh);
+  const isLocked = !!(lanc?.assinaturas?.financeiro || lanc?.assinaturas?.rh || lanc?.status === 'pago');
 
   // Carrega lançamento do mês selecionado + DRE do mês anterior
   useEffect(() => {
@@ -738,6 +740,24 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
     toast.success(`Assinatura de ${assinaDialog.campo === 'financeiro' ? 'Financeiro' : 'RH'} registrada com sucesso!`);
   }
 
+  async function handleConfirmarReabrir() {
+    if (!reabrirDialog || !lanc) return;
+    if (reabrirDialog.senha !== '1985') {
+      setReopenDialog(prev => prev ? { ...prev, erro: 'Senha incorreta.' } : prev);
+      return;
+    }
+    const updated: LancamentoPJ = {
+      ...lanc,
+      assinaturas: {},
+      status: 'pendente',
+      dataPagamento: undefined,
+    };
+    await saveLancamento(updated);
+    setLanc(updated);
+    setReopenDialog(null);
+    toast.success('Demonstrativo reaberto. Assinaturas removidas.');
+  }
+
   function handlePrint() {
     const area = document.getElementById('demonstrativo-print-area');
     const root = document.getElementById('print-root');
@@ -859,11 +879,18 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
                     {saving ? 'Salvando...' : 'Salvar'}
                   </button>
                 </div>
+              ) : isLocked ? (
+                <button
+                  onClick={() => setReopenDialog({ senha: '', erro: null })}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-semibold transition-colors"
+                >
+                  <LockOpen className="w-3.5 h-3.5" />
+                  Reabrir demonstrativo
+                </button>
               ) : (
                 <button
                   onClick={() => setEditing(true)}
-                  disabled={ambasAssinadas}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-teal-300 bg-white text-teal-600 hover:bg-teal-50 text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-teal-300 bg-white text-teal-600 hover:bg-teal-50 text-xs font-semibold transition-colors"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   Lançar valores
@@ -910,6 +937,60 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
           </>
         ) : null}
       </div>
+
+      {/* ─── Dialog de Reabertura ─── */}
+      {reabrirDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <LockOpen className="w-4 h-4 text-amber-600" />
+                <h3 className="text-sm font-bold text-slate-800">Reabrir demonstrativo</h3>
+              </div>
+              <button onClick={() => setReopenDialog(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-3">
+              <p className="text-sm text-slate-600">
+                Isso irá <strong>remover todas as assinaturas</strong> e reverter o status para{' '}
+                <strong>Pendente</strong>. Digite a senha para confirmar.
+              </p>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Senha</label>
+                <input
+                  type="password"
+                  autoFocus
+                  value={reabrirDialog.senha}
+                  onChange={e => setReopenDialog(prev => prev ? { ...prev, senha: e.target.value, erro: null } : prev)}
+                  onKeyDown={e => e.key === 'Enter' && handleConfirmarReabrir()}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  placeholder="Digite a senha de reabertura"
+                />
+                {reabrirDialog.erro && (
+                  <p className="text-xs text-red-500 mt-0.5">{reabrirDialog.erro}</p>
+                )}
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                onClick={() => setReopenDialog(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-500 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarReabrir}
+                disabled={!reabrirDialog.senha}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <LockOpen className="w-3.5 h-3.5" />
+                Reabrir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Dialog de Assinatura Eletrônica ─── */}
       {assinaDialog && (
