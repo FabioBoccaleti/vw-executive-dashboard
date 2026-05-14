@@ -257,21 +257,38 @@ function DemonstrativoTable({
                   </div>
                 </td>
 
-                {/* Base de Cálculo — sempre somente leitura, vem do DRE */}
+                {/* Base de Cálculo */}
                 <td className="px-4 py-3">
                   {item.tipo === 'variavel' ? (
-                    <div className="text-right">
-                      {item.valorBaseCalculo != null && item.valorBaseCalculo !== 0 ? (
-                        <>
-                          <div className="text-sm font-medium text-slate-700 tabular-nums">{fmtBRL(item.valorBaseCalculo)}</div>
-                          {shortLabel && (
-                            <div className="text-[10px] text-slate-500" title={item.baseCalculoLabel}>{shortLabel}</div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-slate-400 text-sm">—</span>
-                      )}
-                    </div>
+                    editing ? (
+                      <div className="flex flex-col items-end gap-0.5">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.valorBaseCalculo || ''}
+                          onChange={e => onItemChange(idx, { valorBaseCalculo: parseFloat(e.target.value) || 0 })}
+                          className="w-36 border border-slate-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-400"
+                          placeholder="0,00"
+                        />
+                        {shortLabel && (
+                          <div className="text-[10px] text-slate-400" title={item.baseCalculoLabel}>{shortLabel}</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-right">
+                        {item.valorBaseCalculo != null && item.valorBaseCalculo !== 0 ? (
+                          <>
+                            <div className="text-sm font-medium text-slate-700 tabular-nums">{fmtBRL(item.valorBaseCalculo)}</div>
+                            {shortLabel && (
+                              <div className="text-[10px] text-slate-500" title={item.baseCalculoLabel}>{shortLabel}</div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-slate-400 text-sm">—</span>
+                        )}
+                      </div>
+                    )
                   ) : item.tipo === 'premio' ? (
                     (() => {
                       const marcados = lanc.itensPremioIds ?? [];
