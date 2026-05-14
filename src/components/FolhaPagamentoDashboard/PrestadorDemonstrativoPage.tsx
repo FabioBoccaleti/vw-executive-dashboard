@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Printer, Check, Save, Loader2, Plus, Trash2, X, History, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import { kvGet } from '@/lib/kvClient';
 import {
   loadLancamento,
   saveLancamento,
@@ -8,6 +9,7 @@ import {
   loadHistorico,
   buildLancamentoVazio,
   totalLancamento,
+  DESCRICAO_TRIMESTRAL,
   type PrestadorPJ,
   type LancamentoPJ,
   type LancamentoItem,
@@ -23,6 +25,34 @@ const MONTHS = [
 const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - 3 + i);
+
+// ─── Mapeamentos DRE ─────────────────────────────────────────────────────────
+
+/** baseCalculo → chave de departamento no DreVwRow / DreAudiRow */
+const BASE_TO_DEPT: Record<string, string> = {
+  lucro_novos:     'novos',
+  lucro_usados:    'usados',
+  lucro_vd_direta: 'direta',
+  lucro_pecas:     'pecas',
+  lucro_oficina:   'oficina',
+  lucro_funilaria: 'funilaria',
+};
+
+/** Label do chip → chave de departamento no DRE */
+const CHIP_TO_DEPT: Record<string, string> = {
+  'Novos Varejo': 'novos',
+  'VD Direta':    'direta',
+  'Usados':       'usados',
+  'Peças':        'pecas',
+  'Oficina':      'oficina',
+  'Funilaria':    'funilaria',
+};
+
+function parseValDre(v: string | number | undefined | null): number {
+  if (v == null || v === '') return 0;
+  if (typeof v === 'number') return v;
+  return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
+}
 
 function fmtBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -181,9 +211,11 @@ function DemonstrativoTable({
                     <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
                       item.tipo === 'fixa'
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : item.tipo === 'premio'
+                          ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
                     }`}>
-                      {item.tipo === 'fixa' ? 'Fixo' : 'Variável'}
+                      {item.tipo === 'fixa' ? 'Fixo' : item.tipo === 'premio' ? 'Prêmio' : 'Variável'}
                     </span>
                     {item.tipo === 'variavel' && pct != null && (
                       <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
@@ -196,43 +228,21 @@ function DemonstrativoTable({
                   </div>
                 </td>
 
-                {/* Base de Cálculo */}
+                {/* Base de Cálculo — sempre somente leitura, vem do DRE */}
                 <td className="px-4 py-3">
                   {item.tipo === 'variavel' ? (
-                    editing ? (
-                      <div className="flex flex-col gap-1 items-end">
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-slate-400">R$</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={item.valorBaseCalculo ?? ''}
-                            onChange={e => onItemChange(idx, { valorBaseCalculo: parseFloat(e.target.value) || 0 })}
-                            className="w-32 border border-amber-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400"
-                            placeholder="0,00"
-                          />
-                        </div>
-                        {shortLabel && (
-                          <span className="text-[10px] text-slate-500 text-right" title={item.baseCalculoLabel}>
-                            {shortLabel}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-right">
-                        {item.valorBaseCalculo != null && item.valorBaseCalculo !== 0 ? (
-                          <>
-                            <div className="text-sm font-medium text-slate-700 tabular-nums">{fmtBRL(item.valorBaseCalculo)}</div>
-                            {shortLabel && (
-                              <div className="text-[10px] text-slate-500" title={item.baseCalculoLabel}>{shortLabel}</div>
-                            )}
-                          </>
-                        ) : (
-                          <span className="text-slate-400 text-sm">—</span>
-                        )}
-                      </div>
-                    )
+                    <div className="text-right">
+                      {item.valorBaseCalculo != null && item.valorBaseCalculo !== 0 ? (
+                        <>
+                          <div className="text-sm font-medium text-slate-700 tabular-nums">{fmtBRL(item.valorBaseCalculo)}</div>
+                          {shortLabel && (
+                            <div className="text-[10px] text-slate-500" title={item.baseCalculoLabel}>{shortLabel}</div>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-slate-400 text-sm">—</span>
+                      )}
+                    </div>
                   ) : (
                     <span className="text-slate-300 text-sm block text-right">—</span>
                   )}
@@ -244,22 +254,26 @@ function DemonstrativoTable({
                     <span className={`text-sm font-semibold tabular-nums ${item.valor ? 'text-slate-800' : 'text-slate-400'}`}>
                       {item.valor ? fmtBRL(item.valor) : '—'}
                     </span>
+                  ) : editing && (item.tipo === 'fixa' || item.tipo === 'premio') ? (
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.valor || ''}
+                      onChange={e => onItemChange(idx, { valor: parseFloat(e.target.value) || 0 })}
+                      className={`w-36 border rounded px-2.5 py-1.5 text-sm text-right focus:outline-none ml-auto block ${
+                        item.tipo === 'premio'
+                          ? 'border-purple-300 focus:ring-2 focus:ring-purple-400'
+                          : 'border-slate-300 focus:ring-2 focus:ring-teal-400'
+                      }`}
+                      placeholder="0,00"
+                    />
                   ) : (
-                    editing ? (
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.valor || ''}
-                        onChange={e => onItemChange(idx, { valor: parseFloat(e.target.value) || 0 })}
-                        className="w-36 border border-slate-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-400 ml-auto block"
-                        placeholder="0,00"
-                      />
-                    ) : (
-                      <span className="text-sm font-semibold text-slate-800 tabular-nums">
-                        {item.valor ? fmtBRL(item.valor) : <span className="text-slate-400">—</span>}
-                      </span>
-                    )
+                    <span className={`text-sm font-semibold tabular-nums ${
+                      item.tipo === 'premio' ? 'text-purple-700' : 'text-slate-800'
+                    }`}>
+                      {item.valor ? fmtBRL(item.valor) : <span className="text-slate-400">—</span>}
+                    </span>
                   )}
                 </td>
 
@@ -401,13 +415,52 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack }: Prest
   const [historico, setHistorico] = useState<LancamentoPJ[]>([]);
   const [histLoading, setHistLoading] = useState(false);
 
-  // Carrega lançamento do mês selecionado
+  // Carrega lançamento do mês selecionado + DRE do mês anterior
   useEffect(() => {
     setLoading(true);
     setEditing(false);
     setDirty(false);
-    loadLancamento(prestador.id, year, month).then(existing => {
-      setLanc(existing ?? buildLancamentoVazio(prestador, year, month));
+
+    const drePrev = month === 1
+      ? { year: year - 1, month: 12 }
+      : { year, month: month - 1 };
+    const dreKey = `resumo_dre:${prestador.brand}:${drePrev.year}-${String(drePrev.month).padStart(2, '0')}`;
+
+    Promise.all([
+      loadLancamento(prestador.id, year, month),
+      kvGet<any>(dreKey),
+    ]).then(([existing, dreRow]) => {
+      const base = existing ?? buildLancamentoVazio(prestador, year, month);
+
+      // Preenche valorBaseCalculo de itens variáveis a partir do DRE
+      if (dreRow) {
+        base.itens = base.itens.map(item => {
+          if (item.tipo !== 'variavel') return item;
+          const prestItem = prestador.itens.find(pi => pi.id === item.itemId);
+          let valorBase = 0;
+
+          if (item.descricao === DESCRICAO_TRIMESTRAL) {
+            // Soma os departamentos selecionados nos chips
+            const deps = prestItem?.departamentos ?? [];
+            valorBase = deps.reduce((sum, dep) => {
+              const dk = CHIP_TO_DEPT[dep];
+              return sum + (dk ? parseValDre(dreRow[dk]?.lucroLiquidoExercicio) : 0);
+            }, 0);
+          } else {
+            const baseCalculo = prestItem?.baseCalculo;
+            if (baseCalculo) {
+              const dk = BASE_TO_DEPT[baseCalculo];
+              if (dk) valorBase = parseValDre(dreRow[dk]?.lucroLiquidoExercicio);
+            }
+          }
+
+          const pct = item.percentualUsado ?? prestItem?.percentual ?? 0;
+          const valor = Math.round((valorBase * pct / 100) * 100) / 100;
+          return { ...item, valorBaseCalculo: valorBase, valor };
+        });
+      }
+
+      setLanc(base);
       setLoading(false);
     });
   }, [prestador.id, year, month]);

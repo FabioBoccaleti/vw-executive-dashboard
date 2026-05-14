@@ -51,14 +51,17 @@ function PrestadorDialog({
   onRemoveDescricao: (d: string) => void;
 }) {
   const isEdit = !!initial;
-  const [form, setForm] = useState<Omit<PrestadorPJ, 'id' | 'ativo' | 'itens'>>({
-    nome: initial?.nome ?? '',
-    cnpjCpf: initial?.cnpjCpf ?? '',
-    empresa: initial?.empresa ?? '',
-    cargo: initial?.cargo ?? '',
-    brand: initial?.brand ?? 'vw',
-    dataInicio: initial?.dataInicio ?? '',
-  });
+  const [form, setForm] = useState<Omit<PrestadorPJ, 'id' | 'ativo' | 'itens'>>(
+    {
+      nome: initial?.nome ?? '',
+      cnpjCpf: initial?.cnpjCpf ?? '',
+      empresa: initial?.empresa ?? '',
+      cargo: initial?.cargo ?? '',
+      brand: initial?.brand ?? 'vw',
+      dataInicio: initial?.dataInicio ?? '',
+      temPremio: initial?.temPremio ?? false,
+    }
+  );
   const [itens, setItens] = useState<ItemRemuneracao[]>(
     initial?.itens?.length ? initial.itens : [newItem()]
   );
@@ -192,6 +195,28 @@ function PrestadorDialog({
             </div>
           </div>
 
+          {/* Toggle Prêmio Adicional */}
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <div
+              onClick={() => setForm(prev => ({ ...prev, temPremio: !prev.temPremio }))}
+              className={`relative w-10 h-5 rounded-full transition-colors ${
+                form.temPremio ? 'bg-purple-600' : 'bg-slate-300'
+              }`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                form.temPremio ? 'translate-x-5' : 'translate-x-0'
+              }`} />
+            </div>
+            <span className="text-sm text-slate-700 font-medium">
+              Tem direito a Prêmio Adicional
+            </span>
+            {form.temPremio && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold border border-purple-200">
+                linha adicionada no demonstrativo
+              </span>
+            )}
+          </label>
+
           {/* Itens de remuneração */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -270,9 +295,11 @@ function PrestadorDialog({
                       value={item.tipo}
                       onChange={e => updateItem(item.id, {
                         tipo: e.target.value as TipoRemuneracao,
+                        descricao: item.descricao === 'Prêmio Adicional' ? '' : item.descricao,
                         valorBase: e.target.value === 'variavel' ? undefined : (item.valorBase ?? 0),
                         percentual: e.target.value === 'variavel' ? (item.percentual ?? undefined) : undefined,
                         baseCalculo: e.target.value === 'variavel' ? (item.baseCalculo ?? undefined) : undefined,
+                        departamentos: e.target.value === 'variavel' ? item.departamentos : undefined,
                       })}
                       className="border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
                     >
@@ -500,7 +527,9 @@ function PrestadorCard({
               className={`text-[0.65rem] px-2 py-0.5 rounded-full font-medium ${
                 item.tipo === 'fixa'
                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  : item.tipo === 'premio'
+                    ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                    : 'bg-amber-50 text-amber-700 border border-amber-200'
               }`}
               title={item.tipo === 'variavel' && item.baseCalculo ? BASE_CALCULO_LABELS[item.baseCalculo] : undefined}
             >

@@ -3,7 +3,7 @@ import { kvGet, kvSet, kvDelete } from '@/lib/kvClient';
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export type PjBrand = 'vw' | 'audi';
-export type TipoRemuneracao = 'fixa' | 'variavel';
+export type TipoRemuneracao = 'fixa' | 'variavel' | 'premio';
 export type StatusPagamento = 'pendente' | 'pago';
 
 export type BaseCalculoVariavel =
@@ -51,6 +51,8 @@ export interface PrestadorPJ {
   dataInicio?: string; // DD/MM/AAAA
   ativo: boolean;
   itens: ItemRemuneracao[];
+  /** Tem direito a Prêmio Adicional */
+  temPremio?: boolean;
   /** ordem de exibição */
   ordem?: number;
 }
@@ -257,18 +259,27 @@ export function buildLancamentoVazio(
     year,
     month,
     status: 'pendente',
-    itens: prestador.itens.map(item => ({
-      itemId: item.id,
-      descricao: item.descricao,
-      tipo: item.tipo,
-      valor: item.tipo === 'fixa' ? (item.valorBase ?? 0) : 0,
-      ...(item.tipo === 'variavel' && {
-        percentualUsado: item.percentual,
-        baseCalculoLabel: item.descricao === DESCRICAO_TRIMESTRAL
-          ? BASE_CALCULO_LABELS['lucro_trimestral']
-          : item.baseCalculo ? BASE_CALCULO_LABELS[item.baseCalculo] : undefined,
-      }),
-    })),
+    itens: [
+      ...prestador.itens.map(item => ({
+        itemId: item.id,
+        descricao: item.descricao,
+        tipo: item.tipo,
+        valor: item.tipo === 'fixa' ? (item.valorBase ?? 0) : 0,
+        ...(item.tipo === 'premio' && { valor: 0 }),
+        ...(item.tipo === 'variavel' && {
+          percentualUsado: item.percentual,
+          baseCalculoLabel: item.descricao === DESCRICAO_TRIMESTRAL
+            ? BASE_CALCULO_LABELS['lucro_trimestral']
+            : item.baseCalculo ? BASE_CALCULO_LABELS[item.baseCalculo] : undefined,
+        }),
+      })),
+      ...(prestador.temPremio ? [{
+        itemId: 'premio_adicional',
+        descricao: 'Prêmio Adicional',
+        tipo: 'premio' as TipoRemuneracao,
+        valor: 0,
+      }] : []),
+    ],
   };
 }
 
