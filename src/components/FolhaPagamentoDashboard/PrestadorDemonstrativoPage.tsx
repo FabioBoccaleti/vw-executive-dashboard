@@ -554,45 +554,50 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
     ]).then(([existing, dreRow]) => {
       const base = existing ?? buildLancamentoVazio(prestador, year, month);
 
-      // Sincroniza tipo e percentualUsado do cadastro atual (caso prestador tenha mudado o item)
-      base.itens = base.itens.map(item => {
-        const prestItem = prestador.itens.find(pi => pi.id === item.itemId);
-        if (!prestItem) return item;
-        return {
-          ...item,
-          tipo: prestItem.tipo,
-          ...(prestItem.tipo === 'variavel' && {
-            percentualUsado: item.percentualUsado ?? prestItem.percentual,
-          }),
-        };
-      });
-
-      // Preenche valorBaseCalculo de itens variáveis a partir do DRE
-      if (dreRow) {
+      // Somente sincroniza dados do cadastro e recalcula DRE quando o lançamento
+      // não está pago (lançamento novo ou pendente). Demonstrativos pagos mantêm
+      // exatamente os valores que foram salvos.
+      if (!existing || existing.status !== 'pago') {
+        // Sincroniza tipo e percentualUsado do cadastro atual (caso prestador tenha mudado o item)
         base.itens = base.itens.map(item => {
-          if (item.tipo !== 'variavel') return item;
           const prestItem = prestador.itens.find(pi => pi.id === item.itemId);
-          let valorBase = 0;
-
-          if (item.descricao === DESCRICAO_TRIMESTRAL) {
-            // Soma os departamentos selecionados nos chips
-            const deps = prestItem?.departamentos ?? [];
-            valorBase = deps.reduce((sum, dep) => {
-              const dk = CHIP_TO_DEPT[dep];
-              return sum + (dk ? parseValDre(dreRow[dk]?.lucroLiquidoExercicio) : 0);
-            }, 0);
-          } else {
-            const baseCalculo = prestItem?.baseCalculo;
-            if (baseCalculo) {
-              const dk = BASE_TO_DEPT[baseCalculo];
-              if (dk) valorBase = parseValDre(dreRow[dk]?.lucroLiquidoExercicio);
-            }
-          }
-
-          const pct = item.percentualUsado ?? prestItem?.percentual ?? 0;
-          const valor = Math.round((valorBase * pct / 100) * 100) / 100;
-          return { ...item, valorBaseCalculo: valorBase, valor };
+          if (!prestItem) return item;
+          return {
+            ...item,
+            tipo: prestItem.tipo,
+            ...(prestItem.tipo === 'variavel' && {
+              percentualUsado: item.percentualUsado ?? prestItem.percentual,
+            }),
+          };
         });
+
+        // Preenche valorBaseCalculo de itens variáveis a partir do DRE
+        if (dreRow) {
+          base.itens = base.itens.map(item => {
+            if (item.tipo !== 'variavel') return item;
+            const prestItem = prestador.itens.find(pi => pi.id === item.itemId);
+            let valorBase = 0;
+
+            if (item.descricao === DESCRICAO_TRIMESTRAL) {
+              // Soma os departamentos selecionados nos chips
+              const deps = prestItem?.departamentos ?? [];
+              valorBase = deps.reduce((sum, dep) => {
+                const dk = CHIP_TO_DEPT[dep];
+                return sum + (dk ? parseValDre(dreRow[dk]?.lucroLiquidoExercicio) : 0);
+              }, 0);
+            } else {
+              const baseCalculo = prestItem?.baseCalculo;
+              if (baseCalculo) {
+                const dk = BASE_TO_DEPT[baseCalculo];
+                if (dk) valorBase = parseValDre(dreRow[dk]?.lucroLiquidoExercicio);
+              }
+            }
+
+            const pct = item.percentualUsado ?? prestItem?.percentual ?? 0;
+            const valor = Math.round((valorBase * pct / 100) * 100) / 100;
+            return { ...item, valorBaseCalculo: valorBase, valor };
+          });
+        }
       }
 
       setLanc(base);
