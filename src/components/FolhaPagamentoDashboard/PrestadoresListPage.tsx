@@ -7,16 +7,27 @@ import {
   addPrestador,
   updatePrestador,
   deletePrestador,
+  loadDescricaoExtras,
+  addDescricaoExtra,
+  removeDescricaoExtra,
+  DESCRICAO_PADRAO,
+  DESCRICAO_TRIMESTRAL,
+  LUCRO_TRIMESTRAL_DEPARTAMENTOS,
+  type LucroTrimestralDepartamento,
   type PrestadorPJ,
   type ItemRemuneracao,
   type PjBrand,
   type TipoRemuneracao,
+  type BaseCalculoVariavel,
+  BASE_CALCULO_LABELS,
 } from './remPjStorage';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const BRAND_LABEL: Record<PjBrand, string> = { vw: 'VW', audi: 'Audi' };
 const TIPO_LABEL: Record<TipoRemuneracao, string> = { fixa: 'Fixa', variavel: 'Variável' };
+
+const BASE_CALCULO_OPTIONS = Object.entries(BASE_CALCULO_LABELS) as [BaseCalculoVariavel, string][];
 
 function newItem(): ItemRemuneracao {
   return { id: crypto.randomUUID(), descricao: '', tipo: 'fixa', valorBase: 0 };
@@ -28,10 +39,16 @@ function PrestadorDialog({
   initial,
   onConfirm,
   onCancel,
+  descricaoOpcoes,
+  onAddDescricao,
+  onRemoveDescricao,
 }: {
   initial?: PrestadorPJ;
   onConfirm: (p: PrestadorPJ) => void;
   onCancel: () => void;
+  descricaoOpcoes: string[];
+  onAddDescricao: (d: string) => void;
+  onRemoveDescricao: (d: string) => void;
 }) {
   const isEdit = !!initial;
   const [form, setForm] = useState<Omit<PrestadorPJ, 'id' | 'ativo' | 'itens'>>({
@@ -45,6 +62,8 @@ function PrestadorDialog({
   const [itens, setItens] = useState<ItemRemuneracao[]>(
     initial?.itens?.length ? initial.itens : [newItem()]
   );
+  const [novaDescricao, setNovaDescricao] = useState('');
+  const [showNovaDescricao, setShowNovaDescricao] = useState(false);
 
   function setField(field: string, value: string) {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -60,6 +79,19 @@ function PrestadorDialog({
 
   function removeItem(id: string) {
     setItens(prev => prev.filter(it => it.id !== id));
+  }
+
+  function handleConfirmNovaDescricao() {
+    const val = novaDescricao.trim();
+    if (!val) return;
+    if (descricaoOpcoes.includes(val)) {
+      toast.error('Essa descrição já existe na lista.');
+      return;
+    }
+    onAddDescricao(val);
+    setNovaDescricao('');
+    setShowNovaDescricao(false);
+    toast.success(`"${val}" adicionado à lista.`);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -166,60 +198,186 @@ function PrestadorDialog({
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 Itens de Remuneração <span className="text-red-500">*</span>
               </p>
-              <button
-                type="button"
-                onClick={addItemRow}
-                className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-semibold"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Adicionar item
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNovaDescricao(v => !v)}
+                  className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 font-semibold border border-slate-200 rounded px-2 py-1 hover:bg-slate-50"
+                  title="Cadastrar nova opção de descrição"
+                >
+                  <Plus className="w-3 h-3" />
+                  Nova opção
+                </button>
+                <button
+                  type="button"
+                  onClick={addItemRow}
+                  className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-semibold"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Adicionar item
+                </button>
+              </div>
             </div>
+
+            {/* Painel inline para cadastrar nova opção de descrição */}
+            {showNovaDescricao && (
+              <div className="mb-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                <input
+                  value={novaDescricao}
+                  onChange={e => setNovaDescricao(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleConfirmNovaDescricao(); } }}
+                  className="flex-1 border border-blue-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  placeholder="Nome da nova opção..."
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={handleConfirmNovaDescricao}
+                  className="flex items-center gap-1 text-xs bg-blue-600 text-white rounded px-3 py-1.5 font-semibold hover:bg-blue-700"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  Salvar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowNovaDescricao(false); setNovaDescricao(''); }}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
             <div className="flex flex-col gap-2">
               {itens.map((item, idx) => (
-                <div key={item.id} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
-                  <span className="text-xs text-slate-400 w-5 text-center select-none">{idx + 1}</span>
+                <div key={item.id} className="flex flex-col gap-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                  {/* Linha principal */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400 w-5 text-center select-none">{idx + 1}</span>
 
-                  <input
-                    value={item.descricao}
-                    onChange={e => updateItem(item.id, { descricao: e.target.value })}
-                    className="flex-1 border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
-                    placeholder="Descrição (ex: Honorários, Comissão)"
-                  />
+                    <select
+                      value={item.descricao}
+                      onChange={e => updateItem(item.id, { descricao: e.target.value })}
+                      className="flex-1 border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                    >
+                      <option value="">Selecione a descrição...</option>
+                      {descricaoOpcoes.map(op => (
+                        <option key={op} value={op}>{op}</option>
+                      ))}
+                    </select>
 
-                  <select
-                    value={item.tipo}
-                    onChange={e => updateItem(item.id, { tipo: e.target.value as TipoRemuneracao, valorBase: e.target.value === 'variavel' ? undefined : (item.valorBase ?? 0) })}
-                    className="border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
-                  >
-                    <option value="fixa">Fixa</option>
-                    <option value="variavel">Variável</option>
-                  </select>
+                    <select
+                      value={item.tipo}
+                      onChange={e => updateItem(item.id, {
+                        tipo: e.target.value as TipoRemuneracao,
+                        valorBase: e.target.value === 'variavel' ? undefined : (item.valorBase ?? 0),
+                        percentual: e.target.value === 'variavel' ? (item.percentual ?? undefined) : undefined,
+                        baseCalculo: e.target.value === 'variavel' ? (item.baseCalculo ?? undefined) : undefined,
+                      })}
+                      className="border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                    >
+                      <option value="fixa">Fixa</option>
+                      <option value="variavel">Variável</option>
+                    </select>
 
-                  {item.tipo === 'fixa' && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-slate-400">R$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.valorBase ?? ''}
-                        onChange={e => updateItem(item.id, { valorBase: parseFloat(e.target.value) || 0 })}
-                        className="w-28 border border-slate-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-400"
-                        placeholder="0,00"
-                      />
+                    {item.tipo === 'fixa' && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-slate-400">R$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.valorBase ?? ''}
+                          onChange={e => updateItem(item.id, { valorBase: parseFloat(e.target.value) || 0 })}
+                          className="w-28 border border-slate-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-400"
+                          placeholder="0,00"
+                        />
+                      </div>
+                    )}
+
+                    {itens.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Linha extra para variável */}
+                  {item.tipo === 'variavel' && (
+                    <div className="flex items-center gap-2 pl-7">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-slate-500 whitespace-nowrap">% sobre a base:</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={item.percentual ?? ''}
+                          onChange={e => updateItem(item.id, { percentual: parseFloat(e.target.value) || undefined })}
+                          className="w-20 border border-amber-300 rounded px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          placeholder="0,00"
+                        />
+                        <span className="text-xs text-slate-400">%</span>
+                      </div>
+                      <div className="flex items-center gap-1 flex-1">
+                        <span className="text-xs text-slate-500 whitespace-nowrap">Sobre:</span>
+                        {item.descricao === DESCRICAO_TRIMESTRAL ? (
+                          <span className="flex-1 border border-amber-200 rounded px-2.5 py-1.5 text-sm bg-amber-50 text-amber-800 font-medium">
+                            Lucro Líquido do Trimestre
+                          </span>
+                        ) : (
+                          <select
+                            value={item.baseCalculo ?? ''}
+                            onChange={e => updateItem(item.id, { baseCalculo: e.target.value as BaseCalculoVariavel || undefined })}
+                            className="flex-1 border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          >
+                            <option value="">Selecione a base...</option>
+                            {BASE_CALCULO_OPTIONS.map(([key, label]) => (
+                              <option key={key} value={key}>{label}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     </div>
                   )}
 
-                  {itens.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.id)}
-                      className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                  {/* Chips de departamento — apenas para Lucro Operacional Trimestral */}
+                  {item.descricao === DESCRICAO_TRIMESTRAL && (
+                    <div className="pl-7 flex flex-col gap-1.5">
+                      <span className="text-xs text-slate-500 font-medium">Departamentos considerados:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {LUCRO_TRIMESTRAL_DEPARTAMENTOS.map(dep => {
+                          const ativo = (item.departamentos ?? []).includes(dep);
+                          return (
+                            <button
+                              key={dep}
+                              type="button"
+                              onClick={() => {
+                                const atual = item.departamentos ?? [];
+                                const novos = ativo
+                                  ? atual.filter(d => d !== dep)
+                                  : [...atual, dep];
+                                updateItem(item.id, { departamentos: novos as LucroTrimestralDepartamento[] });
+                              }}
+                              className={`text-xs font-semibold px-3 py-1 rounded-full border transition-colors ${
+                                ativo
+                                  ? 'bg-teal-600 text-white border-teal-600'
+                                  : 'bg-white text-slate-500 border-slate-300 hover:border-teal-400 hover:text-teal-600'
+                              }`}
+                            >
+                              {dep}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {(item.departamentos ?? []).length === 0 && (
+                        <p className="text-[10px] text-amber-600">Selecione ao menos um departamento.</p>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
@@ -344,11 +502,14 @@ function PrestadorCard({
                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                   : 'bg-amber-50 text-amber-700 border border-amber-200'
               }`}
+              title={item.tipo === 'variavel' && item.baseCalculo ? BASE_CALCULO_LABELS[item.baseCalculo] : undefined}
             >
               {item.descricao}
               {item.tipo === 'fixa' && item.valorBase
                 ? ` · R$${item.valorBase.toLocaleString('pt-BR')}`
-                : item.tipo === 'variavel' ? ' (var.)' : ''}
+                : item.tipo === 'variavel'
+                  ? ` · ${item.percentual != null ? item.percentual + '%' : 'var.'}${item.baseCalculo ? ' / ' + BASE_CALCULO_LABELS[item.baseCalculo].replace('LUCRO LÍQUIDO DO EXERCÍCIO - ', '') : ''}${item.descricao === DESCRICAO_TRIMESTRAL && item.departamentos?.length ? ' [' + item.departamentos.join(', ') + ']' : ''}`
+                  : ''}
             </span>
           ))}
         </div>
@@ -380,13 +541,27 @@ export function PrestadoresListPage({ isAdmin, onOpenPrestador }: PrestadoresLis
   const [editTarget, setEditTarget]   = useState<PrestadorPJ | undefined>();
   const [filterBrand, setFilterBrand] = useState<'todos' | 'vw' | 'audi'>('todos');
   const [showInativos, setShowInativos] = useState(false);
+  const [descricaoExtras, setDescricaoExtras] = useState<string[]>([]);
 
   useEffect(() => {
     loadPrestadores().then(list => {
       setPrestadores(list);
       setLoading(false);
     });
+    loadDescricaoExtras().then(setDescricaoExtras);
   }, []);
+
+  const todasDescricoes = [...DESCRICAO_PADRAO, ...descricaoExtras];
+
+  async function handleAddDescricao(d: string) {
+    await addDescricaoExtra(d);
+    setDescricaoExtras(prev => [...prev, d]);
+  }
+
+  async function handleRemoveDescricao(d: string) {
+    await removeDescricaoExtra(d);
+    setDescricaoExtras(prev => prev.filter(e => e !== d));
+  }
 
   async function handleAdd(p: PrestadorPJ) {
     await addPrestador(p);
@@ -526,6 +701,9 @@ export function PrestadoresListPage({ isAdmin, onOpenPrestador }: PrestadoresLis
           initial={editTarget}
           onConfirm={editTarget ? handleUpdate : handleAdd}
           onCancel={() => { setShowDialog(false); setEditTarget(undefined); }}
+          descricaoOpcoes={todasDescricoes}
+          onAddDescricao={handleAddDescricao}
+          onRemoveDescricao={handleRemoveDescricao}
         />
       )}
     </div>

@@ -6,6 +6,25 @@ export type PjBrand = 'vw' | 'audi';
 export type TipoRemuneracao = 'fixa' | 'variavel';
 export type StatusPagamento = 'pendente' | 'pago';
 
+export type BaseCalculoVariavel =
+  | 'lucro_novos'
+  | 'lucro_usados'
+  | 'lucro_vd_direta'
+  | 'lucro_pecas'
+  | 'lucro_oficina'
+  | 'lucro_funilaria'
+  | 'lucro_trimestral';
+
+export const BASE_CALCULO_LABELS: Record<BaseCalculoVariavel, string> = {
+  lucro_novos:      'LUCRO LÍQUIDO DO EXERCÍCIO - Novos',
+  lucro_usados:     'LUCRO LÍQUIDO DO EXERCÍCIO - Usados',
+  lucro_vd_direta:  'LUCRO LÍQUIDO DO EXERCÍCIO - VD Direta',
+  lucro_pecas:      'LUCRO LÍQUIDO DO EXERCÍCIO - Peças',
+  lucro_oficina:    'LUCRO LÍQUIDO DO EXERCÍCIO - Oficina',
+  lucro_funilaria:  'LUCRO LÍQUIDO DO EXERCÍCIO - Funilaria',
+  lucro_trimestral: 'Lucro Líquido do Trimestre',
+};
+
 /** Item de remuneração vinculado ao cadastro do prestador */
 export interface ItemRemuneracao {
   id: string;
@@ -13,6 +32,12 @@ export interface ItemRemuneracao {
   tipo: TipoRemuneracao;
   /** Valor base — preenchido apenas para tipo 'fixa' */
   valorBase?: number;
+  /** Percentual aplicado sobre a base de cálculo — apenas para tipo 'variavel' */
+  percentual?: number;
+  /** Base de cálculo — apenas para tipo 'variavel' */
+  baseCalculo?: BaseCalculoVariavel;
+  /** Departamentos considerados — apenas para Lucro Operacional Trimestral */
+  departamentos?: LucroTrimestralDepartamento[];
 }
 
 /** Cadastro permanente do prestador */
@@ -37,6 +62,12 @@ export interface LancamentoItem {
   tipo: TipoRemuneracao;
   valor: number;
   observacao?: string;
+  /** Para itens variáveis: valor da base de cálculo informado no lançamento */
+  valorBaseCalculo?: number;
+  /** Para itens variáveis: snapshot do percentual no momento do lançamento */
+  percentualUsado?: number;
+  /** Para itens variáveis: snapshot do label da base de cálculo */
+  baseCalculoLabel?: string;
 }
 
 /** Lançamento mensal de um prestador */
@@ -53,6 +84,63 @@ export interface LancamentoPJ {
 // ─── Chaves KV ────────────────────────────────────────────────────────────────
 
 const PRESTADORES_KEY = 'rem_pj_prestadores';
+const DESCRICAO_EXTRAS_KEY = 'rem_pj_descricao_extras';
+
+// ─── Opções de Descrição de Remuneração ──────────────────────────────────────
+
+export const DESCRICAO_PADRAO: readonly string[] = [
+  'Prestação de Serviço',
+  'Lucro Operacional Veic. Novos Varejo',
+  'Lucro Operacional Veic. Novos VD / Direta',
+  'Lucro Operacional Veic. Usados',
+  'Lucro Operacional Peças',
+  'Lucro Operacional Oficina',
+  'Lucro Operacional Funilaria',
+  'Lucro Operacional Trimestral',
+  'Premiação s/ Venda de Financiamento',
+  'Premiação de Venda Serviço Despachante',
+  'Comissão de Vendas',
+];
+
+export const DESCRICAO_TRIMESTRAL = 'Lucro Operacional Trimestral';
+
+export const LUCRO_TRIMESTRAL_DEPARTAMENTOS = [
+  'Novos Varejo',
+  'VD Direta',
+  'Usados',
+  'Peças',
+  'Oficina',
+  'Funilaria',
+] as const;
+
+export type LucroTrimestralDepartamento = typeof LUCRO_TRIMESTRAL_DEPARTAMENTOS[number];
+
+export async function loadDescricaoExtras(): Promise<string[]> {
+  try {
+    return (await kvGet<string[]>(DESCRICAO_EXTRAS_KEY)) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function addDescricaoExtra(descricao: string): Promise<boolean> {
+  try {
+    const extras = await loadDescricaoExtras();
+    if (extras.includes(descricao)) return true;
+    return kvSet(DESCRICAO_EXTRAS_KEY, [...extras, descricao]);
+  } catch {
+    return false;
+  }
+}
+
+export async function removeDescricaoExtra(descricao: string): Promise<boolean> {
+  try {
+    const extras = await loadDescricaoExtras();
+    return kvSet(DESCRICAO_EXTRAS_KEY, extras.filter(e => e !== descricao));
+  } catch {
+    return false;
+  }
+}
 
 function lancamentoKey(prestadorId: string, year: number, month: number): string {
   const mm = String(month).padStart(2, '0');
@@ -174,6 +262,12 @@ export function buildLancamentoVazio(
       descricao: item.descricao,
       tipo: item.tipo,
       valor: item.tipo === 'fixa' ? (item.valorBase ?? 0) : 0,
+      ...(item.tipo === 'variavel' && {
+        percentualUsado: item.percentual,
+        baseCalculoLabel: item.descricao === DESCRICAO_TRIMESTRAL
+          ? BASE_CALCULO_LABELS['lucro_trimestral']
+          : item.baseCalculo ? BASE_CALCULO_LABELS[item.baseCalculo] : undefined,
+      }),
     })),
   };
 }

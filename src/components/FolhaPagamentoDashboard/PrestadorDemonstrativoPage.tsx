@@ -146,68 +146,141 @@ function DemonstrativoTable({
         <thead>
           <tr className="bg-slate-50 border-b border-slate-200">
             <th className="text-left px-6 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Descrição</th>
-            <th className="text-center px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider w-28">Tipo</th>
+            <th className="text-center px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider w-32">Tipo / %</th>
+            <th className="text-right px-4 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider w-48">Base de Cálculo</th>
             <th className="text-right px-6 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider w-40">Valor</th>
             {editing && isAdmin && <th className="w-10" />}
           </tr>
         </thead>
         <tbody>
-          {lanc.itens.map((item, idx) => (
-            <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-              <td className="px-6 py-3">
-                {editing && isAdmin ? (
-                  <input
-                    value={item.descricao}
-                    onChange={e => onItemChange(idx, { descricao: e.target.value })}
-                    className="w-full border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
-                  />
-                ) : (
-                  <span className="text-sm text-slate-800">{item.descricao}</span>
-                )}
-              </td>
-              <td className="px-4 py-3 text-center">
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                  item.tipo === 'fixa'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-amber-50 text-amber-700 border border-amber-200'
-                }`}>
-                  {item.tipo === 'fixa' ? 'Fixo' : 'Variável'}
-                </span>
-              </td>
-              <td className="px-6 py-3 text-right">
-                {editing ? (
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={item.valor || ''}
-                    onChange={e => onItemChange(idx, { valor: parseFloat(e.target.value) || 0 })}
-                    className="w-36 border border-slate-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-400 ml-auto block"
-                    placeholder="0,00"
-                  />
-                ) : (
-                  <span className="text-sm font-semibold text-slate-800 tabular-nums">
-                    {item.valor ? fmtBRL(item.valor) : <span className="text-slate-400">—</span>}
-                  </span>
-                )}
-              </td>
-              {editing && isAdmin && (
-                <td className="px-2 py-3">
-                  <button
-                    onClick={() => onRemoveItem(idx)}
-                    className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+          {lanc.itens.map((item, idx) => {
+            const pct = item.percentualUsado ??
+              prestador.itens.find(pi => pi.id === item.itemId)?.percentual;
+            const shortLabel = item.baseCalculoLabel
+              ? item.baseCalculoLabel.replace('LUCRO LÍQUIDO DO EXERCÍCIO - ', '')
+              : undefined;
+
+            return (
+              <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                {/* Descrição */}
+                <td className="px-6 py-3">
+                  {editing && isAdmin ? (
+                    <input
+                      value={item.descricao}
+                      onChange={e => onItemChange(idx, { descricao: e.target.value })}
+                      className="w-full border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                    />
+                  ) : (
+                    <span className="text-sm text-slate-800">{item.descricao}</span>
+                  )}
                 </td>
-              )}
-            </tr>
-          ))}
+
+                {/* Tipo / % */}
+                <td className="px-4 py-3 text-center">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      item.tipo === 'fixa'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border border-amber-200'
+                    }`}>
+                      {item.tipo === 'fixa' ? 'Fixo' : 'Variável'}
+                    </span>
+                    {item.tipo === 'variavel' && pct != null && (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                        {pct}% s/ base
+                      </span>
+                    )}
+                    {item.tipo === 'variavel' && pct == null && (
+                      <span className="text-[10px] text-slate-400 italic">sem %</span>
+                    )}
+                  </div>
+                </td>
+
+                {/* Base de Cálculo */}
+                <td className="px-4 py-3">
+                  {item.tipo === 'variavel' ? (
+                    editing ? (
+                      <div className="flex flex-col gap-1 items-end">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-slate-400">R$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.valorBaseCalculo ?? ''}
+                            onChange={e => onItemChange(idx, { valorBaseCalculo: parseFloat(e.target.value) || 0 })}
+                            className="w-32 border border-amber-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            placeholder="0,00"
+                          />
+                        </div>
+                        {shortLabel && (
+                          <span className="text-[10px] text-slate-500 text-right" title={item.baseCalculoLabel}>
+                            {shortLabel}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-right">
+                        {item.valorBaseCalculo != null && item.valorBaseCalculo !== 0 ? (
+                          <>
+                            <div className="text-sm font-medium text-slate-700 tabular-nums">{fmtBRL(item.valorBaseCalculo)}</div>
+                            {shortLabel && (
+                              <div className="text-[10px] text-slate-500" title={item.baseCalculoLabel}>{shortLabel}</div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-slate-400 text-sm">—</span>
+                        )}
+                      </div>
+                    )
+                  ) : (
+                    <span className="text-slate-300 text-sm block text-right">—</span>
+                  )}
+                </td>
+
+                {/* Valor */}
+                <td className="px-6 py-3 text-right">
+                  {item.tipo === 'variavel' ? (
+                    <span className={`text-sm font-semibold tabular-nums ${item.valor ? 'text-slate-800' : 'text-slate-400'}`}>
+                      {item.valor ? fmtBRL(item.valor) : '—'}
+                    </span>
+                  ) : (
+                    editing ? (
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.valor || ''}
+                        onChange={e => onItemChange(idx, { valor: parseFloat(e.target.value) || 0 })}
+                        className="w-36 border border-slate-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-400 ml-auto block"
+                        placeholder="0,00"
+                      />
+                    ) : (
+                      <span className="text-sm font-semibold text-slate-800 tabular-nums">
+                        {item.valor ? fmtBRL(item.valor) : <span className="text-slate-400">—</span>}
+                      </span>
+                    )
+                  )}
+                </td>
+
+                {editing && isAdmin && (
+                  <td className="px-2 py-3">
+                    <button
+                      onClick={() => onRemoveItem(idx)}
+                      className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
 
           {/* Botão adicionar item (apenas em edição) */}
           {editing && isAdmin && (
             <tr className="border-b border-slate-100">
-              <td colSpan={4} className="px-6 py-2">
+              <td colSpan={5} className="px-6 py-2">
                 <button
                   onClick={onAddItem}
                   className="flex items-center gap-1.5 text-xs text-teal-600 hover:text-teal-700 font-semibold"
@@ -222,7 +295,7 @@ function DemonstrativoTable({
           {/* Observação */}
           {lanc.observacaoGeral && !editing && (
             <tr className="border-b border-slate-100">
-              <td colSpan={editing ? 4 : 3} className="px-6 py-3">
+              <td colSpan={4} className="px-6 py-3">
                 <p className="text-xs text-slate-500 italic">Obs: {lanc.observacaoGeral}</p>
               </td>
             </tr>
@@ -230,7 +303,7 @@ function DemonstrativoTable({
         </tbody>
         <tfoot>
           <tr className="text-white" style={{ backgroundColor: brandDark }}>
-            <td colSpan={editing ? 3 : 2} className="px-6 py-4 text-sm font-bold">
+            <td colSpan={editing ? 4 : 3} className="px-6 py-4 text-sm font-bold">
               Total
             </td>
             <td className="px-6 py-4 text-right text-lg font-bold tabular-nums">
@@ -363,7 +436,19 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack }: Prest
   function handleItemChange(idx: number, patch: Partial<LancamentoItem>) {
     setLanc(prev => {
       if (!prev) return prev;
-      const itens = prev.itens.map((it, i) => i === idx ? { ...it, ...patch } : it);
+      const itens = prev.itens.map((it, i) => {
+        if (i !== idx) return it;
+        const updated = { ...it, ...patch };
+        // Auto-calcular valor para itens variáveis quando a base muda
+        if (updated.tipo === 'variavel' && 'valorBaseCalculo' in patch) {
+          const pct =
+            updated.percentualUsado ??
+            prestador.itens.find(pi => pi.id === it.itemId)?.percentual ??
+            0;
+          updated.valor = Math.round(((updated.valorBaseCalculo ?? 0) * pct) / 100 * 100) / 100;
+        }
+        return updated;
+      });
       return { ...prev, itens };
     });
     setDirty(true);
