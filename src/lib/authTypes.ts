@@ -121,6 +121,7 @@ export interface UserRecord {
 export interface SessionPayload {
   userId: string;
   username: string;
+  name?: string;
   role: UserRole;
   modules: ModuleId[];
   brands: BrandId[];

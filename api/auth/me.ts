@@ -48,6 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const freshSession = {
       userId:           user.id,
       username:         user.username,
+      name:             user.name ?? '',
       role:             user.role,
       modules:          user.modules,
       brands:           user.brands,

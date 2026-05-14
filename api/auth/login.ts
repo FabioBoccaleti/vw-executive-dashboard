@@ -87,7 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const token = `${Date.now()}-${randomBytes(24).toString('hex')}`;
     const session = {
-      userId: foundUser.id, username: foundUser.username, role: foundUser.role,
+      userId: foundUser.id, username: foundUser.username, name: foundUser.name ?? '', role: foundUser.role,
       modules: foundUser.modules, brands: foundUser.brands,
       vendasSubModules: foundUser.vendasSubModules ?? [],
       centralVendasVWSubModules: foundUser.centralVendasVWSubModules ?? [],

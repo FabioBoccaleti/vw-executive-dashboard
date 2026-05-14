@@ -77,6 +77,12 @@ export interface LancamentoItem {
 }
 
 /** Lançamento mensal de um prestador */
+export interface AssinaturaDigital {
+  username: string;   // e-mail / username do usuário logado
+  name?: string;      // nome completo do usuário
+  dataHora: string;   // ISO 8601
+}
+
 export interface LancamentoPJ {
   prestadorId: string;
   year: number;
@@ -87,6 +93,11 @@ export interface LancamentoPJ {
   observacaoGeral?: string;
   /** IDs dos itens que compõem a base do Prêmio neste mês (snapshot editável) */
   itensPremioIds?: string[];
+  /** Assinaturas eletrônicas */
+  assinaturas?: {
+    financeiro?: AssinaturaDigital;
+    rh?: AssinaturaDigital;
+  };
 }
 
 // ─── Chaves KV ────────────────────────────────────────────────────────────────
