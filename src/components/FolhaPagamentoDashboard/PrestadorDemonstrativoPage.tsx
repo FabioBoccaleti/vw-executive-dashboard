@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Printer, Check, Save, Loader2, Plus, Trash2, X, History, FileText, PenLine, CheckCircle, ShieldCheck, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { kvGet } from '@/lib/kvClient';
+import { loadDREDataAsync } from '@/lib/dbStorage';
 import { useAuth } from '@/contexts/useAuth';
 import { apiLogin } from '@/lib/authClient';
 import {
@@ -50,6 +51,32 @@ const CHIP_TO_DEPT: Record<string, string> = {
   'Oficina':      'oficina',
   'Funilaria':    'funilaria',
 };
+
+/** Mapeamento de chave de departamento DRE → Department do Dashboard Executivo */
+const DEPT_TO_EXEC_DEPT: Record<string, string> = {
+  novos:     'novos',
+  usados:    'usados',
+  direta:    'vendaDireta',
+  pecas:     'pecas',
+  oficina:   'oficina',
+  funilaria: 'funilaria',
+};
+
+/** Extrai lucroLiquidoExercicio de um DRELine[] do Dashboard Executivo para um mês (0-based) */
+function extractLucroLiquido(dreLines: any[] | null, monthIndex: number): number {
+  if (!dreLines) return 0;
+  for (const line of dreLines) {
+    const label = String(line.label || line.descricao || '')
+      .toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z ]/g, '').trim();
+    if (label === 'LUCRO LIQUIDO DO EXERCICIO') {
+      const vals: number[] = line.meses || line.values || [];
+      return vals[monthIndex] ?? 0;
+    }
+  }
+  return 0;
+}
 
 function parseValDre(v: string | number | undefined | null): number {
   if (v == null || v === '') return 0;
@@ -564,10 +591,32 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
       : { year, month: month - 1 };
     const dreKey = `resumo_dre:${prestador.brand}:${drePrev.year}-${String(drePrev.month).padStart(2, '0')}`;
 
-    Promise.all([
-      loadLancamento(prestador.id, year, month),
-      kvGet<any>(dreKey),
-    ]).then(([existing, dreRow]) => {
+    async function load() {
+      const [existing, kvDreRow] = await Promise.all([
+        loadLancamento(prestador.id, year, month),
+        kvGet<any>(dreKey),
+      ]);
+
+      // Fallback: se não houver dado no formato resumo_dre, tenta carregar do dashboard executivo
+      let dreRow = kvDreRow;
+      if (!dreRow) {
+        const monthIndex = drePrev.month - 1;
+        const yr = drePrev.year as 2024 | 2025 | 2026 | 2027;
+        const brand = prestador.brand as 'vw' | 'audi';
+        const deptEntries = Object.entries(DEPT_TO_EXEC_DEPT);
+        const dreResults = await Promise.all(
+          deptEntries.map(([dk, dept]) =>
+            loadDREDataAsync(yr, dept as any, brand).then(d => ({ dk, d }))
+          )
+        );
+        const synthetic: Record<string, { lucroLiquidoExercicio: number }> = {};
+        for (const { dk, d } of dreResults) {
+          synthetic[dk] = { lucroLiquidoExercicio: extractLucroLiquido(d, monthIndex) };
+        }
+        if (Object.values(synthetic).some(v => v.lucroLiquidoExercicio !== 0)) {
+          dreRow = synthetic;
+        }
+      }
       const base = existing ?? buildLancamentoVazio(prestador, year, month);
 
       // Somente sincroniza dados do cadastro e recalcula DRE quando o lançamento
@@ -618,7 +667,9 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
 
       setLanc(base);
       setLoading(false);
-    });
+    }
+
+    load();
   }, [prestador.id, year, month]);
 
   // Carrega histórico ao abrir o painel
