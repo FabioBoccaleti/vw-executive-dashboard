@@ -52,6 +52,8 @@ export interface KpiPrestador {
   objetivo?: number;
   /** Unidade da meta (ex: "%", "unid.", "R$") — apenas exibição */
   unidade?: string;
+  /** Condição para considerar a meta atingida: '>=' (padrão) ou '<=' */
+  condicao?: '>=' | '<=';
 }
 
 /** Cadastro permanente do prestador */

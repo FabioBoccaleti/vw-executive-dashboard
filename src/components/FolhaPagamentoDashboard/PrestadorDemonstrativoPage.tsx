@@ -519,6 +519,9 @@ function DemonstrativoTable({
                       {temObjetivo && (
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px] text-slate-400 uppercase font-semibold">Meta:</span>
+                          <span className="text-xs font-bold text-slate-500">
+                            {kpi.condicao === '<=' ? '≤' : '≥'}
+                          </span>
                           <span className="text-xs font-bold text-slate-600">
                             {kpi.objetivo?.toLocaleString('pt-BR')}{kpi.unidade ? ` ${kpi.unidade}` : ''}
                           </span>
@@ -945,7 +948,8 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
       const kpi = prestador.kpis?.find(k => k.id === kpiId);
       let novosKpisAtingidos = prev.kpisAtingidos ?? [];
       if (kpi?.objetivo != null && valor != null) {
-        const deveAtigir = valor >= kpi.objetivo;
+        const condicao = kpi.condicao ?? '>=';
+        const deveAtigir = condicao === '>=' ? valor >= kpi.objetivo : valor <= kpi.objetivo;
         const jaEstaAtingido = novosKpisAtingidos.includes(kpiId);
         if (deveAtigir && !jaEstaAtingido) {
           novosKpisAtingidos = [...novosKpisAtingidos, kpiId];

@@ -563,6 +563,14 @@ function PrestadorDialog({
                   </div>
                   <div className="flex items-center gap-2 pl-7">
                     <span className="text-xs text-slate-500 whitespace-nowrap">Objetivo:</span>
+                    <select
+                      value={kpi.condicao ?? '>='}
+                      onChange={e => setKpis(prev => prev.map(k => k.id === kpi.id ? { ...k, condicao: e.target.value as '>=' | '<=' } : k))}
+                      className="border border-teal-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                    >
+                      <option value=">=">≥ Maior ou igual</option>
+                      <option value="<=">≤ Menor ou igual</option>
+                    </select>
                     <input
                       type="number"
                       min="0"
