@@ -40,6 +40,20 @@ export interface ItemRemuneracao {
   departamentos?: LucroTrimestralDepartamento[];
 }
 
+/** KPI vinculado a um item variável do prestador */
+export interface KpiPrestador {
+  id: string;
+  descricao: string;
+  /** ID do ItemRemuneracao (variável) afetado */
+  itemRemuneracaoId: string;
+  /** Percentual de bônus adicionado ao % base do item quando atingido */
+  percentualBonus: number;
+  /** Meta numérica a atingir */
+  objetivo?: number;
+  /** Unidade da meta (ex: "%", "unid.", "R$") — apenas exibição */
+  unidade?: string;
+}
+
 /** Cadastro permanente do prestador */
 export interface PrestadorPJ {
   id: string;
@@ -59,6 +73,8 @@ export interface PrestadorPJ {
   itensPremioIds?: string[];
   /** Valor fixo (R$) a deduzir da base de cálculo do Prêmio Adicional */
   deducaoBasePremio?: number;
+  /** KPIs com bônus de % sobre itens variáveis */
+  kpis?: KpiPrestador[];
   /** ordem de exibição */
   ordem?: number;
 }
@@ -95,6 +111,10 @@ export interface LancamentoPJ {
   observacaoGeral?: string;
   /** IDs dos itens que compõem a base do Prêmio neste mês (snapshot editável) */
   itensPremioIds?: string[];
+  /** IDs dos KPIs atingidos neste mês */
+  kpisAtingidos?: string[];
+  /** Valores alcançados por KPI neste mês: kpiId → valor */
+  kpisAlcancado?: Record<string, number>;
   /** Assinaturas eletrônicas */
   assinaturas?: {
     financeiro?: AssinaturaDigital;
@@ -290,6 +310,7 @@ export function buildLancamentoVazio(
     month,
     status: 'pendente',
     itensPremioIds,
+    kpisAtingidos: [],
     itens: [
       ...prestador.itens.map(item => ({
         itemId: item.id,

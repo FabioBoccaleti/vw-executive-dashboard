@@ -18,6 +18,7 @@ import {
   type LancamentoItem,
   type StatusPagamento,
   type AssinaturaDigital,
+  type KpiPrestador,
 } from './remPjStorage';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -147,6 +148,8 @@ function DemonstrativoTable({
   onAddItem,
   onRemoveItem,
   onPremioToggle,
+  onKpiToggle,
+  onKpiAlcancadoChange,
   onAssinar,
   isAdmin,
 }: {
@@ -161,6 +164,8 @@ function DemonstrativoTable({
   onAddItem: () => void;
   onRemoveItem: (idx: number) => void;
   onPremioToggle: (itemId: string) => void;
+  onKpiToggle: (kpiId: string) => void;
+  onKpiAlcancadoChange: (kpiId: string, valor: number | undefined) => void;
   onAssinar: (campo: 'financeiro' | 'rh') => void;
   isAdmin: boolean;
 }) {
@@ -277,11 +282,24 @@ function DemonstrativoTable({
                     }`}>
                       {item.tipo === 'fixa' ? 'Fixo' : item.tipo === 'premio' ? 'Prêmio' : 'Variável'}
                     </span>
-                    {item.tipo === 'variavel' && pct != null && (
-                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
-                        {pct}% s/ base
-                      </span>
-                    )}
+                    {item.tipo === 'variavel' && pct != null && (() => {
+                      const pctBase = prestador.itens.find(pi => pi.id === item.itemId)?.percentual;
+                      const kpiBonus = (prestador.kpis ?? [])
+                        .filter(k => k.itemRemuneracaoId === item.itemId && (lanc.kpisAtingidos ?? []).includes(k.id))
+                        .reduce((s, k) => s + k.percentualBonus, 0);
+                      return (
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                            {pct}% s/ base
+                          </span>
+                          {kpiBonus > 0 && pctBase != null && (
+                            <span className="text-[9px] text-teal-600 font-semibold">
+                              {pctBase}% + {kpiBonus}% KPI
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {item.tipo === 'variavel' && pct == null && (
                       <span className="text-[10px] text-slate-400 italic">sem %</span>
                     )}
@@ -433,6 +451,117 @@ function DemonstrativoTable({
           </tr>
         </tfoot>
       </table>
+
+      {/* ─── Seção de KPIs ─── */}
+      {(prestador.kpis ?? []).length > 0 && (
+        <div className="px-6 py-4 border-t border-slate-200">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">KPIs</p>
+          <div className="flex flex-col gap-2">
+            {(prestador.kpis ?? []).map(kpi => {
+              const atingido = (lanc.kpisAtingidos ?? []).includes(kpi.id);
+              const alcancado = lanc.kpisAlcancado?.[kpi.id];
+              const itemAfetado = prestador.itens.find(it => it.id === kpi.itemRemuneracaoId);
+              const temObjetivo = kpi.objetivo != null;
+              return (
+                <div key={kpi.id} className={`rounded-lg border transition-colors ${
+                  atingido ? 'bg-teal-50 border-teal-200' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  {/* Linha principal */}
+                  <div className="flex items-center gap-3 px-4 py-2.5">
+                    {/* Toggle (apenas em edição e sem objetivo automático) ou ícone fixo */}
+                    {editing && isAdmin && !temObjetivo ? (
+                      <button
+                        type="button"
+                        onClick={() => onKpiToggle(kpi.id)}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                          atingido
+                            ? 'bg-teal-600 text-white hover:bg-teal-700'
+                            : 'bg-white border-2 border-slate-300 text-slate-400 hover:border-teal-400'
+                        }`}
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        atingido ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-400'
+                      }`}>
+                        <Check className="w-4 h-4" />
+                      </div>
+                    )}
+                    {/* Descrição e item afetado */}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${atingido ? 'text-teal-800' : 'text-slate-600'}`}>
+                        {kpi.descricao}
+                      </p>
+                      {itemAfetado && (
+                        <p className="text-xs text-slate-400 mt-0.5">{itemAfetado.descricao}</p>
+                      )}
+                    </div>
+                    {/* Bônus e status */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                        atingido
+                          ? 'bg-teal-100 text-teal-700 border-teal-300'
+                          : 'bg-slate-100 text-slate-500 border-slate-300'
+                      }`}>
+                        +{kpi.percentualBonus}%
+                      </span>
+                      <span className={`text-xs font-semibold ${atingido ? 'text-teal-600' : 'text-slate-400'}`}>
+                        {atingido ? 'Atingido' : 'Não atingido'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Linha objetivo / alcançado (quando há objetivo ou está em edição) */}
+                  {(temObjetivo || editing) && (
+                    <div className="flex items-center gap-4 px-4 pb-3 pt-0">
+                      {/* Objetivo */}
+                      {temObjetivo && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold">Meta:</span>
+                          <span className="text-xs font-bold text-slate-600">
+                            {kpi.objetivo?.toLocaleString('pt-BR')}{kpi.unidade ? ` ${kpi.unidade}` : ''}
+                          </span>
+                        </div>
+                      )}
+                      {/* Alcançado */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Alcançado:</span>
+                        {editing && isAdmin ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={alcancado ?? ''}
+                              onChange={e => onKpiAlcancadoChange(kpi.id, e.target.value !== '' ? parseFloat(e.target.value) : undefined)}
+                              className={`w-24 border rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-2 ${
+                                atingido
+                                  ? 'border-teal-300 focus:ring-teal-400 bg-white'
+                                  : 'border-slate-300 focus:ring-slate-400 bg-white'
+                              }`}
+                              placeholder="0"
+                            />
+                            {kpi.unidade && <span className="text-[10px] text-slate-400">{kpi.unidade}</span>}
+                          </div>
+                        ) : (
+                          <span className={`text-xs font-bold ${
+                            alcancado != null ? (atingido ? 'text-teal-700' : 'text-red-500') : 'text-slate-400 italic'
+                          }`}>
+                            {alcancado != null
+                              ? `${alcancado.toLocaleString('pt-BR')}${kpi.unidade ? ` ${kpi.unidade}` : ''}`
+                              : '—'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ─── Seção de Assinaturas ─── */}
       <div className="px-6 py-5 border-t border-slate-200">
@@ -658,9 +787,13 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
               }
             }
 
-            const pct = item.percentualUsado ?? prestItem?.percentual ?? 0;
-            const valor = Math.round((valorBase * pct / 100) * 100) / 100;
-            return { ...item, valorBaseCalculo: valorBase, valor };
+            const pctBase = prestItem?.percentual ?? 0;
+            const kpiBonus = (prestador.kpis ?? [])
+              .filter(k => k.itemRemuneracaoId === item.itemId && (base.kpisAtingidos ?? []).includes(k.id))
+              .reduce((s, k) => s + k.percentualBonus, 0);
+            const pctTotal = pctBase + kpiBonus;
+            const valor = Math.round((valorBase * pctTotal / 100) * 100) / 100;
+            return { ...item, valorBaseCalculo: valorBase, valor, percentualUsado: pctTotal };
           });
         }
 
@@ -716,11 +849,13 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
         const updated = { ...it, ...patch };
         // Auto-calcular valor para itens variáveis quando a base muda
         if (updated.tipo === 'variavel' && 'valorBaseCalculo' in patch) {
-          const pct =
-            updated.percentualUsado ??
-            prestador.itens.find(pi => pi.id === it.itemId)?.percentual ??
-            0;
-          updated.valor = Math.round(((updated.valorBaseCalculo ?? 0) * pct) / 100 * 100) / 100;
+          const pctBase = prestador.itens.find(pi => pi.id === it.itemId)?.percentual ?? 0;
+          const kpiBonus = (prestador.kpis ?? [])
+            .filter(k => k.itemRemuneracaoId === it.itemId && (prev.kpisAtingidos ?? []).includes(k.id))
+            .reduce((s, k) => s + k.percentualBonus, 0);
+          const pctTotal = pctBase + kpiBonus;
+          updated.percentualUsado = pctTotal;
+          updated.valor = Math.round(((updated.valorBaseCalculo ?? 0) * pctTotal) / 100 * 100) / 100;
         }
         return updated;
       });
@@ -761,6 +896,90 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
         it.itemId === 'premio_adicional' ? { ...it, valor: valorPremio } : it
       );
       return { ...prev, itensPremioIds: novosIds, itens };
+    });
+    setDirty(true);
+  }
+
+  function handleKpiToggle(kpiId: string) {
+    setLanc(prev => {
+      if (!prev) return prev;
+      const atual = prev.kpisAtingidos ?? [];
+      const marcado = atual.includes(kpiId);
+      const novosKpisAtingidos = marcado ? atual.filter(id => id !== kpiId) : [...atual, kpiId];
+      // Recalcula todos os itens variáveis afetados por este KPI
+      const itens = prev.itens.map(it => {
+        if (it.tipo !== 'variavel') return it;
+        const pctBase = prestador.itens.find(pi => pi.id === it.itemId)?.percentual ?? 0;
+        const kpiBonus = (prestador.kpis ?? [])
+          .filter(k => k.itemRemuneracaoId === it.itemId && novosKpisAtingidos.includes(k.id))
+          .reduce((s, k) => s + k.percentualBonus, 0);
+        const pctTotal = pctBase + kpiBonus;
+        const valor = Math.round(((it.valorBaseCalculo ?? 0) * pctTotal / 100) * 100) / 100;
+        return { ...it, percentualUsado: pctTotal, valor };
+      });
+      // Recalcula prêmio se necessário
+      let itensFinais = itens;
+      if (prestador.temPremio) {
+        const itensPremioIds = prev.itensPremioIds ?? [];
+        const pctPremio = prestador.percentualPremio ?? 0;
+        const somaItens = itens
+          .filter(it => itensPremioIds.includes(it.itemId))
+          .reduce((s, it) => s + (it.valor || 0), 0);
+        const deducao = prestador.deducaoBasePremio ?? 0;
+        const baseValor = Math.max(0, somaItens - deducao);
+        const valorPremio = Math.round(baseValor * pctPremio / 100 * 100) / 100;
+        itensFinais = itens.map(it =>
+          it.itemId === 'premio_adicional' ? { ...it, valor: valorPremio } : it
+        );
+      }
+      return { ...prev, kpisAtingidos: novosKpisAtingidos, itens: itensFinais };
+    });
+    setDirty(true);
+  }
+
+  function handleKpiAlcancadoChange(kpiId: string, valor: number | undefined) {
+    setLanc(prev => {
+      if (!prev) return prev;
+      const novoAlcancado = { ...(prev.kpisAlcancado ?? {}), [kpiId]: valor ?? 0 };
+      // Verifica se atingiu o objetivo para auto-toggle
+      const kpi = prestador.kpis?.find(k => k.id === kpiId);
+      let novosKpisAtingidos = prev.kpisAtingidos ?? [];
+      if (kpi?.objetivo != null && valor != null) {
+        const deveAtigir = valor >= kpi.objetivo;
+        const jaEstaAtingido = novosKpisAtingidos.includes(kpiId);
+        if (deveAtigir && !jaEstaAtingido) {
+          novosKpisAtingidos = [...novosKpisAtingidos, kpiId];
+        } else if (!deveAtigir && jaEstaAtingido) {
+          novosKpisAtingidos = novosKpisAtingidos.filter(id => id !== kpiId);
+        }
+      }
+      // Recalcula itens variáveis com base nos KPIs atingidos atualizados
+      const itens = prev.itens.map(it => {
+        if (it.tipo !== 'variavel') return it;
+        const pctBase = prestador.itens.find(pi => pi.id === it.itemId)?.percentual ?? 0;
+        const kpiBonus = (prestador.kpis ?? [])
+          .filter(k => k.itemRemuneracaoId === it.itemId && novosKpisAtingidos.includes(k.id))
+          .reduce((s, k) => s + k.percentualBonus, 0);
+        const pctTotal = pctBase + kpiBonus;
+        const valor2 = Math.round(((it.valorBaseCalculo ?? 0) * pctTotal / 100) * 100) / 100;
+        return { ...it, percentualUsado: pctTotal, valor: valor2 };
+      });
+      // Recalcula prêmio se necessário
+      let itensFinais = itens;
+      if (prestador.temPremio) {
+        const itensPremioIds = prev.itensPremioIds ?? [];
+        const pctPremio = prestador.percentualPremio ?? 0;
+        const somaItens = itens
+          .filter(it => itensPremioIds.includes(it.itemId))
+          .reduce((s, it) => s + (it.valor || 0), 0);
+        const deducao = prestador.deducaoBasePremio ?? 0;
+        const baseValor = Math.max(0, somaItens - deducao);
+        const valorPremio = Math.round(baseValor * pctPremio / 100 * 100) / 100;
+        itensFinais = itens.map(it =>
+          it.itemId === 'premio_adicional' ? { ...it, valor: valorPremio } : it
+        );
+      }
+      return { ...prev, kpisAlcancado: novoAlcancado, kpisAtingidos: novosKpisAtingidos, itens: itensFinais };
     });
     setDirty(true);
   }
@@ -1009,6 +1228,8 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
               onAddItem={handleAddItem}
               onRemoveItem={handleRemoveItem}
               onPremioToggle={handlePremioToggle}
+              onKpiToggle={handleKpiToggle}
+              onKpiAlcancadoChange={handleKpiAlcancadoChange}
               onAssinar={handleAbrirAssinatura}
             />
 

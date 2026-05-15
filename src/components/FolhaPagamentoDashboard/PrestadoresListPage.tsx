@@ -16,6 +16,7 @@ import {
   type LucroTrimestralDepartamento,
   type PrestadorPJ,
   type ItemRemuneracao,
+  type KpiPrestador,
   type PjBrand,
   type TipoRemuneracao,
   type BaseCalculoVariavel,
@@ -61,7 +62,7 @@ function PrestadorDialog({
   onRemoveDescricao: (d: string) => void;
 }) {
   const isEdit = !!initial;
-  const [form, setForm] = useState<Omit<PrestadorPJ, 'id' | 'ativo' | 'itens'>>(
+  const [form, setForm] = useState<Omit<PrestadorPJ, 'id' | 'ativo' | 'itens' | 'kpis'>>(
     {
       nome: initial?.nome ?? '',
       cnpjCpf: initial?.cnpjCpf ?? '',
@@ -78,6 +79,7 @@ function PrestadorDialog({
   const [itens, setItens] = useState<ItemRemuneracao[]>(
     initial?.itens?.length ? initial.itens : [newItem()]
   );
+  const [kpis, setKpis] = useState<KpiPrestador[]>(initial?.kpis ?? []);
   const [novaDescricao, setNovaDescricao] = useState('');
   const [showNovaDescricao, setShowNovaDescricao] = useState(false);
 
@@ -122,6 +124,7 @@ function PrestadorDialog({
       ...form,
       ativo: initial?.ativo ?? true,
       itens,
+      kpis,
       ordem: initial?.ordem,
     });
   }
@@ -495,6 +498,91 @@ function PrestadorDialog({
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* KPIs */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">KPIs de Remuneração</p>
+              <button
+                type="button"
+                onClick={() => setKpis(prev => [...prev, { id: crypto.randomUUID(), descricao: '', itemRemuneracaoId: '', percentualBonus: 0 }])}
+                className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-semibold"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Adicionar KPI
+              </button>
+            </div>
+            {kpis.length === 0 && (
+              <p className="text-xs text-slate-400 italic">Nenhum KPI cadastrado. KPIs permitem aumentar o % de itens variáveis ao serem atingidos.</p>
+            )}
+            {kpis.map((kpi, idx) => {
+              const itensVariaveis = itens.filter(it => it.tipo === 'variavel' && it.descricao);
+              return (
+                <div key={kpi.id} className="flex flex-col gap-2 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-teal-500 font-bold w-5 text-center">{idx + 1}</span>
+                    <input
+                      value={kpi.descricao}
+                      onChange={e => setKpis(prev => prev.map(k => k.id === kpi.id ? { ...k, descricao: e.target.value } : k))}
+                      placeholder="Descrição do KPI (ex: CSI acima de 90%)"
+                      className="flex-1 border border-teal-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setKpis(prev => prev.filter(k => k.id !== kpi.id))}
+                      className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 pl-7">
+                    <span className="text-xs text-slate-500 whitespace-nowrap">Item afetado:</span>
+                    <select
+                      value={kpi.itemRemuneracaoId}
+                      onChange={e => setKpis(prev => prev.map(k => k.id === kpi.id ? { ...k, itemRemuneracaoId: e.target.value } : k))}
+                      className="flex-1 border border-teal-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                    >
+                      <option value="">Selecione o item variável...</option>
+                      {itensVariaveis.map(it => (
+                        <option key={it.id} value={it.id}>{it.descricao}</option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-slate-500 whitespace-nowrap">Bônus:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={kpi.percentualBonus || ''}
+                      onChange={e => setKpis(prev => prev.map(k => k.id === kpi.id ? { ...k, percentualBonus: parseFloat(e.target.value) || 0 } : k))}
+                      className="w-20 border border-teal-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                      placeholder="0,00"
+                    />
+                    <span className="text-xs text-slate-400">%</span>
+                  </div>
+                  <div className="flex items-center gap-2 pl-7">
+                    <span className="text-xs text-slate-500 whitespace-nowrap">Objetivo:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={kpi.objetivo ?? ''}
+                      onChange={e => setKpis(prev => prev.map(k => k.id === kpi.id ? { ...k, objetivo: parseFloat(e.target.value) || undefined } : k))}
+                      className="w-28 border border-teal-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                      placeholder="ex: 90"
+                    />
+                    <input
+                      value={kpi.unidade ?? ''}
+                      onChange={e => setKpis(prev => prev.map(k => k.id === kpi.id ? { ...k, unidade: e.target.value || undefined } : k))}
+                      className="w-20 border border-teal-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                      placeholder="unid."
+                    />
+                    <span className="text-xs text-slate-400 italic">(unidade opcional, ex: %, R$, unid.)</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Ações */}
