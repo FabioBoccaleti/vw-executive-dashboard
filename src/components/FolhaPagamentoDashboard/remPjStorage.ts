@@ -9,18 +9,22 @@ export type StatusPagamento = 'pendente' | 'pago';
 export type BaseCalculoVariavel =
   | 'lucro_novos'
   | 'lucro_usados'
+  | 'lucro_novos_usados'
   | 'lucro_vd_direta'
   | 'lucro_pecas'
   | 'lucro_oficina'
+  | 'lucro_pecas_oficina'
   | 'lucro_funilaria'
   | 'lucro_trimestral';
 
 export const BASE_CALCULO_LABELS: Record<BaseCalculoVariavel, string> = {
-  lucro_novos:      'LUCRO LÍQUIDO DO EXERCÍCIO - Novos',
-  lucro_usados:     'LUCRO LÍQUIDO DO EXERCÍCIO - Usados',
+  lucro_novos:         'LUCRO LÍQUIDO DO EXERCÍCIO - Novos',
+  lucro_usados:        'LUCRO LÍQUIDO DO EXERCÍCIO - Usados',
+  lucro_novos_usados:  'LUCRO LÍQUIDO DO EXERCÍCIO - Novos + Usados',
   lucro_vd_direta:  'LUCRO LÍQUIDO DO EXERCÍCIO - VD Direta',
-  lucro_pecas:      'LUCRO LÍQUIDO DO EXERCÍCIO - Peças',
-  lucro_oficina:    'LUCRO LÍQUIDO DO EXERCÍCIO - Oficina',
+  lucro_pecas:         'LUCRO LÍQUIDO DO EXERCÍCIO - Peças',
+  lucro_oficina:        'LUCRO LÍQUIDO DO EXERCÍCIO - Oficina',
+  lucro_pecas_oficina:  'LUCRO LÍQUIDO DO EXERCÍCIO - Peças + Oficina',
   lucro_funilaria:  'LUCRO LÍQUIDO DO EXERCÍCIO - Funilaria',
   lucro_trimestral: 'Lucro Líquido do Trimestre',
 };
@@ -140,6 +144,8 @@ export const DESCRICAO_PADRAO: readonly string[] = [
   'Lucro Operacional Oficina',
   'Lucro Operacional Funilaria',
   'Lucro Operacional Trimestral',
+  'Lucro Operacional Veíc. Novos Varejo e Veíc. Usados',
+  'Lucro Operacional Peças e Oficina',
   'Premiação s/ Venda de Financiamento Novos',
   'Premiação s/ Venda de Financiamento Usados',
   'Premiação de Venda Serviço Despachante Novos',

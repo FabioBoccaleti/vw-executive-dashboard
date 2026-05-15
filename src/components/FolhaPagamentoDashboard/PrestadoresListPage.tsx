@@ -35,6 +35,8 @@ const DESCRICAO_TO_BASE: Record<string, BaseCalculoVariavel> = {
   'Lucro Operacional Veic. Novos Varejo': 'lucro_novos',
   'Lucro Operacional Veic. Novos VD / Direta': 'lucro_vd_direta',
   'Lucro Operacional Veic. Usados': 'lucro_usados',
+  'Lucro Operacional Veíc. Novos Varejo e Veíc. Usados': 'lucro_novos_usados',
+  'Lucro Operacional Peças e Oficina': 'lucro_pecas_oficina',
   'Lucro Operacional Peças': 'lucro_pecas',
   'Lucro Operacional Oficina': 'lucro_oficina',
   'Lucro Operacional Funilaria': 'lucro_funilaria',

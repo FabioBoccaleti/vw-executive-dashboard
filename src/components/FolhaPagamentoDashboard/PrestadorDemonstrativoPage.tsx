@@ -785,8 +785,18 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
             } else {
               const baseCalculo = prestItem?.baseCalculo;
               if (baseCalculo) {
-                const dk = BASE_TO_DEPT[baseCalculo];
-                if (dk) valorBase = parseValDre(dreRow[dk]?.lucroLiquidoExercicio);
+                if (baseCalculo === 'lucro_novos_usados') {
+                  valorBase =
+                    parseValDre(dreRow['novos']?.lucroLiquidoExercicio) +
+                    parseValDre(dreRow['usados']?.lucroLiquidoExercicio);
+                } else if (baseCalculo === 'lucro_pecas_oficina') {
+                  valorBase =
+                    parseValDre(dreRow['pecas']?.lucroLiquidoExercicio) +
+                    parseValDre(dreRow['oficina']?.lucroLiquidoExercicio);
+                } else {
+                  const dk = BASE_TO_DEPT[baseCalculo];
+                  if (dk) valorBase = parseValDre(dreRow[dk]?.lucroLiquidoExercicio);
+                }
               }
             }
 
