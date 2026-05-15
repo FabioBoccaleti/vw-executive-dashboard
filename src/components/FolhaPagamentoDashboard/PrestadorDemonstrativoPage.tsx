@@ -181,9 +181,9 @@ function DemonstrativoTable({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold opacity-75 uppercase tracking-wider mb-0.5">
-              Demonstrativo de Pagamento PJ
+              Demonstrativo de Pagamento Prestador de Serviço
             </p>
-            <h2 className="text-lg font-bold">{prestador.nome}</h2>
+            <h2 className="text-lg font-bold no-print">{prestador.nome}</h2>
             {prestador.empresa && (
               <p className="text-sm opacity-80">{prestador.empresa}</p>
             )}
@@ -795,7 +795,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
               .filter(k => k.itemRemuneracaoId === item.itemId && (base.kpisAtingidos ?? []).includes(k.id))
               .reduce((s, k) => s + k.percentualBonus, 0);
             const pctTotal = pctBase + kpiBonus;
-            const valor = Math.round((valorBase * pctTotal / 100) * 100) / 100;
+            const valor = Math.max(0, Math.round((valorBase * pctTotal / 100) * 100) / 100);
             return { ...item, valorBaseCalculo: valorBase, valor, percentualUsado: pctTotal };
           });
         }
@@ -858,7 +858,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
             .reduce((s, k) => s + k.percentualBonus, 0);
           const pctTotal = pctBase + kpiBonus;
           updated.percentualUsado = pctTotal;
-          updated.valor = Math.round(((updated.valorBaseCalculo ?? 0) * pctTotal) / 100 * 100) / 100;
+          updated.valor = Math.max(0, Math.round(((updated.valorBaseCalculo ?? 0) * pctTotal) / 100 * 100) / 100);
         }
         return updated;
       });
@@ -917,7 +917,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
           .filter(k => k.itemRemuneracaoId === it.itemId && novosKpisAtingidos.includes(k.id))
           .reduce((s, k) => s + k.percentualBonus, 0);
         const pctTotal = pctBase + kpiBonus;
-        const valor = Math.round(((it.valorBaseCalculo ?? 0) * pctTotal / 100) * 100) / 100;
+        const valor = Math.max(0, Math.round(((it.valorBaseCalculo ?? 0) * pctTotal / 100) * 100) / 100);
         return { ...it, percentualUsado: pctTotal, valor };
       });
       // Recalcula prêmio se necessário
@@ -965,7 +965,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
           .filter(k => k.itemRemuneracaoId === it.itemId && novosKpisAtingidos.includes(k.id))
           .reduce((s, k) => s + k.percentualBonus, 0);
         const pctTotal = pctBase + kpiBonus;
-        const valor2 = Math.round(((it.valorBaseCalculo ?? 0) * pctTotal / 100) * 100) / 100;
+        const valor2 = Math.max(0, Math.round(((it.valorBaseCalculo ?? 0) * pctTotal / 100) * 100) / 100);
         return { ...it, percentualUsado: pctTotal, valor: valor2 };
       });
       // Recalcula prêmio se necessário
