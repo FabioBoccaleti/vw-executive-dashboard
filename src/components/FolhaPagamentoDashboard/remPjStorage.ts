@@ -140,8 +140,10 @@ export const DESCRICAO_PADRAO: readonly string[] = [
   'Lucro Operacional Oficina',
   'Lucro Operacional Funilaria',
   'Lucro Operacional Trimestral',
-  'Premiação s/ Venda de Financiamento',
-  'Premiação de Venda Serviço Despachante',
+  'Premiação s/ Venda de Financiamento Novos',
+  'Premiação s/ Venda de Financiamento Usados',
+  'Premiação de Venda Serviço Despachante Novos',
+  'Premiação de Venda Serviço Despachante Usados',
   'Comissão de Vendas',
 ];
 
