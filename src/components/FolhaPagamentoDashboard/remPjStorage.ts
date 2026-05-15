@@ -280,7 +280,9 @@ export function buildLancamentoVazio(
   const baseFixa = prestador.itens
     .filter(it => itensPremioIds.includes(it.id) && it.tipo === 'fixa')
     .reduce((s, it) => s + (it.valorBase ?? 0), 0);
-  const valorPremioInicial = Math.round(baseFixa * pct / 100 * 100) / 100;
+  const deducao = prestador.deducaoBasePremio ?? 0;
+  const baseFixaReal = Math.max(0, baseFixa - deducao);
+  const valorPremioInicial = Math.round(baseFixaReal * pct / 100 * 100) / 100;
 
   return {
     prestadorId: prestador.id,

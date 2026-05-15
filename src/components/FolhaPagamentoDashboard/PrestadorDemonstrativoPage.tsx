@@ -663,6 +663,21 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
             return { ...item, valorBaseCalculo: valorBase, valor };
           });
         }
+
+        // Recalcula o prêmio adicional com base nos itens marcados e dedução
+        if (prestador.temPremio) {
+          const itensPremioIds = base.itensPremioIds ?? [];
+          const pctPremio = prestador.percentualPremio ?? 0;
+          const somaItens = base.itens
+            .filter(it => itensPremioIds.includes(it.itemId))
+            .reduce((s, it) => s + (it.valor || 0), 0);
+          const deducaoPremio = prestador.deducaoBasePremio ?? 0;
+          const baseValor = Math.max(0, somaItens - deducaoPremio);
+          const valorPremio = Math.round(baseValor * pctPremio / 100 * 100) / 100;
+          base.itens = base.itens.map(it =>
+            it.itemId === 'premio_adicional' ? { ...it, valor: valorPremio } : it
+          );
+        }
       }
 
       setLanc(base);
