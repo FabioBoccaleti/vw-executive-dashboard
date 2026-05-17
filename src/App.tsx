@@ -13,6 +13,7 @@ import { VPecasCondicaoPagamentoDashboard } from '@/components/VendasBonificacoe
 import { FolhaSelectionPage } from '@/components/FolhaPagamentoDashboard/FolhaSelectionPage'
 import { SalariosFixosDashboard } from '@/components/FolhaPagamentoDashboard/SalariosFixosDashboard'
 import { RemuneracoesPJDashboard } from '@/components/FolhaPagamentoDashboard/RemuneracoesPJDashboard'
+import { CalculoComissoesVWPage } from '@/components/FolhaPagamentoDashboard/CalculoComissoesVWPage'
 import { CadastrosPage } from '@/components/CadastrosPage'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
@@ -36,7 +37,7 @@ function AppContent() {
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
   const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento'>('selection')
-  const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj'>('selection')
+  const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw'>('selection')
   const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica'>('blindagem')
   
   // Inicializa o banco de dados em produção
@@ -230,6 +231,8 @@ function AppContent() {
           <SalariosFixosDashboard onBack={() => setFolhaSubPage('selection')} />
         ) : folhaSubPage === 'remuneracoes_pj' ? (
           <RemuneracoesPJDashboard onBack={() => setFolhaSubPage('selection')} />
+        ) : folhaSubPage === 'calculo_comissoes_vw' ? (
+          <CalculoComissoesVWPage onBack={() => setFolhaSubPage('selection')} />
         ) : null
       ) : brand === 'vendas_bonificacoes' ? (
         vendasSubPage === 'selection' ? (

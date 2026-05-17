@@ -1,7 +1,7 @@
-import { Wallet, UserCheck } from 'lucide-react';
+import { Wallet, UserCheck, Calculator } from 'lucide-react';
 
 interface FolhaSelectionPageProps {
-  onSelect: (option: 'salarios_fixo' | 'remuneracoes_pj') => void;
+  onSelect: (option: 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw') => void;
   onChangeBrand: () => void;
 }
 
@@ -24,7 +24,7 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
 
       {/* Cards */}
       <div className="flex-1 flex items-center justify-center p-8">
-        <div className="flex flex-col sm:flex-row gap-6 w-full max-w-2xl">
+        <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-6 w-full max-w-3xl">
 
           {/* Card — Salários Fixo */}
           <button
@@ -52,6 +52,21 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">
                 Remunerações PJ
+              </h2>
+            </div>
+          </button>
+
+          {/* Card — Cálculo de Comissões VW */}
+          <button
+            onClick={() => onSelect('calculo_comissoes_vw')}
+            className="flex-1 max-w-xs mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-teal-50 group-hover:bg-teal-100 transition-colors">
+              <Calculator className="w-10 h-10 text-teal-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Cálculo de Comissões VW
               </h2>
             </div>
           </button>
