@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { ClipboardList, TrendingUp, Calculator } from 'lucide-react';
 import { ComissoesVendasView } from './ComissoesVendasView';
 import { ComissoesCadastroView } from './ComissoesCadastroView';
+import { ComissoesCalculoView } from './ComissoesCalculoView';
 
 type MainView = 'cadastro' | 'vendas' | 'calculo';
 type VendasSubTab = 'novos' | 'usados';
+type CalculoSubTab = 'novos' | 'usados';
 
 interface CalculoComissoesVWPageProps {
   onBack: () => void;
@@ -15,6 +17,7 @@ interface CalculoComissoesVWPageProps {
 export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) {
   const [mainView, setMainView] = useState<MainView>('cadastro');
   const [vendasSubTab, setVendasSubTab] = useState<VendasSubTab>('novos');
+  const [calculoSubTab, setCalculoSubTab] = useState<CalculoSubTab>('novos');
 
   return (
     <div className="h-screen bg-slate-100 flex flex-col overflow-hidden">
@@ -68,13 +71,32 @@ export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) 
       {/* Conteúdo */}
       {mainView === 'cadastro' && <ComissoesCadastroView />}
 
-      {/* Cálculo */}
+      {/* Cálculo com sub-abas */}
       {mainView === 'calculo' && (
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="flex flex-col items-center gap-4 text-center max-w-sm">
-            <Calculator className="w-12 h-12 text-slate-300" />
-            <p className="text-sm text-slate-400">A aba <strong>Cálculo</strong> está sendo desenvolvida.</p>
+        <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+          {/* Sub-tabs */}
+          <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0">
+            {([  
+              { id: 'novos',  label: 'Novos' },
+              { id: 'usados', label: 'Usados' },
+            ] as const).map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setCalculoSubTab(tab.id)}
+                className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                  calculoSubTab === tab.id
+                    ? 'border-blue-600 text-blue-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
+
+          {/* Conteúdo por sub-aba */}
+          {calculoSubTab === 'novos'  && <ComissoesCalculoView tab="novos" />}
+          {calculoSubTab === 'usados' && <ComissoesCalculoView tab="usados" />}
         </div>
       )}
 
