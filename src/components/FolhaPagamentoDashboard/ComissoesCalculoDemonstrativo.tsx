@@ -23,22 +23,16 @@ function calcImpostosUsados(valorVenda: number, valorCusto: number): number {
   const base = valorVenda - valorCusto - p1;
   return p1 + (base > 0 ? base * 0.0365 : 0);
 }
-function calcDerived(row: VendasResultadoRow, isUsados: boolean, aliquotaBonPct: number) {
-  const valorVenda   = n(row.valorVenda);
-  const valorCusto   = n(row.valorCusto);
-  const bonusVarejo  = n(row.bonusVarejo);
-  const bonusTradeIn = n(row.bonusTradeIn);
-  const impostos     = isUsados ? calcImpostosUsados(valorVenda, valorCusto) : n(row.impostos);
-  const recLiq       = valorVenda - impostos;
-  const impBonus     = isUsados
-    ? bonusVarejo * (aliquotaBonPct / 100)
-    : (bonusVarejo + bonusTradeIn) * (aliquotaBonPct / 100);
-  const lucroBruto   = isUsados
-    ? recLiq - valorCusto + bonusVarejo - impBonus
-    : recLiq - valorCusto + bonusVarejo + bonusTradeIn - impBonus;
-  const lucroBrutoPct = recLiq !== 0 ? (lucroBruto / recLiq) * 100 : 0;
-  const bonus = isUsados ? bonusVarejo : bonusVarejo + bonusTradeIn;
-  return { impostos, recLiq, impBonus, lucroBruto, lucroBrutoPct, bonus };
+function calcDerived(row: VendasResultadoRow) {
+  const valorVenda    = n(row.valorVenda);
+  const valorCusto    = n(row.valorCusto);
+  const bonus         = n(row.bonusVarejo) + n(row.bonusTradeIn);
+  const lucroBruto    = valorVenda - valorCusto + bonus;
+  const lucroBrutoPct = valorVenda !== 0 ? (lucroBruto / valorVenda) * 100 : 0;
+  const comVenda      = 0; // a calcular futuramente
+  const comLB         = 0; // a calcular futuramente
+  const total         = comVenda + comLB;
+  return { bonus, lucroBruto, lucroBrutoPct, comVenda, comLB, total };
 }
 
 const MONTH_NAMES = [
@@ -77,21 +71,21 @@ export function ComissoesCalculoDemonstrativo({
 
   // Valores calculados por linha
   const derivedRows = useMemo(() =>
-    rows.map(r => ({ ...r, _d: calcDerived(r, isUsados, aliquotaBonPct) })),
-  [rows, isUsados, aliquotaBonPct]);
+    rows.map(r => ({ ...r, _d: calcDerived(r) })),
+  [rows]);
 
   // Totais
   const totals = useMemo(() => {
-    let totVenda = 0, totCusto = 0, totBonus = 0, totLB = 0, totRecLiq = 0;
+    let totVenda = 0, totCusto = 0, totBonus = 0, totLB = 0, totTotal = 0;
     for (const r of derivedRows) {
-      totVenda   += n(r.valorVenda);
-      totCusto   += n(r.valorCusto);
-      totBonus   += r._d.bonus;
-      totLB      += r._d.lucroBruto;
-      totRecLiq  += r._d.recLiq;
+      totVenda  += n(r.valorVenda);
+      totCusto  += n(r.valorCusto);
+      totBonus  += r._d.bonus;
+      totLB     += r._d.lucroBruto;
+      totTotal  += r._d.total;
     }
-    const totLBPct = totRecLiq !== 0 ? (totLB / totRecLiq) * 100 : 0;
-    return { totVenda, totCusto, totBonus, totLB, totLBPct };
+    const totLBPct = totVenda !== 0 ? (totLB / totVenda) * 100 : 0;
+    return { totVenda, totCusto, totBonus, totLB, totLBPct, totTotal };
   }, [derivedRows]);
 
   // ── Estilos de header ────────────────────────────────────────────────────
@@ -182,7 +176,7 @@ export function ComissoesCalculoDemonstrativo({
                     {/* Comissão */}
                     <th className={thComm}>Com. s/ Venda</th>
                     <th className={thComm}>Com. s/ LB</th>
-                    <th className={thComm}>Bônus Produtiv.</th>
+                    <th className={thComm}>Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -206,10 +200,14 @@ export function ComissoesCalculoDemonstrativo({
                         <td className={`${tdBase} ${bg} text-right`}><NumCell value={r._d.bonus} /></td>
                         <td className={`${tdBase} ${bg} text-right`}><NumCell value={r._d.lucroBruto} /></td>
                         <td className={`${tdBase} ${bg} text-right`}><NumCell value={r._d.lucroBrutoPct} pct /></td>
-                        {/* Comissão — sem dados por enquanto */}
+                        {/* Comissão */}
                         <td className={`${tdBase} ${bg} text-right text-slate-300`}>—</td>
                         <td className={`${tdBase} ${bg} text-right text-slate-300`}>—</td>
-                        <td className={`${tdBase} ${bg} text-right text-slate-300`}>—</td>
+                        <td className={`${tdBase} ${bg} text-right`}>
+                          {r._d.total === 0
+                            ? <span className="text-slate-300">—</span>
+                            : <NumCell value={r._d.total} />}
+                        </td>
                       </tr>
                     );
                   })}
@@ -229,7 +227,11 @@ export function ComissoesCalculoDemonstrativo({
                       <td className={`px-2 py-2.5 text-right font-mono ${totals.totLBPct < 0 ? 'text-red-300' : ''}`}>
                         {fmtPct(totals.totLBPct)}
                       </td>
-                      <td colSpan={3} />
+                      <td className="px-2 py-2.5 text-right text-slate-400">—</td>
+                      <td className="px-2 py-2.5 text-right text-slate-400">—</td>
+                      <td className={`px-2 py-2.5 text-right font-mono ${totals.totTotal < 0 ? 'text-red-300' : ''}`}>
+                        {totals.totTotal === 0 ? '—' : fmtBRL(totals.totTotal)}
+                      </td>
                     </tr>
                   </tfoot>
                 )}
