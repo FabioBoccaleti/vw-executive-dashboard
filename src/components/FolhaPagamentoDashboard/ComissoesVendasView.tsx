@@ -5,6 +5,10 @@ import {
   type VendasResultadoRow,
 } from '@/components/VendasBonificacoesDashboard/vendasResultadoStorage';
 import { loadAliquotas } from '@/components/VendasBonificacoesDashboard/vendedoresRemuneracaoStorage';
+import {
+  loadComissaoStatus,
+  type ComissaoStatusEntry,
+} from './comissoesStatusStorage';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] as const;
@@ -106,14 +110,16 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [rows, setRows]               = useState<VendasResultadoRow[]>([]);
   const [aliquotaBonPct, setAliquotaBonPct] = useState(0);
+  const [statusMap, setStatusMap]     = useState<Map<string, ComissaoStatusEntry>>(new Map());
   const [loading, setLoading]         = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadVendasResultadoRows(tab), loadAliquotas()])
-      .then(([vendasRows, aliquotas]) => {
+    Promise.all([loadVendasResultadoRows(tab), loadAliquotas(), loadComissaoStatus(tab)])
+      .then(([vendasRows, aliquotas, statusEntries]) => {
         setRows(vendasRows);
         setAliquotaBonPct(aliquotas.reduce((acc, i) => acc + (parseFloat(i.aliquota) || 0), 0));
+        setStatusMap(new Map(statusEntries.map(e => [e.rowId, e])));
       })
       .finally(() => setLoading(false));
   }, [tab]);
@@ -147,7 +153,8 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
   const thId  = 'bg-slate-700 text-white px-3 py-2 text-xs font-semibold whitespace-nowrap border-r border-slate-600 text-left';
   const thFin = 'bg-emerald-700 text-white px-3 py-2 text-xs font-semibold whitespace-nowrap border-r border-emerald-600 text-right';
   const thLB  = 'bg-blue-700 text-white px-3 py-2 text-xs font-semibold whitespace-nowrap border-r border-blue-600 text-right';
-  const thRes = 'bg-teal-700 text-white px-3 py-2 text-xs font-semibold whitespace-nowrap border-r border-teal-600 text-right';
+  const thRes  = 'bg-teal-700 text-white px-3 py-2 text-xs font-semibold whitespace-nowrap border-r border-teal-600 text-right';
+  const thComm = 'bg-violet-700 text-white px-3 py-2 text-xs font-semibold whitespace-nowrap border-r border-violet-600 text-left';
 
   const tdBase = 'border-b border-slate-100 align-middle px-2 py-1.5';
   const tdL    = `${tdBase} text-left`;
@@ -235,12 +242,16 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
                 {/* Resultado */}
                 <th className={thRes}>Lucro Bruto</th>
                 <th className={thRes}>% LB</th>
+                {/* Comissão */}
+                <th className={thComm}>Valor Comissão</th>
+                <th className={thComm}>Situação da Comissão</th>
+                <th className={thComm}>Data Pgto Comissão</th>
               </tr>
             </thead>
             <tbody>
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={15} className="text-center py-16 text-slate-400 text-sm">
+                  <td colSpan={18} className="text-center py-16 text-slate-400 text-sm">
                     Nenhum registro encontrado para o período selecionado
                   </td>
                 </tr>
@@ -268,6 +279,15 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
                       <td className={tdr}><NumCell value={d.impBonus} /></td>
                       <td className={tdr}><NumCell value={d.lucroBruto} /></td>
                       <td className={tdr}><NumCell value={d.lucroBrutoPct} pct /></td>
+                      <td className={`${tdBase} ${ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} text-left`}>
+                        <span className="text-slate-300">—</span>
+                      </td>
+                      <td className={`${tdBase} ${ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} text-left`}>
+                        {statusMap.get(row.id)?.situacao || <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className={`${tdBase} ${ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} text-left`}>
+                        {statusMap.get(row.id)?.dataPgto || <span className="text-slate-300">—</span>}
+                      </td>
                     </tr>
                   );
                 })
@@ -293,6 +313,7 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
                   <td className={`px-2 py-2 text-right font-mono ${totals.totLBPct < 0 ? 'text-red-300' : ''}`}>
                     {fmtPct(totals.totLBPct)}
                   </td>
+                  <td colSpan={3} />
                 </tr>
               </tfoot>
             )}
