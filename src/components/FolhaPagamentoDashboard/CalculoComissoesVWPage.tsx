@@ -1,33 +1,16 @@
 import { useState } from 'react';
-import { ClipboardList, TrendingUp } from 'lucide-react';
+import { ClipboardList, TrendingUp, Calculator } from 'lucide-react';
 import { ComissoesVendasView } from './ComissoesVendasView';
+import { ComissoesCadastroView } from './ComissoesCadastroView';
 
-type MainView = 'cadastro' | 'vendas';
+type MainView = 'cadastro' | 'vendas' | 'calculo';
 type VendasSubTab = 'novos' | 'usados';
 
 interface CalculoComissoesVWPageProps {
   onBack: () => void;
 }
 
-import { Construction } from 'lucide-react';
 
-function EmDesenvolvimento({ label }: { label: string }) {
-  return (
-    <div className="flex-1 flex items-center justify-center p-8">
-      <div className="flex flex-col items-center gap-6 text-center max-w-sm">
-        <div className="p-6 rounded-full bg-amber-50">
-          <Construction className="w-16 h-16 text-amber-400" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold text-slate-700 mb-2">Em Desenvolvimento</h2>
-          <p className="text-sm text-slate-500 leading-relaxed">
-            A aba <strong>{label}</strong> está sendo desenvolvida e estará disponível em breve.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) {
   const [mainView, setMainView] = useState<MainView>('cadastro');
@@ -62,6 +45,15 @@ export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) 
               <TrendingUp className="w-3.5 h-3.5" />
               Vendas
             </button>
+            <button
+              onClick={() => setMainView('calculo')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainView === 'calculo' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Calculator className="w-3.5 h-3.5" />
+              Cálculo
+            </button>
           </div>
 
           <button
@@ -74,7 +66,17 @@ export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) 
       </header>
 
       {/* Conteúdo */}
-      {mainView === 'cadastro' && <EmDesenvolvimento label="Cadastro" />}
+      {mainView === 'cadastro' && <ComissoesCadastroView />}
+
+      {/* Cálculo */}
+      {mainView === 'calculo' && (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+            <Calculator className="w-12 h-12 text-slate-300" />
+            <p className="text-sm text-slate-400">A aba <strong>Cálculo</strong> está sendo desenvolvida.</p>
+          </div>
+        </div>
+      )}
 
       {/* Vendas com sub-abas */}
       {mainView === 'vendas' && (
