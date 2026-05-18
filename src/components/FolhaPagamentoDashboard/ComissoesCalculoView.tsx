@@ -509,16 +509,32 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
     : undefined;
 
   // Filtra vendas pelo período salvo
+  // Exclui chassis já pagos em OUTRA competência (devem aparecer apenas no mês em que foram pagos)
   const periodRows = useMemo(() => {
     if (!savedPeriodo?.de || !savedPeriodo?.ate) return [];
     const de  = new Date(savedPeriodo.de);
     const ate = new Date(savedPeriodo.ate);
     ate.setHours(23, 59, 59, 999);
+
+    const currentPk = filterMonth !== null ? `${filterYear}-${filterMonth}` : null;
+    const chassiPaidElsewhere = new Set<string>();
+    Object.entries(lancamentosMap).forEach(([pk, vendedoresObj]) => {
+      if (pk === currentPk) return; // mesmo período: não excluir
+      Object.values(vendedoresObj).forEach(lanc => {
+        if (!lanc.pago) return;
+        Object.keys(lanc.linhas ?? {}).forEach(chassi => {
+          if (chassi) chassiPaidElsewhere.add(chassi);
+        });
+      });
+    });
+
     return rows.filter(r => {
       const d = parseDataVenda(r.dataVenda);
-      return d !== null && d >= de && d <= ate;
+      if (d === null || d < de || d > ate) return false;
+      if (r.chassi && chassiPaidElsewhere.has(r.chassi)) return false;
+      return true;
     });
-  }, [rows, savedPeriodo]);
+  }, [rows, savedPeriodo, lancamentosMap, filterYear, filterMonth]);
 
   // Agrupa por vendedor (ordenado A-Z)
   const vendedoresMap = useMemo(() => {
