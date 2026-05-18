@@ -133,7 +133,8 @@ function buildSellerPrintHtml(params: {
     ? ` (${countVenda} ${txVenda} − ${countDevol} ${txDevol})`
     : '';
 
-  const tdB = 'padding:3px 5px;border-bottom:1px solid #f1f5f9;font-size:8px;';
+  const rowPad = Math.max(4, Math.min(18, Math.round(90 / Math.max(vRows.length, 1))));
+  const tdB = `padding:${rowPad}px 5px;border-bottom:1px solid #f1f5f9;font-size:8px;`;
   const thS = (bg: string, align = 'left') =>
     `background:${bg};color:white;padding:4px 5px;font-size:7.5px;font-weight:600;white-space:nowrap;text-align:${align};`;
   const tfB = 'background:#1e293b;color:white;padding:5px 6px;font-size:8px;font-weight:700;text-align:right;border-right:1px solid #475569;';
@@ -176,7 +177,7 @@ function buildSellerPrintHtml(params: {
     ? 'background:#d1fae5;color:#065f46;border:1px solid #6ee7b7'
     : 'background:#fef3c7;color:#92400e;border:1px solid #fcd34d';
 
-  return `<div style="page-break-after:${isLast ? 'avoid' : 'always'};padding-bottom:${isLast ? '0' : '12px'}">
+  return `<div style="page-break-after:${isLast ? 'avoid' : 'always'};padding-bottom:${isLast ? '0' : '12px'};display:flex;flex-direction:column;min-height:260mm;">
   <div style="background:#1e293b;color:white;border-radius:10px;overflow:hidden;margin-bottom:8px;">
     <div style="padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start;">
       <div>
@@ -255,7 +256,7 @@ function buildSellerPrintHtml(params: {
         </div>
       </div>`;
     }).join('');
-    return `<div style="margin-top:10px;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;">
+    return `<div style="margin-top:auto;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;">
       <p style="font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin:0 0 8px;">ASSINATURAS</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${camposHtml}</div>
     </div>`;
