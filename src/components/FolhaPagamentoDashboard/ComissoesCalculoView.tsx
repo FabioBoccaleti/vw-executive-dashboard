@@ -216,6 +216,42 @@ function buildSellerPrintHtml(params: {
       <td style="${tfB}font-size:9px;">${hasComissao ? fmtBRL(totComV + totComLB) : '—'}</td>
     </tr></tfoot>
   </table>
+  ${(() => {
+    const assinaturas = lancamento?.assinaturas ?? {};
+    const campos = [
+      { key: 'financeiro'         as const, label: 'Financeiro' },
+      { key: 'gerenciaComercial'  as const, label: 'Gerência Comercial' },
+      { key: 'diretoriaComercial' as const, label: 'Diretoria Comercial' },
+      { key: 'diretoria'          as const, label: 'Diretoria' },
+    ];
+    const camposHtml = campos.map(({ key, label }) => {
+      const ass = assinaturas[key];
+      if (ass) {
+        const dt = new Date(ass.dataHora).toLocaleString('pt-BR', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+        });
+        return `<div>
+          <p style="font-size:7px;font-weight:600;color:#475569;margin:0 0 4px;">${label}</p>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:6px 8px;">
+            <p style="font-size:7.5px;color:#15803d;font-weight:600;margin:0;">${ass.name || ass.username}</p>
+            <p style="font-size:7px;color:#16a34a;margin:2px 0 0;">${dt}</p>
+            <p style="font-size:6.5px;font-weight:700;color:#15803d;letter-spacing:0.05em;margin:3px 0 0;">&#10003; ASSINATURA ELETRÔNICA</p>
+          </div>
+        </div>`;
+      }
+      return `<div>
+        <p style="font-size:7px;font-weight:600;color:#475569;margin:0 0 4px;">${label}</p>
+        <div style="border:1.5px dashed #cbd5e1;border-radius:6px;padding:8px;text-align:center;">
+          <p style="font-size:7px;color:#94a3b8;margin:0;">—</p>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div style="margin-top:10px;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;">
+      <p style="font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin:0 0 8px;">ASSINATURAS</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${camposHtml}</div>
+    </div>`;
+  })()}
 </div>`;
 }
 
