@@ -380,11 +380,13 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
       let changed = false;
       vendedoresMap.forEach(([vendedor]) => {
         const existing = all[pk]?.[vendedor];
-        if (!existing || existing.pago) return;
+        if (existing?.pago) return;
         changed = true;
         all[pk] = {
           ...(all[pk] ?? {}),
-          [vendedor]: { ...existing, pago: true, dataPagamento: existing.dataPagamento ?? today },
+          [vendedor]: existing
+            ? { ...existing, pago: true, dataPagamento: existing.dataPagamento ?? today }
+            : { linhas: {}, pago: true, dataPagamento: today },
         };
       });
       if (changed) {
@@ -469,12 +471,8 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
     if (filterMonth === null) return [0, 0];
     const pk    = `${filterYear}-${filterMonth}`;
     const lancs = lancamentosMap[pk] ?? {};
-    let withLanc = 0, paid = 0;
-    vendedoresMap.forEach(([v]) => {
-      const l = lancs[v];
-      if (l) { withLanc++; if (l.pago) paid++; }
-    });
-    return [withLanc, paid];
+    const paid  = vendedoresMap.filter(([v]) => lancs[v]?.pago).length;
+    return [vendedoresMap.length, paid];
   }, [lancamentosMap, vendedoresMap, filterYear, filterMonth]);
 
   // ── Exibe demonstrativo quando vendedor selecionado ──────────────────────
@@ -781,19 +779,13 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
                     </p>
                   </div>
                   {/* Status */}
-                  {lanc ? (
-                    <span className={`px-3 py-1 rounded-full border text-xs font-semibold whitespace-nowrap flex-shrink-0 ${
-                      pago
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                        : 'bg-amber-50 border-amber-200 text-amber-700'
-                    }`}>
-                      {pago ? 'Pago' : 'Pendente'}
-                    </span>
-                  ) : (
-                    <span className="px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-400 text-xs font-semibold whitespace-nowrap flex-shrink-0">
-                      Sem lançamento
-                    </span>
-                  )}
+                  <span className={`px-3 py-1 rounded-full border text-xs font-semibold whitespace-nowrap flex-shrink-0 ${
+                    pago
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                      : 'bg-amber-50 border-amber-200 text-amber-700'
+                  }`}>
+                    {pago ? 'Pago' : 'Pendente'}
+                  </span>
                   {/* Data de pagamento ou placeholder */}
                   {pago && lanc?.dataPagamento ? (
                     <span className="text-xs text-emerald-500 whitespace-nowrap flex-shrink-0">
