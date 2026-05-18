@@ -148,23 +148,64 @@ export function ComissoesCalculoDemonstrativo({
     });
   }, [tab]);
 
-  // ── Auto-cálculo de Com. s/ LB para Veículos Novos ────────────────────────
+  // ── Auto-cálculo de comissões para Veículos Novos ─────────────────────────
   useEffect(() => {
     if (!lancamentosLoaded) return;
     if (tab !== 'novos') return;
-    if (lancamentosMap[pk]?.[vendedor]) return;          // já tem lançamento manual
     if (derivedRows.length === 0) return;
-    const pctLB = parseFloat(String(modal.comissaoLucroBruto ?? '').replace(',', '.'));
-    if (!pctLB || isNaN(pctLB)) return;                 // percentual não cadastrado
+
+    const pctLB        = parseFloat(String(modal.comissaoLucroBruto ?? '').replace(',', '.'));
+    const pctVendaBase = parseFloat(String(modal.comissaoVenda      ?? '').replace(',', '.'));
+    const temPctLB     = !isNaN(pctLB)        && pctLB        > 0;
+    const temPctVenda  = !isNaN(pctVendaBase) && pctVendaBase > 0;
+    if (!temPctLB && !temPctVenda) return;               // nenhum percentual cadastrado
+
+    const existing       = lancamentosMap[pk]?.[vendedor];
+    const existingLinhas = existing?.linhas ?? {};
+
+    // Se já tem comVenda manual (algum valor ≠ 0), não sobrescreve
+    const hasManualComVenda = Object.values(existingLinhas).some(l => l.comVenda !== 0);
+    if (hasManualComVenda) return;
+
+    // Se há lançamento mas comVenda zerado → só recalcula comVenda, preserva comLB
+    const onlyFillComVenda = !!existing && !hasManualComVenda;
+    if (onlyFillComVenda && !temPctVenda) return;        // sem % configurado para comVenda
+
+    // ── Bônus de produtividade (volume líquido V21 − V07) ──────────────────
+    const countV21 = derivedRows.filter(r => r.transacao === 'V21').length;
+    const countV07 = derivedRows.filter(r => r.transacao === 'V07').length;
+    const netCount  = countV21 - countV07;
+    let bonusPct = 0;
+    if (modal.faixasBonus?.length > 0) {
+      const faixa = modal.faixasBonus.find(f => {
+        const de  = parseInt(f.de)  || 0;
+        const ate = f.ate === '' ? Infinity : (parseInt(f.ate) || 0);
+        return netCount >= de && netCount <= ate;
+      });
+      if (faixa) bonusPct = parseFloat(String(faixa.percentual).replace(',', '.')) || 0;
+    }
+    const pctVenda = (isNaN(pctVendaBase) ? 0 : pctVendaBase) + bonusPct;
+
+    // ── Cálculo por linha ───────────────────────────────────────────────────
     const linhas: Record<string, LinhaComissao> = {};
     derivedRows.forEach((r, ri) => {
       const key  = r.chassi || String(ri);
       const lb   = r._d.lucroBruto;
+      const vv   = n(r.valorVenda);
       const sign = r.transacao === 'V07' ? -1 : 1;
-      // V21: comissão positiva só se LB > 0; V07: desconto se LB > 0
-      linhas[key] = { comVenda: 0, comLB: lb > 0 ? sign * lb * (pctLB / 100) : 0 };
+      linhas[key] = {
+        comVenda: pctVenda > 0 ? sign * vv * (pctVenda / 100) : 0,
+        comLB: onlyFillComVenda
+          ? (existingLinhas[key]?.comLB ?? 0)            // preserva comLB já salvo
+          : ((temPctLB && lb > 0) ? sign * lb * (pctLB / 100) : 0),
+      };
     });
-    const newLanc: LancamentoComissao = { linhas, pago: false, dataPagamento: undefined };
+
+    const newLanc: LancamentoComissao = {
+      linhas,
+      pago:          existing?.pago          ?? false,
+      dataPagamento: existing?.dataPagamento,
+    };
     saveLancamento(tab, year, month, vendedor, newLanc).then(() => {
       setLancamentosMap(prev => ({
         ...prev,
@@ -305,6 +346,20 @@ export function ComissoesCalculoDemonstrativo({
       countV21, countV07, netCount,
     };
   }, [derivedRows, lancamento, editMode, editValues]);
+
+  // ── Faixa de bônus ativa para o período ─────────────────────────────────
+  const bonusFaixaAtual = useMemo(() => {
+    if (tab !== 'novos') return null;
+    if (!modal.faixasBonus?.length) return null;
+    const faixa = modal.faixasBonus.find(f => {
+      const de  = parseInt(f.de)  || 0;
+      const ate = f.ate === '' ? Infinity : (parseInt(f.ate) || 0);
+      return totals.netCount >= de && totals.netCount <= ate;
+    });
+    if (!faixa) return null;
+    const pct = parseFloat(String(faixa.percentual).replace(',', '.'));
+    return isNaN(pct) || pct <= 0 ? null : faixa;
+  }, [tab, modal.faixasBonus, totals.netCount]);
 
   // ── Histórico (últimos 12 meses) ──────────────────────────────────────────
   const historico = useMemo(() => {
@@ -452,6 +507,11 @@ export function ComissoesCalculoDemonstrativo({
             {modal.comissaoLucroBruto && (
               <span className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200">
                 % Com. s/ LB: <strong>{fmtPercent(modal.comissaoLucroBruto)}</strong>
+              </span>
+            )}
+            {bonusFaixaAtual && (
+              <span className="px-3 py-1.5 rounded-full bg-yellow-50 text-yellow-700 text-xs font-medium border border-yellow-300">
+                Bônus Produt.: <strong>{fmtPercent(bonusFaixaAtual.percentual)}</strong>
               </span>
             )}
             <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-200">
