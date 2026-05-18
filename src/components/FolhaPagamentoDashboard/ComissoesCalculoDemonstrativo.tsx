@@ -30,6 +30,15 @@ function fmtPct(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
 }
 
+function parseDV(d: string): number {
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) {
+    const [dd, mm, yyyy] = d.split('/');
+    return new Date(`${yyyy}-${mm}-${dd}`).getTime();
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(d)) return new Date(d).getTime();
+  return 0;
+}
+
 // Corrige artefatos de encoding em nomes de vendedores (exibição apenas)
 function fixVendedorName(name: string): string {
   return name
@@ -219,7 +228,7 @@ export function ComissoesCalculoDemonstrativo({
       // Preserva índice original para chave correta após reordenação por data
       const indexed = derivedRows.map((r, ri) => ({ r, ri, key: r.chassi || String(ri) }));
       const sorted  = [...indexed].sort((a, b) =>
-        (a.r.dataVenda ?? '').localeCompare(b.r.dataVenda ?? '')
+        parseDV(a.r.dataVenda ?? '') - parseDV(b.r.dataVenda ?? '')
       );
 
       // Cada U21 avança o contador e recebe o % da faixa correspondente;
@@ -233,7 +242,7 @@ export function ComissoesCalculoDemonstrativo({
           comVendaByKey[key] = pct > 0 ? n(r.valorVenda) * (pct / 100) : 0;
         } else if (r.transacao === txDevol) {
           const pct = getTierPct(pos, modal.faixasBonus ?? []);
-          comVendaByKey[key] = pct > 0 ? -(n(r.valorVenda) * (pct / 100)) : 0;
+          comVendaByKey[key] = pct > 0 ? n(r.valorVenda) * (pct / 100) : 0;
           pos = Math.max(0, pos - 1);
         } else {
           comVendaByKey[key] = 0;
@@ -243,12 +252,11 @@ export function ComissoesCalculoDemonstrativo({
       derivedRows.forEach((r, ri) => {
         const key  = r.chassi || String(ri);
         const lb   = r._d.lucroBruto;
-        const sign = r.transacao === txDevol ? -1 : 1;
         linhas[key] = {
           comVenda: temFaixas ? (comVendaByKey[key] ?? 0) : 0,
           comLB: onlyFillComVenda
             ? (existingLinhas[key]?.comLB ?? 0)
-            : ((temPctLB && lb > 0) ? sign * lb * (pctLB / 100) : 0),
+            : (temPctLB && (lb > 0 || r.transacao === txDevol) ? lb * (pctLB / 100) : 0),
         };
       });
 
@@ -278,12 +286,11 @@ export function ComissoesCalculoDemonstrativo({
         const key  = r.chassi || String(ri);
         const lb   = r._d.lucroBruto;
         const vv   = n(r.valorVenda);
-        const sign = r.transacao === txDevol ? -1 : 1;
         linhas[key] = {
-          comVenda: pctVenda > 0 ? sign * vv * (pctVenda / 100) : 0,
+          comVenda: pctVenda > 0 ? vv * (pctVenda / 100) : 0,
           comLB: onlyFillComVenda
             ? (existingLinhas[key]?.comLB ?? 0)          // preserva comLB já salvo
-            : ((temPctLB && lb > 0) ? sign * lb * (pctLB / 100) : 0),
+            : (temPctLB && (lb > 0 || r.transacao === txDevol) ? lb * (pctLB / 100) : 0),
         };
       });
     }
@@ -630,7 +637,7 @@ export function ComissoesCalculoDemonstrativo({
                 % Com. s/ LB: <strong>{fmtPercent(modal.comissaoLucroBruto)}</strong>
               </span>
             )}
-            {bonusFaixaAtual && (
+            {bonusFaixaAtual && tab === 'novos' && (
               <span className="px-3 py-1.5 rounded-full bg-yellow-50 text-yellow-700 text-xs font-medium border border-yellow-300">
                 Bônus Produt.: <strong>{fmtPercent(bonusFaixaAtual.percentual)}</strong>
               </span>
@@ -676,8 +683,11 @@ export function ComissoesCalculoDemonstrativo({
                         Nenhuma venda encontrada no período.
                       </td>
                     </tr>
-                  ) : derivedRows.map((r, ri) => {
-                    const bg     = ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
+                  ) : [...derivedRows]
+                    .map((r, ri) => ({ r, ri }))
+                    .sort((a, b) => parseDV(a.r.dataVenda ?? '') - parseDV(b.r.dataVenda ?? ''))
+                    .map(({ r, ri }, dri) => {
+                    const bg     = dri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
                     const key    = r.chassi || String(ri);
                     const linha  = lancamento?.linhas?.[key];
                     const ev     = editValues[key];
@@ -708,7 +718,16 @@ export function ComissoesCalculoDemonstrativo({
                           </td>
                         ) : (
                           <td className={`${tdBase} ${bg} text-right`}>
-                            {linha ? <NumCell value={linha.comVenda} /> : <span className="text-slate-300">—</span>}
+                            {linha ? (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <NumCell value={linha.comVenda} />
+                                {tab === 'usados' && linha.comVenda !== 0 && n(r.valorVenda) !== 0 && (
+                                  <span className="text-[9px] text-slate-400 font-mono leading-none">
+                                    {fmtPct(Math.abs(linha.comVenda) / Math.abs(n(r.valorVenda)) * 100)}
+                                  </span>
+                                )}
+                              </div>
+                            ) : <span className="text-slate-300">—</span>}
                           </td>
                         )}
                         {editMode ? (

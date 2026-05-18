@@ -99,20 +99,20 @@ function buildSellerPrintHtml(params: {
     ? 'Demonstrativo de Comissão de Vendas Usados VW'
     : 'Demonstrativo de Comissão de Vendas Novos VW';
 
-  const derived = vRows.map(r => {
+  const derived = vRows.map((r, ri) => {
     const valorVenda = n(r.valorVenda);
     const valorCusto = n(r.valorCusto);
     const bonus      = n(r.bonusVarejo) + n(r.bonusTradeIn);
     const lucroBruto = valorVenda - valorCusto + bonus;
     const lucroBrutoPct = valorVenda !== 0 ? (lucroBruto / valorVenda) * 100 : 0;
-    return { ...r, _d: { bonus, lucroBruto, lucroBrutoPct } };
+    return { ...r, _ri: ri, _d: { bonus, lucroBruto, lucroBrutoPct } };
   });
 
   let totVenda = 0, totCusto = 0, totBonus = 0, totLB = 0, totComV = 0, totComLB = 0;
   let hasComissao = false;
   let countVenda  = 0, countDevol = 0;
 
-  derived.forEach((r, ri) => {
+  derived.forEach(r => {
     const sign = r.transacao === txDevol ? -1 : 1;
     if (r.transacao === txVenda) countVenda++;
     if (r.transacao === txDevol) countDevol++;
@@ -120,7 +120,7 @@ function buildSellerPrintHtml(params: {
     totCusto += sign * n(r.valorCusto);
     totBonus += sign * r._d.bonus;
     totLB    += sign * r._d.lucroBruto;
-    const key = r.chassi || String(ri);
+    const key = r.chassi || String(r._ri);
     const linha = lancamento?.linhas?.[key];
     if (linha) { totComV += linha.comVenda; totComLB += linha.comLB; hasComissao = true; }
   });
@@ -138,9 +138,14 @@ function buildSellerPrintHtml(params: {
     `background:${bg};color:white;padding:4px 5px;font-size:7.5px;font-weight:600;white-space:nowrap;text-align:${align};`;
   const tfB = 'background:#1e293b;color:white;padding:5px 6px;font-size:8px;font-weight:700;text-align:right;border-right:1px solid #475569;';
 
-  const rowsHtml = derived.map((r, ri) => {
-    const bg    = ri % 2 === 0 ? '#ffffff' : '#f8fafc';
-    const key   = r.chassi || String(ri);
+  const displayDerived = [...derived].sort((a, b) => {
+    const da = parseDataVenda(a.dataVenda ?? '');
+    const db = parseDataVenda(b.dataVenda ?? '');
+    return (da?.getTime() ?? 0) - (db?.getTime() ?? 0);
+  });
+  const rowsHtml = displayDerived.map((r, dri) => {
+    const bg    = dri % 2 === 0 ? '#ffffff' : '#f8fafc';
+    const key   = r.chassi || String(r._ri);
     const linha = lancamento?.linhas?.[key];
     const comV  = linha?.comVenda ?? 0;
     const comLB = linha?.comLB    ?? 0;
@@ -148,6 +153,9 @@ function buildSellerPrintHtml(params: {
     const vv    = n(r.valorVenda);
     const vc    = n(r.valorCusto);
     const none  = '<span style="color:#94a3b8">—</span>';
+    const comVPct = tab === 'usados' && linha && comV !== 0 && Math.abs(vv) > 0
+      ? `<br><span style="font-size:7px;color:#94a3b8;font-family:monospace;">${fmtPct(Math.abs(comV) / Math.abs(vv) * 100)}</span>`
+      : '';
     return `<tr style="background:${bg}">
       <td style="${tdB}font-family:monospace;color:#334155;">${r.chassi || '—'}</td>
       <td style="${tdB}color:#334155;white-space:normal;word-break:break-word;max-width:110px;">${r.modelo || '—'}</td>
@@ -158,7 +166,7 @@ function buildSellerPrintHtml(params: {
       <td style="${tdB}text-align:right;${numColor(r._d.bonus)}">${fmtBRL(r._d.bonus)}</td>
       <td style="${tdB}text-align:right;${numColor(r._d.lucroBruto)}">${fmtBRL(r._d.lucroBruto)}</td>
       <td style="${tdB}text-align:right;${numColor(r._d.lucroBrutoPct)}">${fmtPct(r._d.lucroBrutoPct)}</td>
-      <td style="${tdB}text-align:right;${numColor(comV)}">${linha ? fmtBRL(comV) : none}</td>
+      <td style="${tdB}text-align:right;${numColor(comV)}">${linha ? fmtBRL(comV) + comVPct : none}</td>
       <td style="${tdB}text-align:right;${numColor(comLB)}">${linha ? fmtBRL(comLB) : none}</td>
       <td style="${tdB}text-align:right;font-weight:600;${numColor(total)}">${linha ? fmtBRL(total) : none}</td>
     </tr>`;
@@ -644,8 +652,11 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
 
       if (tab === 'usados') {
         if (onlyFillComVenda && !temFaixas) return;
-        const sorted = [...derived].sort((a, b) =>
-          (a.dataVenda ?? '').localeCompare(b.dataVenda ?? ''));
+        const sorted = [...derived].sort((a, b) => {
+          const da = parseDataVenda(a.dataVenda ?? '');
+          const db = parseDataVenda(b.dataVenda ?? '');
+          return (da?.getTime() ?? 0) - (db?.getTime() ?? 0);
+        });
         const comVendaByKey: Record<string, number> = {};
         let pos = 0;
         sorted.forEach(r => {
@@ -656,7 +667,7 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
             comVendaByKey[key] = pct > 0 ? parseNum(r.valorVenda) * (pct / 100) : 0;
           } else if (r.transacao === txDevol) {
             const pct = getTierPct(pos, modal.faixasBonus ?? []);
-            comVendaByKey[key] = pct > 0 ? -(parseNum(r.valorVenda) * (pct / 100)) : 0;
+            comVendaByKey[key] = pct > 0 ? parseNum(r.valorVenda) * (pct / 100) : 0;
             pos = Math.max(0, pos - 1);
           } else {
             comVendaByKey[key] = 0;
@@ -664,12 +675,11 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
         });
         derived.forEach(r => {
           const key  = r.chassi || String(r._ri);
-          const sign = r.transacao === txDevol ? -1 : 1;
           linhas[key] = {
             comVenda: temFaixas ? (comVendaByKey[key] ?? 0) : 0,
             comLB: onlyFillComVenda
               ? (existingLinhas[key]?.comLB ?? 0)
-              : (temPctLB && r._lb > 0 ? sign * r._lb * (pctLB / 100) : 0),
+              : (temPctLB && (r._lb > 0 || r.transacao === txDevol) ? r._lb * (pctLB / 100) : 0),
           };
         });
       } else {
@@ -689,12 +699,11 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
         const pctVenda = (isNaN(pctVendaBase) ? 0 : pctVendaBase) + bonusPct;
         derived.forEach(r => {
           const key  = r.chassi || String(r._ri);
-          const sign = r.transacao === txDevol ? -1 : 1;
           linhas[key] = {
-            comVenda: pctVenda > 0 ? sign * parseNum(r.valorVenda) * (pctVenda / 100) : 0,
+            comVenda: pctVenda > 0 ? parseNum(r.valorVenda) * (pctVenda / 100) : 0,
             comLB: onlyFillComVenda
               ? (existingLinhas[key]?.comLB ?? 0)
-              : (temPctLB && r._lb > 0 ? sign * r._lb * (pctLB / 100) : 0),
+              : (temPctLB && (r._lb > 0 || r.transacao === txDevol) ? r._lb * (pctLB / 100) : 0),
           };
         });
       }
