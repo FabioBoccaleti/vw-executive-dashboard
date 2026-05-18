@@ -210,12 +210,16 @@ export function ComissoesCalculoDemonstrativo({
     const existing       = lancamentosMap[pk]?.[vendedor];
     const existingLinhas = existing?.linhas ?? {};
 
-    // Se já tem comVenda manual (algum valor ≠ 0), não sobrescreve
+    // Verifica se há linhas novas ainda não cobertas pelo lançamento existente
+    const derivedKeys       = derivedRows.map((r, ri) => r.chassi || String(ri));
+    const hasNewRows        = derivedKeys.some(k => !(k in existingLinhas));
+
+    // Só pula o recálculo se todas as linhas já têm comVenda definida E não há linhas novas
     const hasManualComVenda = Object.values(existingLinhas).some(l => l.comVenda !== 0);
-    if (hasManualComVenda) return;
+    if (hasManualComVenda && !hasNewRows) return;
 
     // Se há lançamento mas comVenda zerado → só recalcula comVenda, preserva comLB
-    const onlyFillComVenda = !!existing && !hasManualComVenda;
+    const onlyFillComVenda = !!existing && !hasManualComVenda && !hasNewRows;
 
     const linhas: Record<string, LinhaComissao> = {};
 
@@ -307,8 +311,9 @@ export function ComissoesCalculoDemonstrativo({
         [pk]: { ...(prev[pk] ?? {}), [vendedor]: newLanc },
       }));
     });
+  // derivedRows é derivado de rows; rows na dep evita TDZ (derivedRows declarado abaixo)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lancamentosLoaded]);
+  }, [lancamentosLoaded, rows]);
 
   const lancamento = lancamentosMap[pk]?.[vendedor];
   const pago       = lancamento?.pago ?? false;

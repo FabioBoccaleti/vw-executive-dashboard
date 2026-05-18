@@ -62,6 +62,7 @@ export interface VendasResultadoRow {
   annotation?:          string;
   syncedFromRegistro?:  boolean;
   periodoImport?:       string; // "YYYY-MM" — herdado do registro, tem prioridade sobre dataVenda para fins de classificação
+  manualEntry?:         boolean; // linha incluída manualmente pelo usuário
 }
 
 export async function loadVendasResultadoRows(tab: VendasResultadoSubTab): Promise<VendasResultadoRow[]> {
