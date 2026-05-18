@@ -91,16 +91,36 @@ export function ComissoesCalculoDemonstrativo({
     // NF Venda e Transação são removidas → colSpan deve ser 3
     const tfootLabel = clone.querySelector('tfoot tr td[colspan]') as HTMLTableCellElement | null;
     if (tfootLabel) tfootLabel.colSpan = 3;
+    // Abreviar cabeçalhos para caber em retrato A4
+    const abbrev: Record<string, string> = {
+      'Valor Venda':   'Vl. Venda',
+      'Lucro Bruto':   'Lc. Bruto',
+      'Com. s/ Venda': 'Com. Venda',
+      'Com. s/ LB':    'Com. LB',
+    };
+    clone.querySelectorAll('thead th').forEach(th => {
+      const t = th.textContent?.trim() ?? '';
+      if (abbrev[t]) th.textContent = abbrev[t];
+    });
     root.innerHTML = clone.outerHTML;
     const style = document.createElement('style');
     style.textContent = `
       @page { size: A4 portrait; margin: 1cm; }
-      #print-root { font-family: Inter, sans-serif; }
+      #print-root { font-family: Inter, sans-serif; zoom: 80%; }
       #print-root, #print-root * {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
         forced-color-adjust: none !important;
         color-scheme: light !important;
+      }
+      #print-root table {
+        font-size: 8px !important;
+        width: 100% !important;
+      }
+      #print-root table th,
+      #print-root table td {
+        padding: 3px 5px !important;
+        white-space: nowrap !important;
       }
     `;
     document.head.appendChild(style);
