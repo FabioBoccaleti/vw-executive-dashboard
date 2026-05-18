@@ -29,6 +29,14 @@ function fmtBRL(v: number): string {
 function fmtPct(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
 }
+
+// Corrige artefatos de encoding em nomes de vendedores (exibição apenas)
+function fixVendedorName(name: string): string {
+  return name
+    .replace(/JOS[\uFFFD?]\s/gi,              'JOSE ')
+    .replace(/LOUREN[\uFFFD?]O/gi,            'LOURENCO')
+    .replace(/CONCEI[\uFFFD?]{1,2}O/gi,       'CONCEICAO');
+}
 function fmtPercent(val: string): string {
   const num = parseFloat(val.replace(',', '.'));
   if (isNaN(num)) return '—';
@@ -585,7 +593,7 @@ export function ComissoesCalculoDemonstrativo({
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
                   {tab === 'usados' ? 'Demonstrativo de Comissão de Vendas Usados VW' : 'Demonstrativo de Comissão de Vendas Novos VW'}
                 </p>
-                <h2 className="text-xl font-bold leading-tight">{vendedor}</h2>
+                <h2 className="text-xl font-bold leading-tight">{fixVendedorName(vendedor)}</h2>
                 <p className="text-sm text-slate-300 mt-1">{tabLabel}</p>
               </div>
               <div className="text-right flex-shrink-0">
