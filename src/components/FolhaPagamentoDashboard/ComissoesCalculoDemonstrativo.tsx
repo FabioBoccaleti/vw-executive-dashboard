@@ -38,6 +38,19 @@ function calcDerived(row: VendasResultadoRow) {
   return { bonus, lucroBruto, lucroBrutoPct };
 }
 
+function getTierPct(
+  pos:    number,
+  faixas: Array<{ de: string; ate: string; percentual: string }>,
+): number {
+  const faixa = faixas.find(f => {
+    const de  = parseInt(f.de)  || 0;
+    const ate = f.ate === '' ? Infinity : (parseInt(f.ate) || 0);
+    return pos >= de && pos <= ate;
+  });
+  if (!faixa) return 0;
+  return parseFloat(String(faixa.percentual).replace(',', '.')) || 0;
+}
+
 const MONTH_NAMES = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
@@ -155,11 +168,8 @@ export function ComissoesCalculoDemonstrativo({
     if (!lancamentosLoaded) return;
     if (derivedRows.length === 0) return;
 
-    const pctLB        = parseFloat(String(modal.comissaoLucroBruto ?? '').replace(',', '.'));
-    const pctVendaBase = parseFloat(String(modal.comissaoVenda      ?? '').replace(',', '.'));
-    const temPctLB     = !isNaN(pctLB)        && pctLB        > 0;
-    const temPctVenda  = !isNaN(pctVendaBase) && pctVendaBase > 0;
-    if (!temPctLB && !temPctVenda) return;               // nenhum percentual cadastrado
+    const pctLB    = parseFloat(String(modal.comissaoLucroBruto ?? '').replace(',', '.'));
+    const temPctLB = !isNaN(pctLB) && pctLB > 0;
 
     const existing       = lancamentosMap[pk]?.[vendedor];
     const existingLinhas = existing?.linhas ?? {};
@@ -170,37 +180,86 @@ export function ComissoesCalculoDemonstrativo({
 
     // Se há lançamento mas comVenda zerado → só recalcula comVenda, preserva comLB
     const onlyFillComVenda = !!existing && !hasManualComVenda;
-    if (onlyFillComVenda && !temPctVenda) return;        // sem % configurado para comVenda
 
-    // ── Bônus de produtividade (volume líquido vendas − devoluções) ──────────
-    const countV21 = derivedRows.filter(r => r.transacao === txVenda).length;
-    const countV07 = derivedRows.filter(r => r.transacao === txDevol).length;
-    const netCount  = countV21 - countV07;
-    let bonusPct = 0;
-    if (modal.faixasBonus?.length > 0) {
-      const faixa = modal.faixasBonus.find(f => {
-        const de  = parseInt(f.de)  || 0;
-        const ate = f.ate === '' ? Infinity : (parseInt(f.ate) || 0);
-        return netCount >= de && netCount <= ate;
-      });
-      if (faixa) bonusPct = parseFloat(String(faixa.percentual).replace(',', '.')) || 0;
-    }
-    const pctVenda = (isNaN(pctVendaBase) ? 0 : pctVendaBase) + bonusPct;
-
-    // ── Cálculo por linha ───────────────────────────────────────────────────
     const linhas: Record<string, LinhaComissao> = {};
-    derivedRows.forEach((r, ri) => {
-      const key  = r.chassi || String(ri);
-      const lb   = r._d.lucroBruto;
-      const vv   = n(r.valorVenda);
-      const sign = r.transacao === txDevol ? -1 : 1;
-      linhas[key] = {
-        comVenda: pctVenda > 0 ? sign * vv * (pctVenda / 100) : 0,
-        comLB: onlyFillComVenda
-          ? (existingLinhas[key]?.comLB ?? 0)            // preserva comLB já salvo
-          : ((temPctLB && lb > 0) ? sign * lb * (pctLB / 100) : 0),
-      };
-    });
+
+    if (tab === 'usados') {
+      // ── Usados: cálculo progressivo por faixa, ordenado por data de venda ──
+      const temFaixas = (modal.faixasBonus?.length ?? 0) > 0;
+      if (!temPctLB && !temFaixas) return;
+      if (onlyFillComVenda && !temFaixas) return;
+
+      // Preserva índice original para chave correta após reordenação por data
+      const indexed = derivedRows.map((r, ri) => ({ r, ri, key: r.chassi || String(ri) }));
+      const sorted  = [...indexed].sort((a, b) =>
+        (a.r.dataVenda ?? '').localeCompare(b.r.dataVenda ?? '')
+      );
+
+      // Cada U21 avança o contador e recebe o % da faixa correspondente;
+      // cada U07 usa o % atual e depois recua o contador (desfaz uma posição)
+      const comVendaByKey: Record<string, number> = {};
+      let pos = 0;
+      sorted.forEach(({ r, key }) => {
+        if (r.transacao === txVenda) {
+          pos++;
+          const pct = getTierPct(pos, modal.faixasBonus ?? []);
+          comVendaByKey[key] = pct > 0 ? n(r.valorVenda) * (pct / 100) : 0;
+        } else if (r.transacao === txDevol) {
+          const pct = getTierPct(pos, modal.faixasBonus ?? []);
+          comVendaByKey[key] = pct > 0 ? -(n(r.valorVenda) * (pct / 100)) : 0;
+          pos = Math.max(0, pos - 1);
+        } else {
+          comVendaByKey[key] = 0;
+        }
+      });
+
+      derivedRows.forEach((r, ri) => {
+        const key  = r.chassi || String(ri);
+        const lb   = r._d.lucroBruto;
+        const sign = r.transacao === txDevol ? -1 : 1;
+        linhas[key] = {
+          comVenda: temFaixas ? (comVendaByKey[key] ?? 0) : 0,
+          comLB: onlyFillComVenda
+            ? (existingLinhas[key]?.comLB ?? 0)
+            : ((temPctLB && lb > 0) ? sign * lb * (pctLB / 100) : 0),
+        };
+      });
+
+    } else {
+      // ── Novos: comissão flat + bônus de produtividade ──────────────────────
+      const pctVendaBase = parseFloat(String(modal.comissaoVenda ?? '').replace(',', '.'));
+      const temPctVenda  = !isNaN(pctVendaBase) && pctVendaBase > 0;
+      if (!temPctLB && !temPctVenda) return;
+      if (onlyFillComVenda && !temPctVenda) return;
+
+      // Bônus de produtividade (volume líquido vendas − devoluções)
+      const countV21 = derivedRows.filter(r => r.transacao === txVenda).length;
+      const countV07 = derivedRows.filter(r => r.transacao === txDevol).length;
+      const netCount  = countV21 - countV07;
+      let bonusPct = 0;
+      if (modal.faixasBonus?.length > 0) {
+        const faixa = modal.faixasBonus.find(f => {
+          const de  = parseInt(f.de)  || 0;
+          const ate = f.ate === '' ? Infinity : (parseInt(f.ate) || 0);
+          return netCount >= de && netCount <= ate;
+        });
+        if (faixa) bonusPct = parseFloat(String(faixa.percentual).replace(',', '.')) || 0;
+      }
+      const pctVenda = (isNaN(pctVendaBase) ? 0 : pctVendaBase) + bonusPct;
+
+      derivedRows.forEach((r, ri) => {
+        const key  = r.chassi || String(ri);
+        const lb   = r._d.lucroBruto;
+        const vv   = n(r.valorVenda);
+        const sign = r.transacao === txDevol ? -1 : 1;
+        linhas[key] = {
+          comVenda: pctVenda > 0 ? sign * vv * (pctVenda / 100) : 0,
+          comLB: onlyFillComVenda
+            ? (existingLinhas[key]?.comLB ?? 0)          // preserva comLB já salvo
+            : ((temPctLB && lb > 0) ? sign * lb * (pctLB / 100) : 0),
+        };
+      });
+    }
 
     const newLanc: LancamentoComissao = {
       linhas,
@@ -470,7 +529,7 @@ export function ComissoesCalculoDemonstrativo({
             <div className="px-6 py-5 flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-                  Demonstrativo de Comissão de Vendas
+                  {tab === 'usados' ? 'Demonstrativo de Comissão de Vendas Usados' : 'Demonstrativo de Comissão de Vendas Novos'}
                 </p>
                 <h2 className="text-xl font-bold leading-tight">{vendedor}</h2>
                 <p className="text-sm text-slate-300 mt-1">{tabLabel}</p>
