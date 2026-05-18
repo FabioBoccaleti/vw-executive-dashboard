@@ -73,13 +73,14 @@ export function ComissoesCalculoDemonstrativo({
   const pk          = `${year}-${month}`;
 
   // ── Estado de lançamentos ──────────────────────────────────────────────────
-  const [lancamentosMap, setLancamentosMap] = useState<LancamentosMap>({});
-  const [showHistorico,  setShowHistorico]  = useState(false);
-  const [editMode,       setEditMode]       = useState(false);
-  const [editValues,     setEditValues]     = useState<Record<string, { comVenda: string; comLB: string }>>({});
-  const [savingLanc,     setSavingLanc]     = useState(false);
-  const [savingPago,     setSavingPago]     = useState(false);
-  const [reabrirDialog,  setReopenDialog]   = useState<{ senha: string; erro: string | null } | null>(null);
+  const [lancamentosMap,    setLancamentosMap]    = useState<LancamentosMap>({});
+  const [lancamentosLoaded, setLancamentosLoaded] = useState(false);
+  const [showHistorico,     setShowHistorico]     = useState(false);
+  const [editMode,          setEditMode]          = useState(false);
+  const [editValues,        setEditValues]        = useState<Record<string, { comVenda: string; comLB: string }>>({})
+  const [savingLanc,        setSavingLanc]        = useState(false);
+  const [savingPago,        setSavingPago]        = useState(false);
+  const [reabrirDialog,     setReopenDialog]      = useState<{ senha: string; erro: string | null } | null>(null);
 
   function handlePrint() {
     const area = document.getElementById('demonstrativo-comissao-print-area');
@@ -140,8 +141,36 @@ export function ComissoesCalculoDemonstrativo({
   }
 
   useEffect(() => {
-    loadLancamentos(tab).then(setLancamentosMap);
+    setLancamentosLoaded(false);
+    loadLancamentos(tab).then(data => {
+      setLancamentosMap(data);
+      setLancamentosLoaded(true);
+    });
   }, [tab]);
+
+  // ── Auto-cálculo de Com. s/ LB para Veículos Novos ────────────────────────
+  useEffect(() => {
+    if (!lancamentosLoaded) return;
+    if (tab !== 'novos') return;
+    if (lancamentosMap[pk]?.[vendedor]) return;          // já tem lançamento manual
+    if (derivedRows.length === 0) return;
+    const pctLB = parseFloat(String(modal.comissaoLucroBruto ?? '').replace(',', '.'));
+    if (!pctLB || isNaN(pctLB)) return;                 // percentual não cadastrado
+    const linhas: Record<string, LinhaComissao> = {};
+    derivedRows.forEach((r, ri) => {
+      const key = r.chassi || String(ri);
+      const lb  = r._d.lucroBruto;
+      linhas[key] = { comVenda: 0, comLB: lb > 0 ? lb * (pctLB / 100) : 0 };
+    });
+    const newLanc: LancamentoComissao = { linhas, pago: false, dataPagamento: undefined };
+    saveLancamento(tab, year, month, vendedor, newLanc).then(() => {
+      setLancamentosMap(prev => ({
+        ...prev,
+        [pk]: { ...(prev[pk] ?? {}), [vendedor]: newLanc },
+      }));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lancamentosLoaded]);
 
   const lancamento = lancamentosMap[pk]?.[vendedor];
   const pago       = lancamento?.pago ?? false;
