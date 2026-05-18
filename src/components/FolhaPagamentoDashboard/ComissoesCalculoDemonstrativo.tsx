@@ -81,6 +81,37 @@ export function ComissoesCalculoDemonstrativo({
   const [savingPago,     setSavingPago]     = useState(false);
   const [reabrirDialog,  setReopenDialog]   = useState<{ senha: string; erro: string | null } | null>(null);
 
+  function handlePrint() {
+    const area = document.getElementById('demonstrativo-comissao-print-area');
+    const root = document.getElementById('print-root');
+    if (!area || !root) { window.print(); return; }
+    const clone = area.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('.no-print').forEach(el => el.remove());
+    // colSpan=5 cobre Chassi, Modelo, NF Venda, Data Venda, Transação
+    // NF Venda e Transação são removidas → colSpan deve ser 3
+    const tfootLabel = clone.querySelector('tfoot tr td[colspan]') as HTMLTableCellElement | null;
+    if (tfootLabel) tfootLabel.colSpan = 3;
+    root.innerHTML = clone.outerHTML;
+    const style = document.createElement('style');
+    style.textContent = `
+      @page { size: A4 portrait; margin: 1cm; }
+      #print-root { font-family: Inter, sans-serif; }
+      #print-root, #print-root * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        forced-color-adjust: none !important;
+        color-scheme: light !important;
+      }
+    `;
+    document.head.appendChild(style);
+    window.onafterprint = () => {
+      document.head.removeChild(style);
+      root.innerHTML = '';
+      window.onafterprint = null;
+    };
+    window.print();
+  }
+
   useEffect(() => {
     loadLancamentos(tab).then(setLancamentosMap);
   }, [tab]);
@@ -257,7 +288,7 @@ export function ComissoesCalculoDemonstrativo({
           Histórico
         </button>
         <button
-          onClick={() => window.print()}
+          onClick={handlePrint}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
         >
           <Printer className="w-3.5 h-3.5" />
@@ -312,7 +343,7 @@ export function ComissoesCalculoDemonstrativo({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div id="demonstrativo-comissao-print-area" className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto space-y-4">
 
           {/* ── Header ──────────────────────────────────────────────────── */}
@@ -377,12 +408,12 @@ export function ComissoesCalculoDemonstrativo({
                   <tr>
                     <th className={thId}>Chassi</th>
                     <th className={thId}>Modelo</th>
-                    <th className={thId}>NF Venda</th>
+                    <th className={`${thId} no-print`}>NF Venda</th>
                     <th className={thId}>Data Venda</th>
-                    <th className={thId}>Transação</th>
+                    <th className={`${thId} no-print`}>Transação</th>
                     <th className={thFin}>Valor Venda</th>
-                    <th className={thFin}>Valor Custo</th>
-                    <th className={thFin}>Bônus</th>
+                    <th className={`${thFin} no-print`}>Valor Custo</th>
+                    <th className={`${thFin} no-print`}>Bônus</th>
                     <th className={thLB}>Lucro Bruto</th>
                     <th className={thLB}>% LB</th>
                     <th className={thComm}>Com. s/ Venda</th>
@@ -409,12 +440,12 @@ export function ComissoesCalculoDemonstrativo({
                       <tr key={key} className={bg}>
                         <td className={`${tdBase} ${bg} text-left font-mono text-slate-700`}>{r.chassi || '—'}</td>
                         <td className={`${tdBase} ${bg} text-left text-slate-700`}>{r.modelo || '—'}</td>
-                        <td className={`${tdBase} ${bg} text-left font-mono text-slate-700`}>{r.nfVenda || '—'}</td>
+                        <td className={`${tdBase} ${bg} text-left font-mono text-slate-700 no-print`}>{r.nfVenda || '—'}</td>
                         <td className={`${tdBase} ${bg} text-left font-mono text-slate-700`}>{r.dataVenda || '—'}</td>
-                        <td className={`${tdBase} ${bg} text-left text-slate-700`}>{r.transacao || '—'}</td>
+                        <td className={`${tdBase} ${bg} text-left text-slate-700 no-print`}>{r.transacao || '—'}</td>
                         <td className={`${tdBase} ${bg} text-right`}><NumCell value={n(r.valorVenda)} /></td>
-                        <td className={`${tdBase} ${bg} text-right`}><NumCell value={n(r.valorCusto)} /></td>
-                        <td className={`${tdBase} ${bg} text-right`}><NumCell value={r._d.bonus} /></td>
+                        <td className={`${tdBase} ${bg} text-right no-print`}><NumCell value={n(r.valorCusto)} /></td>
+                        <td className={`${tdBase} ${bg} text-right no-print`}><NumCell value={r._d.bonus} /></td>
                         <td className={`${tdBase} ${bg} text-right`}><NumCell value={r._d.lucroBruto} /></td>
                         <td className={`${tdBase} ${bg} text-right`}><NumCell value={r._d.lucroBrutoPct} pct /></td>
                         {editMode ? (
@@ -461,8 +492,8 @@ export function ComissoesCalculoDemonstrativo({
                         Total ({rows.length} {rows.length === 1 ? 'venda' : 'vendas'})
                       </td>
                       <td className="px-2 py-2.5 text-right font-mono">{fmtBRL(totals.totVenda)}</td>
-                      <td className="px-2 py-2.5 text-right font-mono">{fmtBRL(totals.totCusto)}</td>
-                      <td className="px-2 py-2.5 text-right font-mono">{fmtBRL(totals.totBonus)}</td>
+                      <td className="px-2 py-2.5 text-right font-mono no-print">{fmtBRL(totals.totCusto)}</td>
+                      <td className="px-2 py-2.5 text-right font-mono no-print">{fmtBRL(totals.totBonus)}</td>
                       <td className={`px-2 py-2.5 text-right font-mono ${totals.totLB < 0 ? 'text-red-300' : ''}`}>
                         {fmtBRL(totals.totLB)}
                       </td>
