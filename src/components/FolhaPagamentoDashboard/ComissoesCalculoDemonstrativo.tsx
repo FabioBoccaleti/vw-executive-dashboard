@@ -106,7 +106,7 @@ export function ComissoesCalculoDemonstrativo({
     const style = document.createElement('style');
     style.textContent = `
       @page { size: A4 portrait; margin: 1cm; }
-      #print-root { font-family: Inter, sans-serif; zoom: 80%; }
+      #print-root { font-family: Inter, sans-serif; zoom: 70%; }
       #print-root, #print-root * {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
@@ -121,6 +121,13 @@ export function ComissoesCalculoDemonstrativo({
       #print-root table td {
         padding: 3px 5px !important;
         white-space: nowrap !important;
+      }
+      /* Coluna Modelo (2ª após remoção das colunas no-print) pode quebrar linha */
+      #print-root table td:nth-child(2),
+      #print-root table th:nth-child(2) {
+        white-space: normal !important;
+        word-break: break-word !important;
+        max-width: 110px !important;
       }
     `;
     document.head.appendChild(style);
