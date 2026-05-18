@@ -47,6 +47,19 @@ function fmtDate(d: string): string {
   return `${dd}/${m}/${y}`;
 }
 
+function getTierPct(
+  pos:    number,
+  faixas: Array<{ de: string; ate: string; percentual: string }>,
+): number {
+  const faixa = faixas.find(f => {
+    const de  = parseInt(f.de)  || 0;
+    const ate = f.ate === '' ? Infinity : (parseInt(f.ate) || 0);
+    return pos >= de && pos <= ate;
+  });
+  if (!faixa) return 0;
+  return parseFloat(String(faixa.percentual).replace(',', '.')) || 0;
+}
+
 // ─── Bulk Print ───────────────────────────────────────────────────────────────
 function buildSellerPrintHtml(params: {
   vendedor:    string;
@@ -474,6 +487,119 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
     const paid  = vendedoresMap.filter(([v]) => lancs[v]?.pago).length;
     return [vendedoresMap.length, paid];
   }, [lancamentosMap, vendedoresMap, filterYear, filterMonth]);
+
+  // ─── Auto-cálculo em massa ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (loading || !remuneracao || filterMonth === null) return;
+    if (!savedPeriodo?.de || !savedPeriodo?.ate) return;
+    if (vendedoresMap.length === 0) return;
+
+    const parseNum = (v: unknown) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
+    const pk      = `${filterYear}-${filterMonth}`;
+    const modal   = remuneracao[tab];
+    const pctLB   = parseFloat(String(modal.comissaoLucroBruto ?? '').replace(',', '.'));
+    const temPctLB  = !isNaN(pctLB) && pctLB > 0;
+    const temFaixas = (modal.faixasBonus?.length ?? 0) > 0;
+    const txVenda   = tab === 'usados' ? 'U21' : 'V21';
+    const txDevol   = tab === 'usados' ? 'U07' : 'V07';
+    const pctVendaBase = tab === 'novos'
+      ? parseFloat(String(modal.comissaoVenda ?? '').replace(',', '.'))
+      : NaN;
+    const temPctVenda = !isNaN(pctVendaBase) && pctVendaBase > 0;
+
+    if (tab === 'usados' && !temPctLB && !temFaixas) return;
+    if (tab === 'novos'  && !temPctLB && !temPctVenda) return;
+
+    const all = { ...lancamentosMap };
+    let changed = false;
+
+    vendedoresMap.forEach(([vendedor, vRows]) => {
+      const existing       = all[pk]?.[vendedor];
+      const existingLinhas = existing?.linhas ?? {};
+      const hasManualComVenda = Object.values(existingLinhas).some(l => l.comVenda !== 0);
+      if (hasManualComVenda) return;
+
+      const derived = vRows.map((r, ri) => {
+        const valorVenda = parseNum(r.valorVenda);
+        const valorCusto = parseNum(r.valorCusto);
+        const bonus      = parseNum(r.bonusVarejo) + parseNum(r.bonusTradeIn);
+        return { ...r, _ri: ri, _lb: valorVenda - valorCusto + bonus };
+      });
+      if (derived.length === 0) return;
+
+      const onlyFillComVenda =
+        !!existing && !hasManualComVenda && Object.keys(existingLinhas).length > 0;
+      const linhas: Record<string, { comVenda: number; comLB: number }> = {};
+
+      if (tab === 'usados') {
+        if (onlyFillComVenda && !temFaixas) return;
+        const sorted = [...derived].sort((a, b) =>
+          (a.dataVenda ?? '').localeCompare(b.dataVenda ?? ''));
+        const comVendaByKey: Record<string, number> = {};
+        let pos = 0;
+        sorted.forEach(r => {
+          const key = r.chassi || String(r._ri);
+          if (r.transacao === txVenda) {
+            pos++;
+            const pct = getTierPct(pos, modal.faixasBonus ?? []);
+            comVendaByKey[key] = pct > 0 ? parseNum(r.valorVenda) * (pct / 100) : 0;
+          } else if (r.transacao === txDevol) {
+            const pct = getTierPct(pos, modal.faixasBonus ?? []);
+            comVendaByKey[key] = pct > 0 ? -(parseNum(r.valorVenda) * (pct / 100)) : 0;
+            pos = Math.max(0, pos - 1);
+          } else {
+            comVendaByKey[key] = 0;
+          }
+        });
+        derived.forEach(r => {
+          const key  = r.chassi || String(r._ri);
+          const sign = r.transacao === txDevol ? -1 : 1;
+          linhas[key] = {
+            comVenda: temFaixas ? (comVendaByKey[key] ?? 0) : 0,
+            comLB: onlyFillComVenda
+              ? (existingLinhas[key]?.comLB ?? 0)
+              : (temPctLB && r._lb > 0 ? sign * r._lb * (pctLB / 100) : 0),
+          };
+        });
+      } else {
+        if (onlyFillComVenda && !temPctVenda) return;
+        const countV21 = derived.filter(r => r.transacao === txVenda).length;
+        const countV07 = derived.filter(r => r.transacao === txDevol).length;
+        const netCount = countV21 - countV07;
+        let bonusPct = 0;
+        if ((modal.faixasBonus?.length ?? 0) > 0) {
+          const faixa = modal.faixasBonus.find((f: { de: string; ate: string; percentual: string }) => {
+            const de  = parseInt(f.de)  || 0;
+            const ate = f.ate === '' ? Infinity : (parseInt(f.ate) || 0);
+            return netCount >= de && netCount <= ate;
+          });
+          if (faixa) bonusPct = parseFloat(String(faixa.percentual).replace(',', '.')) || 0;
+        }
+        const pctVenda = (isNaN(pctVendaBase) ? 0 : pctVendaBase) + bonusPct;
+        derived.forEach(r => {
+          const key  = r.chassi || String(r._ri);
+          const sign = r.transacao === txDevol ? -1 : 1;
+          linhas[key] = {
+            comVenda: pctVenda > 0 ? sign * parseNum(r.valorVenda) * (pctVenda / 100) : 0,
+            comLB: onlyFillComVenda
+              ? (existingLinhas[key]?.comLB ?? 0)
+              : (temPctLB && r._lb > 0 ? sign * r._lb * (pctLB / 100) : 0),
+          };
+        });
+      }
+
+      all[pk] = {
+        ...(all[pk] ?? {}),
+        [vendedor]: { linhas, pago: existing?.pago ?? false, dataPagamento: existing?.dataPagamento },
+      };
+      changed = true;
+    });
+
+    if (!changed) return;
+    bulkSaveLancamentos(tab, all).then(() => setLancamentosMap(all));
+    // lancamentosMap intencionalmente fora das deps para evitar loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, remuneracao, tab, filterYear, filterMonth, vendedoresMap, savedPeriodo]);
 
   // ── Exibe demonstrativo quando vendedor selecionado ──────────────────────
   if (selectedVendedor && remuneracao && filterMonth !== null) {
