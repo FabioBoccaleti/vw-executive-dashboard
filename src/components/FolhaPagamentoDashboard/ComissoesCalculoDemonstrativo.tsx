@@ -158,9 +158,11 @@ export function ComissoesCalculoDemonstrativo({
     if (!pctLB || isNaN(pctLB)) return;                 // percentual não cadastrado
     const linhas: Record<string, LinhaComissao> = {};
     derivedRows.forEach((r, ri) => {
-      const key = r.chassi || String(ri);
-      const lb  = r._d.lucroBruto;
-      linhas[key] = { comVenda: 0, comLB: lb > 0 ? lb * (pctLB / 100) : 0 };
+      const key  = r.chassi || String(ri);
+      const lb   = r._d.lucroBruto;
+      const sign = r.transacao === 'V07' ? -1 : 1;
+      // V21: comissão positiva só se LB > 0; V07: desconto se LB > 0
+      linhas[key] = { comVenda: 0, comLB: lb > 0 ? sign * lb * (pctLB / 100) : 0 };
     });
     const newLanc: LancamentoComissao = { linhas, pago: false, dataPagamento: undefined };
     saveLancamento(tab, year, month, vendedor, newLanc).then(() => {
@@ -275,11 +277,15 @@ export function ComissoesCalculoDemonstrativo({
     let totVenda = 0, totCusto = 0, totBonus = 0, totLB = 0;
     let totComV = 0, totComLB = 0;
     let hasComissao = false;
+    let countV21 = 0, countV07 = 0;
     derivedRows.forEach((r, ri) => {
-      totVenda += n(r.valorVenda);
-      totCusto += n(r.valorCusto);
-      totBonus += r._d.bonus;
-      totLB    += r._d.lucroBruto;
+      const sign = r.transacao === 'V07' ? -1 : 1;
+      if (r.transacao === 'V21') countV21++;
+      if (r.transacao === 'V07') countV07++;
+      totVenda += sign * n(r.valorVenda);
+      totCusto += sign * n(r.valorCusto);
+      totBonus += sign * r._d.bonus;
+      totLB    += sign * r._d.lucroBruto;
       const key = r.chassi || String(ri);
       if (editMode) {
         const ev = editValues[key];
@@ -290,11 +296,13 @@ export function ComissoesCalculoDemonstrativo({
       }
     });
     const totLBPct = totVenda !== 0 ? (totLB / totVenda) * 100 : 0;
+    const netCount = countV21 - countV07;
     return {
       totVenda, totCusto, totBonus, totLB, totLBPct,
       totComV:  hasComissao ? totComV  : null,
       totComLB: hasComissao ? totComLB : null,
       totTotal: hasComissao ? totComV + totComLB : null,
+      countV21, countV07, netCount,
     };
   }, [derivedRows, lancamento, editMode, editValues]);
 
@@ -447,7 +455,10 @@ export function ComissoesCalculoDemonstrativo({
               </span>
             )}
             <span className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-200">
-              {rows.length} {rows.length === 1 ? 'venda' : 'vendas'} no período
+              {totals.netCount} {totals.netCount === 1 ? 'venda' : 'vendas'} no período
+              {totals.countV07 > 0 && (
+                <span className="ml-1 text-emerald-500">({totals.countV21} V21 − {totals.countV07} V07)</span>
+              )}
             </span>
             {editMode && (
               <span className="px-3 py-1.5 rounded-full bg-violet-50 text-violet-700 text-xs font-medium border border-violet-200 animate-pulse">
@@ -545,7 +556,10 @@ export function ComissoesCalculoDemonstrativo({
                   <tfoot>
                     <tr className="bg-slate-800 text-white font-semibold text-xs">
                       <td colSpan={5} className="px-3 py-2.5 text-right border-r border-slate-700">
-                        Total ({rows.length} {rows.length === 1 ? 'venda' : 'vendas'})
+                        Total ({totals.netCount} {totals.netCount === 1 ? 'venda' : 'vendas'})
+                        {totals.countV07 > 0 && (
+                          <span className="ml-1 text-slate-400 font-normal text-[10px]">({totals.countV21} V21 − {totals.countV07} V07)</span>
+                        )}
                       </td>
                       <td className="px-2 py-2.5 text-right font-mono">{fmtBRL(totals.totVenda)}</td>
                       <td className="px-2 py-2.5 text-right font-mono no-print">{fmtBRL(totals.totCusto)}</td>
