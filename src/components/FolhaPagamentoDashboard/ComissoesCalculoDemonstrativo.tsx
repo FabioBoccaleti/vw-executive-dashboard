@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Clock, CheckCircle2, History, Printer, DollarSign, Save, LockOpen } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle2, History, Printer, DollarSign, Save, LockOpen, PenLine, CheckCircle, ShieldCheck } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/useAuth';
+import { apiLogin } from '@/lib/authClient';
 import type { VendasResultadoRow } from '@/components/VendasBonificacoesDashboard/vendasResultadoStorage';
 import type { RemuneracaoData } from '@/components/VendasBonificacoesDashboard/vendedoresRemuneracaoStorage';
 import {
@@ -8,6 +11,8 @@ import {
   type LancamentoComissao,
   type LinhaComissao,
   type LancamentosMap,
+  type CampoAssinaturaComissao,
+  type AssinaturaDigital,
 } from './comissoesLancamentosStorage';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -56,6 +61,13 @@ const MONTH_NAMES = [
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
 ];
 
+const CAMPO_LABELS: Record<CampoAssinaturaComissao, string> = {
+  financeiro:         'Financeiro',
+  gerenciaComercial:  'Gerência Comercial',
+  diretoriaComercial: 'Diretoria Comercial',
+  diretoria:          'Diretoria',
+};
+
 // ─── NumCell ──────────────────────────────────────────────────────────────────
 function NumCell({ value, pct = false }: { value: number; pct?: boolean }) {
   const text  = pct ? fmtPct(value) : fmtBRL(value);
@@ -86,6 +98,7 @@ export function ComissoesCalculoDemonstrativo({
   const pk          = `${year}-${month}`;
   const txVenda     = tab === 'usados' ? 'U21' : 'V21';  // transação de venda
   const txDevol     = tab === 'usados' ? 'U07' : 'V07';  // transação de devolução
+  const { session } = useAuth();
 
   // ── Estado de lançamentos ──────────────────────────────────────────────────
   const [lancamentosMap,    setLancamentosMap]    = useState<LancamentosMap>({});
@@ -96,6 +109,12 @@ export function ComissoesCalculoDemonstrativo({
   const [savingLanc,        setSavingLanc]        = useState(false);
   const [savingPago,        setSavingPago]        = useState(false);
   const [reabrirDialog,     setReopenDialog]      = useState<{ senha: string; erro: string | null } | null>(null);
+  const [assinaDialog,      setAssinaDialog]      = useState<{
+    campo:   CampoAssinaturaComissao;
+    senha:   string;
+    loading: boolean;
+    erro:    string | null;
+  } | null>(null);
 
   function handlePrint() {
     const area = document.getElementById('demonstrativo-comissao-print-area');
@@ -265,6 +284,7 @@ export function ComissoesCalculoDemonstrativo({
       linhas,
       pago:          existing?.pago          ?? false,
       dataPagamento: existing?.dataPagamento,
+      assinaturas:   existing?.assinaturas,
     };
     saveLancamento(tab, year, month, vendedor, newLanc).then(() => {
       setLancamentosMap(prev => ({
@@ -286,6 +306,7 @@ export function ComissoesCalculoDemonstrativo({
         linhas:        lancamento?.linhas ?? {},
         pago:          !pago,
         dataPagamento: !pago ? new Date().toISOString().split('T')[0] : undefined,
+        assinaturas:   lancamento?.assinaturas,
       };
       await saveLancamento(tab, year, month, vendedor, upd);
       setLancamentosMap(prev => ({
@@ -311,6 +332,7 @@ export function ComissoesCalculoDemonstrativo({
       linhas:        lancamento?.linhas ?? {},
       pago:          false,
       dataPagamento: undefined,
+      assinaturas:   {},
     };
     await saveLancamento(tab, year, month, vendedor, upd);
     setLancamentosMap(prev => ({
@@ -355,6 +377,7 @@ export function ComissoesCalculoDemonstrativo({
         linhas,
         pago:          lancamento?.pago          ?? false,
         dataPagamento: lancamento?.dataPagamento,
+        assinaturas:   lancamento?.assinaturas,
       };
       await saveLancamento(tab, year, month, vendedor, upd);
       setLancamentosMap(prev => ({
@@ -366,6 +389,37 @@ export function ComissoesCalculoDemonstrativo({
     } finally {
       setSavingLanc(false);
     }
+  }
+
+  function handleAbrirAssinatura(campo: CampoAssinaturaComissao) {
+    if (!session) return;
+    setAssinaDialog({ campo, senha: '', loading: false, erro: null });
+  }
+
+  async function handleConfirmarAssinatura() {
+    if (!assinaDialog || !lancamento || !session) return;
+    setAssinaDialog(prev => prev ? { ...prev, loading: true, erro: null } : prev);
+    const result = await apiLogin(session.username, assinaDialog.senha);
+    if ('error' in result) {
+      setAssinaDialog(prev => prev ? { ...prev, loading: false, erro: 'Senha incorreta. Tente novamente.' } : prev);
+      return;
+    }
+    const assinatura: AssinaturaDigital = {
+      username: session.username,
+      name:     (result.session.name ?? '') || undefined,
+      dataHora: new Date().toISOString(),
+    };
+    const upd: LancamentoComissao = {
+      ...lancamento,
+      assinaturas: { ...(lancamento.assinaturas ?? {}), [assinaDialog.campo]: assinatura },
+    };
+    await saveLancamento(tab, year, month, vendedor, upd);
+    setLancamentosMap(prev => ({
+      ...prev,
+      [pk]: { ...(prev[pk] ?? {}), [vendedor]: upd },
+    }));
+    toast.success(`Assinatura de ${CAMPO_LABELS[assinaDialog.campo]} registrada com sucesso!`);
+    setAssinaDialog(null);
   }
 
   // ── Cálculo por linha ─────────────────────────────────────────────────────
@@ -529,7 +583,7 @@ export function ComissoesCalculoDemonstrativo({
             <div className="px-6 py-5 flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
-                  {tab === 'usados' ? 'Demonstrativo de Comissão de Vendas Usados' : 'Demonstrativo de Comissão de Vendas Novos'}
+                  {tab === 'usados' ? 'Demonstrativo de Comissão de Vendas Usados VW' : 'Demonstrativo de Comissão de Vendas Novos VW'}
                 </p>
                 <h2 className="text-xl font-bold leading-tight">{vendedor}</h2>
                 <p className="text-sm text-slate-300 mt-1">{tabLabel}</p>
@@ -742,6 +796,51 @@ export function ComissoesCalculoDemonstrativo({
             </div>
           )}
 
+          {/* ── Assinaturas ──────────────────────────────────────────────── */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Assinaturas</p>
+            </div>
+            <div className="px-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                {(Object.entries(CAMPO_LABELS) as [CampoAssinaturaComissao, string][]).map(([campo, label]) => {
+                  const ass = lancamento?.assinaturas?.[campo];
+                  return (
+                    <div key={campo} className="flex flex-col gap-1.5">
+                      <p className="text-xs text-slate-500 font-medium">{label}</p>
+                      {ass ? (
+                        <div className="border border-emerald-200 rounded-lg px-4 py-3 bg-emerald-50 flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                            <div className="flex flex-col">
+                              {ass.name && ass.name !== ass.username && (
+                                <span className="text-sm font-bold text-emerald-900">{ass.name}</span>
+                              )}
+                              <span className="text-xs text-emerald-700">{ass.username}</span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-emerald-600">{new Date(ass.dataHora).toLocaleString('pt-BR')}</p>
+                          <div className="flex items-center gap-1 mt-1">
+                            <ShieldCheck className="w-3 h-3 text-emerald-700" />
+                            <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Assinatura Eletrônica</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleAbrirAssinatura(campo)}
+                          className="border-2 border-dashed border-slate-300 rounded-lg px-4 py-3 text-sm text-slate-400 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50 transition-colors flex items-center gap-2 justify-center no-print"
+                        >
+                          <PenLine className="w-4 h-4" />
+                          Assinar
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
       {/* ── Dialog: Reabrir demonstrativo ─────────────────────────────── */}
@@ -789,6 +888,62 @@ export function ComissoesCalculoDemonstrativo({
                 className="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors"
               >
                 Reabrir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Dialog: Assinatura Eletrônica ─────────────────────────── */}
+      {assinaDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <PenLine className="w-4 h-4 text-teal-600" />
+                <h3 className="text-sm font-bold text-slate-800">
+                  Assinar — {CAMPO_LABELS[assinaDialog.campo]}
+                </h3>
+              </div>
+              <button onClick={() => setAssinaDialog(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100">✕</button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Usuário</label>
+                <div className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 bg-slate-50 select-none">
+                  {session?.username ?? '—'}
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Senha</label>
+                <input
+                  type="password"
+                  autoFocus
+                  value={assinaDialog.senha}
+                  onChange={e => setAssinaDialog(prev => prev ? { ...prev, senha: e.target.value, erro: null } : prev)}
+                  onKeyDown={e => e.key === 'Enter' && !assinaDialog.loading && handleConfirmarAssinatura()}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  placeholder="Digite sua senha"
+                />
+                {assinaDialog.erro && (
+                  <p className="text-xs text-red-500 mt-0.5">{assinaDialog.erro}</p>
+                )}
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                onClick={() => setAssinaDialog(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-500 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarAssinatura}
+                disabled={assinaDialog.loading || !assinaDialog.senha}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              >
+                <PenLine className="w-3.5 h-3.5" />
+                {assinaDialog.loading ? 'Assinando...' : 'Assinar'}
               </button>
             </div>
           </div>

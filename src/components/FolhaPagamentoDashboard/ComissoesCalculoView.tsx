@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, Save, Check, ChevronRight, RefreshCw, Lock, LockOpen, Printer } from 'lucide-react';
+import { ChevronDown, Save, Check, ChevronRight, RefreshCw, Lock, LockOpen, Printer, PenLine, ShieldCheck } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/useAuth';
+import { apiLogin } from '@/lib/authClient';
 import {
   loadVendasResultadoRows,
   type VendasResultadoRow,
@@ -20,6 +23,8 @@ import {
   bulkSaveLancamentos,
   type LancamentoComissao,
   type LancamentosMap,
+  type CampoAssinaturaComissao,
+  type AssinaturaDigital,
 } from './comissoesLancamentosStorage';
 import { ComissoesCalculoDemonstrativo } from './ComissoesCalculoDemonstrativo';
 
@@ -30,6 +35,13 @@ const MONTH_NAMES = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
 ];
+
+const CAMPO_LABELS: Record<CampoAssinaturaComissao, string> = {
+  financeiro:         'Financeiro',
+  gerenciaComercial:  'Gerência Comercial',
+  diretoriaComercial: 'Diretoria Comercial',
+  diretoria:          'Diretoria',
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function parseDataVenda(d: string): Date | null {
@@ -84,8 +96,8 @@ function buildSellerPrintHtml(params: {
   const txDevol    = tab === 'usados' ? 'U07' : 'V07';
   const tabLabel   = tab === 'usados' ? 'Veículos Usados' : 'Veículos Novos';
   const demoTitle  = tab === 'usados'
-    ? 'Demonstrativo de Comissão de Vendas Usados'
-    : 'Demonstrativo de Comissão de Vendas Novos';
+    ? 'Demonstrativo de Comissão de Vendas Usados VW'
+    : 'Demonstrativo de Comissão de Vendas Novos VW';
 
   const derived = vRows.map(r => {
     const valorVenda = n(r.valorVenda);
@@ -214,6 +226,8 @@ interface ComissoesCalculoViewProps {
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
+  const { session } = useAuth();
+
   const [filterYear,  setFilterYear]  = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
 
@@ -249,6 +263,14 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
   const [reopenPass,      setReopenPass]      = useState('');
   const [reopenError,     setReopenError]     = useState<string | null>(null);
   const [reopeningAll,    setReopeningAll]    = useState(false);
+
+  // Bulk assinatura
+  const [assinaTodasDialog, setAssinaTodasDialog] = useState<{
+    campo:   CampoAssinaturaComissao;
+    senha:   string;
+    loading: boolean;
+    erro:    string | null;
+  } | null>(null);
 
   // Carrega tudo ao montar / trocar aba
   useEffect(() => {
@@ -437,6 +459,43 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
     } finally {
       setReopeningAll(false);
     }
+  }
+
+  async function handleAssinarTodos() {
+    if (!assinaTodasDialog || !session || filterMonth === null) return;
+    setAssinaTodasDialog(prev => prev ? { ...prev, loading: true, erro: null } : prev);
+    const result = await apiLogin(session.username, assinaTodasDialog.senha);
+    if ('error' in result) {
+      setAssinaTodasDialog(prev => prev ? { ...prev, loading: false, erro: 'Senha incorreta. Tente novamente.' } : prev);
+      return;
+    }
+    const assinatura: AssinaturaDigital = {
+      username: session.username,
+      name:     (result.session.name ?? '') || undefined,
+      dataHora: new Date().toISOString(),
+    };
+    const pk  = `${filterYear}-${filterMonth}`;
+    const all = { ...lancamentosMap };
+    let count = 0;
+    vendedoresMap.forEach(([vendedor]) => {
+      const existing = all[pk]?.[vendedor];
+      if (!existing) return;
+      if (existing.assinaturas?.[assinaTodasDialog.campo]) return;
+      count++;
+      all[pk] = {
+        ...(all[pk] ?? {}),
+        [vendedor]: {
+          ...existing,
+          assinaturas: { ...(existing.assinaturas ?? {}), [assinaTodasDialog.campo]: assinatura },
+        },
+      };
+    });
+    if (count > 0) {
+      await bulkSaveLancamentos(tab, all);
+      setLancamentosMap(all);
+    }
+    toast.success(`Assinatura de ${CAMPO_LABELS[assinaTodasDialog.campo]} aplicada em ${count} demonstrativo${count !== 1 ? 's' : ''}!`);
+    setAssinaTodasDialog(null);
   }
 
   const hasPeriodo = (year: number, month: number) => {
@@ -867,6 +926,15 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
                   </div>
                 )}
 
+                {/* Assinar todos */}
+                <button
+                  onClick={() => setAssinaTodasDialog({ campo: 'financeiro', senha: '', loading: false, erro: null })}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                >
+                  <PenLine className="w-3.5 h-3.5" />
+                  Assinar todos
+                </button>
+
                 <div className="w-px h-4 bg-slate-200" />
                 <button
                   onClick={handlePrintAll}
@@ -928,6 +996,87 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
           </div>
         )}
       </div>
+
+      {/* ── Dialog: Assinar todos ──────────────────────────────────────── */}
+      {assinaTodasDialog !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget && !assinaTodasDialog.loading) setAssinaTodasDialog(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                <ShieldCheck className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800">Assinar todos os demonstrativos</p>
+                <p className="text-xs text-slate-500 mt-0.5">Somente quem ainda não possui a assinatura selecionada</p>
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Campo de assinatura</label>
+              <select
+                value={assinaTodasDialog.campo}
+                onChange={e => setAssinaTodasDialog(prev => prev ? { ...prev, campo: e.target.value as CampoAssinaturaComissao } : prev)}
+                disabled={assinaTodasDialog.loading}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-60"
+              >
+                {(Object.entries(CAMPO_LABELS) as [CampoAssinaturaComissao, string][]).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-3">
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Usuário</label>
+              <input
+                type="text"
+                value={session?.username ?? ''}
+                disabled
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
+              />
+            </div>
+
+            <div className="mb-5">
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Senha</label>
+              <input
+                type="password"
+                value={assinaTodasDialog.senha}
+                autoFocus
+                disabled={assinaTodasDialog.loading}
+                placeholder="Digite sua senha"
+                onChange={e => setAssinaTodasDialog(prev => prev ? { ...prev, senha: e.target.value, erro: null } : prev)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleAssinarTodos();
+                  if (e.key === 'Escape' && !assinaTodasDialog.loading) setAssinaTodasDialog(null);
+                }}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+              {assinaTodasDialog.erro && (
+                <p className="text-xs text-red-600 mt-1.5">{assinaTodasDialog.erro}</p>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => { if (!assinaTodasDialog.loading) setAssinaTodasDialog(null); }}
+                disabled={assinaTodasDialog.loading}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAssinarTodos}
+                disabled={assinaTodasDialog.loading || !assinaTodasDialog.senha}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-40"
+              >
+                {assinaTodasDialog.loading ? 'Assinando...' : 'Assinar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

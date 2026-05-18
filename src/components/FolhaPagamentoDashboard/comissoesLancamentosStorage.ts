@@ -6,10 +6,23 @@ export interface LinhaComissao {
   comLB:    number;
 }
 
+export interface AssinaturaDigital {
+  username: string;
+  name?:    string;
+  dataHora: string; // ISO 8601
+}
+
+export type CampoAssinaturaComissao =
+  | 'financeiro'
+  | 'gerenciaComercial'
+  | 'diretoriaComercial'
+  | 'diretoria';
+
 export interface LancamentoComissao {
   linhas:         Record<string, LinhaComissao>; // key = chassi (ou índice da linha)
   pago:           boolean;
   dataPagamento?: string; // ISO date "YYYY-MM-DD"
+  assinaturas?:   Partial<Record<CampoAssinaturaComissao, AssinaturaDigital>>;
 }
 
 // { "2026-5": { "NOME VENDEDOR": LancamentoComissao } }

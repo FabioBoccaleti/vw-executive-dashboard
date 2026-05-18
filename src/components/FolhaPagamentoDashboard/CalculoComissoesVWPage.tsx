@@ -15,7 +15,7 @@ interface CalculoComissoesVWPageProps {
 
 
 export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) {
-  const [mainView, setMainView] = useState<MainView>('cadastro');
+  const [mainView, setMainView] = useState<MainView>('calculo');
   const [vendasSubTab, setVendasSubTab] = useState<VendasSubTab>('novos');
   const [calculoSubTab, setCalculoSubTab] = useState<CalculoSubTab>('novos');
 

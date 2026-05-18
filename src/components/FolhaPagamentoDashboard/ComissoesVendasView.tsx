@@ -6,9 +6,9 @@ import {
 } from '@/components/VendasBonificacoesDashboard/vendasResultadoStorage';
 import { loadAliquotas } from '@/components/VendasBonificacoesDashboard/vendedoresRemuneracaoStorage';
 import {
-  loadComissaoStatus,
-  type ComissaoStatusEntry,
-} from './comissoesStatusStorage';
+  loadLancamentos,
+  type LancamentosMap,
+} from './comissoesLancamentosStorage';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] as const;
@@ -25,6 +25,12 @@ function fmtBRL(v: number): string {
 
 function fmtPct(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+}
+
+function fmtDate(d: string): string {
+  if (!d) return '';
+  const [y, m, dd] = d.split('-');
+  return `${dd}/${m}/${y}`;
 }
 
 function calcImpostosUsados(valorVenda: number, valorCusto: number): number {
@@ -110,16 +116,16 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [rows, setRows]               = useState<VendasResultadoRow[]>([]);
   const [aliquotaBonPct, setAliquotaBonPct] = useState(0);
-  const [statusMap, setStatusMap]     = useState<Map<string, ComissaoStatusEntry>>(new Map());
+  const [lancamentosMap, setLancamentosMap] = useState<LancamentosMap>({});
   const [loading, setLoading]         = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([loadVendasResultadoRows(tab), loadAliquotas(), loadComissaoStatus(tab)])
-      .then(([vendasRows, aliquotas, statusEntries]) => {
+    Promise.all([loadVendasResultadoRows(tab), loadAliquotas(), loadLancamentos(tab)])
+      .then(([vendasRows, aliquotas, lancs]) => {
         setRows(vendasRows);
         setAliquotaBonPct(aliquotas.reduce((acc, i) => acc + (parseFloat(i.aliquota) || 0), 0));
-        setStatusMap(new Map(statusEntries.map(e => [e.rowId, e])));
+        setLancamentosMap(lancs);
       })
       .finally(() => setLoading(false));
   }, [tab]);
@@ -148,6 +154,34 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
     () => sumRows(filteredRows, isUsados, aliquotaBonPct),
     [filteredRows, isUsados, aliquotaBonPct],
   );
+
+  // Mapa global chassi → info de comissão (varre todos os períodos)
+  // Resolve o mismatch entre competência do lançamento e dataVenda da linha
+  const chassiToLanc = useMemo(() => {
+    const map = new Map<string, { pago: boolean; dataPagamento?: string; comVenda: number; comLB: number }>();
+    Object.values(lancamentosMap).forEach(vendedoresObj => {
+      Object.values(vendedoresObj).forEach(lanc => {
+        Object.entries(lanc.linhas ?? {}).forEach(([chassi, linha]) => {
+          if (chassi) map.set(chassi, {
+            pago:          lanc.pago,
+            dataPagamento: lanc.dataPagamento,
+            comVenda:      linha.comVenda,
+            comLB:         linha.comLB,
+          });
+        });
+      });
+    });
+    return map;
+  }, [lancamentosMap]);
+
+  const totComissao = useMemo(() => {
+    let total = 0;
+    filteredRows.forEach(row => {
+      const info = chassiToLanc.get(row.chassi ?? '');
+      if (info) total += info.comVenda + info.comLB;
+    });
+    return total;
+  }, [filteredRows, lancamentosMap]);
 
   // ─── Estilos de header por grupo ────────────────────────────────────────────
   const thId  = 'bg-slate-700 text-white px-3 py-2 text-xs font-semibold whitespace-nowrap border-r border-slate-600 text-left';
@@ -262,6 +296,13 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
                   const tdd = `${tdL} ${bg}`;
                   const tdr = `${tdR} ${bg}`;
 
+                  const period = rowPeriod(row);
+                  const info           = chassiToLanc.get(row.chassi ?? '');
+                  const valorComissao  = info ? info.comVenda + info.comLB : null;
+                  const situacao       = info ? (info.pago ? 'Pago' : 'Pendente de Pagamento') : null;
+                  const dataPgto       = info?.pago && info.dataPagamento ? info.dataPagamento : null;
+                  void period;
+
                   return (
                     <tr key={row.id} className={`${bg} hover:bg-emerald-50/40 transition-colors`}>
                       <td className={tdd}>{row.chassi || '—'}</td>
@@ -279,14 +320,26 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
                       <td className={tdr}><NumCell value={d.impBonus} /></td>
                       <td className={tdr}><NumCell value={d.lucroBruto} /></td>
                       <td className={tdr}><NumCell value={d.lucroBrutoPct} pct /></td>
-                      <td className={`${tdBase} ${ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} text-left`}>
-                        <span className="text-slate-300">—</span>
+                      <td className={`${tdBase} ${bg} text-right`}>
+                        {valorComissao !== null
+                          ? <NumCell value={valorComissao} />
+                          : <span className="text-slate-300">—</span>}
                       </td>
-                      <td className={`${tdBase} ${ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} text-left`}>
-                        {statusMap.get(row.id)?.situacao || <span className="text-slate-300">—</span>}
+                      <td className={`${tdBase} ${bg} text-left`}>
+                        {situacao ? (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap ${
+                            info?.pago
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                              : 'bg-amber-50 border-amber-200 text-amber-700'
+                          }`}>
+                            {situacao}
+                          </span>
+                        ) : <span className="text-slate-300">—</span>}
                       </td>
-                      <td className={`${tdBase} ${ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} text-left`}>
-                        {statusMap.get(row.id)?.dataPgto || <span className="text-slate-300">—</span>}
+                      <td className={`${tdBase} ${bg} text-left`}>
+                        {dataPgto
+                          ? <span className="font-mono text-xs text-slate-600">{fmtDate(dataPgto)}</span>
+                          : <span className="text-slate-300">—</span>}
                       </td>
                     </tr>
                   );
@@ -313,7 +366,10 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
                   <td className={`px-2 py-2 text-right font-mono ${totals.totLBPct < 0 ? 'text-red-300' : ''}`}>
                     {fmtPct(totals.totLBPct)}
                   </td>
-                  <td colSpan={3} />
+                  <td className="px-2 py-2 text-right font-mono">
+                    {totComissao !== 0 ? fmtBRL(totComissao) : '—'}
+                  </td>
+                  <td colSpan={2} />
                 </tr>
               </tfoot>
             )}
