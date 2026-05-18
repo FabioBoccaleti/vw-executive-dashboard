@@ -37,3 +37,11 @@ export async function saveLancamento(
     [pk]: { ...(all[pk] ?? {}), [vendedor]: lancamento },
   });
 }
+
+/** Salva o mapa completo de uma vez (usado em operações em massa). */
+export async function bulkSaveLancamentos(
+  tab: 'novos' | 'usados',
+  map: LancamentosMap,
+): Promise<void> {
+  await kvSet(kvKey(tab), map);
+}

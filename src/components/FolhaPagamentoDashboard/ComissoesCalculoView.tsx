@@ -17,7 +17,9 @@ import {
 } from './comissoesCalculoPeriodoStorage';
 import {
   loadLancamentos,
+  bulkSaveLancamentos,
   type LancamentoComissao,
+  type LancamentosMap,
 } from './comissoesLancamentosStorage';
 import { ComissoesCalculoDemonstrativo } from './ComissoesCalculoDemonstrativo';
 
@@ -220,12 +222,20 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
   const [remuneracao, setRemuneracao] = useState<RemuneracaoData | null>(null);
   const [aliquotaBonPct, setAliquotaBonPct] = useState(0);
   const [loading, setLoading]         = useState(true);
+  const [lancamentosMap, setLancamentosMap] = useState<LancamentosMap>({});
 
   // Navegação para demonstrativo
   const [selectedVendedor, setSelectedVendedor] = useState<string | null>(null);
 
   // Bulk print
   const [printingAll, setPrintingAll] = useState(false);
+
+  // Bulk pagamento
+  const [markingAllPaid,  setMarkingAllPaid]  = useState(false);
+  const [showReopenInput, setShowReopenInput] = useState(false);
+  const [reopenPass,      setReopenPass]      = useState('');
+  const [reopenError,     setReopenError]     = useState<string | null>(null);
+  const [reopeningAll,    setReopeningAll]    = useState(false);
 
   // Carrega tudo ao montar / trocar aba
   useEffect(() => {
@@ -236,11 +246,13 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
       loadRemuneracao(),
       loadAliquotas(),
       loadPeriodos(tab),
-    ]).then(([vendasRows, remun, aliquotas, periodos]) => {
+      loadLancamentos(tab),
+    ]).then(([vendasRows, remun, aliquotas, periodos, lancs]) => {
       setRows(vendasRows);
       setRemuneracao(remun);
       setAliquotaBonPct(aliquotas.reduce((acc, i) => acc + (parseFloat(i.aliquota) || 0), 0));
       setPeriodoMap(periodos);
+      setLancamentosMap(lancs);
     }).finally(() => setLoading(false));
   }, [tab]);
 
@@ -256,6 +268,9 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
     setShowUnlockInput(false);
     setUnlockPass('');
     setUnlockError(null);
+    setShowReopenInput(false);
+    setReopenPass('');
+    setReopenError(null);
   }, [filterMonth, filterYear, periodoMap]);
 
   async function handleSave() {
@@ -355,6 +370,60 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
     }
   }
 
+  async function handleMarkAllPaid() {
+    if (filterMonth === null || vendedoresMap.length === 0) return;
+    setMarkingAllPaid(true);
+    try {
+      const pk    = `${filterYear}-${filterMonth}`;
+      const today = new Date().toISOString().split('T')[0];
+      const all   = { ...lancamentosMap };
+      let changed = false;
+      vendedoresMap.forEach(([vendedor]) => {
+        const existing = all[pk]?.[vendedor];
+        if (!existing || existing.pago) return;
+        changed = true;
+        all[pk] = {
+          ...(all[pk] ?? {}),
+          [vendedor]: { ...existing, pago: true, dataPagamento: existing.dataPagamento ?? today },
+        };
+      });
+      if (changed) {
+        await bulkSaveLancamentos(tab, all);
+        setLancamentosMap(all);
+      }
+    } finally {
+      setMarkingAllPaid(false);
+    }
+  }
+
+  async function handleReopenAll() {
+    if (filterMonth === null) return;
+    if (reopenPass !== '1985') { setReopenError('Senha incorreta.'); return; }
+    setReopeningAll(true);
+    try {
+      const pk  = `${filterYear}-${filterMonth}`;
+      const all = { ...lancamentosMap };
+      let changed = false;
+      vendedoresMap.forEach(([vendedor]) => {
+        const existing = all[pk]?.[vendedor];
+        if (!existing || !existing.pago) return;
+        changed = true;
+        const { dataPagamento: _, ...rest } = existing;
+        void _;
+        all[pk] = { ...(all[pk] ?? {}), [vendedor]: { ...rest, pago: false } };
+      });
+      if (changed) {
+        await bulkSaveLancamentos(tab, all);
+        setLancamentosMap(all);
+      }
+      setShowReopenInput(false);
+      setReopenPass('');
+      setReopenError(null);
+    } finally {
+      setReopeningAll(false);
+    }
+  }
+
   const hasPeriodo = (year: number, month: number) => {
     const p = periodoMap[periodoKey(year, month)];
     return !!(p?.de && p?.ate);
@@ -396,6 +465,18 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
     ? `${fmtDate(savedPeriodo.de)} a ${fmtDate(savedPeriodo.ate)}`
     : '';
 
+  const [countComLanc, countPagos] = useMemo(() => {
+    if (filterMonth === null) return [0, 0];
+    const pk    = `${filterYear}-${filterMonth}`;
+    const lancs = lancamentosMap[pk] ?? {};
+    let withLanc = 0, paid = 0;
+    vendedoresMap.forEach(([v]) => {
+      const l = lancs[v];
+      if (l) { withLanc++; if (l.pago) paid++; }
+    });
+    return [withLanc, paid];
+  }, [lancamentosMap, vendedoresMap, filterYear, filterMonth]);
+
   // ── Exibe demonstrativo quando vendedor selecionado ──────────────────────
   if (selectedVendedor && remuneracao && filterMonth !== null) {
     return (
@@ -408,7 +489,10 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
         periodoLabel={periodoLabel}
         year={filterYear}
         month={filterMonth}
-        onBack={() => setSelectedVendedor(null)}
+        onBack={() => {
+          setSelectedVendedor(null);
+          loadLancamentos(tab).then(setLancamentosMap);
+        }}
       />
     );
   }
@@ -607,7 +691,59 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
               <span className="text-sm text-slate-500">
                 {periodRows.length} {periodRows.length === 1 ? 'venda' : 'vendas'} no período
               </span>
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-2 flex-wrap">
+                {countComLanc > 0 && (
+                  <span className="text-xs text-slate-400">
+                    {countPagos} de {countComLanc} {countComLanc === 1 ? 'pago' : 'pagos'}
+                  </span>
+                )}
+
+                {/* Marcar todos como pago */}
+                {countComLanc > countPagos && (
+                  <button
+                    onClick={handleMarkAllPaid}
+                    disabled={markingAllPaid}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    {markingAllPaid ? 'Salvando...' : 'Marcar todos como pago'}
+                  </button>
+                )}
+
+                {/* Reabrir todos */}
+                {countPagos > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => { setShowReopenInput(v => !v); setReopenError(null); setReopenPass(''); }}
+                      disabled={reopeningAll}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40"
+                    >
+                      <LockOpen className="w-3.5 h-3.5" />
+                      {reopeningAll ? 'Reabrindo...' : 'Reabrir todos'}
+                    </button>
+                    {showReopenInput && (
+                      <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1 shadow-sm">
+                        <input
+                          type="password"
+                          value={reopenPass}
+                          autoFocus
+                          placeholder="Senha"
+                          onChange={e => { setReopenPass(e.target.value); setReopenError(null); }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') handleReopenAll();
+                            if (e.key === 'Escape') { setShowReopenInput(false); setReopenPass(''); setReopenError(null); }
+                          }}
+                          className="w-24 text-xs text-slate-700 bg-transparent focus:outline-none"
+                        />
+                        <button onClick={handleReopenAll} disabled={reopeningAll} className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 disabled:opacity-40">OK</button>
+                        <button onClick={() => { setShowReopenInput(false); setReopenPass(''); setReopenError(null); }} className="text-slate-400 hover:text-slate-600 text-xs leading-none">✕</button>
+                      </div>
+                    )}
+                    {reopenError && <span className="text-xs text-red-600 font-medium">{reopenError}</span>}
+                  </div>
+                )}
+
+                <div className="w-px h-4 bg-slate-200" />
                 <button
                   onClick={handlePrintAll}
                   disabled={printingAll}
@@ -620,36 +756,56 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
             </div>
 
             {/* Cards de vendedores */}
-            {vendedoresMap.map(([vendedor, vRows]) => (
-              <button
-                key={vendedor}
-                onClick={() => setSelectedVendedor(vendedor)}
-                className="w-full text-left bg-white rounded-xl border border-slate-200 px-5 py-4 hover:border-slate-300 hover:shadow-sm transition-all flex items-center gap-4"
-              >
-                {/* Avatar com inicial */}
-                <div className="w-9 h-9 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
-                  {vendedor.trim().charAt(0).toUpperCase()}
-                </div>
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 truncate">{vendedor}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {tab === 'novos' ? 'Veículos Novos' : 'Veículos Usados'}
-                    {' · '}
-                    {vRows.length} {vRows.length === 1 ? 'venda' : 'vendas'}
-                  </p>
-                </div>
-                {/* Status */}
-                <span className="px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold whitespace-nowrap flex-shrink-0">
-                  Pendente
-                </span>
-                {/* Valor placeholder */}
-                <span className="text-xs text-slate-400 whitespace-nowrap flex-shrink-0">
-                  Sem lançamento
-                </span>
-                <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
-              </button>
-            ))}
+            {vendedoresMap.map(([vendedor, vRows]) => {
+              const lanc = filterMonth !== null
+                ? lancamentosMap[`${filterYear}-${filterMonth}`]?.[vendedor]
+                : undefined;
+              const pago = lanc?.pago ?? false;
+              return (
+                <button
+                  key={vendedor}
+                  onClick={() => setSelectedVendedor(vendedor)}
+                  className="w-full text-left bg-white rounded-xl border border-slate-200 px-5 py-4 hover:border-slate-300 hover:shadow-sm transition-all flex items-center gap-4"
+                >
+                  {/* Avatar com inicial */}
+                  <div className="w-9 h-9 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                    {vendedor.trim().charAt(0).toUpperCase()}
+                  </div>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{vendedor}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {tab === 'novos' ? 'Veículos Novos' : 'Veículos Usados'}
+                      {' · '}
+                      {vRows.length} {vRows.length === 1 ? 'venda' : 'vendas'}
+                    </p>
+                  </div>
+                  {/* Status */}
+                  {lanc ? (
+                    <span className={`px-3 py-1 rounded-full border text-xs font-semibold whitespace-nowrap flex-shrink-0 ${
+                      pago
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : 'bg-amber-50 border-amber-200 text-amber-700'
+                    }`}>
+                      {pago ? 'Pago' : 'Pendente'}
+                    </span>
+                  ) : (
+                    <span className="px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-400 text-xs font-semibold whitespace-nowrap flex-shrink-0">
+                      Sem lançamento
+                    </span>
+                  )}
+                  {/* Data de pagamento ou placeholder */}
+                  {pago && lanc?.dataPagamento ? (
+                    <span className="text-xs text-emerald-500 whitespace-nowrap flex-shrink-0">
+                      {fmtDate(lanc.dataPagamento)}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-300 whitespace-nowrap flex-shrink-0">—</span>
+                  )}
+                  <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                </button>
+              );
+            })}
 
           </div>
         )}
