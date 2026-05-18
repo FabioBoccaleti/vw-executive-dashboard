@@ -6,8 +6,9 @@ function key(tab: 'novos' | 'usados') {
 }
 
 export interface PeriodoApuracao {
-  de: string;  // YYYY-MM-DD
-  ate: string; // YYYY-MM-DD
+  de:        string;   // YYYY-MM-DD
+  ate:       string;   // YYYY-MM-DD
+  bloqueado?: boolean;
 }
 
 // Chave interna do mapa: "2026-5"

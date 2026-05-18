@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, Save, Check, ChevronRight, RefreshCw } from 'lucide-react';
+import { ChevronDown, Save, Check, ChevronRight, RefreshCw, Lock, LockOpen, Printer } from 'lucide-react';
 import {
   loadVendasResultadoRows,
   type VendasResultadoRow,
@@ -15,6 +15,10 @@ import {
   periodoKey,
   type PeriodoApuracao,
 } from './comissoesCalculoPeriodoStorage';
+import {
+  loadLancamentos,
+  type LancamentoComissao,
+} from './comissoesLancamentosStorage';
 import { ComissoesCalculoDemonstrativo } from './ComissoesCalculoDemonstrativo';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -41,6 +45,153 @@ function fmtDate(d: string): string {
   return `${dd}/${m}/${y}`;
 }
 
+// ─── Bulk Print ───────────────────────────────────────────────────────────────
+function buildSellerPrintHtml(params: {
+  vendedor:    string;
+  vRows:       VendasResultadoRow[];
+  lancamento:  LancamentoComissao | undefined;
+  tab:         'novos' | 'usados';
+  competencia: string;
+  periodoLabel: string;
+  isLast:      boolean;
+}): string {
+  const { vendedor, vRows, lancamento, tab, competencia, periodoLabel, isLast } = params;
+
+  const n = (v: unknown) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
+  const fmtBRL = (v: number) =>
+    v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtPct = (v: number) =>
+    v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+  const numColor = (v: number) =>
+    v < 0 ? 'color:#dc2626' : v === 0 ? 'color:#94a3b8' : 'color:#1e293b';
+
+  const txVenda    = tab === 'usados' ? 'U21' : 'V21';
+  const txDevol    = tab === 'usados' ? 'U07' : 'V07';
+  const tabLabel   = tab === 'usados' ? 'Veículos Usados' : 'Veículos Novos';
+  const demoTitle  = tab === 'usados'
+    ? 'Demonstrativo de Comissão de Vendas Usados'
+    : 'Demonstrativo de Comissão de Vendas Novos';
+
+  const derived = vRows.map(r => {
+    const valorVenda = n(r.valorVenda);
+    const valorCusto = n(r.valorCusto);
+    const bonus      = n(r.bonusVarejo) + n(r.bonusTradeIn);
+    const lucroBruto = valorVenda - valorCusto + bonus;
+    const lucroBrutoPct = valorVenda !== 0 ? (lucroBruto / valorVenda) * 100 : 0;
+    return { ...r, _d: { bonus, lucroBruto, lucroBrutoPct } };
+  });
+
+  let totVenda = 0, totCusto = 0, totBonus = 0, totLB = 0, totComV = 0, totComLB = 0;
+  let hasComissao = false;
+  let countVenda  = 0, countDevol = 0;
+
+  derived.forEach((r, ri) => {
+    const sign = r.transacao === txDevol ? -1 : 1;
+    if (r.transacao === txVenda) countVenda++;
+    if (r.transacao === txDevol) countDevol++;
+    totVenda += sign * n(r.valorVenda);
+    totCusto += sign * n(r.valorCusto);
+    totBonus += sign * r._d.bonus;
+    totLB    += sign * r._d.lucroBruto;
+    const key = r.chassi || String(ri);
+    const linha = lancamento?.linhas?.[key];
+    if (linha) { totComV += linha.comVenda; totComLB += linha.comLB; hasComissao = true; }
+  });
+
+  const totLBPct   = totVenda !== 0 ? (totLB / totVenda) * 100 : 0;
+  const netCount   = countVenda - countDevol;
+  const pago       = lancamento?.pago ?? false;
+  const cntLabel   = `${netCount} ${netCount === 1 ? 'venda' : 'vendas'}`;
+  const cntDetail  = countDevol > 0
+    ? ` (${countVenda} ${txVenda} − ${countDevol} ${txDevol})`
+    : '';
+
+  const tdB = 'padding:3px 5px;border-bottom:1px solid #f1f5f9;font-size:8px;';
+  const thS = (bg: string, align = 'left') =>
+    `background:${bg};color:white;padding:4px 5px;font-size:7.5px;font-weight:600;white-space:nowrap;text-align:${align};`;
+  const tfB = 'background:#1e293b;color:white;padding:5px 6px;font-size:8px;font-weight:700;text-align:right;border-right:1px solid #475569;';
+
+  const rowsHtml = derived.map((r, ri) => {
+    const bg    = ri % 2 === 0 ? '#ffffff' : '#f8fafc';
+    const key   = r.chassi || String(ri);
+    const linha = lancamento?.linhas?.[key];
+    const comV  = linha?.comVenda ?? 0;
+    const comLB = linha?.comLB    ?? 0;
+    const total = comV + comLB;
+    const vv    = n(r.valorVenda);
+    const vc    = n(r.valorCusto);
+    const none  = '<span style="color:#94a3b8">—</span>';
+    return `<tr style="background:${bg}">
+      <td style="${tdB}font-family:monospace;color:#334155;">${r.chassi || '—'}</td>
+      <td style="${tdB}color:#334155;white-space:normal;word-break:break-word;max-width:110px;">${r.modelo || '—'}</td>
+      <td style="${tdB}font-family:monospace;color:#334155;">${r.dataVenda || '—'}</td>
+      <td style="${tdB}color:#334155;">${r.transacao || '—'}</td>
+      <td style="${tdB}text-align:right;${numColor(vv)}">${fmtBRL(vv)}</td>
+      <td style="${tdB}text-align:right;${numColor(vc)}">${fmtBRL(vc)}</td>
+      <td style="${tdB}text-align:right;${numColor(r._d.bonus)}">${fmtBRL(r._d.bonus)}</td>
+      <td style="${tdB}text-align:right;${numColor(r._d.lucroBruto)}">${fmtBRL(r._d.lucroBruto)}</td>
+      <td style="${tdB}text-align:right;${numColor(r._d.lucroBrutoPct)}">${fmtPct(r._d.lucroBrutoPct)}</td>
+      <td style="${tdB}text-align:right;${numColor(comV)}">${linha ? fmtBRL(comV) : none}</td>
+      <td style="${tdB}text-align:right;${numColor(comLB)}">${linha ? fmtBRL(comLB) : none}</td>
+      <td style="${tdB}text-align:right;font-weight:600;${numColor(total)}">${linha ? fmtBRL(total) : none}</td>
+    </tr>`;
+  }).join('');
+
+  const pagoBadge = pago
+    ? 'background:#d1fae5;color:#065f46;border:1px solid #6ee7b7'
+    : 'background:#fef3c7;color:#92400e;border:1px solid #fcd34d';
+
+  return `<div style="page-break-after:${isLast ? 'avoid' : 'always'};padding-bottom:${isLast ? '0' : '12px'}">
+  <div style="background:#1e293b;color:white;border-radius:10px;overflow:hidden;margin-bottom:8px;">
+    <div style="padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <p style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin:0 0 3px;">${demoTitle}</p>
+        <p style="font-size:15px;font-weight:700;margin:0 0 3px;">${vendedor}</p>
+        <p style="font-size:11px;color:#cbd5e1;margin:0;">${tabLabel}</p>
+      </div>
+      <div style="text-align:right;">
+        <p style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin:0 0 3px;">Competência</p>
+        <p style="font-size:15px;font-weight:700;margin:0 0 3px;">${competencia}</p>
+        <p style="font-size:9px;color:#94a3b8;margin:0;">Período: ${periodoLabel}</p>
+      </div>
+    </div>
+    <div style="background:#0f172a;padding:6px 18px;display:flex;align-items:center;gap:8px;">
+      <span style="${pagoBadge};padding:2px 8px;border-radius:20px;font-size:7.5px;font-weight:700;">${pago ? 'Pago' : 'Pendente'}</span>
+      <span style="background:#f8fafc;color:#475569;border:1px solid #e2e8f0;padding:2px 8px;border-radius:20px;font-size:7.5px;font-weight:600;">${cntLabel}${cntDetail} no período</span>
+    </div>
+  </div>
+  <table style="width:100%;border-collapse:collapse;">
+    <thead><tr>
+      <th style="${thS('#334155')}">Chassi</th>
+      <th style="${thS('#334155')}">Modelo</th>
+      <th style="${thS('#334155')}">Data Venda</th>
+      <th style="${thS('#334155')}">Transação</th>
+      <th style="${thS('#065f46', 'right')}">Vl. Venda</th>
+      <th style="${thS('#065f46', 'right')}">Vl. Custo</th>
+      <th style="${thS('#065f46', 'right')}">Bônus</th>
+      <th style="${thS('#0f766e', 'right')}">Lc. Bruto</th>
+      <th style="${thS('#0f766e', 'right')}">% LB</th>
+      <th style="${thS('#6d28d9', 'right')}">Com. Venda</th>
+      <th style="${thS('#6d28d9', 'right')}">Com. LB</th>
+      <th style="${thS('#6d28d9', 'right')}">Total</th>
+    </tr></thead>
+    <tbody>${rowsHtml}</tbody>
+    <tfoot><tr>
+      <td colspan="3" style="${tfB}text-align:left;">Total — ${cntLabel}${cntDetail}</td>
+      <td style="${tfB}"></td>
+      <td style="${tfB}">${fmtBRL(totVenda)}</td>
+      <td style="${tfB}">${fmtBRL(totCusto)}</td>
+      <td style="${tfB}">${fmtBRL(totBonus)}</td>
+      <td style="${tfB}">${fmtBRL(totLB)}</td>
+      <td style="${tfB}">${fmtPct(totLBPct)}</td>
+      <td style="${tfB}">${hasComissao ? fmtBRL(totComV) : '—'}</td>
+      <td style="${tfB}">${hasComissao ? fmtBRL(totComLB) : '—'}</td>
+      <td style="${tfB}font-size:9px;">${hasComissao ? fmtBRL(totComV + totComLB) : '—'}</td>
+    </tr></tfoot>
+  </table>
+</div>`;
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface ComissoesCalculoViewProps {
   tab: 'novos' | 'usados';
@@ -58,6 +209,12 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
   const [saving,  setSaving]  = useState(false);
   const [saved,   setSaved]   = useState(false);
 
+  // Bloqueio do período
+  const [bloqueado,       setBloqueado]       = useState(false);
+  const [showUnlockInput, setShowUnlockInput] = useState(false);
+  const [unlockPass,      setUnlockPass]      = useState('');
+  const [unlockError,     setUnlockError]     = useState<string | null>(null);
+
   // Dados
   const [rows, setRows]               = useState<VendasResultadoRow[]>([]);
   const [remuneracao, setRemuneracao] = useState<RemuneracaoData | null>(null);
@@ -66,6 +223,9 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
 
   // Navegação para demonstrativo
   const [selectedVendedor, setSelectedVendedor] = useState<string | null>(null);
+
+  // Bulk print
+  const [printingAll, setPrintingAll] = useState(false);
 
   // Carrega tudo ao montar / trocar aba
   useEffect(() => {
@@ -90,23 +250,108 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
     const stored = periodoMap[periodoKey(filterYear, filterMonth)];
     setEditDe(stored?.de  ?? '');
     setEditAte(stored?.ate ?? '');
+    setBloqueado(stored?.bloqueado ?? false);
     setSaved(false);
     setSelectedVendedor(null);
+    setShowUnlockInput(false);
+    setUnlockPass('');
+    setUnlockError(null);
   }, [filterMonth, filterYear, periodoMap]);
 
   async function handleSave() {
     if (filterMonth === null) return;
     setSaving(true);
     try {
-      await savePeriodo(tab, filterYear, filterMonth, { de: editDe, ate: editAte });
-      setPeriodoMap(prev => ({
-        ...prev,
-        [periodoKey(filterYear, filterMonth)]: { de: editDe, ate: editAte },
-      }));
+      const p: PeriodoApuracao = { de: editDe, ate: editAte, bloqueado };
+      await savePeriodo(tab, filterYear, filterMonth, p);
+      setPeriodoMap(prev => ({ ...prev, [periodoKey(filterYear, filterMonth)]: p }));
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleLock() {
+    if (filterMonth === null || !editDe || !editAte) return;
+    setSaving(true);
+    try {
+      const p: PeriodoApuracao = { de: editDe, ate: editAte, bloqueado: true };
+      await savePeriodo(tab, filterYear, filterMonth, p);
+      setPeriodoMap(prev => ({ ...prev, [periodoKey(filterYear, filterMonth)]: p }));
+      setBloqueado(true);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUnlock() {
+    if (filterMonth === null) return;
+    if (unlockPass !== '1985') { setUnlockError('Senha incorreta.'); return; }
+    setSaving(true);
+    try {
+      const p: PeriodoApuracao = { de: editDe, ate: editAte, bloqueado: false };
+      await savePeriodo(tab, filterYear, filterMonth, p);
+      setPeriodoMap(prev => ({ ...prev, [periodoKey(filterYear, filterMonth)]: p }));
+      setBloqueado(false);
+      setShowUnlockInput(false);
+      setUnlockPass('');
+      setUnlockError(null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handlePrintAll() {
+    if (!remuneracao || filterMonth === null || vendedoresMap.length === 0) return;
+    setPrintingAll(true);
+    try {
+      const pk         = `${filterYear}-${filterMonth}`;
+      const competencia = `${MONTH_NAMES[filterMonth - 1]} de ${filterYear}`;
+      const lancs       = await loadLancamentos(tab);
+
+      const html = vendedoresMap.map(([vendedor, vRows], idx) =>
+        buildSellerPrintHtml({
+          vendedor,
+          vRows,
+          lancamento:  lancs[pk]?.[vendedor],
+          tab,
+          competencia,
+          periodoLabel: savedPeriodo?.de && savedPeriodo?.ate
+            ? `${fmtDate(savedPeriodo.de)} a ${fmtDate(savedPeriodo.ate)}`
+            : '',
+          isLast: idx === vendedoresMap.length - 1,
+        })
+      ).join('');
+
+      const root = document.getElementById('print-root');
+      if (!root) { window.print(); return; }
+      root.innerHTML = `<div style="font-family:Inter,system-ui,sans-serif;">${html}</div>`;
+
+      const style = document.createElement('style');
+      style.textContent = `
+        @page { size: A4 portrait; margin: 1cm; }
+        #print-root { font-family: Inter, system-ui, sans-serif; zoom: 73%; }
+        #print-root, #print-root * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          forced-color-adjust: none !important;
+          color-scheme: light !important;
+        }
+      `;
+      document.head.appendChild(style);
+
+      window.onafterprint = () => {
+        document.head.removeChild(style);
+        root.innerHTML = '';
+        window.onafterprint = null;
+        setPrintingAll(false);
+      };
+      window.print();
+    } catch {
+      setPrintingAll(false);
     }
   }
 
@@ -230,8 +475,13 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
             <input
               type="date"
               value={editDe}
+              disabled={bloqueado}
               onChange={e => { setEditDe(e.target.value); setSaved(false); }}
-              className="border border-emerald-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className={`border rounded-lg px-2.5 py-1 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
+                bloqueado
+                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-white border-emerald-200'
+              }`}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -239,13 +489,18 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
             <input
               type="date"
               value={editAte}
+              disabled={bloqueado}
               onChange={e => { setEditAte(e.target.value); setSaved(false); }}
-              className="border border-emerald-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className={`border rounded-lg px-2.5 py-1 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
+                bloqueado
+                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-white border-emerald-200'
+              }`}
             />
           </div>
           <button
             onClick={handleSave}
-            disabled={saving || !editDe || !editAte}
+            disabled={saving || !editDe || !editAte || bloqueado}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
               saved
                 ? 'bg-emerald-600 text-white'
@@ -257,6 +512,63 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
               : <><Save className="w-3.5 h-3.5" /> Salvar</>
             }
           </button>
+
+          {/* ── Cadeado ──────────────────────────────────────────────────── */}
+          <div className="w-px h-4 bg-emerald-200" />
+          {bloqueado ? (
+            <button
+              onClick={() => { setShowUnlockInput(v => !v); setUnlockError(null); setUnlockPass(''); }}
+              title="Período bloqueado — clique para desbloquear"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition-colors"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              Bloqueado
+            </button>
+          ) : (
+            <button
+              onClick={handleLock}
+              disabled={saving || !editDe || !editAte}
+              title="Clique para bloquear o período"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <LockOpen className="w-3.5 h-3.5" />
+              Bloquear
+            </button>
+          )}
+
+          {/* Campo de senha inline para desbloquear */}
+          {showUnlockInput && (
+            <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1 shadow-sm">
+              <input
+                type="password"
+                value={unlockPass}
+                autoFocus
+                placeholder="Senha"
+                onChange={e => { setUnlockPass(e.target.value); setUnlockError(null); }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleUnlock();
+                  if (e.key === 'Escape') { setShowUnlockInput(false); setUnlockPass(''); setUnlockError(null); }
+                }}
+                className="w-24 text-xs text-slate-700 bg-transparent focus:outline-none"
+              />
+              <button
+                onClick={handleUnlock}
+                disabled={saving}
+                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 disabled:opacity-40"
+              >
+                OK
+              </button>
+              <button
+                onClick={() => { setShowUnlockInput(false); setUnlockPass(''); setUnlockError(null); }}
+                className="text-slate-400 hover:text-slate-600 text-xs leading-none"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {unlockError && (
+            <span className="text-xs text-red-600 font-medium">{unlockError}</span>
+          )}
         </div>
       )}
 
@@ -295,6 +607,16 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
               <span className="text-sm text-slate-500">
                 {periodRows.length} {periodRows.length === 1 ? 'venda' : 'vendas'} no período
               </span>
+              <div className="ml-auto">
+                <button
+                  onClick={handlePrintAll}
+                  disabled={printingAll}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  {printingAll ? 'Gerando...' : 'Imprimir PDF'}
+                </button>
+              </div>
             </div>
 
             {/* Cards de vendedores */}
