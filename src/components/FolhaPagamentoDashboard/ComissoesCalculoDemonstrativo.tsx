@@ -71,6 +71,8 @@ export function ComissoesCalculoDemonstrativo({
   const modal       = remuneracao[tab];
   const competencia = `${MONTH_NAMES[month - 1]} de ${year}`;
   const pk          = `${year}-${month}`;
+  const txVenda     = tab === 'usados' ? 'U21' : 'V21';  // transação de venda
+  const txDevol     = tab === 'usados' ? 'U07' : 'V07';  // transação de devolução
 
   // ── Estado de lançamentos ──────────────────────────────────────────────────
   const [lancamentosMap,    setLancamentosMap]    = useState<LancamentosMap>({});
@@ -148,10 +150,9 @@ export function ComissoesCalculoDemonstrativo({
     });
   }, [tab]);
 
-  // ── Auto-cálculo de comissões para Veículos Novos ─────────────────────────
+  // ── Auto-cálculo de comissões (Novos e Usados) ──────────────────────────────
   useEffect(() => {
     if (!lancamentosLoaded) return;
-    if (tab !== 'novos') return;
     if (derivedRows.length === 0) return;
 
     const pctLB        = parseFloat(String(modal.comissaoLucroBruto ?? '').replace(',', '.'));
@@ -171,9 +172,9 @@ export function ComissoesCalculoDemonstrativo({
     const onlyFillComVenda = !!existing && !hasManualComVenda;
     if (onlyFillComVenda && !temPctVenda) return;        // sem % configurado para comVenda
 
-    // ── Bônus de produtividade (volume líquido V21 − V07) ──────────────────
-    const countV21 = derivedRows.filter(r => r.transacao === 'V21').length;
-    const countV07 = derivedRows.filter(r => r.transacao === 'V07').length;
+    // ── Bônus de produtividade (volume líquido vendas − devoluções) ──────────
+    const countV21 = derivedRows.filter(r => r.transacao === txVenda).length;
+    const countV07 = derivedRows.filter(r => r.transacao === txDevol).length;
     const netCount  = countV21 - countV07;
     let bonusPct = 0;
     if (modal.faixasBonus?.length > 0) {
@@ -192,7 +193,7 @@ export function ComissoesCalculoDemonstrativo({
       const key  = r.chassi || String(ri);
       const lb   = r._d.lucroBruto;
       const vv   = n(r.valorVenda);
-      const sign = r.transacao === 'V07' ? -1 : 1;
+      const sign = r.transacao === txDevol ? -1 : 1;
       linhas[key] = {
         comVenda: pctVenda > 0 ? sign * vv * (pctVenda / 100) : 0,
         comLB: onlyFillComVenda
@@ -320,9 +321,9 @@ export function ComissoesCalculoDemonstrativo({
     let hasComissao = false;
     let countV21 = 0, countV07 = 0;
     derivedRows.forEach((r, ri) => {
-      const sign = r.transacao === 'V07' ? -1 : 1;
-      if (r.transacao === 'V21') countV21++;
-      if (r.transacao === 'V07') countV07++;
+      const sign = r.transacao === txDevol ? -1 : 1;
+      if (r.transacao === txVenda) countV21++;
+      if (r.transacao === txDevol) countV07++;
       totVenda += sign * n(r.valorVenda);
       totCusto += sign * n(r.valorCusto);
       totBonus += sign * r._d.bonus;
@@ -345,11 +346,10 @@ export function ComissoesCalculoDemonstrativo({
       totTotal: hasComissao ? totComV + totComLB : null,
       countV21, countV07, netCount,
     };
-  }, [derivedRows, lancamento, editMode, editValues]);
+  }, [derivedRows, lancamento, editMode, editValues, txVenda, txDevol]);
 
   // ── Faixa de bônus ativa para o período ─────────────────────────────────
   const bonusFaixaAtual = useMemo(() => {
-    if (tab !== 'novos') return null;
     if (!modal.faixasBonus?.length) return null;
     const faixa = modal.faixasBonus.find(f => {
       const de  = parseInt(f.de)  || 0;
