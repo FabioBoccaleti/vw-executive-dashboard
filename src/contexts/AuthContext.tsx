@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { SessionPayload, ModuleId, BrandId, VendasSubModuleId, FolhaSubModuleId } from '@/lib/authTypes';
+import type { SessionPayload, ModuleId, BrandId, VendasSubModuleId, FolhaSubModuleId, CentralVendasVWSubModuleId } from '@/lib/authTypes';
 import { getSessionToken, saveSession, clearSession, apiLogin, apiLogout } from '@/lib/authClient';
 import { AuthContext } from './authContextDef';
 import type { AuthContextValue } from './authContextDef';
@@ -88,12 +88,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (session.folhaSubModules ?? []).includes(sub);
   }, [session]);
 
+  const canAccessCentralVendasVWSub = useCallback((sub: CentralVendasVWSubModuleId): boolean => {
+    if (!session) return false;
+    if (session.role === 'admin') return true;
+    return (session.centralVendasVWSubModules ?? []).includes(sub);
+  }, [session]);
+
   const isAdmin = useCallback((): boolean => {
     return session?.role === 'admin';
   }, [session]);
 
   return (
-    <AuthContext.Provider value={{ session, isLoading, login, logout, canAccessModule, canAccessBrand, canAccessVendasSub, canAccessFolhaSub, isAdmin }}>
+    <AuthContext.Provider value={{ session, isLoading, login, logout, canAccessModule, canAccessBrand, canAccessVendasSub, canAccessFolhaSub, canAccessCentralVendasVWSub, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

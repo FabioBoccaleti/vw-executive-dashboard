@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag, TrendingUp, BarChart2, TrendingDown, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker as createTesseractWorker } from 'tesseract.js';
+import { useAuth } from '@/contexts/useAuth';
 import { TabelaDadosDashboard } from './TabelaDadosDashboard';
 import { RegistroVendasDashboard } from './RegistroVendasDashboard';
 import { BonusVarejoDashboard } from './BonusVarejoDashboard';
@@ -447,8 +448,35 @@ function pdfResultsToTableRows(pages: PageResult[]): Omit<TabelaDadosRow, 'id'>[
 
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { canAccessCentralVendasVWSub } = useAuth();
+
+  const canCadastros  = canAccessCentralVendasVWSub('central_vw.cadastros');
+  const canRegistros  = canAccessCentralVendasVWSub('central_vw.registros');
+  const canFinanceiro = canAccessCentralVendasVWSub('central_vw.financeiro');
+  const canVendas     = canAccessCentralVendasVWSub('central_vw.vendas');
+  const canAnalises   = canAccessCentralVendasVWSub('central_vw.analises');
+  const canResumo     = canAccessCentralVendasVWSub('central_vw.resumo');
+
   const [mainView, setMainView] = useState<'cadastros' | 'manual' | 'registros' | 'financeiro' | 'vendas' | 'analises' | 'resumo'>('resumo');
   const [analiseTab, setAnaliseTab] = useState<'novos' | 'usados' | 'direta' | 'pecas' | 'oficina'>('novos');
+
+  // Redireciona para a primeira aba permitida se a aba atual não for acessível
+  useEffect(() => {
+    const viewPermMap: Record<typeof mainView, boolean> = {
+      resumo:     canResumo,
+      analises:   canAnalises,
+      vendas:     canVendas,
+      financeiro: canFinanceiro,
+      registros:  canRegistros,
+      manual:     canRegistros,
+      cadastros:  canCadastros,
+    };
+    if (!viewPermMap[mainView]) {
+      const first = (['resumo', 'analises', 'vendas', 'financeiro', 'registros', 'manual', 'cadastros'] as const)
+        .find(v => viewPermMap[v]);
+      if (first) setMainView(first);
+    }
+  }, [mainView, canResumo, canAnalises, canVendas, canFinanceiro, canRegistros, canCadastros]);
   const [activeTab, setActiveTab] = useState<'guia' | 'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros'>('importar');
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
   const [registroFilterYear, setRegistroFilterYear] = useState<number>(new Date().getFullYear());
@@ -556,6 +584,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
         <div className="flex items-center gap-3">
           {/* Seletor de visão principal */}
           <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
+            {canCadastros && (
             <button
               onClick={() => setMainView('cadastros')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -565,6 +594,8 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
               <ClipboardList className="w-3.5 h-3.5" />
               Cadastros
             </button>
+            )}
+            {canRegistros && (
             <button
               onClick={() => setMainView('manual')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -574,6 +605,8 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
               <BookOpen className="w-3.5 h-3.5" />
               Manual de Relatórios
             </button>
+            )}
+            {canRegistros && (
             <button
               onClick={() => setMainView('registros')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -583,6 +616,8 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
               <Archive className="w-3.5 h-3.5" />
               Registros
             </button>
+            )}
+            {canFinanceiro && (
             <button
               onClick={() => setMainView('financeiro')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -592,6 +627,8 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
               <Banknote className="w-3.5 h-3.5" />
               Financeiro
             </button>
+            )}
+            {canVendas && (
             <button
               onClick={() => setMainView('vendas')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -601,6 +638,8 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
               <TrendingUp className="w-3.5 h-3.5" />
               Vendas
             </button>
+            )}
+            {canAnalises && (
             <button
               onClick={() => setMainView('analises')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -610,6 +649,8 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
               <BarChart2 className="w-3.5 h-3.5" />
               Análises
             </button>
+            )}
+            {canResumo && (
             <button
               onClick={() => setMainView('resumo')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -619,6 +660,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
               <TrendingDown className="w-3.5 h-3.5" />
               Resumo
             </button>
+            )}
           </div>
           <button
             onClick={onBack}
