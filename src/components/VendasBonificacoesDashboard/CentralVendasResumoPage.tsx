@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { kvGet, kvSet } from '@/lib/kvClient';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, Cell,
@@ -150,6 +151,16 @@ export function CentralVendasResumoPage() {
   // Dias úteis editável
   const [diasUteis, setDiasUteis] = useState(22);
 
+  // Carrega/salva diasUteis no KV por mês/ano
+  const diasUteisKey = `resumo:diasUteis:${year}-${String(month).padStart(2, '0')}`;
+  useEffect(() => {
+    kvGet<number>(diasUteisKey).then(v => {
+      if (v !== null && v > 0) setDiasUteis(v);
+      else setDiasUteis(22);
+    });
+  }, [diasUteisKey]);
+  const saveDiasUteis = (v: number) => kvSet(diasUteisKey, v);
+
   // Dados brutos
   const [rowsNovos,   setRowsNovos]   = useState<VendasResultadoRow[]>([]);
   const [rowsUsados,  setRowsUsados]  = useState<VendasResultadoRow[]>([]);
@@ -221,8 +232,11 @@ export function CentralVendasResumoPage() {
         const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
         return y === yr && m === mo && serie !== 'RPS';
       });
-      let pecasRecBruta = 0;
-      for (const r of pecasRows) { pecasRecBruta += n(r.data['LIQ_NOTA_FISCAL']); }
+      let pecasRecBruta = 0, pecasLb = 0;
+      for (const r of pecasRows) {
+        pecasRecBruta += n(r.data['LIQ_NOTA_FISCAL']);
+        pecasLb       += calcPecasRow(r.data).lb;
+      }
 
       // — Oficina — depts 104+122, somente RPS (igual ao VServicosAnalise)
       const oficinaRows = rowsVPecas.filter(r => {
@@ -277,7 +291,7 @@ export function CentralVendasResumoPage() {
         make('novos',      'Novos',         novosVol,            novosRecBruta,     novosLb,     true),
         make('usados',     'Usados',        usadosVol,           usadosRecBruta,    usadosLb,    true),
         make('direta',     'VD / Frotista', diretaVol,           diretaRecBruta,    diretaLb,    true),
-        make('pecas',      'Peças',         pecasRows.length,    pecasRecBruta,     null,         false),
+        make('pecas',      'Peças',         pecasRows.length,    pecasRecBruta,     pecasLb,     true),
         make('oficina',    'Oficina',       oficinaRows.length,  oficinaRecBruta,   null,         false),
         make('funilaria',  'Funilaria',     funitariaRows.length, funitariaRecBruta, null,        false),
         make('acessorios', 'Acessórios',    acessoriosRows.length, acessoriosRecBruta, null,      false),
@@ -450,6 +464,7 @@ export function CentralVendasResumoPage() {
             max={31}
             value={diasUteis}
             onChange={e => setDiasUteis(Math.max(1, Number(e.target.value)))}
+            onBlur={e => saveDiasUteis(Math.max(1, Number(e.target.value)))}
             className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 w-16 text-center focus:outline-none focus:ring-2 focus:ring-blue-300"
           />
         </div>
@@ -718,12 +733,9 @@ export function CentralVendasResumoPage() {
                 <tr className="bg-slate-800 text-white">
                   <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wide">Departamento</th>
                   <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">Qtde</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">Receita Líq. Mês</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">LB (R$)</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">LB%</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">Receita Mês</th>
                   <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">Rec. / Dia Útil</th>
                   <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">Mês Anterior</th>
-                  <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">LB% Ant.</th>
                   <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">Δ R$</th>
                   <th className="text-right px-4 py-3 text-xs font-bold uppercase tracking-wide">Δ%</th>
                 </tr>
@@ -760,31 +772,10 @@ export function CentralVendasResumoPage() {
                         {fmtBRL(dept.recLiq)}
                       </td>
                       <td className="px-4 py-3 text-right text-slate-600 tabular-nums">
-                        {dept.hasLB ? fmtBRL(dept.lb) : <span className="text-slate-300 text-xs">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {dept.hasLB ? (
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold border ${lbBg(dept.lbPct)}`}>
-                            {fmtPct(dept.lbPct)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right text-slate-600 tabular-nums">
                         {fmtBRL(dept.recDia)}
                       </td>
                       <td className="px-4 py-3 text-right text-slate-500 tabular-nums">
                         {fmtBRL(prev.recLiq)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {prev.hasLB ? (
-                          <span className={`inline-block px-1.5 py-0.5 rounded-full text-xs font-bold border ${lbBg(prev.lbPct)}`}>
-                            {fmtPct(prev.lbPct)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 text-xs">—</span>
-                        )}
                       </td>
                       <td className={`px-4 py-3 text-right tabular-nums font-semibold ${delta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                         {delta >= 0 ? '+' : ''}{fmtBRL(delta)}
@@ -823,11 +814,8 @@ export function CentralVendasResumoPage() {
                           {withLB.reduce((s, d) => s + d.vol, 0).toLocaleString('pt-BR')}
                         </td>
                         <td className="px-4 py-2.5 text-right font-bold text-blue-900 tabular-nums">{fmtBRL(subRec)}</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-blue-800 tabular-nums">{fmtBRL(subLb)}</td>
-                        <td className="px-4 py-2.5 text-right"></td>
                         <td className="px-4 py-2.5 text-right text-blue-700 tabular-nums">{fmtBRL(subDia)}</td>
                         <td className="px-4 py-2.5 text-right text-blue-600 tabular-nums">{fmtBRL(subRecPrev)}</td>
-                        <td className="px-4 py-2.5 text-right"></td>
                         <td className={`px-4 py-2.5 text-right tabular-nums font-semibold text-xs ${subDelta >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                           {subDelta >= 0 ? '+' : ''}{fmtBRL(subDelta)}
                         </td>
@@ -845,11 +833,8 @@ export function CentralVendasResumoPage() {
                     {deptsCurrent.reduce((s, d) => s + d.vol, 0).toLocaleString('pt-BR')}
                   </td>
                   <td className="px-4 py-3 text-right font-black text-base tabular-nums">{fmtBRL(totalRecLiqCurrent)}</td>
-                  <td className="px-4 py-3 text-right font-bold tabular-nums">{fmtBRL(totalLbCurrent)}</td>
-                  <td className="px-4 py-3 text-right"></td>
                   <td className="px-4 py-3 text-right font-bold tabular-nums">{fmtBRL(recDiaTotal)}</td>
                   <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{fmtBRL(totalRecLiqPrev)}</td>
-                  <td className="px-4 py-3 text-right"></td>
                   <td className={`px-4 py-3 text-right font-bold tabular-nums ${deltaRecLiq >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
                     {deltaRecLiq >= 0 ? '+' : ''}{fmtBRL(deltaRecLiq)}
                   </td>
