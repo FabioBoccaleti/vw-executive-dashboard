@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, Save, Check, ChevronRight, RefreshCw, Lock, LockOpen, Printer, PenLine, ShieldCheck } from 'lucide-react';
+import { ChevronDown, Save, Check, ChevronRight, RefreshCw, Lock, LockOpen, Printer, PenLine, ShieldCheck, UserX, UserCheck } from 'lucide-react';
+import { kvGet, kvSet } from '@/lib/kvClient';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/useAuth';
 import { apiLogin } from '@/lib/authClient';
@@ -299,6 +300,20 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
   // Navegação para demonstrativo
   const [selectedVendedor, setSelectedVendedor] = useState<string | null>(null);
 
+  // Vendedores inativos (global por tab, persiste no KV)
+  const [inativosSet, setInativosSet] = useState<Set<string>>(new Set());
+  const inativosKey = `comissoes:inativos:${tab}`;
+  useEffect(() => {
+    kvGet<string[]>(inativosKey).then(v => setInativosSet(new Set(v ?? [])));
+  }, [inativosKey]);
+  async function toggleInativo(vendedor: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    const next = new Set(inativosSet);
+    if (next.has(vendedor)) next.delete(vendedor); else next.add(vendedor);
+    setInativosSet(next);
+    await kvSet(inativosKey, [...next]);
+  }
+
   // Bulk print
   const [printingAll, setPrintingAll] = useState(false);
 
@@ -407,7 +422,7 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
       const competencia = `${MONTH_NAMES[filterMonth - 1]} de ${filterYear}`;
       const lancs       = await loadLancamentos(tab);
 
-      const html = vendedoresMap.map(([vendedor, vRows], idx) =>
+      const html = vendedoresMap.filter(([v]) => !inativosSet.has(v)).map(([vendedor, vRows], idx, arr) =>
         buildSellerPrintHtml({
           vendedor,
           vRows,
@@ -417,7 +432,7 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
           periodoLabel: savedPeriodo?.de && savedPeriodo?.ate
             ? `${fmtDate(savedPeriodo.de)} a ${fmtDate(savedPeriodo.ate)}`
             : '',
-          isLast: idx === vendedoresMap.length - 1,
+          isLast: idx === arr.length - 1,
         })
       ).join('');
 
@@ -734,6 +749,7 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
         periodoLabel={periodoLabel}
         year={filterYear}
         month={filterMonth}
+        isInativo={inativosSet.has(selectedVendedor)}
         onBack={() => {
           setSelectedVendedor(null);
           loadLancamentos(tab).then(setLancamentosMap);
@@ -1015,19 +1031,26 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
                 ? lancamentosMap[`${filterYear}-${filterMonth}`]?.[vendedor]
                 : undefined;
               const pago = lanc?.pago ?? false;
+              const inativo = inativosSet.has(vendedor);
               return (
                 <button
                   key={vendedor}
                   onClick={() => setSelectedVendedor(vendedor)}
-                  className="w-full text-left bg-white rounded-xl border border-slate-200 px-5 py-4 hover:border-slate-300 hover:shadow-sm transition-all flex items-center gap-4"
+                  className={`w-full text-left rounded-xl border px-5 py-4 hover:shadow-sm transition-all flex items-center gap-4 ${
+                    inativo
+                      ? 'bg-slate-50 border-slate-200 opacity-70'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
+                  }`}
                 >
                   {/* Avatar com inicial */}
-                  <div className="w-9 h-9 rounded-full bg-slate-700 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                    inativo ? 'bg-slate-400 text-white' : 'bg-slate-700 text-white'
+                  }`}>
                     {vendedor.trim().charAt(0).toUpperCase()}
                   </div>
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{vendedor}</p>
+                    <p className={`text-sm font-semibold truncate ${inativo ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{vendedor}</p>
                     <p className="text-xs text-slate-400 mt-0.5">
                       {tab === 'novos' ? 'Veículos Novos' : 'Veículos Usados'}
                       {' · '}
@@ -1035,21 +1058,43 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
                     </p>
                   </div>
                   {/* Status */}
-                  <span className={`px-3 py-1 rounded-full border text-xs font-semibold whitespace-nowrap flex-shrink-0 ${
-                    pago
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                      : 'bg-amber-50 border-amber-200 text-amber-700'
-                  }`}>
-                    {pago ? 'Pago' : 'Pendente'}
-                  </span>
+                  {inativo ? (
+                    <span className="px-3 py-1 rounded-full border text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-slate-100 border-slate-300 text-slate-500">
+                      Inativo
+                    </span>
+                  ) : (
+                    <span className={`px-3 py-1 rounded-full border text-xs font-semibold whitespace-nowrap flex-shrink-0 ${
+                      pago
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : 'bg-amber-50 border-amber-200 text-amber-700'
+                    }`}>
+                      {pago ? 'Pago' : 'Pendente'}
+                    </span>
+                  )}
                   {/* Data de pagamento ou placeholder */}
-                  {pago && lanc?.dataPagamento ? (
+                  {pago && lanc?.dataPagamento && !inativo ? (
                     <span className="text-xs text-emerald-500 whitespace-nowrap flex-shrink-0">
                       {fmtDate(lanc.dataPagamento)}
                     </span>
                   ) : (
                     <span className="text-xs text-slate-300 whitespace-nowrap flex-shrink-0">—</span>
                   )}
+                  {/* Botão inativar/reativar */}
+                  <button
+                    disabled={pago}
+                    onClick={e => { if (!pago) toggleInativo(vendedor, e); else e.stopPropagation(); }}
+                    title={pago ? 'Não é possível alterar o status de um vendedor com pagamento confirmado' : inativo ? 'Reativar vendedor' : 'Marcar como inativo'}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors flex-shrink-0 ${
+                      pago
+                        ? 'bg-slate-50 border-slate-150 text-slate-300 cursor-not-allowed'
+                        : inativo
+                          ? 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100 hover:border-red-300'
+                          : 'bg-white border-slate-200 text-slate-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600'
+                    }`}
+                  >
+                    {inativo ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                    {inativo ? 'Reativar' : 'Inativar'}
+                  </button>
                   <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
                 </button>
               );

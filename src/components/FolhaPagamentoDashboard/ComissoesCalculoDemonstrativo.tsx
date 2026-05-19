@@ -102,12 +102,13 @@ interface Props {
   periodoLabel:   string;
   year:           number;
   month:          number;
+  isInativo?:     boolean;
   onBack:         () => void;
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 export function ComissoesCalculoDemonstrativo({
-  vendedor, rows, tab, remuneracao, periodoLabel, year, month, onBack,
+  vendedor, rows, tab, remuneracao, periodoLabel, year, month, isInativo, onBack,
 }: Props) {
   const tabLabel    = tab === 'usados' ? 'Veículos Usados' : 'Veículos Novos';
   const modal       = remuneracao[tab];
@@ -607,6 +608,11 @@ export function ComissoesCalculoDemonstrativo({
                 </p>
                 <h2 className="text-xl font-bold leading-tight">{fixVendedorName(vendedor)}</h2>
                 <p className="text-sm text-slate-300 mt-1">{tabLabel}</p>
+                {isInativo && (
+                  <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full bg-slate-600 border border-slate-500 text-slate-200 text-xs font-semibold">
+                    Vendedor Inativo — Comissões zeradas
+                  </span>
+                )}
               </div>
               <div className="text-right flex-shrink-0">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
@@ -723,7 +729,7 @@ export function ComissoesCalculoDemonstrativo({
                           </td>
                         ) : (
                           <td className={`${tdBase} ${bg} text-right`}>
-                            {linha ? (
+                            {isInativo ? <NumCell value={0} /> : linha ? (
                               <div className="flex flex-col items-end gap-0.5">
                                 <NumCell value={linha.comVenda} />
                                 {tab === 'usados' && linha.comVenda !== 0 && n(r.valorVenda) !== 0 && (
@@ -747,11 +753,11 @@ export function ComissoesCalculoDemonstrativo({
                           </td>
                         ) : (
                           <td className={`${tdBase} ${bg} text-right`}>
-                            {linha ? <NumCell value={linha.comLB} /> : <span className="text-slate-300">—</span>}
+                            {isInativo ? <NumCell value={0} /> : linha ? <NumCell value={linha.comLB} /> : <span className="text-slate-300">—</span>}
                           </td>
                         )}
                         <td className={`${tdBase} ${bg} text-right`}>
-                          {hasVal ? <NumCell value={cvVal + clVal} /> : <span className="text-slate-300">—</span>}
+                          {isInativo ? <NumCell value={0} /> : hasVal ? <NumCell value={cvVal + clVal} /> : <span className="text-slate-300">—</span>}
                         </td>
                       </tr>
                     );
@@ -776,13 +782,13 @@ export function ComissoesCalculoDemonstrativo({
                         {fmtPct(totals.totLBPct)}
                       </td>
                       <td className="px-2 py-2.5 text-right font-mono">
-                        {totals.totComV !== null ? fmtBRL(totals.totComV) : '—'}
+                        {isInativo ? fmtBRL(0) : totals.totComV !== null ? fmtBRL(totals.totComV) : '—'}
                       </td>
                       <td className="px-2 py-2.5 text-right font-mono">
-                        {totals.totComLB !== null ? fmtBRL(totals.totComLB) : '—'}
+                        {isInativo ? fmtBRL(0) : totals.totComLB !== null ? fmtBRL(totals.totComLB) : '—'}
                       </td>
-                      <td className={`px-2 py-2.5 text-right font-mono ${totals.totTotal !== null && totals.totTotal < 0 ? 'text-red-300' : ''}`}>
-                        {totals.totTotal !== null ? fmtBRL(totals.totTotal) : '—'}
+                      <td className={`px-2 py-2.5 text-right font-mono ${!isInativo && totals.totTotal !== null && totals.totTotal < 0 ? 'text-red-300' : ''}`}>
+                        {isInativo ? fmtBRL(0) : totals.totTotal !== null ? fmtBRL(totals.totTotal) : '—'}
                       </td>
                     </tr>
                   </tfoot>
