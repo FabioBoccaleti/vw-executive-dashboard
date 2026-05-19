@@ -199,7 +199,7 @@ export function CentralVendasResumoPage() {
   const calcMonth = useMemo(() => {
     return (yr: number, mo: number): DeptResult[] => {
       // — Novos — (Receita Bruta = valorVenda, igual ao Evolução Diária de Novos)
-      const novosRows = rowsNovos.filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === yr && m === mo; });
+      const novosRows = rowsNovos.filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === yr && m === mo && getDiaVenda(r) > 0; });
       let novosRecBruta = 0, novosLb = 0;
       for (const r of novosRows) {
         novosRecBruta += n(r.valorVenda);
@@ -208,7 +208,7 @@ export function CentralVendasResumoPage() {
       const novosVol = novosRows.filter(r => r.transacao !== 'V07').length;
 
       // — Usados — (Receita Bruta = valorVenda, igual ao Evolução Diária de Usados)
-      const usadosRows = rowsUsados.filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === yr && m === mo; });
+      const usadosRows = rowsUsados.filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === yr && m === mo && getDiaVenda(r) > 0; });
       let usadosRecBruta = 0, usadosLb = 0;
       for (const r of usadosRows) {
         usadosRecBruta += n(r.valorVenda);
@@ -217,7 +217,7 @@ export function CentralVendasResumoPage() {
       const usadosVol = usadosRows.filter(r => r.transacao !== 'U07').length;
 
       // — VD / Frotista — (Receita Bruta = valorVenda)
-      const diretaRows = rowsDireta.filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === yr && m === mo; });
+      const diretaRows = rowsDireta.filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === yr && m === mo && getDiaVenda(r) > 0; });
       let diretaRecBruta = 0, diretaLb = 0;
       for (const r of diretaRows) {
         diretaRecBruta += n(r.valorVenda);
@@ -680,11 +680,11 @@ export function CentralVendasResumoPage() {
                     <td className="px-2 py-1.5 font-black uppercase text-[9px] tracking-wide">TOTAL</td>
                     {(['novos','usados','direta','pecas','oficina','funilaria','acessorios'] as const).map(k => (
                       <td key={k} className="px-2 py-1.5 text-right tabular-nums font-bold">
-                        {fmtBRL(deptsCurrent.find(d => d.id === k)?.recLiq ?? 0)}
+                        {fmtBRL(dailyData.reduce((s, d) => s + d[k], 0))}
                       </td>
                     ))}
                     <td className="px-2 py-1.5 text-right tabular-nums font-black">
-                      {fmtBRL(totalRecLiqCurrent)}
+                      {fmtBRL(dailyData.reduce((s, d) => s + d.total, 0))}
                     </td>
                   </tr>
                 </tfoot>
