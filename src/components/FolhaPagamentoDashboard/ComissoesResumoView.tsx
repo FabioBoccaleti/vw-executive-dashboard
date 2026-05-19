@@ -77,6 +77,23 @@ export function ComissoesResumoView() {
       setUsadosMap(u);
       setInativosNovos(new Set(inN ?? []));
       setInativosUsados(new Set(inU ?? []));
+
+      // Auto-seleciona o último mês que tenha pelo menos um lançamento
+      const keysComDados = new Set([
+        ...Object.entries(n).filter(([, v]) => Object.keys(v).length > 0).map(([k]) => k),
+        ...Object.entries(u).filter(([, v]) => Object.keys(v).length > 0).map(([k]) => k),
+      ]);
+      const validKeys = [...keysComDados].filter(k => /^\d{4}-\d{1,2}$/.test(k));
+      if (validKeys.length > 0) {
+        const latestKey = validKeys.sort((a, b) => {
+          const [ay, am] = a.split('-').map(Number);
+          const [by, bm] = b.split('-').map(Number);
+          return (by * 12 + bm) - (ay * 12 + am);
+        })[0];
+        const [ly, lm] = latestKey.split('-').map(Number);
+        setYear(ly);
+        setMonth(lm);
+      }
     }).finally(() => setLoading(false));
   }, []);
 

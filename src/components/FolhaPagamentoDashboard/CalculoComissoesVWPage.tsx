@@ -29,7 +29,7 @@ export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) 
   const canCalculoUsados  = admin || canAccessFolhaSub('folha.comissoes_vw.calculo.usados');
   const canResumo         = admin || canAccessFolhaSub('folha.comissoes_vw.resumo');
 
-  const firstAllowedView: MainView = canCalculo ? 'calculo' : canVendas ? 'vendas' : canResumo ? 'resumo' : 'cadastro';
+  const firstAllowedView: MainView = canResumo ? 'resumo' : canCalculo ? 'calculo' : canVendas ? 'vendas' : 'cadastro';
   const [mainView, setMainView] = useState<MainView>(firstAllowedView);
   const [vendasSubTab,  setVendasSubTab]  = useState<VendasSubTab>(() => canVendasNovos ? 'novos' : 'usados');
   const [calculoSubTab, setCalculoSubTab] = useState<CalculoSubTab>(() => canCalculoNovos ? 'novos' : 'usados');
