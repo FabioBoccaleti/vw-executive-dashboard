@@ -58,3 +58,17 @@ export async function bulkSaveLancamentos(
 ): Promise<void> {
   await kvSet(kvKey(tab), map);
 }
+
+/** Remove o lançamento de um vendedor em um período específico. */
+export async function deleteLancamento(
+  tab:      'novos' | 'usados',
+  year:     number,
+  month:    number,
+  vendedor: string,
+): Promise<void> {
+  const pk  = `${year}-${month}`;
+  const all = await loadLancamentos(tab);
+  if (!all[pk] || !(vendedor in all[pk])) return;
+  const { [vendedor]: _removed, ...rest } = all[pk];
+  await kvSet(kvKey(tab), { ...all, [pk]: rest });
+}

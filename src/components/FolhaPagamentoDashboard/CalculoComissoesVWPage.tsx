@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ClipboardList, TrendingUp, Calculator, Lock } from 'lucide-react';
+import { ClipboardList, TrendingUp, Calculator, Lock, BarChart2 } from 'lucide-react';
 import { ComissoesVendasView } from './ComissoesVendasView';
 import { ComissoesCadastroView } from './ComissoesCadastroView';
 import { ComissoesCalculoView } from './ComissoesCalculoView';
+import { ComissoesResumoView } from './ComissoesResumoView';
 import { useAuth } from '@/contexts/useAuth';
 
-type MainView = 'cadastro' | 'vendas' | 'calculo';
+type MainView = 'cadastro' | 'vendas' | 'calculo' | 'resumo';
 type VendasSubTab = 'novos' | 'usados';
 type CalculoSubTab = 'novos' | 'usados';
 
@@ -26,8 +27,9 @@ export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) 
   const canCalculo        = admin || canAccessFolhaSub('folha.comissoes_vw.calculo');
   const canCalculoNovos   = admin || canAccessFolhaSub('folha.comissoes_vw.calculo.novos');
   const canCalculoUsados  = admin || canAccessFolhaSub('folha.comissoes_vw.calculo.usados');
+  const canResumo         = admin || canAccessFolhaSub('folha.comissoes_vw.resumo');
 
-  const firstAllowedView: MainView = canCalculo ? 'calculo' : canVendas ? 'vendas' : 'cadastro';
+  const firstAllowedView: MainView = canCalculo ? 'calculo' : canVendas ? 'vendas' : canResumo ? 'resumo' : 'cadastro';
   const [mainView, setMainView] = useState<MainView>(firstAllowedView);
   const [vendasSubTab,  setVendasSubTab]  = useState<VendasSubTab>(() => canVendasNovos ? 'novos' : 'usados');
   const [calculoSubTab, setCalculoSubTab] = useState<CalculoSubTab>(() => canCalculoNovos ? 'novos' : 'usados');
@@ -86,6 +88,17 @@ export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) 
             >
               <Calculator className="w-3.5 h-3.5" />
               Cálculo
+            </button>
+            )}
+            {canResumo && (
+            <button
+              onClick={() => setMainView('resumo')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainView === 'resumo' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+              Resumo
             </button>
             )}
           </div>
@@ -161,6 +174,9 @@ export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) 
           {vendasSubTab === 'usados' && canVendasUsados && <ComissoesVendasView tab="usados" />}
         </div>
       )}
+
+      {/* Resumo de Comissões */}
+      {mainView === 'resumo' && canResumo && <ComissoesResumoView />}
     </div>
   );
 }

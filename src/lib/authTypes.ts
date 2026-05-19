@@ -66,7 +66,8 @@ export type FolhaSubModuleId =
   | 'folha.comissoes_vw.vendas.usados'
   | 'folha.comissoes_vw.calculo'
   | 'folha.comissoes_vw.calculo.novos'
-  | 'folha.comissoes_vw.calculo.usados';
+  | 'folha.comissoes_vw.calculo.usados'
+  | 'folha.comissoes_vw.resumo';
 
 export const FOLHA_SUB_MODULE_LABELS: Record<FolhaSubModuleId, string> = {
   'folha.analise': 'Análise',
@@ -85,6 +86,7 @@ export const FOLHA_SUB_MODULE_LABELS: Record<FolhaSubModuleId, string> = {
   'folha.comissoes_vw.calculo':        'Cálculo',
   'folha.comissoes_vw.calculo.novos':  'Novos',
   'folha.comissoes_vw.calculo.usados': 'Usados',
+  'folha.comissoes_vw.resumo':         'Resumo',
 };
 
 // Subpermissões do módulo central_vendas_vw

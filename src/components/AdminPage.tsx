@@ -421,7 +421,7 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
             <div className="ml-3 space-y-2 border-l-2 border-teal-300 pl-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cálculo de Comissões VW — Visões</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {(['folha.comissoes_vw.cadastro', 'folha.comissoes_vw.vendas', 'folha.comissoes_vw.calculo'] as FolhaSubModuleId[]).map(s => (
+                {(['folha.comissoes_vw.cadastro', 'folha.comissoes_vw.vendas', 'folha.comissoes_vw.calculo', 'folha.comissoes_vw.resumo'] as FolhaSubModuleId[]).map(s => (
                   <button
                     key={s} type="button"
                     onClick={() => toggleFolhaSub(s)}
