@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Clock, CheckCircle2, History, Printer, DollarSign, Save, LockOpen, PenLine, CheckCircle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle2, History, Printer, DollarSign, Save, LockOpen, PenLine, CheckCircle, ShieldCheck, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/useAuth';
 import { apiLogin } from '@/lib/authClient';
@@ -126,6 +126,7 @@ export function ComissoesCalculoDemonstrativo({
   const [editValues,        setEditValues]        = useState<Record<string, { comVenda: string; comLB: string }>>({})
   const [savingLanc,        setSavingLanc]        = useState(false);
   const [savingPago,        setSavingPago]        = useState(false);
+  const [recalculating,     setRecalculating]     = useState(false);
   const [reabrirDialog,     setReopenDialog]      = useState<{ senha: string; erro: string | null } | null>(null);
   const [assinaDialog,      setAssinaDialog]      = useState<{
     campo:   CampoAssinaturaComissao;
@@ -347,6 +348,91 @@ export function ComissoesCalculoDemonstrativo({
 
   function rowKey(chassi: string | undefined, idx: number): string {
     return chassi || String(idx);
+  }
+
+  async function handleRecalcular() {
+    if (pago) return;
+    setRecalculating(true);
+    try {
+      const pctLB    = parseFloat(String(modal.comissaoLucroBruto ?? '').replace(',', '.'));
+      const temPctLB = !isNaN(pctLB) && pctLB > 0;
+      const existing       = lancamentosMap[pk]?.[vendedor];
+      const existingLinhas = existing?.linhas ?? {};
+      const linhas: Record<string, LinhaComissao> = {};
+
+      if (tab === 'usados') {
+        const temFaixas = (modal.faixasBonus?.length ?? 0) > 0;
+        const indexed = derivedRows.map((r, ri) => ({ r, ri, key: r.chassi || String(ri) }));
+        const sorted  = [...indexed].sort((a, b) =>
+          parseDV(a.r.dataVenda ?? '') - parseDV(b.r.dataVenda ?? '')
+        );
+        const comVendaByKey: Record<string, number> = {};
+        let pos = 0;
+        sorted.forEach(({ r, key }) => {
+          if (r.transacao === txVenda) {
+            pos++;
+            const pct = getTierPct(pos, modal.faixasBonus ?? []);
+            comVendaByKey[key] = pct > 0 ? n(r.valorVenda) * (pct / 100) : 0;
+          } else if (r.transacao === txDevol) {
+            const pct = getTierPct(pos, modal.faixasBonus ?? []);
+            comVendaByKey[key] = pct > 0 ? n(r.valorVenda) * (pct / 100) : 0;
+            pos = Math.max(0, pos - 1);
+          } else {
+            comVendaByKey[key] = 0;
+          }
+        });
+        derivedRows.forEach((r, ri) => {
+          const key = r.chassi || String(ri);
+          const lb  = r._d.lucroBruto;
+          linhas[key] = {
+            comVenda: temFaixas ? (comVendaByKey[key] ?? 0) : 0,
+            comLB: key in existingLinhas
+              ? (existingLinhas[key]?.comLB ?? 0)
+              : (temPctLB && (lb > 0 || r.transacao === txDevol) ? lb * (pctLB / 100) : 0),
+          };
+        });
+      } else {
+        const pctVendaBase = parseFloat(String(modal.comissaoVenda ?? '').replace(',', '.'));
+        const countV21 = derivedRows.filter(r => r.transacao === txVenda).length;
+        const countV07 = derivedRows.filter(r => r.transacao === txDevol).length;
+        const netCount  = countV21 - countV07;
+        let bonusPct = 0;
+        if (modal.faixasBonus?.length > 0) {
+          const faixa = modal.faixasBonus.find((f: { de: string; ate: string; percentual: string }) => {
+            const de  = parseInt(f.de)  || 0;
+            const ate = f.ate === '' ? Infinity : (parseInt(f.ate) || 0);
+            return netCount >= de && netCount <= ate;
+          });
+          if (faixa) bonusPct = parseFloat(String(faixa.percentual).replace(',', '.')) || 0;
+        }
+        const pctVenda = (isNaN(pctVendaBase) ? 0 : pctVendaBase) + bonusPct;
+        derivedRows.forEach((r, ri) => {
+          const key = r.chassi || String(ri);
+          const lb  = r._d.lucroBruto;
+          linhas[key] = {
+            comVenda: pctVenda > 0 ? n(r.valorVenda) * (pctVenda / 100) : 0,
+            comLB: key in existingLinhas
+              ? (existingLinhas[key]?.comLB ?? 0)
+              : (temPctLB && (lb > 0 || r.transacao === txDevol) ? lb * (pctLB / 100) : 0),
+          };
+        });
+      }
+
+      const newLanc: LancamentoComissao = {
+        linhas,
+        pago:          existing?.pago          ?? false,
+        dataPagamento: existing?.dataPagamento,
+        assinaturas:   existing?.assinaturas,
+      };
+      await saveLancamento(tab, year, month, vendedor, newLanc);
+      setLancamentosMap(prev => ({
+        ...prev,
+        [pk]: { ...(prev[pk] ?? {}), [vendedor]: newLanc },
+      }));
+      toast.success('Comissões recalculadas com sucesso.');
+    } finally {
+      setRecalculating(false);
+    }
   }
 
   async function handleConfirmarReabrir() {
@@ -592,13 +678,26 @@ export function ComissoesCalculoDemonstrativo({
             </button>
           </>
         ) : (
-          <button
-            onClick={openEdit}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
-          >
-            <DollarSign className="w-3.5 h-3.5" />
-            Lançar valores
-          </button>
+          <>
+            {!pago && !!lancamento && (
+              <button
+                onClick={handleRecalcular}
+                disabled={recalculating}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 disabled:opacity-50 transition-colors"
+                title="Recalcula as comissões usando as faixas atuais do Cadastro, preservando os valores de Com. s/ LB"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? 'animate-spin' : ''}`} />
+                {recalculating ? 'Recalculando...' : 'Recalcular'}
+              </button>
+            )}
+            <button
+              onClick={openEdit}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
+            >
+              <DollarSign className="w-3.5 h-3.5" />
+              Lançar valores
+            </button>
+          </>
         )}
       </div>
 
