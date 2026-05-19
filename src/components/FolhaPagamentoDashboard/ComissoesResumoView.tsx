@@ -22,6 +22,17 @@ const fmtBRL = (v: number) =>
 const sumLinhas = (linhas: Record<string, LinhaComissao>): number =>
   Object.values(linhas).reduce((s, l) => s + l.comVenda + l.comLB, 0);
 
+/** Corrige nomes com caracteres corrompidos no KV. */
+const NAME_FIXES: Record<string, string> = {
+  'CARLOS JOS\uFFFD BARGIERI':            'CARLOS JOSE BARGIERI',
+  'CARLOS JOS\u00C3\u00B3 BARGIERI':      'CARLOS JOSE BARGIERI',
+  'CESAR LUIZ GARCIA LOUREN\uFFFDO':      'CESAR LUIZ GARCIA LOURENCO',
+  'CESAR LUIZ GARCIA LOUREN\u00C3\u0087O':'CESAR LUIZ GARCIA LOURENCO',
+  'LUCIMEIRE DA CONCEI\uFFFD\uFFFDO SANTOS':           'LUCIMEIRE DA CONCEICAO SANTOS',
+  'LUCIMEIRE DA CONCEI\u00C3\u00A7\u00C3\u00A3O SANTOS':'LUCIMEIRE DA CONCEICAO SANTOS',
+};
+const fixName = (name: string): string => NAME_FIXES[name] ?? name;
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 interface RowData {
@@ -175,7 +186,7 @@ export function ComissoesResumoView() {
 
     const rowsHtml = rows.map(r => `
       <tr>
-        <td>${r.vendedor}</td>
+        <td>${fixName(r.vendedor)}</td>
         <td class="num">${r.novos  !== null ? 'R$ ' + fmtBRL(r.novos)  : '<span class="dash">—</span>'}</td>
         <td class="num">${r.usados !== null ? 'R$ ' + fmtBRL(r.usados) : '<span class="dash">—</span>'}</td>
         <td class="num"><strong>R$ ${fmtBRL(r.total)}</strong></td>
@@ -323,7 +334,7 @@ tfoot td { font-weight: bold; background: #f8fafc; border-top: 2px solid #cbd5e1
                             : <ChevronRight className="w-4 h-4 text-slate-400" />
                           }
                         </td>
-                        <td className={`${tdCls} font-medium text-slate-800`}>{r.vendedor}</td>
+                        <td className={`${tdCls} font-medium text-slate-800`}>{fixName(r.vendedor)}</td>
                         <td className={numCls}>
                           {r.novos !== null
                             ? `R$ ${fmtBRL(r.novos)}`
