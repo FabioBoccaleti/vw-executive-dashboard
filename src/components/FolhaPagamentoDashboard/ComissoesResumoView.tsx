@@ -193,7 +193,7 @@ h2  { font-size: 14px; margin-bottom: 4px; }
 table { width: 100%; border-collapse: collapse; }
 th { background: #f1f5f9; font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
      padding: 6px 10px; text-align: left; border-bottom: 2px solid #cbd5e1; }
-td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; }
+td { padding: 10px 10px; border-bottom: 1px solid #e2e8f0; }
 .num  { text-align: right; font-variant-numeric: tabular-nums; }
 .dash { color: #94a3b8; }
 tfoot td { font-weight: bold; background: #f8fafc; border-top: 2px solid #cbd5e1; }
