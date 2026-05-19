@@ -95,7 +95,8 @@ export type CentralVendasVWSubModuleId =
   | 'central_vw.vendas'
   | 'central_vw.financeiro'
   | 'central_vw.registros'
-  | 'central_vw.cadastros';
+  | 'central_vw.cadastros'
+  | 'central_vw.resumo';
 
 export const CENTRAL_VENDAS_VW_SUB_MODULE_LABELS: Record<CentralVendasVWSubModuleId, string> = {
   'central_vw.analises': 'Análises',
@@ -103,6 +104,7 @@ export const CENTRAL_VENDAS_VW_SUB_MODULE_LABELS: Record<CentralVendasVWSubModul
   'central_vw.financeiro': 'Financeiro',
   'central_vw.registros': 'Registros',
   'central_vw.cadastros': 'Cadastros',
+  'central_vw.resumo': 'Resumo',
 };
 
 export const VENDAS_SUB_MODULE_LABELS: Record<VendasSubModuleId, string> = {

@@ -346,7 +346,7 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
             Permissões — Central de Vendas VW
           </Label>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {(['central_vw.analises', 'central_vw.vendas', 'central_vw.financeiro', 'central_vw.registros', 'central_vw.cadastros'] as CentralVendasVWSubModuleId[]).map(s => (
+            {(['central_vw.analises', 'central_vw.vendas', 'central_vw.financeiro', 'central_vw.registros', 'central_vw.cadastros', 'central_vw.resumo'] as CentralVendasVWSubModuleId[]).map(s => (
               <button
                 key={s} type="button"
                 onClick={() => toggleCentralVendasSub(s)}

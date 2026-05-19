@@ -28,7 +28,8 @@ export type CentralVendasVWSubModuleId =
   | 'central_vw.vendas'
   | 'central_vw.financeiro'
   | 'central_vw.registros'
-  | 'central_vw.cadastros';
+  | 'central_vw.cadastros'
+  | 'central_vw.resumo';
 export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw', 'custos_alugueis'];
 export const ALL_BRANDS: BrandId[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'];
 
