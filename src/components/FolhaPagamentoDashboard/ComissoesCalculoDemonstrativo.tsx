@@ -217,10 +217,16 @@ export function ComissoesCalculoDemonstrativo({
 
     // Só pula o recálculo se todas as linhas já têm comVenda definida E não há linhas novas
     const hasManualComVenda = Object.values(existingLinhas).some(l => l.comVenda !== 0);
-    if (hasManualComVenda && !hasNewRows) return;
+    // Detecta linhas de venda que já estão no lançamento mas com comVenda=0 (ex.: linha manual
+    // adicionada com transação vazia e depois corrigida para U21/V21 pelo usuário)
+    const hasUnpricedSaleRows = derivedRows.some((r, ri) => {
+      const key = r.chassi || String(ri);
+      return r.transacao === txVenda && key in existingLinhas && (existingLinhas[key]?.comVenda ?? 0) === 0;
+    });
+    if (hasManualComVenda && !hasNewRows && !hasUnpricedSaleRows) return;
 
     // Se há lançamento mas comVenda zerado → só recalcula comVenda, preserva comLB
-    const onlyFillComVenda = !!existing && !hasManualComVenda && !hasNewRows;
+    const onlyFillComVenda = !!existing && !hasManualComVenda && !hasNewRows && !hasUnpricedSaleRows;
 
     const linhas: Record<string, LinhaComissao> = {};
 

@@ -652,7 +652,6 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
       const existing       = all[pk]?.[vendedor];
       const existingLinhas = existing?.linhas ?? {};
       const hasManualComVenda = Object.values(existingLinhas).some(l => l.comVenda !== 0);
-      if (hasManualComVenda) return;
 
       const derived = vRows.map((r, ri) => {
         const valorVenda = parseNum(r.valorVenda);
@@ -662,8 +661,17 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
       });
       if (derived.length === 0) return;
 
+      const derivedKeyArr = derived.map(r => r.chassi || String(r._ri));
+      const hasNewRows    = derivedKeyArr.some(k => !(k in existingLinhas));
+      // Linhas de venda já no lançamento mas com comVenda=0 (manual adicionada com transação vazia)
+      const hasUnpricedSaleRows = derived.some(r => {
+        const key = r.chassi || String(r._ri);
+        return r.transacao === txVenda && key in existingLinhas && (existingLinhas[key]?.comVenda ?? 0) === 0;
+      });
+      if (hasManualComVenda && !hasNewRows && !hasUnpricedSaleRows) return;
+
       const onlyFillComVenda =
-        !!existing && !hasManualComVenda && Object.keys(existingLinhas).length > 0;
+        !!existing && !hasManualComVenda && !hasNewRows && !hasUnpricedSaleRows;
       const linhas: Record<string, { comVenda: number; comLB: number }> = {};
 
       if (tab === 'usados') {
