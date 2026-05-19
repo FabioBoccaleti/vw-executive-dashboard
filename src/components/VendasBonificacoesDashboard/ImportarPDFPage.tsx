@@ -447,7 +447,7 @@ function pdfResultsToTableRows(pages: PageResult[]): Omit<TabelaDadosRow, 'id'>[
 
 export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mainView, setMainView] = useState<'cadastros' | 'manual' | 'registros' | 'financeiro' | 'vendas' | 'analises' | 'resumo'>('analises');
+  const [mainView, setMainView] = useState<'cadastros' | 'manual' | 'registros' | 'financeiro' | 'vendas' | 'analises' | 'resumo'>('resumo');
   const [analiseTab, setAnaliseTab] = useState<'novos' | 'usados' | 'direta' | 'pecas' | 'oficina'>('novos');
   const [activeTab, setActiveTab] = useState<'guia' | 'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros'>('importar');
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
