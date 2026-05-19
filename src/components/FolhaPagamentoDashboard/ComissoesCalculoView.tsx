@@ -324,6 +324,9 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
   const [reopenError,     setReopenError]     = useState<string | null>(null);
   const [reopeningAll,    setReopeningAll]    = useState(false);
 
+  // Confirmação inativar/reativar
+  const [confirmInativoTarget, setConfirmInativoTarget] = useState<string | null>(null);
+
   // Bulk assinatura
   const [assinaTodasDialog, setAssinaTodasDialog] = useState<{
     campo:   CampoAssinaturaComissao;
@@ -1090,7 +1093,7 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
                   {/* Botão inativar/reativar */}
                   <button
                     disabled={pago}
-                    onClick={e => { if (!pago) toggleInativo(vendedor, e); else e.stopPropagation(); }}
+                    onClick={e => { e.stopPropagation(); if (!pago) setConfirmInativoTarget(vendedor); }}
                     title={pago ? 'Não é possível alterar o status de um vendedor com pagamento confirmado' : inativo ? 'Reativar vendedor' : 'Marcar como inativo'}
                     className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors flex-shrink-0 ${
                       pago
@@ -1111,6 +1114,59 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
           </div>
         )}
       </div>
+
+      {/* ── Dialog: Confirmar Inativar/Reativar ───────────────────────── */}
+      {confirmInativoTarget !== null && (() => {
+        const isInativo = inativosSet.has(confirmInativoTarget);
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+            onClick={e => { if (e.target === e.currentTarget) setConfirmInativoTarget(null); }}
+          >
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${isInativo ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                  {isInativo
+                    ? <UserCheck className="w-5 h-5 text-emerald-600" />
+                    : <UserX    className="w-5 h-5 text-red-600" />}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-800">
+                    {isInativo ? 'Reativar vendedor' : 'Inativar vendedor'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5 leading-snug">
+                    {isInativo
+                      ? 'O vendedor voltará a aparecer nos lançamentos futuros.'
+                      : 'O vendedor será ocultado dos lançamentos futuros.'}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-700 mb-6">
+                Deseja realmente <strong>{isInativo ? 'reativar' : 'inativar'}</strong> o vendedor{' '}
+                <strong>{confirmInativoTarget}</strong>?
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setConfirmInativoTarget(null)}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    const target = confirmInativoTarget;
+                    setConfirmInativoTarget(null);
+                    await toggleInativo(target, { stopPropagation: () => {} } as React.MouseEvent);
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors ${isInativo ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
+                >
+                  {isInativo ? 'Reativar' : 'Inativar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Dialog: Assinar todos ──────────────────────────────────────── */}
       {assinaTodasDialog !== null && (
