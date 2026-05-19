@@ -1,4 +1,5 @@
 import { Wallet, UserCheck, Calculator } from 'lucide-react';
+import { useAuth } from '@/contexts/useAuth';
 
 interface FolhaSelectionPageProps {
   onSelect: (option: 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw') => void;
@@ -6,6 +7,10 @@ interface FolhaSelectionPageProps {
 }
 
 export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPageProps) {
+  const { canAccessFolhaSub, isAdmin } = useAuth();
+  const admin = isAdmin();
+  const canPJ          = admin || canAccessFolhaSub('folha.pj');
+  const canComissoesVW = admin || canAccessFolhaSub('folha.comissoes_vw');
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       {/* Header */}
@@ -42,6 +47,7 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
           </button>
 
           {/* Card — Remunerações PJ */}
+          {canPJ && (
           <button
             onClick={() => onSelect('remuneracoes_pj')}
             className="flex-1 max-w-xs mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
@@ -55,8 +61,10 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
               </h2>
             </div>
           </button>
+          )}
 
           {/* Card — Cálculo de Comissões VW */}
+          {canComissoesVW && (
           <button
             onClick={() => onSelect('calculo_comissoes_vw')}
             className="flex-1 max-w-xs mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
@@ -70,6 +78,7 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
               </h2>
             </div>
           </button>
+          )}
 
         </div>
       </div>

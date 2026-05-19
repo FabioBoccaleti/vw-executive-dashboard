@@ -56,7 +56,17 @@ export type FolhaSubModuleId =
   | 'folha.audi'
   | 'folha.vw'
   | 'folha.total'
-  | 'folha.pj';
+  | 'folha.pj'
+  | 'folha.pj.demonstrativos'
+  | 'folha.pj.cadastro'
+  | 'folha.comissoes_vw'
+  | 'folha.comissoes_vw.cadastro'
+  | 'folha.comissoes_vw.vendas'
+  | 'folha.comissoes_vw.vendas.novos'
+  | 'folha.comissoes_vw.vendas.usados'
+  | 'folha.comissoes_vw.calculo'
+  | 'folha.comissoes_vw.calculo.novos'
+  | 'folha.comissoes_vw.calculo.usados';
 
 export const FOLHA_SUB_MODULE_LABELS: Record<FolhaSubModuleId, string> = {
   'folha.analise': 'Análise',
@@ -65,6 +75,16 @@ export const FOLHA_SUB_MODULE_LABELS: Record<FolhaSubModuleId, string> = {
   'folha.vw':     'VW',
   'folha.total':  'Total',
   'folha.pj':     'Remunerações PJ',
+  'folha.pj.demonstrativos':           'Demonstrativos',
+  'folha.pj.cadastro':                 'Cadastro',
+  'folha.comissoes_vw':                'Cálculo de Comissões VW',
+  'folha.comissoes_vw.cadastro':       'Cadastro',
+  'folha.comissoes_vw.vendas':         'Vendas',
+  'folha.comissoes_vw.vendas.novos':   'Novos',
+  'folha.comissoes_vw.vendas.usados':  'Usados',
+  'folha.comissoes_vw.calculo':        'Cálculo',
+  'folha.comissoes_vw.calculo.novos':  'Novos',
+  'folha.comissoes_vw.calculo.usados': 'Usados',
 };
 
 // Subpermissões do módulo central_vendas_vw

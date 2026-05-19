@@ -374,7 +374,7 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Visões</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {(['folha.analise', 'folha.relacao'] as FolhaSubModuleId[]).map(s => (
+              {(['folha.analise', 'folha.relacao', 'folha.pj', 'folha.comissoes_vw'] as FolhaSubModuleId[]).map(s => (
                 <button
                   key={s} type="button"
                   onClick={() => toggleFolhaSub(s)}
@@ -391,6 +391,103 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
               ))}
             </div>
           </div>
+
+          {/* Sub-abas: Remunerações PJ */}
+          {form.folhaSubModules.includes('folha.pj') && (
+            <div className="ml-3 space-y-2 border-l-2 border-teal-300 pl-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Remunerações PJ — Sub-abas</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {(['folha.pj.demonstrativos', 'folha.pj.cadastro'] as FolhaSubModuleId[]).map(s => (
+                  <button
+                    key={s} type="button"
+                    onClick={() => toggleFolhaSub(s)}
+                    className={cn(
+                      'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                      form.folhaSubModules.includes(s)
+                        ? 'border-teal-500 bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 font-medium'
+                        : 'border-border bg-background text-muted-foreground hover:border-input',
+                    )}
+                  >
+                    {form.folhaSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                    {FOLHA_SUB_MODULE_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sub-abas: Cálculo de Comissões VW */}
+          {form.folhaSubModules.includes('folha.comissoes_vw') && (
+            <div className="ml-3 space-y-2 border-l-2 border-teal-300 pl-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cálculo de Comissões VW — Visões</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {(['folha.comissoes_vw.cadastro', 'folha.comissoes_vw.vendas', 'folha.comissoes_vw.calculo'] as FolhaSubModuleId[]).map(s => (
+                  <button
+                    key={s} type="button"
+                    onClick={() => toggleFolhaSub(s)}
+                    className={cn(
+                      'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                      form.folhaSubModules.includes(s)
+                        ? 'border-teal-500 bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 font-medium'
+                        : 'border-border bg-background text-muted-foreground hover:border-input',
+                    )}
+                  >
+                    {form.folhaSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                    {FOLHA_SUB_MODULE_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+
+              {/* Sub-abas: Vendas */}
+              {form.folhaSubModules.includes('folha.comissoes_vw.vendas') && (
+                <div className="ml-3 space-y-1 border-l-2 border-teal-200 pl-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Vendas</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {(['folha.comissoes_vw.vendas.novos', 'folha.comissoes_vw.vendas.usados'] as FolhaSubModuleId[]).map(s => (
+                      <button
+                        key={s} type="button"
+                        onClick={() => toggleFolhaSub(s)}
+                        className={cn(
+                          'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                          form.folhaSubModules.includes(s)
+                            ? 'border-teal-500 bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 font-medium'
+                            : 'border-border bg-background text-muted-foreground hover:border-input',
+                        )}
+                      >
+                        {form.folhaSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                        {FOLHA_SUB_MODULE_LABELS[s]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-abas: Cálculo */}
+              {form.folhaSubModules.includes('folha.comissoes_vw.calculo') && (
+                <div className="ml-3 space-y-1 border-l-2 border-teal-200 pl-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cálculo</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {(['folha.comissoes_vw.calculo.novos', 'folha.comissoes_vw.calculo.usados'] as FolhaSubModuleId[]).map(s => (
+                      <button
+                        key={s} type="button"
+                        onClick={() => toggleFolhaSub(s)}
+                        className={cn(
+                          'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                          form.folhaSubModules.includes(s)
+                            ? 'border-teal-500 bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 font-medium'
+                            : 'border-border bg-background text-muted-foreground hover:border-input',
+                        )}
+                      >
+                        {form.folhaSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                        {FOLHA_SUB_MODULE_LABELS[s]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Marcas</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

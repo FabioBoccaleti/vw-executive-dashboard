@@ -14,9 +14,12 @@ interface RemuneracoesPJDashboardProps {
 
 export function RemuneracoesPJDashboard({ onBack }: RemuneracoesPJDashboardProps) {
   const { canAccessFolhaSub, isAdmin } = useAuth();
-  const canAccess = isAdmin() || canAccessFolhaSub('folha.pj');
+  const admin = isAdmin();
+  const canAccess      = admin || canAccessFolhaSub('folha.pj');
+  const canDemonst     = admin || canAccessFolhaSub('folha.pj.demonstrativos');
+  const canCadastro    = admin || canAccessFolhaSub('folha.pj.cadastro');
 
-  const [aba, setAba] = useState<Aba>('demonstrativos');
+  const [aba, setAba] = useState<Aba>(() => canDemonst ? 'demonstrativos' : 'cadastro');
   const [activePrestador, setActivePrestador] = useState<PrestadorPJ | null>(null);
   const [activeYear,  setActiveYear]  = useState<number | undefined>();
   const [activeMonth, setActiveMonth] = useState<number | undefined>();
@@ -94,9 +97,11 @@ export function RemuneracoesPJDashboard({ onBack }: RemuneracoesPJDashboardProps
       <div className="bg-white border-b border-slate-200 px-6 flex-shrink-0">
         <div className="flex gap-0">
           {([
-            { key: 'demonstrativos', label: 'Demonstrativos', icon: LayoutList },
-            { key: 'cadastro',       label: 'Cadastro',       icon: Users },
-          ] as { key: Aba; label: string; icon: React.ElementType }[]).map(({ key, label, icon: Icon }) => (
+            { key: 'demonstrativos', label: 'Demonstrativos', icon: LayoutList, can: canDemonst },
+            { key: 'cadastro',       label: 'Cadastro',       icon: Users,       can: canCadastro },
+          ] as { key: Aba; label: string; icon: React.ElementType; can: boolean }[])
+            .filter(t => t.can)
+            .map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setAba(key)}
