@@ -178,6 +178,7 @@ const IGNORED_TRANSACOES_EXACT = new Set([
   'V21', 'U21', 'I21', 'C41', 'C21',
   'V42', 'V29', 'U25', 'U27', 'P68', 'P37', 'P30',
   'G23', 'P27', 'O25', 'ST1', 'P64', 'P65', 'P66',
+  'A52',
 ]);
 function isIgnoredTransacao(t: string): boolean {
   const upper = t.toUpperCase();
