@@ -42,6 +42,7 @@ export interface UserRecord {
   modules: ModuleId[];
   brands: BrandId[];
   vendasSubModules?: VendasSubModuleId[];
+  folhaSubModules?: string[];
   centralVendasVWSubModules?: CentralVendasVWSubModuleId[];
   active: boolean;
   createdAt: number;
