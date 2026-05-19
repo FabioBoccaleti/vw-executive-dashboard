@@ -713,7 +713,16 @@ export function ComissoesCalculoDemonstrativo({
                     const hasVal = editMode ? (cvVal !== 0 || clVal !== 0) : !!linha;
                     return (
                       <tr key={key} className={bg}>
-                        <td className={`${tdBase} ${bg} text-left font-mono text-slate-700`}>{r.chassi || '—'}</td>
+                        <td className={`${tdBase} ${bg} text-left font-mono text-slate-700`}>
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span>{r.chassi || '—'}</span>
+                            {r.manualEntry && (
+                              <span className="text-[9px] italic border border-dashed border-slate-400 text-slate-500 px-1 leading-tight rounded-sm font-sans">
+                                manual
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className={`${tdBase} ${bg} text-left text-slate-700`}>{r.modelo || '—'}</td>
                         <td className={`${tdBase} ${bg} text-left font-mono text-slate-700 no-print`}>{r.nfVenda || '—'}</td>
                         <td className={`${tdBase} ${bg} text-left font-mono text-slate-700`}>{r.dataVenda || '—'}</td>

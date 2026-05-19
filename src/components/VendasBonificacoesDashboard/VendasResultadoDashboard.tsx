@@ -812,7 +812,7 @@ export default function VendasResultadoDashboard() {
   }
 
   function addRow() {
-    const newRow: VendasResultadoRow = { id: crypto.randomUUID(), ...emptyVendasResultadoRow() };
+    const newRow: VendasResultadoRow = { id: crypto.randomUUID(), ...emptyVendasResultadoRow(), manualEntry: true };
     if (filterMonth) {
       const mo = String(filterMonth).padStart(2, '0');
       newRow.dataVenda = `01/${mo}/${filterYear}`;
