@@ -236,6 +236,12 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     loading: boolean;
     erro:    string | null;
   } | null>(null);
+  const [demoAssinarTodosDialog, setDemoAssinarTodosDialog] = useState<{
+    campo:   CampoAssinaturaComissao;
+    senha:   string;
+    loading: boolean;
+    erro:    string | null;
+  } | null>(null);
 
   // ── Aba Acelera ──
   const [aceleraGarantido, setAceleraGarantido] = useState<Record<string, string>>({});
@@ -312,6 +318,42 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     const next = { ...aceleraGarantido, [vendedor]: value };
     setAceleraGarantido(next);
     await kvSet(`financiamento:acelera:garantido:${vendasYear}:${vendasMonth}`, next);
+  }
+
+  async function handleAssinarTodosDemo() {
+    if (!demoAssinarTodosDialog || !session) return;
+    setDemoAssinarTodosDialog(prev => prev ? { ...prev, loading: true, erro: null } : prev);
+    const result = await apiLogin(session.username, demoAssinarTodosDialog.senha);
+    if ('error' in result) {
+      setDemoAssinarTodosDialog(prev => prev ? { ...prev, loading: false, erro: 'Senha incorreta. Tente novamente.' } : prev);
+      return;
+    }
+    const assinatura: AssinaturaDigital = {
+      username: session.username,
+      name:     (result.session.name ?? '') || undefined,
+      dataHora: new Date().toISOString(),
+    };
+    const VEND_COL_TODOS = 'Vendedor CDC, PPS AV, GE, SEGUROS';
+    const allRowsTodos = vendasData?.rows ?? [];
+    const vendorList = [
+      ...new Map(
+        allRowsTodos.map(r => [String(r[VEND_COL_TODOS] ?? '').trim(), true] as [string, boolean])
+      ).keys()
+    ].filter(v => v);
+    const targets = [...vendorList, '__resumo__'];
+    const next = { ...demoAssinaturas };
+    let count = 0;
+    targets.forEach(vendor => {
+      if (next[vendor]?.[demoAssinarTodosDialog.campo]) return;
+      count++;
+      next[vendor] = { ...(next[vendor] ?? {}), [demoAssinarTodosDialog.campo]: assinatura };
+    });
+    if (count > 0) {
+      setDemoAssinaturas(next);
+      await kvSet(`financiamento:assinaturas:${vendasYear}:${vendasMonth}`, next);
+    }
+    toast.success(`Assinatura de ${DEMO_CAMPO_LABELS[demoAssinarTodosDialog.campo]} aplicada em ${count} demonstrativo${count !== 1 ? 's' : ''}!`);
+    setDemoAssinarTodosDialog(null);
   }
 
   function handleAbrirDemoAssinatura(vendor: string, campo: CampoAssinaturaComissao) {
@@ -1453,7 +1495,14 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                       .demo-print-area th { border-color: #1e293b !important; }
                     }
                   `}</style>
-                  <div className="print-hidden flex justify-end mb-3 sticky top-0 bg-white z-10 py-2 border-b border-slate-100">
+                  <div className="print-hidden flex items-center justify-end gap-2 mb-3 sticky top-0 bg-white z-10 py-2 border-b border-slate-100">
+                    <button
+                      onClick={() => setDemoAssinarTodosDialog({ campo: 'financeiro', senha: '', loading: false, erro: null })}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      Assinar todos
+                    </button>
                     <button
                       onClick={handlePrintDemonstrativo}
                       className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
@@ -2187,6 +2236,87 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                 className="flex-1 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
               >
                 Remover
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Dialog: Assinar todos (Demonstrativo Banco Volks) ── */}
+      {demoAssinarTodosDialog !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget && !demoAssinarTodosDialog.loading) setDemoAssinarTodosDialog(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                <ShieldCheck className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800">Assinar todos os demonstrativos</p>
+                <p className="text-xs text-slate-500 mt-0.5">Somente quem ainda não possui a assinatura selecionada</p>
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Campo de assinatura</label>
+              <select
+                value={demoAssinarTodosDialog.campo}
+                onChange={e => setDemoAssinarTodosDialog(prev => prev ? { ...prev, campo: e.target.value as CampoAssinaturaComissao } : prev)}
+                disabled={demoAssinarTodosDialog.loading}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-60"
+              >
+                {(Object.entries(DEMO_CAMPO_LABELS) as [CampoAssinaturaComissao, string][]).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-3">
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Usuário</label>
+              <input
+                type="text"
+                value={session?.username ?? ''}
+                disabled
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
+              />
+            </div>
+
+            <div className="mb-5">
+              <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Senha</label>
+              <input
+                type="password"
+                value={demoAssinarTodosDialog.senha}
+                autoFocus
+                disabled={demoAssinarTodosDialog.loading}
+                placeholder="Digite sua senha"
+                onChange={e => setDemoAssinarTodosDialog(prev => prev ? { ...prev, senha: e.target.value, erro: null } : prev)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleAssinarTodosDemo();
+                  if (e.key === 'Escape' && !demoAssinarTodosDialog.loading) setDemoAssinarTodosDialog(null);
+                }}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+              {demoAssinarTodosDialog.erro && (
+                <p className="text-xs text-red-600 mt-1.5">{demoAssinarTodosDialog.erro}</p>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => { if (!demoAssinarTodosDialog.loading) setDemoAssinarTodosDialog(null); }}
+                disabled={demoAssinarTodosDialog.loading}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAssinarTodosDemo}
+                disabled={demoAssinarTodosDialog.loading || !demoAssinarTodosDialog.senha}
+                className="flex-1 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-40"
+              >
+                {demoAssinarTodosDialog.loading ? 'Assinando...' : 'Assinar'}
               </button>
             </div>
           </div>
