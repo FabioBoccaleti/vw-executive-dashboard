@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, Printer, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { loadVendasResultadoRows, type VendasResultadoRow } from './vendasResultadoStorage';
-import { loadVPecasRows, type VPecasRow } from './vPecasStorage';
+import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from './vPecasStorage';
 import { loadAliquotas } from './vendedoresRemuneracaoStorage';
 
 // ─── Helpers numéricos ────────────────────────────────────────────────────────
@@ -170,12 +170,14 @@ export function CentralVendasResumoPage() {
       loadVendasResultadoRows('usados'),
       loadVendasResultadoRows('direta'),
       loadVPecasRows(),
+      loadVPecasDevolucaoRows(),
       loadAliquotas(),
-    ]).then(([novos, usados, direta, vpecas, aliq]) => {
+    ]).then(([novos, usados, direta, vpecas, vpecasDevol, aliq]) => {
       setRowsNovos(novos);
       setRowsUsados(usados);
       setRowsDireta(direta);
-      setRowsVPecas(vpecas);
+      // Combina NFs normais + devoluções (igual ao VPecasAnalise)
+      setRowsVPecas([...(vpecas as VPecasRow[]), ...(vpecasDevol as VPecasRow[])]);
       const al = Array.isArray(aliq) && aliq.length ? aliq[0] : null;
       setAliqBon(al ? (parseFloat(String(al.bonificacao ?? '').replace(',', '.')) || 0) : 0);
       setLoading(false);
@@ -185,116 +187,86 @@ export function CentralVendasResumoPage() {
   // ── Calcula dados para um mês/ano específico ──────────────────────────────
   const calcMonth = useMemo(() => {
     return (yr: number, mo: number): DeptResult[] => {
-      // — Novos —
+      // — Novos — (Receita Bruta = valorVenda, igual ao Evolução Diária de Novos)
       const novosRows = rowsNovos.filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === yr && m === mo; });
-      let novosRecLiq = 0, novosLb = 0;
+      let novosRecBruta = 0, novosLb = 0;
       for (const r of novosRows) {
-        const c = calcNovosRow(r, aliqBon);
-        novosRecLiq += c.recLiq;
-        novosLb     += c.lb;
+        novosRecBruta += n(r.valorVenda);
+        novosLb       += calcNovosRow(r, aliqBon).lb;
       }
       const novosVol = novosRows.filter(r => r.transacao !== 'V07').length;
 
-      // — Usados —
+      // — Usados — (Receita Bruta = valorVenda, igual ao Evolução Diária de Usados)
       const usadosRows = rowsUsados.filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === yr && m === mo; });
-      let usadosRecLiq = 0, usadosLb = 0;
+      let usadosRecBruta = 0, usadosLb = 0;
       for (const r of usadosRows) {
-        const c = calcUsadosRow(r, aliqBon);
-        usadosRecLiq += c.recLiq;
-        usadosLb     += c.lb;
+        usadosRecBruta += n(r.valorVenda);
+        usadosLb       += calcUsadosRow(r, aliqBon).lb;
       }
       const usadosVol = usadosRows.filter(r => r.transacao !== 'U07').length;
 
-      // — VD / Frotista —
+      // — VD / Frotista — (Receita Bruta = valorVenda)
       const diretaRows = rowsDireta.filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === yr && m === mo; });
-      let diretaRecLiq = 0, diretaLb = 0;
+      let diretaRecBruta = 0, diretaLb = 0;
       for (const r of diretaRows) {
-        const c = calcDiretaRow(r);
-        diretaRecLiq += c.recLiq;
-        diretaLb     += c.lb;
+        diretaRecBruta += n(r.valorVenda);
+        diretaLb       += calcDiretaRow(r).lb;
       }
       const diretaVol = diretaRows.length;
 
-      // — Peças (dept 103, NFs normais — exclui RPS/OS) —
-      const pecasDepts = ['103'];
+      // — Peças — total de todos os departamentos, NFs não-RPS
+      // (igual ao VPecasAnalise: loadVPecasRows + loadVPecasDevolucaoRows, filtra SERIE != RPS, todos os depts)
       const pecasRows = rowsVPecas.filter(r => {
         const { yr: y, mo: m } = getYrMoVPecas(r);
-        const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
         const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
-        return y === yr && m === mo && pecasDepts.includes(dept) && serie !== 'RPS';
+        return y === yr && m === mo && serie !== 'RPS';
       });
-      let pecasRecLiq = 0, pecasLb = 0;
-      for (const r of pecasRows) {
-        const c = calcPecasRow(r.data);
-        pecasRecLiq += c.recLiq;
-        pecasLb     += c.lb;
-      }
+      let pecasRecBruta = 0;
+      for (const r of pecasRows) { pecasRecBruta += n(r.data['LIQ_NOTA_FISCAL']); }
 
-      // — Oficina (dept 104, 122, somente RPS/OS) —
-      const oficinaDepts = ['104', '122'];
+      // — Oficina — depts 104+122, somente RPS (igual ao VServicosAnalise)
       const oficinaRows = rowsVPecas.filter(r => {
         const { yr: y, mo: m } = getYrMoVPecas(r);
         const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
         const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
-        return y === yr && m === mo && oficinaDepts.includes(dept) && serie === 'RPS';
+        return y === yr && m === mo && ['104', '122'].includes(dept) && serie === 'RPS';
       });
-      let oficinaRecLiq = 0;
-      for (const r of oficinaRows) { oficinaRecLiq += calcServicosRow(r.data).recLiq; }
-      // Peças vendidas pela Oficina (não-RPS) — base para LB
-      const oficinaPecasRows = rowsVPecas.filter(r => {
-        const { yr: y, mo: m } = getYrMoVPecas(r);
-        const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
-        const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
-        return y === yr && m === mo && oficinaDepts.includes(dept) && serie !== 'RPS';
-      });
-      let oficinaPecasLb = 0, oficinaPecasRecLiq = 0;
-      for (const r of oficinaPecasRows) { const c = calcPecasRow(r.data); oficinaPecasLb += c.lb; oficinaPecasRecLiq += c.recLiq; }
+      let oficinaRecBruta = 0;
+      for (const r of oficinaRows) {
+        const d = r.data;
+        oficinaRecBruta += n(d['LIQ_NOTA_FISCAL']) + n(d['VAL_PIS_ST']) + n(d['VAL_COFINS_ST']) + n(d['VAL_CSLL']);
+      }
 
-      // — Funilaria (dept 106, 129, somente RPS/OS) —
-      const funilariaDepts = ['106', '129'];
+      // — Funilaria — depts 106+129, somente RPS (igual ao VServicosAnalise)
       const funitariaRows = rowsVPecas.filter(r => {
         const { yr: y, mo: m } = getYrMoVPecas(r);
         const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
         const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
-        return y === yr && m === mo && funilariaDepts.includes(dept) && serie === 'RPS';
+        return y === yr && m === mo && ['106', '129'].includes(dept) && serie === 'RPS';
       });
-      let funitariaRecLiq = 0;
-      for (const r of funitariaRows) { funitariaRecLiq += calcServicosRow(r.data).recLiq; }
-      // Peças vendidas pela Funilaria (não-RPS) — base para LB
-      const funitariaPecasRows = rowsVPecas.filter(r => {
-        const { yr: y, mo: m } = getYrMoVPecas(r);
-        const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
-        const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
-        return y === yr && m === mo && funilariaDepts.includes(dept) && serie !== 'RPS';
-      });
-      let funitariaPecasLb = 0, funitariaPecasRecLiq = 0;
-      for (const r of funitariaPecasRows) { const c = calcPecasRow(r.data); funitariaPecasLb += c.lb; funitariaPecasRecLiq += c.recLiq; }
+      let funitariaRecBruta = 0;
+      for (const r of funitariaRows) {
+        const d = r.data;
+        funitariaRecBruta += n(d['LIQ_NOTA_FISCAL']) + n(d['VAL_PIS_ST']) + n(d['VAL_COFINS_ST']) + n(d['VAL_CSLL']);
+      }
 
-      // — Acessórios (dept 107, somente RPS/OS) —
-      const acessoriosDepts = ['107'];
+      // — Acessórios — dept 107, somente RPS (igual ao VServicosAnalise)
       const acessoriosRows = rowsVPecas.filter(r => {
         const { yr: y, mo: m } = getYrMoVPecas(r);
         const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
         const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
-        return y === yr && m === mo && acessoriosDepts.includes(dept) && serie === 'RPS';
+        return y === yr && m === mo && dept === '107' && serie === 'RPS';
       });
-      let acessoriosRecLiq = 0;
-      for (const r of acessoriosRows) { acessoriosRecLiq += calcServicosRow(r.data).recLiq; }
-      // Peças vendidas pelos Acessórios (não-RPS) — base para LB
-      const acessoriosPecasRows = rowsVPecas.filter(r => {
-        const { yr: y, mo: m } = getYrMoVPecas(r);
-        const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
-        const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
-        return y === yr && m === mo && acessoriosDepts.includes(dept) && serie !== 'RPS';
-      });
-      let acessoriosPecasLb = 0, acessoriosPecasRecLiq = 0;
-      for (const r of acessoriosPecasRows) { const c = calcPecasRow(r.data); acessoriosPecasLb += c.lb; acessoriosPecasRecLiq += c.recLiq; }
+      let acessoriosRecBruta = 0;
+      for (const r of acessoriosRows) {
+        const d = r.data;
+        acessoriosRecBruta += n(d['LIQ_NOTA_FISCAL']) + n(d['VAL_PIS_ST']) + n(d['VAL_COFINS_ST']) + n(d['VAL_CSLL']);
+      }
 
-      // lbBase: denominador do LB% (pode ser diferente de recLiq)
-      const make = (id: string, label: string, vol: number, recLiq: number, lb: number | null, hasLB: boolean, lbBase?: number): DeptResult => ({
+      const make = (id: string, label: string, vol: number, recLiq: number, lb: number | null, hasLB: boolean): DeptResult => ({
         id, label, vol, recLiq,
         lb: hasLB ? (lb ?? 0) : NaN,
-        lbPct: hasLB && (lbBase ?? recLiq) ? ((lb ?? 0) / (lbBase ?? recLiq) * 100) : NaN,
+        lbPct: hasLB && recLiq ? ((lb ?? 0) / recLiq * 100) : NaN,
         recDia: diasUteis > 0 ? recLiq / diasUteis : 0,
         hasLB,
         ticketMedio: vol > 0 ? recLiq / vol : 0,
@@ -302,13 +274,13 @@ export function CentralVendasResumoPage() {
       });
 
       return [
-        make('novos',      'Novos',          novosVol,    novosRecLiq,    novosLb,    true),
-        make('usados',     'Usados',         usadosVol,   usadosRecLiq,   usadosLb,   true),
-        make('direta',     'VD / Frotista',  diretaVol,   diretaRecLiq,   diretaLb,   true),
-        make('pecas',      'Peças',          pecasRows.length, pecasRecLiq, pecasLb,  true),
-        make('oficina',    'Oficina',        oficinaRows.length + oficinaPecasRows.length,    oficinaRecLiq + oficinaPecasRecLiq,    oficinaPecasLb > 0 || oficinaPecasRecLiq > 0 ? oficinaPecasLb : null,    oficinaPecasRecLiq > 0,    oficinaPecasRecLiq || undefined),
-        make('funilaria',  'Funilaria',      funitariaRows.length + funitariaPecasRows.length, funitariaRecLiq + funitariaPecasRecLiq, funitariaPecasLb > 0 || funitariaPecasRecLiq > 0 ? funitariaPecasLb : null,  funitariaPecasRecLiq > 0,  funitariaPecasRecLiq || undefined),
-        make('acessorios', 'Acessórios',     acessoriosRows.length + acessoriosPecasRows.length, acessoriosRecLiq + acessoriosPecasRecLiq, acessoriosPecasLb > 0 || acessoriosPecasRecLiq > 0 ? acessoriosPecasLb : null, acessoriosPecasRecLiq > 0, acessoriosPecasRecLiq || undefined),
+        make('novos',      'Novos',         novosVol,            novosRecBruta,     novosLb,     true),
+        make('usados',     'Usados',        usadosVol,           usadosRecBruta,    usadosLb,    true),
+        make('direta',     'VD / Frotista', diretaVol,           diretaRecBruta,    diretaLb,    true),
+        make('pecas',      'Peças',         pecasRows.length,    pecasRecBruta,     null,         false),
+        make('oficina',    'Oficina',       oficinaRows.length,  oficinaRecBruta,   null,         false),
+        make('funilaria',  'Funilaria',     funitariaRows.length, funitariaRecBruta, null,        false),
+        make('acessorios', 'Acessórios',    acessoriosRows.length, acessoriosRecBruta, null,      false),
       ];
     };
   }, [rowsNovos, rowsUsados, rowsDireta, rowsVPecas, aliqBon, diasUteis]);
@@ -346,33 +318,47 @@ export function CentralVendasResumoPage() {
     for (let d = 1; d <= 31; d++) {
       map[d] = { novos: 0, usados: 0, direta: 0, pecas: 0, oficina: 0, funilaria: 0, acessorios: 0 };
     }
+    // Novos — receita bruta = valorVenda (igual ao Evolução Diária de Novos)
     rowsNovos
       .filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === year && m === month; })
-      .forEach(r => { const dia = getDiaVenda(r); if (dia > 0) map[dia].novos += calcNovosRow(r, aliqBon).recLiq; });
+      .forEach(r => { const dia = getDiaVenda(r); if (dia > 0) map[dia].novos += n(r.valorVenda); });
+    // Usados — receita bruta = valorVenda (igual ao Evolução Diária de Usados)
     rowsUsados
       .filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === year && m === month; })
-      .forEach(r => { const dia = getDiaVenda(r); if (dia > 0) map[dia].usados += calcUsadosRow(r, aliqBon).recLiq; });
+      .forEach(r => { const dia = getDiaVenda(r); if (dia > 0) map[dia].usados += n(r.valorVenda); });
+    // VD / Frotista — receita bruta = valorVenda
     rowsDireta
       .filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === year && m === month; })
-      .forEach(r => { const dia = getDiaVenda(r); if (dia > 0) map[dia].direta += calcDiretaRow(r).recLiq; });
+      .forEach(r => { const dia = getDiaVenda(r); if (dia > 0) map[dia].direta += n(r.valorVenda); });
+    // Peças/Serviços — igual ao VPecasAnalise + VServicosAnalise
     rowsVPecas
       .filter(r => { const { yr: y, mo: m } = getYrMoVPecas(r); return y === year && m === month; })
       .forEach(r => {
         const dia   = getDiaVPecas(r);
         const dept  = r.data['DEPARTAMENTO']?.trim() ?? '';
         const serie = r.data['SERIE_NOTA_FISCAL']?.trim() ?? '';
+        const d     = r.data;
         if (dia > 0) {
-          if (dept === '103' && serie !== 'RPS')               map[dia].pecas      += calcPecasRow(r.data).recLiq;
-          else if (['104','122'].includes(dept) && serie === 'RPS') map[dia].oficina    += calcServicosRow(r.data).recLiq;
-          else if (['106','129'].includes(dept) && serie === 'RPS') map[dia].funilaria  += calcServicosRow(r.data).recLiq;
-          else if (dept === '107'               && serie === 'RPS') map[dia].acessorios += calcServicosRow(r.data).recLiq;
+          if (serie !== 'RPS') {
+            // Peças: todos os departamentos, NFs não-RPS → LIQ_NOTA_FISCAL
+            map[dia].pecas += n(d['LIQ_NOTA_FISCAL']);
+          } else if (['104', '122'].includes(dept)) {
+            // Oficina: RPS, depts 104+122 → valorVenda bruta (igual ao VServicosAnalise)
+            map[dia].oficina += n(d['LIQ_NOTA_FISCAL']) + n(d['VAL_PIS_ST']) + n(d['VAL_COFINS_ST']) + n(d['VAL_CSLL']);
+          } else if (['106', '129'].includes(dept)) {
+            // Funilaria: RPS, depts 106+129 → valorVenda bruta
+            map[dia].funilaria += n(d['LIQ_NOTA_FISCAL']) + n(d['VAL_PIS_ST']) + n(d['VAL_COFINS_ST']) + n(d['VAL_CSLL']);
+          } else if (dept === '107') {
+            // Acessórios: RPS, dept 107 → valorVenda bruta
+            map[dia].acessorios += n(d['LIQ_NOTA_FISCAL']) + n(d['VAL_PIS_ST']) + n(d['VAL_COFINS_ST']) + n(d['VAL_CSLL']);
+          }
         }
       });
     return Object.entries(map)
       .map(([dia, vals]) => ({ dia: Number(dia), ...vals, total: vals.novos + vals.usados + vals.direta + vals.pecas + vals.oficina + vals.funilaria + vals.acessorios }))
       .filter(d => d.total > 0)
       .sort((a, b) => a.dia - b.dia);
-  }, [rowsNovos, rowsUsados, rowsDireta, rowsVPecas, aliqBon, year, month]);
+  }, [rowsNovos, rowsUsados, rowsDireta, rowsVPecas, year, month]);
 
   // ── Projeção de fechamento e melhor dia ──────────────────────────────────
   const diasComMovimento   = dailyData.length;
@@ -508,9 +494,9 @@ export function CentralVendasResumoPage() {
 
         {/* ── KPI CARDS ────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 print:grid-cols-5">
-          {/* Receita Líquida Total */}
+          {/* Receita Bruta Total */}
           <KpiCard
-            label="Receita Líquida Total"
+            label="Receita Bruta Total"
             value={fmtBRL(totalRecLiqCurrent)}
             accent="#1d4ed8"
             delta={deltaRecLiqPct}
@@ -553,7 +539,7 @@ export function CentralVendasResumoPage() {
             className="print-hidden w-full px-6 py-3 border-b border-slate-100 flex items-center justify-between hover:bg-slate-50 transition-colors"
           >
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-              Receita Líquida por Dia — {currLabel}
+              Receita Bruta por Dia — {currLabel}
               {dailyData.length > 0 && <span className="ml-2 font-normal text-slate-400 normal-case">({dailyData.length} dias com movimento)</span>}
             </span>
             {dailyExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
@@ -561,7 +547,7 @@ export function CentralVendasResumoPage() {
           {/* Header para impressão */}
           <div className="print:block px-6 py-3 border-b border-slate-100 hidden">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-              Receita Líquida por Dia — {currLabel}
+              Receita Bruta por Dia — {currLabel}
             </span>
           </div>
 

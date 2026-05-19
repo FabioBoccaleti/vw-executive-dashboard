@@ -987,8 +987,9 @@ export default function VPecasAnalise() {
                       const activeKeys = dailyGroupBy === 'dept'
                         ? (singleDept ? [dailySelDept] : dailyDepts).filter(k => (d?.[k] ?? 0) > 0)
                         : (dailySelTrans === 'Todos' ? dailyTransacoes : [dailySelTrans]).filter(k => (d?.[k] ?? 0) > 0);
+                      const cumKeys = keys.filter(k => (d?.[`cum_${k}`] ?? 0) > 0);
                       const moTotal = activeKeys.reduce((s, k) => s + (d?.[k] ?? 0), 0);
-                      const cumTotal = activeKeys.reduce((s, k) => s + (d?.[`cum_${k}`] ?? 0), 0);
+                      const cumTotal = cumKeys.reduce((s, k) => s + (d?.[`cum_${k}`] ?? 0), 0);
                       return (
                         <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[200px]">
                           <p className="font-bold text-slate-700 mb-1.5">{d?.mes}/{year}</p>
@@ -1008,7 +1009,7 @@ export default function VPecasAnalise() {
                           )}
                           <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
                             <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até {d?.mes}</p>
-                            {activeKeys.map(k => (d?.[`cum_${k}`] ?? 0) > 0 && (
+                            {cumKeys.map(k => (
                               <div key={k} className="flex justify-between gap-4">
                                 <span className="font-semibold" style={{ color: dailyGroupBy === 'dept' ? deptColor(k, dailyDepts.indexOf(k)) : transColorD(dailyTransacoes, k) }}>
                                   {dailyGroupBy === 'dept' ? deptName(k) : transLabelD(k)}
@@ -1016,7 +1017,7 @@ export default function VPecasAnalise() {
                                 <span className="font-mono text-slate-600">{fmtBRLF(d?.[`cum_${k}`] ?? 0)}</span>
                               </div>
                             ))}
-                            {activeKeys.length > 1 && (
+                            {cumKeys.length > 1 && (
                               <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
                                 <span className="font-bold text-slate-700">Total</span>
                                 <span className="font-mono font-bold text-slate-800">{fmtBRLF(cumTotal)}</span>
@@ -1065,8 +1066,9 @@ export default function VPecasAnalise() {
                       const activeKeys = dailyGroupBy === 'dept'
                         ? (singleDept ? [dailySelDept] : dailyDepts).filter(k => (d?.[k] ?? 0) > 0)
                         : (dailySelTrans === 'Todos' ? dailyTransacoes : [dailySelTrans]).filter(k => (d?.[k] ?? 0) > 0);
+                      const cumKeys = keys.filter(k => (d?.[`cum_${k}`] ?? 0) > 0);
                       const dayTotal = activeKeys.reduce((s, k) => s + (d?.[k] ?? 0), 0);
-                      const cumTotal = activeKeys.reduce((s, k) => s + (d?.[`cum_${k}`] ?? 0), 0);
+                      const cumTotal = cumKeys.reduce((s, k) => s + (d?.[`cum_${k}`] ?? 0), 0);
                       return (
                         <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs min-w-[200px]">
                           <p className="font-bold text-slate-700 mb-1.5">Dia {lbl} — {MS[month! - 1]}/{year}</p>
@@ -1086,7 +1088,7 @@ export default function VPecasAnalise() {
                           )}
                           <div className="mt-2 pt-1.5 border-t-2 border-slate-200">
                             <p className="text-[10px] text-slate-400 font-bold mb-1">Acumulado até dia {lbl}</p>
-                            {activeKeys.map(k => (d?.[`cum_${k}`] ?? 0) > 0 && (
+                            {cumKeys.map(k => (
                               <div key={k} className="flex justify-between gap-4">
                                 <span className="font-semibold" style={{ color: dailyGroupBy === 'dept' ? deptColor(k, dailyDepts.indexOf(k)) : transColorD(dailyTransacoes, k) }}>
                                   {dailyGroupBy === 'dept' ? deptName(k) : transLabelD(k)}
@@ -1094,7 +1096,7 @@ export default function VPecasAnalise() {
                                 <span className="font-mono text-slate-600">{fmtBRLF(d?.[`cum_${k}`] ?? 0)}</span>
                               </div>
                             ))}
-                            {activeKeys.length > 1 && (
+                            {cumKeys.length > 1 && (
                               <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
                                 <span className="font-bold text-slate-700">Total</span>
                                 <span className="font-mono font-bold text-slate-800">{fmtBRLF(cumTotal)}</span>
