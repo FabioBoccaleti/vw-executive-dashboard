@@ -151,6 +151,7 @@ export const DESCRICAO_PADRAO: readonly string[] = [
   'Premiação de Venda Serviço Despachante Novos',
   'Premiação de Venda Serviço Despachante Usados',
   'Comissão de Vendas',
+  'Adicional de Dias Trabalhados',
 ];
 
 export const DESCRICAO_TRIMESTRAL = 'Lucro Operacional Trimestral';
