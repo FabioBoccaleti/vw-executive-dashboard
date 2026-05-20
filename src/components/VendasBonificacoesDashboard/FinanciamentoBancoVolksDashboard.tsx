@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, Trash2, FileSpreadsheet, BarChart2, ClipboardList, Pencil, X, Percent, Printer, Zap, PenLine, CheckCircle, ShieldCheck } from 'lucide-react';
+import { Upload, Trash2, FileSpreadsheet, BarChart2, ClipboardList, Pencil, X, Percent, Printer, Zap, PenLine, CheckCircle, ShieldCheck, Lock, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiLogin } from '@/lib/authClient';
 import type { CampoAssinaturaComissao, AssinaturaDigital } from '../FolhaPagamentoDashboard/comissoesLancamentosStorage';
@@ -246,6 +246,8 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   // ── Aba Acelera ──
   const [aceleraGarantido, setAceleraGarantido] = useState<Record<string, string>>({});
   const [aceleraGarantidoLoading, setAceleraGarantidoLoading] = useState(false);
+  const [aceleraPago, setAceleraPago] = useState(false);
+  const [aceleraReabrirDialog, setAceleraReabrirDialog] = useState<{ senhaInput: string; erro: string | null } | null>(null);
 
   const loadMes = useCallback(async () => {
     setLoading(true);
@@ -298,14 +300,20 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     loadRemuneracaoRegras().then(r => setRegras(r)).finally(() => setRegrasLoading(false));
   }, []);
 
-  // Carrega % Garantido do KV ao entrar na aba Acelera ou mudar mês/ano
+  // Carrega % Garantido e status de pagamento do KV ao entrar na aba Acelera ou no Demonstrativo de Pagamento
   useEffect(() => {
-    if (vendasSubTab !== 'acelera') return;
+    if (vendasSubTab !== 'acelera' && vendasInnerTab !== 'demonstrativo') return;
     setAceleraGarantidoLoading(true);
-    kvGet<Record<string, string>>(`financiamento:acelera:garantido:${vendasYear}:${vendasMonth}`)
-      .then(d => setAceleraGarantido(d ?? {}))
+    Promise.all([
+      kvGet<Record<string, string>>(`financiamento:acelera:garantido:${vendasYear}:${vendasMonth}`),
+      kvGet<boolean>(`financiamento:acelera:pago:${vendasYear}:${vendasMonth}`),
+    ])
+      .then(([garantido, pago]) => {
+        setAceleraGarantido(garantido ?? {});
+        setAceleraPago(pago ?? false);
+      })
       .finally(() => setAceleraGarantidoLoading(false));
-  }, [vendasSubTab, vendasYear, vendasMonth]);
+  }, [vendasSubTab, vendasInnerTab, vendasYear, vendasMonth]);
 
   // Carrega assinaturas digitais do demonstrativo
   useEffect(() => {
@@ -315,9 +323,25 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   }, [activeSection, vendasInnerTab, vendasYear, vendasMonth]);
 
   async function handleGarantidoChange(vendedor: string, value: string) {
+    if (aceleraPago) return;
     const next = { ...aceleraGarantido, [vendedor]: value };
     setAceleraGarantido(next);
     await kvSet(`financiamento:acelera:garantido:${vendasYear}:${vendasMonth}`, next);
+  }
+
+  async function handleAceleraPagar() {
+    setAceleraPago(true);
+    await kvSet(`financiamento:acelera:pago:${vendasYear}:${vendasMonth}`, true);
+  }
+
+  async function handleAceleraReabrir() {
+    if (aceleraReabrirDialog?.senhaInput !== '1985') {
+      setAceleraReabrirDialog(prev => prev ? { ...prev, erro: 'Senha incorreta.' } : prev);
+      return;
+    }
+    setAceleraPago(false);
+    await kvSet(`financiamento:acelera:pago:${vendasYear}:${vendasMonth}`, false);
+    setAceleraReabrirDialog(null);
   }
 
   async function handleAssinarTodosDemo() {
@@ -1458,6 +1482,15 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                 </div>
               );
 
+              // Pré-calcula totais do Acelera para exibir Pontos no cabeçalho de cada demonstrativo
+              const totalAceleraIncentivo = aceleraRows.reduce((acc, r) => acc + r.incentivo, 0);
+              const totalAceleraGarantidoPct = aceleraRows.reduce((acc, r) => {
+                const raw = (aceleraGarantido[r.vendedor] ?? '').replace('%', '').replace(',', '.').trim();
+                const n = parseFloat(raw);
+                return acc + (isNaN(n) ? 0 : n);
+              }, 0);
+              const aceleraPctRestante = Math.max(0, 100 - totalAceleraGarantidoPct);
+
               return (
                 <div className="overflow-auto max-h-[calc(100vh-280px)] print:overflow-visible print:max-h-none">
                   <style>{`
@@ -1522,6 +1555,23 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                     const vendorRows = allRows.filter(r => String(r[VEND_COL] ?? '').trim() === vendor);
                     const novos = vendorRows.filter(r => !String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
                     const usados = vendorRows.filter(r => String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
+
+                    // Pontos Acelera deste vendedor
+                    const aceleraRowVendor = aceleraRows.find(r => r.vendedor === vendor);
+                    let pontosAcelera: number | null = null;
+                    if (aceleraRowVendor) {
+                      const garantidoRaw = (aceleraGarantido[vendor] ?? '').trim();
+                      const temGarantido = garantidoRaw !== '' && garantidoRaw !== '0' && garantidoRaw !== '0%';
+                      if (temGarantido) {
+                        const garantidoPct = parseFloat(garantidoRaw.replace('%', '').replace(',', '.'));
+                        if (!isNaN(garantidoPct) && totalAceleraIncentivo !== 0) {
+                          pontosAcelera = Math.floor((garantidoPct / 100) * totalAceleraIncentivo);
+                        }
+                      } else if (aceleraRowVendor.incentivo !== 0 && totalAceleraIncentivo !== 0) {
+                        pontosAcelera = Math.floor(aceleraRowVendor.incentivo * (aceleraPctRestante / 100));
+                      }
+                    }
+
                     return (
                       <div key={vi} className="demo-page bg-white border border-slate-200 rounded-xl p-5 mb-4">
                         <div className="text-center pb-2 mb-3 border-b border-slate-200">
@@ -1530,9 +1580,15 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                         </div>
                         <div className="flex justify-between items-center mb-4 text-xs text-slate-800">
                           <div><span className="font-semibold">Vendedor:</span> {vendor}</div>
-                          <div className="flex gap-6">
+                          <div className="flex gap-6 items-center">
                             <div><span className="font-semibold">Mês de Apuração:</span> {MONTHS[vendasMonth - 1]}/{vendasYear}</div>
                             <div><span className="font-semibold">Mês Base:</span> {MONTHS[mesBaseMonth - 1]}/{mesBaseYear}</div>
+                            {pontosAcelera !== null && pontosAcelera > 0 && (
+                              <div className="bg-amber-50 border border-amber-300 rounded px-2 py-0.5 flex items-center gap-1">
+                                <span className="font-semibold text-amber-700">⚡ Acelera:</span>
+                                <span className="font-bold text-amber-800">{pontosAcelera.toLocaleString('pt-BR')} pts</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                         {novos.length > 0 && renderTable(novos, 'Veículos Novos')}
@@ -1890,6 +1946,29 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-xs text-slate-400">{aceleraRows.length} vendedor(es)</span>
+                      {aceleraPago ? (
+                        <>
+                          <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-300">
+                            <Lock className="w-3.5 h-3.5" />
+                            PAGO
+                          </span>
+                          <button
+                            onClick={() => setAceleraReabrirDialog({ senhaInput: '', erro: null })}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded-lg transition-colors border border-slate-300"
+                          >
+                            <LockOpen className="w-3.5 h-3.5" />
+                            Reabrir
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={handleAceleraPagar}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                        >
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          Marcar como Pago
+                        </button>
+                      )}
                       <button
                         onClick={handlePrintAcelera}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors"
@@ -1955,7 +2034,12 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                                     value={aceleraGarantido[row.vendedor] ?? ''}
                                     onChange={e => handleGarantidoChange(row.vendedor, e.target.value)}
                                     placeholder="0,00%"
-                                    className="w-full border border-slate-300 rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-amber-300 bg-amber-50 placeholder:text-slate-300"
+                                    disabled={aceleraPago}
+                                    className={`w-full border rounded px-2 py-1 text-xs text-center focus:outline-none placeholder:text-slate-300 ${
+                                      aceleraPago
+                                        ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed'
+                                        : 'border-slate-300 bg-amber-50 focus:ring-2 focus:ring-amber-300'
+                                    }`}
                                   />
                                 </td>
                                 <td className="px-3 py-2 text-center text-slate-700">
@@ -2385,6 +2469,54 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
               >
                 <PenLine className="w-3.5 h-3.5" />
                 {demoAssinaDialog.loading ? 'Assinando...' : 'Assinar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Dialog: Reabrir Acelera ── */}
+      {aceleraReabrirDialog !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) setAceleraReabrirDialog(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0">
+                <LockOpen className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800">Reabrir Acelera</p>
+                <p className="text-xs text-slate-500 mt-0.5">{MONTHS[vendasMonth - 1]}/{vendasYear}</p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-slate-600">Senha</label>
+              <input
+                type="password"
+                autoFocus
+                value={aceleraReabrirDialog.senhaInput}
+                onChange={e => setAceleraReabrirDialog(prev => prev ? { ...prev, senhaInput: e.target.value, erro: null } : prev)}
+                onKeyDown={e => e.key === 'Enter' && handleAceleraReabrir()}
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                placeholder="Digite a senha"
+              />
+              {aceleraReabrirDialog.erro && (
+                <p className="text-xs text-red-500">{aceleraReabrirDialog.erro}</p>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setAceleraReabrirDialog(null)}
+                className="flex-1 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAceleraReabrir}
+                className="flex-1 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold transition-colors"
+              >
+                Reabrir
               </button>
             </div>
           </div>
