@@ -436,11 +436,17 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       const garantidoRaw = (aceleraGarantido[row.vendedor] ?? '').trim();
       const temGarantido = garantidoRaw !== '' && garantidoRaw !== '0' && garantidoRaw !== '0%';
       let pctAcelera = '—';
+      let displayedIncentivo: number | null = null;
       if (temGarantido) {
         pctAcelera = garantidoRaw;
+        const garantidoPct = parseFloat(garantidoRaw.replace('%', '').replace(',', '.'));
+        if (!isNaN(garantidoPct) && totalIncentivo !== 0) {
+          displayedIncentivo = (garantidoPct / 100) * totalIncentivo;
+        }
       } else if (row.incentivo !== 0 && totalIncentivo !== 0) {
         const prop = (row.incentivo / totalIncentivo) * pctRestante;
         pctAcelera = prop.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+        displayedIncentivo = row.incentivo * (pctRestante / 100);
       }
       const isEven = idx % 2 === 0;
       const rowBg   = isEven ? '#ffffff' : '#fffbeb';
@@ -450,7 +456,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
         <td class="col-num" style="color:${numColor};font-weight:700">${idx + 1}</td>
         <td class="col-nome" style="font-weight:600;color:#1e293b">${row.vendedor}</td>
         <td class="col-cpf" style="color:#475569;font-weight:600">${row.cpf || '—'}</td>
-        <td class="col-inc" style="text-align:right;color:${row.incentivo !== 0 ? '#1e293b' : '#cbd5e1'}">${row.incentivo !== 0 ? 'R$&nbsp;' + fmtBRL(row.incentivo) : '—'}</td>
+        <td class="col-inc" style="text-align:right;color:${displayedIncentivo !== null ? '#1e293b' : '#cbd5e1'}">${displayedIncentivo !== null ? 'R$&nbsp;' + fmtBRL(displayedIncentivo) : '—'}</td>
         <td class="col-pct" style="text-align:center;color:${hasGar ? '#b45309' : '#cbd5e1'};font-weight:${hasGar ? '700' : '400'}">${(aceleraGarantido[row.vendedor] ?? '').trim() || '—'}</td>
         <td class="col-pct" style="text-align:center;color:${pctAcelera !== '—' ? '#0f766e' : '#cbd5e1'};font-weight:700">${pctAcelera}</td>
       </tr>`;
@@ -1922,11 +1928,17 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
 
                             // % Acelera: se tem garantido → usa garantido; se tem incentivo → proporcional; senão → —
                             let pctAcelera: string | null = null;
+                            let displayedIncentivo: number | null = null;
                             if (temGarantido) {
                               pctAcelera = garantidoRaw;
+                              const garantidoPct = parseFloat(garantidoRaw.replace('%', '').replace(',', '.'));
+                              if (!isNaN(garantidoPct) && totalIncentivo !== 0) {
+                                displayedIncentivo = (garantidoPct / 100) * totalIncentivo;
+                              }
                             } else if (row.incentivo !== 0 && totalIncentivo !== 0) {
                               const proporcional = (row.incentivo / totalIncentivo) * pctRestante;
                               pctAcelera = proporcional.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+                              displayedIncentivo = row.incentivo * (pctRestante / 100);
                             }
 
                             return (
@@ -1935,7 +1947,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                                 <td className="px-3 py-2 text-slate-800 font-medium border-r border-slate-100 whitespace-nowrap">{row.vendedor}</td>
                                 <td className="px-3 py-2 text-slate-600 border-r border-slate-100 whitespace-nowrap font-mono">{row.cpf || '—'}</td>
                                 <td className="px-3 py-2 text-slate-700 border-r border-slate-100 text-right whitespace-nowrap">
-                                  {row.incentivo !== 0 ? `R$ ${fmtBRL(row.incentivo)}` : '—'}
+                                  {displayedIncentivo !== null ? `R$ ${fmtBRL(displayedIncentivo)}` : '—'}
                                 </td>
                                 <td className="px-2 py-1.5 border-r border-slate-100 text-center">
                                   <input
