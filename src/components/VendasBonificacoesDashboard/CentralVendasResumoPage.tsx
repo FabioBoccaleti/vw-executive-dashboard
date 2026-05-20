@@ -212,9 +212,8 @@ export function CentralVendasResumoPage() {
       const usadosRows = rowsUsados.filter(r => { const { yr: y, mo: m } = getYrMo(r); return y === yr && m === mo && getDiaVenda(r) > 0; });
       let usadosRecBruta = 0, usadosLb = 0;
       for (const r of usadosRows) {
-        const sign = r.transacao === 'U07' ? -1 : 1;
-        usadosRecBruta += sign * n(r.valorVenda);
-        usadosLb       += sign * calcUsadosRow(r, aliqBon).lb;
+        usadosRecBruta += n(r.valorVenda);
+        usadosLb       += calcUsadosRow(r, aliqBon).lb;
       }
       const usadosVol = usadosRows.filter(r => r.transacao !== 'U07').length;
 

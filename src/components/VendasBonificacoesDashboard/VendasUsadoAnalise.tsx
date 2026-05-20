@@ -842,7 +842,7 @@ export function VendasUsadoAnalise() {
     let cumReceita = 0, cumQtd = 0;
     return daysInMonthUsados.map(day => {
       const dayRows = baseRows.filter(r => getDiaVenda(r) === day);
-      const receita = dayRows.reduce((s, r) => s + (r.transacao === 'U07' ? -1 : 1) * n(r.valorVenda), 0);
+      const receita = dayRows.reduce((s, r) => s + n(r.valorVenda), 0);
       const qtd     = dayRows.reduce((s, r) => s + (r.transacao === 'U07' ? -1 : 1), 0);
       cumReceita += receita;
       cumQtd     += qtd;
@@ -860,7 +860,7 @@ export function VendasUsadoAnalise() {
     return MS.map((label, i) => {
       const mo = i + 1;
       const moRows = baseRows.filter(r => getMo(r) === mo);
-      const receita = moRows.reduce((s, r) => s + (r.transacao === 'U07' ? -1 : 1) * n(r.valorVenda), 0);
+      const receita = moRows.reduce((s, r) => s + n(r.valorVenda), 0);
       const qtd     = moRows.reduce((s, r) => s + (r.transacao === 'U07' ? -1 : 1), 0);
       cumReceita += receita;
       cumQtd     += qtd;
