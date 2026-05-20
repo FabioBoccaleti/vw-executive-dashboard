@@ -841,9 +841,9 @@ export function VendasUsadoAnalise() {
     );
     let cumReceita = 0, cumQtd = 0;
     return daysInMonthUsados.map(day => {
-      const dayRows = baseRows.filter(r => getDiaVenda(r) === day && r.transacao !== 'U07');
-      const receita = dayRows.reduce((s, r) => s + n(r.valorVenda), 0);
-      const qtd     = dayRows.length;
+      const dayRows = baseRows.filter(r => getDiaVenda(r) === day);
+      const receita = dayRows.reduce((s, r) => s + (r.transacao === 'U07' ? -1 : 1) * n(r.valorVenda), 0);
+      const qtd     = dayRows.reduce((s, r) => s + (r.transacao === 'U07' ? -1 : 1), 0);
       cumReceita += receita;
       cumQtd     += qtd;
       return { dia: String(day).padStart(2, '0'), receita, qtd, cumReceita, cumQtd };
@@ -854,15 +854,14 @@ export function VendasUsadoAnalise() {
   const monthlyUsadosData = useMemo(() => {
     const baseRows = yearRows.filter(r =>
       (dailyVendedor === 'Todos' || (r.vendedor?.trim() || '') === dailyVendedor) &&
-      (dailyMarca    === 'Todas' || normalizeMarca(r.modelo ?? '') === dailyMarca) &&
-      r.transacao !== 'U07'
+      (dailyMarca    === 'Todas' || normalizeMarca(r.modelo ?? '') === dailyMarca)
     );
     let cumReceita = 0, cumQtd = 0;
     return MS.map((label, i) => {
       const mo = i + 1;
       const moRows = baseRows.filter(r => getMo(r) === mo);
-      const receita = moRows.reduce((s, r) => s + n(r.valorVenda), 0);
-      const qtd     = moRows.length;
+      const receita = moRows.reduce((s, r) => s + (r.transacao === 'U07' ? -1 : 1) * n(r.valorVenda), 0);
+      const qtd     = moRows.reduce((s, r) => s + (r.transacao === 'U07' ? -1 : 1), 0);
       cumReceita += receita;
       cumQtd     += qtd;
       return { mes: label, receita, qtd, cumReceita, cumQtd };
