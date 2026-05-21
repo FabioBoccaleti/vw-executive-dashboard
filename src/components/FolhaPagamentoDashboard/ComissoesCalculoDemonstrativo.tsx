@@ -386,9 +386,7 @@ export function ComissoesCalculoDemonstrativo({
           const lb  = r._d.lucroBruto;
           linhas[key] = {
             comVenda: temFaixas ? (comVendaByKey[key] ?? 0) : 0,
-            comLB: key in existingLinhas
-              ? (existingLinhas[key]?.comLB ?? 0)
-              : (temPctLB && (lb > 0 || r.transacao === txDevol) ? lb * (pctLB / 100) : 0),
+            comLB: temPctLB && (lb > 0 || r.transacao === txDevol) ? lb * (pctLB / 100) : 0,
           };
         });
       } else {
@@ -411,9 +409,7 @@ export function ComissoesCalculoDemonstrativo({
           const lb  = r._d.lucroBruto;
           linhas[key] = {
             comVenda: pctVenda > 0 ? n(r.valorVenda) * (pctVenda / 100) : 0,
-            comLB: key in existingLinhas
-              ? (existingLinhas[key]?.comLB ?? 0)
-              : (temPctLB && (lb > 0 || r.transacao === txDevol) ? lb * (pctLB / 100) : 0),
+            comLB: temPctLB && (lb > 0 || r.transacao === txDevol) ? lb * (pctLB / 100) : 0,
           };
         });
       }
@@ -684,7 +680,7 @@ export function ComissoesCalculoDemonstrativo({
                 onClick={handleRecalcular}
                 disabled={recalculating}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 disabled:opacity-50 transition-colors"
-                title="Recalcula as comissões usando as faixas atuais do Cadastro, preservando os valores de Com. s/ LB"
+                title="Recalcula as comissões usando as faixas e percentuais atuais do Cadastro"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? 'animate-spin' : ''}`} />
                 {recalculating ? 'Recalculando...' : 'Recalcular'}
