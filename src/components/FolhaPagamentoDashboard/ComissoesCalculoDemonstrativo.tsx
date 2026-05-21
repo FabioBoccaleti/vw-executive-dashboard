@@ -213,7 +213,7 @@ export function ComissoesCalculoDemonstrativo({
     const existingLinhas = existing?.linhas ?? {};
 
     // Verifica se há linhas novas ainda não cobertas pelo lançamento existente
-    const derivedKeys       = derivedRows.map((r, ri) => r.chassi || String(ri));
+    const derivedKeys       = derivedRows.map((r, ri) => rowKey(r.chassi, ri));
     const hasNewRows        = derivedKeys.some(k => !(k in existingLinhas));
 
     // Só pula o recálculo se todas as linhas já têm comVenda definida E não há linhas novas
@@ -221,7 +221,7 @@ export function ComissoesCalculoDemonstrativo({
     // Detecta linhas de venda que já estão no lançamento mas com comVenda=0 (ex.: linha manual
     // adicionada com transação vazia e depois corrigida para U21/V21 pelo usuário)
     const hasUnpricedSaleRows = derivedRows.some((r, ri) => {
-      const key = r.chassi || String(ri);
+      const key = rowKey(r.chassi, ri);
       return r.transacao === txVenda && key in existingLinhas && (existingLinhas[key]?.comVenda ?? 0) === 0;
     });
     if (hasManualComVenda && !hasNewRows && !hasUnpricedSaleRows) return;
@@ -238,7 +238,7 @@ export function ComissoesCalculoDemonstrativo({
       if (onlyFillComVenda && !temFaixas) return;
 
       // Preserva índice original para chave correta após reordenação por data
-      const indexed = derivedRows.map((r, ri) => ({ r, ri, key: r.chassi || String(ri) }));
+      const indexed = derivedRows.map((r, ri) => ({ r, ri, key: rowKey(r.chassi, ri) }));
       const sorted  = [...indexed].sort((a, b) =>
         parseDV(a.r.dataVenda ?? '') - parseDV(b.r.dataVenda ?? '')
       );
@@ -262,7 +262,7 @@ export function ComissoesCalculoDemonstrativo({
       });
 
       derivedRows.forEach((r, ri) => {
-        const key  = r.chassi || String(ri);
+        const key  = rowKey(r.chassi, ri);
         const lb   = r._d.lucroBruto;
         linhas[key] = {
           comVenda: temFaixas ? (comVendaByKey[key] ?? 0) : 0,
@@ -295,7 +295,7 @@ export function ComissoesCalculoDemonstrativo({
       const pctVenda = (isNaN(pctVendaBase) ? 0 : pctVendaBase) + bonusPct;
 
       derivedRows.forEach((r, ri) => {
-        const key  = r.chassi || String(ri);
+        const key  = rowKey(r.chassi, ri);
         const lb   = r._d.lucroBruto;
         const vv   = n(r.valorVenda);
         linhas[key] = {
@@ -347,7 +347,7 @@ export function ComissoesCalculoDemonstrativo({
   }
 
   function rowKey(chassi: string | undefined, idx: number): string {
-    return chassi || String(idx);
+    return chassi ? `${chassi}_${idx}` : String(idx);
   }
 
   async function handleRecalcular() {
@@ -362,7 +362,7 @@ export function ComissoesCalculoDemonstrativo({
 
       if (tab === 'usados') {
         const temFaixas = (modal.faixasBonus?.length ?? 0) > 0;
-        const indexed = derivedRows.map((r, ri) => ({ r, ri, key: r.chassi || String(ri) }));
+        const indexed = derivedRows.map((r, ri) => ({ r, ri, key: rowKey(r.chassi, ri) }));
         const sorted  = [...indexed].sort((a, b) =>
           parseDV(a.r.dataVenda ?? '') - parseDV(b.r.dataVenda ?? '')
         );
@@ -382,7 +382,7 @@ export function ComissoesCalculoDemonstrativo({
           }
         });
         derivedRows.forEach((r, ri) => {
-          const key = r.chassi || String(ri);
+          const key = rowKey(r.chassi, ri);
           const lb  = r._d.lucroBruto;
           linhas[key] = {
             comVenda: temFaixas ? (comVendaByKey[key] ?? 0) : 0,
@@ -405,7 +405,7 @@ export function ComissoesCalculoDemonstrativo({
         }
         const pctVenda = (isNaN(pctVendaBase) ? 0 : pctVendaBase) + bonusPct;
         derivedRows.forEach((r, ri) => {
-          const key = r.chassi || String(ri);
+          const key = rowKey(r.chassi, ri);
           const lb  = r._d.lucroBruto;
           linhas[key] = {
             comVenda: pctVenda > 0 ? n(r.valorVenda) * (pctVenda / 100) : 0,
@@ -550,7 +550,7 @@ export function ComissoesCalculoDemonstrativo({
       totCusto += sign * n(r.valorCusto);
       totBonus += sign * r._d.bonus;
       totLB    += sign * r._d.lucroBruto;
-      const key = r.chassi || String(ri);
+      const key = rowKey(r.chassi, ri);
       if (editMode) {
         const ev = editValues[key];
         if (ev) { totComV += nInput(ev.comVenda); totComLB += nInput(ev.comLB); hasComissao = true; }
@@ -800,7 +800,7 @@ export function ComissoesCalculoDemonstrativo({
                     .sort((a, b) => parseDV(a.r.dataVenda ?? '') - parseDV(b.r.dataVenda ?? ''))
                     .map(({ r, ri }, dri) => {
                     const bg     = dri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
-                    const key    = r.chassi || String(ri);
+                    const key    = rowKey(r.chassi, ri);
                     const linha  = lancamento?.linhas?.[key];
                     const ev     = editValues[key];
                     const cvVal  = editMode ? nInput(ev?.comVenda ?? '') : (linha?.comVenda ?? 0);
