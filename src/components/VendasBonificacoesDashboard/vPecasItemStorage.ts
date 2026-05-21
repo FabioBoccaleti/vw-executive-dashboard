@@ -4,32 +4,23 @@ import * as XLSX from 'xlsx';
 const KEY_VPECAS_ITEM = 'registro_vpecas_item';
 const KEY_VPECAS_ITEM_DEVOLUCAO = 'registro_vpecas_item_devolucao';
 
-// Todos os cabecalhos do arquivo de itens (na ordem original)
+// Colunas armazenadas (apenas as utilizadas pelo dashboard)
 export const ITEM_HEADERS = [
-  'EMPRESA', 'REVENDA', 'ITEM_ESTOQUE', 'VAL_VENDA', 'VAL_RENTABILIDADE',
-  'PER_RENTABILIDADE', 'VAL_IMPOSTOS', 'ITEM_ESTOQUE_PUB', 'DES_ITEM_ESTOQUE',
-  'CLASS_ABC', 'CLASS_XYZ', 'QUANTIDADE', 'VAL_DESCONTO', 'VAL_DEVERIA',
-  'VAL_UNITARIO', 'VAL_FRETE_PF', 'VAL_FRETE', 'CUSTO_REPOS', 'CUSTO_MEDIO',
-  'PRECO_PUBLICO_ATUAL', 'NOME_GRUPO', 'GRUPO', 'NOME_CATEGORIA', 'CATEGORIA',
-  'NOME_SUB_CATEGORIA', 'SUB_CATEGORIA', 'PCT_DESCONTO', 'GRUPO_DESCONTO',
-  'CLIENTE', 'NOME_CLIENTE', 'CATEGORIA_CLIENTE', 'CGCCPF', 'NOME_CATEGORIA_CLIENTE',
-  'VENDEDOR', 'NOME_VENDEDOR', 'NOME_DEPARTAMENTO', 'DEPARTAMENTO',
-  'DTA_ENTRADA_SAIDA', 'MODALIDADE', 'TIPO_TRANSACAO', 'TIPO',
-  'NUMERO_NOTA_FISCAL', 'SERIE_NOTA_FISCAL', 'NOME_USUARIO', 'PCTDESC_PERMITIDO',
-  'PCT_PIS', 'PCT_COFINS', 'CST_PIS_COFINS', 'CONTADOR',
+  'ITEM_ESTOQUE', 'ITEM_ESTOQUE_PUB', 'DES_ITEM_ESTOQUE',
+  'VAL_VENDA', 'VAL_RENTABILIDADE', 'VAL_IMPOSTOS', 'VAL_DESCONTO',
+  'VAL_UNITARIO', 'CUSTO_MEDIO', 'QUANTIDADE',
+  'NOME_CLIENTE', 'NOME_VENDEDOR', 'NOME_DEPARTAMENTO', 'DEPARTAMENTO',
+  'DTA_ENTRADA_SAIDA', 'TIPO_TRANSACAO', 'NUMERO_NOTA_FISCAL', 'SERIE_NOTA_FISCAL',
 ] as const;
 
 // Campos monetarios
 export const ITEM_CURRENCY_FIELDS = new Set<string>([
   'VAL_VENDA', 'VAL_RENTABILIDADE', 'VAL_IMPOSTOS', 'VAL_DESCONTO',
-  'VAL_DEVERIA', 'VAL_UNITARIO', 'VAL_FRETE_PF', 'VAL_FRETE',
-  'CUSTO_REPOS', 'CUSTO_MEDIO', 'PRECO_PUBLICO_ATUAL',
+  'VAL_UNITARIO', 'CUSTO_MEDIO',
 ]);
 
 // Campos percentuais
-export const ITEM_PERCENT_FIELDS = new Set<string>([
-  'PER_RENTABILIDADE', 'PCT_DESCONTO', 'PCTDESC_PERMITIDO', 'PCT_PIS', 'PCT_COFINS',
-]);
+export const ITEM_PERCENT_FIELDS = new Set<string>();
 
 export const ITEM_DATE_FIELDS = new Set<string>(['DTA_ENTRADA_SAIDA']);
 
@@ -158,10 +149,6 @@ export function parsePecasItemTxt(content: string): Omit<VPecasItemRow, 'id'>[] 
       const idx = colIdx[h];
       rowData[h] = idx !== undefined ? (fields[idx] ?? '').trim() : '';
     }
-    // Colunas extras no arquivo alem de ITEM_HEADERS
-    headers.forEach((h, idx) => {
-      if (h && !(h in rowData)) rowData[h] = (fields[idx] ?? '').trim();
-    });
 
     // Ignora transações P07 e A07
     const tipoTransacao = (rowData['TIPO_TRANSACAO'] ?? '').trim().toUpperCase();
@@ -259,9 +246,6 @@ export function parsePecasItemDevolucaoTxt(content: string): Omit<VPecasItemRow,
       const idx = colIdx[h];
       rowData[h] = idx !== undefined ? (fields[idx] ?? '').trim() : '';
     }
-    headers.forEach((h, idx) => {
-      if (h && !(h in rowData)) rowData[h] = (fields[idx] ?? '').trim();
-    });
 
     result.push({ data: negateMonetaryFields(rowData), isDevolucao: true });
   }
