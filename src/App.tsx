@@ -24,6 +24,7 @@ import { LoginScreen } from '@/components/LoginScreen'
 import { AdminPage } from '@/components/AdminPage'
 import { CustosAlugueisDashboard } from '@/components/CustosAlugueisDashboard'
 import { ResumoDREDashboard } from '@/components/ResumoDREDashboard'
+import { AnaliseProjecoesDashboard } from '@/components/AnaliseProjecoesDashboard'
 import { AnaliseDespesasDashboard } from '@/components/AnaliseDespesasDashboard'
 
 function AppContent() {
@@ -70,7 +71,7 @@ function AppContent() {
     }
   }, [])
   
-  const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'vw_outros', 'audi_outros']
+  const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'vw_outros', 'audi_outros']
 
   const handleBrandSelect = async (selectedBrand: Brand) => {
     saveBrand(selectedBrand)
@@ -300,6 +301,8 @@ function AppContent() {
         <AnaliseDespesasDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'resumo_dre' ? (
         <ResumoDREDashboard onChangeBrand={handleChangeBrand} />
+      ) : brand === 'analise_projecoes' ? (
+        <AnaliseProjecoesDashboard onChangeBrand={handleChangeBrand} />
       ) : (
         <VWFinancialDashboard 
           brand={brand} 

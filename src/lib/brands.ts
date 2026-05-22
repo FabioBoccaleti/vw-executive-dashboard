@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas';
 
 // Interface de configuraÃ§Ã£o visual da marca
 export interface BrandConfig {
@@ -135,6 +135,31 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-primary-light': '#f0fdfa',
       '--brand-secondary': '#14b8a6',
       '--brand-accent': '#2dd4bf',
+    }
+  },
+  analise_projecoes: {
+    id: 'analise_projecoes',
+    name: 'Análise de Projeções',
+    shortName: 'Projeções',
+    colors: {
+      primary: '#ea580c',
+      primaryHover: '#c2410c',
+      primaryLight: '#fff7ed',
+      secondary: '#fb923c',
+      accent: '#fdba74',
+      headerBg: 'bg-[#ea580c]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#ea580c] hover:bg-[#c2410c]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-orange-100 dark:bg-orange-900/30',
+      badgeText: 'text-orange-800 dark:text-orange-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#ea580c',
+      '--brand-primary-hover': '#c2410c',
+      '--brand-primary-light': '#fff7ed',
+      '--brand-secondary': '#fb923c',
+      '--brand-accent': '#fdba74',
     }
   },
   vw_outros: {

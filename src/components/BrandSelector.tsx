@@ -7,7 +7,7 @@ import { PasswordDialog } from '@/components/PasswordDialog';
 import { useAuth } from '@/contexts/useAuth';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
 
-const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'vw_outros', 'audi_outros'];
+const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'vw_outros', 'audi_outros'];
 const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas'];
 const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despesas'];
 
@@ -83,6 +83,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
     if (brand === 'folha_pagamento')                 return <Users className={size} />;
     if (brand === 'custos_alugueis')                 return <Home className={size} />;
     if (brand === 'analise_evolutiva_despesas')      return <Activity className={size} />;
+    if (brand === 'analise_projecoes')             return <BarChart2 className={size} />;
     if (brand.includes('vw'))                        return <Car className={size} />;
     return <Building2 className={size} />;
   };
