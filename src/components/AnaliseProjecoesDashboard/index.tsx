@@ -26,8 +26,8 @@ import {
   type PeriodoType,
 } from './ComparativoTab';
 import { AnualView } from './AnualView';
-import { loadDreVw, type DreVwRow } from '../ResumoDREDashboard/dreVwStorage';
-import { loadDreAudi, type DreAudiRow } from '../ResumoDREDashboard/dreAudiStorage';
+import { loadAllDreVw, type DreVwRow } from '../ResumoDREDashboard/dreVwStorage';
+import { loadAllDreAudi, type DreAudiRow } from '../ResumoDREDashboard/dreAudiStorage';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -90,10 +90,10 @@ export function AnaliseProjecoesDashboard({ onChangeBrand }: AnaliseProjecoesDas
         const [bvw, baudi, r25vw, r25audi, r26vw, r26audi] = await Promise.all([
           loadAllBudgetVw(BUDGET_YEAR),
           loadAllBudgetAudi(BUDGET_YEAR),
-          Promise.all(Array.from({ length: 12 }, (_, i) => loadDreVw(2025, i + 1))),
-          Promise.all(Array.from({ length: 12 }, (_, i) => loadDreAudi(2025, i + 1))),
-          Promise.all(Array.from({ length: 12 }, (_, i) => loadDreVw(2026, i + 1))),
-          Promise.all(Array.from({ length: 12 }, (_, i) => loadDreAudi(2026, i + 1))),
+          loadAllDreVw(2025),
+          loadAllDreAudi(2025),
+          loadAllDreVw(2026),
+          loadAllDreAudi(2026),
         ]);
         setBudgetVw(bvw);
         setBudgetAudi(baudi);

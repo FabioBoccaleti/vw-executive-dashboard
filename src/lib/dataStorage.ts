@@ -150,6 +150,14 @@ export async function initializeFromDatabase(brand?: Brand): Promise<boolean> {
     return vwInit && audiInit;
   }
   
+  // Marcas que carregam seus próprios dados via chaves específicas (não usam o padrão ${brand}_*)
+  // Pré-carregar chaves inexistentes desperdiça cotas do Redis e causa falhas por rate-limit
+  if (currentBrand === 'analise_projecoes' || currentBrand === 'resumo_dre') {
+    console.log(`✅ [DB] ${currentBrand} gerencia seus próprios dados - pulando pré-carregamento`);
+    initializedBrands.add(currentBrand);
+    return true;
+  }
+
   // Verifica se já inicializou para esta marca específica
   if (initializedBrands.has(currentBrand)) {
     console.log(`✅ [DB] Banco de dados já inicializado para ${currentBrand}`);
