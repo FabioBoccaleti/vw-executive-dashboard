@@ -4,7 +4,7 @@ import {
   loadLancamentos,
   deleteLancamento,
 } from './comissoesLancamentosStorage';
-import type { LancamentosMap, LinhaComissao } from './comissoesLancamentosStorage';
+import type { LancamentosMap, LinhaComissao, CampoAssinaturaComissao, AssinaturaDigital } from './comissoesLancamentosStorage';
 import { kvGet } from '@/lib/kvClient';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -33,6 +33,16 @@ const NAME_FIXES: Record<string, string> = {
 };
 const fixName = (name: string): string => NAME_FIXES[name] ?? name;
 
+// ─── Constantes ──────────────────────────────────────────────────────────────
+
+const CAMPOS: CampoAssinaturaComissao[] = ['financeiro', 'gerenciaComercial', 'diretoriaComercial', 'diretoria'];
+const CAMPO_ABBREV: Record<CampoAssinaturaComissao, string> = {
+  financeiro:         'Fin',
+  gerenciaComercial:  'G.Com',
+  diretoriaComercial: 'D.Com',
+  diretoria:          'Dir',
+};
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 interface RowData {
@@ -44,6 +54,8 @@ interface RowData {
   usadosPago:  boolean | undefined;
   novosLinhas:  Record<string, LinhaComissao>;
   usadosLinhas: Record<string, LinhaComissao>;
+  novosAssinaturas:  Partial<Record<CampoAssinaturaComissao, AssinaturaDigital>> | undefined;
+  usadosAssinaturas: Partial<Record<CampoAssinaturaComissao, AssinaturaDigital>> | undefined;
 }
 
 // ─── Componente ──────────────────────────────────────────────────────────────
@@ -135,6 +147,8 @@ export function ComissoesResumoView() {
         usadosPago:   usadosLanc?.pago,
         novosLinhas:  novosLanc?.linhas  ?? {},
         usadosLinhas: usadosLanc?.linhas ?? {},
+        novosAssinaturas:  novosLanc?.assinaturas,
+        usadosAssinaturas: usadosLanc?.assinaturas,
       });
     }
 
@@ -368,24 +382,60 @@ tfoot td { font-weight: bold; background: #f8fafc; border-top: 2px solid #cbd5e1
                           R$ {fmtBRL(r.total)}
                         </td>
                         <td className={tdCls}>
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-col gap-1.5">
                             {r.novos !== null && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                                r.novosPago
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-amber-100 text-amber-700'
-                              }`}>
-                                N: {r.novosPago ? 'Pago' : 'Pendente'}
-                              </span>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                  r.novosPago
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  N: {r.novosPago ? 'Pago' : 'Pendente'}
+                                </span>
+                                {CAMPOS.map(campo => {
+                                  const ass = r.novosAssinaturas?.[campo];
+                                  return (
+                                    <span
+                                      key={campo}
+                                      title={ass ? `${ass.name ?? ass.username} — ${new Date(ass.dataHora).toLocaleString('pt-BR')}` : 'Não assinado'}
+                                      className={`text-[9px] px-1.5 py-0.5 rounded font-semibold border ${
+                                        ass
+                                          ? 'bg-emerald-600 border-emerald-600 text-white'
+                                          : 'bg-white border-slate-300 text-slate-400'
+                                      }`}
+                                    >
+                                      {CAMPO_ABBREV[campo]}
+                                    </span>
+                                  );
+                                })}
+                              </div>
                             )}
                             {r.usados !== null && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                                r.usadosPago
-                                  ? 'bg-green-100 text-green-700'
-                                  : 'bg-amber-100 text-amber-700'
-                              }`}>
-                                U: {r.usadosPago ? 'Pago' : 'Pendente'}
-                              </span>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                  r.usadosPago
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  U: {r.usadosPago ? 'Pago' : 'Pendente'}
+                                </span>
+                                {CAMPOS.map(campo => {
+                                  const ass = r.usadosAssinaturas?.[campo];
+                                  return (
+                                    <span
+                                      key={campo}
+                                      title={ass ? `${ass.name ?? ass.username} — ${new Date(ass.dataHora).toLocaleString('pt-BR')}` : 'Não assinado'}
+                                      className={`text-[9px] px-1.5 py-0.5 rounded font-semibold border ${
+                                        ass
+                                          ? 'bg-emerald-600 border-emerald-600 text-white'
+                                          : 'bg-white border-slate-300 text-slate-400'
+                                      }`}
+                                    >
+                                      {CAMPO_ABBREV[campo]}
+                                    </span>
+                                  );
+                                })}
+                              </div>
                             )}
                           </div>
                         </td>

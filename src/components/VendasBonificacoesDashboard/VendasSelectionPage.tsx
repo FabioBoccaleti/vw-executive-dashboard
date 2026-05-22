@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Layers, Car, Sparkles, Banknote, Wrench } from 'lucide-react';
+import { Shield, Layers, Car, Sparkles, Banknote, Wrench, ClipboardList } from 'lucide-react';
 import { useAuth } from '@/contexts/useAuth';
 import type { VendasSubModuleId } from '@/lib/authTypes';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
@@ -14,7 +14,7 @@ const FINANCIAMENTO_BV_SUBS: VendasSubModuleId[] = ['financiamento_bv.vendas', '
 const VPECAS_COND_SUBS: VendasSubModuleId[] = ['vpecas_cond.relatorios', 'vpecas_cond.resumo'];
 
 interface VendasSelectionPageProps {
-  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento') => void;
+  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante') => void;
   onChangeBrand: () => void;
 }
 
@@ -148,6 +148,21 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
             </div>
           </button>
           )}
+
+          {/* Card — Serviços de Despachante */}
+          <button
+            onClick={() => onSelect('despachante')}
+            className="flex-1 bg-white rounded-2xl border-2 border-violet-400 shadow-md hover:shadow-xl hover:border-violet-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-violet-50 group-hover:bg-violet-100 transition-colors">
+              <ClipboardList className="w-10 h-10 text-violet-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Serviços de Despachante
+              </h2>
+            </div>
+          </button>
 
         </div>
       </div>
