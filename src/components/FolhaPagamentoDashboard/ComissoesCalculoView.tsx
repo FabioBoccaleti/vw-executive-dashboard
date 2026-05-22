@@ -1068,6 +1068,29 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
                       {vRows.length} {vRows.length === 1 ? 'venda' : 'vendas'}
                     </p>
                   </div>
+                  {/* Assinaturas */}
+                  {filterMonth !== null && (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {([
+                        ['Fin',    'financeiro'],
+                        ['G.Com',  'gerenciaComercial'],
+                        ['D.Com',  'diretoriaComercial'],
+                        ['Dir',    'diretoria'],
+                      ] as [string, CampoAssinaturaComissao][]).map(([label, campo]) => {
+                        const assinado = !!lanc?.assinaturas?.[campo];
+                        return (
+                          <div key={campo} className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                            assinado
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-slate-50 text-slate-400 border-slate-200'
+                          }`}>
+                            {assinado && <ShieldCheck className="w-3 h-3" />}
+                            {label}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   {/* Status */}
                   {inativo ? (
                     <span className="px-3 py-1 rounded-full border text-xs font-semibold whitespace-nowrap flex-shrink-0 bg-slate-100 border-slate-300 text-slate-500">
