@@ -206,6 +206,9 @@ export function ComissoesCalculoDemonstrativo({
     if (!lancamentosLoaded) return;
     if (derivedRows.length === 0) return;
 
+    // Demonstrativo pago: não recalcula nem sobrescreve valores congelados
+    if (lancamentosMap[pk]?.[vendedor]?.pago) return;
+
     const pctLB    = parseFloat(String(modal.comissaoLucroBruto ?? '').replace(',', '.'));
     const temPctLB = !isNaN(pctLB) && pctLB > 0;
 
@@ -686,13 +689,15 @@ export function ComissoesCalculoDemonstrativo({
                 {recalculating ? 'Recalculando...' : 'Recalcular'}
               </button>
             )}
-            <button
-              onClick={openEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
-            >
-              <DollarSign className="w-3.5 h-3.5" />
-              Lançar valores
-            </button>
+            {!pago && (
+              <button
+                onClick={openEdit}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
+              >
+                <DollarSign className="w-3.5 h-3.5" />
+                Lançar valores
+              </button>
+            )}
           </>
         )}
       </div>

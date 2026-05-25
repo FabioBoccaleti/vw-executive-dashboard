@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Migrar Dados para Produção</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            max-width: 860px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 { color: #1e293b; margin-bottom: 6px; }
+        .subtitle { color: #64748b; margin-bottom: 28px; font-size: 14px; }
+        label { display: block; font-weight: 600; color: #334155; margin-bottom: 6px; }
+        input[type="text"], input[type="url"] {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+        .checkboxes {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .check-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #475569;
+            cursor: pointer;
+        }
+        .check-item input { width: 16px; height: 16px; cursor: pointer; }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: background 0.2s;
+        }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+        .btn-secondary:hover { background: #cbd5e1; }
+        .info {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 14px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #1e3a5f;
+        }
+        .warning {
+            background: #fef9c3;
+            border-left: 4px solid #ca8a04;
+            padding: 14px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #713f12;
+        }
+        .success {
+            background: #dcfce7;
+            border-left: 4px solid #16a34a;
+            padding: 14px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #14532d;
+        }
+        .error {
+            background: #fee2e2;
+            border-left: 4px solid #dc2626;
+            padding: 14px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #7f1d1d;
+        }
+        #log {
+            background: #0f172a;
+            color: #94a3b8;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 320px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin-top: 20px;
+            display: none;
+        }
+        #log .ok   { color: #4ade80; }
+        #log .warn { color: #fbbf24; }
+        #log .err  { color: #f87171; }
+        #preview {
+            margin-top: 20px;
+            display: none;
+        }
+        #preview table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        #preview th, #preview td {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        #preview th { background: #f1f5f9; color: #475569; font-weight: 600; }
+        #preview td:first-child { font-family: monospace; color: #1d4ed8; }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-vw   { background: #dbeafe; color: #1d4ed8; }
+        .badge-audi { background: #fce7f3; color: #be185d; }
+        .section { margin-top: 28px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🚀 Migrar Dados para Produção</h1>
+    <p class="subtitle">Copia os dados do DRE do IndexedDB local para o Redis de produção (Vercel).</p>
+
+    <div class="warning">
+        <strong>⚠️ Atenção:</strong> Abra este arquivo a partir do servidor de desenvolvimento (<code>http://localhost:5000</code> ou similar), não diretamente do sistema de arquivos, para que o IndexedDB da aplicação esteja acessível.
+    </div>
+
+    <div class="info">
+        <strong>ℹ️ O que esse utilitário faz:</strong> Lê todas as chaves <code>resumo_dre:*</code> do IndexedDB local e envia para o Redis da produção usando o endpoint <code>/api/kv/bulk-set</code>.
+    </div>
+
+    <div>
+        <label for="prodUrl">URL de Produção (Vercel)</label>
+        <input type="url" id="prodUrl" placeholder="https://seu-app.vercel.app" />
+    </div>
+
+    <div>
+        <label>Dados a migrar</label>
+        <div class="checkboxes">
+            <label class="check-item">
+                <input type="checkbox" id="chkDreVw" checked>
+                DRE VW (<code>resumo_dre:vw:*</code>)
+            </label>
+            <label class="check-item">
+                <input type="checkbox" id="chkDreAudi" checked>
+                DRE Audi (<code>resumo_dre:audi:*</code>)
+            </label>
+            <label class="check-item">
+                <input type="checkbox" id="chkBudgetVw">
+                Budget VW (<code>projecoes:vw:*</code>)
+            </label>
+            <label class="check-item">
+                <input type="checkbox" id="chkBudgetAudi">
+                Budget Audi (<code>projecoes:audi:*</code>)
+            </label>
+        </div>
+    </div>
+
+    <button class="btn btn-secondary" onclick="previewData()">🔍 Pré-visualizar dados locais</button>
+    <button class="btn btn-primary" id="btnMigrate" onclick="migrate()" disabled>📤 Migrar para Produção</button>
+
+    <div id="preview"></div>
+    <div id="status"></div>
+    <div id="log"></div>
+</div>
+
+<script>
+const IDB_NAME = '__kvStore__';
+const IDB_STORE = 'kv';
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+function idbGetAllKeys(db) {
+    return new Promise((resolve, reject) => {
+        const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).getAllKeys();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+function idbGetValue(db, key) {
+    return new Promise((resolve, reject) => {
+        const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(key);
+        req.onsuccess = () => resolve(req.result ?? null);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+function getSelectedPrefixes() {
+    const prefixes = [];
+    if (document.getElementById('chkDreVw').checked)    prefixes.push('resumo_dre:vw:');
+    if (document.getElementById('chkDreAudi').checked)  prefixes.push('resumo_dre:audi:');
+    if (document.getElementById('chkBudgetVw').checked) prefixes.push('projecoes:vw:');
+    if (document.getElementById('chkBudgetAudi').checked) prefixes.push('projecoes:audi:');
+    return prefixes;
+}
+
+function log(msg, cls = '') {
+    const el = document.getElementById('log');
+    el.style.display = 'block';
+    const line = document.createElement('span');
+    line.className = cls;
+    line.textContent = msg + '\n';
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+}
+
+function setStatus(html, type = 'info') {
+    const el = document.getElementById('status');
+    el.className = type;
+    el.innerHTML = html;
+    el.style.display = html ? 'block' : 'none';
+    if (!html) el.className = '';
+}
+
+async function getFilteredItems() {
+    const db = await openDB();
+    const allKeys = await idbGetAllKeys(db);
+    const prefixes = getSelectedPrefixes();
+    const matchingKeys = allKeys.filter(k => prefixes.some(p => k.startsWith(p)));
+
+    const items = [];
+    for (const key of matchingKeys) {
+        const value = await idbGetValue(db, key);
+        if (value !== null) items.push({ key, value });
+    }
+    return items;
+}
+
+async function previewData() {
+    const previewEl = document.getElementById('preview');
+    previewEl.style.display = 'none';
+    previewEl.innerHTML = '';
+    setStatus('', '');
+
+    let items;
+    try {
+        items = await getFilteredItems();
+    } catch (e) {
+        setStatus('<strong>Erro ao ler IndexedDB:</strong> ' + e.message + '<br><small>Verifique se este arquivo está sendo acessado via localhost.</small>', 'error');
+        return;
+    }
+
+    if (items.length === 0) {
+        setStatus('Nenhuma chave encontrada com os prefixos selecionados no IndexedDB local. Verifique se o app está em desenvolvimento e se os dados foram importados.', 'warning');
+        return;
+    }
+
+    const sorted = [...items].sort((a, b) => a.key.localeCompare(b.key));
+    let html = `<div class="success"><strong>✅ ${items.length} chave(s) encontrada(s) no IndexedDB local:</strong></div>`;
+    html += `<table><thead><tr><th>Chave</th><th>Marca</th><th>Mês</th><th>Tamanho</th></tr></thead><tbody>`;
+    for (const { key, value } of sorted) {
+        const parts = key.split(':');
+        const brand = parts[1] || '';
+        const month = parts[2] || '';
+        const size = (JSON.stringify(value).length / 1024).toFixed(1) + ' KB';
+        const badgeCls = brand === 'vw' ? 'badge-vw' : brand === 'audi' ? 'badge-audi' : '';
+        html += `<tr>
+            <td>${key}</td>
+            <td><span class="badge ${badgeCls}">${brand.toUpperCase()}</span></td>
+            <td>${month}</td>
+            <td>${size}</td>
+        </tr>`;
+    }
+    html += '</tbody></table>';
+    previewEl.innerHTML = html;
+    previewEl.style.display = 'block';
+
+    document.getElementById('btnMigrate').disabled = false;
+}
+
+async function migrate() {
+    const prodUrl = document.getElementById('prodUrl').value.trim().replace(/\/$/, '');
+    if (!prodUrl || !prodUrl.startsWith('http')) {
+        setStatus('Por favor, informe a URL de produção válida (ex: https://meu-app.vercel.app)', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('btnMigrate');
+    btn.disabled = true;
+    btn.textContent = '⏳ Migrando...';
+    setStatus('', '');
+
+    const logEl = document.getElementById('log');
+    logEl.innerHTML = '';
+    logEl.style.display = 'block';
+
+    try {
+        log('📦 Lendo dados do IndexedDB local...');
+        const items = await getFilteredItems();
+
+        if (items.length === 0) {
+            setStatus('Nenhum dado encontrado para migrar. Execute "Pré-visualizar" primeiro.', 'warning');
+            btn.disabled = false;
+            btn.textContent = '📤 Migrar para Produção';
+            return;
+        }
+
+        log(`🔑 ${items.length} chave(s) encontrada(s):`, '');
+        items.sort((a, b) => a.key.localeCompare(b.key)).forEach(i => log(`   ${i.key}`, 'ok'));
+
+        log(`\n📡 Enviando para ${prodUrl}/api/kv/bulk-set ...`);
+
+        const response = await fetch(`${prodUrl}/api/kv/bulk-set`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            log(`\n✅ Migração concluída! ${result.count} chave(s) salvas no Redis.`, 'ok');
+            setStatus(`<strong>✅ Sucesso!</strong> ${result.count} chave(s) foram migradas para o Redis de produção. Agora abra a Análise de Projeções em produção para verificar.`, 'success');
+        } else {
+            const errMsg = result.error || `HTTP ${response.status}`;
+            log(`\n❌ Erro: ${errMsg}`, 'err');
+            setStatus(`<strong>❌ Erro na migração:</strong> ${errMsg}`, 'error');
+        }
+
+    } catch (e) {
+        log(`\n❌ Exceção: ${e.message}`, 'err');
+        const isCors = e.message.includes('fetch') || e.message.includes('Failed');
+        setStatus(
+            `<strong>❌ Erro:</strong> ${e.message}` +
+            (isCors ? `<br><small>Se for erro de CORS, certifique-se de que a URL de produção está correta.</small>` : ''),
+            'error'
+        );
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '📤 Migrar para Produção';
+    }
+}
+</script>
+</body>
+</html>
