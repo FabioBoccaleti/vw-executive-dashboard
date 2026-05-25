@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { ArrowLeft, Clock, CheckCircle2, History, Printer, DollarSign, Save, LockOpen, PenLine, CheckCircle, ShieldCheck, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/useAuth';
@@ -120,6 +120,9 @@ export function ComissoesCalculoDemonstrativo({
 
   // ── Estado de lançamentos ──────────────────────────────────────────────────
   const [lancamentosMap,    setLancamentosMap]    = useState<LancamentosMap>({});
+  // Ref sempre atualizado para evitar stale closure em handlers async
+  const lancamentosMapRef = useRef(lancamentosMap);
+  useEffect(() => { lancamentosMapRef.current = lancamentosMap; }, [lancamentosMap]);
   const [lancamentosLoaded, setLancamentosLoaded] = useState(false);
   const [showHistorico,     setShowHistorico]     = useState(false);
   const [editMode,          setEditMode]          = useState(false);
@@ -509,29 +512,40 @@ export function ComissoesCalculoDemonstrativo({
   }
 
   async function handleConfirmarAssinatura() {
-    if (!assinaDialog || !lancamento || !session) return;
+    if (!assinaDialog || !session) return;
     setAssinaDialog(prev => prev ? { ...prev, loading: true, erro: null } : prev);
-    const result = await apiLogin(session.username, assinaDialog.senha);
-    if ('error' in result) {
-      setAssinaDialog(prev => prev ? { ...prev, loading: false, erro: 'Senha incorreta. Tente novamente.' } : prev);
-      return;
+    try {
+      const result = await apiLogin(session.username, assinaDialog.senha);
+      if ('error' in result) {
+        setAssinaDialog(prev => prev ? { ...prev, loading: false, erro: 'Senha incorreta. Tente novamente.' } : prev);
+        return;
+      }
+      // Usa o lancamento mais recente (via ref) para evitar stale closure
+      // durante a espera do apiLogin, caso outro save tenha ocorrido
+      const lancamentoAtual = lancamentosMapRef.current[pk]?.[vendedor];
+      if (!lancamentoAtual) {
+        setAssinaDialog(prev => prev ? { ...prev, loading: false, erro: 'Demonstrativo não encontrado. Recarregue a página.' } : prev);
+        return;
+      }
+      const assinatura: AssinaturaDigital = {
+        username: session.username,
+        name:     (result.session.name ?? '') || undefined,
+        dataHora: new Date().toISOString(),
+      };
+      const upd: LancamentoComissao = {
+        ...lancamentoAtual,
+        assinaturas: { ...(lancamentoAtual.assinaturas ?? {}), [assinaDialog.campo]: assinatura },
+      };
+      await saveLancamento(tab, year, month, vendedor, upd);
+      setLancamentosMap(prev => ({
+        ...prev,
+        [pk]: { ...(prev[pk] ?? {}), [vendedor]: upd },
+      }));
+      toast.success(`Assinatura de ${CAMPO_LABELS[assinaDialog.campo]} registrada com sucesso!`);
+      setAssinaDialog(null);
+    } catch {
+      setAssinaDialog(prev => prev ? { ...prev, loading: false, erro: 'Erro ao salvar. Verifique sua conexão e tente novamente.' } : prev);
     }
-    const assinatura: AssinaturaDigital = {
-      username: session.username,
-      name:     (result.session.name ?? '') || undefined,
-      dataHora: new Date().toISOString(),
-    };
-    const upd: LancamentoComissao = {
-      ...lancamento,
-      assinaturas: { ...(lancamento.assinaturas ?? {}), [assinaDialog.campo]: assinatura },
-    };
-    await saveLancamento(tab, year, month, vendedor, upd);
-    setLancamentosMap(prev => ({
-      ...prev,
-      [pk]: { ...(prev[pk] ?? {}), [vendedor]: upd },
-    }));
-    toast.success(`Assinatura de ${CAMPO_LABELS[assinaDialog.campo]} registrada com sucesso!`);
-    setAssinaDialog(null);
   }
 
   // ── Cálculo por linha ─────────────────────────────────────────────────────
@@ -639,11 +653,11 @@ export function ComissoesCalculoDemonstrativo({
           Imprimir PDF
         </button>
         <button
-          onClick={handleMarcarPago}
-          disabled={savingPago}
+          onClick={pago ? undefined : handleMarcarPago}
+          disabled={savingPago || pago}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50 ${
             pago
-              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100'
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 cursor-default'
               : 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
           }`}
         >
