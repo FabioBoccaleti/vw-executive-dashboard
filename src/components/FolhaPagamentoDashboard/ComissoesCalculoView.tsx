@@ -121,7 +121,7 @@ function buildSellerPrintHtml(params: {
     totCusto += sign * n(r.valorCusto);
     totBonus += sign * r._d.bonus;
     totLB    += sign * r._d.lucroBruto;
-    const key = r.chassi || String(r._ri);
+    const key = r.chassi ? `${r.chassi}_${r._ri}` : String(r._ri);
     const linha = lancamento?.linhas?.[key];
     if (linha) { totComV += linha.comVenda; totComLB += linha.comLB; hasComissao = true; }
   });
@@ -147,7 +147,7 @@ function buildSellerPrintHtml(params: {
   });
   const rowsHtml = displayDerived.map((r, dri) => {
     const bg    = dri % 2 === 0 ? '#ffffff' : '#f8fafc';
-    const key   = r.chassi || String(r._ri);
+    const key   = r.chassi ? `${r.chassi}_${r._ri}` : String(r._ri);
     const linha = lancamento?.linhas?.[key];
     const comV  = linha?.comVenda ?? 0;
     const comLB = linha?.comLB    ?? 0;
@@ -653,6 +653,8 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
 
     vendedoresMap.forEach(([vendedor, vRows]) => {
       const existing       = all[pk]?.[vendedor];
+      // Demonstrativo pago: nunca sobrescrever — preserva linhas, assinaturas e pago
+      if (existing?.pago) return;
       const existingLinhas = existing?.linhas ?? {};
       const hasManualComVenda = Object.values(existingLinhas).some(l => l.comVenda !== 0);
 
@@ -664,11 +666,13 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
       });
       if (derived.length === 0) return;
 
-      const derivedKeyArr = derived.map(r => r.chassi || String(r._ri));
+      // Usa o mesmo formato de chave do ComissoesCalculoDemonstrativo: "chassi_idx" ou "idx"
+      const rowKey = (r: { chassi?: string }, ri: number) => r.chassi ? `${r.chassi}_${ri}` : String(ri);
+      const derivedKeyArr = derived.map((r, ri) => rowKey(r, ri));
       const hasNewRows    = derivedKeyArr.some(k => !(k in existingLinhas));
       // Linhas de venda já no lançamento mas com comVenda=0 (manual adicionada com transação vazia)
-      const hasUnpricedSaleRows = derived.some(r => {
-        const key = r.chassi || String(r._ri);
+      const hasUnpricedSaleRows = derived.some((r, ri) => {
+        const key = rowKey(r, ri);
         return r.transacao === txVenda && key in existingLinhas && (existingLinhas[key]?.comVenda ?? 0) === 0;
       });
       if (hasManualComVenda && !hasNewRows && !hasUnpricedSaleRows) return;
@@ -686,8 +690,10 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
         });
         const comVendaByKey: Record<string, number> = {};
         let pos = 0;
-        sorted.forEach(r => {
-          const key = r.chassi || String(r._ri);
+        sorted.forEach((r, _si) => {
+          // índice original (não reordenado) para gerar a chave correta
+          const ri  = derived.indexOf(r);
+          const key = rowKey(r, ri);
           if (r.transacao === txVenda) {
             pos++;
             const pct = getTierPct(pos, modal.faixasBonus ?? []);
@@ -700,8 +706,8 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
             comVendaByKey[key] = 0;
           }
         });
-        derived.forEach(r => {
-          const key  = r.chassi || String(r._ri);
+        derived.forEach((r, ri) => {
+          const key  = rowKey(r, ri);
           linhas[key] = {
             comVenda: temFaixas ? (comVendaByKey[key] ?? 0) : 0,
             comLB: onlyFillComVenda
@@ -724,8 +730,8 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
           if (faixa) bonusPct = parseFloat(String(faixa.percentual).replace(',', '.')) || 0;
         }
         const pctVenda = (isNaN(pctVendaBase) ? 0 : pctVendaBase) + bonusPct;
-        derived.forEach(r => {
-          const key  = r.chassi || String(r._ri);
+        derived.forEach((r, ri) => {
+          const key  = rowKey(r, ri);
           linhas[key] = {
             comVenda: pctVenda > 0 ? parseNum(r.valorVenda) * (pctVenda / 100) : 0,
             comLB: onlyFillComVenda
@@ -737,7 +743,12 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
 
       all[pk] = {
         ...(all[pk] ?? {}),
-        [vendedor]: { linhas, pago: existing?.pago ?? false, dataPagamento: existing?.dataPagamento },
+        [vendedor]: {
+          linhas,
+          pago:          existing?.pago          ?? false,
+          dataPagamento: existing?.dataPagamento,
+          assinaturas:   existing?.assinaturas,
+        },
       };
       changed = true;
     });
