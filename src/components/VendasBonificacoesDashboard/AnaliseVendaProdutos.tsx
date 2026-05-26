@@ -468,7 +468,7 @@ export default function AnaliseVendaProdutos() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50">
-      <div className="max-w-[1600px] mx-auto px-6 py-5 space-y-7">
+      <div className="w-full px-3 lg:px-4 py-4 space-y-5">
 
         {/* ─── Filtros ───────────────────────────────────────────────────── */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -557,7 +557,7 @@ export default function AnaliseVendaProdutos() {
         </div>
 
         {/* ─── Gráfico de Evolução (dinâmico) ────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
           {month !== null ? (
             <>
               <SH>Evolução Diária — {MS[month - 1]} {year}</SH>
@@ -609,7 +609,7 @@ export default function AnaliseVendaProdutos() {
 
         {/* ─── Comparativo Mensal (12 meses) — sempre visível quando mês selecionado ── */}
         {month !== null && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
             <SH right={
               <div className="flex items-center gap-2">
                 <MetricToggle value={cmpMetric} onChange={setCmpMetric} />
@@ -640,10 +640,10 @@ export default function AnaliseVendaProdutos() {
           </SH>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* ── Performance por Produto ── */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
             <SH>Performance por Produto</SH>
 
             {productData.length === 0 ? (
@@ -739,7 +739,7 @@ export default function AnaliseVendaProdutos() {
           </div>
 
           {/* ── Performance por Vendedor ── */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
             <SH>Performance por Vendedor</SH>
 
             {vendorData.length === 0 ? (
