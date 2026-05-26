@@ -21,6 +21,7 @@ import {
   importVPecasItemDevolucaoForPeriod,
   parsePecasItemDevolucaoTxt,
 } from './vPecasItemStorage';
+import { syncProdutosFromImport } from './produtosMonitoradosStorage';
 
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const KPI_FIELDS = ['VAL_VENDA', 'VAL_RENTABILIDADE', 'VAL_IMPOSTOS', 'VAL_DESCONTO', 'QUANTIDADE'] as const;
@@ -309,6 +310,8 @@ export function VPecasItemDashboard() {
     }
     const periodo = `${importPeriodYear}-${String(importPeriodMonth).padStart(2, '0')}`;
     const { added, removed, originalCount } = await importVPecasItemForPeriod(periodo, parsed);
+    // Sincroniza produtos monitorados com os dados completos (antes do filtro 100+100)
+    await syncProdutosFromImport(periodo, parsed);
     const updated = await loadVPecasItemRows();
     setRows(updated);
     const filteredOut = originalCount - added;
