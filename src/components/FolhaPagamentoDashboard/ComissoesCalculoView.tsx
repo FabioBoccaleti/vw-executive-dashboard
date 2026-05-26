@@ -73,6 +73,33 @@ function getTierPct(
   return parseFloat(String(faixa.percentual).replace(',', '.')) || 0;
 }
 
+function normalizeKeyPart(v: string | undefined): string {
+  return String(v ?? '').trim().toUpperCase();
+}
+
+function stableRowKey(row: VendasResultadoRow, idx: number): string {
+  if (row.id) return `id:${row.id}`;
+  const chassi = normalizeKeyPart(row.chassi);
+  const nf     = normalizeKeyPart(row.nfVenda);
+  const data   = normalizeKeyPart(row.dataVenda);
+  const tx     = normalizeKeyPart(row.transacao);
+  if (chassi || nf || data || tx) return `txn:${chassi}|${nf}|${data}|${tx}`;
+  return `idx:${idx}`;
+}
+
+function legacyRowKey(row: VendasResultadoRow, idx: number): string {
+  return row.chassi ? `${row.chassi}_${idx}` : String(idx);
+}
+
+function getLinhaComissao(
+  linhas: Record<string, { comVenda: number; comLB: number }> | undefined,
+  row: VendasResultadoRow,
+  idx: number,
+): { comVenda: number; comLB: number } | undefined {
+  if (!linhas) return undefined;
+  return linhas[stableRowKey(row, idx)] ?? linhas[legacyRowKey(row, idx)];
+}
+
 // ─── Bulk Print ───────────────────────────────────────────────────────────────
 function buildSellerPrintHtml(params: {
   vendedor:    string;
@@ -100,7 +127,11 @@ function buildSellerPrintHtml(params: {
     ? 'Demonstrativo de Comissão de Vendas Usados VW'
     : 'Demonstrativo de Comissão de Vendas Novos VW';
 
-  const derived = vRows.map((r, ri) => {
+  const visibleRows = lancamento?.pago && (lancamento.snapshotRows?.length ?? 0) > 0
+    ? lancamento.snapshotRows
+    : vRows;
+
+  const derived = visibleRows.map((r, ri) => {
     const valorVenda = n(r.valorVenda);
     const valorCusto = n(r.valorCusto);
     const bonus      = n(r.bonusVarejo) + n(r.bonusTradeIn);
@@ -121,8 +152,7 @@ function buildSellerPrintHtml(params: {
     totCusto += sign * n(r.valorCusto);
     totBonus += sign * r._d.bonus;
     totLB    += sign * r._d.lucroBruto;
-    const key = r.chassi ? `${r.chassi}_${r._ri}` : String(r._ri);
-    const linha = lancamento?.linhas?.[key];
+    const linha = getLinhaComissao(lancamento?.linhas, r, r._ri);
     if (linha) { totComV += linha.comVenda; totComLB += linha.comLB; hasComissao = true; }
   });
 
@@ -147,8 +177,7 @@ function buildSellerPrintHtml(params: {
   });
   const rowsHtml = displayDerived.map((r, dri) => {
     const bg    = dri % 2 === 0 ? '#ffffff' : '#f8fafc';
-    const key   = r.chassi ? `${r.chassi}_${r._ri}` : String(r._ri);
-    const linha = lancamento?.linhas?.[key];
+    const linha = getLinhaComissao(lancamento?.linhas, r, r._ri);
     const comV  = linha?.comVenda ?? 0;
     const comLB = linha?.comLB    ?? 0;
     const total = comV + comLB;
@@ -476,15 +505,20 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
       const today = new Date().toISOString().split('T')[0];
       const all   = { ...lancamentosMap };
       let changed = false;
-      vendedoresMap.forEach(([vendedor]) => {
+      vendedoresMap.forEach(([vendedor, vRows]) => {
         const existing = all[pk]?.[vendedor];
         if (existing?.pago) return;
         changed = true;
         all[pk] = {
           ...(all[pk] ?? {}),
           [vendedor]: existing
-            ? { ...existing, pago: true, dataPagamento: existing.dataPagamento ?? today }
-            : { linhas: {}, pago: true, dataPagamento: today },
+            ? {
+                ...existing,
+                pago: true,
+                dataPagamento: existing.dataPagamento ?? today,
+                snapshotRows: existing.snapshotRows ?? vRows.map(r => ({ ...r })),
+              }
+            : { linhas: {}, pago: true, dataPagamento: today, snapshotRows: vRows.map(r => ({ ...r })) },
         };
       });
       if (changed) {
@@ -508,8 +542,9 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
         const existing = all[pk]?.[vendedor];
         if (!existing || !existing.pago) return;
         changed = true;
-        const { dataPagamento: _, ...rest } = existing;
+        const { dataPagamento: _, snapshotRows: __, ...rest } = existing;
         void _;
+        void __;
         all[pk] = { ...(all[pk] ?? {}), [vendedor]: { ...rest, pago: false } };
       });
       if (changed) {
@@ -666,14 +701,11 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
       });
       if (derived.length === 0) return;
 
-      // Usa o mesmo formato de chave do ComissoesCalculoDemonstrativo: "chassi_idx" ou "idx"
-      const rowKey = (r: { chassi?: string }, ri: number) => r.chassi ? `${r.chassi}_${ri}` : String(ri);
-      const derivedKeyArr = derived.map((r, ri) => rowKey(r, ri));
-      const hasNewRows    = derivedKeyArr.some(k => !(k in existingLinhas));
+      const hasNewRows = derived.some((r, ri) => !getLinhaComissao(existingLinhas, r, ri));
       // Linhas de venda já no lançamento mas com comVenda=0 (manual adicionada com transação vazia)
       const hasUnpricedSaleRows = derived.some((r, ri) => {
-        const key = rowKey(r, ri);
-        return r.transacao === txVenda && key in existingLinhas && (existingLinhas[key]?.comVenda ?? 0) === 0;
+        const linha = getLinhaComissao(existingLinhas, r, ri);
+        return r.transacao === txVenda && !!linha && (linha.comVenda ?? 0) === 0;
       });
       if (hasManualComVenda && !hasNewRows && !hasUnpricedSaleRows) return;
 
@@ -693,7 +725,7 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
         sorted.forEach((r, _si) => {
           // índice original (não reordenado) para gerar a chave correta
           const ri  = derived.indexOf(r);
-          const key = rowKey(r, ri);
+          const key = stableRowKey(r, ri);
           if (r.transacao === txVenda) {
             pos++;
             const pct = getTierPct(pos, modal.faixasBonus ?? []);
@@ -707,11 +739,12 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
           }
         });
         derived.forEach((r, ri) => {
-          const key  = rowKey(r, ri);
+          const key  = stableRowKey(r, ri);
+          const prevLinha = getLinhaComissao(existingLinhas, r, ri);
           linhas[key] = {
             comVenda: temFaixas ? (comVendaByKey[key] ?? 0) : 0,
             comLB: onlyFillComVenda
-              ? (existingLinhas[key]?.comLB ?? 0)
+              ? (prevLinha?.comLB ?? 0)
               : (temPctLB && (r._lb > 0 || r.transacao === txDevol) ? r._lb * (pctLB / 100) : 0),
           };
         });
@@ -731,11 +764,12 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
         }
         const pctVenda = (isNaN(pctVendaBase) ? 0 : pctVendaBase) + bonusPct;
         derived.forEach((r, ri) => {
-          const key  = rowKey(r, ri);
+          const key  = stableRowKey(r, ri);
+          const prevLinha = getLinhaComissao(existingLinhas, r, ri);
           linhas[key] = {
             comVenda: pctVenda > 0 ? parseNum(r.valorVenda) * (pctVenda / 100) : 0,
             comLB: onlyFillComVenda
-              ? (existingLinhas[key]?.comLB ?? 0)
+              ? (prevLinha?.comLB ?? 0)
               : (temPctLB && (r._lb > 0 || r.transacao === txDevol) ? r._lb * (pctLB / 100) : 0),
           };
         });
@@ -747,6 +781,7 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
           linhas,
           pago:          existing?.pago          ?? false,
           dataPagamento: existing?.dataPagamento,
+          snapshotRows:  existing?.snapshotRows,
           assinaturas:   existing?.assinaturas,
         },
       };

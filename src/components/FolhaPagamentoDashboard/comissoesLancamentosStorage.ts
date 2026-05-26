@@ -1,4 +1,5 @@
 import { kvGet, kvSet } from '@/lib/kvClient';
+import type { VendasResultadoRow } from '@/components/VendasBonificacoesDashboard/vendasResultadoStorage';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface LinhaComissao {
@@ -22,6 +23,8 @@ export interface LancamentoComissao {
   linhas:         Record<string, LinhaComissao>; // key = chassi (ou índice da linha)
   pago:           boolean;
   dataPagamento?: string; // ISO date "YYYY-MM-DD"
+  // Snapshot das linhas no momento do pagamento para congelar o demonstrativo.
+  snapshotRows?:  VendasResultadoRow[];
   assinaturas?:   Partial<Record<CampoAssinaturaComissao, AssinaturaDigital>>;
 }
 

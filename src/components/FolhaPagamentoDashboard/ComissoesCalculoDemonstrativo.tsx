@@ -60,6 +60,24 @@ function calcDerived(row: VendasResultadoRow) {
   return { bonus, lucroBruto, lucroBrutoPct };
 }
 
+function normalizeKeyPart(v: string | undefined): string {
+  return String(v ?? '').trim().toUpperCase();
+}
+
+function stableRowKey(row: VendasResultadoRow, idx: number): string {
+  if (row.id) return `id:${row.id}`;
+  const chassi = normalizeKeyPart(row.chassi);
+  const nf     = normalizeKeyPart(row.nfVenda);
+  const data   = normalizeKeyPart(row.dataVenda);
+  const tx     = normalizeKeyPart(row.transacao);
+  if (chassi || nf || data || tx) return `txn:${chassi}|${nf}|${data}|${tx}`;
+  return `idx:${idx}`;
+}
+
+function legacyRowKey(row: VendasResultadoRow, idx: number): string {
+  return row.chassi ? `${row.chassi}_${idx}` : String(idx);
+}
+
 function getTierPct(
   pos:    number,
   faixas: Array<{ de: string; ate: string; percentual: string }>,
@@ -137,6 +155,20 @@ export function ComissoesCalculoDemonstrativo({
     loading: boolean;
     erro:    string | null;
   } | null>(null);
+
+  const lancamento = lancamentosMap[pk]?.[vendedor];
+  const pago       = lancamento?.pago ?? false;
+  const sourceRows = pago && (lancamento?.snapshotRows?.length ?? 0) > 0
+    ? (lancamento?.snapshotRows ?? [])
+    : rows;
+
+  function rowKey(row: VendasResultadoRow, idx: number): string {
+    return stableRowKey(row, idx);
+  }
+
+  function getLinha(linhas: Record<string, LinhaComissao>, row: VendasResultadoRow, idx: number): LinhaComissao | undefined {
+    return linhas[rowKey(row, idx)] ?? linhas[legacyRowKey(row, idx)];
+  }
 
   function handlePrint() {
     const area = document.getElementById('demonstrativo-comissao-print-area');
@@ -219,16 +251,15 @@ export function ComissoesCalculoDemonstrativo({
     const existingLinhas = existing?.linhas ?? {};
 
     // Verifica se há linhas novas ainda não cobertas pelo lançamento existente
-    const derivedKeys       = derivedRows.map((r, ri) => rowKey(r.chassi, ri));
-    const hasNewRows        = derivedKeys.some(k => !(k in existingLinhas));
+    const hasNewRows = derivedRows.some((r, ri) => !getLinha(existingLinhas, r, ri));
 
     // Só pula o recálculo se todas as linhas já têm comVenda definida E não há linhas novas
     const hasManualComVenda = Object.values(existingLinhas).some(l => l.comVenda !== 0);
     // Detecta linhas de venda que já estão no lançamento mas com comVenda=0 (ex.: linha manual
     // adicionada com transação vazia e depois corrigida para U21/V21 pelo usuário)
     const hasUnpricedSaleRows = derivedRows.some((r, ri) => {
-      const key = rowKey(r.chassi, ri);
-      return r.transacao === txVenda && key in existingLinhas && (existingLinhas[key]?.comVenda ?? 0) === 0;
+      const linha = getLinha(existingLinhas, r, ri);
+      return r.transacao === txVenda && !!linha && (linha.comVenda ?? 0) === 0;
     });
     if (hasManualComVenda && !hasNewRows && !hasUnpricedSaleRows) return;
 
@@ -244,7 +275,7 @@ export function ComissoesCalculoDemonstrativo({
       if (onlyFillComVenda && !temFaixas) return;
 
       // Preserva índice original para chave correta após reordenação por data
-      const indexed = derivedRows.map((r, ri) => ({ r, ri, key: rowKey(r.chassi, ri) }));
+      const indexed = derivedRows.map((r, ri) => ({ r, ri, key: rowKey(r, ri) }));
       const sorted  = [...indexed].sort((a, b) =>
         parseDV(a.r.dataVenda ?? '') - parseDV(b.r.dataVenda ?? '')
       );
@@ -268,12 +299,13 @@ export function ComissoesCalculoDemonstrativo({
       });
 
       derivedRows.forEach((r, ri) => {
-        const key  = rowKey(r.chassi, ri);
+        const key  = rowKey(r, ri);
         const lb   = r._d.lucroBruto;
+        const prevLinha = getLinha(existingLinhas, r, ri);
         linhas[key] = {
           comVenda: temFaixas ? (comVendaByKey[key] ?? 0) : 0,
           comLB: onlyFillComVenda
-            ? (existingLinhas[key]?.comLB ?? 0)
+            ? (prevLinha?.comLB ?? 0)
             : (temPctLB && (lb > 0 || r.transacao === txDevol) ? lb * (pctLB / 100) : 0),
         };
       });
@@ -301,13 +333,14 @@ export function ComissoesCalculoDemonstrativo({
       const pctVenda = (isNaN(pctVendaBase) ? 0 : pctVendaBase) + bonusPct;
 
       derivedRows.forEach((r, ri) => {
-        const key  = rowKey(r.chassi, ri);
+        const key  = rowKey(r, ri);
         const lb   = r._d.lucroBruto;
         const vv   = n(r.valorVenda);
+        const prevLinha = getLinha(existingLinhas, r, ri);
         linhas[key] = {
           comVenda: pctVenda > 0 ? vv * (pctVenda / 100) : 0,
           comLB: onlyFillComVenda
-            ? (existingLinhas[key]?.comLB ?? 0)          // preserva comLB já salvo
+            ? (prevLinha?.comLB ?? 0)          // preserva comLB já salvo
             : (temPctLB && (lb > 0 || r.transacao === txDevol) ? lb * (pctLB / 100) : 0),
         };
       });
@@ -317,6 +350,7 @@ export function ComissoesCalculoDemonstrativo({
       linhas,
       pago:          existing?.pago          ?? false,
       dataPagamento: existing?.dataPagamento,
+      snapshotRows:  existing?.snapshotRows,
       assinaturas:   existing?.assinaturas,
     };
     saveLancamento(tab, year, month, vendedor, newLanc).then(() => {
@@ -325,12 +359,9 @@ export function ComissoesCalculoDemonstrativo({
         [pk]: { ...(prev[pk] ?? {}), [vendedor]: newLanc },
       }));
     });
-  // derivedRows é derivado de rows; rows na dep evita TDZ (derivedRows declarado abaixo)
+  // sourceRows contém rows correntes ou snapshot congelado quando pago.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lancamentosLoaded, rows]);
-
-  const lancamento = lancamentosMap[pk]?.[vendedor];
-  const pago       = lancamento?.pago ?? false;
+  }, [lancamentosLoaded, sourceRows]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   async function handleMarcarPago() {
@@ -340,6 +371,7 @@ export function ComissoesCalculoDemonstrativo({
         linhas:        lancamento?.linhas ?? {},
         pago:          !pago,
         dataPagamento: !pago ? new Date().toISOString().split('T')[0] : undefined,
+        snapshotRows:  !pago ? rows.map(r => ({ ...r })) : undefined,
         assinaturas:   lancamento?.assinaturas,
       };
       await saveLancamento(tab, year, month, vendedor, upd);
@@ -350,10 +382,6 @@ export function ComissoesCalculoDemonstrativo({
     } finally {
       setSavingPago(false);
     }
-  }
-
-  function rowKey(chassi: string | undefined, idx: number): string {
-    return chassi ? `${chassi}_${idx}` : String(idx);
   }
 
   async function handleRecalcular() {
@@ -368,7 +396,7 @@ export function ComissoesCalculoDemonstrativo({
 
       if (tab === 'usados') {
         const temFaixas = (modal.faixasBonus?.length ?? 0) > 0;
-        const indexed = derivedRows.map((r, ri) => ({ r, ri, key: rowKey(r.chassi, ri) }));
+        const indexed = derivedRows.map((r, ri) => ({ r, ri, key: rowKey(r, ri) }));
         const sorted  = [...indexed].sort((a, b) =>
           parseDV(a.r.dataVenda ?? '') - parseDV(b.r.dataVenda ?? '')
         );
@@ -388,7 +416,7 @@ export function ComissoesCalculoDemonstrativo({
           }
         });
         derivedRows.forEach((r, ri) => {
-          const key = rowKey(r.chassi, ri);
+          const key = rowKey(r, ri);
           const lb  = r._d.lucroBruto;
           linhas[key] = {
             comVenda: temFaixas ? (comVendaByKey[key] ?? 0) : 0,
@@ -411,7 +439,7 @@ export function ComissoesCalculoDemonstrativo({
         }
         const pctVenda = (isNaN(pctVendaBase) ? 0 : pctVendaBase) + bonusPct;
         derivedRows.forEach((r, ri) => {
-          const key = rowKey(r.chassi, ri);
+          const key = rowKey(r, ri);
           const lb  = r._d.lucroBruto;
           linhas[key] = {
             comVenda: pctVenda > 0 ? n(r.valorVenda) * (pctVenda / 100) : 0,
@@ -424,6 +452,7 @@ export function ComissoesCalculoDemonstrativo({
         linhas,
         pago:          existing?.pago          ?? false,
         dataPagamento: existing?.dataPagamento,
+        snapshotRows:  existing?.snapshotRows,
         assinaturas:   existing?.assinaturas,
       };
       await saveLancamento(tab, year, month, vendedor, newLanc);
@@ -447,6 +476,7 @@ export function ComissoesCalculoDemonstrativo({
       linhas:        lancamento?.linhas ?? {},
       pago:          false,
       dataPagamento: undefined,
+      snapshotRows:  undefined,
       assinaturas:   {},
     };
     await saveLancamento(tab, year, month, vendedor, upd);
@@ -461,8 +491,8 @@ export function ComissoesCalculoDemonstrativo({
     const linhas = lancamento?.linhas ?? {};
     const init: Record<string, { comVenda: string; comLB: string }> = {};
     derivedRows.forEach((r, ri) => {
-      const key = rowKey(r.chassi, ri);
-      const l   = linhas[key];
+      const key = rowKey(r, ri);
+      const l   = getLinha(linhas, r, ri);
       init[key] = {
         comVenda: l && l.comVenda !== 0 ? fmtBRL(l.comVenda) : '',
         comLB:    l && l.comLB    !== 0 ? fmtBRL(l.comLB)    : '',
@@ -482,7 +512,7 @@ export function ComissoesCalculoDemonstrativo({
     try {
       const linhas: Record<string, LinhaComissao> = {};
       derivedRows.forEach((r, ri) => {
-        const key = rowKey(r.chassi, ri);
+        const key = rowKey(r, ri);
         const ev  = editValues[key];
         if (ev) {
           linhas[key] = { comVenda: nInput(ev.comVenda), comLB: nInput(ev.comLB) };
@@ -492,6 +522,7 @@ export function ComissoesCalculoDemonstrativo({
         linhas,
         pago:          lancamento?.pago          ?? false,
         dataPagamento: lancamento?.dataPagamento,
+        snapshotRows:  lancamento?.snapshotRows,
         assinaturas:   lancamento?.assinaturas,
       };
       await saveLancamento(tab, year, month, vendedor, upd);
@@ -550,8 +581,8 @@ export function ComissoesCalculoDemonstrativo({
 
   // ── Cálculo por linha ─────────────────────────────────────────────────────
   const derivedRows = useMemo(() =>
-    rows.map(r => ({ ...r, _d: calcDerived(r) })),
-  [rows]);
+    sourceRows.map(r => ({ ...r, _d: calcDerived(r) })),
+  [sourceRows]);
 
   // ── Totais ────────────────────────────────────────────────────────────────
   const totals = useMemo(() => {
@@ -567,12 +598,12 @@ export function ComissoesCalculoDemonstrativo({
       totCusto += sign * n(r.valorCusto);
       totBonus += sign * r._d.bonus;
       totLB    += sign * r._d.lucroBruto;
-      const key = rowKey(r.chassi, ri);
+      const key = rowKey(r, ri);
       if (editMode) {
         const ev = editValues[key];
         if (ev) { totComV += nInput(ev.comVenda); totComLB += nInput(ev.comLB); hasComissao = true; }
       } else {
-        const linha = lancamento?.linhas?.[key];
+        const linha = lancamento?.linhas ? getLinha(lancamento.linhas, r, ri) : undefined;
         if (linha) { totComV += linha.comVenda; totComLB += linha.comLB; hasComissao = true; }
       }
     });
@@ -819,8 +850,8 @@ export function ComissoesCalculoDemonstrativo({
                     .sort((a, b) => parseDV(a.r.dataVenda ?? '') - parseDV(b.r.dataVenda ?? ''))
                     .map(({ r, ri }, dri) => {
                     const bg     = dri % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
-                    const key    = rowKey(r.chassi, ri);
-                    const linha  = lancamento?.linhas?.[key];
+                    const key    = rowKey(r, ri);
+                    const linha  = lancamento?.linhas ? getLinha(lancamento.linhas, r, ri) : undefined;
                     const ev     = editValues[key];
                     const cvVal  = editMode ? nInput(ev?.comVenda ?? '') : (linha?.comVenda ?? 0);
                     const clVal  = editMode ? nInput(ev?.comLB    ?? '') : (linha?.comLB    ?? 0);
