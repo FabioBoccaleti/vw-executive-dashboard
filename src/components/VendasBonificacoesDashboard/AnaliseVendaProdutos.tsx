@@ -215,6 +215,47 @@ function TipComparativoMensal({
   );
 }
 
+function TipEvolucaoMensal({
+  active,
+  payload,
+  label,
+  year,
+}: {
+  active?: boolean;
+  payload?: { name: string; value: number; color: string; payload: Record<string, number | string> }[];
+  label?: string;
+  year: number;
+}) {
+  if (!active || !payload?.length) return null;
+
+  const firstPayload = payload[0]?.payload;
+  const recLiq = typeof firstPayload?.recLiq === 'number' ? firstPayload.recLiq : 0;
+  const lbPct = typeof firstPayload?.lbPct === 'number' ? firstPayload.lbPct : 0;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[220px]">
+      <p className="font-bold text-slate-700 mb-1.5">{label}</p>
+      {payload.map((p, i) => (
+        <div key={i} className="flex justify-between gap-4">
+          <span style={{ color: p.color }} className="font-medium">{p.name}</span>
+          <span className="font-mono text-slate-700">{fmtBRLF(p.value)}</span>
+        </div>
+      ))}
+
+      <div className="mt-2 pt-2 border-t border-slate-200">
+        <div className="flex justify-between gap-4">
+          <span className="text-teal-700 font-medium">Rec. Líquida {year}</span>
+          <span className="font-mono text-slate-700">{fmtBRLF(recLiq)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-emerald-700 font-medium">% Margem {year}</span>
+          <span className={`font-mono font-bold ${lbPct >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{fmtPct(lbPct)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Tooltip para gráfico de vendedores (BRL + nome do item)
 function TipVendors({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
@@ -553,14 +594,12 @@ export default function AnaliseVendaProdutos() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                     <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                     <YAxis yAxisId="brl" orientation="left" tickFormatter={v => fmtBRL(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={85} />
-                    <YAxis yAxisId="pct" orientation="right" tickFormatter={v => fmtPct(v)} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={50} />
-                    <Tooltip content={<TipBRL />} />
+                    <Tooltip content={<TipEvolucaoMensal year={year} />} />
                     <Bar yAxisId="brl" dataKey={cmpMetric} name={metricLabel[cmpMetric]} fill={VIOLET} radius={[4,4,0,0]} maxBarSize={32} />
                     {showPrevYear && (
                       <Line yAxisId="brl" dataKey={prevDataKey} name={`${metricLabel[cmpMetric]} ${prevYear}`}
                         stroke={VIOLETL} dot={{ r: 3, fill: VIOLETL }} strokeWidth={2} strokeDasharray="5 3" />
                     )}
-                    <Line yAxisId="pct" dataKey="lbPct" name="% Margem" stroke={AMBER} dot={false} strokeWidth={2} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
