@@ -14,6 +14,7 @@ import {
   totalLancamento,
   DESCRICAO_TRIMESTRAL,
   type PrestadorPJ,
+  type PrestadorSnapshotPJ,
   type LancamentoPJ,
   type LancamentoItem,
   type StatusPagamento,
@@ -89,6 +90,15 @@ function fmtBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function buildPrestadorSnapshot(prestador: PrestadorPJ): PrestadorSnapshotPJ {
+  return {
+    ...prestador,
+    itens: (prestador.itens ?? []).map(i => ({ ...i })),
+    kpis: (prestador.kpis ?? []).map(k => ({ ...k })),
+    itensPremioIds: [...(prestador.itensPremioIds ?? [])],
+  };
+}
+
 function prevMonth(y: number, m: number) {
   return m === 1 ? { year: y - 1, month: 12 } : { year: y, month: m - 1 };
 }
@@ -153,7 +163,7 @@ function DemonstrativoTable({
   onAssinar,
   isAdmin,
 }: {
-  prestador: PrestadorPJ;
+  prestador: PrestadorPJ | PrestadorSnapshotPJ;
   lanc: LancamentoPJ;
   year: number;
   month: number;
@@ -711,6 +721,9 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
 
   const ambasAssinadas = !!(lanc?.assinaturas?.financeiro && lanc?.assinaturas?.rh);
   const isLocked = !!(lanc?.assinaturas?.financeiro || lanc?.assinaturas?.rh || lanc?.status === 'pago');
+  const effectivePrestador = lanc?.status === 'pago' && lanc?.snapshotPrestador
+    ? lanc.snapshotPrestador
+    : prestador;
 
   // Carrega lançamento do mês selecionado + DRE do mês anterior
   useEffect(() => {
@@ -724,10 +737,21 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
     const dreKey = `resumo_dre:${prestador.brand}:${drePrev.year}-${String(drePrev.month).padStart(2, '0')}`;
 
     async function load() {
-      const [existing, kvDreRow] = await Promise.all([
+      let [existing, kvDreRow] = await Promise.all([
         loadLancamento(prestador.id, year, month),
         kvGet<any>(dreKey),
       ]);
+
+      // Migração automática: lançamentos pagos antigos passam a salvar snapshot
+      // para garantir congelamento completo no novo formato.
+      if (existing && existing.status === 'pago' && !existing.snapshotPrestador) {
+        const migrated: LancamentoPJ = {
+          ...existing,
+          snapshotPrestador: buildPrestadorSnapshot(prestador),
+        };
+        await saveLancamento(migrated);
+        existing = migrated;
+      }
 
       // Fallback: se não houver dado no formato resumo_dre, tenta carregar do dashboard executivo
       let dreRow = kvDreRow;
@@ -1022,16 +1046,16 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
 
   async function handleToggleStatus() {
     if (!lanc) return;
+    if (lanc.status === 'pago') return;
     const updated: LancamentoPJ = {
       ...lanc,
-      status: lanc.status === 'pago' ? 'pendente' : 'pago',
-      dataPagamento: lanc.status === 'pendente'
-        ? new Date().toLocaleDateString('pt-BR')
-        : undefined,
+      status: 'pago',
+      dataPagamento: new Date().toLocaleDateString('pt-BR'),
+      snapshotPrestador: buildPrestadorSnapshot(prestador),
     };
     setLanc(updated);
     await saveLancamento(updated);
-    toast.success(updated.status === 'pago' ? 'Marcado como pago.' : 'Marcado como pendente.');
+    toast.success('Marcado como pago.');
   }
 
   function handleAbrirAssinatura(campo: 'financeiro' | 'rh') {
@@ -1073,6 +1097,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
       assinaturas: {},
       status: 'pendente',
       dataPagamento: undefined,
+      snapshotPrestador: undefined,
     };
     await saveLancamento(updated);
     setLanc(updated);
@@ -1110,7 +1135,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
     }
   }
 
-  const brandColor = prestador.brand === 'vw' ? '#001e50' : '#bb0a30';
+  const brandColor = effectivePrestador.brand === 'vw' ? '#001e50' : '#bb0a30';
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50">
@@ -1127,10 +1152,10 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
               Prestadores
             </button>
             <div>
-              <h2 className="text-base font-bold text-slate-800">{prestador.nome}</h2>
+              <h2 className="text-base font-bold text-slate-800">{effectivePrestador.nome}</h2>
               <p className="text-xs text-slate-500">
-                {prestador.brand === 'vw' ? 'VW' : 'Audi'}
-                {prestador.cargo ? ` · ${prestador.cargo}` : ''}
+                {effectivePrestador.brand === 'vw' ? 'VW' : 'Audi'}
+                {effectivePrestador.cargo ? ` · ${effectivePrestador.cargo}` : ''}
               </p>
             </div>
           </div>
@@ -1164,17 +1189,15 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
             </button>
 
             {/* Status pago/pendente */}
-            {!editing && (
+            {!editing && lanc?.status !== 'pago' && (
               <button
                 onClick={handleToggleStatus}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                  lanc?.status === 'pago'
-                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-200'
-                    : 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-200'
+                  'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-200'
                 }`}
               >
                 <Check className="w-3.5 h-3.5" />
-                {lanc?.status === 'pago' ? 'Pago' : 'Marcar como pago'}
+                Marcar como pago
               </button>
             )}
 
@@ -1230,7 +1253,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
         ) : lanc ? (
           <>
             <DemonstrativoTable
-              prestador={prestador}
+              prestador={effectivePrestador}
               lanc={lanc}
               year={year}
               month={month}
@@ -1255,7 +1278,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
               ) : (
                 <HistoricoPanel
                   historico={historico}
-                  prestador={prestador}
+                  prestador={effectivePrestador}
                   brandColor={brandColor}
                 />
               )

@@ -85,6 +85,24 @@ export interface PrestadorPJ {
   ordem?: number;
 }
 
+export interface PrestadorSnapshotPJ {
+  id: string;
+  nome: string;
+  cnpjCpf?: string;
+  empresa?: string;
+  cargo?: string;
+  brand: PjBrand;
+  dataInicio?: string;
+  ativo: boolean;
+  itens: ItemRemuneracao[];
+  temPremio?: boolean;
+  percentualPremio?: number;
+  itensPremioIds?: string[];
+  deducaoBasePremio?: number;
+  kpis?: KpiPrestador[];
+  ordem?: number;
+}
+
 /** Linha de um lançamento mensal */
 export interface LancamentoItem {
   itemId: string;     // referência a ItemRemuneracao.id
@@ -114,6 +132,8 @@ export interface LancamentoPJ {
   status: StatusPagamento;
   dataPagamento?: string; // DD/MM/AAAA
   itens: LancamentoItem[];
+  /** Snapshot do cadastro do prestador no momento em que foi marcado como pago */
+  snapshotPrestador?: PrestadorSnapshotPJ;
   observacaoGeral?: string;
   /** IDs dos itens que compõem a base do Prêmio neste mês (snapshot editável) */
   itensPremioIds?: string[];
