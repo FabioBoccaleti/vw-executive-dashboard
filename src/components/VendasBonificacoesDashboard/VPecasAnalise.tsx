@@ -810,11 +810,12 @@ export default function VPecasAnalise() {
   const deptMetricLabel: Record<typeof deptMetric, string> = { nfs: 'Qtd NFs', valorVenda: 'Receita Bruta', recLiq: 'Rec. Líquida', lucroBruto: 'Lucro Bruto' };
   const estadoMetricLabel: Record<typeof estadoMetric, string> = { valorVenda: 'Receita Bruta', recLiq: 'Rec. Líquida', lucroBruto: 'Lucro Bruto' };
   const vendorSortLabel: Record<typeof vendorSort, string> = { valorVenda: 'Receita Bruta', nfs: 'Qtd NFs', lucroBruto: 'Lucro Bruto', lbPct: '% Lucro Bruto' };
+  const showMainFilters = analiseTab === 'nfs' || analiseTab === 'itens';
 
   return (
     <div className="flex-1 overflow-auto bg-slate-50 px-6 py-5 space-y-8" style={{ minHeight: 0 }}>
       {/* ── Filtros ────────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-3 flex items-center gap-4 flex-wrap">
+      {showMainFilters && <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-3 flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
           ANO
           <select
@@ -843,7 +844,7 @@ export default function VPecasAnalise() {
           ))}
         </div>
         <span className="ml-auto text-[11px] text-slate-400">{filteredRows.length} NF{filteredRows.length !== 1 ? 's' : ''}</span>
-      </div>
+      </div>}
 
       {/* ── Sub-tabs Análise ──────────────────────────────────────────────── */}
       <div className="flex gap-1 bg-white rounded-xl border border-slate-200 shadow-sm px-3 py-2">
