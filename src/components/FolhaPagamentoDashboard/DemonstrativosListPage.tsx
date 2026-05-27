@@ -22,6 +22,82 @@ function fmtBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function buildLancamentoPreview(prestador: PrestadorPJ, lanc: LancamentoPJ): LancamentoPJ {
+  if (lanc.status === 'pago') return lanc;
+
+  const prestadorItensMap = new Map(prestador.itens.map(pi => [pi.id, pi]));
+  const itensAtuaisMap = new Map(lanc.itens.map(item => [item.itemId, item]));
+
+  const itensCadastro = prestador.itens.map(prestItem => {
+    const itemAtual = itensAtuaisMap.get(prestItem.id);
+
+    if (prestItem.tipo === 'fixa') {
+      return {
+        itemId: prestItem.id,
+        descricao: prestItem.descricao,
+        tipo: 'fixa' as const,
+        valor: prestItem.valorBase ?? 0,
+      };
+    }
+
+    if (prestItem.tipo === 'variavel') {
+      return {
+        itemId: prestItem.id,
+        descricao: prestItem.descricao,
+        tipo: 'variavel' as const,
+        valor: itemAtual?.valor ?? 0,
+        valorBaseCalculo: itemAtual?.valorBaseCalculo,
+        percentualUsado: itemAtual?.percentualUsado ?? prestItem.percentual,
+        baseCalculoLabel: itemAtual?.baseCalculoLabel,
+      };
+    }
+
+    return {
+      itemId: prestItem.id,
+      descricao: prestItem.descricao,
+      tipo: 'premio' as const,
+      valor: itemAtual?.valor ?? 0,
+      percentualUsado: itemAtual?.percentualUsado ?? prestItem.percentual,
+    };
+  });
+
+  const itensExtras = lanc.itens.filter(item =>
+    item.itemId !== 'premio_adicional' && !prestadorItensMap.has(item.itemId)
+  );
+
+  const itensPremioIds = (lanc.itensPremioIds ?? []).filter(id => prestadorItensMap.has(id));
+  let itensPreview = [...itensCadastro, ...itensExtras];
+
+  if (prestador.temPremio) {
+    const pctPremio = prestador.percentualPremio ?? 0;
+    const deducao = prestador.deducaoBasePremio ?? 0;
+    const basePremio = itensPreview
+      .filter(it => itensPremioIds.includes(it.itemId))
+      .reduce((s, it) => s + (it.valor || 0), 0);
+    const valorPremio = Math.round(Math.max(0, basePremio - deducao) * pctPremio) / 100;
+
+    const premioIdx = itensPreview.findIndex(it => it.itemId === 'premio_adicional');
+    const premioItem = {
+      itemId: 'premio_adicional',
+      descricao: 'Prêmio Adicional',
+      tipo: 'premio' as const,
+      valor: valorPremio,
+      ...(prestador.percentualPremio != null && { percentualUsado: prestador.percentualPremio }),
+    };
+
+    if (premioIdx === -1) itensPreview.push(premioItem);
+    else itensPreview[premioIdx] = { ...itensPreview[premioIdx], ...premioItem };
+  } else {
+    itensPreview = itensPreview.filter(it => it.itemId !== 'premio_adicional');
+  }
+
+  return {
+    ...lanc,
+    itens: itensPreview,
+    itensPremioIds,
+  };
+}
+
 // ─── Linha de resumo de um prestador ─────────────────────────────────────────
 
 function PrestadorRow({
@@ -33,7 +109,8 @@ function PrestadorRow({
   lanc: LancamentoPJ | null;
   onClick: () => void;
 }) {
-  const total = lanc ? totalLancamento(lanc) : null;
+  const lancPreview = lanc ? buildLancamentoPreview(prestador, lanc) : null;
+  const total = lancPreview ? totalLancamento(lancPreview) : null;
   const pago = lanc?.status === 'pago';
   const finAssinou = !!lanc?.assinaturas?.financeiro;
   const rhAssinou  = !!lanc?.assinaturas?.rh;
@@ -161,7 +238,7 @@ export function DemonstrativosListPage({ onOpenPrestador }: DemonstrativosListPa
 
   const totalGeral = filtered.reduce((sum, p) => {
     const l = lancamentos[p.id];
-    return sum + (l ? totalLancamento(l) : 0);
+    return sum + (l ? totalLancamento(buildLancamentoPreview(p, l)) : 0);
   }, 0);
 
   async function handleImprimirTodos() {
@@ -172,7 +249,7 @@ export function DemonstrativosListPage({ onOpenPrestador }: DemonstrativosListPa
     const lancMap: Record<string, LancamentoPJ> = {};
     await Promise.all(filtered.map(async p => {
       const l = lancamentos[p.id] ?? buildLancamentoVazio(p, year, month);
-      lancMap[p.id] = l;
+      lancMap[p.id] = buildLancamentoPreview(p, l);
     }));
 
     const brandColor = (brand: string) => brand === 'vw' ? '#001e50' : '#bb0a30';

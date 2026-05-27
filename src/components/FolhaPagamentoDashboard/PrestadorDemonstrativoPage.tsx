@@ -12,6 +12,7 @@ import {
   loadHistorico,
   buildLancamentoVazio,
   totalLancamento,
+  BASE_CALCULO_LABELS,
   DESCRICAO_TRIMESTRAL,
   type PrestadorPJ,
   type PrestadorSnapshotPJ,
@@ -779,18 +780,78 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
       // não está pago (lançamento novo ou pendente). Demonstrativos pagos mantêm
       // exatamente os valores que foram salvos.
       if (!existing || existing.status !== 'pago') {
-        // Sincroniza tipo e percentualUsado do cadastro atual (caso prestador tenha mudado o item)
-        base.itens = base.itens.map(item => {
-          const prestItem = prestador.itens.find(pi => pi.id === item.itemId);
-          if (!prestItem) return item;
+        // Em pendente, o demonstrativo deve refletir sempre o cadastro atual:
+        // atualiza descrição/tipo/valor dos itens cadastrados e preserva apenas itens extras manuais.
+        const prestadorItensMap = new Map(prestador.itens.map(pi => [pi.id, pi]));
+        const itensAtuaisMap = new Map(base.itens.map(item => [item.itemId, item]));
+
+        const itensCadastroAtualizados: LancamentoItem[] = prestador.itens.map(prestItem => {
+          const itemAtual = itensAtuaisMap.get(prestItem.id);
+
+          if (prestItem.tipo === 'fixa') {
+            return {
+              itemId: prestItem.id,
+              descricao: prestItem.descricao,
+              tipo: 'fixa',
+              valor: prestItem.valorBase ?? 0,
+            };
+          }
+
+          if (prestItem.tipo === 'variavel') {
+            return {
+              itemId: prestItem.id,
+              descricao: prestItem.descricao,
+              tipo: 'variavel',
+              valor: itemAtual?.valor ?? 0,
+              valorBaseCalculo: itemAtual?.valorBaseCalculo,
+              percentualUsado: itemAtual?.percentualUsado ?? prestItem.percentual,
+              baseCalculoLabel: prestItem.descricao === DESCRICAO_TRIMESTRAL
+                ? 'Lucro Líquido do Trimestre'
+                : prestItem.baseCalculo ? BASE_CALCULO_LABELS[prestItem.baseCalculo] : undefined,
+            };
+          }
+
           return {
-            ...item,
-            tipo: prestItem.tipo,
-            ...(prestItem.tipo === 'variavel' && {
-              percentualUsado: item.percentualUsado ?? prestItem.percentual,
-            }),
+            itemId: prestItem.id,
+            descricao: prestItem.descricao,
+            tipo: 'premio',
+            valor: itemAtual?.valor ?? 0,
+            percentualUsado: itemAtual?.percentualUsado ?? prestItem.percentual,
           };
         });
+
+        const itensExtras = base.itens.filter(item =>
+          item.itemId !== 'premio_adicional' && !prestadorItensMap.has(item.itemId)
+        );
+
+        base.itens = [...itensCadastroAtualizados, ...itensExtras];
+
+        const premioIdsValidos = (base.itensPremioIds ?? []).filter(id => prestadorItensMap.has(id));
+        base.itensPremioIds = premioIdsValidos.length > 0
+          ? premioIdsValidos
+          : [...(prestador.itensPremioIds ?? [])];
+
+        const idxPremioAdicional = base.itens.findIndex(it => it.itemId === 'premio_adicional');
+        if (prestador.temPremio) {
+          if (idxPremioAdicional === -1) {
+            base.itens.push({
+              itemId: 'premio_adicional',
+              descricao: 'Prêmio Adicional',
+              tipo: 'premio',
+              valor: 0,
+              ...(prestador.percentualPremio != null && { percentualUsado: prestador.percentualPremio }),
+            });
+          } else {
+            base.itens[idxPremioAdicional] = {
+              ...base.itens[idxPremioAdicional],
+              descricao: 'Prêmio Adicional',
+              tipo: 'premio',
+              ...(prestador.percentualPremio != null && { percentualUsado: prestador.percentualPremio }),
+            };
+          }
+        } else if (idxPremioAdicional !== -1) {
+          base.itens.splice(idxPremioAdicional, 1);
+        }
 
         // Preenche valorBaseCalculo de itens variáveis a partir do DRE
         if (dreRow) {
@@ -855,7 +916,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
     }
 
     load();
-  }, [prestador.id, year, month]);
+  }, [prestador, year, month]);
 
   // Carrega histórico ao abrir o painel
   useEffect(() => {
