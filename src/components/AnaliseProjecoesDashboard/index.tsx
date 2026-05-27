@@ -422,7 +422,7 @@ export function AnaliseProjecoesDashboard({ onChangeBrand }: AnaliseProjecoesDas
         {editMode && (
           <div className="ml-auto flex items-center gap-1.5 bg-orange-50 border border-orange-200 rounded px-2.5 py-1">
             <Edit3 size={11} className="text-orange-500" />
-            <span className="text-[11px] text-orange-700 font-medium">Modo edição ativo — clique nos valores do Budget para editar</span>
+            <span className="text-[11px] text-orange-700 font-medium">Modo edição ativo — clique nos valores do Budget para editar. Salvo automaticamente ao confirmar.</span>
             <button onClick={() => setEditMode(false)} className="ml-1 text-orange-400 hover:text-orange-600">
               <X size={12} />
             </button>

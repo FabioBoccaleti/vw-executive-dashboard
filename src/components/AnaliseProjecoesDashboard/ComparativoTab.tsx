@@ -10,6 +10,8 @@ import {
   VW_DEPT_LABELS,
   AUDI_DEPT_LABELS,
   parseVal,
+  recalculateBudgetVwRow,
+  recalculateBudgetAudiRow,
   saveBudgetVw,
   saveBudgetAudi,
   type BudgetVwRow,
@@ -344,9 +346,13 @@ export function ComparativoTab({
           pecas: {} as DeptBudget, oficina: {} as DeptBudget, funilaria: {} as DeptBudget, adm: {} as DeptBudget,
         }),
       };
-      (row[dept as VwDept] as DeptBudget)[f] = rawVal;
-      onBudgetVwChange(row, mi);
-      try { await saveBudgetVw(row); toast.success('Salvo'); } catch { toast.error('Erro ao salvar'); }
+      const updatedDept: DeptBudget = { ...(row[dept as VwDept] as DeptBudget) };
+      updatedDept[f] = rawVal;
+      row[dept as VwDept] = updatedDept;
+
+      const recalculatedRow = recalculateBudgetVwRow(row);
+      onBudgetVwChange(recalculatedRow, mi);
+      try { await saveBudgetVw(recalculatedRow); toast.success('Salvo'); } catch { toast.error('Erro ao salvar'); }
     } else {
       const row: BudgetAudiRow = {
         ...(budgetAudiMonths[mi] ?? {
@@ -355,9 +361,13 @@ export function ComparativoTab({
           pecas: {} as DeptBudget, oficina: {} as DeptBudget, funilaria: {} as DeptBudget, adm: {} as DeptBudget,
         }),
       };
-      (row[dept as AudiDept] as DeptBudget)[f] = rawVal;
-      onBudgetAudiChange(row, mi);
-      try { await saveBudgetAudi(row); toast.success('Salvo'); } catch { toast.error('Erro ao salvar'); }
+      const updatedDept: DeptBudget = { ...(row[dept as AudiDept] as DeptBudget) };
+      updatedDept[f] = rawVal;
+      row[dept as AudiDept] = updatedDept;
+
+      const recalculatedRow = recalculateBudgetAudiRow(row);
+      onBudgetAudiChange(recalculatedRow, mi);
+      try { await saveBudgetAudi(recalculatedRow); toast.success('Salvo'); } catch { toast.error('Erro ao salvar'); }
     }
   };
 

@@ -147,7 +147,7 @@ export async function loadBudgetVw(year: number, month: number): Promise<BudgetV
 
 export async function saveBudgetVw(row: BudgetVwRow): Promise<void> {
   const [yr, mo] = row.periodo.split('-').map(Number);
-  await kvSet(keyVw(yr, mo), row);
+  await kvSet(keyVw(yr, mo), recalculateBudgetVwRow(row));
 }
 
 export async function loadBudgetAudi(year: number, month: number): Promise<BudgetAudiRow | null> {
@@ -156,7 +156,7 @@ export async function loadBudgetAudi(year: number, month: number): Promise<Budge
 
 export async function saveBudgetAudi(row: BudgetAudiRow): Promise<void> {
   const [yr, mo] = row.periodo.split('-').map(Number);
-  await kvSet(keyAudi(yr, mo), row);
+  await kvSet(keyAudi(yr, mo), recalculateBudgetAudiRow(row));
 }
 
 export async function loadAllBudgetVw(year: number): Promise<(BudgetVwRow | null)[]> {
@@ -181,6 +181,88 @@ export function parseVal(v: string | number | undefined): number {
   }
   // Formato inglês/neutro: ponto já é decimal (ex: "29762782.56") ou inteiro
   return parseFloat(s) || 0;
+}
+
+function formatCalculatedValue(value: number): string {
+  if (!Number.isFinite(value) || Math.abs(value) < 1e-9) return '';
+  return Number(value.toFixed(6)).toString();
+}
+
+export function recalculateDeptBudget(dept: DeptBudget): DeptBudget {
+  const receitaOperacionalLiquida = parseVal(dept.receitaOperacionalLiquida);
+  const custoOperacionalReceita = parseVal(dept.custoOperacionalReceita);
+  const lucroPrejOperacionalBruto = receitaOperacionalLiquida + custoOperacionalReceita;
+
+  const outrasReceitasOperacionais = parseVal(dept.outrasReceitasOperacionais);
+  const outrasDespesasOperacionais = parseVal(dept.outrasDespesasOperacionais);
+  const margemContribuicao =
+    lucroPrejOperacionalBruto +
+    outrasReceitasOperacionais +
+    outrasDespesasOperacionais;
+
+  const despPessoal = parseVal(dept.despPessoal);
+  const despServTerceiros = parseVal(dept.despServTerceiros);
+  const despOcupacao = parseVal(dept.despOcupacao);
+  const despFuncionamento = parseVal(dept.despFuncionamento);
+  const despVendas = parseVal(dept.despVendas);
+  const lucroPrejOperacionalLiquido =
+    margemContribuicao +
+    despPessoal +
+    despServTerceiros +
+    despOcupacao +
+    despFuncionamento +
+    despVendas;
+
+  const amortizacoesDepreciacoes = parseVal(dept.amortizacoesDepreciacoes);
+  const outrasReceitasFinanceiras = parseVal(dept.outrasReceitasFinanceiras);
+  const despFinanceirasNaoOperacional = parseVal(dept.despFinanceirasNaoOperacional);
+  const despesasNaoOperacionais = parseVal(dept.despesasNaoOperacionais);
+  const outrasRendasNaoOperacionais = parseVal(dept.outrasRendasNaoOperacionais);
+  const lucroPrejAntesImpostos =
+    lucroPrejOperacionalLiquido +
+    amortizacoesDepreciacoes +
+    outrasReceitasFinanceiras +
+    despFinanceirasNaoOperacional +
+    despesasNaoOperacionais +
+    outrasRendasNaoOperacionais;
+
+  const provisoesIrpjCs = parseVal(dept.provisoesIrpjCs);
+  const participacoes = parseVal(dept.participacoes);
+  const lucroLiquidoExercicio = lucroPrejAntesImpostos + provisoesIrpjCs + participacoes;
+
+  return {
+    ...dept,
+    lucroPrejOperacionalBruto: formatCalculatedValue(lucroPrejOperacionalBruto),
+    margemContribuicao: formatCalculatedValue(margemContribuicao),
+    lucroPrejOperacionalLiquido: formatCalculatedValue(lucroPrejOperacionalLiquido),
+    lucroPrejAntesImpostos: formatCalculatedValue(lucroPrejAntesImpostos),
+    lucroLiquidoExercicio: formatCalculatedValue(lucroLiquidoExercicio),
+  };
+}
+
+export function recalculateBudgetVwRow(row: BudgetVwRow): BudgetVwRow {
+  return {
+    ...row,
+    novos: recalculateDeptBudget(row.novos),
+    usados: recalculateDeptBudget(row.usados),
+    direta: recalculateDeptBudget(row.direta),
+    pecas: recalculateDeptBudget(row.pecas),
+    oficina: recalculateDeptBudget(row.oficina),
+    funilaria: recalculateDeptBudget(row.funilaria),
+    adm: recalculateDeptBudget(row.adm),
+  };
+}
+
+export function recalculateBudgetAudiRow(row: BudgetAudiRow): BudgetAudiRow {
+  return {
+    ...row,
+    novos: recalculateDeptBudget(row.novos),
+    usados: recalculateDeptBudget(row.usados),
+    pecas: recalculateDeptBudget(row.pecas),
+    oficina: recalculateDeptBudget(row.oficina),
+    funilaria: recalculateDeptBudget(row.funilaria),
+    adm: recalculateDeptBudget(row.adm),
+  };
 }
 
 /** Soma todos os departamentos de uma linha VW para um campo */
