@@ -914,7 +914,7 @@ function EditableCell({ value, onChange, isTotal = false, isNegative = false, is
     <span
       onClick={() => { setDraft(value); setEditing(true); }}
       title="Clique para editar"
-      className={`block w-full text-right cursor-pointer rounded px-1 py-0.5 hover:bg-yellow-50 hover:ring-1 hover:ring-yellow-200 transition-colors min-w-[5rem] ${isNeg ? 'text-red-600' : ''} ${isTotal ? (isNeg ? 'text-red-700' : '') : ''} ${!value ? 'text-slate-300' : ''}`}
+      className={`block w-full text-right cursor-pointer rounded px-1 py-0.5 hover:bg-yellow-50 hover:ring-1 hover:ring-yellow-200 transition-colors min-w-[5rem] ${!value ? 'text-slate-300' : ''}`}
     >
       {display || '—'}
     </span>

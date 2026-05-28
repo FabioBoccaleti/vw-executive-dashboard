@@ -150,9 +150,7 @@ function KpiCard({
 }) {
   const hasDelta = !isAnual && delta !== undefined && !isNaN(delta) && isFinite(delta);
   const isPos    = hasDelta && delta! > 0;
-  const isNeg    = hasDelta && delta! < 0;
   const isZero   = hasDelta && delta! === 0;
-  void isNeg;
   const fmt = (v: number) => isPct
     ? v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%'
     : isVolume ? Math.round(v).toLocaleString('pt-BR') : fmtK(v);
@@ -162,7 +160,7 @@ function KpiCard({
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col gap-1.5 min-w-0">
         <span className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider leading-tight">{label}</span>
         <div className="flex items-baseline gap-1.5">
-          <span className={`text-2xl font-extrabold tracking-tight ${accumValue < 0 ? 'text-red-600' : 'text-slate-800'}`}>{fmt(accumValue)}</span>
+          <span className="text-2xl font-extrabold tracking-tight text-slate-800">{fmt(accumValue)}</span>
         </div>
         <span className="text-[0.6rem] text-slate-400 font-medium">acumulado anual</span>
       </div>
@@ -172,11 +170,11 @@ function KpiCard({
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col gap-1.5 min-w-0">
       <span className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider leading-tight">{label}</span>
       <div className="flex items-baseline gap-1.5">
-        <span className={`text-2xl font-extrabold tracking-tight ${mesValue < 0 ? 'text-red-600' : 'text-slate-800'}`}>{fmt(mesValue)}</span>
+        <span className="text-2xl font-extrabold tracking-tight text-slate-800">{fmt(mesValue)}</span>
         <span className="text-[0.6rem] text-slate-400 font-medium">mês</span>
       </div>
       <div className="flex items-baseline gap-1.5">
-        <span className={`text-sm font-bold ${accumValue < 0 ? 'text-red-500' : 'text-slate-500'}`}>{fmt(accumValue)}</span>
+        <span className="text-sm font-bold text-slate-500">{fmt(accumValue)}</span>
         <span className="text-[0.6rem] text-slate-400">acum.</span>
       </div>
       {hasDelta && (

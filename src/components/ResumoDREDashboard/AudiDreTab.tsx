@@ -1486,8 +1486,8 @@ function EditableCell({
       onClick={startEdit}
       title="Clique para editar"
       className={`block w-full text-right cursor-pointer rounded px-1 py-0.5 hover:bg-yellow-50 hover:ring-1 hover:ring-yellow-200 transition-colors min-w-[5rem] ${
-        isNeg ? 'text-red-600' : ''
-      } ${isTotal ? (isNeg ? 'text-red-700' : 'text-black') : ''} ${!value ? 'text-slate-300' : ''}`}
+        isTotal ? 'text-black' : ''
+      } ${!value ? 'text-slate-300' : ''}`}
     >
       {display || (isQuant ? '—' : '—')}
     </span>
