@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, TrendingUp } from 'lucide-react';
+import { ChevronDown, Calculator, Check, Pencil, Plus, TrendingUp, UserCheck, UserX, Wallet, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from '@/components/VendasBonificacoesDashboard/vPecasStorage';
@@ -9,8 +9,17 @@ import { loadProdutosRows } from '@/components/VendasBonificacoesDashboard/produ
 import type { VPecasItemRow } from '@/components/VendasBonificacoesDashboard/vPecasItemStorage';
 import { kvGet, kvSet } from '@/lib/kvClient';
 import { toast } from 'sonner';
+import {
+  calculoPeriodoKey,
+  loadCalculoPosVendasRemuneracoes,
+  saveCalculoPosVendasRemuneracoes,
+  upsertCalculoPosVendasRemuneracao,
+  type CalculoPosVendasRemuneracao,
+} from './calculoPosVendasStorage';
 
 type VendasSubTab = 'pecas' | 'oficina' | 'funilaria' | 'acessorios' | 'produto' | 'mecanicos';
+type MainTab = 'vendas' | 'calculo';
+type CalculoAba = 'cadastrados' | 'pendentes';
 
 interface CalculoComissoesVWPosVendasPageProps {
   onBack: () => void;
@@ -18,6 +27,13 @@ interface CalculoComissoesVWPosVendasPageProps {
 
 interface PecasOverride {
   condPgto: string;
+}
+
+interface CalculoVendorCard {
+  vendedor: string;
+  registros: number;
+  fontes: string[];
+  record?: CalculoPosVendasRemuneracao;
 }
 
 const OV_KEY = 'vendas_pecas_vendas_ov';
@@ -122,6 +138,31 @@ function productRowPeriod(row: VPecasItemRow): { year: number; month: number } |
     return { year: parseInt(dta.split('/')[2], 10), month: parseInt(dta.split('/')[1], 10) };
   }
   return null;
+}
+
+function normalizeVendorName(value: string): string {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+function vendorKey(value: string): string {
+  return normalizeVendorName(value).toLowerCase();
+}
+
+function extractVendorNames(data: Record<string, string>): string[] {
+  return [
+    data['NOME_VENDEDOR'],
+    data['VENDEDOR'],
+    data['NOME_VENDEDOR2'],
+    data['VENDEDOR2'],
+  ]
+    .map((value) => normalizeVendorName(String(value ?? '')))
+    .filter((value) => value.length > 0);
+}
+
+function getSourceLabelFromRow(data: Record<string, string>, fallback: string): string {
+  const serie = (data['SERIE_NOTA_FISCAL'] ?? '').trim().toUpperCase();
+  if (fallback === 'Vendas' && serie === 'RPS') return 'RPS';
+  return fallback;
 }
 
 function isBlankCell(value: unknown): boolean {
@@ -278,6 +319,7 @@ function ovKey(d: Record<string, string>): string {
 }
 
 export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPosVendasPageProps) {
+  const [mainTab, setMainTab] = useState<MainTab>('vendas');
   const [vendasSubTab, setVendasSubTab] = useState<VendasSubTab>('pecas');
   const [allRows, setAllRows] = useState<VPecasRow[]>([]);
   const [allPecasRows, setAllPecasRows] = useState<VPecasRow[]>([]);
@@ -300,6 +342,14 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [produtoFilterMonth, setProdutoFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [mecanicosFilterYear, setMecanicosFilterYear] = useState(new Date().getFullYear());
   const [mecanicosFilterMonth, setMecanicosFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [calculoYear, setCalculoYear] = useState(new Date().getFullYear());
+  const [calculoMonth, setCalculoMonth] = useState<number>(new Date().getMonth() + 1);
+  const [calculoAba, setCalculoAba] = useState<CalculoAba>('cadastrados');
+  const [calculoRemuneracoes, setCalculoRemuneracoes] = useState<CalculoPosVendasRemuneracao[]>([]);
+  const [calculoLoading, setCalculoLoading] = useState(true);
+  const [calculoSaving, setCalculoSaving] = useState(false);
+  const [calculoModalOpen, setCalculoModalOpen] = useState(false);
+  const [calculoDraft, setCalculoDraft] = useState<CalculoPosVendasRemuneracao | null>(null);
   const mecanicosInputRef = useRef<HTMLInputElement>(null);
   const [pendingMecanicosImport, setPendingMecanicosImport] = useState<{
     rows: VPecasItemRow[];
@@ -341,6 +391,13 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         setLoading(false);
       },
     );
+  }, []);
+
+  useEffect(() => {
+    loadCalculoPosVendasRemuneracoes().then((items) => {
+      setCalculoRemuneracoes(items);
+      setCalculoLoading(false);
+    });
   }, []);
 
   const oficinaBaseRows = useMemo(
@@ -837,6 +894,161 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     };
   }, [filteredProdutoRows]);
 
+  const calculoPeriodo = calculoPeriodoKey(calculoYear, calculoMonth);
+
+  const calculoSourceRows = useMemo(() => {
+    const rows: Array<{ data: Record<string, string>; periodo: { year: number; month: number } | null; origem: string }> = [];
+
+    allRows.forEach((row) => {
+      rows.push({
+        data: row.data,
+        periodo: rowPeriod(row),
+        origem: getSourceLabelFromRow(row.data, row.data['SERIE_NOTA_FISCAL'] === 'RPS' ? 'RPS' : 'Vendas'),
+      });
+    });
+
+    produtoRows.forEach((row) => {
+      rows.push({
+        data: row.data,
+        periodo: productRowPeriod(row),
+        origem: 'Produto',
+      });
+    });
+
+    mecanicosRows.forEach((row) => {
+      rows.push({
+        data: row.data,
+        periodo: productRowPeriod(row),
+        origem: 'Mecânicos',
+      });
+    });
+
+    return rows.filter((row) => row.periodo && row.periodo.year === calculoYear && row.periodo.month === calculoMonth);
+  }, [allRows, produtoRows, mecanicosRows, calculoYear, calculoMonth]);
+
+  const calculoVendors = useMemo<CalculoVendorCard[]>(() => {
+    const map = new Map<string, { vendedor: string; registros: number; fontes: Set<string> }>();
+    const addVendor = (name: string, source: string) => {
+      const normalized = normalizeVendorName(name);
+      if (!normalized) return;
+      const key = vendorKey(normalized);
+      const current = map.get(key) ?? { vendedor: normalized, registros: 0, fontes: new Set<string>() };
+      current.vendedor = current.vendedor || normalized;
+      current.registros += 1;
+      current.fontes.add(source);
+      map.set(key, current);
+    };
+
+    calculoSourceRows.forEach((row) => {
+      extractVendorNames(row.data).forEach((name) => addVendor(name, row.origem));
+    });
+
+    const records = new Map(
+      calculoRemuneracoes
+        .filter((item) => item.periodo === calculoPeriodo)
+        .map((item) => [vendorKey(item.vendedor), item] as const),
+    );
+
+    return [...map.values()]
+      .map((item) => ({
+        ...item,
+        fontes: [...item.fontes].sort(),
+        record: records.get(vendorKey(item.vendedor)),
+      }))
+      .sort((a, b) => a.vendedor.localeCompare(b.vendedor, 'pt-BR', { sensitivity: 'base' }));
+  }, [calculoSourceRows, calculoRemuneracoes, calculoPeriodo]);
+
+  const calculoRegistered = useMemo(() => calculoVendors.filter((item) => Boolean(item.record)), [calculoVendors]);
+  const calculoPending = useMemo(() => calculoVendors.filter((item) => !item.record), [calculoVendors]);
+
+  function openCalculoDraft(vendedor: string) {
+    const existing = calculoRemuneracoes.find(
+      (item) => item.periodo === calculoPeriodo && vendorKey(item.vendedor) === vendorKey(vendedor),
+    );
+
+    setCalculoDraft(
+      existing
+        ? { ...existing }
+        : {
+            id: crypto.randomUUID(),
+            periodo: calculoPeriodo,
+            vendedor: normalizeVendorName(vendedor),
+            comissionado: false,
+            salarioFixo: '',
+            ativo: true,
+            criadoEm: new Date().toISOString(),
+            atualizadoEm: new Date().toISOString(),
+          },
+    );
+    setCalculoModalOpen(true);
+  }
+
+  function closeCalculoDraft() {
+    setCalculoModalOpen(false);
+    setCalculoDraft(null);
+  }
+
+  async function saveCalculoDraft() {
+    if (!calculoDraft) return;
+    const now = new Date().toISOString();
+    const payload: CalculoPosVendasRemuneracao = {
+      ...calculoDraft,
+      periodo: calculoPeriodo,
+      vendedor: normalizeVendorName(calculoDraft.vendedor),
+      salarioFixo: String(calculoDraft.salarioFixo ?? '').trim(),
+      atualizadoEm: now,
+      criadoEm: calculoDraft.criadoEm || now,
+    };
+
+    const previous = calculoRemuneracoes.find(
+      (item) => item.periodo === calculoPeriodo && vendorKey(item.vendedor) === vendorKey(payload.vendedor),
+    );
+    if (previous?.ativo !== false && payload.ativo === false) {
+      const confirmed = window.confirm(`Inativar ${payload.vendedor} para ${MONTHS[calculoMonth - 1]}/${calculoYear}?`);
+      if (!confirmed) return;
+    }
+
+    setCalculoSaving(true);
+    try {
+      const next = upsertCalculoPosVendasRemuneracao(calculoRemuneracoes, payload);
+      const ok = await saveCalculoPosVendasRemuneracoes(next);
+      if (!ok) {
+        toast.error('Não foi possível salvar a remuneração.');
+        return;
+      }
+      setCalculoRemuneracoes(next);
+      closeCalculoDraft();
+      toast.success(`Remuneração de ${payload.vendedor} salva para ${MONTHS[calculoMonth - 1]}/${calculoYear}.`);
+    } finally {
+      setCalculoSaving(false);
+    }
+  }
+
+  async function toggleCalculoAtivo(vendedor: string) {
+    const existing = calculoRemuneracoes.find(
+      (item) => item.periodo === calculoPeriodo && vendorKey(item.vendedor) === vendorKey(vendedor),
+    );
+    if (!existing) return;
+    const nextActive = !existing.ativo;
+    if (!nextActive) {
+      const confirmed = window.confirm(`Inativar ${existing.vendedor} para ${MONTHS[calculoMonth - 1]}/${calculoYear}?`);
+      if (!confirmed) return;
+    }
+    const payload: CalculoPosVendasRemuneracao = {
+      ...existing,
+      ativo: nextActive,
+      atualizadoEm: new Date().toISOString(),
+    };
+    const next = upsertCalculoPosVendasRemuneracao(calculoRemuneracoes, payload);
+    const ok = await saveCalculoPosVendasRemuneracoes(next);
+    if (!ok) {
+      toast.error('Não foi possível atualizar o status.');
+      return;
+    }
+    setCalculoRemuneracoes(next);
+    toast.success(`${payload.vendedor} ${nextActive ? 'reativado' : 'inativado'}.`);
+  }
+
   const mecanicosAvailableYears = useMemo(() => {
     const years = new Set<number>();
     mecanicosRows.forEach((row) => {
@@ -994,9 +1206,23 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
         <div className="flex items-center gap-3">
           <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors bg-white text-slate-800 shadow-sm">
+            <button
+              onClick={() => setMainTab('vendas')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainTab === 'vendas' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
               <TrendingUp className="w-3.5 h-3.5" />
               Vendas
+            </button>
+            <button
+              onClick={() => setMainTab('calculo')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainTab === 'calculo' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Calculator className="w-3.5 h-3.5" />
+              Cálculo
             </button>
           </div>
 
@@ -1010,49 +1236,17 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       </header>
 
       <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
-        <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
-          {VENDAS_SUB_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setVendasSubTab(tab.id)}
-              className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
-                vendasSubTab === tab.id
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {vendasSubTab === 'mecanicos' ? (
+        {mainTab === 'calculo' ? (
           <div className="flex-1 p-6" style={{ minHeight: 0 }}>
             <div className="h-full bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col">
               <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-bold text-slate-800">Mecânicos</p>
-                  <p className="text-xs text-slate-500">Importe um arquivo Excel para criar e alimentar a tabela.</p>
+                  <p className="text-sm font-bold text-slate-800">Cálculo</p>
+                  <p className="text-xs text-slate-500">Cadastro mensal de remuneração para vendedores com vendas registradas no período.</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-rose-300 text-rose-700 hover:bg-rose-50"
-                    onClick={() => setConfirmDeleteMecanicos(true)}
-                    disabled={mecanicosRows.length === 0}
-                  >
-                    Apagar dados
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                    onClick={() => mecanicosInputRef.current?.click()}
-                  >
-                    Importar Excel
-                  </Button>
-                </div>
+                <span className="text-xs text-slate-400 whitespace-nowrap">
+                  {calculoVendors.length} vendedor{calculoVendors.length !== 1 ? 'es' : ''}
+                </span>
               </div>
 
               <div className="bg-white border-b border-slate-100 px-4 py-3 space-y-3">
@@ -1061,11 +1255,11 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                     <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold whitespace-nowrap">
                       ANO
                       <select
-                        value={mecanicosFilterYear}
-                        onChange={(e) => setMecanicosFilterYear(Number(e.target.value))}
+                        value={calculoYear}
+                        onChange={(e) => setCalculoYear(Number(e.target.value))}
                         className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
                       >
-                        {mecanicosAvailableYears.map((year) => (
+                        {Array.from(new Set([calculoYear - 1, calculoYear, calculoYear + 1, new Date().getFullYear()])).sort().map((year) => (
                           <option key={year} value={year}>
                             {year}
                           </option>
@@ -1073,66 +1267,125 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       </select>
                     </div>
                     <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setMecanicosFilterMonth(null)}
-                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${mecanicosFilterMonth === null ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
-                      >
-                        Ano todo
-                      </button>
                       {MONTHS.map((month, index) => (
                         <button
                           key={month}
-                          onClick={() => setMecanicosFilterMonth(index + 1)}
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${mecanicosFilterMonth === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'} ${mecanicosMonthCounts[index + 1] ? 'font-semibold' : ''}`}
+                          onClick={() => setCalculoMonth(index + 1)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                            calculoMonth === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+                          }`}
                         >
                           {month}
-                          {mecanicosMonthCounts[index + 1] ? (
-                            <span className="ml-0.5 text-[10px] opacity-70">({mecanicosMonthCounts[index + 1]})</span>
-                          ) : null}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <span className="text-xs text-slate-400 whitespace-nowrap">
-                    {filteredMecanicosRows.length} registro{filteredMecanicosRows.length !== 1 ? 's' : ''}
-                  </span>
+                  <div className="text-xs text-slate-400 whitespace-nowrap">
+                    Competência {MONTHS[calculoMonth - 1]}/{calculoYear}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-0.5 w-fit">
+                  <button
+                    onClick={() => setCalculoAba('cadastrados')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                      calculoAba === 'cadastrados' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Remuneração cadastrada ({calculoRegistered.length})
+                  </button>
+                  <button
+                    onClick={() => setCalculoAba('pendentes')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                      calculoAba === 'pendentes' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    A cadastrar ({calculoPending.length})
+                  </button>
                 </div>
 
                 <div className="text-xs text-slate-500">
-                  Arquivo importado e salvo localmente para reabrir depois.
+                  A lista é alimentada pelos vendedores que tiveram vendas registradas no período selecionado nas abas de Pós Vendas.
                 </div>
               </div>
 
               <div className="flex-1 overflow-auto">
-                {mecanicosRows.length === 0 ? (
+                {calculoLoading ? (
+                  <div className="flex h-full items-center justify-center text-slate-400 text-sm px-6 text-center">Carregando dados do cadastro...</div>
+                ) : (calculoAba === 'cadastrados' ? calculoRegistered : calculoPending).length === 0 ? (
                   <div className="flex h-full items-center justify-center text-slate-400 text-sm px-6 text-center">
-                    Nenhum arquivo importado ainda. Clique em Importar Excel para carregar os dados.
-                  </div>
-                ) : filteredMecanicosRows.length === 0 ? (
-                  <div className="flex h-full items-center justify-center text-slate-400 text-sm px-6 text-center">
-                    Nenhum registro encontrado para o período selecionado.
+                    Nenhum vendedor encontrado para esta visão.
                   </div>
                 ) : (
-                  <table className="min-w-max w-full text-xs text-slate-700">
+                  <table className="min-w-[1200px] w-full text-xs text-slate-700">
                     <thead className="bg-slate-800 text-white sticky top-0 z-10">
                       <tr>
-                        {mecanicosColumns.map((column) => (
-                          <th key={column} className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-slate-700 last:border-r-0">
-                            {column}
-                          </th>
-                        ))}
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-slate-700">Vendedor</th>
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-slate-700">Origem</th>
+                        <th className="px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700">Vendas</th>
+                        <th className="px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700">Comissionado</th>
+                        <th className="px-3 py-2 text-right font-semibold whitespace-nowrap border-r border-slate-700">Salário fixo</th>
+                        <th className="px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700">Status</th>
+                        <th className="px-3 py-2 text-center font-semibold whitespace-nowrap">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredMecanicosRows.map((row, rowIndex) => {
-                        const rowBg = rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+                      {(calculoAba === 'cadastrados' ? calculoRegistered : calculoPending).map((item, index) => {
+                        const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+                        const record = item.record;
                         return (
-                          <tr key={row.id} className={`${rowBg} border-t border-slate-100`}>
-                            {mecanicosColumns.map((column) => (
-                              <td key={column} className="px-3 py-2 whitespace-nowrap">
-                                {formatMecanicosCell(row.data[column] || '')}
-                              </td>
-                            ))}
+                          <tr key={`${item.vendedor}-${index}`} className={`${rowBg} border-t border-slate-100`}>
+                            <td className="px-3 py-2 whitespace-nowrap font-semibold text-slate-800">{item.vendedor}</td>
+                            <td className="px-3 py-2 whitespace-nowrap text-slate-500">{item.fontes.join(' · ')}</td>
+                            <td className="px-3 py-2 whitespace-nowrap text-center">{item.registros}</td>
+                            <td className="px-3 py-2 whitespace-nowrap text-center">
+                              {record?.comissionado ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 px-2 py-1 text-[11px] font-semibold">
+                                  <UserCheck className="w-3 h-3" />
+                                  Sim
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-500 px-2 py-1 text-[11px] font-semibold">
+                                  <UserX className="w-3 h-3" />
+                                  Não
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-right font-mono">R$ {fmtCurrency(Number(String(record?.salarioFixo ?? '').replace(',', '.')) || 0)}</td>
+                            <td className="px-3 py-2 whitespace-nowrap text-center">
+                              {record ? (
+                                record.ativo ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 px-2 py-1 text-[11px] font-semibold">Ativo</span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 text-rose-700 px-2 py-1 text-[11px] font-semibold">Inativo</span>
+                                )
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 px-2 py-1 text-[11px] font-semibold">Pendente</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="h-7 px-3 text-xs border-slate-300 text-slate-700 hover:bg-slate-50"
+                                  onClick={() => openCalculoDraft(item.vendedor)}
+                                >
+                                  <Pencil className="w-3 h-3 mr-1" />
+                                  {record ? 'Editar' : 'Adicionar'}
+                                </Button>
+                                {record ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className={`h-7 px-3 text-xs ${record.ativo ? 'border-rose-300 text-rose-700 hover:bg-rose-50' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'}`}
+                                    onClick={() => toggleCalculoAtivo(item.vendedor)}
+                                  >
+                                    {record.ativo ? 'Inativar' : 'Reativar'}
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
@@ -1140,361 +1393,565 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                   </table>
                 )}
               </div>
-            </div>
-          </div>
-        ) : TABLE_TABS.includes(vendasSubTab) ? (
-          <div className="flex-1 p-6" style={{ minHeight: 0 }}>
-            <div className="h-full bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col">
-              {isServiceLoading && (
-                <div className="px-4 py-3 border-b border-slate-100 bg-amber-50 text-amber-800 text-sm font-medium">
-                  Carregando dados da Central de Vendas VW para {serviceTabLabel} considerando apenas os departamentos {vendasSubTab === 'oficina' ? '104 e 122' : '106 e 129'}...
-                </div>
-              )}
-              {showDateFilters && (
-                <div className="bg-white border-b border-slate-100 px-4 py-3 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 overflow-x-auto">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold whitespace-nowrap">
-                        ANO
-                        <select
-                          value={isProdutoTab ? produtoFilterYear : activeFilterYear}
-                          onChange={(e) => (isProdutoTab ? setProdutoFilterYear(Number(e.target.value)) : setActiveFilterYear(Number(e.target.value)))}
-                          className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-                        >
-                          {(isProdutoTab ? produtoAvailableYears : availableYears).map((year) => (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          ))}
-                        </select>
+
+              {calculoModalOpen && calculoDraft && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                  <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+                    <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">Cadastro de remuneração</p>
+                        <p className="text-xs text-slate-500">Competência {MONTHS[calculoMonth - 1]}/{calculoYear}</p>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => (isProdutoTab ? setProdutoFilterMonth(null) : setActiveFilterMonth(null))}
-                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                            (isProdutoTab ? produtoFilterMonth : activeFilterMonth) === null ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
-                          }`}
-                        >
-                          Ano todo
-                        </button>
-                        {MONTHS.map((month, index) => (
-                          <button
-                            key={month}
-                            onClick={() => (isProdutoTab ? setProdutoFilterMonth(index + 1) : setActiveFilterMonth(index + 1))}
-                            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                              (isProdutoTab ? produtoFilterMonth : activeFilterMonth) === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
-                            } ${(isProdutoTab ? produtoMonthCounts[index + 1] : monthCounts[index + 1]) ? 'font-semibold' : ''}`}
-                          >
-                            {month}
-                            {(isProdutoTab ? produtoMonthCounts[index + 1] : monthCounts[index + 1]) ? (
-                              <span className="ml-0.5 text-[10px] opacity-70">({isProdutoTab ? produtoMonthCounts[index + 1] : monthCounts[index + 1]})</span>
-                            ) : null}
-                          </button>
-                        ))}
-                      </div>
+                      <button onClick={closeCalculoDraft} className="text-slate-400 hover:text-slate-600">
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                    <span className="text-xs text-slate-400 whitespace-nowrap">
-                      {(isProdutoTab ? filteredProdutoRows.length : filteredPecasRows.length)} registro{(isProdutoTab ? filteredProdutoRows.length : filteredPecasRows.length) !== 1 ? 's' : ''}
-                    </span>
-                  </div>
 
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
-                      <div className="flex items-center justify-between gap-3">
+                    <div className="mt-4 space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Vendedor</label>
+                        <input
+                          value={calculoDraft.vendedor}
+                          onChange={(e) => setCalculoDraft({ ...calculoDraft, vendedor: e.target.value })}
+                          className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <label className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-3">
+                          <input
+                            type="checkbox"
+                            checked={calculoDraft.comissionado}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, comissionado: e.target.checked })}
+                            className="h-4 w-4"
+                          />
+                          <span className="text-sm text-slate-700">Comissionado</span>
+                        </label>
+
                         <div>
-                          <p className="text-sm font-bold text-slate-800">Resumo por vendedor</p>
-                          <p className="text-xs text-slate-500">Total por vendedor com detalhe por transação</p>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Salário fixo</label>
+                          <div className="relative">
+                            <Wallet className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={calculoDraft.salarioFixo}
+                              onChange={(e) => setCalculoDraft({ ...calculoDraft, salarioFixo: e.target.value })}
+                              placeholder="0,00"
+                              className="w-full border border-slate-200 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            />
+                          </div>
                         </div>
-                        <span className="text-xs font-semibold text-slate-500">{(isProdutoTab ? produtoSummaryByVendor.length : summaryByVendor.length)} vendedor{(isProdutoTab ? produtoSummaryByVendor.length : summaryByVendor.length) !== 1 ? 'es' : ''}</span>
                       </div>
-                      <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
-                        {(isProdutoTab ? produtoSummaryByVendor.length : summaryByVendor.length) === 0 ? (
-                          <div className="text-xs text-slate-400 py-4 text-center">Sem dados para o período selecionado.</div>
-                        ) : (isProdutoTab ? produtoSummaryByVendor : summaryByVendor).map((item) => {
-                          const isOpen = openVendorKeys.includes(item.vendor);
-                          return (
-                            <div key={item.vendor} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                              <button
-                                type="button"
-                                onClick={() => toggleAccordionItem(item.vendor, openVendorKeys, setOpenVendorKeys)}
-                                className="w-full flex items-center justify-between gap-3 text-left"
-                              >
-                                <div className="min-w-0 flex items-center gap-2">
-                                  <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-semibold text-slate-800 truncate">{item.vendor}</p>
-                                    <p className="text-xs text-slate-500">{item.count} registro{item.count !== 1 ? 's' : ''}</p>
-                                  </div>
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <p className="text-sm font-bold text-slate-800">R$ {fmtCurrency(item.total)}</p>
-                                  <p className="text-[11px] text-slate-500">Total</p>
-                                </div>
-                              </button>
 
-                              {isOpen && (
-                                <div className="mt-3 space-y-1 border-t border-slate-100 pt-2">
-                                  {item.transactions.map((tx) => (
-                                    <div key={tx.label} className="flex items-center justify-between gap-3 text-xs">
-                                      <div className="min-w-0 text-slate-600">
-                                        <span className="font-medium text-slate-700">{tx.label}</span>
-                                        <span className="text-slate-400"> · {tx.count}</span>
-                                      </div>
-                                      <div className="font-mono text-slate-700 shrink-0">R$ {fmtCurrency(tx.total)}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </section>
+                      <p className="text-xs text-slate-500">
+                        Para inativar este vendedor, use o botão de status na lista. Ao salvar a inativação, será exibida uma confirmação.
+                      </p>
+                    </div>
 
-                    <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-bold text-slate-800">Resumo por departamento</p>
-                          <p className="text-xs text-slate-500">Total por departamento com detalhe por transação</p>
-                        </div>
-                        <span className="text-xs font-semibold text-slate-500">{(isProdutoTab ? produtoSummaryByDepartment.length : summaryByDepartment.length)} departamento{(isProdutoTab ? produtoSummaryByDepartment.length : summaryByDepartment.length) !== 1 ? 's' : ''}</span>
-                      </div>
-                      <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
-                        {(isProdutoTab ? produtoSummaryByDepartment.length : summaryByDepartment.length) === 0 ? (
-                          <div className="text-xs text-slate-400 py-4 text-center">Sem dados para o período selecionado.</div>
-                        ) : (isProdutoTab ? produtoSummaryByDepartment : summaryByDepartment).map((item) => {
-                          const isOpen = openDepartmentKeys.includes(item.department);
-                          return (
-                            <div key={item.department} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                              <button
-                                type="button"
-                                onClick={() => toggleAccordionItem(item.department, openDepartmentKeys, setOpenDepartmentKeys)}
-                                className="w-full flex items-center justify-between gap-3 text-left"
-                              >
-                                <div className="min-w-0 flex items-center gap-2">
-                                  <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-semibold text-slate-800 truncate">{item.department}</p>
-                                    <p className="text-xs text-slate-500">{item.count} registro{item.count !== 1 ? 's' : ''}</p>
-                                  </div>
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <p className="text-sm font-bold text-slate-800">R$ {fmtCurrency(item.total)}</p>
-                                  <p className="text-[11px] text-slate-500">Total</p>
-                                </div>
-                              </button>
-
-                              {isOpen && (
-                                <div className="mt-3 space-y-1 border-t border-slate-100 pt-2">
-                                  {item.transactions.map((tx) => (
-                                    <div key={tx.label} className="flex items-center justify-between gap-3 text-xs">
-                                      <div className="min-w-0 text-slate-600">
-                                        <span className="font-medium text-slate-700">{tx.label}</span>
-                                        <span className="text-slate-400"> · {tx.count}</span>
-                                      </div>
-                                      <div className="font-mono text-slate-700 shrink-0">R$ {fmtCurrency(tx.total)}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </section>
+                    <div className="mt-6 flex items-center justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={closeCalculoDraft}>
+                        Cancelar
+                      </Button>
+                      <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={saveCalculoDraft} disabled={calculoSaving}>
+                        <Check className="w-4 h-4 mr-1" />
+                        Salvar
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
-              <div
-                ref={tableScrollRef}
-                onScroll={() => {
-                  if (tableScrollRef.current && bottomScrollRef.current) {
-                    bottomScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
-                  }
-                }}
-                className="flex-1 overflow-auto"
-              >
-                <table className={isProdutoTab ? 'min-w-[2400px] w-full text-xs text-slate-700' : 'min-w-[2600px] w-full text-xs text-slate-700'}>
-                  <thead className="bg-slate-800 text-white sticky top-0 z-10">
-                    <tr>
-                      {(isProdutoTab ? PRODUCT_TABLE_COLUMNS : TABLE_COLUMNS).map((column) => (
-                        <th
-                          key={column}
-                          className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-slate-700 last:border-r-0"
-                        >
-                          {column}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(isProdutoTab ? filteredProdutoRows.length : filteredPecasRows.length) === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={(isProdutoTab ? PRODUCT_TABLE_COLUMNS.length : TABLE_COLUMNS.length)}
-                          className="px-3 py-8 text-center text-slate-400 border-t border-slate-100"
-                        >
-                          Nenhum registro encontrado no período selecionado.
-                        </td>
-                      </tr>
-                    ) : isProdutoTab ? (
-                      filteredProdutoRows.map((row, rowIndex) => {
-                        const d = row.data;
-                        const qtde = n(d['QUANTIDADE']);
-                        const valUnitario = n(d['VAL_UNITARIO']);
-                        const valVenda = n(d['VAL_VENDA']);
-                        const valImpostos = n(d['VAL_IMPOSTOS']);
-                        const recLiquida = valVenda - valImpostos;
-                        const custoMedio = n(d['CUSTO_MEDIO']);
-                        const lucroBruto = recLiquida - custoMedio;
-                        const lucroBrutoPct = recLiquida !== 0 ? (lucroBruto / recLiquida) * 100 : 0;
-                        const rowBg = rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
-
-                        return (
-                          <tr key={row.id} className={`${rowBg} border-t border-slate-100`}>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['NUMERO_NOTA_FISCAL'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['DTA_ENTRADA_SAIDA'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['TIPO_TRANSACAO'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['DEPARTAMENTO'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['NOME_VENDEDOR'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['NOME_CLIENTE'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['ITEM_ESTOQUE_PUB'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['DES_ITEM_ESTOQUE'] || '—'}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{qtde.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(valUnitario)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(valVenda)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(valImpostos)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(recLiquida)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(custoMedio)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(lucroBruto)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{fmtPercent(lucroBrutoPct)}</td>
-                            <td className="px-3 py-2 text-center text-slate-300">—</td>
-                            <td className="px-3 py-2 text-center text-slate-300">—</td>
-                            <td className="px-3 py-2 text-center text-slate-300">—</td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      filteredPecasRows.map((row, rowIndex) => {
-                        const d = row.data;
-                        const key = ovKey(d);
-                        const condPgto = overrides[key]?.condPgto ?? '';
-                        const isOfficeRow = vendasSubTab === 'oficina';
-                        const valorVenda = isOfficeRow
-                          ? n(d['LIQ_NOTA_FISCAL']) + n(d['VAL_PIS_ST']) + n(d['VAL_COFINS_ST']) + n(d['VAL_CSLL'])
-                          : n(d['LIQ_NOTA_FISCAL']);
-                        const iss = n(d['VAL_ISS']);
-                        const icms = n(d['VAL_ICMS']);
-                        const pis = n(d['VAL_PIS']);
-                        const cofins = n(d['VAL_COFINS']);
-                        const difal = n(d['VAL_ICMS_PARTIL_UF_DEST']) + n(d['VAL_ICMS_COMB_POBREZA']);
-                        const recLiquida = isOfficeRow
-                          ? valorVenda - iss - icms - pis - cofins - difal
-                          : valorVenda - icms - pis - cofins - difal;
-                        const taxaMLMatch = taxaMLLookup.get(d['NUMERO_NOTA_FISCAL']);
-                        const tituloValML = taxaMLMatch?.data['VAL_TITULO'] ?? '';
-                        const taxaMercadoLivre = tituloValML ? valorVenda - n(tituloValML) : 0;
-                        const epSum = taxaEPLookup.get(d['NUMERO_NOTA_FISCAL']) ?? 0;
-                        const taxaEPecas = epSum > 0 ? valorVenda - epSum : 0;
-                        const custoMedio = n(d['TOT_CUSTO_MEDIO']);
-                        const lucroBruto = recLiquida - taxaMercadoLivre - taxaEPecas - custoMedio;
-                        const lbPct = recLiquida !== 0 ? (lucroBruto / recLiquida) * 100 : 0;
-                        const rowBg = rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
-
-                        return (
-                          <tr key={row.id} className={`${rowBg} border-t border-slate-100`}>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['NUMERO_NOTA_FISCAL'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['SERIE_NOTA_FISCAL'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['TIPO_TRANSACAO'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['DTA_DOCUMENTO'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['DEPARTAMENTO'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['NOME_VENDEDOR'] || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{condPgto || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{d['NOME_CLIENTE'] || '—'}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(valorVenda)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(iss)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(icms)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(pis)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(cofins)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(difal)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(recLiquida)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(taxaMercadoLivre)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(taxaEPecas)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(custoMedio)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(lucroBruto)}</td>
-                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{fmtPercent(lbPct)}</td>
-                            <td className="px-3 py-2 text-center text-slate-300">—</td>
-                            <td className="px-3 py-2 text-center text-slate-300">—</td>
-                            <td className="px-3 py-2 text-center text-slate-300">—</td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                  {isProdutoTab && filteredProdutoRows.length > 0 && (
-                    <tfoot className="sticky bottom-0 z-20">
-                      <tr className="bg-slate-800 text-white text-xs font-semibold">
-                        <td colSpan={8} className="px-3 py-2 text-left whitespace-nowrap border-t border-slate-700">
-                          TOTAIS ({filteredProdutoRows.length} registros)
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">{produtoTotals.qtde.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(produtoTotals.valUnitario)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(produtoTotals.valVenda)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(produtoTotals.valImpostos)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">R$ {fmtCurrency(produtoTotals.recLiquida)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(produtoTotals.custoMedio)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">R$ {fmtCurrency(produtoTotals.lucroBruto)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">{fmtPercent(produtoTotals.lucroBrutoPct)}</td>
-                        <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
-                        <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
-                        <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
-                      </tr>
-                    </tfoot>
-                  )}
-                  {(vendasSubTab === 'pecas' || vendasSubTab === 'oficina') && filteredPecasRows.length > 0 && (
-                    <tfoot className="sticky bottom-0 z-20">
-                      <tr className="bg-slate-800 text-white text-xs font-semibold">
-                        <td colSpan={8} className="px-3 py-2 text-left whitespace-nowrap border-t border-slate-700">
-                          TOTAIS ({filteredPecasRows.length} registros)
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.valorVenda : pecasTotals.valorVenda)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.iss : pecasTotals.iss)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.icms : pecasTotals.icms)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.pis : pecasTotals.pis)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.cofins : pecasTotals.cofins)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.difal : pecasTotals.difal)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.recLiquida : pecasTotals.recLiquida)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.taxaMercadoLivre : pecasTotals.taxaMercadoLivre)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.taxaEPecas : pecasTotals.taxaEPecas)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.custoMedio : pecasTotals.custoMedio)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.lucroBruto : pecasTotals.lucroBruto)}</td>
-                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">{fmtPercent(vendasSubTab === 'oficina' ? oficinaTotals.lbPct : pecasTotals.lbPct)}</td>
-                        <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
-                        <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
-                        <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
-              </div>
-              <div
-                ref={bottomScrollRef}
-                onScroll={() => {
-                  if (tableScrollRef.current && bottomScrollRef.current) {
-                    tableScrollRef.current.scrollLeft = bottomScrollRef.current.scrollLeft;
-                  }
-                }}
-                className="overflow-x-auto overflow-y-hidden shrink-0 border-t border-slate-200 bg-slate-100"
-                style={{ height: 16 }}
-              >
-                <div ref={bottomScrollDummyRef} style={{ height: 12 }} />
-              </div>
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
-            Conteúdo da aba em desenvolvimento.
-          </div>
+          <>
+            <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
+              {VENDAS_SUB_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setVendasSubTab(tab.id)}
+                  className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                    vendasSubTab === tab.id
+                      ? 'border-blue-600 text-blue-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {vendasSubTab === 'mecanicos' ? (
+              <div className="flex-1 p-6" style={{ minHeight: 0 }}>
+                <div className="h-full bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col">
+                  <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">Mecânicos</p>
+                      <p className="text-xs text-slate-500">Importe um arquivo Excel para criar e alimentar a tabela.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-rose-300 text-rose-700 hover:bg-rose-50"
+                        onClick={() => setConfirmDeleteMecanicos(true)}
+                        disabled={mecanicosRows.length === 0}
+                      >
+                        Apagar dados
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                        onClick={() => mecanicosInputRef.current?.click()}
+                      >
+                        Importar Excel
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border-b border-slate-100 px-4 py-3 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 overflow-x-auto">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold whitespace-nowrap">
+                          ANO
+                          <select
+                            value={mecanicosFilterYear}
+                            onChange={(e) => setMecanicosFilterYear(Number(e.target.value))}
+                            className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          >
+                            {mecanicosAvailableYears.map((year) => (
+                              <option key={year} value={year}>
+                                {year}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setMecanicosFilterMonth(null)}
+                            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${mecanicosFilterMonth === null ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+                          >
+                            Ano todo
+                          </button>
+                          {MONTHS.map((month, index) => (
+                            <button
+                              key={month}
+                              onClick={() => setMecanicosFilterMonth(index + 1)}
+                              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${mecanicosFilterMonth === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'} ${mecanicosMonthCounts[index + 1] ? 'font-semibold' : ''}`}
+                            >
+                              {month}
+                              {mecanicosMonthCounts[index + 1] ? (
+                                <span className="ml-0.5 text-[10px] opacity-70">({mecanicosMonthCounts[index + 1]})</span>
+                              ) : null}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <span className="text-xs text-slate-400 whitespace-nowrap">
+                        {filteredMecanicosRows.length} registro{filteredMecanicosRows.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-slate-500">
+                      Arquivo importado e salvo localmente para reabrir depois.
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-auto">
+                    {mecanicosRows.length === 0 ? (
+                      <div className="flex h-full items-center justify-center text-slate-400 text-sm px-6 text-center">
+                        Nenhum arquivo importado ainda. Clique em Importar Excel para carregar os dados.
+                      </div>
+                    ) : filteredMecanicosRows.length === 0 ? (
+                      <div className="flex h-full items-center justify-center text-slate-400 text-sm px-6 text-center">
+                        Nenhum registro encontrado para o período selecionado.
+                      </div>
+                    ) : (
+                      <table className="min-w-max w-full text-xs text-slate-700">
+                        <thead className="bg-slate-800 text-white sticky top-0 z-10">
+                          <tr>
+                            {mecanicosColumns.map((column) => (
+                              <th key={column} className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-slate-700 last:border-r-0">
+                                {column}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredMecanicosRows.map((row, rowIndex) => {
+                            const rowBg = rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+                            return (
+                              <tr key={row.id} className={`${rowBg} border-t border-slate-100`}>
+                                {mecanicosColumns.map((column) => (
+                                  <td key={column} className="px-3 py-2 whitespace-nowrap">
+                                    {formatMecanicosCell(row.data[column] || '')}
+                                  </td>
+                                ))}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : TABLE_TABS.includes(vendasSubTab) ? (
+              <div className="flex-1 p-6" style={{ minHeight: 0 }}>
+                <div className="h-full bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col">
+                  {isServiceLoading && (
+                    <div className="px-4 py-3 border-b border-slate-100 bg-amber-50 text-amber-800 text-sm font-medium">
+                      Carregando dados da Central de Vendas VW para {serviceTabLabel} considerando apenas os departamentos {vendasSubTab === 'oficina' ? '104 e 122' : '106 e 129'}...
+                    </div>
+                  )}
+                  {showDateFilters && (
+                    <div className="bg-white border-b border-slate-100 px-4 py-3 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 overflow-x-auto">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold whitespace-nowrap">
+                            ANO
+                            <select
+                              value={isProdutoTab ? produtoFilterYear : activeFilterYear}
+                              onChange={(e) => (isProdutoTab ? setProdutoFilterYear(Number(e.target.value)) : setActiveFilterYear(Number(e.target.value)))}
+                              className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                            >
+                              {(isProdutoTab ? produtoAvailableYears : availableYears).map((year) => (
+                                <option key={year} value={year}>
+                                  {year}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => (isProdutoTab ? setProdutoFilterMonth(null) : setActiveFilterMonth(null))}
+                              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                                (isProdutoTab ? produtoFilterMonth : activeFilterMonth) === null ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+                              }`}
+                            >
+                              Ano todo
+                            </button>
+                            {MONTHS.map((month, index) => (
+                              <button
+                                key={month}
+                                onClick={() => (isProdutoTab ? setProdutoFilterMonth(index + 1) : setActiveFilterMonth(index + 1))}
+                                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                                  (isProdutoTab ? produtoFilterMonth : activeFilterMonth) === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+                                } ${(isProdutoTab ? produtoMonthCounts[index + 1] : monthCounts[index + 1]) ? 'font-semibold' : ''}`}
+                              >
+                                {month}
+                                {(isProdutoTab ? produtoMonthCounts[index + 1] : monthCounts[index + 1]) ? (
+                                  <span className="ml-0.5 text-[10px] opacity-70">({isProdutoTab ? produtoMonthCounts[index + 1] : monthCounts[index + 1]})</span>
+                                ) : null}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <span className="text-xs text-slate-400 whitespace-nowrap">
+                          {(isProdutoTab ? filteredProdutoRows.length : filteredPecasRows.length)} registro{(isProdutoTab ? filteredProdutoRows.length : filteredPecasRows.length) !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">Resumo por vendedor</p>
+                              <p className="text-xs text-slate-500">Total por vendedor com detalhe por transação</p>
+                            </div>
+                            <span className="text-xs font-semibold text-slate-500">{(isProdutoTab ? produtoSummaryByVendor.length : summaryByVendor.length)} vendedor{(isProdutoTab ? produtoSummaryByVendor.length : summaryByVendor.length) !== 1 ? 'es' : ''}</span>
+                          </div>
+                          <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
+                            {(isProdutoTab ? produtoSummaryByVendor.length : summaryByVendor.length) === 0 ? (
+                              <div className="text-xs text-slate-400 py-4 text-center">Sem dados para o período selecionado.</div>
+                            ) : (isProdutoTab ? produtoSummaryByVendor : summaryByVendor).map((item) => {
+                              const isOpen = openVendorKeys.includes(item.vendor);
+                              return (
+                                <div key={item.vendor} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleAccordionItem(item.vendor, openVendorKeys, setOpenVendorKeys)}
+                                    className="w-full flex items-center justify-between gap-3 text-left"
+                                  >
+                                    <div className="min-w-0 flex items-center gap-2">
+                                      <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-slate-800 truncate">{item.vendor}</p>
+                                        <p className="text-xs text-slate-500">{item.count} registro{item.count !== 1 ? 's' : ''}</p>
+                                      </div>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <p className="text-sm font-bold text-slate-800">R$ {fmtCurrency(item.total)}</p>
+                                      <p className="text-[11px] text-slate-500">Total</p>
+                                    </div>
+                                  </button>
+
+                                  {isOpen && (
+                                    <div className="mt-3 space-y-1 border-t border-slate-100 pt-2">
+                                      {item.transactions.map((tx) => (
+                                        <div key={tx.label} className="flex items-center justify-between gap-3 text-xs">
+                                          <div className="min-w-0 text-slate-600">
+                                            <span className="font-medium text-slate-700">{tx.label}</span>
+                                            <span className="text-slate-400"> · {tx.count}</span>
+                                          </div>
+                                          <div className="font-mono text-slate-700 shrink-0">R$ {fmtCurrency(tx.total)}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </section>
+
+                        <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">Resumo por departamento</p>
+                              <p className="text-xs text-slate-500">Total por departamento com detalhe por transação</p>
+                            </div>
+                            <span className="text-xs font-semibold text-slate-500">{(isProdutoTab ? produtoSummaryByDepartment.length : summaryByDepartment.length)} departamento{(isProdutoTab ? produtoSummaryByDepartment.length : summaryByDepartment.length) !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
+                            {(isProdutoTab ? produtoSummaryByDepartment.length : summaryByDepartment.length) === 0 ? (
+                              <div className="text-xs text-slate-400 py-4 text-center">Sem dados para o período selecionado.</div>
+                            ) : (isProdutoTab ? produtoSummaryByDepartment : summaryByDepartment).map((item) => {
+                              const isOpen = openDepartmentKeys.includes(item.department);
+                              return (
+                                <div key={item.department} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleAccordionItem(item.department, openDepartmentKeys, setOpenDepartmentKeys)}
+                                    className="w-full flex items-center justify-between gap-3 text-left"
+                                  >
+                                    <div className="min-w-0 flex items-center gap-2">
+                                      <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-slate-800 truncate">{item.department}</p>
+                                        <p className="text-xs text-slate-500">{item.count} registro{item.count !== 1 ? 's' : ''}</p>
+                                      </div>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <p className="text-sm font-bold text-slate-800">R$ {fmtCurrency(item.total)}</p>
+                                      <p className="text-[11px] text-slate-500">Total</p>
+                                    </div>
+                                  </button>
+
+                                  {isOpen && (
+                                    <div className="mt-3 space-y-1 border-t border-slate-100 pt-2">
+                                      {item.transactions.map((tx) => (
+                                        <div key={tx.label} className="flex items-center justify-between gap-3 text-xs">
+                                          <div className="min-w-0 text-slate-600">
+                                            <span className="font-medium text-slate-700">{tx.label}</span>
+                                            <span className="text-slate-400"> · {tx.count}</span>
+                                          </div>
+                                          <div className="font-mono text-slate-700 shrink-0">R$ {fmtCurrency(tx.total)}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </section>
+                      </div>
+                    </div>
+                  )}
+                  <div
+                    ref={tableScrollRef}
+                    onScroll={() => {
+                      if (tableScrollRef.current && bottomScrollRef.current) {
+                        bottomScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+                      }
+                    }}
+                    className="flex-1 overflow-auto"
+                  >
+                    <table className={isProdutoTab ? 'min-w-[2400px] w-full text-xs text-slate-700' : 'min-w-[2600px] w-full text-xs text-slate-700'}>
+                      <thead className="bg-slate-800 text-white sticky top-0 z-10">
+                        <tr>
+                          {(isProdutoTab ? PRODUCT_TABLE_COLUMNS : TABLE_COLUMNS).map((column) => (
+                            <th
+                              key={column}
+                              className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-slate-700 last:border-r-0"
+                            >
+                              {column}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(isProdutoTab ? filteredProdutoRows.length : filteredPecasRows.length) === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={(isProdutoTab ? PRODUCT_TABLE_COLUMNS.length : TABLE_COLUMNS.length)}
+                              className="px-3 py-8 text-center text-slate-400 border-t border-slate-100"
+                            >
+                              Nenhum registro encontrado no período selecionado.
+                            </td>
+                          </tr>
+                        ) : isProdutoTab ? (
+                          filteredProdutoRows.map((row, rowIndex) => {
+                            const d = row.data;
+                            const qtde = n(d['QUANTIDADE']);
+                            const valUnitario = n(d['VAL_UNITARIO']);
+                            const valVenda = n(d['VAL_VENDA']);
+                            const valImpostos = n(d['VAL_IMPOSTOS']);
+                            const recLiquida = valVenda - valImpostos;
+                            const custoMedio = n(d['CUSTO_MEDIO']);
+                            const lucroBruto = recLiquida - custoMedio;
+                            const lucroBrutoPct = recLiquida !== 0 ? (lucroBruto / recLiquida) * 100 : 0;
+                            const rowBg = rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+
+                            return (
+                              <tr key={row.id} className={`${rowBg} border-t border-slate-100`}>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['NUMERO_NOTA_FISCAL'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['DTA_ENTRADA_SAIDA'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['TIPO_TRANSACAO'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['DEPARTAMENTO'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['NOME_VENDEDOR'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['NOME_CLIENTE'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['ITEM_ESTOQUE_PUB'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['DES_ITEM_ESTOQUE'] || '—'}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{qtde.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(valUnitario)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(valVenda)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(valImpostos)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(recLiquida)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(custoMedio)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(lucroBruto)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{fmtPercent(lucroBrutoPct)}</td>
+                                <td className="px-3 py-2 text-center text-slate-300">—</td>
+                                <td className="px-3 py-2 text-center text-slate-300">—</td>
+                                <td className="px-3 py-2 text-center text-slate-300">—</td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          filteredPecasRows.map((row, rowIndex) => {
+                            const d = row.data;
+                            const key = ovKey(d);
+                            const condPgto = overrides[key]?.condPgto ?? '';
+                            const isOfficeRow = vendasSubTab === 'oficina';
+                            const valorVenda = isOfficeRow
+                              ? n(d['LIQ_NOTA_FISCAL']) + n(d['VAL_PIS_ST']) + n(d['VAL_COFINS_ST']) + n(d['VAL_CSLL'])
+                              : n(d['LIQ_NOTA_FISCAL']);
+                            const iss = n(d['VAL_ISS']);
+                            const icms = n(d['VAL_ICMS']);
+                            const pis = n(d['VAL_PIS']);
+                            const cofins = n(d['VAL_COFINS']);
+                            const difal = n(d['VAL_ICMS_PARTIL_UF_DEST']) + n(d['VAL_ICMS_COMB_POBREZA']);
+                            const recLiquida = isOfficeRow
+                              ? valorVenda - iss - icms - pis - cofins - difal
+                              : valorVenda - icms - pis - cofins - difal;
+                            const taxaMLMatch = taxaMLLookup.get(d['NUMERO_NOTA_FISCAL']);
+                            const tituloValML = taxaMLMatch?.data['VAL_TITULO'] ?? '';
+                            const taxaMercadoLivre = tituloValML ? valorVenda - n(tituloValML) : 0;
+                            const epSum = taxaEPLookup.get(d['NUMERO_NOTA_FISCAL']) ?? 0;
+                            const taxaEPecas = epSum > 0 ? valorVenda - epSum : 0;
+                            const custoMedio = n(d['TOT_CUSTO_MEDIO']);
+                            const lucroBruto = recLiquida - taxaMercadoLivre - taxaEPecas - custoMedio;
+                            const lbPct = recLiquida !== 0 ? (lucroBruto / recLiquida) * 100 : 0;
+                            const rowBg = rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+
+                            return (
+                              <tr key={row.id} className={`${rowBg} border-t border-slate-100`}>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['NUMERO_NOTA_FISCAL'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['SERIE_NOTA_FISCAL'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['TIPO_TRANSACAO'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['DTA_DOCUMENTO'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['DEPARTAMENTO'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['NOME_VENDEDOR'] || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{condPgto || '—'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{d['NOME_CLIENTE'] || '—'}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(valorVenda)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(iss)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(icms)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(pis)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(cofins)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(difal)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(recLiquida)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(taxaMercadoLivre)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(taxaEPecas)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(custoMedio)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(lucroBruto)}</td>
+                                <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{fmtPercent(lbPct)}</td>
+                                <td className="px-3 py-2 text-center text-slate-300">—</td>
+                                <td className="px-3 py-2 text-center text-slate-300">—</td>
+                                <td className="px-3 py-2 text-center text-slate-300">—</td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                      {isProdutoTab && filteredProdutoRows.length > 0 && (
+                        <tfoot className="sticky bottom-0 z-20">
+                          <tr className="bg-slate-800 text-white text-xs font-semibold">
+                            <td colSpan={8} className="px-3 py-2 text-left whitespace-nowrap border-t border-slate-700">
+                              TOTAIS ({filteredProdutoRows.length} registros)
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">{produtoTotals.qtde.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(produtoTotals.valUnitario)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(produtoTotals.valVenda)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(produtoTotals.valImpostos)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">R$ {fmtCurrency(produtoTotals.recLiquida)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(produtoTotals.custoMedio)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">R$ {fmtCurrency(produtoTotals.lucroBruto)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">{fmtPercent(produtoTotals.lucroBrutoPct)}</td>
+                            <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
+                            <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
+                            <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
+                          </tr>
+                        </tfoot>
+                      )}
+                      {(vendasSubTab === 'pecas' || vendasSubTab === 'oficina') && filteredPecasRows.length > 0 && (
+                        <tfoot className="sticky bottom-0 z-20">
+                          <tr className="bg-slate-800 text-white text-xs font-semibold">
+                            <td colSpan={8} className="px-3 py-2 text-left whitespace-nowrap border-t border-slate-700">
+                              TOTAIS ({filteredPecasRows.length} registros)
+                            </td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.valorVenda : pecasTotals.valorVenda)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.iss : pecasTotals.iss)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.icms : pecasTotals.icms)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.pis : pecasTotals.pis)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.cofins : pecasTotals.cofins)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.difal : pecasTotals.difal)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.recLiquida : pecasTotals.recLiquida)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.taxaMercadoLivre : pecasTotals.taxaMercadoLivre)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.taxaEPecas : pecasTotals.taxaEPecas)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.custoMedio : pecasTotals.custoMedio)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">R$ {fmtCurrency(vendasSubTab === 'oficina' ? oficinaTotals.lucroBruto : pecasTotals.lucroBruto)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">{fmtPercent(vendasSubTab === 'oficina' ? oficinaTotals.lbPct : pecasTotals.lbPct)}</td>
+                            <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
+                            <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
+                            <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+                  <div
+                    ref={bottomScrollRef}
+                    onScroll={() => {
+                      if (tableScrollRef.current && bottomScrollRef.current) {
+                        tableScrollRef.current.scrollLeft = bottomScrollRef.current.scrollLeft;
+                      }
+                    }}
+                    className="overflow-x-auto overflow-y-hidden shrink-0 border-t border-slate-200 bg-slate-100"
+                    style={{ height: 16 }}
+                  >
+                    <div ref={bottomScrollDummyRef} style={{ height: 12 }} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+                Conteúdo da aba em desenvolvimento.
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
