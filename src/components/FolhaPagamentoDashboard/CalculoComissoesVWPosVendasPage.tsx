@@ -7,7 +7,7 @@ import { loadProdutosRows } from '@/components/VendasBonificacoesDashboard/produ
 import type { VPecasItemRow } from '@/components/VendasBonificacoesDashboard/vPecasItemStorage';
 import { kvGet } from '@/lib/kvClient';
 
-type VendasSubTab = 'pecas' | 'oficina' | 'funilaria' | 'acessorios' | 'produto';
+type VendasSubTab = 'pecas' | 'oficina' | 'funilaria' | 'acessorios' | 'produto' | 'mecanicos';
 
 interface CalculoComissoesVWPosVendasPageProps {
   onBack: () => void;
@@ -77,6 +77,7 @@ const VENDAS_SUB_TABS: Array<{ id: VendasSubTab; label: string }> = [
   { id: 'funilaria', label: 'Funilaria' },
   { id: 'acessorios', label: 'Acessórios' },
   { id: 'produto', label: 'Produto' },
+  { id: 'mecanicos', label: 'Mecânicos' },
 ];
 
 function n(v: string | undefined): number {
