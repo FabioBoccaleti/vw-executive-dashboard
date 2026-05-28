@@ -150,6 +150,17 @@ function parseFlexibleNumber(value: string): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+function formatExcelCellValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'number') {
+    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  if (value instanceof Date) {
+    return value.toLocaleDateString('pt-BR');
+  }
+  return String(value).trim();
+}
+
 function formatMecanicosCell(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return '—';
@@ -210,24 +221,27 @@ function parseMecanicosExcel(buffer: ArrayBuffer): MecanicosStore {
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) return { columns: [], rows: [] };
   const worksheet = workbook.Sheets[sheetName];
-  const raw = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: '' });
-  const headers = (raw[0] ?? [])
-    .map((header) => String(header ?? '').trim())
-    .filter((header) => header.length > 0);
+  const raw = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: '' }) as unknown[][];
+  const headers = (raw[0] ?? []).map((header) => String(header ?? '').trim());
+  const normalizedHeaders = headers.filter((header) => header.length > 0);
 
-  if (headers.length === 0) return { columns: [], rows: [] };
+  if (normalizedHeaders.length === 0) return { columns: [], rows: [] };
+
+  const valuesByColumn = normalizedHeaders.map(() => [] as string[]);
 
   const rows: VPecasItemRow[] = [];
   for (let index = 1; index < raw.length; index += 1) {
     const values = raw[index] ?? [];
-    const hasContent = values.some((value) => String(value ?? '').trim().length > 0);
+    const hasContent = values.some((value) => formatExcelCellValue(value).length > 0);
     if (!hasContent) continue;
     const data: Record<string, string> = {};
-    headers.forEach((header, headerIndex) => {
-      data[header] = String(values[headerIndex] ?? '').trim();
+    normalizedHeaders.forEach((header, headerIndex) => {
+      const formattedValue = formatExcelCellValue(values[headerIndex]);
+      data[header] = formattedValue;
+      if (formattedValue) valuesByColumn[headerIndex].push(formattedValue);
     });
-    const firstValue = data[headers[0]] ?? '';
-    const otherValues = headers.slice(1).map((header) => data[header] ?? '');
+    const firstValue = data[normalizedHeaders[0]] ?? '';
+    const otherValues = normalizedHeaders.slice(1).map((header) => data[header] ?? '');
     const rowIsEmpty = isBlankCell(firstValue) && otherValues.every((value) => {
       const normalized = String(value ?? '').trim();
       if (isBlankCell(normalized)) return true;
@@ -238,7 +252,7 @@ function parseMecanicosExcel(buffer: ArrayBuffer): MecanicosStore {
     rows.push({ id: crypto.randomUUID(), data });
   }
 
-  const columns = headers.filter((header) => rows.some((row) => !isBlankCell(row.data[header])));
+  const columns = normalizedHeaders.filter((header, index) => valuesByColumn[index]?.some((value) => !isBlankCell(value)));
   return { columns, rows };
 }
 
@@ -287,6 +301,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [mecanicosFilterYear, setMecanicosFilterYear] = useState(new Date().getFullYear());
   const [mecanicosFilterMonth, setMecanicosFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const mecanicosInputRef = useRef<HTMLInputElement>(null);
+  const [confirmDeleteMecanicos, setConfirmDeleteMecanicos] = useState(false);
   const [openVendorKeys, setOpenVendorKeys] = useState<string[]>([]);
   const [openDepartmentKeys, setOpenDepartmentKeys] = useState<string[]>([]);
 
@@ -850,6 +865,27 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     await kvSet(MECANICOS_KEY, { columns: nextColumns, rows: nextRows });
   }
 
+  async function handleDeleteMecanicosPeriod() {
+    const nextRows = mecanicosRows.filter((row) => {
+      const period = productRowPeriod(row);
+      if (!period) return false;
+      if (period.year !== mecanicosFilterYear) return true;
+      if (mecanicosFilterMonth !== null && period.month !== mecanicosFilterMonth) return true;
+      return false;
+    });
+
+    if (nextRows.length === mecanicosRows.length) {
+      toast.info('Nenhum registro encontrado para remover no período selecionado.');
+      setConfirmDeleteMecanicos(false);
+      return;
+    }
+
+    await persistMecanicosStore(nextRows, mecanicosColumns);
+    setMecanicosRows(nextRows);
+    setConfirmDeleteMecanicos(false);
+    toast.success('Dados do período selecionado removidos.');
+  }
+
   async function handleMecanicosImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -861,10 +897,15 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         if (mecanicosInputRef.current) mecanicosInputRef.current.value = '';
         return;
       }
-      await persistMecanicosStore(parsed.rows, parsed.columns);
-      setMecanicosRows(parsed.rows);
+      const fallbackPeriod = `${mecanicosFilterYear}-${String(mecanicosFilterMonth ?? new Date().getMonth() + 1).padStart(2, '0')}`;
+      const taggedRows = parsed.rows.map((row) => {
+        if (productRowPeriod(row)) return row;
+        return { ...row, periodoImport: fallbackPeriod };
+      });
+      await persistMecanicosStore(taggedRows, parsed.columns);
+      setMecanicosRows(taggedRows);
       setMecanicosColumns(parsed.columns);
-      toast.success(`${parsed.rows.length} registro(s) importado(s).`);
+      toast.success(`${taggedRows.length} registro(s) importado(s).`);
     } catch (error) {
       console.error('Erro ao importar Mecânicos:', error);
       toast.error(`Erro ao importar o arquivo: ${String(error)}`);
@@ -893,6 +934,25 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   return (
     <div className="h-screen bg-slate-100 flex flex-col overflow-hidden">
       <input ref={mecanicosInputRef} type="file" accept=".xlsx,.xls,.ods" className="hidden" onChange={handleMecanicosImport} />
+      {confirmDeleteMecanicos && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <p className="text-sm font-semibold text-slate-800">Apagar dados da aba Mecânicos</p>
+            <p className="mt-2 text-xs text-slate-500">
+              Isso vai remover apenas o período selecionado: <strong>{mecanicosFilterMonth === null ? `Ano todo / ${mecanicosFilterYear}` : `${MONTHS[mecanicosFilterMonth - 1]}/${mecanicosFilterYear}`}</strong>.
+            </p>
+            <p className="mt-2 text-xs text-slate-500">Deseja continuar?</p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setConfirmDeleteMecanicos(false)}>
+                Cancelar
+              </Button>
+              <Button type="button" className="bg-rose-600 text-white hover:bg-rose-700" onClick={handleDeleteMecanicosPeriod}>
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div>
           <h1 className="text-lg font-bold text-slate-800">Cálculo de Comissões VW - Pós Vendas</h1>
@@ -941,14 +1001,25 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                   <p className="text-sm font-bold text-slate-800">Mecânicos</p>
                   <p className="text-xs text-slate-500">Importe um arquivo Excel para criar e alimentar a tabela.</p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                  onClick={() => mecanicosInputRef.current?.click()}
-                >
-                  Importar Excel
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-rose-300 text-rose-700 hover:bg-rose-50"
+                    onClick={() => setConfirmDeleteMecanicos(true)}
+                    disabled={mecanicosRows.length === 0}
+                  >
+                    Apagar dados
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                    onClick={() => mecanicosInputRef.current?.click()}
+                  >
+                    Importar Excel
+                  </Button>
+                </div>
               </div>
 
               <div className="bg-white border-b border-slate-100 px-4 py-3 space-y-3">
