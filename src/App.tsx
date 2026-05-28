@@ -14,6 +14,7 @@ import { FolhaSelectionPage } from '@/components/FolhaPagamentoDashboard/FolhaSe
 import { SalariosFixosDashboard } from '@/components/FolhaPagamentoDashboard/SalariosFixosDashboard'
 import { RemuneracoesPJDashboard } from '@/components/FolhaPagamentoDashboard/RemuneracoesPJDashboard'
 import { CalculoComissoesVWPage } from '@/components/FolhaPagamentoDashboard/CalculoComissoesVWPage'
+import { CalculoComissoesVWPosVendasPage } from '@/components/FolhaPagamentoDashboard/CalculoComissoesVWPosVendasPage'
 import { CadastrosPage } from '@/components/CadastrosPage'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
@@ -235,30 +236,7 @@ function AppContent() {
         ) : folhaSubPage === 'calculo_comissoes_vw' ? (
           <CalculoComissoesVWPage onBack={() => setFolhaSubPage('selection')} />
         ) : folhaSubPage === 'calculo_comissoes_vw_pos_vendas' ? (
-          <div className="min-h-screen bg-slate-100 flex flex-col">
-            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
-              <div>
-                <h1 className="text-lg font-bold text-slate-800">Cálculo de Comissões VW - Pós Vendas</h1>
-                <p className="text-xs text-slate-500 mt-0.5">Folha de Pagamento</p>
-              </div>
-              <button
-                onClick={() => setFolhaSubPage('selection')}
-                className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
-              >
-                ← Voltar
-              </button>
-            </header>
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-full bg-violet-100 flex items-center justify-center mx-auto">
-                  <svg className="w-8 h-8 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l5.653-4.655m5.24-6.029-.79 2.895M5.28 8.28l2.895-.79M15 3h2.25M15 3v2.25M3 15h2.25M3 15v2.25" />
-                  </svg>
-                </div>
-                <p className="text-lg font-semibold text-slate-700">Em desenvolvimento</p>
-              </div>
-            </div>
-          </div>
+          <CalculoComissoesVWPosVendasPage onBack={() => setFolhaSubPage('selection')} />
         ) : null
       ) : brand === 'vendas_bonificacoes' ? (
         vendasSubPage === 'selection' ? (
