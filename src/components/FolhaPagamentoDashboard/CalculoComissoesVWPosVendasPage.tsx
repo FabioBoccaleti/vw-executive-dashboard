@@ -116,6 +116,8 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [pecasFilterMonth, setPecasFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [oficinaFilterYear, setOficinaFilterYear] = useState(new Date().getFullYear());
   const [oficinaFilterMonth, setOficinaFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [funilariaFilterYear, setFunilariaFilterYear] = useState(new Date().getFullYear());
+  const [funilariaFilterMonth, setFunilariaFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [openVendorKeys, setOpenVendorKeys] = useState<string[]>([]);
   const [openDepartmentKeys, setOpenDepartmentKeys] = useState<string[]>([]);
 
@@ -144,6 +146,14 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     [allRows],
   );
 
+  const funilariaBaseRows = useMemo(
+    () => allRows.filter((row) => {
+      const dept = (row.data['DEPARTAMENTO'] ?? '').trim();
+      return row.data['SERIE_NOTA_FISCAL'] === 'RPS' && ['106', '129'].includes(dept);
+    }),
+    [allRows],
+  );
+
   useEffect(() => {
     if (!loading && oficinaBaseRows.length > 0) {
       const latestOfficePeriod = latestPeriod(oficinaBaseRows);
@@ -160,11 +170,47 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     }
   }, [vendasSubTab, oficinaBaseRows]);
 
-  const activeSourceRows = vendasSubTab === 'oficina' ? oficinaBaseRows : allPecasRows;
-  const activeFilterYear = vendasSubTab === 'oficina' ? oficinaFilterYear : pecasFilterYear;
-  const activeFilterMonth = vendasSubTab === 'oficina' ? oficinaFilterMonth : pecasFilterMonth;
-  const setActiveFilterYear = vendasSubTab === 'oficina' ? setOficinaFilterYear : setPecasFilterYear;
-  const setActiveFilterMonth = vendasSubTab === 'oficina' ? setOficinaFilterMonth : setPecasFilterMonth;
+  useEffect(() => {
+    if (!loading && funilariaBaseRows.length > 0) {
+      const latestFunilariaPeriod = latestPeriod(funilariaBaseRows);
+      setFunilariaFilterYear(latestFunilariaPeriod.year);
+      setFunilariaFilterMonth(latestFunilariaPeriod.month);
+    }
+  }, [loading, funilariaBaseRows]);
+
+  useEffect(() => {
+    if (vendasSubTab === 'funilaria' && funilariaBaseRows.length > 0) {
+      const latestFunilariaPeriod = latestPeriod(funilariaBaseRows);
+      setFunilariaFilterYear(latestFunilariaPeriod.year);
+      setFunilariaFilterMonth(latestFunilariaPeriod.month);
+    }
+  }, [vendasSubTab, funilariaBaseRows]);
+
+  const activeSourceRows = vendasSubTab === 'oficina'
+    ? oficinaBaseRows
+    : vendasSubTab === 'funilaria'
+      ? funilariaBaseRows
+      : allPecasRows;
+  const activeFilterYear = vendasSubTab === 'oficina'
+    ? oficinaFilterYear
+    : vendasSubTab === 'funilaria'
+      ? funilariaFilterYear
+      : pecasFilterYear;
+  const activeFilterMonth = vendasSubTab === 'oficina'
+    ? oficinaFilterMonth
+    : vendasSubTab === 'funilaria'
+      ? funilariaFilterMonth
+      : pecasFilterMonth;
+  const setActiveFilterYear = vendasSubTab === 'oficina'
+    ? setOficinaFilterYear
+    : vendasSubTab === 'funilaria'
+      ? setFunilariaFilterYear
+      : setPecasFilterYear;
+  const setActiveFilterMonth = vendasSubTab === 'oficina'
+    ? setOficinaFilterMonth
+    : vendasSubTab === 'funilaria'
+      ? setFunilariaFilterMonth
+      : setPecasFilterMonth;
 
   const availableYears = useMemo(() => {
     const years = new Set<number>();
@@ -229,8 +275,9 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     return map;
   }, [taxaEPRows, activeFilterMonth, activeFilterYear]);
 
-  const isOfficeLoading = vendasSubTab === 'oficina' && loading;
-  const showDateFilters = vendasSubTab === 'pecas' || vendasSubTab === 'oficina';
+  const isServiceLoading = (vendasSubTab === 'oficina' || vendasSubTab === 'funilaria') && loading;
+  const showDateFilters = vendasSubTab === 'pecas' || vendasSubTab === 'oficina' || vendasSubTab === 'funilaria';
+  const serviceTabLabel = vendasSubTab === 'oficina' ? 'Oficina' : vendasSubTab === 'funilaria' ? 'Funilaria' : '';
 
   const pecasTotals = useMemo(() => {
     let valorVenda = 0;
@@ -462,9 +509,9 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         {TABLE_TABS.includes(vendasSubTab) ? (
           <div className="flex-1 p-6" style={{ minHeight: 0 }}>
             <div className="h-full bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col">
-              {isOfficeLoading && (
+              {isServiceLoading && (
                 <div className="px-4 py-3 border-b border-slate-100 bg-amber-50 text-amber-800 text-sm font-medium">
-                  Carregando dados da Central de Vendas VW para Oficina considerando apenas os departamentos 104 e 122...
+                  Carregando dados da Central de Vendas VW para {serviceTabLabel} considerando apenas os departamentos {vendasSubTab === 'oficina' ? '104 e 122' : '106 e 129'}...
                 </div>
               )}
               {showDateFilters && (
