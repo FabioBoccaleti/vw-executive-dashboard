@@ -118,6 +118,8 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [oficinaFilterMonth, setOficinaFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [funilariaFilterYear, setFunilariaFilterYear] = useState(new Date().getFullYear());
   const [funilariaFilterMonth, setFunilariaFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [acessoriosFilterYear, setAcessoriosFilterYear] = useState(new Date().getFullYear());
+  const [acessoriosFilterMonth, setAcessoriosFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [openVendorKeys, setOpenVendorKeys] = useState<string[]>([]);
   const [openDepartmentKeys, setOpenDepartmentKeys] = useState<string[]>([]);
 
@@ -154,6 +156,11 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     [allRows],
   );
 
+  const acessoriosBaseRows = useMemo(
+    () => allPecasRows.filter((row) => (row.data['DEPARTAMENTO'] ?? '').trim() === '107'),
+    [allPecasRows],
+  );
+
   useEffect(() => {
     if (!loading && oficinaBaseRows.length > 0) {
       const latestOfficePeriod = latestPeriod(oficinaBaseRows);
@@ -186,30 +193,56 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     }
   }, [vendasSubTab, funilariaBaseRows]);
 
+  useEffect(() => {
+    if (!loading && acessoriosBaseRows.length > 0) {
+      const latestAcessoriosPeriod = latestPeriod(acessoriosBaseRows);
+      setAcessoriosFilterYear(latestAcessoriosPeriod.year);
+      setAcessoriosFilterMonth(latestAcessoriosPeriod.month);
+    }
+  }, [loading, acessoriosBaseRows]);
+
+  useEffect(() => {
+    if (vendasSubTab === 'acessorios' && acessoriosBaseRows.length > 0) {
+      const latestAcessoriosPeriod = latestPeriod(acessoriosBaseRows);
+      setAcessoriosFilterYear(latestAcessoriosPeriod.year);
+      setAcessoriosFilterMonth(latestAcessoriosPeriod.month);
+    }
+  }, [vendasSubTab, acessoriosBaseRows]);
+
   const activeSourceRows = vendasSubTab === 'oficina'
     ? oficinaBaseRows
     : vendasSubTab === 'funilaria'
       ? funilariaBaseRows
+      : vendasSubTab === 'acessorios'
+        ? acessoriosBaseRows
       : allPecasRows;
   const activeFilterYear = vendasSubTab === 'oficina'
     ? oficinaFilterYear
     : vendasSubTab === 'funilaria'
       ? funilariaFilterYear
+      : vendasSubTab === 'acessorios'
+        ? acessoriosFilterYear
       : pecasFilterYear;
   const activeFilterMonth = vendasSubTab === 'oficina'
     ? oficinaFilterMonth
     : vendasSubTab === 'funilaria'
       ? funilariaFilterMonth
+      : vendasSubTab === 'acessorios'
+        ? acessoriosFilterMonth
       : pecasFilterMonth;
   const setActiveFilterYear = vendasSubTab === 'oficina'
     ? setOficinaFilterYear
     : vendasSubTab === 'funilaria'
       ? setFunilariaFilterYear
+      : vendasSubTab === 'acessorios'
+        ? setAcessoriosFilterYear
       : setPecasFilterYear;
   const setActiveFilterMonth = vendasSubTab === 'oficina'
     ? setOficinaFilterMonth
     : vendasSubTab === 'funilaria'
       ? setFunilariaFilterMonth
+      : vendasSubTab === 'acessorios'
+        ? setAcessoriosFilterMonth
       : setPecasFilterMonth;
 
   const availableYears = useMemo(() => {
@@ -276,7 +309,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   }, [taxaEPRows, activeFilterMonth, activeFilterYear]);
 
   const isServiceLoading = (vendasSubTab === 'oficina' || vendasSubTab === 'funilaria') && loading;
-  const showDateFilters = vendasSubTab === 'pecas' || vendasSubTab === 'oficina' || vendasSubTab === 'funilaria';
+  const showDateFilters = vendasSubTab === 'pecas' || vendasSubTab === 'oficina' || vendasSubTab === 'funilaria' || vendasSubTab === 'acessorios';
   const serviceTabLabel = vendasSubTab === 'oficina' ? 'Oficina' : vendasSubTab === 'funilaria' ? 'Funilaria' : '';
 
   const pecasTotals = useMemo(() => {
