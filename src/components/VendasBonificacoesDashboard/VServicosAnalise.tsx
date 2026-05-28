@@ -149,7 +149,6 @@ function Empty() {
 
 function TipBRL({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
-  const total = payload.reduce((s, p) => s + p.value, 0);
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-xl px-4 py-3 text-xs min-w-[180px]">
       <p className="font-bold text-slate-700 mb-1.5">{label}</p>
@@ -159,12 +158,6 @@ function TipBRL({ active, payload, label }: { active?: boolean; payload?: { name
           <span className="font-mono text-slate-700">{fmtBRLF(p.value)}</span>
         </div>
       ))}
-      {payload.length > 1 && total !== 0 && (
-        <div className="flex justify-between gap-4 mt-1 pt-1 border-t border-slate-100">
-          <span className="font-bold text-slate-600">Total</span>
-          <span className="font-mono font-bold text-slate-700">{fmtBRLF(total)}</span>
-        </div>
-      )}
     </div>
   );
 }
