@@ -9,6 +9,7 @@ import { loadProdutosRows } from '@/components/VendasBonificacoesDashboard/produ
 import type { VPecasItemRow } from '@/components/VendasBonificacoesDashboard/vPecasItemStorage';
 import { kvGet, kvSet } from '@/lib/kvClient';
 import { toast } from 'sonner';
+import { loadVendedores, type Vendedor as CadastroVendedor } from '@/components/CadastrosPage/cadastrosStorage';
 import {
   calculoPeriodoKey,
   loadCalculoPosVendasRemuneracoes,
@@ -144,25 +145,62 @@ function normalizeVendorName(value: string): string {
   return value.trim().replace(/\s+/g, ' ');
 }
 
+function normalizeFieldKey(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
 function vendorKey(value: string): string {
   return normalizeVendorName(value).toLowerCase();
 }
 
 function extractVendorNames(data: Record<string, string>): string[] {
-  return [
-    data['NOME_VENDEDOR'],
-    data['VENDEDOR'],
-    data['NOME_VENDEDOR2'],
-    data['VENDEDOR2'],
+  const fieldMap = new Map<string, string>();
+  Object.entries(data).forEach(([key, value]) => {
+    fieldMap.set(normalizeFieldKey(key), String(value ?? ''));
+  });
+
+  const pick = (...aliases: string[]) => {
+    for (const alias of aliases) {
+      const found = fieldMap.get(normalizeFieldKey(alias));
+      if (found !== undefined) return found;
+    }
+    return '';
+  };
+
+  const candidates = [
+    pick('MECANICO', 'MECÂNICO', 'Mecanico', 'Mecânico'),
+    pick('NOME_VENDEDOR'),
+    pick('VENDEDOR'),
+    pick('NOME_VENDEDOR2'),
+    pick('VENDEDOR2'),
   ]
     .map((value) => normalizeVendorName(String(value ?? '')))
     .filter((value) => value.length > 0);
+
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  candidates.forEach((value) => {
+    const key = vendorKey(value);
+    if (seen.has(key)) return;
+    seen.add(key);
+    unique.push(value);
+  });
+
+  return unique;
 }
 
 function getSourceLabelFromRow(data: Record<string, string>, fallback: string): string {
   const serie = (data['SERIE_NOTA_FISCAL'] ?? '').trim().toUpperCase();
   if (fallback === 'Vendas' && serie === 'RPS') return 'RPS';
   return fallback;
+}
+
+function normalizeCode(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 function isBlankCell(value: unknown): boolean {
@@ -350,6 +388,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [calculoSaving, setCalculoSaving] = useState(false);
   const [calculoModalOpen, setCalculoModalOpen] = useState(false);
   const [calculoDraft, setCalculoDraft] = useState<CalculoPosVendasRemuneracao | null>(null);
+  const [cadastroVendedores, setCadastroVendedores] = useState<CadastroVendedor[]>([]);
   const mecanicosInputRef = useRef<HTMLInputElement>(null);
   const [pendingMecanicosImport, setPendingMecanicosImport] = useState<{
     rows: VPecasItemRow[];
@@ -397,6 +436,14 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     loadCalculoPosVendasRemuneracoes().then((items) => {
       setCalculoRemuneracoes(items);
       setCalculoLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    loadVendedores().then((items) => {
+      setCadastroVendedores(
+        [...items].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })),
+      );
     });
   }, []);
 
@@ -896,7 +943,35 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
   const calculoPeriodo = calculoPeriodoKey(calculoYear, calculoMonth);
 
+  const vendorLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    cadastroVendedores.forEach((item) => {
+      const name = normalizeVendorName(item.nome);
+      if (!name) return;
+      map.set(normalizeCode(name), name);
+      if (item.codigo) {
+        map.set(normalizeCode(item.codigo), name);
+      }
+    });
+    return map;
+  }, [cadastroVendedores]);
+
+  function resolveVendorName(raw: string): string {
+    const normalized = normalizeVendorName(raw);
+    if (!normalized) return '';
+    const byName = vendorLookup.get(normalizeCode(normalized));
+    if (byName) return byName;
+    if (/^\d+$/.test(normalized)) {
+      const byCode = vendorLookup.get(normalizeCode(normalized));
+      if (byCode) return byCode;
+    }
+    return normalized;
+  }
+
   const calculoSourceRows = useMemo(() => {
+    const now = new Date();
+    const systemYear = now.getFullYear();
+    const systemMonth = now.getMonth() + 1;
     const rows: Array<{ data: Record<string, string>; periodo: { year: number; month: number } | null; origem: string }> = [];
 
     allRows.forEach((row) => {
@@ -916,14 +991,20 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     });
 
     mecanicosRows.forEach((row) => {
+      const period = productRowPeriod(row) ?? { year: systemYear, month: systemMonth };
+      if (period.year !== systemYear || period.month !== systemMonth) return;
       rows.push({
         data: row.data,
-        periodo: productRowPeriod(row),
+        periodo: period,
         origem: 'Mecânicos',
       });
     });
 
-    return rows.filter((row) => row.periodo && row.periodo.year === calculoYear && row.periodo.month === calculoMonth);
+    return rows.filter((row) => {
+      if (!row.periodo) return false;
+      if (row.origem === 'Mecânicos') return true;
+      return row.periodo.year === calculoYear && row.periodo.month === calculoMonth;
+    });
   }, [allRows, produtoRows, mecanicosRows, calculoYear, calculoMonth]);
 
   const calculoVendors = useMemo<CalculoVendorCard[]>(() => {
@@ -940,7 +1021,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     };
 
     calculoSourceRows.forEach((row) => {
-      extractVendorNames(row.data).forEach((name) => addVendor(name, row.origem));
+      extractVendorNames(row.data).forEach((name) => addVendor(resolveVendorName(name), row.origem));
     });
 
     const records = new Map(
