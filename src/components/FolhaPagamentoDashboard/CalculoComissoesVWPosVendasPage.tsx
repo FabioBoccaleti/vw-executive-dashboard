@@ -3,6 +3,8 @@ import { ChevronDown, TrendingUp } from 'lucide-react';
 import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from '@/components/VendasBonificacoesDashboard/vPecasStorage';
 import { loadTaxaMLRows, type TaxaMLRow } from '@/components/VendasBonificacoesDashboard/taxaMercadoLivreStorage';
 import { loadTaxaEPecasRows, type TaxaEPecasRow } from '@/components/VendasBonificacoesDashboard/taxaEPecasStorage';
+import { loadProdutosRows } from '@/components/VendasBonificacoesDashboard/produtosMonitoradosStorage';
+import type { VPecasItemRow } from '@/components/VendasBonificacoesDashboard/vPecasItemStorage';
 import { kvGet } from '@/lib/kvClient';
 
 type VendasSubTab = 'pecas' | 'oficina' | 'funilaria' | 'acessorios' | 'produto';
@@ -19,7 +21,7 @@ const OV_KEY = 'vendas_pecas_vendas_ov';
 
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
-const TABLE_TABS: VendasSubTab[] = ['pecas', 'oficina', 'funilaria', 'acessorios'];
+const TABLE_TABS: VendasSubTab[] = ['pecas', 'oficina', 'funilaria', 'acessorios', 'produto'];
 
 const TABLE_COLUMNS = [
   'NF',
@@ -42,6 +44,28 @@ const TABLE_COLUMNS = [
   'Custo Médio',
   'Lucro Bruto',
   'LB %',
+  'Valor Comissão',
+  'Situação da Comissão',
+  'Data Pgto Comissão',
+] as const;
+
+const PRODUCT_TABLE_COLUMNS = [
+  'NF',
+  'Data',
+  'Tipo',
+  'Depto',
+  'Vendedor',
+  'Cliente',
+  'Código',
+  'Descrição',
+  'Qtde',
+  'Val. Unitário',
+  'Val. Venda',
+  'Val. Impostos',
+  'Rec. Líquida',
+  'Custo Médio',
+  'Lucro Bruto',
+  '% Lucro Bruto',
   'Valor Comissão',
   'Situação da Comissão',
   'Data Pgto Comissão',
@@ -83,6 +107,18 @@ function rowPeriod(row: VPecasRow): { year: number; month: number } | null {
   return null;
 }
 
+function productRowPeriod(row: VPecasItemRow): { year: number; month: number } | null {
+  if (row.periodoImport) {
+    const [y, m] = row.periodoImport.split('-').map(Number);
+    if (y > 2000 && m >= 1 && m <= 12) return { year: y, month: m };
+  }
+  const dta = row.data['DTA_ENTRADA_SAIDA'] ?? '';
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(dta)) {
+    return { year: parseInt(dta.split('/')[2], 10), month: parseInt(dta.split('/')[1], 10) };
+  }
+  return null;
+}
+
 function latestPeriod(rows: VPecasRow[]): { year: number; month: number } {
   const current = new Date();
   const periods = rows
@@ -110,6 +146,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [allPecasRows, setAllPecasRows] = useState<VPecasRow[]>([]);
   const [taxaMLRows, setTaxaMLRows] = useState<TaxaMLRow[]>([]);
   const [taxaEPRows, setTaxaEPRows] = useState<TaxaEPecasRow[]>([]);
+  const [produtoRows, setProdutoRows] = useState<VPecasItemRow[]>([]);
   const [overrides, setOverrides] = useState<Record<string, PecasOverride>>({});
   const [loading, setLoading] = useState(true);
   const [pecasFilterYear, setPecasFilterYear] = useState(new Date().getFullYear());
@@ -120,18 +157,21 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [funilariaFilterMonth, setFunilariaFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [acessoriosFilterYear, setAcessoriosFilterYear] = useState(new Date().getFullYear());
   const [acessoriosFilterMonth, setAcessoriosFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [produtoFilterYear, setProdutoFilterYear] = useState(new Date().getFullYear());
+  const [produtoFilterMonth, setProdutoFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [openVendorKeys, setOpenVendorKeys] = useState<string[]>([]);
   const [openDepartmentKeys, setOpenDepartmentKeys] = useState<string[]>([]);
 
   useEffect(() => {
-    Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows(), loadTaxaMLRows(), loadTaxaEPecasRows(), kvGet(OV_KEY)]).then(
-      ([rows, devol, taxaMl, taxaEp, rawOverrides]) => {
+    Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows(), loadTaxaMLRows(), loadTaxaEPecasRows(), loadProdutosRows(), kvGet(OV_KEY)]).then(
+      ([rows, devol, taxaMl, taxaEp, produtos, rawOverrides]) => {
         const combined = [...rows, ...devol].filter((r) => r.data['SERIE_NOTA_FISCAL'] !== 'RPS');
         const combinedRaw = [...rows, ...devol];
         setAllRows(combinedRaw);
         setAllPecasRows(combined);
         setTaxaMLRows(taxaMl as TaxaMLRow[]);
         setTaxaEPRows(taxaEp as TaxaEPecasRow[]);
+        setProdutoRows(produtos as VPecasItemRow[]);
         if (rawOverrides && typeof rawOverrides === 'object' && !Array.isArray(rawOverrides)) {
           setOverrides(rawOverrides as Record<string, PecasOverride>);
         }
@@ -208,6 +248,40 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       setAcessoriosFilterMonth(latestAcessoriosPeriod.month);
     }
   }, [vendasSubTab, acessoriosBaseRows]);
+
+  useEffect(() => {
+    if (!loading && produtoRows.length > 0) {
+      const periods = produtoRows
+        .map((row) => productRowPeriod(row))
+        .filter((period): period is { year: number; month: number } => Boolean(period));
+      if (periods.length > 0) {
+        const latest = periods.reduce((best, period) => {
+          if (period.year > best.year) return period;
+          if (period.year === best.year && period.month > best.month) return period;
+          return best;
+        });
+        setProdutoFilterYear(latest.year);
+        setProdutoFilterMonth(latest.month);
+      }
+    }
+  }, [loading, produtoRows]);
+
+  useEffect(() => {
+    if (vendasSubTab === 'produto' && produtoRows.length > 0) {
+      const periods = produtoRows
+        .map((row) => productRowPeriod(row))
+        .filter((period): period is { year: number; month: number } => Boolean(period));
+      if (periods.length > 0) {
+        const latest = periods.reduce((best, period) => {
+          if (period.year > best.year) return period;
+          if (period.year === best.year && period.month > best.month) return period;
+          return best;
+        });
+        setProdutoFilterYear(latest.year);
+        setProdutoFilterMonth(latest.month);
+      }
+    }
+  }, [vendasSubTab, produtoRows]);
 
   const activeSourceRows = vendasSubTab === 'oficina'
     ? oficinaBaseRows
@@ -309,8 +383,40 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   }, [taxaEPRows, activeFilterMonth, activeFilterYear]);
 
   const isServiceLoading = (vendasSubTab === 'oficina' || vendasSubTab === 'funilaria') && loading;
-  const showDateFilters = vendasSubTab === 'pecas' || vendasSubTab === 'oficina' || vendasSubTab === 'funilaria' || vendasSubTab === 'acessorios';
+  const showDateFilters = vendasSubTab === 'pecas' || vendasSubTab === 'oficina' || vendasSubTab === 'funilaria' || vendasSubTab === 'acessorios' || vendasSubTab === 'produto';
   const serviceTabLabel = vendasSubTab === 'oficina' ? 'Oficina' : vendasSubTab === 'funilaria' ? 'Funilaria' : '';
+  const isProdutoTab = vendasSubTab === 'produto';
+
+  const produtoAvailableYears = useMemo(() => {
+    const years = new Set<number>();
+    produtoRows.forEach((row) => {
+      const period = productRowPeriod(row);
+      if (period) years.add(period.year);
+    });
+    const current = new Date().getFullYear();
+    [current - 1, current, current + 1].forEach((y) => years.add(y));
+    return [...years].sort();
+  }, [produtoRows]);
+
+  const produtoMonthCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    produtoRows.forEach((row) => {
+      const period = productRowPeriod(row);
+      if (!period || period.year !== produtoFilterYear) return;
+      counts[period.month] = (counts[period.month] || 0) + 1;
+    });
+    return counts;
+  }, [produtoRows, produtoFilterYear]);
+
+  const filteredProdutoRows = useMemo(() => {
+    return produtoRows.filter((row) => {
+      const period = productRowPeriod(row);
+      if (!period) return false;
+      if (period.year !== produtoFilterYear) return false;
+      if (produtoFilterMonth !== null && period.month !== produtoFilterMonth) return false;
+      return true;
+    });
+  }, [produtoRows, produtoFilterYear, produtoFilterMonth]);
 
   const pecasTotals = useMemo(() => {
     let valorVenda = 0;
@@ -480,6 +586,94 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       .sort((a, b) => b.total - a.total);
   }, [filteredPecasRows]);
 
+  const produtoSummaryByVendor = useMemo(() => {
+    const map = new Map<string, VPecasItemRow[]>();
+    filteredProdutoRows.forEach((row) => {
+      const vendor = row.data['NOME_VENDEDOR'] || 'Sem vendedor';
+      map.set(vendor, [...(map.get(vendor) ?? []), row]);
+    });
+    return [...map.entries()]
+      .map(([vendor, rows]) => ({
+        vendor,
+        total: rows.reduce((sum, row) => sum + n(row.data['VAL_VENDA']), 0),
+        count: rows.length,
+        transactions: [...rows.reduce((txMap, row) => {
+          const tx = row.data['TIPO_TRANSACAO'] || 'Sem transação';
+          const current = txMap.get(tx) ?? { label: tx, total: 0, count: 0 };
+          current.total += n(row.data['VAL_VENDA']);
+          current.count += 1;
+          txMap.set(tx, current);
+          return txMap;
+        }, new Map<string, { label: string; total: number; count: number }>()).values()].sort((a, b) => b.total - a.total),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [filteredProdutoRows]);
+
+  const produtoSummaryByDepartment = useMemo(() => {
+    const map = new Map<string, VPecasItemRow[]>();
+    filteredProdutoRows.forEach((row) => {
+      const dept = row.data['DEPARTAMENTO'] || 'Sem departamento';
+      map.set(dept, [...(map.get(dept) ?? []), row]);
+    });
+    return [...map.entries()]
+      .map(([department, rows]) => ({
+        department,
+        total: rows.reduce((sum, row) => sum + n(row.data['VAL_VENDA']), 0),
+        count: rows.length,
+        transactions: [...rows.reduce((txMap, row) => {
+          const tx = row.data['TIPO_TRANSACAO'] || 'Sem transação';
+          const current = txMap.get(tx) ?? { label: tx, total: 0, count: 0 };
+          current.total += n(row.data['VAL_VENDA']);
+          current.count += 1;
+          txMap.set(tx, current);
+          return txMap;
+        }, new Map<string, { label: string; total: number; count: number }>()).values()].sort((a, b) => b.total - a.total),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [filteredProdutoRows]);
+
+  const produtoTotals = useMemo(() => {
+    let qtde = 0;
+    let valUnitario = 0;
+    let valVenda = 0;
+    let valImpostos = 0;
+    let recLiquida = 0;
+    let custoMedio = 0;
+    let lucroBruto = 0;
+
+    filteredProdutoRows.forEach((row) => {
+      const d = row.data;
+      const quantidade = n(d['QUANTIDADE']);
+      const unitario = n(d['VAL_UNITARIO']);
+      const venda = n(d['VAL_VENDA']);
+      const impostos = n(d['VAL_IMPOSTOS']);
+      const rec = venda - impostos;
+      const custo = n(d['CUSTO_MEDIO']);
+      const lucro = rec - custo;
+
+      qtde += quantidade;
+      valUnitario += unitario;
+      valVenda += venda;
+      valImpostos += impostos;
+      recLiquida += rec;
+      custoMedio += custo;
+      lucroBruto += lucro;
+    });
+
+    const lucroBrutoPct = recLiquida !== 0 ? (lucroBruto / recLiquida) * 100 : 0;
+
+    return {
+      qtde,
+      valUnitario,
+      valVenda,
+      valImpostos,
+      recLiquida,
+      custoMedio,
+      lucroBruto,
+      lucroBrutoPct,
+    };
+  }, [filteredProdutoRows]);
+
   function toggleAccordionItem(key: string, current: string[], setCurrent: (value: string[]) => void) {
     setCurrent(current.includes(key) ? current.filter(item => item !== key) : [...current, key]);
   }
@@ -554,11 +748,11 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold whitespace-nowrap">
                         ANO
                         <select
-                          value={activeFilterYear}
-                          onChange={(e) => setActiveFilterYear(Number(e.target.value))}
+                          value={isProdutoTab ? produtoFilterYear : activeFilterYear}
+                          onChange={(e) => (isProdutoTab ? setProdutoFilterYear(Number(e.target.value)) : setActiveFilterYear(Number(e.target.value)))}
                           className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
                         >
-                          {availableYears.map((year) => (
+                          {(isProdutoTab ? produtoAvailableYears : availableYears).map((year) => (
                             <option key={year} value={year}>
                               {year}
                             </option>
@@ -567,9 +761,9 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       </div>
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => setActiveFilterMonth(null)}
+                          onClick={() => (isProdutoTab ? setProdutoFilterMonth(null) : setActiveFilterMonth(null))}
                           className={`px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                            activeFilterMonth === null ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+                            (isProdutoTab ? produtoFilterMonth : activeFilterMonth) === null ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
                           }`}
                         >
                           Ano todo
@@ -577,21 +771,21 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         {MONTHS.map((month, index) => (
                           <button
                             key={month}
-                            onClick={() => setActiveFilterMonth(index + 1)}
+                            onClick={() => (isProdutoTab ? setProdutoFilterMonth(index + 1) : setActiveFilterMonth(index + 1))}
                             className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                              activeFilterMonth === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
-                            } ${monthCounts[index + 1] ? 'font-semibold' : ''}`}
+                              (isProdutoTab ? produtoFilterMonth : activeFilterMonth) === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+                            } ${(isProdutoTab ? produtoMonthCounts[index + 1] : monthCounts[index + 1]) ? 'font-semibold' : ''}`}
                           >
                             {month}
-                            {monthCounts[index + 1] ? (
-                              <span className="ml-0.5 text-[10px] opacity-70">({monthCounts[index + 1]})</span>
+                            {(isProdutoTab ? produtoMonthCounts[index + 1] : monthCounts[index + 1]) ? (
+                              <span className="ml-0.5 text-[10px] opacity-70">({isProdutoTab ? produtoMonthCounts[index + 1] : monthCounts[index + 1]})</span>
                             ) : null}
                           </button>
                         ))}
                       </div>
                     </div>
                     <span className="text-xs text-slate-400 whitespace-nowrap">
-                      {filteredPecasRows.length} registro{filteredPecasRows.length !== 1 ? 's' : ''}
+                      {(isProdutoTab ? filteredProdutoRows.length : filteredPecasRows.length)} registro{(isProdutoTab ? filteredProdutoRows.length : filteredPecasRows.length) !== 1 ? 's' : ''}
                     </span>
                   </div>
 
@@ -602,12 +796,12 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <p className="text-sm font-bold text-slate-800">Resumo por vendedor</p>
                           <p className="text-xs text-slate-500">Total por vendedor com detalhe por transação</p>
                         </div>
-                        <span className="text-xs font-semibold text-slate-500">{summaryByVendor.length} vendedor{summaryByVendor.length !== 1 ? 'es' : ''}</span>
+                        <span className="text-xs font-semibold text-slate-500">{(isProdutoTab ? produtoSummaryByVendor.length : summaryByVendor.length)} vendedor{(isProdutoTab ? produtoSummaryByVendor.length : summaryByVendor.length) !== 1 ? 'es' : ''}</span>
                       </div>
                       <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
-                        {summaryByVendor.length === 0 ? (
+                        {(isProdutoTab ? produtoSummaryByVendor.length : summaryByVendor.length) === 0 ? (
                           <div className="text-xs text-slate-400 py-4 text-center">Sem dados para o período selecionado.</div>
-                        ) : summaryByVendor.map((item) => {
+                        ) : (isProdutoTab ? produtoSummaryByVendor : summaryByVendor).map((item) => {
                           const isOpen = openVendorKeys.includes(item.vendor);
                           return (
                             <div key={item.vendor} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
@@ -654,12 +848,12 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <p className="text-sm font-bold text-slate-800">Resumo por departamento</p>
                           <p className="text-xs text-slate-500">Total por departamento com detalhe por transação</p>
                         </div>
-                        <span className="text-xs font-semibold text-slate-500">{summaryByDepartment.length} departamento{summaryByDepartment.length !== 1 ? 's' : ''}</span>
+                        <span className="text-xs font-semibold text-slate-500">{(isProdutoTab ? produtoSummaryByDepartment.length : summaryByDepartment.length)} departamento{(isProdutoTab ? produtoSummaryByDepartment.length : summaryByDepartment.length) !== 1 ? 's' : ''}</span>
                       </div>
                       <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
-                        {summaryByDepartment.length === 0 ? (
+                        {(isProdutoTab ? produtoSummaryByDepartment.length : summaryByDepartment.length) === 0 ? (
                           <div className="text-xs text-slate-400 py-4 text-center">Sem dados para o período selecionado.</div>
-                        ) : summaryByDepartment.map((item) => {
+                        ) : (isProdutoTab ? produtoSummaryByDepartment : summaryByDepartment).map((item) => {
                           const isOpen = openDepartmentKeys.includes(item.department);
                           return (
                             <div key={item.department} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
@@ -711,10 +905,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                 }}
                 className="flex-1 overflow-auto"
               >
-                <table className="min-w-[2600px] w-full text-xs text-slate-700">
+                <table className={isProdutoTab ? 'min-w-[2400px] w-full text-xs text-slate-700' : 'min-w-[2600px] w-full text-xs text-slate-700'}>
                   <thead className="bg-slate-800 text-white sticky top-0 z-10">
                     <tr>
-                      {TABLE_COLUMNS.map((column) => (
+                      {(isProdutoTab ? PRODUCT_TABLE_COLUMNS : TABLE_COLUMNS).map((column) => (
                         <th
                           key={column}
                           className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-slate-700 last:border-r-0"
@@ -725,15 +919,52 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredPecasRows.length === 0 ? (
+                    {(isProdutoTab ? filteredProdutoRows.length : filteredPecasRows.length) === 0 ? (
                       <tr>
                         <td
-                          colSpan={TABLE_COLUMNS.length}
+                          colSpan={(isProdutoTab ? PRODUCT_TABLE_COLUMNS.length : TABLE_COLUMNS.length)}
                           className="px-3 py-8 text-center text-slate-400 border-t border-slate-100"
                         >
                           Nenhum registro encontrado no período selecionado.
                         </td>
                       </tr>
+                    ) : isProdutoTab ? (
+                      filteredProdutoRows.map((row, rowIndex) => {
+                        const d = row.data;
+                        const qtde = n(d['QUANTIDADE']);
+                        const valUnitario = n(d['VAL_UNITARIO']);
+                        const valVenda = n(d['VAL_VENDA']);
+                        const valImpostos = n(d['VAL_IMPOSTOS']);
+                        const recLiquida = valVenda - valImpostos;
+                        const custoMedio = n(d['CUSTO_MEDIO']);
+                        const lucroBruto = recLiquida - custoMedio;
+                        const lucroBrutoPct = recLiquida !== 0 ? (lucroBruto / recLiquida) * 100 : 0;
+                        const rowBg = rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+
+                        return (
+                          <tr key={row.id} className={`${rowBg} border-t border-slate-100`}>
+                            <td className="px-3 py-2 whitespace-nowrap">{d['NUMERO_NOTA_FISCAL'] || '—'}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{d['DTA_ENTRADA_SAIDA'] || '—'}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{d['TIPO_TRANSACAO'] || '—'}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{d['DEPARTAMENTO'] || '—'}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{d['NOME_VENDEDOR'] || '—'}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{d['NOME_CLIENTE'] || '—'}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{d['ITEM_ESTOQUE_PUB'] || '—'}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{d['DES_ITEM_ESTOQUE'] || '—'}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{qtde.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(valUnitario)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(valVenda)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(valImpostos)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(recLiquida)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(custoMedio)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">R$ {fmtCurrency(lucroBruto)}</td>
+                            <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{fmtPercent(lucroBrutoPct)}</td>
+                            <td className="px-3 py-2 text-center text-slate-300">—</td>
+                            <td className="px-3 py-2 text-center text-slate-300">—</td>
+                            <td className="px-3 py-2 text-center text-slate-300">—</td>
+                          </tr>
+                        );
+                      })
                     ) : (
                       filteredPecasRows.map((row, rowIndex) => {
                         const d = row.data;
@@ -791,6 +1022,26 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       })
                     )}
                   </tbody>
+                  {isProdutoTab && filteredProdutoRows.length > 0 && (
+                    <tfoot className="sticky bottom-0 z-20">
+                      <tr className="bg-slate-800 text-white text-xs font-semibold">
+                        <td colSpan={8} className="px-3 py-2 text-left whitespace-nowrap border-t border-slate-700">
+                          TOTAIS ({filteredProdutoRows.length} registros)
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">{produtoTotals.qtde.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</td>
+                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(produtoTotals.valUnitario)}</td>
+                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(produtoTotals.valVenda)}</td>
+                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(produtoTotals.valImpostos)}</td>
+                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">R$ {fmtCurrency(produtoTotals.recLiquida)}</td>
+                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap border-t border-slate-700">R$ {fmtCurrency(produtoTotals.custoMedio)}</td>
+                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">R$ {fmtCurrency(produtoTotals.lucroBruto)}</td>
+                        <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-emerald-300 border-t border-slate-700">{fmtPercent(produtoTotals.lucroBrutoPct)}</td>
+                        <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
+                        <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
+                        <td className="px-3 py-2 text-center text-slate-300 border-t border-slate-700">—</td>
+                      </tr>
+                    </tfoot>
+                  )}
                   {(vendasSubTab === 'pecas' || vendasSubTab === 'oficina') && filteredPecasRows.length > 0 && (
                     <tfoot className="sticky bottom-0 z-20">
                       <tr className="bg-slate-800 text-white text-xs font-semibold">
