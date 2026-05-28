@@ -1,6 +1,7 @@
 import { kvGet, kvSet } from '@/lib/kvClient';
 
 const KEY = 'calculo_pos_vendas_remuneracoes';
+const KEY_PERIODOS = 'calculo_pos_vendas_periodos';
 
 export interface CalculoPosVendasRemuneracao {
   id: string;
@@ -8,9 +9,28 @@ export interface CalculoPosVendasRemuneracao {
   vendedor: string;
   comissionado: boolean;
   salarioFixo: string;
+  comissaoPecasPct: string;
+  comissaoRpsPct: string;
+  comissaoTotalPecasPct: string;
+  bonusProdutividade: string;
+  departamentos: string[];
+  transacoes: string[];
+  bonusEscalas: Array<{
+    id: string;
+    de: string;
+    ate: string;
+    bonus: string;
+  }>;
+  descontarDevolucao: boolean;
   ativo: boolean;
   criadoEm: string;
   atualizadoEm: string;
+}
+
+export interface CalculoPosVendasPeriodo {
+  de: string; // YYYY-MM-DD
+  ate: string; // YYYY-MM-DD
+  bloqueado?: boolean;
 }
 
 export function calculoPeriodoKey(year: number, month: number): string {
@@ -27,6 +47,21 @@ export async function loadCalculoPosVendasRemuneracoes(): Promise<CalculoPosVend
       vendedor: String(item.vendedor ?? ''),
       comissionado: Boolean(item.comissionado),
       salarioFixo: String(item.salarioFixo ?? ''),
+      comissaoPecasPct: String(item.comissaoPecasPct ?? ''),
+      comissaoRpsPct: String(item.comissaoRpsPct ?? ''),
+      comissaoTotalPecasPct: String(item.comissaoTotalPecasPct ?? ''),
+      bonusProdutividade: String(item.bonusProdutividade ?? ''),
+      departamentos: Array.isArray(item.departamentos) ? item.departamentos.map((value) => String(value ?? '').trim()).filter(Boolean) : [],
+      transacoes: Array.isArray(item.transacoes) ? item.transacoes.map((value) => String(value ?? '').trim()).filter(Boolean) : [],
+      bonusEscalas: Array.isArray(item.bonusEscalas)
+        ? item.bonusEscalas.map((faixa) => ({
+            id: String((faixa as Record<string, unknown>).id ?? crypto.randomUUID()),
+            de: String((faixa as Record<string, unknown>).de ?? ''),
+            ate: String((faixa as Record<string, unknown>).ate ?? ''),
+            bonus: String((faixa as Record<string, unknown>).bonus ?? ''),
+          }))
+        : [],
+      descontarDevolucao: Boolean(item.descontarDevolucao),
       ativo: item.ativo === undefined ? true : Boolean(item.ativo),
       criadoEm: String(item.criadoEm ?? new Date().toISOString()),
       atualizadoEm: String(item.atualizadoEm ?? new Date().toISOString()),
@@ -50,4 +85,22 @@ export function upsertCalculoPosVendasRemuneracao(
 ): CalculoPosVendasRemuneracao[] {
   const others = items.filter((item) => !(item.periodo === nextItem.periodo && item.vendedor === nextItem.vendedor));
   return [...others, nextItem];
+}
+
+export async function loadCalculoPosVendasPeriodos(): Promise<Record<string, CalculoPosVendasPeriodo>> {
+  try {
+    const data = await kvGet(KEY_PERIODOS);
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+    return data as Record<string, CalculoPosVendasPeriodo>;
+  } catch {
+    return {};
+  }
+}
+
+export async function saveCalculoPosVendasPeriodos(items: Record<string, CalculoPosVendasPeriodo>): Promise<boolean> {
+  try {
+    return await kvSet(KEY_PERIODOS, items);
+  } catch {
+    return false;
+  }
 }

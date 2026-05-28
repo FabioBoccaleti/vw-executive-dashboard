@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Calculator, Check, Pencil, Plus, TrendingUp, UserCheck, UserX, Wallet, X } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Copy, Calculator, Check, Lock, LockOpen, Pencil, Save, TrendingUp, UserCheck, UserX, Wallet, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from '@/components/VendasBonificacoesDashboard/vPecasStorage';
@@ -12,9 +12,12 @@ import { toast } from 'sonner';
 import { loadVendedores, type Vendedor as CadastroVendedor } from '@/components/CadastrosPage/cadastrosStorage';
 import {
   calculoPeriodoKey,
+  loadCalculoPosVendasPeriodos,
   loadCalculoPosVendasRemuneracoes,
+  saveCalculoPosVendasPeriodos,
   saveCalculoPosVendasRemuneracoes,
   upsertCalculoPosVendasRemuneracao,
+  type CalculoPosVendasPeriodo,
   type CalculoPosVendasRemuneracao,
 } from './calculoPosVendasStorage';
 
@@ -37,10 +40,47 @@ interface CalculoVendorCard {
   record?: CalculoPosVendasRemuneracao;
 }
 
+interface BonusEscalaDraft {
+  id: string;
+  de: string;
+  ate: string;
+  bonus: string;
+}
+
+interface CalculoValorResumo {
+  basePecas: number;
+  baseRps: number;
+  baseTotalPecas: number;
+  bonus: number;
+  comissao: number;
+  total: number;
+  volumeLiquido: number;
+  bonusRegra: string;
+  filtros: string;
+}
+
 const OV_KEY = 'vendas_pecas_vendas_ov';
 const MECANICOS_KEY = 'calculo_comissoes_vw_pos_vendas_mecanicos';
 
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const UNLOCK_PASSWORD = '1985';
+
+function toIsoDate(value: Date): string {
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, '0');
+  const d = String(value.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function defaultApuracaoPeriodo(year: number, month: number): CalculoPosVendasPeriodo {
+  const first = new Date(year, month - 1, 1);
+  const last = new Date(year, month, 0);
+  return {
+    de: toIsoDate(first),
+    ate: toIsoDate(last),
+    bloqueado: false,
+  };
+}
 
 const TABLE_TABS: VendasSubTab[] = ['pecas', 'oficina', 'funilaria', 'acessorios', 'produto'];
 
@@ -201,6 +241,46 @@ function getSourceLabelFromRow(data: Record<string, string>, fallback: string): 
 
 function normalizeCode(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function createBonusEscalaDraft(): BonusEscalaDraft {
+  return { id: crypto.randomUUID(), de: '', ate: '', bonus: '' };
+}
+
+function cleanBonusEscalas(value: BonusEscalaDraft[]): BonusEscalaDraft[] {
+  return value
+    .map((item) => ({
+      id: item.id || crypto.randomUUID(),
+      de: String(item.de ?? '').trim(),
+      ate: String(item.ate ?? '').trim(),
+      bonus: String(item.bonus ?? '').trim(),
+    }))
+    .filter((item) => item.de || item.ate || item.bonus);
+}
+
+function parseDecimal(value: string): number {
+  const parsed = Number(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function rowAmountForCalculo(origem: string, data: Record<string, string>): number {
+  if (origem === 'Produto' || origem === 'Mecânicos') return Math.abs(n(data['VAL_VENDA']));
+  return Math.abs(n(data['LIQ_NOTA_FISCAL']));
+}
+
+function isTransacaoDevolucao(value: string): boolean {
+  const normalized = normalizeFieldKey(value);
+  if (!normalized) return false;
+  return normalized.includes('DEVOL') || normalized.endsWith('07') || normalized === 'D';
+}
+
+function firstMatchingFaixa(volumeLiquido: number, faixas: BonusEscalaDraft[]): BonusEscalaDraft | null {
+  return faixas.find((faixa) => {
+    const de = parseDecimal(faixa.de);
+    const ateRaw = String(faixa.ate ?? '').trim();
+    const ate = ateRaw === '' ? Number.POSITIVE_INFINITY : parseDecimal(ateRaw);
+    return volumeLiquido >= de && volumeLiquido <= ate;
+  }) ?? null;
 }
 
 function isBlankCell(value: unknown): boolean {
@@ -383,9 +463,11 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [calculoYear, setCalculoYear] = useState(new Date().getFullYear());
   const [calculoMonth, setCalculoMonth] = useState<number>(new Date().getMonth() + 1);
   const [calculoAba, setCalculoAba] = useState<CalculoAba>('cadastrados');
+  const [calculoPeriodos, setCalculoPeriodos] = useState<Record<string, CalculoPosVendasPeriodo>>({});
   const [calculoRemuneracoes, setCalculoRemuneracoes] = useState<CalculoPosVendasRemuneracao[]>([]);
   const [calculoLoading, setCalculoLoading] = useState(true);
   const [calculoSaving, setCalculoSaving] = useState(false);
+  const [calculoPeriodoSaving, setCalculoPeriodoSaving] = useState(false);
   const [calculoModalOpen, setCalculoModalOpen] = useState(false);
   const [calculoDraft, setCalculoDraft] = useState<CalculoPosVendasRemuneracao | null>(null);
   const [cadastroVendedores, setCadastroVendedores] = useState<CadastroVendedor[]>([]);
@@ -433,8 +515,9 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   }, []);
 
   useEffect(() => {
-    loadCalculoPosVendasRemuneracoes().then((items) => {
+    Promise.all([loadCalculoPosVendasRemuneracoes(), loadCalculoPosVendasPeriodos()]).then(([items, periodos]) => {
       setCalculoRemuneracoes(items);
+      setCalculoPeriodos(periodos);
       setCalculoLoading(false);
     });
   }, []);
@@ -942,6 +1025,13 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   }, [filteredProdutoRows]);
 
   const calculoPeriodo = calculoPeriodoKey(calculoYear, calculoMonth);
+  const calculoPeriodoData = calculoPeriodos[calculoPeriodo] ?? defaultApuracaoPeriodo(calculoYear, calculoMonth);
+  const calculoBloqueado = Boolean(calculoPeriodoData.bloqueado);
+  const mecanicosSystemPeriodo = useMemo(() => {
+    const now = new Date();
+    return calculoPeriodoKey(now.getFullYear(), now.getMonth() + 1);
+  }, []);
+  const mecanicosBloqueado = Boolean(calculoPeriodos[mecanicosSystemPeriodo]?.bloqueado);
 
   const vendorLookup = useMemo(() => {
     const map = new Map<string, string>();
@@ -1042,20 +1132,172 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const calculoRegistered = useMemo(() => calculoVendors.filter((item) => Boolean(item.record)), [calculoVendors]);
   const calculoPending = useMemo(() => calculoVendors.filter((item) => !item.record), [calculoVendors]);
 
+  const calculoValoresByVendor = useMemo(() => {
+    const map = new Map<string, CalculoValorResumo>();
+    calculoVendors.forEach((item) => {
+      const record = item.record;
+      if (!record || !record.ativo || !record.comissionado) {
+        map.set(vendorKey(item.vendedor), {
+          basePecas: 0,
+          baseRps: 0,
+          baseTotalPecas: 0,
+          bonus: 0,
+          comissao: 0,
+          total: parseDecimal(record?.salarioFixo ?? ''),
+          volumeLiquido: 0,
+          bonusRegra: 'Bônus inativo',
+          filtros: 'Sem filtros aplicados',
+        });
+        return;
+      }
+
+      const deptFilter = new Set((record.departamentos ?? []).map((value) => normalizeFieldKey(value)));
+      const txFilter = new Set((record.transacoes ?? []).map((value) => normalizeFieldKey(value)));
+      const useDept = deptFilter.size > 0;
+      const useTx = txFilter.size > 0;
+
+      let basePecas = 0;
+      let baseRps = 0;
+      let countVenda = 0;
+      let countDevolucao = 0;
+
+      calculoSourceRows.forEach((row) => {
+        const vendors = extractVendorNames(row.data).map((name) => vendorKey(resolveVendorName(name)));
+        if (!vendors.includes(vendorKey(item.vendedor))) return;
+
+        const dept = normalizeFieldKey(String(row.data['DEPARTAMENTO'] ?? ''));
+        const txRaw = String(row.data['TIPO_TRANSACAO'] ?? row.data['TRANSACAO'] ?? '');
+        const tx = normalizeFieldKey(txRaw);
+        if (useDept && !deptFilter.has(dept)) return;
+        if (useTx && !txFilter.has(tx)) return;
+
+        const isDevolucao = isTransacaoDevolucao(txRaw);
+        const sign = record.descontarDevolucao && isDevolucao ? -1 : 1;
+        const amount = sign * rowAmountForCalculo(row.origem, row.data);
+
+        if (isDevolucao) countDevolucao += 1;
+        else countVenda += 1;
+
+        if (row.origem === 'RPS') {
+          baseRps += amount;
+        } else {
+          basePecas += amount;
+        }
+      });
+
+      const baseTotalPecas = basePecas;
+      const pctPecas = parseDecimal(record.comissaoPecasPct);
+      const pctRps = parseDecimal(record.comissaoRpsPct);
+      const pctTotalPecas = parseDecimal(record.comissaoTotalPecasPct);
+      const comissao =
+        basePecas * (pctPecas / 100) +
+        baseRps * (pctRps / 100) +
+        baseTotalPecas * (pctTotalPecas / 100);
+
+      const volumeLiquido = countVenda - countDevolucao;
+      const faixas = cleanBonusEscalas((record.bonusEscalas ?? []) as BonusEscalaDraft[]);
+      const faixaAtiva = firstMatchingFaixa(volumeLiquido, faixas);
+      const bonus = faixaAtiva ? parseDecimal(faixaAtiva.bonus) : parseDecimal(record.bonusProdutividade);
+      const salario = parseDecimal(record.salarioFixo);
+      const bonusRegra = faixaAtiva
+        ? `Faixa ${faixaAtiva.de || '0'}-${faixaAtiva.ate || 'em diante'} = R$ ${fmtCurrency(parseDecimal(faixaAtiva.bonus))}`
+        : `Bônus fixo = R$ ${fmtCurrency(parseDecimal(record.bonusProdutividade))}`;
+      const filtros = `${useDept ? `Departamentos: ${(record.departamentos ?? []).join(', ')}` : 'Departamentos: todos'} · ${useTx ? `Transações: ${(record.transacoes ?? []).join(', ')}` : 'Transações: todas'}`;
+
+      map.set(vendorKey(item.vendedor), {
+        basePecas,
+        baseRps,
+        baseTotalPecas,
+        bonus,
+        comissao,
+        total: salario + comissao + bonus,
+        volumeLiquido,
+        bonusRegra,
+        filtros,
+      });
+    });
+    return map;
+  }, [calculoVendors, calculoSourceRows]);
+
+  const calculoRulesByVendor = useMemo(() => {
+    const rules = new Map<string, { departamentos: Set<string>; transacoes: Set<string> }>();
+    const getRule = (name: string) => {
+      const key = vendorKey(name);
+      const current = rules.get(key) ?? { departamentos: new Set<string>(), transacoes: new Set<string>() };
+      rules.set(key, current);
+      return current;
+    };
+
+    calculoSourceRows.forEach((row) => {
+      const dept = normalizeVendorName(String(row.data['DEPARTAMENTO'] ?? ''));
+      const tx = normalizeVendorName(String(row.data['TIPO_TRANSACAO'] ?? row.data['TRANSACAO'] ?? ''));
+      const vendors = extractVendorNames(row.data).map((name) => resolveVendorName(name));
+      vendors.forEach((name) => {
+        if (!name) return;
+        const target = getRule(name);
+        if (dept) target.departamentos.add(dept);
+        if (tx) target.transacoes.add(tx);
+      });
+    });
+
+    return rules;
+  }, [calculoSourceRows]);
+
+  const calculoDraftDepartamentos = useMemo(() => {
+    if (!calculoDraft?.vendedor) return [];
+    const byVendor = calculoRulesByVendor.get(vendorKey(calculoDraft.vendedor));
+    const selected = calculoDraft.departamentos ?? [];
+    const merged = new Set<string>([...(byVendor ? [...byVendor.departamentos] : []), ...selected]);
+    return [...merged].sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+  }, [calculoDraft, calculoRulesByVendor]);
+
+  const calculoDraftTransacoes = useMemo(() => {
+    if (!calculoDraft?.vendedor) return [];
+    const byVendor = calculoRulesByVendor.get(vendorKey(calculoDraft.vendedor));
+    const selected = calculoDraft.transacoes ?? [];
+    const merged = new Set<string>([...(byVendor ? [...byVendor.transacoes] : []), ...selected]);
+    return [...merged].sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+  }, [calculoDraft, calculoRulesByVendor]);
+
   function openCalculoDraft(vendedor: string) {
+    if (calculoBloqueado) {
+      toast.warning('Período bloqueado. Desbloqueie para editar remunerações.');
+      return;
+    }
     const existing = calculoRemuneracoes.find(
       (item) => item.periodo === calculoPeriodo && vendorKey(item.vendedor) === vendorKey(vendedor),
     );
+    const defaults = calculoRulesByVendor.get(vendorKey(vendedor));
+    const departamentosDefault = defaults ? [...defaults.departamentos].sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })) : [];
+    const transacoesDefault = defaults ? [...defaults.transacoes].sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })) : [];
 
     setCalculoDraft(
       existing
-        ? { ...existing }
+        ? {
+            ...existing,
+            comissaoPecasPct: existing.comissaoPecasPct ?? '',
+            comissaoRpsPct: existing.comissaoRpsPct ?? '',
+            comissaoTotalPecasPct: existing.comissaoTotalPecasPct ?? '',
+            bonusProdutividade: existing.bonusProdutividade ?? '',
+            departamentos: existing.departamentos?.length ? existing.departamentos : departamentosDefault,
+            transacoes: existing.transacoes?.length ? existing.transacoes : transacoesDefault,
+            bonusEscalas: existing.bonusEscalas?.length ? existing.bonusEscalas : [createBonusEscalaDraft()],
+            descontarDevolucao: Boolean(existing.descontarDevolucao),
+          }
         : {
             id: crypto.randomUUID(),
             periodo: calculoPeriodo,
             vendedor: normalizeVendorName(vendedor),
             comissionado: false,
             salarioFixo: '',
+            comissaoPecasPct: '',
+            comissaoRpsPct: '',
+            comissaoTotalPecasPct: '',
+            bonusProdutividade: '',
+            departamentos: departamentosDefault,
+            transacoes: transacoesDefault,
+            bonusEscalas: [createBonusEscalaDraft()],
+            descontarDevolucao: false,
             ativo: true,
             criadoEm: new Date().toISOString(),
             atualizadoEm: new Date().toISOString(),
@@ -1069,14 +1311,110 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     setCalculoDraft(null);
   }
 
+  function toggleDraftListField(field: 'departamentos' | 'transacoes', value: string) {
+    if (!calculoDraft) return;
+    const normalized = normalizeVendorName(value);
+    if (!normalized) return;
+    const current = new Set(calculoDraft[field] ?? []);
+    if (current.has(normalized)) current.delete(normalized);
+    else current.add(normalized);
+    setCalculoDraft({ ...calculoDraft, [field]: [...current].sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })) });
+  }
+
+  function addBonusEscalaRow() {
+    if (!calculoDraft) return;
+    const next = [...(calculoDraft.bonusEscalas ?? []), createBonusEscalaDraft()];
+    setCalculoDraft({ ...calculoDraft, bonusEscalas: next });
+  }
+
+  function removeBonusEscalaRow(id: string) {
+    if (!calculoDraft) return;
+    const next = (calculoDraft.bonusEscalas ?? []).filter((item) => item.id !== id);
+    setCalculoDraft({ ...calculoDraft, bonusEscalas: next.length ? next : [createBonusEscalaDraft()] });
+  }
+
+  function updateBonusEscalaRow(id: string, field: 'de' | 'ate' | 'bonus', value: string) {
+    if (!calculoDraft) return;
+    const next = (calculoDraft.bonusEscalas ?? []).map((item) => (
+      item.id === id ? { ...item, [field]: value } : item
+    ));
+    setCalculoDraft({ ...calculoDraft, bonusEscalas: next });
+  }
+
+  function updateCalculoPeriodoField(field: 'de' | 'ate', value: string) {
+    setCalculoPeriodos((prev) => ({
+      ...prev,
+      [calculoPeriodo]: {
+        ...(prev[calculoPeriodo] ?? defaultApuracaoPeriodo(calculoYear, calculoMonth)),
+        [field]: value,
+      },
+    }));
+  }
+
+  async function saveCalculoPeriodo() {
+    const payload = {
+      ...calculoPeriodos,
+      [calculoPeriodo]: calculoPeriodoData,
+    };
+    setCalculoPeriodoSaving(true);
+    try {
+      const ok = await saveCalculoPosVendasPeriodos(payload);
+      if (!ok) {
+        toast.error('Não foi possível salvar o período de apuração.');
+        return;
+      }
+      setCalculoPeriodos(payload);
+      toast.success(`Período de apuração salvo para ${MONTHS[calculoMonth - 1]}/${calculoYear}.`);
+    } finally {
+      setCalculoPeriodoSaving(false);
+    }
+  }
+
+  async function toggleCalculoBloqueio() {
+    const current = calculoPeriodoData;
+    if (current.bloqueado) {
+      const pass = window.prompt('Digite a senha para desbloquear o período:');
+      if (pass !== UNLOCK_PASSWORD) {
+        toast.error('Senha incorreta.');
+        return;
+      }
+    }
+    const next = {
+      ...calculoPeriodos,
+      [calculoPeriodo]: {
+        ...current,
+        bloqueado: !current.bloqueado,
+      },
+    };
+    const ok = await saveCalculoPosVendasPeriodos(next);
+    if (!ok) {
+      toast.error('Não foi possível atualizar o bloqueio do período.');
+      return;
+    }
+    setCalculoPeriodos(next);
+    toast.success(current.bloqueado ? 'Período desbloqueado.' : 'Período bloqueado.');
+  }
+
   async function saveCalculoDraft() {
     if (!calculoDraft) return;
+    if (calculoBloqueado) {
+      toast.warning('Período bloqueado. Desbloqueie para editar remunerações.');
+      return;
+    }
     const now = new Date().toISOString();
     const payload: CalculoPosVendasRemuneracao = {
       ...calculoDraft,
       periodo: calculoPeriodo,
       vendedor: normalizeVendorName(calculoDraft.vendedor),
       salarioFixo: String(calculoDraft.salarioFixo ?? '').trim(),
+      comissaoPecasPct: String(calculoDraft.comissaoPecasPct ?? '').trim(),
+      comissaoRpsPct: String(calculoDraft.comissaoRpsPct ?? '').trim(),
+      comissaoTotalPecasPct: String(calculoDraft.comissaoTotalPecasPct ?? '').trim(),
+      bonusProdutividade: String(calculoDraft.bonusProdutividade ?? '').trim(),
+      departamentos: (calculoDraft.departamentos ?? []).map((item) => normalizeVendorName(item)).filter(Boolean),
+      transacoes: (calculoDraft.transacoes ?? []).map((item) => normalizeVendorName(item)).filter(Boolean),
+      bonusEscalas: cleanBonusEscalas((calculoDraft.bonusEscalas ?? []) as BonusEscalaDraft[]),
+      descontarDevolucao: Boolean(calculoDraft.descontarDevolucao),
       atualizadoEm: now,
       criadoEm: calculoDraft.criadoEm || now,
     };
@@ -1106,6 +1444,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   }
 
   async function toggleCalculoAtivo(vendedor: string) {
+    if (calculoBloqueado) {
+      toast.warning('Período bloqueado. Desbloqueie para alterar status.');
+      return;
+    }
     const existing = calculoRemuneracoes.find(
       (item) => item.periodo === calculoPeriodo && vendorKey(item.vendedor) === vendorKey(vendedor),
     );
@@ -1128,6 +1470,44 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     }
     setCalculoRemuneracoes(next);
     toast.success(`${payload.vendedor} ${nextActive ? 'reativado' : 'inativado'}.`);
+  }
+
+  async function copyPreviousCalculoPeriodo() {
+    if (calculoBloqueado) {
+      toast.warning('Período bloqueado. Desbloqueie para copiar dados.');
+      return;
+    }
+    const previousDate = new Date(calculoYear, calculoMonth - 2, 1);
+    const previousPeriodo = calculoPeriodoKey(previousDate.getFullYear(), previousDate.getMonth() + 1);
+    const prevItems = calculoRemuneracoes.filter((item) => item.periodo === previousPeriodo);
+    if (prevItems.length === 0) {
+      toast.info('Não há cadastros no período anterior para copiar.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Copiar ${prevItems.length} cadastro(s) de ${MONTHS[previousDate.getMonth()]}/${previousDate.getFullYear()} para ${MONTHS[calculoMonth - 1]}/${calculoYear}? Os existentes serão sobrescritos.`,
+    );
+    if (!confirmed) return;
+
+    const now = new Date().toISOString();
+    let next = [...calculoRemuneracoes];
+    prevItems.forEach((item) => {
+      next = upsertCalculoPosVendasRemuneracao(next, {
+        ...item,
+        id: crypto.randomUUID(),
+        periodo: calculoPeriodo,
+        atualizadoEm: now,
+      });
+    });
+
+    const ok = await saveCalculoPosVendasRemuneracoes(next);
+    if (!ok) {
+      toast.error('Não foi possível copiar os cadastros do período anterior.');
+      return;
+    }
+    setCalculoRemuneracoes(next);
+    toast.success('Cadastros copiados do período anterior com sucesso.');
   }
 
   const mecanicosAvailableYears = useMemo(() => {
@@ -1164,6 +1544,11 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   }
 
   async function handleDeleteMecanicosPeriod() {
+    if (mecanicosBloqueado) {
+      toast.warning('Competência atual bloqueada em Cálculo. Não é possível apagar Mecânicos.');
+      setConfirmDeleteMecanicos(false);
+      return;
+    }
     const nextRows = mecanicosRows.filter((row) => {
       const period = productRowPeriod(row);
       if (!period) return false;
@@ -1186,6 +1571,11 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
   async function confirmMecanicosImport() {
     if (!pendingMecanicosImport) return;
+    if (mecanicosBloqueado) {
+      toast.warning('Competência atual bloqueada em Cálculo. Não é possível importar Mecânicos.');
+      setPendingMecanicosImport(null);
+      return;
+    }
     const { rows, columns, periodLabel } = pendingMecanicosImport;
     const nextRows = rows.map((row) => {
       if (productRowPeriod(row)) return row;
@@ -1200,6 +1590,11 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   }
 
   async function handleMecanicosImport(e: React.ChangeEvent<HTMLInputElement>) {
+    if (mecanicosBloqueado) {
+      toast.warning('Competência atual bloqueada em Cálculo. Não é possível importar Mecânicos.');
+      if (mecanicosInputRef.current) mecanicosInputRef.current.value = '';
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     try {
@@ -1366,6 +1761,67 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                   </div>
                 </div>
 
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <label className="text-xs font-semibold text-slate-600">
+                        Período de apuração - De
+                        <input
+                          type="date"
+                          value={calculoPeriodoData.de}
+                          onChange={(e) => updateCalculoPeriodoField('de', e.target.value)}
+                          disabled={calculoBloqueado}
+                          className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        />
+                      </label>
+                      <label className="text-xs font-semibold text-slate-600">
+                        Período de apuração - Até
+                        <input
+                          type="date"
+                          value={calculoPeriodoData.ate}
+                          onChange={(e) => updateCalculoPeriodoField('ate', e.target.value)}
+                          disabled={calculoBloqueado}
+                          className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={copyPreviousCalculoPeriodo}
+                        disabled={calculoBloqueado}
+                      >
+                        <Copy className="mr-1 h-4 w-4" />
+                        Copiar período anterior
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={saveCalculoPeriodo}
+                        disabled={calculoPeriodoSaving || calculoBloqueado}
+                      >
+                        <Save className="mr-1 h-4 w-4" />
+                        Salvar período
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={toggleCalculoBloqueio}
+                        className={calculoBloqueado ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-50' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}
+                      >
+                        {calculoBloqueado ? <LockOpen className="mr-1 h-4 w-4" /> : <Lock className="mr-1 h-4 w-4" />}
+                        {calculoBloqueado ? 'Desbloquear' : 'Bloquear'}
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {calculoBloqueado
+                      ? 'Competência bloqueada: edição e status de remuneração ficam indisponíveis.'
+                      : 'Defina o período de apuração antes de cadastrar as remunerações.'}
+                  </p>
+                </div>
+
                 <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-0.5 w-fit">
                   <button
                     onClick={() => setCalculoAba('cadastrados')}
@@ -1398,14 +1854,17 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                     Nenhum vendedor encontrado para esta visão.
                   </div>
                 ) : (
-                  <table className="min-w-[1200px] w-full text-xs text-slate-700">
+                  <table className="min-w-[1460px] w-full text-xs text-slate-700">
                     <thead className="bg-slate-800 text-white sticky top-0 z-10">
                       <tr>
                         <th className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-slate-700">Vendedor</th>
                         <th className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-slate-700">Origem</th>
                         <th className="px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700">Vendas</th>
                         <th className="px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700">Comissionado</th>
+                        <th className="px-3 py-2 text-right font-semibold whitespace-nowrap border-r border-slate-700">Comissão prevista</th>
+                        <th className="px-3 py-2 text-right font-semibold whitespace-nowrap border-r border-slate-700">Bônus previsto</th>
                         <th className="px-3 py-2 text-right font-semibold whitespace-nowrap border-r border-slate-700">Salário fixo</th>
+                        <th className="px-3 py-2 text-right font-semibold whitespace-nowrap border-r border-slate-700">Total previsto</th>
                         <th className="px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700">Status</th>
                         <th className="px-3 py-2 text-center font-semibold whitespace-nowrap">Ações</th>
                       </tr>
@@ -1414,60 +1873,98 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       {(calculoAba === 'cadastrados' ? calculoRegistered : calculoPending).map((item, index) => {
                         const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
                         const record = item.record;
+                        const valores = calculoValoresByVendor.get(vendorKey(item.vendedor));
+                        const detailKey = `calculo-${vendorKey(item.vendedor)}`;
+                        const detailOpen = openVendorKeys.includes(detailKey);
                         return (
-                          <tr key={`${item.vendedor}-${index}`} className={`${rowBg} border-t border-slate-100`}>
-                            <td className="px-3 py-2 whitespace-nowrap font-semibold text-slate-800">{item.vendedor}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-slate-500">{item.fontes.join(' · ')}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-center">{item.registros}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-center">
-                              {record?.comissionado ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 px-2 py-1 text-[11px] font-semibold">
-                                  <UserCheck className="w-3 h-3" />
-                                  Sim
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-500 px-2 py-1 text-[11px] font-semibold">
-                                  <UserX className="w-3 h-3" />
-                                  Não
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap text-right font-mono">R$ {fmtCurrency(Number(String(record?.salarioFixo ?? '').replace(',', '.')) || 0)}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-center">
-                              {record ? (
-                                record.ativo ? (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 px-2 py-1 text-[11px] font-semibold">Ativo</span>
+                          <Fragment key={`${item.vendedor}-${index}`}>
+                            <tr className={`${rowBg} border-t border-slate-100`}>
+                              <td className="px-3 py-2 whitespace-nowrap font-semibold text-slate-800">{item.vendedor}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-slate-500">{item.fontes.join(' · ')}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-center">{item.registros}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-center">
+                                {record?.comissionado ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 px-2 py-1 text-[11px] font-semibold">
+                                    <UserCheck className="w-3 h-3" />
+                                    Sim
+                                  </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 text-rose-700 px-2 py-1 text-[11px] font-semibold">Inativo</span>
-                                )
-                              ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 px-2 py-1 text-[11px] font-semibold">Pendente</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap text-center">
-                              <div className="flex items-center justify-center gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="h-7 px-3 text-xs border-slate-300 text-slate-700 hover:bg-slate-50"
-                                  onClick={() => openCalculoDraft(item.vendedor)}
-                                >
-                                  <Pencil className="w-3 h-3 mr-1" />
-                                  {record ? 'Editar' : 'Adicionar'}
-                                </Button>
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-500 px-2 py-1 text-[11px] font-semibold">
+                                    <UserX className="w-3 h-3" />
+                                    Não
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-right font-mono">R$ {fmtCurrency(valores?.comissao ?? 0)}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-right font-mono">R$ {fmtCurrency(valores?.bonus ?? 0)}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-right font-mono">R$ {fmtCurrency(Number(String(record?.salarioFixo ?? '').replace(',', '.')) || 0)}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-right font-mono text-slate-900">R$ {fmtCurrency(valores?.total ?? (Number(String(record?.salarioFixo ?? '').replace(',', '.')) || 0))}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-center">
                                 {record ? (
+                                  record.ativo ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 px-2 py-1 text-[11px] font-semibold">Ativo</span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 text-rose-700 px-2 py-1 text-[11px] font-semibold">Inativo</span>
+                                  )
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 px-2 py-1 text-[11px] font-semibold">Pendente</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                  {record ? (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="h-7 px-3 text-xs border-slate-300 text-slate-700 hover:bg-slate-50"
+                                      onClick={() => toggleAccordionItem(detailKey, openVendorKeys, setOpenVendorKeys)}
+                                    >
+                                      {detailOpen ? 'Ocultar detalhes' : 'Ver detalhes'}
+                                    </Button>
+                                  ) : null}
                                   <Button
                                     type="button"
                                     variant="outline"
-                                    className={`h-7 px-3 text-xs ${record.ativo ? 'border-rose-300 text-rose-700 hover:bg-rose-50' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'}`}
-                                    onClick={() => toggleCalculoAtivo(item.vendedor)}
+                                    className="h-7 px-3 text-xs border-slate-300 text-slate-700 hover:bg-slate-50"
+                                    onClick={() => openCalculoDraft(item.vendedor)}
+                                    disabled={calculoBloqueado}
                                   >
-                                    {record.ativo ? 'Inativar' : 'Reativar'}
+                                    <Pencil className="w-3 h-3 mr-1" />
+                                    {record ? 'Editar' : 'Adicionar'}
                                   </Button>
-                                ) : null}
-                              </div>
-                            </td>
-                          </tr>
+                                  {record ? (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className={`h-7 px-3 text-xs ${record.ativo ? 'border-rose-300 text-rose-700 hover:bg-rose-50' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'}`}
+                                      onClick={() => toggleCalculoAtivo(item.vendedor)}
+                                      disabled={calculoBloqueado}
+                                    >
+                                      {record.ativo ? 'Inativar' : 'Reativar'}
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </td>
+                            </tr>
+                            {record && detailOpen ? (
+                              <tr className="bg-slate-50 border-t border-slate-100">
+                                <td colSpan={10} className="px-4 py-3">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] text-slate-600">
+                                    <div className="space-y-1">
+                                      <p><strong className="text-slate-700">Base Peças/Produto:</strong> R$ {fmtCurrency(valores?.basePecas ?? 0)}</p>
+                                      <p><strong className="text-slate-700">Base Mão de Obra RPS:</strong> R$ {fmtCurrency(valores?.baseRps ?? 0)}</p>
+                                      <p><strong className="text-slate-700">Volume líquido:</strong> {valores?.volumeLiquido ?? 0}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p><strong className="text-slate-700">Regra bônus:</strong> {valores?.bonusRegra ?? '—'}</p>
+                                      <p><strong className="text-slate-700">Filtros:</strong> {valores?.filtros ?? '—'}</p>
+                                      <p><strong className="text-slate-700">Composição:</strong> Salário + Comissão + Bônus</p>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : null}
+                          </Fragment>
                         );
                       })}
                     </tbody>
@@ -1494,6 +1991,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         <input
                           value={calculoDraft.vendedor}
                           onChange={(e) => setCalculoDraft({ ...calculoDraft, vendedor: e.target.value })}
+                          disabled={calculoBloqueado}
                           className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                         />
                       </div>
@@ -1504,6 +2002,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                             type="checkbox"
                             checked={calculoDraft.comissionado}
                             onChange={(e) => setCalculoDraft({ ...calculoDraft, comissionado: e.target.checked })}
+                            disabled={calculoBloqueado}
                             className="h-4 w-4"
                           />
                           <span className="text-sm text-slate-700">Comissionado</span>
@@ -1518,10 +2017,199 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                               step="0.01"
                               value={calculoDraft.salarioFixo}
                               onChange={(e) => setCalculoDraft({ ...calculoDraft, salarioFixo: e.target.value })}
+                              disabled={calculoBloqueado}
                               placeholder="0,00"
                               className="w-full border border-slate-200 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                             />
                           </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Comissão Peças (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={calculoDraft.comissaoPecasPct}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, comissaoPecasPct: e.target.value })}
+                            disabled={calculoBloqueado}
+                            placeholder="0,00"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Comissão Mão de Obra RPS (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={calculoDraft.comissaoRpsPct}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, comissaoRpsPct: e.target.value })}
+                            disabled={calculoBloqueado}
+                            placeholder="0,00"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Comissão Total Peças (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={calculoDraft.comissaoTotalPecasPct}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, comissaoTotalPecasPct: e.target.value })}
+                            disabled={calculoBloqueado}
+                            placeholder="0,00"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Bônus produtividade fixo (R$)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={calculoDraft.bonusProdutividade}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, bonusProdutividade: e.target.value })}
+                            disabled={calculoBloqueado}
+                            placeholder="0,00"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                        </div>
+                        <label className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-3">
+                          <input
+                            type="checkbox"
+                            checked={calculoDraft.descontarDevolucao}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, descontarDevolucao: e.target.checked })}
+                            disabled={calculoBloqueado}
+                            className="h-4 w-4"
+                          />
+                          <span className="text-sm text-slate-700">Descontar devoluções na comissão</span>
+                        </label>
+                      </div>
+
+                      <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <p className="mb-2 text-xs font-semibold text-slate-600">Departamentos habilitados</p>
+                            {calculoDraftDepartamentos.length === 0 ? (
+                              <p className="text-xs text-slate-400">Sem departamentos encontrados para este vendedor no período.</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {calculoDraftDepartamentos.map((dept) => {
+                                  const active = (calculoDraft.departamentos ?? []).includes(dept);
+                                  return (
+                                    <button
+                                      key={dept}
+                                      type="button"
+                                      onClick={() => toggleDraftListField('departamentos', dept)}
+                                      disabled={calculoBloqueado}
+                                      className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                                        active ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+                                      }`}
+                                    >
+                                      {dept}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <p className="mb-2 text-xs font-semibold text-slate-600">Transações habilitadas</p>
+                            {calculoDraftTransacoes.length === 0 ? (
+                              <p className="text-xs text-slate-400">Sem transações encontradas para este vendedor no período.</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {calculoDraftTransacoes.map((tx) => {
+                                  const active = (calculoDraft.transacoes ?? []).includes(tx);
+                                  return (
+                                    <button
+                                      key={tx}
+                                      type="button"
+                                      onClick={() => toggleDraftListField('transacoes', tx)}
+                                      disabled={calculoBloqueado}
+                                      className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                                        active ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+                                      }`}
+                                    >
+                                      {tx}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-semibold text-slate-600">Escala de bônus de produtividade (não acumulada)</p>
+                          <Button type="button" variant="outline" onClick={addBonusEscalaRow} disabled={calculoBloqueado}>
+                            + Faixa
+                          </Button>
+                        </div>
+                        <div className="overflow-auto rounded-md border border-slate-200">
+                          <table className="w-full min-w-[420px] text-xs">
+                            <thead className="bg-slate-100 text-slate-600">
+                              <tr>
+                                <th className="px-2 py-2 text-left">De (qtd)</th>
+                                <th className="px-2 py-2 text-left">Até (qtd)</th>
+                                <th className="px-2 py-2 text-left">Bônus (R$)</th>
+                                <th className="px-2 py-2 text-center">Ação</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(calculoDraft.bonusEscalas ?? []).map((faixa, index) => (
+                                <tr key={faixa.id} className="border-t border-slate-100">
+                                  <td className="px-2 py-2">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={faixa.de}
+                                      onChange={(e) => updateBonusEscalaRow(faixa.id, 'de', e.target.value)}
+                                      disabled={calculoBloqueado}
+                                      className="w-full rounded border border-slate-200 px-2 py-1"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={faixa.ate}
+                                      onChange={(e) => updateBonusEscalaRow(faixa.id, 'ate', e.target.value)}
+                                      disabled={calculoBloqueado}
+                                      placeholder={index === (calculoDraft.bonusEscalas ?? []).length - 1 ? 'Em diante' : ''}
+                                      className="w-full rounded border border-slate-200 px-2 py-1"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={faixa.bonus}
+                                      onChange={(e) => updateBonusEscalaRow(faixa.id, 'bonus', e.target.value)}
+                                      disabled={calculoBloqueado}
+                                      className="w-full rounded border border-slate-200 px-2 py-1"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => removeBonusEscalaRow(faixa.id)}
+                                      disabled={calculoBloqueado}
+                                      className="rounded border border-rose-300 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50"
+                                    >
+                                      Remover
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
 
@@ -1534,7 +2222,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       <Button type="button" variant="outline" onClick={closeCalculoDraft}>
                         Cancelar
                       </Button>
-                      <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={saveCalculoDraft} disabled={calculoSaving}>
+                      <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={saveCalculoDraft} disabled={calculoSaving || calculoBloqueado}>
                         <Check className="w-4 h-4 mr-1" />
                         Salvar
                       </Button>
@@ -1576,7 +2264,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         variant="outline"
                         className="border-rose-300 text-rose-700 hover:bg-rose-50"
                         onClick={() => setConfirmDeleteMecanicos(true)}
-                        disabled={mecanicosRows.length === 0}
+                        disabled={mecanicosRows.length === 0 || mecanicosBloqueado}
                       >
                         Apagar dados
                       </Button>
@@ -1585,11 +2273,18 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         variant="outline"
                         className="border-blue-300 text-blue-700 hover:bg-blue-50"
                         onClick={() => mecanicosInputRef.current?.click()}
+                        disabled={mecanicosBloqueado}
                       >
                         Importar Excel
                       </Button>
                     </div>
                   </div>
+
+                  {mecanicosBloqueado ? (
+                    <div className="px-4 py-2 border-b border-amber-100 bg-amber-50 text-xs text-amber-700">
+                      Competência atual bloqueada em Cálculo. Importação e exclusão de Mecânicos estão desabilitadas.
+                    </div>
+                  ) : null}
 
                   <div className="bg-white border-b border-slate-100 px-4 py-3 space-y-3">
                     <div className="flex items-center justify-between gap-3">
