@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, TrendingUp } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { Button } from '@/components/ui/button';
 import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from '@/components/VendasBonificacoesDashboard/vPecasStorage';
 import { loadTaxaMLRows, type TaxaMLRow } from '@/components/VendasBonificacoesDashboard/taxaMercadoLivreStorage';
 import { loadTaxaEPecasRows, type TaxaEPecasRow } from '@/components/VendasBonificacoesDashboard/taxaEPecasStorage';
 import { loadProdutosRows } from '@/components/VendasBonificacoesDashboard/produtosMonitoradosStorage';
 import type { VPecasItemRow } from '@/components/VendasBonificacoesDashboard/vPecasItemStorage';
-import { kvGet } from '@/lib/kvClient';
+import { kvGet, kvSet } from '@/lib/kvClient';
+import { toast } from 'sonner';
 
 type VendasSubTab = 'pecas' | 'oficina' | 'funilaria' | 'acessorios' | 'produto' | 'mecanicos';
 
@@ -18,6 +21,7 @@ interface PecasOverride {
 }
 
 const OV_KEY = 'vendas_pecas_vendas_ov';
+const MECANICOS_KEY = 'calculo_comissoes_vw_pos_vendas_mecanicos';
 
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
@@ -120,6 +124,124 @@ function productRowPeriod(row: VPecasItemRow): { year: number; month: number } |
   return null;
 }
 
+function isBlankCell(value: unknown): boolean {
+  return String(value ?? '').trim() === '';
+}
+
+function parseFlexibleNumber(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const hasComma = trimmed.includes(',');
+  const hasDot = trimmed.includes('.');
+
+  let normalized = trimmed;
+  if (hasComma && hasDot) {
+    const lastComma = trimmed.lastIndexOf(',');
+    const lastDot = trimmed.lastIndexOf('.');
+    normalized = lastComma > lastDot
+      ? trimmed.replace(/\./g, '').replace(',', '.')
+      : trimmed.replace(/,/g, '');
+  } else if (hasComma) {
+    normalized = trimmed.replace(',', '.');
+  }
+
+  const parsed = Number(normalized);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function formatMecanicosCell(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '—';
+  const parsed = parseFlexibleNumber(trimmed);
+  if (parsed !== null) return parsed.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return trimmed;
+}
+
+interface MecanicosStore {
+  columns: string[];
+  rows: VPecasItemRow[];
+}
+
+function normalizeMecanicosStore(raw: unknown): MecanicosStore {
+  const normalizeRow = (item: Record<string, unknown>): VPecasItemRow => {
+    if (item.data && typeof item.data === 'object') return item as unknown as VPecasItemRow;
+    const { id, periodoImport, highlight, annotation, ...fields } = item;
+    return {
+      id: String(id ?? crypto.randomUUID()),
+      periodoImport: periodoImport as string | undefined,
+      highlight: highlight as boolean | undefined,
+      annotation: annotation as string | undefined,
+      data: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, String(value ?? '')])),
+    };
+  };
+
+  if (Array.isArray(raw)) {
+    const rows = raw
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+      .map(normalizeRow);
+    const columns = rows[0]
+      ? Object.keys(rows[0].data).filter((column) => rows.some((row) => !isBlankCell(row.data[column])))
+      : [];
+    return { columns, rows };
+  }
+
+  if (raw && typeof raw === 'object') {
+    const store = raw as { columns?: unknown; rows?: unknown };
+    const rows = Array.isArray(store.rows)
+      ? store.rows
+          .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+          .map(normalizeRow)
+      : [];
+    const columns = Array.isArray(store.columns)
+      ? store.columns.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+      : rows[0]
+        ? Object.keys(rows[0].data)
+        : [];
+    const prunedColumns = columns.filter((column) => rows.some((row) => !isBlankCell(row.data[column])));
+    return { columns: prunedColumns, rows };
+  }
+
+  return { columns: [], rows: [] };
+}
+
+function parseMecanicosExcel(buffer: ArrayBuffer): MecanicosStore {
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) return { columns: [], rows: [] };
+  const worksheet = workbook.Sheets[sheetName];
+  const raw = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, defval: '' });
+  const headers = (raw[0] ?? [])
+    .map((header) => String(header ?? '').trim())
+    .filter((header) => header.length > 0);
+
+  if (headers.length === 0) return { columns: [], rows: [] };
+
+  const rows: VPecasItemRow[] = [];
+  for (let index = 1; index < raw.length; index += 1) {
+    const values = raw[index] ?? [];
+    const hasContent = values.some((value) => String(value ?? '').trim().length > 0);
+    if (!hasContent) continue;
+    const data: Record<string, string> = {};
+    headers.forEach((header, headerIndex) => {
+      data[header] = String(values[headerIndex] ?? '').trim();
+    });
+    const firstValue = data[headers[0]] ?? '';
+    const otherValues = headers.slice(1).map((header) => data[header] ?? '');
+    const rowIsEmpty = isBlankCell(firstValue) && otherValues.every((value) => {
+      const normalized = String(value ?? '').trim();
+      if (isBlankCell(normalized)) return true;
+      const parsed = parseFlexibleNumber(normalized);
+      return parsed !== null && parsed === 0;
+    });
+    if (rowIsEmpty) continue;
+    rows.push({ id: crypto.randomUUID(), data });
+  }
+
+  const columns = headers.filter((header) => rows.some((row) => !isBlankCell(row.data[header])));
+  return { columns, rows };
+}
+
 function latestPeriod(rows: VPecasRow[]): { year: number; month: number } {
   const current = new Date();
   const periods = rows
@@ -148,6 +270,8 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [taxaMLRows, setTaxaMLRows] = useState<TaxaMLRow[]>([]);
   const [taxaEPRows, setTaxaEPRows] = useState<TaxaEPecasRow[]>([]);
   const [produtoRows, setProdutoRows] = useState<VPecasItemRow[]>([]);
+  const [mecanicosRows, setMecanicosRows] = useState<VPecasItemRow[]>([]);
+  const [mecanicosColumns, setMecanicosColumns] = useState<string[]>([]);
   const [overrides, setOverrides] = useState<Record<string, PecasOverride>>({});
   const [loading, setLoading] = useState(true);
   const [pecasFilterYear, setPecasFilterYear] = useState(new Date().getFullYear());
@@ -160,12 +284,15 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [acessoriosFilterMonth, setAcessoriosFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [produtoFilterYear, setProdutoFilterYear] = useState(new Date().getFullYear());
   const [produtoFilterMonth, setProdutoFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [mecanicosFilterYear, setMecanicosFilterYear] = useState(new Date().getFullYear());
+  const [mecanicosFilterMonth, setMecanicosFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const mecanicosInputRef = useRef<HTMLInputElement>(null);
   const [openVendorKeys, setOpenVendorKeys] = useState<string[]>([]);
   const [openDepartmentKeys, setOpenDepartmentKeys] = useState<string[]>([]);
 
   useEffect(() => {
-    Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows(), loadTaxaMLRows(), loadTaxaEPecasRows(), loadProdutosRows(), kvGet(OV_KEY)]).then(
-      ([rows, devol, taxaMl, taxaEp, produtos, rawOverrides]) => {
+    Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows(), loadTaxaMLRows(), loadTaxaEPecasRows(), loadProdutosRows(), kvGet(OV_KEY), kvGet(MECANICOS_KEY)]).then(
+      ([rows, devol, taxaMl, taxaEp, produtos, rawOverrides, rawMecanicos]) => {
         const combined = [...rows, ...devol].filter((r) => r.data['SERIE_NOTA_FISCAL'] !== 'RPS');
         const combinedRaw = [...rows, ...devol];
         setAllRows(combinedRaw);
@@ -173,6 +300,21 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         setTaxaMLRows(taxaMl as TaxaMLRow[]);
         setTaxaEPRows(taxaEp as TaxaEPecasRow[]);
         setProdutoRows(produtos as VPecasItemRow[]);
+        const mecanicosStore = normalizeMecanicosStore(rawMecanicos);
+        setMecanicosRows(mecanicosStore.rows);
+        setMecanicosColumns(mecanicosStore.columns);
+        const mecanicosPeriods = mecanicosStore.rows
+          .map((row) => productRowPeriod(row))
+          .filter((period): period is { year: number; month: number } => Boolean(period));
+        if (mecanicosPeriods.length > 0) {
+          const latestMecanicos = mecanicosPeriods.reduce((best, period) => {
+            if (period.year > best.year) return period;
+            if (period.year === best.year && period.month > best.month) return period;
+            return best;
+          });
+          setMecanicosFilterYear(latestMecanicos.year);
+          setMecanicosFilterMonth(latestMecanicos.month);
+        }
         if (rawOverrides && typeof rawOverrides === 'object' && !Array.isArray(rawOverrides)) {
           setOverrides(rawOverrides as Record<string, PecasOverride>);
         }
@@ -675,6 +817,62 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     };
   }, [filteredProdutoRows]);
 
+  const mecanicosAvailableYears = useMemo(() => {
+    const years = new Set<number>();
+    mecanicosRows.forEach((row) => {
+      const period = productRowPeriod(row);
+      if (period) years.add(period.year);
+    });
+    const current = new Date().getFullYear();
+    [current - 1, current, current + 1].forEach((y) => years.add(y));
+    return [...years].sort();
+  }, [mecanicosRows]);
+
+  const mecanicosMonthCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    mecanicosRows.forEach((row) => {
+      const period = productRowPeriod(row);
+      if (!period) return;
+      counts[period.month] = (counts[period.month] || 0) + 1;
+    });
+    return counts;
+  }, [mecanicosRows]);
+
+  const filteredMecanicosRows = useMemo(() => mecanicosRows.filter((row) => {
+    const period = productRowPeriod(row);
+    if (!period) return true;
+    if (period.year !== mecanicosFilterYear) return false;
+    if (mecanicosFilterMonth !== null && period.month !== mecanicosFilterMonth) return false;
+    return true;
+  }), [mecanicosRows, mecanicosFilterYear, mecanicosFilterMonth]);
+
+  async function persistMecanicosStore(nextRows: VPecasItemRow[], nextColumns: string[]) {
+    await kvSet(MECANICOS_KEY, { columns: nextColumns, rows: nextRows });
+  }
+
+  async function handleMecanicosImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const buffer = await file.arrayBuffer();
+      const parsed = parseMecanicosExcel(buffer);
+      if (parsed.rows.length === 0 || parsed.columns.length === 0) {
+        toast.warning('Nenhum dado válido foi encontrado no Excel.');
+        if (mecanicosInputRef.current) mecanicosInputRef.current.value = '';
+        return;
+      }
+      await persistMecanicosStore(parsed.rows, parsed.columns);
+      setMecanicosRows(parsed.rows);
+      setMecanicosColumns(parsed.columns);
+      toast.success(`${parsed.rows.length} registro(s) importado(s).`);
+    } catch (error) {
+      console.error('Erro ao importar Mecânicos:', error);
+      toast.error(`Erro ao importar o arquivo: ${String(error)}`);
+    } finally {
+      if (mecanicosInputRef.current) mecanicosInputRef.current.value = '';
+    }
+  }
+
   function toggleAccordionItem(key: string, current: string[], setCurrent: (value: string[]) => void) {
     setCurrent(current.includes(key) ? current.filter(item => item !== key) : [...current, key]);
   }
@@ -694,6 +892,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
   return (
     <div className="h-screen bg-slate-100 flex flex-col overflow-hidden">
+      <input ref={mecanicosInputRef} type="file" accept=".xlsx,.xls,.ods" className="hidden" onChange={handleMecanicosImport} />
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div>
           <h1 className="text-lg font-bold text-slate-800">Cálculo de Comissões VW - Pós Vendas</h1>
@@ -734,7 +933,112 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
           ))}
         </div>
 
-        {TABLE_TABS.includes(vendasSubTab) ? (
+        {vendasSubTab === 'mecanicos' ? (
+          <div className="flex-1 p-6" style={{ minHeight: 0 }}>
+            <div className="h-full bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-slate-800">Mecânicos</p>
+                  <p className="text-xs text-slate-500">Importe um arquivo Excel para criar e alimentar a tabela.</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                  onClick={() => mecanicosInputRef.current?.click()}
+                >
+                  Importar Excel
+                </Button>
+              </div>
+
+              <div className="bg-white border-b border-slate-100 px-4 py-3 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 overflow-x-auto">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold whitespace-nowrap">
+                      ANO
+                      <select
+                        value={mecanicosFilterYear}
+                        onChange={(e) => setMecanicosFilterYear(Number(e.target.value))}
+                        className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      >
+                        {mecanicosAvailableYears.map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setMecanicosFilterMonth(null)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${mecanicosFilterMonth === null ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+                      >
+                        Ano todo
+                      </button>
+                      {MONTHS.map((month, index) => (
+                        <button
+                          key={month}
+                          onClick={() => setMecanicosFilterMonth(index + 1)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${mecanicosFilterMonth === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'} ${mecanicosMonthCounts[index + 1] ? 'font-semibold' : ''}`}
+                        >
+                          {month}
+                          {mecanicosMonthCounts[index + 1] ? (
+                            <span className="ml-0.5 text-[10px] opacity-70">({mecanicosMonthCounts[index + 1]})</span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <span className="text-xs text-slate-400 whitespace-nowrap">
+                    {filteredMecanicosRows.length} registro{filteredMecanicosRows.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                <div className="text-xs text-slate-500">
+                  Arquivo importado e salvo localmente para reabrir depois.
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto">
+                {mecanicosRows.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-slate-400 text-sm px-6 text-center">
+                    Nenhum arquivo importado ainda. Clique em Importar Excel para carregar os dados.
+                  </div>
+                ) : filteredMecanicosRows.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-slate-400 text-sm px-6 text-center">
+                    Nenhum registro encontrado para o período selecionado.
+                  </div>
+                ) : (
+                  <table className="min-w-max w-full text-xs text-slate-700">
+                    <thead className="bg-slate-800 text-white sticky top-0 z-10">
+                      <tr>
+                        {mecanicosColumns.map((column) => (
+                          <th key={column} className="px-3 py-2 text-left font-semibold whitespace-nowrap border-r border-slate-700 last:border-r-0">
+                            {column}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredMecanicosRows.map((row, rowIndex) => {
+                        const rowBg = rowIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+                        return (
+                          <tr key={row.id} className={`${rowBg} border-t border-slate-100`}>
+                            {mecanicosColumns.map((column) => (
+                              <td key={column} className="px-3 py-2 whitespace-nowrap">
+                                {formatMecanicosCell(row.data[column] || '')}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : TABLE_TABS.includes(vendasSubTab) ? (
           <div className="flex-1 p-6" style={{ minHeight: 0 }}>
             <div className="h-full bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col">
               {isServiceLoading && (
