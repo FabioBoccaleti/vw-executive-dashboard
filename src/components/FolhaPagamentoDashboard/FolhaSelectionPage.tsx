@@ -2,7 +2,7 @@ import { Wallet, UserCheck, Calculator } from 'lucide-react';
 import { useAuth } from '@/contexts/useAuth';
 
 interface FolhaSelectionPageProps {
-  onSelect: (option: 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw') => void;
+  onSelect: (option: 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas') => void;
   onChangeBrand: () => void;
 }
 
@@ -63,7 +63,7 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
           </button>
           )}
 
-          {/* Card — Cálculo de Comissões VW */}
+          {/* Card — Cálculo de Comissões VW - Veículos */}
           {canComissoesVW && (
           <button
             onClick={() => onSelect('calculo_comissoes_vw')}
@@ -74,7 +74,24 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">
-                Cálculo de Comissões VW
+                Cálculo de Comissões VW - Veículos
+              </h2>
+            </div>
+          </button>
+          )}
+
+          {/* Card — Cálculo de Comissões VW - Pós Vendas */}
+          {canComissoesVW && (
+          <button
+            onClick={() => onSelect('calculo_comissoes_vw_pos_vendas')}
+            className="flex-1 max-w-xs mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-teal-50 group-hover:bg-teal-100 transition-colors">
+              <Calculator className="w-10 h-10 text-teal-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Cálculo de Comissões VW - Pós Vendas
               </h2>
             </div>
           </button>

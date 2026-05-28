@@ -79,7 +79,7 @@ export const FOLHA_SUB_MODULE_LABELS: Record<FolhaSubModuleId, string> = {
   'folha.pj':     'Remunerações PJ',
   'folha.pj.demonstrativos':           'Demonstrativos',
   'folha.pj.cadastro':                 'Cadastro',
-  'folha.comissoes_vw':                'Cálculo de Comissões VW',
+  'folha.comissoes_vw':                'Cálculo de Comissões VW - Veículos',
   'folha.comissoes_vw.cadastro':       'Cadastro',
   'folha.comissoes_vw.vendas':         'Vendas',
   'folha.comissoes_vw.vendas.novos':   'Novos',

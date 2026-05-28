@@ -51,7 +51,7 @@ export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) 
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Cálculo de Comissões VW</h1>
+          <h1 className="text-lg font-bold text-slate-800">Cálculo de Comissões VW - Veículos</h1>
           <p className="text-xs text-slate-500 mt-0.5">Folha de Pagamento</p>
         </div>
         <div className="flex items-center gap-3">
