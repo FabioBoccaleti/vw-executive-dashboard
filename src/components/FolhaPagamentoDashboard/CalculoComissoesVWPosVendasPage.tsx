@@ -301,6 +301,11 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [mecanicosFilterYear, setMecanicosFilterYear] = useState(new Date().getFullYear());
   const [mecanicosFilterMonth, setMecanicosFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const mecanicosInputRef = useRef<HTMLInputElement>(null);
+  const [pendingMecanicosImport, setPendingMecanicosImport] = useState<{
+    rows: VPecasItemRow[];
+    columns: string[];
+    periodLabel: string;
+  } | null>(null);
   const [confirmDeleteMecanicos, setConfirmDeleteMecanicos] = useState(false);
   const [openVendorKeys, setOpenVendorKeys] = useState<string[]>([]);
   const [openDepartmentKeys, setOpenDepartmentKeys] = useState<string[]>([]);
@@ -886,6 +891,21 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     toast.success('Dados do período selecionado removidos.');
   }
 
+  async function confirmMecanicosImport() {
+    if (!pendingMecanicosImport) return;
+    const { rows, columns, periodLabel } = pendingMecanicosImport;
+    const nextRows = rows.map((row) => {
+      if (productRowPeriod(row)) return row;
+      const fallbackPeriod = `${mecanicosFilterYear}-${String(mecanicosFilterMonth ?? new Date().getMonth() + 1).padStart(2, '0')}`;
+      return { ...row, periodoImport: fallbackPeriod };
+    });
+    await persistMecanicosStore(nextRows, columns);
+    setMecanicosRows(nextRows);
+    setMecanicosColumns(columns);
+    setPendingMecanicosImport(null);
+    toast.success(`Importação confirmada para ${periodLabel}.`);
+  }
+
   async function handleMecanicosImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -897,15 +917,9 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         if (mecanicosInputRef.current) mecanicosInputRef.current.value = '';
         return;
       }
-      const fallbackPeriod = `${mecanicosFilterYear}-${String(mecanicosFilterMonth ?? new Date().getMonth() + 1).padStart(2, '0')}`;
-      const taggedRows = parsed.rows.map((row) => {
-        if (productRowPeriod(row)) return row;
-        return { ...row, periodoImport: fallbackPeriod };
-      });
-      await persistMecanicosStore(taggedRows, parsed.columns);
-      setMecanicosRows(taggedRows);
-      setMecanicosColumns(parsed.columns);
-      toast.success(`${taggedRows.length} registro(s) importado(s).`);
+      const importMonth = mecanicosFilterMonth ?? new Date().getMonth() + 1;
+      const importPeriodLabel = `${MONTHS[importMonth - 1]}/${String(mecanicosFilterYear).slice(-2)}`;
+      setPendingMecanicosImport({ rows: parsed.rows, columns: parsed.columns, periodLabel: importPeriodLabel });
     } catch (error) {
       console.error('Erro ao importar Mecânicos:', error);
       toast.error(`Erro ao importar o arquivo: ${String(error)}`);
@@ -934,6 +948,25 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   return (
     <div className="h-screen bg-slate-100 flex flex-col overflow-hidden">
       <input ref={mecanicosInputRef} type="file" accept=".xlsx,.xls,.ods" className="hidden" onChange={handleMecanicosImport} />
+      {pendingMecanicosImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <p className="text-sm font-semibold text-slate-800">Confirmar importação</p>
+            <p className="mt-2 text-xs text-slate-500">
+              Deseja importar os dados no mês <strong>{pendingMecanicosImport.periodLabel}</strong>?
+            </p>
+            <p className="mt-2 text-xs text-slate-500">Os registros serão salvos como competência desse período.</p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPendingMecanicosImport(null)}>
+                Cancelar
+              </Button>
+              <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={confirmMecanicosImport}>
+                Confirmar importação
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       {confirmDeleteMecanicos && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
