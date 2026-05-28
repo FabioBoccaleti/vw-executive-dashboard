@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { ChevronDown, TrendingUp } from 'lucide-react';
 import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from '@/components/VendasBonificacoesDashboard/vPecasStorage';
 import { loadTaxaMLRows, type TaxaMLRow } from '@/components/VendasBonificacoesDashboard/taxaMercadoLivreStorage';
 import { loadTaxaEPecasRows, type TaxaEPecasRow } from '@/components/VendasBonificacoesDashboard/taxaEPecasStorage';
@@ -95,6 +95,8 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [overrides, setOverrides] = useState<Record<string, PecasOverride>>({});
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [openVendorKeys, setOpenVendorKeys] = useState<string[]>([]);
+  const [openDepartmentKeys, setOpenDepartmentKeys] = useState<string[]>([]);
 
   useEffect(() => {
     Promise.all([loadVPecasRows(), loadVPecasDevolucaoRows(), loadTaxaMLRows(), loadTaxaEPecasRows(), kvGet(OV_KEY)]).then(
@@ -234,6 +236,56 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     };
   }, [filteredPecasRows, taxaEPLookup, taxaMLLookup]);
 
+  const summaryByVendor = useMemo(() => {
+    const map = new Map<string, VPecasRow[]>();
+    filteredPecasRows.forEach((row) => {
+      const vendor = row.data['NOME_VENDEDOR'] || 'Sem vendedor';
+      map.set(vendor, [...(map.get(vendor) ?? []), row]);
+    });
+    return [...map.entries()]
+      .map(([vendor, rows]) => ({
+        vendor,
+        total: rows.reduce((sum, row) => sum + n(row.data['LIQ_NOTA_FISCAL']), 0),
+        count: rows.length,
+        transactions: [...rows.reduce((txMap, row) => {
+          const tx = row.data['TIPO_TRANSACAO'] || 'Sem transação';
+          const current = txMap.get(tx) ?? { label: tx, total: 0, count: 0 };
+          current.total += n(row.data['LIQ_NOTA_FISCAL']);
+          current.count += 1;
+          txMap.set(tx, current);
+          return txMap;
+        }, new Map<string, { label: string; total: number; count: number }>()).values()].sort((a, b) => b.total - a.total),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [filteredPecasRows]);
+
+  const summaryByDepartment = useMemo(() => {
+    const map = new Map<string, VPecasRow[]>();
+    filteredPecasRows.forEach((row) => {
+      const dept = row.data['DEPARTAMENTO'] || 'Sem departamento';
+      map.set(dept, [...(map.get(dept) ?? []), row]);
+    });
+    return [...map.entries()]
+      .map(([department, rows]) => ({
+        department,
+        total: rows.reduce((sum, row) => sum + n(row.data['LIQ_NOTA_FISCAL']), 0),
+        count: rows.length,
+        transactions: [...rows.reduce((txMap, row) => {
+          const tx = row.data['TIPO_TRANSACAO'] || 'Sem transação';
+          const current = txMap.get(tx) ?? { label: tx, total: 0, count: 0 };
+          current.total += n(row.data['LIQ_NOTA_FISCAL']);
+          current.count += 1;
+          txMap.set(tx, current);
+          return txMap;
+        }, new Map<string, { label: string; total: number; count: number }>()).values()].sort((a, b) => b.total - a.total),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [filteredPecasRows]);
+
+  function toggleAccordionItem(key: string, current: string[], setCurrent: (value: string[]) => void) {
+    setCurrent(current.includes(key) ? current.filter(item => item !== key) : [...current, key]);
+  }
+
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const bottomScrollRef = useRef<HTMLDivElement>(null);
   const bottomScrollDummyRef = useRef<HTMLDivElement>(null);
@@ -293,50 +345,158 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
           <div className="flex-1 p-6" style={{ minHeight: 0 }}>
             <div className="h-full bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col">
               {vendasSubTab === 'pecas' && (
-                <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 overflow-x-auto">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold whitespace-nowrap">
-                      ANO
-                      <select
-                        value={filterYear}
-                        onChange={(e) => setFilterYear(Number(e.target.value))}
-                        className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      >
-                        {availableYears.map((year) => (
-                          <option key={year} value={year}>
-                            {year}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setFilterMonth(null)}
-                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                          filterMonth === null ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
-                        }`}
-                      >
-                        Ano todo
-                      </button>
-                      {MONTHS.map((month, index) => (
-                        <button
-                          key={month}
-                          onClick={() => setFilterMonth(index + 1)}
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                            filterMonth === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
-                          } ${monthCounts[index + 1] ? 'font-semibold' : ''}`}
+                <div className="bg-white border-b border-slate-100 px-4 py-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 overflow-x-auto">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold whitespace-nowrap">
+                        ANO
+                        <select
+                          value={filterYear}
+                          onChange={(e) => setFilterYear(Number(e.target.value))}
+                          className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
                         >
-                          {month}
-                          {monthCounts[index + 1] ? (
-                            <span className="ml-0.5 text-[10px] opacity-70">({monthCounts[index + 1]})</span>
-                          ) : null}
+                          {availableYears.map((year) => (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setFilterMonth(null)}
+                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                            filterMonth === null ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+                          }`}
+                        >
+                          Ano todo
                         </button>
-                      ))}
+                        {MONTHS.map((month, index) => (
+                          <button
+                            key={month}
+                            onClick={() => setFilterMonth(index + 1)}
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                              filterMonth === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+                            } ${monthCounts[index + 1] ? 'font-semibold' : ''}`}
+                          >
+                            {month}
+                            {monthCounts[index + 1] ? (
+                              <span className="ml-0.5 text-[10px] opacity-70">({monthCounts[index + 1]})</span>
+                            ) : null}
+                          </button>
+                        ))}
+                      </div>
                     </div>
+                    <span className="text-xs text-slate-400 whitespace-nowrap">
+                      {filteredPecasRows.length} registro{filteredPecasRows.length !== 1 ? 's' : ''}
+                    </span>
                   </div>
-                  <span className="text-xs text-slate-400 whitespace-nowrap">
-                    {filteredPecasRows.length} registro{filteredPecasRows.length !== 1 ? 's' : ''}
-                  </span>
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">Resumo por vendedor</p>
+                          <p className="text-xs text-slate-500">Total por vendedor com detalhe por transação</p>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-500">{summaryByVendor.length} vendedor{summaryByVendor.length !== 1 ? 'es' : ''}</span>
+                      </div>
+                      <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
+                        {summaryByVendor.length === 0 ? (
+                          <div className="text-xs text-slate-400 py-4 text-center">Sem dados para o período selecionado.</div>
+                        ) : summaryByVendor.map((item) => {
+                          const isOpen = openVendorKeys.includes(item.vendor);
+                          return (
+                            <div key={item.vendor} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleAccordionItem(item.vendor, openVendorKeys, setOpenVendorKeys)}
+                                className="w-full flex items-center justify-between gap-3 text-left"
+                              >
+                                <div className="min-w-0 flex items-center gap-2">
+                                  <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-slate-800 truncate">{item.vendor}</p>
+                                    <p className="text-xs text-slate-500">{item.count} registro{item.count !== 1 ? 's' : ''}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="text-sm font-bold text-slate-800">R$ {fmtCurrency(item.total)}</p>
+                                  <p className="text-[11px] text-slate-500">Total</p>
+                                </div>
+                              </button>
+
+                              {isOpen && (
+                                <div className="mt-3 space-y-1 border-t border-slate-100 pt-2">
+                                  {item.transactions.map((tx) => (
+                                    <div key={tx.label} className="flex items-center justify-between gap-3 text-xs">
+                                      <div className="min-w-0 text-slate-600">
+                                        <span className="font-medium text-slate-700">{tx.label}</span>
+                                        <span className="text-slate-400"> · {tx.count}</span>
+                                      </div>
+                                      <div className="font-mono text-slate-700 shrink-0">R$ {fmtCurrency(tx.total)}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+
+                    <section className="rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">Resumo por departamento</p>
+                          <p className="text-xs text-slate-500">Total por departamento com detalhe por transação</p>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-500">{summaryByDepartment.length} departamento{summaryByDepartment.length !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="mt-3 space-y-2 max-h-72 overflow-auto pr-1">
+                        {summaryByDepartment.length === 0 ? (
+                          <div className="text-xs text-slate-400 py-4 text-center">Sem dados para o período selecionado.</div>
+                        ) : summaryByDepartment.map((item) => {
+                          const isOpen = openDepartmentKeys.includes(item.department);
+                          return (
+                            <div key={item.department} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleAccordionItem(item.department, openDepartmentKeys, setOpenDepartmentKeys)}
+                                className="w-full flex items-center justify-between gap-3 text-left"
+                              >
+                                <div className="min-w-0 flex items-center gap-2">
+                                  <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-slate-800 truncate">{item.department}</p>
+                                    <p className="text-xs text-slate-500">{item.count} registro{item.count !== 1 ? 's' : ''}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="text-sm font-bold text-slate-800">R$ {fmtCurrency(item.total)}</p>
+                                  <p className="text-[11px] text-slate-500">Total</p>
+                                </div>
+                              </button>
+
+                              {isOpen && (
+                                <div className="mt-3 space-y-1 border-t border-slate-100 pt-2">
+                                  {item.transactions.map((tx) => (
+                                    <div key={tx.label} className="flex items-center justify-between gap-3 text-xs">
+                                      <div className="min-w-0 text-slate-600">
+                                        <span className="font-medium text-slate-700">{tx.label}</span>
+                                        <span className="text-slate-400"> · {tx.count}</span>
+                                      </div>
+                                      <div className="font-mono text-slate-700 shrink-0">R$ {fmtCurrency(tx.total)}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  </div>
                 </div>
               )}
               <div
