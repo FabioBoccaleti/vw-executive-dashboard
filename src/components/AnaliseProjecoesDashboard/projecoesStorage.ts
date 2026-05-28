@@ -147,7 +147,10 @@ export async function loadBudgetVw(year: number, month: number): Promise<BudgetV
 
 export async function saveBudgetVw(row: BudgetVwRow): Promise<void> {
   const [yr, mo] = row.periodo.split('-').map(Number);
-  await kvSet(keyVw(yr, mo), recalculateBudgetVwRow(row));
+  const success = await kvSet(keyVw(yr, mo), recalculateBudgetVwRow(row));
+  if (!success) {
+    throw new Error('Falha ao salvar budget VW');
+  }
 }
 
 export async function loadBudgetAudi(year: number, month: number): Promise<BudgetAudiRow | null> {
@@ -156,7 +159,10 @@ export async function loadBudgetAudi(year: number, month: number): Promise<Budge
 
 export async function saveBudgetAudi(row: BudgetAudiRow): Promise<void> {
   const [yr, mo] = row.periodo.split('-').map(Number);
-  await kvSet(keyAudi(yr, mo), recalculateBudgetAudiRow(row));
+  const success = await kvSet(keyAudi(yr, mo), recalculateBudgetAudiRow(row));
+  if (!success) {
+    throw new Error('Falha ao salvar budget Audi');
+  }
 }
 
 export async function loadAllBudgetVw(year: number): Promise<(BudgetVwRow | null)[]> {
