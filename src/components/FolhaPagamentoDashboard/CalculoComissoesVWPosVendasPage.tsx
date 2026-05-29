@@ -1816,6 +1816,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const headerAbbrev: Record<string, string> = {
         'Bônus produtividade': 'Bônus prod.',
         'Bônus Adicional': 'Bônus adic.',
+        'Participação no resultado': 'Partic. resultado',
         'Total remuneração': 'Tot. rem.',
       };
       Array.from(table.querySelectorAll('thead th')).forEach((th) => {
@@ -1826,7 +1827,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const tbodyRows = Array.from(table.tBodies?.[0]?.rows ?? []);
       if (tbodyRows.length === 0) return;
 
-      const remuneracaoCols = [5, 6, 7, 8, 9, 10, 11];
+      const remuneracaoCols = [5, 6, 7, 8, 9, 10, 11, 12];
       const colsToHide = new Set<number>();
 
       remuneracaoCols.forEach((colIndex) => {
@@ -1838,7 +1839,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       });
 
       // Total remuneracao deve permanecer sempre visivel para evitar ambiguidades no rodape.
-      colsToHide.delete(11);
+      colsToHide.delete(12);
 
       if (colsToHide.size === 0) return;
 
@@ -1859,9 +1860,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         8: 6,
         9: 7,
         10: 6,
-        11: 12,
+        11: 6,
+        12: 12,
       };
-      const visibleCols = Array.from({ length: 11 }, (_, i) => i + 1).filter((col) => !colsToHide.has(col));
+      const visibleCols = Array.from({ length: 12 }, (_, i) => i + 1).filter((col) => !colsToHide.has(col));
       const visibleWeight = visibleCols.reduce((sum, col) => sum + (widthWeightByCol[col] ?? 1), 0);
       visibleCols.forEach((colIndex) => {
         const col = colgroupCols[colIndex - 1];
@@ -1889,6 +1891,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
           9: 5,
           10: 6,
           11: 7,
+          12: 8,
         };
         colsToHide.forEach((colIndex) => {
           const cellIndex = tfootCellByLogicalCol[colIndex];
@@ -1928,7 +1931,8 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       if (colsToHide.has(5)) removeRow1ByLabel('Salário Fixo');
       if (colsToHide.has(9)) removeRow1ByLabel('Bônus produtividade');
       if (colsToHide.has(10)) removeRow1ByLabel('Bônus Adicional');
-      if (colsToHide.has(11)) removeRow1ByLabel('Total remuneração');
+      if (colsToHide.has(11)) removeRow1ByLabel('Participação no resultado');
+      if (colsToHide.has(12)) removeRow1ByLabel('Total remuneração');
 
       const comCell = Array.from(row1.cells).find((c) => c.textContent?.includes('Comissões'));
       if (comCell) {
@@ -2921,6 +2925,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         <col className="w-[90px]" />
                         <col className="w-[90px]" />
                         <col className="w-[90px]" />
+                        <col className="w-[90px]" />
                         <col className="w-[110px]" />
                       </colgroup>
                       <thead className="bg-slate-800 text-white sticky top-0 z-10">
@@ -2932,6 +2937,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <th colSpan={3} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Comissões</th>
                           <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus produtividade</th>
                           <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus Adicional</th>
+                          <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Participação no resultado</th>
                           <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap">Total remuneração</th>
                         </tr>
                         <tr>
@@ -2960,6 +2966,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
                               <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{bonusProdutividade > 0 ? `R$ ${fmtCurrency(bonusProdutividade)}` : ''}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
                               <td className="px-3 py-2 text-center whitespace-nowrap font-mono font-semibold bg-violet-100/80">{totalRemuneracao > 0 ? `R$ ${fmtCurrency(totalRemuneracao)}` : ''}</td>
                             </tr>
                           );
@@ -2973,6 +2980,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                           <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.bonusProdutividade)}</td>
+                          <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                           <td className="px-3 py-2 text-center font-mono font-bold whitespace-nowrap bg-violet-200/90">R$ {fmtCurrency(demonstrativoTotais.totalRemuneracao)}</td>
                         </tr>
@@ -3010,6 +3018,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                             <col className="w-[90px]" />
                             <col className="w-[90px]" />
                             <col className="w-[90px]" />
+                            <col className="w-[90px]" />
                             <col className="w-[110px]" />
                           </colgroup>
                           <thead className="bg-slate-800 text-white">
@@ -3021,6 +3030,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                               <th colSpan={3} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Comissões</th>
                               <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus produtividade</th>
                               <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus Adicional</th>
+                              <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Participação no resultado</th>
                               <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap">Total remuneração</th>
                             </tr>
                             <tr>
@@ -3049,6 +3059,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                                   <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
                                   <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{bonusProdutividade > 0 ? `R$ ${fmtCurrency(bonusProdutividade)}` : ''}</td>
                                   <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
                                   <td className="px-3 py-2 text-center whitespace-nowrap font-mono font-semibold bg-violet-100/80">{totalRemuneracao > 0 ? `R$ ${fmtCurrency(totalRemuneracao)}` : ''}</td>
                                 </tr>
                               );
@@ -3062,6 +3073,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                               <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(totais.bonusProdutividade)}</td>
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                               <td className="px-3 py-2 text-center font-mono font-bold whitespace-nowrap bg-violet-200/90">R$ {fmtCurrency(totais.totalRemuneracao)}</td>
                             </tr>
