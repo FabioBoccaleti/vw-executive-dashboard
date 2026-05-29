@@ -70,6 +70,7 @@ const OV_KEY = 'vendas_pecas_vendas_ov';
 const MECANICOS_KEY = 'calculo_comissoes_vw_pos_vendas_mecanicos';
 
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const MONTHS_FULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const UNLOCK_PASSWORD = '1985';
 
 function toIsoDate(value: Date): string {
@@ -539,16 +540,12 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [mainTab, setMainTab] = useState<MainTab>('vendas');
   const [vendasSubTab, setVendasSubTab] = useState<VendasSubTab>('pecas');
   const [demonstrativoSubTab, setDemonstrativoSubTab] = useState<DemonstrativoSubTab>('pecas');
-  const [demonstrativoFilters, setDemonstrativoFilters] = useState<Record<DemonstrativoSubTab, { year: number; month: number | null }>>(() => {
+  const [demonstrativoFilter, setDemonstrativoFilterState] = useState<{ year: number; month: number | null }>(() => {
     const year = new Date().getFullYear();
     const month = new Date().getMonth() + 1;
-    return {
-      pecas: { year, month },
-      oficina: { year, month },
-      funilaria: { year, month },
-      acessorios: { year, month },
-    };
+    return { year, month };
   });
+  const [demonstrativoPrintMode, setDemonstrativoPrintMode] = useState<'atual' | 'todos'>('atual');
   const [allRows, setAllRows] = useState<VPecasRow[]>([]);
   const [allPecasRows, setAllPecasRows] = useState<VPecasRow[]>([]);
   const [taxaMLRows, setTaxaMLRows] = useState<TaxaMLRow[]>([]);
@@ -1708,46 +1705,63 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     return true;
   }), [mecanicosRows, mecanicosFilterYear, mecanicosFilterMonth]);
 
-  const demonstrativoFilter = demonstrativoFilters[demonstrativoSubTab];
-  const demonstrativoRemuneracoesAtivas = useMemo(() => {
+  const demonstrativoRemuneracoesValidas = useMemo(() => {
     return calculoRemuneracoes
       .filter((item) => item.ativo)
-      .filter((item) => item.departamentoColaborador === demonstrativoSubTab)
-      .filter((item) => parsePeriodoKey(item.periodo) !== null)
-      .sort((a, b) => a.vendedor.localeCompare(b.vendedor, 'pt-BR', { sensitivity: 'base' }));
-  }, [calculoRemuneracoes, demonstrativoSubTab]);
+      .filter((item) => parsePeriodoKey(item.periodo) !== null);
+  }, [calculoRemuneracoes]);
 
   const demonstrativoAvailableYears = useMemo(() => {
     const years = new Set<number>();
-    demonstrativoRemuneracoesAtivas.forEach((item) => {
+    demonstrativoRemuneracoesValidas.forEach((item) => {
       const period = parsePeriodoKey(item.periodo);
       if (period) years.add(period.year);
     });
     const current = new Date().getFullYear();
     [current - 1, current, current + 1].forEach((year) => years.add(year));
     return [...years].sort();
-  }, [demonstrativoRemuneracoesAtivas]);
+  }, [demonstrativoRemuneracoesValidas]);
 
   const demonstrativoMonthCounts = useMemo(() => {
     const counts: Record<number, number> = {};
-    demonstrativoRemuneracoesAtivas.forEach((item) => {
+    demonstrativoRemuneracoesValidas.forEach((item) => {
       const period = parsePeriodoKey(item.periodo);
       if (!period || period.year !== demonstrativoFilter.year) return;
       counts[period.month] = (counts[period.month] || 0) + 1;
     });
     return counts;
-  }, [demonstrativoRemuneracoesAtivas, demonstrativoFilter.year]);
+  }, [demonstrativoRemuneracoesValidas, demonstrativoFilter.year]);
 
-  const demonstrativoFilteredRows = useMemo(() => demonstrativoRemuneracoesAtivas.filter((item) => {
-    const period = parsePeriodoKey(item.periodo);
-    if (!period) return false;
-    if (period.year !== demonstrativoFilter.year) return false;
-    if (demonstrativoFilter.month !== null && period.month !== demonstrativoFilter.month) return false;
-    return true;
-  }), [demonstrativoRemuneracoesAtivas, demonstrativoFilter.year, demonstrativoFilter.month]);
+  const demonstrativoRowsByTab = useMemo<Record<DemonstrativoSubTab, CalculoPosVendasRemuneracao[]>>(() => {
+    const grouped: Record<DemonstrativoSubTab, CalculoPosVendasRemuneracao[]> = {
+      pecas: [],
+      oficina: [],
+      funilaria: [],
+      acessorios: [],
+    };
 
-  const demonstrativoTotais = useMemo(() => {
-    return demonstrativoFilteredRows.reduce((acc, item) => {
+    demonstrativoRemuneracoesValidas.forEach((item) => {
+      const period = parsePeriodoKey(item.periodo);
+      if (!period) return;
+      if (period.year !== demonstrativoFilter.year) return;
+      if (demonstrativoFilter.month !== null && period.month !== demonstrativoFilter.month) return;
+      const dep = item.departamentoColaborador;
+      if (dep === 'pecas' || dep === 'oficina' || dep === 'funilaria' || dep === 'acessorios') {
+        grouped[dep].push(item);
+      }
+    });
+
+    (Object.keys(grouped) as DemonstrativoSubTab[]).forEach((dep) => {
+      grouped[dep].sort((a, b) => a.vendedor.localeCompare(b.vendedor, 'pt-BR', { sensitivity: 'base' }));
+    });
+
+    return grouped;
+  }, [demonstrativoRemuneracoesValidas, demonstrativoFilter.year, demonstrativoFilter.month]);
+
+  const demonstrativoFilteredRows = demonstrativoRowsByTab[demonstrativoSubTab];
+
+  function calcDemonstrativoTotais(rows: CalculoPosVendasRemuneracao[]) {
+    return rows.reduce((acc, item) => {
       const salarioFixo = parseDecimal(item.salarioFixo ?? '');
       const bonusProdutividade = parseDecimal(item.bonusProdutividade ?? '');
       acc.salarioFixo += salarioFixo;
@@ -1759,7 +1773,241 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       bonusProdutividade: 0,
       totalRemuneracao: 0,
     });
+  }
+
+  const demonstrativoTotais = useMemo(() => {
+    return calcDemonstrativoTotais(demonstrativoFilteredRows);
   }, [demonstrativoFilteredRows]);
+
+  const demonstrativoTotaisByTab = useMemo<Record<DemonstrativoSubTab, { salarioFixo: number; bonusProdutividade: number; totalRemuneracao: number }>>(() => {
+    return {
+      pecas: calcDemonstrativoTotais(demonstrativoRowsByTab.pecas),
+      oficina: calcDemonstrativoTotais(demonstrativoRowsByTab.oficina),
+      funilaria: calcDemonstrativoTotais(demonstrativoRowsByTab.funilaria),
+      acessorios: calcDemonstrativoTotais(demonstrativoRowsByTab.acessorios),
+    };
+  }, [demonstrativoRowsByTab]);
+
+  const demonstrativoTabsComDados = useMemo(() => {
+    return DEMONSTRATIVO_SUB_TABS.filter((tab) => demonstrativoRowsByTab[tab.id].length > 0);
+  }, [demonstrativoRowsByTab]);
+
+  function isPrintValueEmptyOrZero(text: string): boolean {
+    const raw = String(text ?? '').trim();
+    if (!raw) return true;
+    const cleaned = raw
+      .replace(/\s+/g, '')
+      .replace(/R\$/g, '')
+      .replace(/\./g, '')
+      .replace(',', '.');
+    const n = Number(cleaned);
+    if (Number.isNaN(n)) return false;
+    return n === 0;
+  }
+
+  function hidePrintRemuneracaoColumns(container: HTMLElement) {
+    const tables = Array.from(container.querySelectorAll('table'));
+
+    tables.forEach((table) => {
+      table.classList.remove('table-fixed');
+      table.style.tableLayout = 'fixed';
+      table.style.width = '100%';
+
+      const headerAbbrev: Record<string, string> = {
+        'Bônus produtividade': 'Bônus prod.',
+        'Bônus Adicional': 'Bônus adic.',
+        'Total remuneração': 'Tot. rem.',
+      };
+      Array.from(table.querySelectorAll('thead th')).forEach((th) => {
+        const text = th.textContent?.trim() ?? '';
+        if (headerAbbrev[text]) th.textContent = headerAbbrev[text];
+      });
+
+      const tbodyRows = Array.from(table.tBodies?.[0]?.rows ?? []);
+      if (tbodyRows.length === 0) return;
+
+      const remuneracaoCols = [5, 6, 7, 8, 9, 10, 11];
+      const colsToHide = new Set<number>();
+
+      remuneracaoCols.forEach((colIndex) => {
+        const emptyAll = tbodyRows.every((row) => {
+          const value = row.cells[colIndex - 1]?.textContent ?? '';
+          return isPrintValueEmptyOrZero(value);
+        });
+        if (emptyAll) colsToHide.add(colIndex);
+      });
+
+      // Total remuneracao deve permanecer sempre visivel para evitar ambiguidades no rodape.
+      colsToHide.delete(11);
+
+      if (colsToHide.size === 0) return;
+
+      const colgroupCols = Array.from(table.querySelectorAll('colgroup col'));
+      colsToHide.forEach((colIndex) => {
+        const col = colgroupCols[colIndex - 1];
+        if (col) col.style.display = 'none';
+      });
+
+      const widthWeightByCol: Record<number, number> = {
+        1: 22,
+        2: 12,
+        3: 8,
+        4: 8,
+        5: 8,
+        6: 6,
+        7: 6,
+        8: 6,
+        9: 7,
+        10: 6,
+        11: 12,
+      };
+      const visibleCols = Array.from({ length: 11 }, (_, i) => i + 1).filter((col) => !colsToHide.has(col));
+      const visibleWeight = visibleCols.reduce((sum, col) => sum + (widthWeightByCol[col] ?? 1), 0);
+      visibleCols.forEach((colIndex) => {
+        const col = colgroupCols[colIndex - 1];
+        if (!col) return;
+        const pct = ((widthWeightByCol[colIndex] ?? 1) / visibleWeight) * 100;
+        col.style.width = `${pct.toFixed(2)}%`;
+      });
+
+      Array.from(table.tBodies).forEach((tbody) => {
+        Array.from(tbody.rows).forEach((row) => {
+          colsToHide.forEach((colIndex) => {
+            const cell = row.cells[colIndex - 1];
+            if (cell) cell.style.display = 'none';
+          });
+        });
+      });
+
+      const tfootRow = table.tFoot?.rows?.[0];
+      if (tfootRow) {
+        const tfootCellByLogicalCol: Partial<Record<number, number>> = {
+          5: 1,
+          6: 2,
+          7: 3,
+          8: 4,
+          9: 5,
+          10: 6,
+          11: 7,
+        };
+        colsToHide.forEach((colIndex) => {
+          const cellIndex = tfootCellByLogicalCol[colIndex];
+          if (cellIndex === undefined) return;
+          const cell = tfootRow.cells[cellIndex];
+          if (cell) cell.style.display = 'none';
+        });
+      }
+
+      const theadRows = Array.from(table.tHead?.rows ?? []);
+      const row1 = theadRows[0];
+      const row2 = theadRows[1];
+      if (!row1 || !row2) return;
+
+      const comSubHeaderMap: Array<{ col: number; row2Index: number }> = [
+        { col: 8, row2Index: 4 },
+        { col: 7, row2Index: 3 },
+        { col: 6, row2Index: 2 },
+      ];
+
+      comSubHeaderMap.forEach(({ col, row2Index }) => {
+        if (colsToHide.has(col)) {
+          const cell = row2.cells[row2Index];
+          if (cell) cell.style.display = 'none';
+        }
+      });
+
+      const removeRow1ByLabel = (label: string) => {
+        const abbrev = headerAbbrev[label];
+        const cell = Array.from(row1.cells).find((c) => {
+          const text = c.textContent?.trim() ?? '';
+          return text.includes(label) || (abbrev ? text.includes(abbrev) : false);
+        });
+        if (cell) cell.style.display = 'none';
+      };
+
+      if (colsToHide.has(5)) removeRow1ByLabel('Salário Fixo');
+      if (colsToHide.has(9)) removeRow1ByLabel('Bônus produtividade');
+      if (colsToHide.has(10)) removeRow1ByLabel('Bônus Adicional');
+      if (colsToHide.has(11)) removeRow1ByLabel('Total remuneração');
+
+      const comCell = Array.from(row1.cells).find((c) => c.textContent?.includes('Comissões'));
+      if (comCell) {
+        const visibleComCols = [6, 7, 8].filter((col) => !colsToHide.has(col)).length;
+        if (visibleComCols === 0) {
+          comCell.style.display = 'none';
+        } else {
+          comCell.colSpan = visibleComCols;
+        }
+      }
+
+      const totaisLabelCell = table.tFoot?.rows?.[0]?.cells?.[0];
+      if (totaisLabelCell) {
+        const visibleBeforeSalario = [1, 2, 3, 4].filter((col) => !colsToHide.has(col)).length;
+        totaisLabelCell.colSpan = Math.max(1, visibleBeforeSalario);
+      }
+    });
+  }
+
+  function printFromElement(elementId: string) {
+    const area = document.getElementById(elementId);
+    const root = document.getElementById('print-root');
+    if (!area || !root) {
+      window.print();
+      return;
+    }
+
+    const clone = area.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('.no-print').forEach((el) => el.remove());
+    hidePrintRemuneracaoColumns(clone);
+    root.innerHTML = `<div style="font-family:Inter,system-ui,sans-serif;">${clone.outerHTML}</div>`;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      @page { size: A4 landscape; margin: 0.8cm 0.7cm; }
+      #print-root, #print-root * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        forced-color-adjust: none !important;
+        color-scheme: light !important;
+      }
+      #print-root table {
+        width: 100% !important;
+        table-layout: fixed !important;
+      }
+      #print-root table th {
+        white-space: normal !important;
+        line-height: 1.1 !important;
+        font-size: 8px !important;
+        padding: 4px 5px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      #print-root table td {
+        font-size: 9px !important;
+        padding: 4px 5px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      #print-root table th:nth-child(1),
+      #print-root table th:nth-child(2),
+      #print-root table td:nth-child(1),
+      #print-root table td:nth-child(2) {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      #print-root .sticky-col { position: static !important; }
+    `;
+    document.head.appendChild(style);
+
+    const cleanup = () => {
+      document.head.removeChild(style);
+      root.innerHTML = '';
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+  }
 
   const demonstrativoKpis = useMemo(() => {
     const colaboradores = demonstrativoFilteredRows.length;
@@ -1776,18 +2024,32 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       toast.warning('Selecione um mês para imprimir o demonstrativo da sub-aba atual.');
       return;
     }
-    window.print();
+    setDemonstrativoPrintMode('atual');
+    setTimeout(() => printFromElement('demonstrativo-print-current-content'), 0);
   }
 
-  function setDemonstrativoFilter(tab: DemonstrativoSubTab, patch: Partial<{ year: number; month: number | null }>) {
-    setDemonstrativoFilters((prev) => ({
-      ...prev,
-      [tab]: {
-        ...prev[tab],
-        ...patch,
-      },
-    }));
+  function printDemonstrativoTodos() {
+    if (demonstrativoFilter.month === null) {
+      toast.warning('Selecione um mês para imprimir os demonstrativos.');
+      return;
+    }
+    if (demonstrativoTabsComDados.length === 0) {
+      toast.warning('Não há demonstrativos com dados para imprimir nesta competência.');
+      return;
+    }
+    setDemonstrativoPrintMode('todos');
+    setTimeout(() => printFromElement('demonstrativo-print-all-content'), 0);
   }
+
+  function setDemonstrativoFilter(patch: Partial<{ year: number; month: number | null }>) {
+    setDemonstrativoFilterState((prev) => ({ ...prev, ...patch }));
+  }
+
+  useEffect(() => {
+    const handleAfterPrint = () => setDemonstrativoPrintMode('atual');
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
+  }, []);
 
   async function persistMecanicosStore(nextRows: VPecasItemRow[], nextColumns: string[]) {
     await kvSet(MECANICOS_KEY, { columns: nextColumns, rows: nextRows });
@@ -1884,12 +2146,16 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   }, [vendasSubTab, filteredPecasRows.length]);
 
   return (
-    <div className="h-screen bg-slate-100 flex flex-col overflow-hidden">
+    <div className="h-screen bg-slate-100 flex flex-col overflow-hidden" data-print-mode={demonstrativoPrintMode}>
         <style>{`.sticky-col { position: sticky; z-index: 6; }
+      .print-only-all { display: none; }
       @media print {
   .no-print { display: none !important; }
   .print-surface { border: none !important; box-shadow: none !important; }
   .print-preserve { overflow: visible !important; }
+  [data-print-mode="todos"] .print-hide-when-all { display: none !important; }
+  [data-print-mode="todos"] .print-only-all { display: block !important; }
+  .print-page-break { break-before: page; }
       .sticky-col { position: static !important; }
   body { background: #fff !important; }
 }`}</style>
@@ -2527,72 +2793,81 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
           </div>
         ) : mainTab === 'demonstrativo' ? (
           <>
-            <div className="no-print bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
-              {DEMONSTRATIVO_SUB_TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setDemonstrativoSubTab(tab.id)}
-                  className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
-                    demonstrativoSubTab === tab.id
-                      ? 'border-blue-600 text-blue-700'
-                      : 'border-transparent text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="no-print bg-white border-b border-slate-200 px-6 py-3 space-y-3 flex-shrink-0">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 overflow-x-auto">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold whitespace-nowrap">
+                    ANO
+                    <select
+                      value={demonstrativoFilter.year}
+                      onChange={(e) => setDemonstrativoFilter({ year: Number(e.target.value) })}
+                      className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    >
+                      {demonstrativoAvailableYears.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setDemonstrativoFilter({ month: null })}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                        demonstrativoFilter.month === null ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+                      }`}
+                    >
+                      Ano todo
+                    </button>
+                    {MONTHS.map((month, index) => (
+                      <button
+                        key={month}
+                        onClick={() => setDemonstrativoFilter({ month: index + 1 })}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                          demonstrativoFilter.month === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+                        } ${demonstrativoMonthCounts[index + 1] ? 'font-semibold' : ''}`}
+                      >
+                        {month}
+                        {demonstrativoMonthCounts[index + 1] ? (
+                          <span className="ml-0.5 text-[10px] opacity-70">({demonstrativoMonthCounts[index + 1]})</span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <span className="text-xs text-slate-400 whitespace-nowrap">
+                  {demonstrativoFilteredRows.length} registro{demonstrativoFilteredRows.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              <div className="flex gap-0 overflow-x-auto">
+                {DEMONSTRATIVO_SUB_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setDemonstrativoSubTab(tab.id)}
+                    className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                      demonstrativoSubTab === tab.id
+                        ? 'border-blue-600 text-blue-700'
+                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="flex-1 p-6" style={{ minHeight: 0 }}>
-              <div className="h-full bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col print-surface print-preserve">
-                <div className="no-print bg-white border-b border-slate-100 px-4 py-3 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 overflow-x-auto">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold whitespace-nowrap">
-                        ANO
-                        <select
-                          value={demonstrativoFilter.year}
-                          onChange={(e) => setDemonstrativoFilter(demonstrativoSubTab, { year: Number(e.target.value) })}
-                          className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-                        >
-                          {demonstrativoAvailableYears.map((year) => (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setDemonstrativoFilter(demonstrativoSubTab, { month: null })}
-                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                            demonstrativoFilter.month === null ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
-                          }`}
-                        >
-                          Ano todo
-                        </button>
-                        {MONTHS.map((month, index) => (
-                          <button
-                            key={month}
-                            onClick={() => setDemonstrativoFilter(demonstrativoSubTab, { month: index + 1 })}
-                            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                              demonstrativoFilter.month === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
-                            } ${demonstrativoMonthCounts[index + 1] ? 'font-semibold' : ''}`}
-                          >
-                            {month}
-                            {demonstrativoMonthCounts[index + 1] ? (
-                              <span className="ml-0.5 text-[10px] opacity-70">({demonstrativoMonthCounts[index + 1]})</span>
-                            ) : null}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <span className="text-xs text-slate-400 whitespace-nowrap">
-                      {demonstrativoFilteredRows.length} registro{demonstrativoFilteredRows.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                </div>
+              <div className="no-print mb-3 flex items-center justify-end gap-2">
+                <Button type="button" variant="outline" onClick={printDemonstrativoAtual}>
+                  Imprimir PDF
+                </Button>
+                <Button type="button" variant="outline" onClick={printDemonstrativoTodos} disabled={demonstrativoTabsComDados.length === 0}>
+                  Imprimir todos com dados
+                </Button>
+              </div>
 
+              <div id="demonstrativo-print-current-content" className="h-full bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col print-surface print-preserve print-hide-when-all">
                 <div className="border-b border-slate-100 px-4 py-4 space-y-3">
                   <div className="rounded-xl bg-slate-900 px-4 py-4 text-white flex items-start justify-between gap-4">
                     <div>
@@ -2602,7 +2877,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                     </div>
                     <div className="text-right">
                       <p className="text-[11px] uppercase tracking-wider text-slate-300">Competência</p>
-                      <p className="text-2xl font-bold leading-tight">{demonstrativoFilter.month === null ? 'Ano todo' : MONTHS[demonstrativoFilter.month - 1]}</p>
+                      <p className="text-2xl font-bold leading-tight">{demonstrativoFilter.month === null ? 'Ano todo' : MONTHS_FULL[demonstrativoFilter.month - 1]}</p>
                       <p className="text-xs text-slate-300">{demonstrativoFilter.year}</p>
                     </div>
                   </div>
@@ -2626,11 +2901,6 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                     </div>
                   </div>
 
-                  <div className="no-print flex items-center justify-end">
-                    <Button type="button" variant="outline" onClick={printDemonstrativoAtual}>
-                      Imprimir sub-aba atual
-                    </Button>
-                  </div>
                 </div>
 
                 <div className="flex-1 overflow-auto print-preserve">
@@ -2713,6 +2983,94 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
                 <div className="border-t border-slate-100 px-4 py-2 text-[11px] text-slate-500">
                   Layout inicial do demonstrativo. Valores serão alimentados na próxima etapa.
+                </div>
+              </div>
+
+              <div className="print-only-all">
+                <div id="demonstrativo-print-all-content">
+                {demonstrativoTabsComDados.map((tab, tabIndex) => {
+                  const rows = demonstrativoRowsByTab[tab.id];
+                  const totais = demonstrativoTotaisByTab[tab.id];
+                  return (
+                    <div key={tab.id} className={`bg-white border border-slate-200 rounded-lg overflow-hidden print-surface ${tabIndex > 0 ? 'print-page-break mt-6' : ''}`}>
+                      <div className="border-b border-slate-100 px-4 py-3">
+                        <p className="text-sm font-bold text-slate-800">Demonstrativo de pagamento - {tab.label}</p>
+                        <p className="text-xs text-slate-500">Competência {MONTHS_FULL[(demonstrativoFilter.month ?? 1) - 1]}/{demonstrativoFilter.year}</p>
+                      </div>
+                      <div className="overflow-visible">
+                        <table className="w-full table-fixed text-xs text-slate-700">
+                          <colgroup>
+                            <col className="w-[220px]" />
+                            <col className="w-[110px]" />
+                            <col className="w-[70px]" />
+                            <col className="w-[90px]" />
+                            <col className="w-[90px]" />
+                            <col className="w-[90px]" />
+                            <col className="w-[90px]" />
+                            <col className="w-[90px]" />
+                            <col className="w-[90px]" />
+                            <col className="w-[90px]" />
+                            <col className="w-[110px]" />
+                          </colgroup>
+                          <thead className="bg-slate-800 text-white">
+                            <tr>
+                              <th rowSpan={2} className="px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700">Nome vendedor</th>
+                              <th rowSpan={2} className="px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700">Cargo</th>
+                              <th colSpan={2} className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Produção</th>
+                              <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Salário Fixo</th>
+                              <th colSpan={3} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Comissões</th>
+                              <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus produtividade</th>
+                              <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus Adicional</th>
+                              <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap">Total remuneração</th>
+                            </tr>
+                            <tr>
+                              <th className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Peças</th>
+                              <th className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Mão de Obra</th>
+                              <th className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Peças</th>
+                              <th className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Acessórios</th>
+                              <th className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Mão de obra</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rows.map((item, index) => {
+                              const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+                              const salarioFixo = parseDecimal(item.salarioFixo ?? '');
+                              const bonusProdutividade = parseDecimal(item.bonusProdutividade ?? '');
+                              const totalRemuneracao = salarioFixo + bonusProdutividade;
+                              return (
+                                <tr key={`${tab.id}-${item.id}-${index}`} className={`${rowBg} border-t border-slate-100`}>
+                                  <td className={`px-3 py-2 text-center whitespace-nowrap font-semibold text-slate-800 ${rowBg}`}>{item.vendedor}</td>
+                                  <td className={`px-3 py-2 text-center whitespace-nowrap text-slate-700 ${rowBg}`}>{item.cargoColaborador || ''}</td>
+                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
+                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
+                                  <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{salarioFixo > 0 ? `R$ ${fmtCurrency(salarioFixo)}` : ''}</td>
+                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                                  <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{bonusProdutividade > 0 ? `R$ ${fmtCurrency(bonusProdutividade)}` : ''}</td>
+                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                                  <td className="px-3 py-2 text-center whitespace-nowrap font-mono font-semibold bg-violet-100/80">{totalRemuneracao > 0 ? `R$ ${fmtCurrency(totalRemuneracao)}` : ''}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot className="bg-slate-200 text-slate-900">
+                            <tr className="border-t-2 border-slate-300">
+                              <td colSpan={4} className="px-3 py-2 text-center font-semibold whitespace-nowrap">Totais</td>
+                              <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(totais.salarioFixo)}</td>
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
+                              <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(totais.bonusProdutividade)}</td>
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
+                              <td className="px-3 py-2 text-center font-mono font-bold whitespace-nowrap bg-violet-200/90">R$ {fmtCurrency(totais.totalRemuneracao)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
                 </div>
               </div>
             </div>
