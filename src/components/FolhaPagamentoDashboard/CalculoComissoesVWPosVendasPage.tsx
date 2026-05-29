@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Copy, Calculator, Check, Lock, LockOpen, Pencil, Save, TrendingUp, UserCheck, UserX, Wallet, X } from 'lucide-react';
+import { ChevronDown, Copy, Calculator, Check, Lock, LockOpen, Pencil, Save, Search, TrendingUp, UserCheck, UserX, Wallet, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { loadVPecasRows, loadVPecasDevolucaoRows, type VPecasRow } from '@/components/VendasBonificacoesDashboard/vPecasStorage';
@@ -88,6 +88,37 @@ function defaultApuracaoPeriodo(year: number, month: number): CalculoPosVendasPe
     ate: toIsoDate(last),
     bloqueado: false,
   };
+}
+
+function parseDateInput(value: string): Date | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    const [y, m, d] = raw.slice(0, 10).split('-').map(Number);
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+    return new Date(y, m - 1, d);
+  }
+  const normalized = raw.split(' ')[0];
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(normalized)) {
+    const [d, m, y] = normalized.split('/').map(Number);
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+    return new Date(y, m - 1, d);
+  }
+  return null;
+}
+
+function rowDateForCalculo(origem: string, data: Record<string, string>, fallbackPeriodo: { year: number; month: number } | null): Date | null {
+  const candidates = origem === 'Produto' || origem === 'Mecânicos'
+    ? [data['DTA_ENTRADA_SAIDA'], data['DATA'], data['DTA_DOCUMENTO']]
+    : [data['DTA_ENTRADA_SAIDA'], data['DTA_DOCUMENTO']];
+
+  for (const candidate of candidates) {
+    const parsed = parseDateInput(String(candidate ?? ''));
+    if (parsed) return parsed;
+  }
+
+  if (!fallbackPeriodo) return null;
+  return new Date(fallbackPeriodo.year, fallbackPeriodo.month - 1, 1);
 }
 
 const TABLE_TABS: VendasSubTab[] = ['pecas', 'oficina', 'funilaria', 'acessorios', 'produto'];
@@ -575,6 +606,8 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [calculoLoading, setCalculoLoading] = useState(true);
   const [calculoSaving, setCalculoSaving] = useState(false);
   const [calculoPeriodoSaving, setCalculoPeriodoSaving] = useState(false);
+  const [calculoBuscaPeriodo, setCalculoBuscaPeriodo] = useState<{ de: string; ate: string } | null>(null);
+  const [calculoBuscaAtiva, setCalculoBuscaAtiva] = useState(false);
   const [calculoModalOpen, setCalculoModalOpen] = useState(false);
   const [calculoDraft, setCalculoDraft] = useState<CalculoPosVendasRemuneracao | null>(null);
   const [cadastroVendedores, setCadastroVendedores] = useState<CadastroVendedor[]>([]);
@@ -1175,6 +1208,13 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const calculoPeriodo = calculoPeriodoKey(calculoYear, calculoMonth);
   const calculoPeriodoData = calculoPeriodos[calculoPeriodo] ?? defaultApuracaoPeriodo(calculoYear, calculoMonth);
   const calculoBloqueado = Boolean(calculoPeriodoData.bloqueado);
+  const calculoBuscaRange = useMemo(() => {
+    if (!calculoBuscaPeriodo?.de || !calculoBuscaPeriodo?.ate) return null;
+    const de = parseDateInput(calculoBuscaPeriodo.de);
+    const ate = parseDateInput(calculoBuscaPeriodo.ate);
+    if (!de || !ate) return null;
+    return { de, ate };
+  }, [calculoBuscaPeriodo]);
   const mecanicosSystemPeriodo = useMemo(() => {
     const now = new Date();
     return calculoPeriodoKey(now.getFullYear(), now.getMonth() + 1);
@@ -1249,11 +1289,15 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     });
 
     return rows.filter((row) => {
+      if (!calculoBuscaAtiva) return false;
       if (!row.periodo) return false;
-      if (row.origem === 'Mecânicos') return true;
-      return row.periodo.year === calculoYear && row.periodo.month === calculoMonth;
+      if (row.origem !== 'Mecânicos' && (row.periodo.year !== calculoYear || row.periodo.month !== calculoMonth)) return false;
+      if (!calculoBuscaRange) return true;
+      const date = rowDateForCalculo(row.origem, row.data, row.periodo);
+      if (!date) return false;
+      return date >= calculoBuscaRange.de && date <= calculoBuscaRange.ate;
     });
-  }, [allRows, produtoRows, mecanicosRows, calculoYear, calculoMonth]);
+  }, [allRows, produtoRows, mecanicosRows, calculoYear, calculoMonth, calculoBuscaRange, calculoBuscaAtiva]);
 
   const calculoVendors = useMemo<CalculoVendorCard[]>(() => {
     const map = new Map<string, { vendedor: string; registros: number; fontes: Set<string> }>();
@@ -1512,6 +1556,39 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       },
     }));
   }
+
+  function buscarCalculoPeriodo() {
+    const de = String(calculoPeriodoData.de ?? '').trim();
+    const ate = String(calculoPeriodoData.ate ?? '').trim();
+    if (!de || !ate) {
+      toast.warning('Informe as datas de início e fim para buscar.');
+      return;
+    }
+    const deDate = parseDateInput(de);
+    const ateDate = parseDateInput(ate);
+    if (!deDate || !ateDate) {
+      toast.warning('Datas inválidas no período de apuração.');
+      return;
+    }
+    if (deDate > ateDate) {
+      toast.warning('A data inicial não pode ser maior que a data final.');
+      return;
+    }
+    setCalculoBuscaAtiva(true);
+    setCalculoBuscaPeriodo({ de, ate });
+    toast.success('Busca aplicada para o período informado.');
+  }
+
+  function limparCalculoBusca() {
+    setCalculoBuscaPeriodo(null);
+    setCalculoBuscaAtiva(false);
+    toast.success('Busca limpa.');
+  }
+
+  useEffect(() => {
+    setCalculoBuscaPeriodo(null);
+    setCalculoBuscaAtiva(false);
+  }, [calculoYear, calculoMonth]);
 
   async function saveCalculoPeriodo() {
     const payload = {
@@ -2299,30 +2376,50 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                 </div>
 
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <label className="text-xs font-semibold text-slate-600">
-                        Período de apuração - De
-                        <input
-                          type="date"
-                          value={calculoPeriodoData.de}
-                          onChange={(e) => updateCalculoPeriodoField('de', e.target.value)}
-                          disabled={calculoBloqueado}
-                          className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:cursor-not-allowed disabled:bg-slate-100"
-                        />
-                      </label>
-                      <label className="text-xs font-semibold text-slate-600">
-                        Período de apuração - Até
-                        <input
-                          type="date"
-                          value={calculoPeriodoData.ate}
-                          onChange={(e) => updateCalculoPeriodoField('ate', e.target.value)}
-                          disabled={calculoBloqueado}
-                          className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:cursor-not-allowed disabled:bg-slate-100"
-                        />
-                      </label>
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:flex-wrap">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="text-xs font-semibold text-slate-600">
+                          Período de apuração - De
+                          <input
+                            type="date"
+                            value={calculoPeriodoData.de}
+                            onChange={(e) => updateCalculoPeriodoField('de', e.target.value)}
+                            disabled={calculoBloqueado}
+                            className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+                          />
+                        </label>
+                        <label className="text-xs font-semibold text-slate-600">
+                          Período de apuração - Até
+                          <input
+                            type="date"
+                            value={calculoPeriodoData.ate}
+                            onChange={(e) => updateCalculoPeriodoField('ate', e.target.value)}
+                            disabled={calculoBloqueado}
+                            className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:cursor-not-allowed disabled:bg-slate-100"
+                          />
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={buscarCalculoPeriodo}
+                        >
+                          <Search className="mr-1 h-4 w-4" />
+                          Buscar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={limparCalculoBusca}
+                          disabled={!calculoBuscaAtiva}
+                        >
+                          Limpar
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Button
                         type="button"
                         variant="outline"
@@ -2357,6 +2454,11 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       ? 'Competência bloqueada: edição e status de remuneração ficam indisponíveis.'
                       : 'Defina o período de apuração antes de cadastrar as remunerações.'}
                   </p>
+                  {calculoBuscaPeriodo && (
+                    <p className="mt-1 text-xs text-blue-600">
+                      Busca aplicada: {calculoBuscaPeriodo.de} até {calculoBuscaPeriodo.ate}.
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-0.5 w-fit">
@@ -2386,6 +2488,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
               <div className="flex-1 overflow-auto">
                 {calculoLoading ? (
                   <div className="flex h-full items-center justify-center text-slate-400 text-sm px-6 text-center">Carregando dados do cadastro...</div>
+                ) : !calculoBuscaAtiva ? (
+                  <div className="flex h-full items-center justify-center text-slate-400 text-sm px-6 text-center">
+                    Defina o período e clique em Buscar para carregar os dados.
+                  </div>
                 ) : (calculoAba === 'cadastrados' ? calculoRegistered : calculoPending).length === 0 ? (
                   <div className="flex h-full items-center justify-center text-slate-400 text-sm px-6 text-center">
                     Nenhum vendedor encontrado para esta visão.

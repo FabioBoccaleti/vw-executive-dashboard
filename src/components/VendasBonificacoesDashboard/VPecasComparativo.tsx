@@ -37,16 +37,20 @@ const n = (v?: string | null) => parseFloat(String(v ?? '').replace(',', '.')) |
 const fmtBRL  = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 const fmtPct  = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
 
+function getPecasDataVenda(d: Record<string, string>): string {
+  return (d['DTA_ENTRADA_SAIDA'] ?? '').trim() || (d['DTA_DOCUMENTO'] ?? '').trim();
+}
+
 function getYr(row: VPecasRow): number {
   if (row.periodoImport) { const [y] = row.periodoImport.split('-').map(Number); if (y > 2000) return y; }
-  const d = row.data['DTA_DOCUMENTO'] ?? '';
+  const d = getPecasDataVenda(row.data);
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[2];
   if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[0];
   return 0;
 }
 function getMo(row: VPecasRow): number {
   if (row.periodoImport) { const [,m] = row.periodoImport.split('-').map(Number); if (m >= 1 && m <= 12) return m; }
-  const d = row.data['DTA_DOCUMENTO'] ?? '';
+  const d = getPecasDataVenda(row.data);
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[1];
   if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[1];
   return 0;

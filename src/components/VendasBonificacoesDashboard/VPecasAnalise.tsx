@@ -72,22 +72,26 @@ const fmtBRLF = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', cu
 const fmtPct  = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
 
 // ─── Período ──────────────────────────────────────────────────────────────────
+function getPecasDataVenda(d: Record<string, string>): string {
+  return (d['DTA_ENTRADA_SAIDA'] ?? '').trim() || (d['DTA_DOCUMENTO'] ?? '').trim();
+}
+
 function getYr(row: VPecasRow): number {
   if (row.periodoImport) { const [y] = row.periodoImport.split('-').map(Number); if (y > 2000) return y; }
-  const d = row.data['DTA_DOCUMENTO'] ?? '';
+  const d = getPecasDataVenda(row.data);
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[2];
   if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[0];
   return 0;
 }
 function getMo(row: VPecasRow): number {
   if (row.periodoImport) { const [,m] = row.periodoImport.split('-').map(Number); if (m >= 1 && m <= 12) return m; }
-  const d = row.data['DTA_DOCUMENTO'] ?? '';
+  const d = getPecasDataVenda(row.data);
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[1];
   if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[1];
   return 0;
 }
 function getDia(row: VPecasRow): number {
-  const d = row.data['DTA_DOCUMENTO'] ?? '';
+  const d = getPecasDataVenda(row.data);
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[0];
   if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[2];
   return 0;
@@ -98,7 +102,13 @@ const PECAS_OV_KEY = 'vendas_pecas_vendas_ov';
 interface PecasOverride { condPgto: string; taxaML: string; taxaEPecas: string; comissao: string; dsr: string; provisoes: string; }
 function emptyOv(): PecasOverride { return { condPgto: '', taxaML: '', taxaEPecas: '', comissao: '', dsr: '', provisoes: '' }; }
 function ovKey(d: Record<string, string>): string {
+  return `${d['NUMERO_NOTA_FISCAL'] ?? ''}_${d['SERIE_NOTA_FISCAL'] ?? ''}_${getPecasDataVenda(d)}`;
+}
+function legacyOvKey(d: Record<string, string>): string {
   return `${d['NUMERO_NOTA_FISCAL'] ?? ''}_${d['SERIE_NOTA_FISCAL'] ?? ''}_${d['DTA_DOCUMENTO'] ?? ''}`;
+}
+function getOv(d: Record<string, string>, ovs: Record<string, PecasOverride>): PecasOverride {
+  return ovs[ovKey(d)] ?? ovs[legacyOvKey(d)] ?? emptyOv();
 }
 interface TaxaContext { mlMap: Map<string, TaxaMLRow>; epMap: Map<string, number>; ovs: Record<string, PecasOverride>; }
 function buildTaxaContext(mlRows: TaxaMLRow[], epRows: TaxaEPecasRow[], ovs: Record<string, PecasOverride>, yr: number, mo: number | null): TaxaContext {
@@ -114,7 +124,7 @@ function buildTaxaContext(mlRows: TaxaMLRow[], epRows: TaxaEPecasRow[], ovs: Rec
 function rowTaxa(d: Record<string, string>, ctx: TaxaContext): { taxaML: number; taxaEP: number } {
   const nf    = d['NUMERO_NOTA_FISCAL'];
   const liqNF = n(d['LIQ_NOTA_FISCAL']);
-  const ov    = ctx.ovs[ovKey(d)] ?? emptyOv();
+  const ov    = getOv(d, ctx.ovs);
   const mlRow = ctx.mlMap.get(nf);
   const tituloValML = mlRow?.data['VAL_TITULO'] ?? '';
   const autoTaxaML  = tituloValML ? liqNF - n(tituloValML) : undefined;
