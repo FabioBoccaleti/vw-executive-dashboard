@@ -59,19 +59,22 @@ function ovKey(d: Record<string, string>): string {
   return `${d['NUMERO_NOTA_FISCAL'] ?? ''}_${d['SERIE_NOTA_FISCAL'] ?? ''}_${d['DTA_DOCUMENTO'] ?? ''}`;
 }
 
+function getPecasDataVenda(d: Record<string, string>): string {
+  return (d['DTA_ENTRADA_SAIDA'] ?? '').trim() || (d['DTA_DOCUMENTO'] ?? '').trim();
+}
+
 // ─── Período da linha ─────────────────────────────────────────────────────────
 function rowPeriod(row: VPecasRow): { year: number; month: number } | null {
   if (row.periodoImport) {
     const [y, m] = row.periodoImport.split('-').map(Number);
     if (y > 2000 && m >= 1 && m <= 12) return { year: y, month: m };
   }
-  const dtaDoc = row.data['DTA_DOCUMENTO'] ?? '';
-  if (/^\d{2}\/\d{2}\/\d{4}/.test(dtaDoc)) {
-    return { year: parseInt(dtaDoc.split('/')[2]), month: parseInt(dtaDoc.split('/')[1]) };
+  const dataVenda = getPecasDataVenda(row.data);
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(dataVenda)) {
+    return { year: parseInt(dataVenda.split('/')[2]), month: parseInt(dataVenda.split('/')[1]) };
   }
-  const dtaEnt = row.data['DTA_ENTRADA_SAIDA'] ?? '';
-  if (/^\d{2}\/\d{2}\/\d{4}/.test(dtaEnt)) {
-    return { year: parseInt(dtaEnt.split('/')[2]), month: parseInt(dtaEnt.split('/')[1]) };
+  if (/^\d{4}-\d{2}-\d{2}/.test(dataVenda)) {
+    return { year: parseInt(dataVenda.split('-')[0]), month: parseInt(dataVenda.split('-')[1]) };
   }
   return null;
 }
@@ -226,7 +229,7 @@ async function exportPecasExcel(
     const c = calcPecasRow(d, ov, autoTaxaML, autoTaxaEP);
     const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF5F3FF';
     const vals = [
-      d['NUMERO_NOTA_FISCAL'], d['SERIE_NOTA_FISCAL'], d['TIPO_TRANSACAO'], d['DTA_DOCUMENTO'],
+      d['NUMERO_NOTA_FISCAL'], d['SERIE_NOTA_FISCAL'], d['TIPO_TRANSACAO'], getPecasDataVenda(d),
       d['DEPARTAMENTO'], d['NOME_VENDEDOR'], ov.condPgto, d['NOME_CLIENTE'], d['CIDADE'], d['ESTADO'],
       n(d['LIQ_NOTA_FISCAL']), n(d['VAL_ICMS']), n(d['VAL_PIS']), n(d['VAL_COFINS']), c.difal,
       c.recLiq, autoTaxaML, autoTaxaEP,
@@ -563,7 +566,7 @@ export default function VPecasVendasDashboard() {
                     </td>
                     <td className={`${td} px-2 min-w-[60px]`}><ReadCell value={d['SERIE_NOTA_FISCAL']} /></td>
                     <td className={`${td} px-2 min-w-[90px]`}><ReadCell value={d['TIPO_TRANSACAO']} /></td>
-                    <td className={`${td} px-2 min-w-[100px]`}><ReadCell value={d['DTA_DOCUMENTO']} /></td>
+                    <td className={`${td} px-2 min-w-[100px]`}><ReadCell value={getPecasDataVenda(d)} /></td>
                     <td className={`${td} px-2 min-w-[120px]`}><ReadCell value={d['DEPARTAMENTO']} /></td>
                     <td className={`${td} px-2 min-w-[130px]`}><ReadCell value={d['NOME_VENDEDOR']} /></td>
                     <td className={`${td} px-2 min-w-[130px]`}>
