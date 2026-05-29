@@ -54,7 +54,7 @@ function getYrMoVPecas(row: VPecasRow): { yr: number; mo: number } {
     const [y, m] = row.periodoImport.split('-').map(Number);
     if (y > 2000 && m >= 1 && m <= 12) return { yr: y, mo: m };
   }
-  const d = row.data['DTA_DOCUMENTO'] ?? '';
+  const d = row.data['DTA_ENTRADA_SAIDA'] ?? '';
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return { yr: +d.split('/')[2], mo: +d.split('/')[1] };
   if (/^\d{4}-\d{2}-\d{2}/.test(d))   return { yr: +d.split('-')[0], mo: +d.split('-')[1] };
   return { yr: 0, mo: 0 };
@@ -68,7 +68,7 @@ function getDiaVenda(row: VendasResultadoRow): number {
 }
 
 function getDiaVPecas(row: VPecasRow): number {
-  const d = row.data['DTA_DOCUMENTO'] ?? '';
+  const d = row.data['DTA_ENTRADA_SAIDA'] ?? '';
   if (/^\d{2}\/\d{2}\/\d{4}/.test(d)) return +d.split('/')[0];
   if (/^\d{4}-\d{2}-\d{2}/.test(d))   return +d.split('-')[2];
   return 0;
