@@ -28,7 +28,8 @@ import {
 } from './calculoPosVendasStorage';
 
 type VendasSubTab = 'pecas' | 'oficina' | 'funilaria' | 'acessorios' | 'produto' | 'mecanicos';
-type MainTab = 'vendas' | 'calculo';
+type DemonstrativoSubTab = 'pecas' | 'oficina' | 'funilaria' | 'acessorios';
+type MainTab = 'vendas' | 'calculo' | 'demonstrativo';
 type CalculoAba = 'cadastrados' | 'pendentes';
 
 interface CalculoComissoesVWPosVendasPageProps {
@@ -147,6 +148,13 @@ const VENDAS_SUB_TABS: Array<{ id: VendasSubTab; label: string }> = [
   { id: 'mecanicos', label: 'Mecânicos' },
 ];
 
+const DEMONSTRATIVO_SUB_TABS: Array<{ id: DemonstrativoSubTab; label: string }> = [
+  { id: 'pecas', label: 'Peças' },
+  { id: 'oficina', label: 'Oficina' },
+  { id: 'funilaria', label: 'Funilaria' },
+  { id: 'acessorios', label: 'Acessórios' },
+];
+
 const DEPARTAMENTO_COLABORADOR_OPTIONS: Array<{ value: Exclude<DepartamentoColaborador, ''>; label: string }> = [
   { value: 'pecas', label: 'Peças' },
   { value: 'oficina', label: 'Oficina' },
@@ -192,6 +200,14 @@ function productRowPeriod(row: VPecasItemRow): { year: number; month: number } |
     return { year: parseInt(dta.split('/')[2], 10), month: parseInt(dta.split('/')[1], 10) };
   }
   return null;
+}
+
+function parsePeriodoKey(value: string): { year: number; month: number } | null {
+  const [yearRaw, monthRaw] = String(value ?? '').split('-');
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || year < 2000 || month < 1 || month > 12) return null;
+  return { year, month };
 }
 
 function normalizeVendorName(value: string): string {
@@ -522,6 +538,17 @@ function ovKey(d: Record<string, string>): string {
 export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPosVendasPageProps) {
   const [mainTab, setMainTab] = useState<MainTab>('vendas');
   const [vendasSubTab, setVendasSubTab] = useState<VendasSubTab>('pecas');
+  const [demonstrativoSubTab, setDemonstrativoSubTab] = useState<DemonstrativoSubTab>('pecas');
+  const [demonstrativoFilters, setDemonstrativoFilters] = useState<Record<DemonstrativoSubTab, { year: number; month: number | null }>>(() => {
+    const year = new Date().getFullYear();
+    const month = new Date().getMonth() + 1;
+    return {
+      pecas: { year, month },
+      oficina: { year, month },
+      funilaria: { year, month },
+      acessorios: { year, month },
+    };
+  });
   const [allRows, setAllRows] = useState<VPecasRow[]>([]);
   const [allPecasRows, setAllPecasRows] = useState<VPecasRow[]>([]);
   const [taxaMLRows, setTaxaMLRows] = useState<TaxaMLRow[]>([]);
@@ -663,6 +690,16 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const acessoriosBaseRows = useMemo(
     () => allPecasRows.filter((row) => (row.data['DEPARTAMENTO'] ?? '').trim() === '107'),
     [allPecasRows],
+  );
+
+  const demonstrativoBaseRows = useMemo<Record<DemonstrativoSubTab, VPecasRow[]>>(
+    () => ({
+      pecas: allPecasRows,
+      oficina: oficinaBaseRows,
+      funilaria: funilariaBaseRows,
+      acessorios: acessoriosBaseRows,
+    }),
+    [allPecasRows, oficinaBaseRows, funilariaBaseRows, acessoriosBaseRows],
   );
 
   useEffect(() => {
@@ -1671,6 +1708,87 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     return true;
   }), [mecanicosRows, mecanicosFilterYear, mecanicosFilterMonth]);
 
+  const demonstrativoFilter = demonstrativoFilters[demonstrativoSubTab];
+  const demonstrativoRemuneracoesAtivas = useMemo(() => {
+    return calculoRemuneracoes
+      .filter((item) => item.ativo)
+      .filter((item) => item.departamentoColaborador === demonstrativoSubTab)
+      .filter((item) => parsePeriodoKey(item.periodo) !== null)
+      .sort((a, b) => a.vendedor.localeCompare(b.vendedor, 'pt-BR', { sensitivity: 'base' }));
+  }, [calculoRemuneracoes, demonstrativoSubTab]);
+
+  const demonstrativoAvailableYears = useMemo(() => {
+    const years = new Set<number>();
+    demonstrativoRemuneracoesAtivas.forEach((item) => {
+      const period = parsePeriodoKey(item.periodo);
+      if (period) years.add(period.year);
+    });
+    const current = new Date().getFullYear();
+    [current - 1, current, current + 1].forEach((year) => years.add(year));
+    return [...years].sort();
+  }, [demonstrativoRemuneracoesAtivas]);
+
+  const demonstrativoMonthCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    demonstrativoRemuneracoesAtivas.forEach((item) => {
+      const period = parsePeriodoKey(item.periodo);
+      if (!period || period.year !== demonstrativoFilter.year) return;
+      counts[period.month] = (counts[period.month] || 0) + 1;
+    });
+    return counts;
+  }, [demonstrativoRemuneracoesAtivas, demonstrativoFilter.year]);
+
+  const demonstrativoFilteredRows = useMemo(() => demonstrativoRemuneracoesAtivas.filter((item) => {
+    const period = parsePeriodoKey(item.periodo);
+    if (!period) return false;
+    if (period.year !== demonstrativoFilter.year) return false;
+    if (demonstrativoFilter.month !== null && period.month !== demonstrativoFilter.month) return false;
+    return true;
+  }), [demonstrativoRemuneracoesAtivas, demonstrativoFilter.year, demonstrativoFilter.month]);
+
+  const demonstrativoTotais = useMemo(() => {
+    return demonstrativoFilteredRows.reduce((acc, item) => {
+      const salarioFixo = parseDecimal(item.salarioFixo ?? '');
+      const bonusProdutividade = parseDecimal(item.bonusProdutividade ?? '');
+      acc.salarioFixo += salarioFixo;
+      acc.bonusProdutividade += bonusProdutividade;
+      acc.totalRemuneracao += salarioFixo + bonusProdutividade;
+      return acc;
+    }, {
+      salarioFixo: 0,
+      bonusProdutividade: 0,
+      totalRemuneracao: 0,
+    });
+  }, [demonstrativoFilteredRows]);
+
+  const demonstrativoKpis = useMemo(() => {
+    const colaboradores = demonstrativoFilteredRows.length;
+    return {
+      colaboradores,
+      salarioFixo: demonstrativoTotais.salarioFixo,
+      bonusProdutividade: demonstrativoTotais.bonusProdutividade,
+      totalRemuneracao: demonstrativoTotais.totalRemuneracao,
+    };
+  }, [demonstrativoFilteredRows, demonstrativoTotais]);
+
+  function printDemonstrativoAtual() {
+    if (demonstrativoFilter.month === null) {
+      toast.warning('Selecione um mês para imprimir o demonstrativo da sub-aba atual.');
+      return;
+    }
+    window.print();
+  }
+
+  function setDemonstrativoFilter(tab: DemonstrativoSubTab, patch: Partial<{ year: number; month: number | null }>) {
+    setDemonstrativoFilters((prev) => ({
+      ...prev,
+      [tab]: {
+        ...prev[tab],
+        ...patch,
+      },
+    }));
+  }
+
   async function persistMecanicosStore(nextRows: VPecasItemRow[], nextColumns: string[]) {
     await kvSet(MECANICOS_KEY, { columns: nextColumns, rows: nextRows });
   }
@@ -1767,6 +1885,14 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
   return (
     <div className="h-screen bg-slate-100 flex flex-col overflow-hidden">
+        <style>{`.sticky-col { position: sticky; z-index: 6; }
+      @media print {
+  .no-print { display: none !important; }
+  .print-surface { border: none !important; box-shadow: none !important; }
+  .print-preserve { overflow: visible !important; }
+      .sticky-col { position: static !important; }
+  body { background: #fff !important; }
+}`}</style>
       <input ref={mecanicosInputRef} type="file" accept=".xlsx,.xls,.ods" className="hidden" onChange={handleMecanicosImport} />
       {pendingMecanicosImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -1806,7 +1932,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
           </div>
         </div>
       )}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+      <header className="no-print bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div>
           <h1 className="text-lg font-bold text-slate-800">Cálculo de Comissões VW - Pós Vendas</h1>
           <p className="text-xs text-slate-500 mt-0.5">Folha de Pagamento</p>
@@ -1831,6 +1957,15 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             >
               <Calculator className="w-3.5 h-3.5" />
               Cálculo
+            </button>
+            <button
+              onClick={() => setMainTab('demonstrativo')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainTab === 'demonstrativo' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Wallet className="w-3.5 h-3.5" />
+              Demonstrativo de pagamento
             </button>
           </div>
 
@@ -2390,6 +2525,198 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
               )}
             </div>
           </div>
+        ) : mainTab === 'demonstrativo' ? (
+          <>
+            <div className="no-print bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
+              {DEMONSTRATIVO_SUB_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setDemonstrativoSubTab(tab.id)}
+                  className={`px-5 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                    demonstrativoSubTab === tab.id
+                      ? 'border-blue-600 text-blue-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 p-6" style={{ minHeight: 0 }}>
+              <div className="h-full bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col print-surface print-preserve">
+                <div className="no-print bg-white border-b border-slate-100 px-4 py-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 overflow-x-auto">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-600 font-semibold whitespace-nowrap">
+                        ANO
+                        <select
+                          value={demonstrativoFilter.year}
+                          onChange={(e) => setDemonstrativoFilter(demonstrativoSubTab, { year: Number(e.target.value) })}
+                          className="border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+                        >
+                          {demonstrativoAvailableYears.map((year) => (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setDemonstrativoFilter(demonstrativoSubTab, { month: null })}
+                          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                            demonstrativoFilter.month === null ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+                          }`}
+                        >
+                          Ano todo
+                        </button>
+                        {MONTHS.map((month, index) => (
+                          <button
+                            key={month}
+                            onClick={() => setDemonstrativoFilter(demonstrativoSubTab, { month: index + 1 })}
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                              demonstrativoFilter.month === index + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+                            } ${demonstrativoMonthCounts[index + 1] ? 'font-semibold' : ''}`}
+                          >
+                            {month}
+                            {demonstrativoMonthCounts[index + 1] ? (
+                              <span className="ml-0.5 text-[10px] opacity-70">({demonstrativoMonthCounts[index + 1]})</span>
+                            ) : null}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <span className="text-xs text-slate-400 whitespace-nowrap">
+                      {demonstrativoFilteredRows.length} registro{demonstrativoFilteredRows.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="border-b border-slate-100 px-4 py-4 space-y-3">
+                  <div className="rounded-xl bg-slate-900 px-4 py-4 text-white flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-slate-300">Demonstrativo de pagamento</p>
+                      <p className="text-lg font-bold leading-tight">{DEMONSTRATIVO_SUB_TABS.find((item) => item.id === demonstrativoSubTab)?.label}</p>
+                      <p className="text-xs text-slate-300 mt-1">Colaboradores ativos com remuneração cadastrada</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[11px] uppercase tracking-wider text-slate-300">Competência</p>
+                      <p className="text-2xl font-bold leading-tight">{demonstrativoFilter.month === null ? 'Ano todo' : MONTHS[demonstrativoFilter.month - 1]}</p>
+                      <p className="text-xs text-slate-300">{demonstrativoFilter.year}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="text-[11px] text-slate-500">Colaboradores</p>
+                      <p className="text-sm font-bold text-slate-800">{demonstrativoKpis.colaboradores}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="text-[11px] text-slate-500">Salário Fixo</p>
+                      <p className="text-sm font-bold text-slate-800 font-mono">R$ {fmtCurrency(demonstrativoKpis.salarioFixo)}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="text-[11px] text-slate-500">Bônus Produtividade</p>
+                      <p className="text-sm font-bold text-slate-800 font-mono">R$ {fmtCurrency(demonstrativoKpis.bonusProdutividade)}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="text-[11px] text-slate-500">Total Remuneração</p>
+                      <p className="text-sm font-bold text-slate-800 font-mono">R$ {fmtCurrency(demonstrativoKpis.totalRemuneracao)}</p>
+                    </div>
+                  </div>
+
+                  <div className="no-print flex items-center justify-end">
+                    <Button type="button" variant="outline" onClick={printDemonstrativoAtual}>
+                      Imprimir sub-aba atual
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-auto print-preserve">
+                  {demonstrativoFilteredRows.length === 0 ? (
+                    <div className="flex h-full items-center justify-center text-slate-400 text-sm px-6 text-center">
+                      Nenhum colaborador ativo com remuneração cadastrada para este departamento e competência.
+                    </div>
+                  ) : (
+                    <table className="min-w-[1060px] w-full table-fixed text-xs text-slate-700">
+                      <colgroup>
+                        <col className="w-[220px]" />
+                        <col className="w-[110px]" />
+                        <col className="w-[70px]" />
+                        <col className="w-[90px]" />
+                        <col className="w-[90px]" />
+                        <col className="w-[90px]" />
+                        <col className="w-[90px]" />
+                        <col className="w-[90px]" />
+                        <col className="w-[90px]" />
+                        <col className="w-[90px]" />
+                        <col className="w-[110px]" />
+                      </colgroup>
+                      <thead className="bg-slate-800 text-white sticky top-0 z-10">
+                        <tr>
+                          <th rowSpan={2} className="sticky-col bg-slate-800 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700" style={{ left: 0 }}>Nome vendedor</th>
+                          <th rowSpan={2} className="sticky-col bg-slate-800 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700" style={{ left: 220 }}>Cargo</th>
+                          <th colSpan={2} className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Produção</th>
+                          <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Salário Fixo</th>
+                          <th colSpan={3} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Comissões</th>
+                          <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus produtividade</th>
+                          <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus Adicional</th>
+                          <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap">Total remuneração</th>
+                        </tr>
+                        <tr>
+                          <th className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Peças</th>
+                          <th className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Mão de Obra</th>
+                          <th className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Peças</th>
+                          <th className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Acessórios</th>
+                          <th className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Mão de obra</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {demonstrativoFilteredRows.map((item, index) => {
+                          const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+                          const salarioFixo = parseDecimal(item.salarioFixo ?? '');
+                          const bonusProdutividade = parseDecimal(item.bonusProdutividade ?? '');
+                          const totalRemuneracao = salarioFixo + bonusProdutividade;
+                          return (
+                            <tr key={`${item.id}-${index}`} className={`${rowBg} border-t border-slate-100 hover:bg-slate-100/70`}>
+                              <td className={`sticky-col px-3 py-2 text-center whitespace-nowrap font-semibold text-slate-800 ${rowBg}`} style={{ left: 0 }}>{item.vendedor}</td>
+                              <td className={`sticky-col px-3 py-2 text-center whitespace-nowrap text-slate-700 ${rowBg}`} style={{ left: 220 }}>{item.cargoColaborador || ''}</td>
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{salarioFixo > 0 ? `R$ ${fmtCurrency(salarioFixo)}` : ''}</td>
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{bonusProdutividade > 0 ? `R$ ${fmtCurrency(bonusProdutividade)}` : ''}</td>
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap font-mono font-semibold bg-violet-100/80">{totalRemuneracao > 0 ? `R$ ${fmtCurrency(totalRemuneracao)}` : ''}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot className="bg-slate-200 text-slate-900">
+                        <tr className="border-t-2 border-slate-300">
+                          <td colSpan={4} className="px-3 py-2 text-center font-semibold whitespace-nowrap">Totais</td>
+                          <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.salarioFixo)}</td>
+                          <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
+                          <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
+                          <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
+                          <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.bonusProdutividade)}</td>
+                          <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
+                          <td className="px-3 py-2 text-center font-mono font-bold whitespace-nowrap bg-violet-200/90">R$ {fmtCurrency(demonstrativoTotais.totalRemuneracao)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  )}
+                </div>
+
+                <div className="border-t border-slate-100 px-4 py-2 text-[11px] text-slate-500">
+                  Layout inicial do demonstrativo. Valores serão alimentados na próxima etapa.
+                </div>
+              </div>
+            </div>
+          </>
         ) : (
           <>
             <div className="bg-white border-b border-slate-200 px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
