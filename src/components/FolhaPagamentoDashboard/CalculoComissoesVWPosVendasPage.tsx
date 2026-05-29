@@ -11,6 +11,11 @@ import { kvGet, kvSet } from '@/lib/kvClient';
 import { toast } from 'sonner';
 import { loadVendedores, type Vendedor as CadastroVendedor } from '@/components/CadastrosPage/cadastrosStorage';
 import {
+  findLatestSalariosPeriod,
+  loadSalariosFixos,
+  type SalarioFuncionario,
+} from '@/components/FolhaPagamentoDashboard/salariosFixosStorage';
+import {
   calculoPeriodoKey,
   loadCalculoPosVendasPeriodos,
   loadCalculoPosVendasRemuneracoes,
@@ -18,6 +23,7 @@ import {
   saveCalculoPosVendasRemuneracoes,
   upsertCalculoPosVendasRemuneracao,
   type CalculoPosVendasPeriodo,
+  type DepartamentoColaborador,
   type CalculoPosVendasRemuneracao,
 } from './calculoPosVendasStorage';
 
@@ -141,6 +147,13 @@ const VENDAS_SUB_TABS: Array<{ id: VendasSubTab; label: string }> = [
   { id: 'mecanicos', label: 'Mecânicos' },
 ];
 
+const DEPARTAMENTO_COLABORADOR_OPTIONS: Array<{ value: Exclude<DepartamentoColaborador, ''>; label: string }> = [
+  { value: 'pecas', label: 'Peças' },
+  { value: 'oficina', label: 'Oficina' },
+  { value: 'funilaria', label: 'Funilaria' },
+  { value: 'acessorios', label: 'Acessórios' },
+];
+
 function n(v: string | undefined): number {
   return parseFloat(String(v ?? '').replace(',', '.')) || 0;
 }
@@ -211,14 +224,52 @@ function extractVendorNames(data: Record<string, string>): string[] {
     return '';
   };
 
+  const looksNumericCode = (value: string) => {
+    const trimmed = normalizeVendorName(value);
+    if (!trimmed) return false;
+    return /^\d+[\d.,\s]*$/.test(trimmed);
+  };
+
+  const hasLetters = (value: string) => /[A-Za-zÀ-ÿ]/.test(value);
+
+  const chooseBestName = (...values: string[]) => {
+    const normalized = values
+      .map((value) => normalizeVendorName(String(value ?? '')))
+      .filter((value) => value.length > 0);
+    if (normalized.length === 0) return '';
+
+    const textual = normalized.filter((value) => hasLetters(value) && !looksNumericCode(value));
+    if (textual.length > 0) {
+      return textual.sort((a, b) => b.length - a.length)[0];
+    }
+
+    const withLetters = normalized.filter((value) => hasLetters(value));
+    if (withLetters.length > 0) {
+      return withLetters.sort((a, b) => b.length - a.length)[0];
+    }
+
+    return normalized[0];
+  };
+
   const candidates = [
-    pick('MECANICO', 'MECÂNICO', 'Mecanico', 'Mecânico'),
-    pick('NOME_VENDEDOR'),
-    pick('VENDEDOR'),
-    pick('NOME_VENDEDOR2'),
-    pick('VENDEDOR2'),
+    chooseBestName(
+      pick('NOME_VENDEDOR'),
+      pick('VENDEDOR'),
+      pick('NOME_CONSULTOR'),
+      pick('CONSULTOR'),
+    ),
+    chooseBestName(
+      pick('NOME_VENDEDOR2'),
+      pick('VENDEDOR2'),
+      pick('NOME_CONSULTOR2'),
+      pick('CONSULTOR2'),
+    ),
+    chooseBestName(
+      pick('MECANICO', 'MECÂNICO', 'Mecanico', 'Mecânico'),
+      pick('NOME_MECANICO', 'NOME_MECÂNICO', 'Nome Mecanico', 'Nome Mecânico'),
+    ),
   ]
-    .map((value) => normalizeVendorName(String(value ?? '')))
+    .map((value) => normalizeVendorName(value))
     .filter((value) => value.length > 0);
 
   const seen = new Set<string>();
@@ -241,6 +292,38 @@ function getSourceLabelFromRow(data: Record<string, string>, fallback: string): 
 
 function normalizeCode(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function vendorCodeLookupKeys(value: string): string[] {
+  const normalized = normalizeVendorName(value).toLowerCase();
+  if (!normalized) return [];
+
+  const keys = new Set<string>();
+  keys.add(normalized);
+
+  const compact = normalized.replace(/\s+/g, '');
+  if (compact) keys.add(compact);
+
+  const digitsOnly = normalized.replace(/\D+/g, '');
+  if (digitsOnly) {
+    keys.add(digitsOnly);
+    const digitsAsNumber = Number.parseInt(digitsOnly, 10);
+    if (Number.isFinite(digitsAsNumber)) {
+      keys.add(String(digitsAsNumber));
+    }
+  }
+
+  const parsed = parseFlexibleNumber(normalized);
+  if (parsed !== null) {
+    const rounded = Math.round(parsed);
+    if (Math.abs(parsed - rounded) < 1e-9) {
+      keys.add(String(rounded));
+    } else {
+      keys.add(String(parsed));
+    }
+  }
+
+  return [...keys];
 }
 
 function createBonusEscalaDraft(): BonusEscalaDraft {
@@ -471,6 +554,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [calculoModalOpen, setCalculoModalOpen] = useState(false);
   const [calculoDraft, setCalculoDraft] = useState<CalculoPosVendasRemuneracao | null>(null);
   const [cadastroVendedores, setCadastroVendedores] = useState<CadastroVendedor[]>([]);
+  const [salariosVwFuncionarios, setSalariosVwFuncionarios] = useState<SalarioFuncionario[]>([]);
   const mecanicosInputRef = useRef<HTMLInputElement>(null);
   const [pendingMecanicosImport, setPendingMecanicosImport] = useState<{
     rows: VPecasItemRow[];
@@ -529,6 +613,36 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       );
     });
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadVwSalariosFallback() {
+      const currentPeriodRows = await loadSalariosFixos('vw', calculoYear, calculoMonth);
+      if (cancelled) return;
+
+      if (currentPeriodRows.length > 0) {
+        setSalariosVwFuncionarios(currentPeriodRows);
+        return;
+      }
+
+      const latestPeriod = await findLatestSalariosPeriod();
+      if (cancelled) return;
+      if (!latestPeriod) {
+        setSalariosVwFuncionarios([]);
+        return;
+      }
+
+      const latestRows = await loadSalariosFixos('vw', latestPeriod.year, latestPeriod.month);
+      if (cancelled) return;
+      setSalariosVwFuncionarios(latestRows);
+    }
+
+    loadVwSalariosFallback();
+    return () => {
+      cancelled = true;
+    };
+  }, [calculoYear, calculoMonth]);
 
   const oficinaBaseRows = useMemo(
     () => allRows.filter((row) => {
@@ -1035,24 +1149,34 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
   const vendorLookup = useMemo(() => {
     const map = new Map<string, string>();
-    cadastroVendedores.forEach((item) => {
-      const name = normalizeVendorName(item.nome);
+    const addEntry = (rawName: string, rawCode?: string) => {
+      const name = normalizeVendorName(rawName);
       if (!name) return;
       map.set(normalizeCode(name), name);
-      if (item.codigo) {
-        map.set(normalizeCode(item.codigo), name);
-      }
+      if (!rawCode) return;
+      vendorCodeLookupKeys(rawCode).forEach((key) => {
+        map.set(key, name);
+      });
+    };
+
+    cadastroVendedores.forEach((item) => {
+      addEntry(item.nome, item.codigo);
     });
+
+    salariosVwFuncionarios.forEach((item) => {
+      addEntry(item.nome, item.codigo);
+    });
+
     return map;
-  }, [cadastroVendedores]);
+  }, [cadastroVendedores, salariosVwFuncionarios]);
 
   function resolveVendorName(raw: string): string {
     const normalized = normalizeVendorName(raw);
     if (!normalized) return '';
     const byName = vendorLookup.get(normalizeCode(normalized));
     if (byName) return byName;
-    if (/^\d+$/.test(normalized)) {
-      const byCode = vendorLookup.get(normalizeCode(normalized));
+    for (const key of vendorCodeLookupKeys(normalized)) {
+      const byCode = vendorLookup.get(key);
       if (byCode) return byCode;
     }
     return normalized;
@@ -1127,7 +1251,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         record: records.get(vendorKey(item.vendedor)),
       }))
       .sort((a, b) => a.vendedor.localeCompare(b.vendedor, 'pt-BR', { sensitivity: 'base' }));
-  }, [calculoSourceRows, calculoRemuneracoes, calculoPeriodo]);
+  }, [calculoSourceRows, calculoRemuneracoes, calculoPeriodo, vendorLookup]);
 
   const calculoRegistered = useMemo(() => calculoVendors.filter((item) => Boolean(item.record)), [calculoVendors]);
   const calculoPending = useMemo(() => calculoVendors.filter((item) => !item.record), [calculoVendors]);
@@ -1217,7 +1341,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       });
     });
     return map;
-  }, [calculoVendors, calculoSourceRows]);
+  }, [calculoVendors, calculoSourceRows, vendorLookup]);
 
   const calculoRulesByVendor = useMemo(() => {
     const rules = new Map<string, { departamentos: Set<string>; transacoes: Set<string> }>();
@@ -1241,7 +1365,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     });
 
     return rules;
-  }, [calculoSourceRows]);
+  }, [calculoSourceRows, vendorLookup]);
 
   const calculoDraftDepartamentos = useMemo(() => {
     if (!calculoDraft?.vendedor) return [];
@@ -1275,6 +1399,8 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       existing
         ? {
             ...existing,
+          departamentoColaborador: existing.departamentoColaborador ?? '',
+          cargoColaborador: existing.cargoColaborador ?? '',
             comissaoPecasPct: existing.comissaoPecasPct ?? '',
             comissaoRpsPct: existing.comissaoRpsPct ?? '',
             comissaoTotalPecasPct: existing.comissaoTotalPecasPct ?? '',
@@ -1288,6 +1414,8 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             id: crypto.randomUUID(),
             periodo: calculoPeriodo,
             vendedor: normalizeVendorName(vendedor),
+            departamentoColaborador: '',
+            cargoColaborador: '',
             comissionado: false,
             salarioFixo: '',
             comissaoPecasPct: '',
@@ -1406,6 +1534,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       ...calculoDraft,
       periodo: calculoPeriodo,
       vendedor: normalizeVendorName(calculoDraft.vendedor),
+      departamentoColaborador: (['pecas', 'oficina', 'funilaria', 'acessorios'].includes(calculoDraft.departamentoColaborador)
+        ? calculoDraft.departamentoColaborador
+        : '') as DepartamentoColaborador,
+      cargoColaborador: String(calculoDraft.cargoColaborador ?? '').trim(),
       salarioFixo: String(calculoDraft.salarioFixo ?? '').trim(),
       comissaoPecasPct: String(calculoDraft.comissaoPecasPct ?? '').trim(),
       comissaoRpsPct: String(calculoDraft.comissaoRpsPct ?? '').trim(),
@@ -1992,6 +2124,32 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           value={calculoDraft.vendedor}
                           onChange={(e) => setCalculoDraft({ ...calculoDraft, vendedor: e.target.value })}
                           disabled={calculoBloqueado}
+                          className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Departamento do colaborador</label>
+                        <select
+                          value={calculoDraft.departamentoColaborador ?? ''}
+                          onChange={(e) => setCalculoDraft({ ...calculoDraft, departamentoColaborador: e.target.value as DepartamentoColaborador })}
+                          disabled={calculoBloqueado}
+                          className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        >
+                          <option value="">Selecione</option>
+                          {DEPARTAMENTO_COLABORADOR_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Cargo do colaborador</label>
+                        <input
+                          value={calculoDraft.cargoColaborador ?? ''}
+                          onChange={(e) => setCalculoDraft({ ...calculoDraft, cargoColaborador: e.target.value })}
+                          disabled={calculoBloqueado}
+                          placeholder="Ex.: Consultor Técnico"
                           className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                         />
                       </div>

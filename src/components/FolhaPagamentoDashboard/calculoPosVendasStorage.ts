@@ -3,10 +3,30 @@ import { kvGet, kvSet } from '@/lib/kvClient';
 const KEY = 'calculo_pos_vendas_remuneracoes';
 const KEY_PERIODOS = 'calculo_pos_vendas_periodos';
 
+export type DepartamentoColaborador = '' | 'pecas' | 'oficina' | 'funilaria' | 'acessorios';
+
+function normalizeDepartamentoColaborador(value: unknown): DepartamentoColaborador {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const normalized = raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  if (normalized.includes('pec')) return 'pecas';
+  if (normalized.includes('ofic')) return 'oficina';
+  if (normalized.includes('funil')) return 'funilaria';
+  if (normalized.includes('acess')) return 'acessorios';
+  return '';
+}
+
 export interface CalculoPosVendasRemuneracao {
   id: string;
   periodo: string; // YYYY-M
   vendedor: string;
+  departamentoColaborador: DepartamentoColaborador;
+  cargoColaborador: string;
   comissionado: boolean;
   salarioFixo: string;
   comissaoPecasPct: string;
@@ -45,6 +65,8 @@ export async function loadCalculoPosVendasRemuneracoes(): Promise<CalculoPosVend
       id: String(item.id ?? crypto.randomUUID()),
       periodo: String(item.periodo ?? ''),
       vendedor: String(item.vendedor ?? ''),
+      departamentoColaborador: normalizeDepartamentoColaborador(item.departamentoColaborador),
+      cargoColaborador: String(item.cargoColaborador ?? '').trim(),
       comissionado: Boolean(item.comissionado),
       salarioFixo: String(item.salarioFixo ?? ''),
       comissaoPecasPct: String(item.comissaoPecasPct ?? ''),
