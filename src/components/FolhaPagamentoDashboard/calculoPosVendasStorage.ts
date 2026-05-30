@@ -51,6 +51,7 @@ export interface CalculoPosVendasPeriodo {
   de: string; // YYYY-MM-DD
   ate: string; // YYYY-MM-DD
   bloqueado?: boolean;
+  buscaAtiva?: boolean;
 }
 
 export function calculoPeriodoKey(year: number, month: number): string {

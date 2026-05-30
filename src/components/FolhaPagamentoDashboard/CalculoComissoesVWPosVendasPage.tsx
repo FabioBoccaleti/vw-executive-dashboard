@@ -93,6 +93,7 @@ function defaultApuracaoPeriodo(year: number, month: number): CalculoPosVendasPe
     de: toIsoDate(first),
     ate: toIsoDate(last),
     bloqueado: false,
+    buscaAtiva: false,
   };
 }
 
@@ -1609,7 +1610,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     }));
   }
 
-  function buscarCalculoPeriodo() {
+  async function buscarCalculoPeriodo() {
     const de = String(calculoPeriodoData.de ?? '').trim();
     const ate = String(calculoPeriodoData.ate ?? '').trim();
     if (!de || !ate) {
@@ -1626,21 +1627,64 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       toast.warning('A data inicial não pode ser maior que a data final.');
       return;
     }
+    const nextPeriodos = {
+      ...calculoPeriodos,
+      [calculoPeriodo]: {
+        ...(calculoPeriodos[calculoPeriodo] ?? defaultApuracaoPeriodo(calculoYear, calculoMonth)),
+        de,
+        ate,
+        buscaAtiva: true,
+      },
+    };
+
     setCalculoBuscaAtiva(true);
     setCalculoBuscaPeriodo({ de, ate });
+    setCalculoPeriodos(nextPeriodos);
+
+    const saved = await saveCalculoPosVendasPeriodos(nextPeriodos);
+    if (!saved) {
+      toast.error('Busca aplicada, mas não foi possível salvar automaticamente o período.');
+      return;
+    }
+
     toast.success('Busca aplicada para o período informado.');
   }
 
-  function limparCalculoBusca() {
+  async function limparCalculoBusca() {
+    const nextPeriodos = {
+      ...calculoPeriodos,
+      [calculoPeriodo]: {
+        ...(calculoPeriodos[calculoPeriodo] ?? defaultApuracaoPeriodo(calculoYear, calculoMonth)),
+        buscaAtiva: false,
+      },
+    };
+
     setCalculoBuscaPeriodo(null);
     setCalculoBuscaAtiva(false);
+
+    setCalculoPeriodos(nextPeriodos);
+
+    const saved = await saveCalculoPosVendasPeriodos(nextPeriodos);
+    if (!saved) {
+      toast.error('Busca limpa, mas não foi possível salvar automaticamente o período.');
+      return;
+    }
+
     toast.success('Busca limpa.');
   }
 
   useEffect(() => {
+    const periodo = calculoPeriodos[calculoPeriodo] ?? defaultApuracaoPeriodo(calculoYear, calculoMonth);
+    const de = String(periodo.de ?? '').trim();
+    const ate = String(periodo.ate ?? '').trim();
+    if (periodo.buscaAtiva && de && ate) {
+      setCalculoBuscaPeriodo({ de, ate });
+      setCalculoBuscaAtiva(true);
+      return;
+    }
     setCalculoBuscaPeriodo(null);
     setCalculoBuscaAtiva(false);
-  }, [calculoYear, calculoMonth]);
+  }, [calculoPeriodo, calculoPeriodos, calculoYear, calculoMonth]);
 
   async function saveCalculoPeriodo() {
     const payload = {
