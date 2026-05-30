@@ -1943,10 +1943,11 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const tbodyRows = Array.from(table.tBodies?.[0]?.rows ?? []);
       if (tbodyRows.length === 0) return;
 
-      const remuneracaoCols = [5, 6, 7, 8, 9, 10, 11, 12];
+      const producaoCols = [3, 4, 5];
+      const remuneracaoCols = [6, 7, 8, 9, 10, 11, 12, 13];
       const colsToHide = new Set<number>();
 
-      remuneracaoCols.forEach((colIndex) => {
+      [...producaoCols, ...remuneracaoCols].forEach((colIndex) => {
         const emptyAll = tbodyRows.every((row) => {
           const value = row.cells[colIndex - 1]?.textContent ?? '';
           return isPrintValueEmptyOrZero(value);
@@ -1955,7 +1956,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       });
 
       // Total remuneracao deve permanecer sempre visivel para evitar ambiguidades no rodape.
-      colsToHide.delete(12);
+      colsToHide.delete(13);
 
       if (colsToHide.size === 0) return;
 
@@ -1968,7 +1969,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const widthWeightByCol: Record<number, number> = {
         1: 22,
         2: 12,
-        3: 8,
+        3: 7,
         4: 8,
         5: 8,
         6: 6,
@@ -1977,9 +1978,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         9: 7,
         10: 6,
         11: 6,
-        12: 12,
+        12: 6,
+        13: 12,
       };
-      const visibleCols = Array.from({ length: 12 }, (_, i) => i + 1).filter((col) => !colsToHide.has(col));
+      const visibleCols = Array.from({ length: 13 }, (_, i) => i + 1).filter((col) => !colsToHide.has(col));
       const visibleWeight = visibleCols.reduce((sum, col) => sum + (widthWeightByCol[col] ?? 1), 0);
       visibleCols.forEach((colIndex) => {
         const col = colgroupCols[colIndex - 1];
@@ -2000,14 +2002,14 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const tfootRow = table.tFoot?.rows?.[0];
       if (tfootRow) {
         const tfootCellByLogicalCol: Partial<Record<number, number>> = {
-          5: 1,
-          6: 2,
-          7: 3,
-          8: 4,
-          9: 5,
-          10: 6,
-          11: 7,
-          12: 8,
+          6: 1,
+          7: 2,
+          8: 3,
+          9: 4,
+          10: 5,
+          11: 6,
+          12: 7,
+          13: 8,
         };
         colsToHide.forEach((colIndex) => {
           const cellIndex = tfootCellByLogicalCol[colIndex];
@@ -2022,10 +2024,23 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const row2 = theadRows[1];
       if (!row1 || !row2) return;
 
+      const producaoSubHeaderMap: Array<{ col: number; row2Index: number }> = [
+        { col: 3, row2Index: 0 },
+        { col: 4, row2Index: 1 },
+        { col: 5, row2Index: 2 },
+      ];
+
+      producaoSubHeaderMap.forEach(({ col, row2Index }) => {
+        if (colsToHide.has(col)) {
+          const cell = row2.cells[row2Index];
+          if (cell) cell.style.display = 'none';
+        }
+      });
+
       const comSubHeaderMap: Array<{ col: number; row2Index: number }> = [
+        { col: 9, row2Index: 5 },
         { col: 8, row2Index: 4 },
         { col: 7, row2Index: 3 },
-        { col: 6, row2Index: 2 },
       ];
 
       comSubHeaderMap.forEach(({ col, row2Index }) => {
@@ -2044,15 +2059,25 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         if (cell) cell.style.display = 'none';
       };
 
-      if (colsToHide.has(5)) removeRow1ByLabel('Salário Fixo');
-      if (colsToHide.has(9)) removeRow1ByLabel('Bônus produtividade');
-      if (colsToHide.has(10)) removeRow1ByLabel('Bônus Adicional');
-      if (colsToHide.has(11)) removeRow1ByLabel('Participação no resultado');
-      if (colsToHide.has(12)) removeRow1ByLabel('Total remuneração');
+      if (colsToHide.has(6)) removeRow1ByLabel('Salário Fixo');
+      if (colsToHide.has(10)) removeRow1ByLabel('Bônus produtividade');
+      if (colsToHide.has(11)) removeRow1ByLabel('Bônus Adicional');
+      if (colsToHide.has(12)) removeRow1ByLabel('Participação no resultado');
+      if (colsToHide.has(13)) removeRow1ByLabel('Total remuneração');
+
+      const producaoCell = Array.from(row1.cells).find((c) => c.textContent?.includes('Produção'));
+      if (producaoCell) {
+        const visibleProdCols = [3, 4, 5].filter((col) => !colsToHide.has(col)).length;
+        if (visibleProdCols === 0) {
+          producaoCell.style.display = 'none';
+        } else {
+          producaoCell.colSpan = visibleProdCols;
+        }
+      }
 
       const comCell = Array.from(row1.cells).find((c) => c.textContent?.includes('Comissões'));
       if (comCell) {
-        const visibleComCols = [6, 7, 8].filter((col) => !colsToHide.has(col)).length;
+        const visibleComCols = [7, 8, 9].filter((col) => !colsToHide.has(col)).length;
         if (visibleComCols === 0) {
           comCell.style.display = 'none';
         } else {
@@ -2062,7 +2087,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
       const totaisLabelCell = table.tFoot?.rows?.[0]?.cells?.[0];
       if (totaisLabelCell) {
-        const visibleBeforeSalario = [1, 2, 3, 4].filter((col) => !colsToHide.has(col)).length;
+        const visibleBeforeSalario = [1, 2, 3, 4, 5].filter((col) => !colsToHide.has(col)).length;
         totaisLabelCell.colSpan = Math.max(1, visibleBeforeSalario);
       }
     });
@@ -3075,13 +3100,14 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         <col className="w-[90px]" />
                         <col className="w-[90px]" />
                         <col className="w-[90px]" />
+                        <col className="w-[90px]" />
                         <col className="w-[110px]" />
                       </colgroup>
                       <thead className="bg-slate-800 text-white sticky top-0 z-10">
                         <tr>
                           <th rowSpan={2} className="sticky-col bg-slate-800 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700" style={{ left: 0 }}>Nome vendedor</th>
                           <th rowSpan={2} className="sticky-col bg-slate-800 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700" style={{ left: 220 }}>Cargo</th>
-                          <th colSpan={2} className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Produção</th>
+                          <th colSpan={3} className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Produção</th>
                           <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Salário Fixo</th>
                           <th colSpan={3} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Comissões</th>
                           <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus produtividade</th>
@@ -3091,6 +3117,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         </tr>
                         <tr>
                           <th className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Peças</th>
+                          <th className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Acessórios</th>
                           <th className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Mão de Obra</th>
                           <th className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Peças</th>
                           <th className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Acessórios</th>
@@ -3109,6 +3136,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                               <td className={`sticky-col px-3 py-2 text-center whitespace-nowrap text-slate-700 ${rowBg}`} style={{ left: 220 }}>{item.cargoColaborador || ''}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
                               <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{salarioFixo > 0 ? `R$ ${fmtCurrency(salarioFixo)}` : ''}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
@@ -3123,7 +3151,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       </tbody>
                       <tfoot className="bg-slate-200 text-slate-900">
                         <tr className="border-t-2 border-slate-300">
-                          <td colSpan={4} className="px-3 py-2 text-center font-semibold whitespace-nowrap">Totais</td>
+                          <td colSpan={5} className="px-3 py-2 text-center font-semibold whitespace-nowrap">Totais</td>
                           <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.salarioFixo)}</td>
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
@@ -3168,13 +3196,14 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                             <col className="w-[90px]" />
                             <col className="w-[90px]" />
                             <col className="w-[90px]" />
+                            <col className="w-[90px]" />
                             <col className="w-[110px]" />
                           </colgroup>
                           <thead className="bg-slate-800 text-white">
                             <tr>
                               <th rowSpan={2} className="px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700">Nome vendedor</th>
                               <th rowSpan={2} className="px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-slate-700">Cargo</th>
-                              <th colSpan={2} className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Produção</th>
+                              <th colSpan={3} className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Produção</th>
                               <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Salário Fixo</th>
                               <th colSpan={3} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Comissões</th>
                               <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus produtividade</th>
@@ -3184,6 +3213,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                             </tr>
                             <tr>
                               <th className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Peças</th>
+                              <th className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Acessórios</th>
                               <th className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Mão de Obra</th>
                               <th className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Peças</th>
                               <th className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Acessórios</th>
@@ -3202,6 +3232,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                                   <td className={`px-3 py-2 text-center whitespace-nowrap text-slate-700 ${rowBg}`}>{item.cargoColaborador || ''}</td>
                                   <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
                                   <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
+                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
                                   <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{salarioFixo > 0 ? `R$ ${fmtCurrency(salarioFixo)}` : ''}</td>
                                   <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
                                   <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
@@ -3216,7 +3247,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           </tbody>
                           <tfoot className="bg-slate-200 text-slate-900">
                             <tr className="border-t-2 border-slate-300">
-                              <td colSpan={4} className="px-3 py-2 text-center font-semibold whitespace-nowrap">Totais</td>
+                              <td colSpan={5} className="px-3 py-2 text-center font-semibold whitespace-nowrap">Totais</td>
                               <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(totais.salarioFixo)}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
