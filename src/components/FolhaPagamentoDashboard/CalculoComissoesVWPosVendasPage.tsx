@@ -631,6 +631,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [calculoPeriodoSaving, setCalculoPeriodoSaving] = useState(false);
   const [calculoBuscaPeriodo, setCalculoBuscaPeriodo] = useState<{ de: string; ate: string } | null>(null);
   const [calculoBuscaAtiva, setCalculoBuscaAtiva] = useState(false);
+  const [calculoResumoExpandido, setCalculoResumoExpandido] = useState(false);
   const [calculoModalOpen, setCalculoModalOpen] = useState(false);
   const [calculoDraft, setCalculoDraft] = useState<CalculoPosVendasRemuneracao | null>(null);
   const [cadastroVendedores, setCadastroVendedores] = useState<CadastroVendedor[]>([]);
@@ -1333,6 +1334,35 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     });
   }, [allRows, produtoRows, mecanicosRows, calculoYear, calculoMonth, calculoBuscaRange, calculoBuscaAtiva]);
 
+  const calculoResumoGeral = useMemo(() => {
+    let pecas = 0;
+    let acessorios = 0;
+    let produtos = 0;
+    let rpsOficina = 0;
+    let rpsFunilaria = 0;
+    let mecanicos = 0;
+
+    calculoSourceRows.forEach((row) => {
+      const amount = rowAmountForCalculo(row.origem, row.data);
+      if (row.origem === 'Peças') pecas += amount;
+      if (row.origem === 'Acessórios') acessorios += amount;
+      if (row.origem === 'Produto') produtos += amount;
+      if (row.origem === 'Oficina RPS') rpsOficina += amount;
+      if (row.origem === 'Funilaria RPS') rpsFunilaria += amount;
+      if (row.origem === 'Mecânicos') mecanicos += amount;
+    });
+
+    return {
+      pecas,
+      acessorios,
+      produtos,
+      pecasAcessorios: pecas + acessorios,
+      rpsOficina,
+      rpsFunilaria,
+      mecanicos,
+    };
+  }, [calculoSourceRows]);
+
   const calculoVendors = useMemo<CalculoVendorCard[]>(() => {
     const map = new Map<string, { vendedor: string; registros: number; fontes: Set<string> }>();
     const addVendor = (name: string, source: string) => {
@@ -1639,6 +1669,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
     setCalculoBuscaAtiva(true);
     setCalculoBuscaPeriodo({ de, ate });
+    setCalculoResumoExpandido(false);
     setCalculoPeriodos(nextPeriodos);
 
     const saved = await saveCalculoPosVendasPeriodos(nextPeriodos);
@@ -1661,6 +1692,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
     setCalculoBuscaPeriodo(null);
     setCalculoBuscaAtiva(false);
+    setCalculoResumoExpandido(false);
 
     setCalculoPeriodos(nextPeriodos);
 
@@ -2580,6 +2612,71 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       Busca aplicada: {calculoBuscaPeriodo.de} até {calculoBuscaPeriodo.ate}.
                     </p>
                   )}
+
+                  {calculoBuscaAtiva && calculoBuscaPeriodo ? (
+                    <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/40 px-3 py-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold text-blue-800">Resumo geral da apuração</p>
+                          <p className="text-[11px] text-blue-700">Período aplicado: {calculoBuscaPeriodo.de} até {calculoBuscaPeriodo.ate}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-7 px-3 text-xs border-blue-200 text-blue-700 hover:bg-blue-100"
+                          onClick={() => setCalculoResumoExpandido((prev) => !prev)}
+                        >
+                          {calculoResumoExpandido ? 'Ocultar origem' : 'Ver por origem'}
+                        </Button>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                        <div className="rounded border border-blue-100 bg-white px-3 py-2">
+                          <p className="text-[11px] text-slate-500">Total Peças + Acessórios</p>
+                          <p className="text-sm font-semibold font-mono text-slate-800">R$ {fmtCurrency(calculoResumoGeral.pecasAcessorios)}</p>
+                        </div>
+                        <div className="rounded border border-blue-100 bg-white px-3 py-2">
+                          <p className="text-[11px] text-slate-500">Total Peças (sem depto 107)</p>
+                          <p className="text-sm font-semibold font-mono text-slate-800">R$ {fmtCurrency(calculoResumoGeral.pecas)}</p>
+                        </div>
+                        <div className="rounded border border-blue-100 bg-white px-3 py-2">
+                          <p className="text-[11px] text-slate-500">Total Acessórios</p>
+                          <p className="text-sm font-semibold font-mono text-slate-800">R$ {fmtCurrency(calculoResumoGeral.acessorios)}</p>
+                        </div>
+                        <div className="rounded border border-blue-100 bg-white px-3 py-2">
+                          <p className="text-[11px] text-slate-500">Total Produtos</p>
+                          <p className="text-sm font-semibold font-mono text-slate-800">R$ {fmtCurrency(calculoResumoGeral.produtos)}</p>
+                        </div>
+                        <div className="rounded border border-blue-100 bg-white px-3 py-2">
+                          <p className="text-[11px] text-slate-500">Total mão de obra RPS Oficina</p>
+                          <p className="text-sm font-semibold font-mono text-slate-800">R$ {fmtCurrency(calculoResumoGeral.rpsOficina)}</p>
+                        </div>
+                        <div className="rounded border border-blue-100 bg-white px-3 py-2">
+                          <p className="text-[11px] text-slate-500">Total mão de obra RPS Funilaria</p>
+                          <p className="text-sm font-semibold font-mono text-slate-800">R$ {fmtCurrency(calculoResumoGeral.rpsFunilaria)}</p>
+                        </div>
+                        <div className="rounded border border-blue-100 bg-white px-3 py-2">
+                          <p className="text-[11px] text-slate-500">Total mão de obra Mecânico</p>
+                          <p className="text-sm font-semibold font-mono text-slate-800">R$ {fmtCurrency(calculoResumoGeral.mecanicos)}</p>
+                        </div>
+                      </div>
+
+                      {calculoResumoExpandido ? (
+                        <div className="mt-3 rounded border border-blue-100 bg-white px-3 py-2 text-xs text-slate-700">
+                          <p><strong className="text-slate-800">Total de vendas de peças (sem depto 107):</strong> R$ {fmtCurrency(calculoResumoGeral.pecas)}</p>
+                          <p><strong className="text-slate-800">Total de vendas acessórios (depto 107):</strong> R$ {fmtCurrency(calculoResumoGeral.acessorios)}</p>
+                          <p><strong className="text-slate-800">Total de vendas produtos:</strong> R$ {fmtCurrency(calculoResumoGeral.produtos)}</p>
+                          <p><strong className="text-slate-800">Total mão de obra RPS oficina:</strong> R$ {fmtCurrency(calculoResumoGeral.rpsOficina)}</p>
+                          <p><strong className="text-slate-800">Total mão de obra RPS funilaria:</strong> R$ {fmtCurrency(calculoResumoGeral.rpsFunilaria)}</p>
+                          <p><strong className="text-slate-800">Total mão de obra mecânico:</strong> R$ {fmtCurrency(calculoResumoGeral.mecanicos)}</p>
+                        </div>
+                      ) : null}
+
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        Regras aplicadas: Peças exclui depto 107; Acessórios considera depto 107; Mecânico considera mês de competência.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-0.5 w-fit">
