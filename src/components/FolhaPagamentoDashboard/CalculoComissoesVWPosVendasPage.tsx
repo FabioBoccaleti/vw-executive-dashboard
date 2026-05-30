@@ -58,6 +58,12 @@ interface CalculoValorResumo {
   basePecas: number;
   baseRps: number;
   baseTotalPecas: number;
+  basePecasVendas: number;
+  baseAcessorios: number;
+  baseProdutos: number;
+  baseRpsOficina: number;
+  baseRpsFunilaria: number;
+  baseMecanicos: number;
   bonus: number;
   comissao: number;
   total: number;
@@ -396,6 +402,9 @@ function parseDecimal(value: string): number {
 
 function rowAmountForCalculo(origem: string, data: Record<string, string>): number {
   if (origem === 'Produto' || origem === 'Mecânicos') return Math.abs(n(data['VAL_VENDA']));
+  if (origem === 'Oficina RPS') {
+    return Math.abs(n(data['LIQ_NOTA_FISCAL']) + n(data['VAL_PIS_ST']) + n(data['VAL_COFINS_ST']) + n(data['VAL_CSLL']));
+  }
   return Math.abs(n(data['LIQ_NOTA_FISCAL']));
 }
 
@@ -1257,16 +1266,25 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   }
 
   const calculoSourceRows = useMemo(() => {
-    const now = new Date();
-    const systemYear = now.getFullYear();
-    const systemMonth = now.getMonth() + 1;
     const rows: Array<{ data: Record<string, string>; periodo: { year: number; month: number } | null; origem: string }> = [];
 
     allRows.forEach((row) => {
+      const serie = String(row.data['SERIE_NOTA_FISCAL'] ?? '').trim().toUpperCase();
+      const dept = String(row.data['DEPARTAMENTO'] ?? '').trim();
+      let origem = 'Peças';
+
+      if (serie === 'RPS') {
+        if (['104', '122'].includes(dept)) origem = 'Oficina RPS';
+        else if (['106', '129'].includes(dept)) origem = 'Funilaria RPS';
+        else return;
+      } else if (dept === '107') {
+        origem = 'Acessórios';
+      }
+
       rows.push({
         data: row.data,
         periodo: rowPeriod(row),
-        origem: getSourceLabelFromRow(row.data, row.data['SERIE_NOTA_FISCAL'] === 'RPS' ? 'RPS' : 'Vendas'),
+        origem,
       });
     });
 
@@ -1279,8 +1297,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     });
 
     mecanicosRows.forEach((row) => {
-      const period = productRowPeriod(row) ?? { year: systemYear, month: systemMonth };
-      if (period.year !== systemYear || period.month !== systemMonth) return;
+      const period = productRowPeriod(row);
       rows.push({
         data: row.data,
         periodo: period,
@@ -1291,7 +1308,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     return rows.filter((row) => {
       if (!calculoBuscaAtiva) return false;
       if (!row.periodo) return false;
-      if (row.origem !== 'Mecânicos' && (row.periodo.year !== calculoYear || row.periodo.month !== calculoMonth)) return false;
+      if (row.origem === 'Mecânicos') {
+        return row.periodo.year === calculoYear && row.periodo.month === calculoMonth;
+      }
+
       if (!calculoBuscaRange) return true;
       const date = rowDateForCalculo(row.origem, row.data, row.periodo);
       if (!date) return false;
@@ -1343,6 +1363,12 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
           basePecas: 0,
           baseRps: 0,
           baseTotalPecas: 0,
+          basePecasVendas: 0,
+          baseAcessorios: 0,
+          baseProdutos: 0,
+          baseRpsOficina: 0,
+          baseRpsFunilaria: 0,
+          baseMecanicos: 0,
           bonus: 0,
           comissao: 0,
           total: parseDecimal(record?.salarioFixo ?? ''),
@@ -1358,8 +1384,12 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const useDept = deptFilter.size > 0;
       const useTx = txFilter.size > 0;
 
-      let basePecas = 0;
-      let baseRps = 0;
+      let basePecasVendas = 0;
+      let baseAcessorios = 0;
+      let baseProdutos = 0;
+      let baseRpsOficina = 0;
+      let baseRpsFunilaria = 0;
+      let baseMecanicos = 0;
       let countVenda = 0;
       let countDevolucao = 0;
 
@@ -1380,13 +1410,16 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         if (isDevolucao) countDevolucao += 1;
         else countVenda += 1;
 
-        if (row.origem === 'RPS') {
-          baseRps += amount;
-        } else {
-          basePecas += amount;
-        }
+        if (row.origem === 'Peças') basePecasVendas += amount;
+        if (row.origem === 'Acessórios') baseAcessorios += amount;
+        if (row.origem === 'Produto') baseProdutos += amount;
+        if (row.origem === 'Oficina RPS') baseRpsOficina += amount;
+        if (row.origem === 'Funilaria RPS') baseRpsFunilaria += amount;
+        if (row.origem === 'Mecânicos') baseMecanicos += amount;
       });
 
+      const basePecas = basePecasVendas + baseAcessorios + baseProdutos + baseMecanicos;
+      const baseRps = baseRpsOficina + baseRpsFunilaria;
       const baseTotalPecas = basePecas;
       const pctPecas = parseDecimal(record.comissaoPecasPct);
       const pctRps = parseDecimal(record.comissaoRpsPct);
@@ -1410,6 +1443,12 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         basePecas,
         baseRps,
         baseTotalPecas,
+        basePecasVendas,
+        baseAcessorios,
+        baseProdutos,
+        baseRpsOficina,
+        baseRpsFunilaria,
+        baseMecanicos,
         bonus,
         comissao,
         total: salario + comissao + bonus,
@@ -2594,8 +2633,12 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                                 <td colSpan={10} className="px-4 py-3">
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] text-slate-600">
                                     <div className="space-y-1">
-                                      <p><strong className="text-slate-700">Base Peças/Produto:</strong> R$ {fmtCurrency(valores?.basePecas ?? 0)}</p>
-                                      <p><strong className="text-slate-700">Base Mão de Obra RPS:</strong> R$ {fmtCurrency(valores?.baseRps ?? 0)}</p>
+                                      <p><strong className="text-slate-700">Base de Peças:</strong> R$ {fmtCurrency(valores?.basePecasVendas ?? 0)}</p>
+                                      <p><strong className="text-slate-700">Base Acessórios:</strong> R$ {fmtCurrency(valores?.baseAcessorios ?? 0)}</p>
+                                      <p><strong className="text-slate-700">Base Produtos:</strong> R$ {fmtCurrency(valores?.baseProdutos ?? 0)}</p>
+                                      <p><strong className="text-slate-700">Base mão de Obra RPS Oficina:</strong> R$ {fmtCurrency(valores?.baseRpsOficina ?? 0)}</p>
+                                      <p><strong className="text-slate-700">Base mão de Obra RPS Funilaria:</strong> R$ {fmtCurrency(valores?.baseRpsFunilaria ?? 0)}</p>
+                                      <p><strong className="text-slate-700">Base Mão de Obra mecânico:</strong> R$ {fmtCurrency(valores?.baseMecanicos ?? 0)}</p>
                                       <p><strong className="text-slate-700">Volume líquido:</strong> {valores?.volumeLiquido ?? 0}</p>
                                     </div>
                                     <div className="space-y-1">
