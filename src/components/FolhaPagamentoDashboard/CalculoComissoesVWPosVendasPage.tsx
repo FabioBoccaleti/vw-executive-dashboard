@@ -260,6 +260,19 @@ function normalizeFieldKey(value: string): string {
     .toUpperCase();
 }
 
+function normalizeDepartamentoCode(value: string): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const parsed = parseFlexibleNumber(raw);
+  if (parsed !== null) {
+    const rounded = Math.round(parsed);
+    if (Math.abs(parsed - rounded) < 1e-9) return String(rounded);
+  }
+  const digits = raw.replace(/\D+/g, '');
+  if (digits) return String(Number.parseInt(digits, 10));
+  return raw;
+}
+
 function vendorKey(value: string): string {
   return normalizeVendorName(value).toLowerCase();
 }
@@ -712,7 +725,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
   const oficinaBaseRows = useMemo(
     () => allRows.filter((row) => {
-      const dept = (row.data['DEPARTAMENTO'] ?? '').trim();
+      const dept = normalizeDepartamentoCode(row.data['DEPARTAMENTO'] ?? '');
       return row.data['SERIE_NOTA_FISCAL'] === 'RPS' && ['104', '122'].includes(dept);
     }),
     [allRows],
@@ -720,14 +733,14 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
   const funilariaBaseRows = useMemo(
     () => allRows.filter((row) => {
-      const dept = (row.data['DEPARTAMENTO'] ?? '').trim();
+      const dept = normalizeDepartamentoCode(row.data['DEPARTAMENTO'] ?? '');
       return row.data['SERIE_NOTA_FISCAL'] === 'RPS' && ['106', '129'].includes(dept);
     }),
     [allRows],
   );
 
   const acessoriosBaseRows = useMemo(
-    () => allPecasRows.filter((row) => (row.data['DEPARTAMENTO'] ?? '').trim() === '107'),
+    () => allPecasRows.filter((row) => normalizeDepartamentoCode(row.data['DEPARTAMENTO'] ?? '') === '107'),
     [allPecasRows],
   );
 
@@ -1270,7 +1283,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
     allRows.forEach((row) => {
       const serie = String(row.data['SERIE_NOTA_FISCAL'] ?? '').trim().toUpperCase();
-      const dept = String(row.data['DEPARTAMENTO'] ?? '').trim();
+      const dept = normalizeDepartamentoCode(row.data['DEPARTAMENTO'] ?? '');
       let origem = 'Peças';
 
       if (serie === 'RPS') {
