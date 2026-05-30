@@ -33,6 +33,7 @@ export interface CalculoPosVendasRemuneracao {
   comissaoRpsPct: string;
   comissaoTotalPecasPct: string;
   bonusProdutividade: string;
+  premioProduto: string;
   departamentos: string[];
   transacoes: string[];
   bonusEscalas: Array<{
@@ -74,6 +75,7 @@ export async function loadCalculoPosVendasRemuneracoes(): Promise<CalculoPosVend
       comissaoRpsPct: String(item.comissaoRpsPct ?? ''),
       comissaoTotalPecasPct: String(item.comissaoTotalPecasPct ?? ''),
       bonusProdutividade: String(item.bonusProdutividade ?? ''),
+      premioProduto: String(item.premioProduto ?? ''),
       departamentos: Array.isArray(item.departamentos) ? item.departamentos.map((value) => String(value ?? '').trim()).filter(Boolean) : [],
       transacoes: Array.isArray(item.transacoes) ? item.transacoes.map((value) => String(value ?? '').trim()).filter(Boolean) : [],
       bonusEscalas: Array.isArray(item.bonusEscalas)

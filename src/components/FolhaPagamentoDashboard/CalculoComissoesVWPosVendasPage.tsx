@@ -64,6 +64,7 @@ interface CalculoValorResumo {
   baseRpsOficina: number;
   baseRpsFunilaria: number;
   baseMecanicos: number;
+  premioProduto: number;
   bonus: number;
   comissao: number;
   total: number;
@@ -1413,9 +1414,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
           baseRpsOficina: 0,
           baseRpsFunilaria: 0,
           baseMecanicos: 0,
+          premioProduto: parseDecimal(record?.premioProduto ?? ''),
           bonus: 0,
           comissao: 0,
-          total: parseDecimal(record?.salarioFixo ?? ''),
+          total: parseDecimal(record?.salarioFixo ?? '') + parseDecimal(record?.premioProduto ?? ''),
           volumeLiquido: 0,
           bonusRegra: 'Bônus inativo',
           filtros: 'Sem filtros aplicados',
@@ -1478,6 +1480,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const faixaAtiva = firstMatchingFaixa(volumeLiquido, faixas);
       const bonus = faixaAtiva ? parseDecimal(faixaAtiva.bonus) : parseDecimal(record.bonusProdutividade);
       const salario = parseDecimal(record.salarioFixo);
+      const premioProduto = parseDecimal(record.premioProduto ?? '');
       const bonusRegra = faixaAtiva
         ? `Faixa ${faixaAtiva.de || '0'}-${faixaAtiva.ate || 'em diante'} = R$ ${fmtCurrency(parseDecimal(faixaAtiva.bonus))}`
         : `Bônus fixo = R$ ${fmtCurrency(parseDecimal(record.bonusProdutividade))}`;
@@ -1493,9 +1496,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         baseRpsOficina,
         baseRpsFunilaria,
         baseMecanicos,
+        premioProduto,
         bonus,
         comissao,
-        total: salario + comissao + bonus,
+        total: salario + comissao + bonus + premioProduto,
         volumeLiquido,
         bonusRegra,
         filtros,
@@ -1566,6 +1570,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             comissaoRpsPct: existing.comissaoRpsPct ?? '',
             comissaoTotalPecasPct: existing.comissaoTotalPecasPct ?? '',
             bonusProdutividade: existing.bonusProdutividade ?? '',
+            premioProduto: existing.premioProduto ?? '',
             departamentos: existing.departamentos?.length ? existing.departamentos : departamentosDefault,
             transacoes: existing.transacoes?.length ? existing.transacoes : transacoesDefault,
             bonusEscalas: existing.bonusEscalas?.length ? existing.bonusEscalas : [createBonusEscalaDraft()],
@@ -1583,6 +1588,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             comissaoRpsPct: '',
             comissaoTotalPecasPct: '',
             bonusProdutividade: '',
+            premioProduto: '',
             departamentos: departamentosDefault,
             transacoes: transacoesDefault,
             bonusEscalas: [createBonusEscalaDraft()],
@@ -1782,6 +1788,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       comissaoRpsPct: String(calculoDraft.comissaoRpsPct ?? '').trim(),
       comissaoTotalPecasPct: String(calculoDraft.comissaoTotalPecasPct ?? '').trim(),
       bonusProdutividade: String(calculoDraft.bonusProdutividade ?? '').trim(),
+      premioProduto: String(calculoDraft.premioProduto ?? '').trim(),
       departamentos: (calculoDraft.departamentos ?? []).map((item) => normalizeVendorName(item)).filter(Boolean),
       transacoes: (calculoDraft.transacoes ?? []).map((item) => normalizeVendorName(item)).filter(Boolean),
       bonusEscalas: cleanBonusEscalas((calculoDraft.bonusEscalas ?? []) as BonusEscalaDraft[]),
@@ -1969,13 +1976,16 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     return rows.reduce((acc, item) => {
       const salarioFixo = parseDecimal(item.salarioFixo ?? '');
       const bonusProdutividade = parseDecimal(item.bonusProdutividade ?? '');
+      const premioProduto = parseDecimal(item.premioProduto ?? '');
       acc.salarioFixo += salarioFixo;
       acc.bonusProdutividade += bonusProdutividade;
-      acc.totalRemuneracao += salarioFixo + bonusProdutividade;
+      acc.premioProduto += premioProduto;
+      acc.totalRemuneracao += salarioFixo + bonusProdutividade + premioProduto;
       return acc;
     }, {
       salarioFixo: 0,
       bonusProdutividade: 0,
+      premioProduto: 0,
       totalRemuneracao: 0,
     });
   }
@@ -1984,7 +1994,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     return calcDemonstrativoTotais(demonstrativoFilteredRows);
   }, [demonstrativoFilteredRows]);
 
-  const demonstrativoTotaisByTab = useMemo<Record<DemonstrativoSubTab, { salarioFixo: number; bonusProdutividade: number; totalRemuneracao: number }>>(() => {
+  const demonstrativoTotaisByTab = useMemo<Record<DemonstrativoSubTab, { salarioFixo: number; bonusProdutividade: number; premioProduto: number; totalRemuneracao: number }>>(() => {
     return {
       pecas: calcDemonstrativoTotais(demonstrativoRowsByTab.pecas),
       oficina: calcDemonstrativoTotais(demonstrativoRowsByTab.oficina),
@@ -2822,8 +2832,9 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                                     </div>
                                     <div className="space-y-1">
                                       <p><strong className="text-slate-700">Regra bônus:</strong> {valores?.bonusRegra ?? '—'}</p>
+                                      <p><strong className="text-slate-700">Prêmio Produto:</strong> R$ {fmtCurrency(valores?.premioProduto ?? 0)}</p>
                                       <p><strong className="text-slate-700">Filtros:</strong> {valores?.filtros ?? '—'}</p>
-                                      <p><strong className="text-slate-700">Composição:</strong> Salário + Comissão + Bônus</p>
+                                      <p><strong className="text-slate-700">Composição:</strong> Salário + Comissão + Bônus + Prêmio Produto</p>
                                     </div>
                                   </div>
                                 </td>
@@ -2839,7 +2850,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
               {calculoModalOpen && calculoDraft && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                  <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+                  <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl">
                     <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
                       <div>
                         <p className="text-sm font-bold text-slate-800">Cadastro de remuneração</p>
@@ -2916,7 +2927,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-slate-600 mb-1">Comissão Peças (%)</label>
                           <input
@@ -2955,7 +2966,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-slate-600 mb-1">Bônus produtividade fixo (R$)</label>
                           <input
@@ -2968,7 +2979,19 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                             className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                           />
                         </div>
-                        <label className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Prêmio Produto (R$)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={calculoDraft.premioProduto ?? ''}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, premioProduto: e.target.value })}
+                            disabled={calculoBloqueado}
+                            placeholder="0,00"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                        </div>
+                        <label className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-3 sm:col-span-1">
                           <input
                             type="checkbox"
                             checked={calculoDraft.descontarDevolucao}
@@ -3283,7 +3306,8 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
                           const salarioFixo = parseDecimal(item.salarioFixo ?? '');
                           const bonusProdutividade = parseDecimal(item.bonusProdutividade ?? '');
-                          const totalRemuneracao = salarioFixo + bonusProdutividade;
+                          const premioProduto = parseDecimal(item.premioProduto ?? '');
+                          const totalRemuneracao = salarioFixo + bonusProdutividade + premioProduto;
                           return (
                             <tr key={`${item.id}-${index}`} className={`${rowBg} border-t border-slate-100 hover:bg-slate-100/70`}>
                               <td className={`sticky-col px-3 py-2 text-center whitespace-nowrap font-semibold text-slate-800 ${rowBg}`} style={{ left: 0 }}>{item.vendedor}</td>
@@ -3296,7 +3320,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
                               <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{bonusProdutividade > 0 ? `R$ ${fmtCurrency(bonusProdutividade)}` : ''}</td>
-                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{premioProduto > 0 ? `R$ ${fmtCurrency(premioProduto)}` : ''}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
                               <td className="px-3 py-2 text-center whitespace-nowrap font-mono font-semibold bg-violet-100/80">{totalRemuneracao > 0 ? `R$ ${fmtCurrency(totalRemuneracao)}` : ''}</td>
                             </tr>
@@ -3312,6 +3336,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                           <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.bonusProdutividade)}</td>
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
+                          <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.premioProduto)}</td>
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                           <td className="px-3 py-2 text-center font-mono font-bold whitespace-nowrap bg-violet-200/90">R$ {fmtCurrency(demonstrativoTotais.totalRemuneracao)}</td>
                         </tr>
@@ -3379,7 +3404,8 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                               const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
                               const salarioFixo = parseDecimal(item.salarioFixo ?? '');
                               const bonusProdutividade = parseDecimal(item.bonusProdutividade ?? '');
-                              const totalRemuneracao = salarioFixo + bonusProdutividade;
+                              const premioProduto = parseDecimal(item.premioProduto ?? '');
+                              const totalRemuneracao = salarioFixo + bonusProdutividade + premioProduto;
                               return (
                                 <tr key={`${tab.id}-${item.id}-${index}`} className={`${rowBg} border-t border-slate-100`}>
                                   <td className={`px-3 py-2 text-center whitespace-nowrap font-semibold text-slate-800 ${rowBg}`}>{item.vendedor}</td>
@@ -3392,7 +3418,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                                   <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
                                   <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
                                   <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{bonusProdutividade > 0 ? `R$ ${fmtCurrency(bonusProdutividade)}` : ''}</td>
-                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                                  <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{premioProduto > 0 ? `R$ ${fmtCurrency(premioProduto)}` : ''}</td>
                                   <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
                                   <td className="px-3 py-2 text-center whitespace-nowrap font-mono font-semibold bg-violet-100/80">{totalRemuneracao > 0 ? `R$ ${fmtCurrency(totalRemuneracao)}` : ''}</td>
                                 </tr>
@@ -3408,6 +3434,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                               <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(totais.bonusProdutividade)}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
+                              <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(totais.premioProduto)}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                               <td className="px-3 py-2 text-center font-mono font-bold whitespace-nowrap bg-violet-200/90">R$ {fmtCurrency(totais.totalRemuneracao)}</td>
                             </tr>
