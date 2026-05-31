@@ -3,16 +3,20 @@ import { Loader2, Settings2 } from 'lucide-react';
 import {
   type AnaliseBrand,
   type RateioCirculanteConfig,
+  type RateioDepartamentoBrandYearData,
+  type RateioDepartamentoValores,
   type RateioEndividamentoBrandYearData,
   type RateioResultadoLinha,
   type RateioResultadosBrandYearData,
   type RateioTaxaJurosYearData,
+  loadRateioDepartamento,
   loadRateioEndividamento,
   loadMultipleMonthsAnaliseDespesas,
   loadRateioCirculanteConfig,
   loadRateioResultados,
   loadRateioTaxaJuros,
   saveRateioCirculanteConfig,
+  saveRateioDepartamento,
   saveRateioEndividamento,
   saveRateioResultados,
   saveRateioTaxaJuros,
@@ -20,6 +24,8 @@ import {
 
 type CirculanteGroup = 'ativo' | 'passivo';
 type MonthChoice = 'all' | number;
+type MainTab = 'rotativo' | 'departamento';
+type DepartmentKey = keyof RateioDepartamentoValores;
 
 interface ParsedAccount {
   conta: string;
@@ -46,6 +52,16 @@ const DEFAULT_CONFIG: RateioCirculanteConfig = {
 const BRAND_LABEL: Record<AnaliseBrand, string> = {
   vw: 'VW',
   audi: 'Audi',
+};
+
+const DEPARTMENT_ORDER: DepartmentKey[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria'];
+const DEPARTMENT_LABELS: Record<DepartmentKey, string> = {
+  novos: 'Novos',
+  vendaDireta: 'Venda Direta',
+  usados: 'Usados',
+  pecas: 'Peças',
+  oficina: 'Oficina',
+  funilaria: 'Funilaria',
 };
 
 const EMPTY_RESULTS_BY_MONTH: RateioResultadosBrandYearData = {
@@ -91,6 +107,30 @@ const EMPTY_TAXA_JUROS_BY_MONTH: RateioTaxaJurosYearData = {
   10: 0,
   11: 0,
   12: 0,
+};
+
+const EMPTY_DEPARTAMENTO_VALORES: RateioDepartamentoValores = {
+  novos: 0,
+  vendaDireta: 0,
+  usados: 0,
+  pecas: 0,
+  oficina: 0,
+  funilaria: 0,
+};
+
+const EMPTY_DEPARTAMENTO_BY_MONTH: RateioDepartamentoBrandYearData = {
+  1: {},
+  2: {},
+  3: {},
+  4: {},
+  5: {},
+  6: {},
+  7: {},
+  8: {},
+  9: {},
+  10: {},
+  11: {},
+  12: {},
 };
 
 function parseBalanceteCirculante(text: string): AccountsByConta {
@@ -157,6 +197,26 @@ function cloneEndividamentoByMonth(data?: RateioEndividamentoBrandYearData): Rat
   return out;
 }
 
+function cloneDepartamentoByMonth(data?: RateioDepartamentoBrandYearData): RateioDepartamentoBrandYearData {
+  const out: RateioDepartamentoBrandYearData = {
+    1: {}, 2: {}, 3: {}, 4: {}, 5: {}, 6: {}, 7: {}, 8: {}, 9: {}, 10: {}, 11: {}, 12: {},
+  };
+  if (!data) return out;
+  for (const month of MONTHS) {
+    const monthData = data[month] ?? {};
+    const rows: Record<string, RateioDepartamentoValores> = {};
+    for (const [conta, valores] of Object.entries(monthData)) {
+      rows[conta] = { ...EMPTY_DEPARTAMENTO_VALORES, ...valores };
+    }
+    out[month] = rows;
+  }
+  return out;
+}
+
+function cloneDepartamentoValores(data?: RateioDepartamentoValores): RateioDepartamentoValores {
+  return { ...EMPTY_DEPARTAMENTO_VALORES, ...(data ?? {}) };
+}
+
 function parseManualValue(raw: string): number {
   if (!raw.trim()) return 0;
   const normalized = raw.replace(/\./g, '').replace(',', '.');
@@ -205,6 +265,14 @@ function getBrandMonthEndividamentoTotal(
   const monthAccounts = accountsByMonth[month] ?? {};
   const raw = selectedContas.reduce((sum, conta) => sum + (monthAccounts[conta]?.saldoAtual ?? 0), 0);
   return raw > 0 ? 0 : raw;
+}
+
+function getRowDepartamentoTotal(valores: RateioDepartamentoValores): number {
+  return DEPARTMENT_ORDER.reduce((sum, departamento) => sum + (Number(valores[departamento]) || 0), 0);
+}
+
+function getRowDepartamentoDiff(saldoAtual: number, valores: RateioDepartamentoValores): number {
+  return saldoAtual - getRowDepartamentoTotal(valores);
 }
 
 function ConfigSection({
@@ -667,10 +735,116 @@ function BrandMonthTable({
   );
 }
 
+function DepartamentoLinhasTable({
+  brand,
+  month,
+  title,
+  rows,
+  allocations,
+  onChangeAllocation,
+}: {
+  brand: AnaliseBrand;
+  month: number;
+  title: string;
+  rows: Array<{ conta: string; desc: string; saldoAtual: number }>;
+  allocations: Record<string, RateioDepartamentoValores>;
+  onChangeAllocation: (brand: AnaliseBrand, month: number, conta: string, departamento: DepartmentKey, value: number) => void;
+}) {
+  const baseTotal = rows.reduce((sum, row) => sum + row.saldoAtual, 0);
+  const percentBase = Math.abs(baseTotal);
+  const departmentTotals = DEPARTMENT_ORDER.reduce((acc, dept) => {
+    acc[dept] = rows.reduce((sum, row) => sum + (Number(allocations[row.conta]?.[dept]) || 0), 0);
+    return acc;
+  }, {} as Record<DepartmentKey, number>);
+
+  const anyError = rows.some((row) => getRowDepartamentoDiff(row.saldoAtual, allocations[row.conta] ?? EMPTY_DEPARTAMENTO_VALORES) !== 0);
+
+  return (
+    <div className="mb-4">
+      <h4 className="text-sm font-bold text-slate-700 mb-2">{title}</h4>
+      <div className="overflow-x-auto border border-slate-200 rounded-lg">
+        <table className="min-w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600 sticky top-0">
+            <tr>
+              <th className="text-left px-3 py-2 font-semibold">Conta</th>
+              <th className="text-left px-3 py-2 font-semibold">Descrição</th>
+              <th className="text-right px-3 py-2 font-semibold">Saldo Atual</th>
+              {DEPARTMENT_ORDER.map((dept) => (
+                <th key={dept} className="text-right px-2 py-2 font-semibold whitespace-nowrap">{DEPARTMENT_LABELS[dept]}</th>
+              ))}
+              <th className="text-right px-3 py-2 font-semibold">Total Deptos</th>
+              <th className="text-right px-3 py-2 font-semibold">Diferença</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={3 + DEPARTMENT_ORDER.length + 2} className="px-3 py-4 text-center text-slate-500">Nenhuma conta selecionada para este grupo.</td>
+              </tr>
+            ) : (
+              rows.map((row) => {
+                const values = cloneDepartamentoValores(allocations[row.conta]);
+                const totalDeptos = getRowDepartamentoTotal(values);
+                const diff = getRowDepartamentoDiff(row.saldoAtual, values);
+                const rowError = diff !== 0;
+
+                return (
+                  <tr key={row.conta} className={`border-t border-slate-100 ${rowError ? 'bg-red-50/40' : ''}`}>
+                    <td className="px-3 py-2 font-mono text-[11px]">{row.conta}</td>
+                    <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{row.desc}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-slate-800 whitespace-nowrap">{formatCurrency(row.saldoAtual)}</td>
+                    {DEPARTMENT_ORDER.map((dept) => (
+                      <td key={dept} className="px-2 py-2 text-right">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={Number(values[dept] ?? 0)}
+                          onChange={(e) => onChangeAllocation(brand, month, row.conta, dept, Number(e.target.value) || 0)}
+                          className="w-24 h-8 px-2 text-right rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </td>
+                    ))}
+                    <td className={`px-3 py-2 text-right font-semibold whitespace-nowrap ${rowError ? 'text-red-700' : 'text-slate-800'}`}>
+                      {formatCurrency(totalDeptos)}
+                    </td>
+                    <td className={`px-3 py-2 text-right font-semibold whitespace-nowrap ${rowError ? 'text-red-700' : 'text-emerald-700'}`}>
+                      {formatCurrency(diff)}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+          <tfoot>
+            <tr className={`border-t-2 border-slate-200 bg-slate-50 ${anyError ? 'bg-red-50' : ''}`}>
+              <td colSpan={3} className="px-3 py-2 text-right font-bold text-slate-800">Total {title}</td>
+              {DEPARTMENT_ORDER.map((dept) => (
+                <td key={dept} className="px-2 py-2 text-right font-bold text-slate-900 whitespace-nowrap">{formatCurrency(departmentTotals[dept])}</td>
+              ))}
+              <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(rows.reduce((sum, row) => sum + row.saldoAtual, 0))}</td>
+              <td className={`px-3 py-2 text-right font-bold ${anyError ? 'text-red-700' : 'text-emerald-700'}`}>{anyError ? 'Há diferenças' : 'OK'}</td>
+            </tr>
+            <tr className="border-t border-slate-100 bg-sky-50">
+              <td colSpan={3} className="px-3 py-2 text-right font-semibold text-slate-700">% sobre base circulante</td>
+              {DEPARTMENT_ORDER.map((dept) => (
+                <td key={dept} className="px-2 py-2 text-right font-bold text-slate-900 whitespace-nowrap">
+                  {percentBase > 0 ? `${((departmentTotals[dept] / percentBase) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : '0,00%'}
+                </td>
+              ))}
+              <td colSpan={2} />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesasFinanceirasPageProps) {
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 6 }, (_, i) => currentYear - 2 + i);
 
+  const [activeTab, setActiveTab] = useState<MainTab>('rotativo');
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<MonthChoice>('all');
   const [loading, setLoading] = useState(true);
@@ -689,6 +863,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     cloneEndividamentoByMonth(EMPTY_ENDIVIDAMENTO_BY_MONTH),
   );
   const [taxaJurosByMonth, setTaxaJurosByMonth] = useState<RateioTaxaJurosYearData>({ ...EMPTY_TAXA_JUROS_BY_MONTH });
+  const [vwDepartamento, setVwDepartamento] = useState<RateioDepartamentoBrandYearData>(cloneDepartamentoByMonth(EMPTY_DEPARTAMENTO_BY_MONTH));
+  const [audiDepartamento, setAudiDepartamento] = useState<RateioDepartamentoBrandYearData>(cloneDepartamentoByMonth(EMPTY_DEPARTAMENTO_BY_MONTH));
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [ativoOptions, setAtivoOptions] = useState<Array<{ conta: string; desc: string }>>([]);
   const [passivoOptions, setPassivoOptions] = useState<Array<{ conta: string; desc: string }>>([]);
@@ -708,6 +884,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           savedVwEndividamento,
           savedAudiEndividamento,
           savedTaxaJuros,
+          savedVwDepartamento,
+          savedAudiDepartamento,
         ] = await Promise.all([
           loadRateioCirculanteConfig(),
           loadMultipleMonthsAnaliseDespesas('vw', selectedYear, MONTHS),
@@ -717,6 +895,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           loadRateioEndividamento('vw', selectedYear),
           loadRateioEndividamento('audi', selectedYear),
           loadRateioTaxaJuros(selectedYear),
+          loadRateioDepartamento('vw', selectedYear),
+          loadRateioDepartamento('audi', selectedYear),
         ]);
 
         if (cancelled) return;
@@ -754,6 +934,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         setVwEndividamento(cloneEndividamentoByMonth(savedVwEndividamento));
         setAudiEndividamento(cloneEndividamentoByMonth(savedAudiEndividamento));
         setTaxaJurosByMonth({ ...EMPTY_TAXA_JUROS_BY_MONTH, ...savedTaxaJuros });
+        setVwDepartamento(cloneDepartamentoByMonth(savedVwDepartamento));
+        setAudiDepartamento(cloneDepartamentoByMonth(savedAudiDepartamento));
         setDescriptions(descMap);
         setAtivoOptions(
           Array.from(ativoMap.entries())
@@ -878,6 +1060,39 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     });
   }
 
+  function applyDepartamentoUpdate(
+    brand: AnaliseBrand,
+    updater: (current: RateioDepartamentoBrandYearData) => RateioDepartamentoBrandYearData,
+  ) {
+    const current = brand === 'vw' ? vwDepartamento : audiDepartamento;
+    const next = updater(cloneDepartamentoByMonth(current));
+    if (brand === 'vw') {
+      setVwDepartamento(next);
+    } else {
+      setAudiDepartamento(next);
+    }
+    void saveRateioDepartamento(brand, selectedYear, next);
+  }
+
+  function handleDepartamentoChange(
+    brand: AnaliseBrand,
+    month: number,
+    conta: string,
+    departamento: DepartmentKey,
+    value: number,
+  ) {
+    applyDepartamentoUpdate(brand, (current) => {
+      const monthData = { ...(current[month] ?? {}) };
+      const existing = cloneDepartamentoValores(monthData[conta]);
+      monthData[conta] = {
+        ...existing,
+        [departamento]: value,
+      };
+      current[month] = monthData;
+      return current;
+    });
+  }
+
   function handleApplyTaxaFromMonth(month: number, taxaPercent: number) {
     const sanitized = Number.isFinite(taxaPercent) ? Math.max(0, taxaPercent) : 0;
     const next: RateioTaxaJurosYearData = { ...taxaJurosByMonth };
@@ -966,6 +1181,38 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     return out;
   }, [taxaJurosByMonth, vwEndividamento, audiEndividamento, vwData, audiData, monthTotals]);
 
+  const departmentMonthData = useMemo(() => {
+    const mapData = (brand: AnaliseBrand, month: number) => {
+      const selectedActive = getSelectedAccounts(config, brand, 'ativo');
+      const selectedPassivo = getSelectedAccounts(config, brand, 'passivo');
+      const monthAccounts = brand === 'vw' ? vwData[month] ?? {} : audiData[month] ?? {};
+      const allocations = brand === 'vw' ? (vwDepartamento[month] ?? {}) : (audiDepartamento[month] ?? {});
+
+      const buildRows = (contas: string[]) => contas.map((conta) => ({
+        conta,
+        desc: monthAccounts[conta]?.desc || descriptions[conta] || 'Conta não encontrada no balancete do mês',
+        saldoAtual: monthAccounts[conta]?.saldoAtual ?? 0,
+      }));
+
+      return {
+        ativo: buildRows(selectedActive),
+        passivo: buildRows(selectedPassivo),
+        allocations,
+      };
+    };
+
+    return {
+      vw: MONTHS.reduce((acc, month) => {
+        acc[month] = mapData('vw', month);
+        return acc;
+      }, {} as Record<number, ReturnType<typeof mapData>>),
+      audi: MONTHS.reduce((acc, month) => {
+        acc[month] = mapData('audi', month);
+        return acc;
+      }, {} as Record<number, ReturnType<typeof mapData>>),
+    };
+  }, [config, vwData, audiData, vwDepartamento, audiDepartamento, descriptions]);
+
   function renderLiquidezEntreMarcasTable(month: number) {
     const financial = monthFinancials[month];
     if (!financial) return null;
@@ -1013,6 +1260,78 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                 <td colSpan={4} className="px-3 py-2 text-right font-bold text-slate-800">Liquidação Final do Mês</td>
                 <td colSpan={3} className="px-3 py-2 text-right font-bold text-slate-900">
                   {transferencia.valor > 0 ? `${transferencia.de} paga para ${transferencia.para} ${formatCurrency(transferencia.valor)}` : 'Sem transferência entre marcas'}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  function renderDepartamentoBrandPanel(brand: AnaliseBrand, month: number) {
+    const monthData = departmentMonthData[brand][month];
+    const ativoRows = monthData.ativo;
+    const passivoRows = monthData.passivo;
+    const allocations = monthData.allocations;
+    const brandLabel = BRAND_LABEL[brand];
+    const baseCirculante = [...ativoRows, ...passivoRows].reduce((sum, row) => sum + row.saldoAtual, 0);
+    const baseCirculantePercent = Math.abs(baseCirculante);
+    const combinedRows = [...ativoRows, ...passivoRows];
+    const combinedDepartmentTotals = DEPARTMENT_ORDER.reduce((acc, dept) => {
+      acc[dept] = combinedRows.reduce((sum, row) => sum + (Number(allocations[row.conta]?.[dept]) || 0), 0);
+      return acc;
+    }, {} as Record<DepartmentKey, number>);
+    const combinedPercentSum = DEPARTMENT_ORDER.reduce((sum, dept) => {
+      if (baseCirculantePercent <= 0) return sum;
+      return sum + (combinedDepartmentTotals[dept] / baseCirculantePercent) * 100;
+    }, 0);
+
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 space-y-4">
+        <h3 className="text-base font-bold text-slate-800">{brandLabel} - {MONTH_NAMES[month - 1]}</h3>
+        <DepartamentoLinhasTable
+          brand={brand}
+          month={month}
+          title="Ativo Circulante"
+          rows={ativoRows}
+          allocations={allocations}
+          onChangeAllocation={handleDepartamentoChange}
+        />
+        <DepartamentoLinhasTable
+          brand={brand}
+          month={month}
+          title="Passivo Circulante"
+          rows={passivoRows}
+          allocations={allocations}
+          onChangeAllocation={handleDepartamentoChange}
+        />
+        <div className="overflow-x-auto border border-slate-200 rounded-lg">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="text-left px-3 py-2 font-semibold">Departamento</th>
+                <th className="text-right px-3 py-2 font-semibold">Total Alocado</th>
+                <th className="text-right px-3 py-2 font-semibold">% Uso do Circulante</th>
+              </tr>
+            </thead>
+            <tbody>
+              {DEPARTMENT_ORDER.map((dept) => (
+                <tr key={dept} className="border-t border-slate-100">
+                  <td className="px-3 py-2 text-slate-700 font-semibold">{DEPARTMENT_LABELS[dept]}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(combinedDepartmentTotals[dept])}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-800">
+                    {baseCirculantePercent > 0 ? `${((combinedDepartmentTotals[dept] / baseCirculantePercent) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : '0,00%'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-slate-50">
+                <td className="px-3 py-2 text-right font-bold text-slate-800">Total da Marca</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(combinedRows.reduce((sum, row) => sum + row.saldoAtual, 0))}</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">
+                  Soma %: {combinedPercentSum.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
                 </td>
               </tr>
             </tfoot>
@@ -1092,13 +1411,28 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         </div>
       </div>
 
+      <div className="bg-slate-50 border-b border-slate-200 px-6 py-3 flex items-center gap-2">
+        <button
+          onClick={() => setActiveTab('rotativo')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-colors ${activeTab === 'rotativo' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+        >
+          Rotativo
+        </button>
+        <button
+          onClick={() => setActiveTab('departamento')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-colors ${activeTab === 'departamento' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+        >
+          Rateio Departamento
+        </button>
+      </div>
+
       <div className="p-6 space-y-6">
         {loading ? (
           <div className="bg-white rounded-xl border border-slate-200 py-16 flex items-center justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-slate-500" />
           </div>
         ) : (
-          monthsToRender.map((month) => (
+          activeTab === 'rotativo' ? monthsToRender.map((month) => (
             <section key={month} className="space-y-3">
               <h2 className="text-lg font-bold text-slate-800">{MONTH_NAMES[month - 1]} / {selectedYear}</h2>
               <MonthTaxaJurosControl
@@ -1143,6 +1477,14 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                 />
               </div>
               {renderLiquidezEntreMarcasTable(month)}
+            </section>
+          )) : monthsToRender.map((month) => (
+            <section key={month} className="space-y-4">
+              <h2 className="text-lg font-bold text-slate-800">Rateio Departamento - {MONTH_NAMES[month - 1]} / {selectedYear}</h2>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {renderDepartamentoBrandPanel('vw', month)}
+                {renderDepartamentoBrandPanel('audi', month)}
+              </div>
             </section>
           ))
         )}

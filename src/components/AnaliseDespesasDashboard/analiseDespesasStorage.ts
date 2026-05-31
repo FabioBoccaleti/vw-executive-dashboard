@@ -38,6 +38,18 @@ export interface RateioResultadoLinha {
 export type RateioResultadosBrandYearData = Record<number, RateioResultadoLinha[]>;
 export type RateioEndividamentoBrandYearData = Record<number, string[]>;
 export type RateioTaxaJurosYearData = Record<number, number>;
+export type RateioDepartamentoName = 'novos' | 'vendaDireta' | 'usados' | 'pecas' | 'oficina' | 'funilaria';
+
+export interface RateioDepartamentoValores {
+  novos: number;
+  vendaDireta: number;
+  usados: number;
+  pecas: number;
+  oficina: number;
+  funilaria: number;
+}
+
+export type RateioDepartamentoBrandYearData = Record<number, Record<string, RateioDepartamentoValores>>;
 
 function getKey(brand: AnaliseBrand, year: number, month: number): string {
   const mm = String(month).padStart(2, '0');
@@ -62,6 +74,10 @@ function getRateioEndividamentoKey(brand: AnaliseBrand, year: number): string {
 
 function getRateioTaxaJurosKey(year: number): string {
   return `analise_despesas_rateio_taxa_juros_${year}`;
+}
+
+function getRateioDepartamentoKey(brand: AnaliseBrand, year: number): string {
+  return `analise_despesas_rateio_departamento_${brand}_${year}`;
 }
 
 function getDefaultRateioConfig(): RateioCirculanteConfig {
@@ -92,6 +108,25 @@ function getDefaultRateioTaxaJurosData(): RateioTaxaJurosYearData {
   const out: RateioTaxaJurosYearData = {};
   for (let month = 1; month <= 12; month++) {
     out[month] = 0;
+  }
+  return out;
+}
+
+function getDefaultRateioDepartamentoValores(): RateioDepartamentoValores {
+  return {
+    novos: 0,
+    vendaDireta: 0,
+    usados: 0,
+    pecas: 0,
+    oficina: 0,
+    funilaria: 0,
+  };
+}
+
+function getDefaultRateioDepartamentoData(): RateioDepartamentoBrandYearData {
+  const out: RateioDepartamentoBrandYearData = {};
+  for (let month = 1; month <= 12; month++) {
+    out[month] = {};
   }
   return out;
 }
@@ -345,5 +380,52 @@ export async function saveRateioTaxaJuros(
     await kvSet(getRateioTaxaJurosKey(year), payload);
   } catch (err) {
     console.error('Erro ao salvar taxa de juros do rateio:', err);
+  }
+}
+
+/** Carrega o rateio por departamento por marca/ano. */
+export async function loadRateioDepartamento(
+  brand: AnaliseBrand,
+  year: number,
+): Promise<RateioDepartamentoBrandYearData> {
+  try {
+    const saved = await kvGet<Record<string, Record<string, RateioDepartamentoValores>>>(getRateioDepartamentoKey(brand, year));
+    const base = getDefaultRateioDepartamentoData();
+    if (!saved) return base;
+
+    for (let month = 1; month <= 12; month++) {
+      const monthData = saved[String(month)];
+      if (!monthData || typeof monthData !== 'object') continue;
+      const rows: Record<string, RateioDepartamentoValores> = {};
+      for (const [conta, valores] of Object.entries(monthData)) {
+        rows[conta] = {
+          novos: Number(valores?.novos) || 0,
+          vendaDireta: Number(valores?.vendaDireta) || 0,
+          usados: Number(valores?.usados) || 0,
+          pecas: Number(valores?.pecas) || 0,
+          oficina: Number(valores?.oficina) || 0,
+          funilaria: Number(valores?.funilaria) || 0,
+        };
+      }
+      base[month] = rows;
+    }
+
+    return base;
+  } catch (err) {
+    console.error('Erro ao carregar rateio por departamento:', err);
+    return getDefaultRateioDepartamentoData();
+  }
+}
+
+/** Salva o rateio por departamento por marca/ano. */
+export async function saveRateioDepartamento(
+  brand: AnaliseBrand,
+  year: number,
+  data: RateioDepartamentoBrandYearData,
+): Promise<void> {
+  try {
+    await kvSet(getRateioDepartamentoKey(brand, year), data);
+  } catch (err) {
+    console.error('Erro ao salvar rateio por departamento:', err);
   }
 }
