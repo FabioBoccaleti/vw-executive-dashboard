@@ -24,7 +24,7 @@ import {
 
 type CirculanteGroup = 'ativo' | 'passivo';
 type MonthChoice = 'all' | number;
-type MainTab = 'rotativo' | 'departamento';
+type MainTab = 'rotativo' | 'departamento' | 'contabil';
 type DepartmentKey = keyof RateioDepartamentoValores;
 
 interface ParsedAccount {
@@ -63,6 +63,7 @@ const DEPARTMENT_LABELS: Record<DepartmentKey, string> = {
   oficina: 'Oficina',
   funilaria: 'Funilaria',
 };
+const JUROS_CONTA_CONTABIL = '5.5.7.01.01.008 - Juros S/ Estoques';
 
 const EMPTY_RESULTS_BY_MONTH: RateioResultadosBrandYearData = {
   1: [],
@@ -1398,6 +1399,144 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     );
   }
 
+  function getDepartamentoResumo(brand: AnaliseBrand, month: number) {
+    const monthData = departmentMonthData[brand][month];
+    const ativoRows = monthData.ativo;
+    const passivoRows = monthData.passivo;
+    const allocations = monthData.allocations;
+    const combinedRows = [...ativoRows, ...passivoRows];
+    const baseCirculante = combinedRows.reduce((sum, row) => sum + row.saldoAtual, 0);
+    const baseCirculantePercent = Math.abs(baseCirculante);
+    const departmentTotals = DEPARTMENT_ORDER.reduce((acc, dept) => {
+      acc[dept] = combinedRows.reduce((sum, row) => sum + (Number(allocations[row.conta]?.[dept]) || 0), 0);
+      return acc;
+    }, {} as Record<DepartmentKey, number>);
+    const departmentPercents = DEPARTMENT_ORDER.reduce((acc, dept) => {
+      acc[dept] = baseCirculantePercent > 0 ? (departmentTotals[dept] / baseCirculantePercent) * 100 : 0;
+      return acc;
+    }, {} as Record<DepartmentKey, number>);
+
+    const financial = monthFinancials[month];
+    const jurosReconhecido = brand === 'vw' ? (financial?.vwJurosCalculado ?? 0) : (financial?.audiJurosCalculado ?? 0);
+    const valorAReceber = brand === 'vw' ? (financial?.vwAReceberDaAudi ?? 0) : (financial?.audiAReceberDaVw ?? 0);
+    const valorAPagar = brand === 'vw' ? (financial?.vwAPagarParaAudi ?? 0) : (financial?.audiAPagarParaVw ?? 0);
+    const saldoLiquido = brand === 'vw' ? (financial?.vwSaldoLiquido ?? 0) : (financial?.audiSaldoLiquido ?? 0);
+    const valorDebitoLiquidacao = saldoLiquido < 0 ? Math.abs(saldoLiquido) : 0;
+    const valorCreditoLiquidacao = saldoLiquido > 0 ? saldoLiquido : 0;
+    const jurosRatear = jurosReconhecido + valorAPagar - valorAReceber;
+    const jurosDeptos = DEPARTMENT_ORDER.reduce((acc, dept) => {
+      acc[dept] = jurosRatear * (departmentPercents[dept] / 100);
+      return acc;
+    }, {} as Record<DepartmentKey, number>);
+
+    return {
+      jurosReconhecido,
+      valorAReceber,
+      valorAPagar,
+      saldoLiquido,
+      valorDebitoLiquidacao,
+      valorCreditoLiquidacao,
+      jurosRatear,
+      departmentTotals,
+      departmentPercents,
+      jurosDeptos,
+      somaJurosDeptos: DEPARTMENT_ORDER.reduce((sum, dept) => sum + jurosDeptos[dept], 0),
+    };
+  }
+
+  function renderContabilBrandSection(brand: AnaliseBrand, month: number) {
+    const resumo = getDepartamentoResumo(brand, month);
+    const brandLabel = BRAND_LABEL[brand];
+
+    return (
+      <div className="bg-white border border-slate-300 rounded-xl p-5 space-y-4">
+        <div>
+          <h3 className="text-lg font-bold text-slate-900">{brandLabel} - Demonstrativo Contábil</h3>
+          <p className="text-xs text-slate-600">Período: {MONTH_NAMES[month - 1]}/{selectedYear}</p>
+          <p className="text-xs text-slate-600">Conta Contábil: {JUROS_CONTA_CONTABIL}</p>
+        </div>
+
+        <div className="overflow-x-auto border border-slate-200 rounded-lg">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-slate-700">
+              <tr>
+                <th className="text-left px-3 py-2 font-semibold">Memória de Cálculo</th>
+                <th className="text-right px-3 py-2 font-semibold">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2">Juros Reconhecido da Marca</td>
+                <td className="px-3 py-2 text-right font-semibold">{formatCurrency(resumo.jurosReconhecido)}</td>
+              </tr>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2">(+ ) Valor a Pagar na Liquidação</td>
+                <td className="px-3 py-2 text-right font-semibold">{formatCurrency(resumo.valorAPagar)}</td>
+              </tr>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2">(-) Valor a Receber na Liquidação</td>
+                <td className="px-3 py-2 text-right font-semibold">{formatCurrency(resumo.valorAReceber)}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-violet-50">
+                <td className="px-3 py-2 text-right font-bold">Juros a Ratear</td>
+                <td className="px-3 py-2 text-right font-bold">{formatCurrency(resumo.jurosRatear)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div className="overflow-x-auto border border-slate-200 rounded-lg">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-slate-700">
+              <tr>
+                <th className="text-left px-3 py-2 font-semibold">Departamento</th>
+                <th className="text-right px-3 py-2 font-semibold">% Utilização</th>
+                <th className="text-right px-3 py-2 font-semibold">Débito</th>
+                <th className="text-right px-3 py-2 font-semibold">Crédito</th>
+              </tr>
+            </thead>
+            <tbody>
+              {DEPARTMENT_ORDER.map((dept) => (
+                <tr key={dept} className="border-t border-slate-100">
+                  <td className="px-3 py-2">{DEPARTMENT_LABELS[dept]}</td>
+                  <td className="px-3 py-2 text-right">{resumo.departmentPercents[dept].toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</td>
+                  <td className="px-3 py-2 text-right font-semibold">{formatCurrency(resumo.jurosDeptos[dept])}</td>
+                  <td className="px-3 py-2 text-right">-</td>
+                </tr>
+              ))}
+              {resumo.valorDebitoLiquidacao > 0 && (
+                <tr className="border-t border-slate-100 bg-amber-50">
+                  <td className="px-3 py-2">Novos - Débito Liquidação Entre Marcas</td>
+                  <td className="px-3 py-2 text-right">-</td>
+                  <td className="px-3 py-2 text-right font-semibold">{formatCurrency(resumo.valorDebitoLiquidacao)}</td>
+                  <td className="px-3 py-2 text-right">-</td>
+                </tr>
+              )}
+              {resumo.valorCreditoLiquidacao > 0 && (
+                <tr className="border-t border-slate-100 bg-emerald-50">
+                  <td className="px-3 py-2">Novos - Crédito Liquidação Entre Marcas</td>
+                  <td className="px-3 py-2 text-right">-</td>
+                  <td className="px-3 py-2 text-right">-</td>
+                  <td className="px-3 py-2 text-right font-semibold">{formatCurrency(resumo.valorCreditoLiquidacao)}</td>
+                </tr>
+              )}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-slate-50">
+                <td className="px-3 py-2 text-right font-bold">Totais</td>
+                <td className="px-3 py-2" />
+                <td className="px-3 py-2 text-right font-bold">{formatCurrency(resumo.somaJurosDeptos + resumo.valorDebitoLiquidacao)}</td>
+                <td className="px-3 py-2 text-right font-bold">{formatCurrency(resumo.valorCreditoLiquidacao)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
@@ -1406,6 +1545,14 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           <p className="text-xs text-slate-500 mt-0.5">Ativo circulante (1.1) e passivo circulante (2.1) por mês e por marca</p>
         </div>
         <div className="flex items-center gap-2">
+          {activeTab === 'contabil' && (
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 text-xs border border-slate-300 rounded px-3 py-1.5 text-slate-700 bg-white hover:bg-slate-50"
+            >
+              Imprimir / PDF
+            </button>
+          )}
           <button
             onClick={() => {
               setDraftConfig(config);
@@ -1481,6 +1628,12 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         >
           Rateio Departamento
         </button>
+        <button
+          onClick={() => setActiveTab('contabil')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-colors ${activeTab === 'contabil' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+        >
+          Demonstrativo Contábil
+        </button>
       </div>
 
       <div className="p-6 space-y-6">
@@ -1535,12 +1688,20 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
               </div>
               {renderLiquidezEntreMarcasTable(month)}
             </section>
-          )) : monthsToRender.map((month) => (
+          )) : activeTab === 'departamento' ? monthsToRender.map((month) => (
             <section key={month} className="space-y-4">
               <h2 className="text-lg font-bold text-slate-800">Rateio Departamento - {MONTH_NAMES[month - 1]} / {selectedYear}</h2>
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {renderDepartamentoBrandPanel('vw', month)}
                 {renderDepartamentoBrandPanel('audi', month)}
+              </div>
+            </section>
+          )) : monthsToRender.map((month) => (
+            <section key={month} className="space-y-4 print:space-y-3">
+              <h2 className="text-lg font-bold text-slate-800">Demonstrativo Contábil - {MONTH_NAMES[month - 1]} / {selectedYear}</h2>
+              <div className="space-y-4">
+                {renderContabilBrandSection('vw', month)}
+                {renderContabilBrandSection('audi', month)}
               </div>
             </section>
           ))
