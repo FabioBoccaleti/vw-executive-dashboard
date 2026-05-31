@@ -1484,12 +1484,15 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const pctAcessorios = parseDecimal(record.comissaoAcessoriosPct ?? '');
       const pctRps = parseDecimal(record.comissaoRpsPct);
       const pctMecanico = parseDecimal(record.comissaoMecanicoPct ?? '');
+      const pctTotalPecas = parseDecimal(record.comissaoTotalPecasPct ?? '');
+      const baseTotalPecasApuracao = calculoResumoGeral.pecasAcessorios;
       const comissao =
         basePecasVendas * (pctPecas / 100) +
         baseAcessorios * (pctAcessorios / 100) +
         baseRpsOficina * (pctRps / 100) +
         baseRpsFunilaria * (pctRps / 100) +
-        baseMecanicos * (pctMecanico / 100);
+        baseMecanicos * (pctMecanico / 100) +
+        baseTotalPecasApuracao * (pctTotalPecas / 100);
 
       const volumeLiquido = countVenda - countDevolucao;
       const faixas = cleanBonusEscalas((record.bonusEscalas ?? []) as BonusEscalaDraft[]);
@@ -1528,7 +1531,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       });
     });
     return map;
-  }, [calculoVendors, calculoSourceRows, vendorLookup]);
+  }, [calculoVendors, calculoSourceRows, vendorLookup, calculoResumoGeral.pecasAcessorios]);
 
   const calculoRulesByVendor = useMemo(() => {
     const rules = new Map<string, { departamentos: Set<string>; transacoes: Set<string> }>();
@@ -2888,7 +2891,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
               {calculoModalOpen && calculoDraft && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                  <div className="w-full max-w-4xl rounded-xl bg-white p-6 shadow-xl">
+                  <div className="w-full max-w-6xl rounded-xl bg-white p-6 shadow-xl">
                     <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
                       <div>
                         <p className="text-sm font-bold text-slate-800">Cadastro de remuneração</p>
@@ -2965,7 +2968,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-slate-600 mb-1">Comissão Peças (%)</label>
                           <input
@@ -3009,6 +3012,18 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                             step="0.01"
                             value={calculoDraft.comissaoMecanicoPct ?? ''}
                             onChange={(e) => setCalculoDraft({ ...calculoDraft, comissaoMecanicoPct: e.target.value })}
+                            disabled={calculoBloqueado}
+                            placeholder="0,00"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Comissão Total Peças (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={calculoDraft.comissaoTotalPecasPct ?? ''}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, comissaoTotalPecasPct: e.target.value })}
                             disabled={calculoBloqueado}
                             placeholder="0,00"
                             className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
