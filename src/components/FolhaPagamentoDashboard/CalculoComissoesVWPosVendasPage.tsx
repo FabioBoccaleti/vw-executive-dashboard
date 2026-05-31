@@ -3341,21 +3341,21 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       Nenhum colaborador ativo com remuneração cadastrada para este departamento e competência.
                     </div>
                   ) : (
-                    <table className="min-w-[1060px] w-full table-fixed text-xs text-slate-700">
+                    <table className="min-w-[1580px] w-full table-fixed text-xs text-slate-700">
                       <colgroup>
                         <col className="w-[220px]" />
                         <col className="w-[110px]" />
-                        <col className="w-[70px]" />
                         <col className="w-[90px]" />
                         <col className="w-[90px]" />
-                        <col className="w-[90px]" />
-                        <col className="w-[90px]" />
-                        <col className="w-[90px]" />
-                        <col className="w-[90px]" />
-                        <col className="w-[90px]" />
-                        <col className="w-[90px]" />
-                        <col className="w-[90px]" />
+                        <col className="w-[100px]" />
                         <col className="w-[110px]" />
+                        <col className="w-[95px]" />
+                        <col className="w-[95px]" />
+                        <col className="w-[100px]" />
+                        <col className="w-[130px]" />
+                        <col className="w-[130px]" />
+                        <col className="w-[150px]" />
+                        <col className="w-[140px]" />
                       </colgroup>
                       <thead className="bg-slate-800 text-white sticky top-0 z-10">
                         <tr>
@@ -3364,10 +3364,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <th colSpan={3} className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Produção</th>
                           <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Salário Fixo</th>
                           <th colSpan={3} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Comissões</th>
-                          <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus produtividade</th>
-                          <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus Adicional</th>
-                          <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Participação no resultado</th>
-                          <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap">Total remuneração</th>
+                          <th rowSpan={2} className="bg-violet-700 px-2 py-2 text-center text-[11px] leading-tight font-semibold whitespace-normal border-r border-violet-600">Bônus produtividade</th>
+                          <th rowSpan={2} className="bg-violet-700 px-2 py-2 text-center text-[11px] leading-tight font-semibold whitespace-normal border-r border-violet-600">Bônus adicional</th>
+                          <th rowSpan={2} className="bg-violet-700 px-2 py-2 text-center text-[11px] leading-tight font-semibold whitespace-normal border-r border-violet-600">Participação no resultado</th>
+                          <th rowSpan={2} className="bg-violet-700 px-2 py-2 text-center text-[11px] leading-tight font-semibold whitespace-normal">Total remuneração</th>
                         </tr>
                         <tr>
                           <th className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Peças</th>
@@ -3412,7 +3412,6 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                           <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.bonusProdutividade)}</td>
-                          <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                           <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.premioProduto)}</td>
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                           <td className="px-3 py-2 text-center font-mono font-bold whitespace-nowrap bg-violet-200/90">R$ {fmtCurrency(demonstrativoTotais.totalRemuneracao)}</td>
@@ -3439,21 +3438,21 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         <p className="text-xs text-slate-500">Competência {MONTHS_FULL[(demonstrativoFilter.month ?? 1) - 1]}/{demonstrativoFilter.year}</p>
                       </div>
                       <div className="overflow-visible">
-                        <table className="w-full table-fixed text-xs text-slate-700">
+                        <table className="min-w-[1580px] w-full table-fixed text-xs text-slate-700">
                           <colgroup>
                             <col className="w-[220px]" />
                             <col className="w-[110px]" />
-                            <col className="w-[70px]" />
                             <col className="w-[90px]" />
                             <col className="w-[90px]" />
-                            <col className="w-[90px]" />
-                            <col className="w-[90px]" />
-                            <col className="w-[90px]" />
-                            <col className="w-[90px]" />
-                            <col className="w-[90px]" />
-                            <col className="w-[90px]" />
-                            <col className="w-[90px]" />
+                            <col className="w-[100px]" />
                             <col className="w-[110px]" />
+                            <col className="w-[95px]" />
+                            <col className="w-[95px]" />
+                            <col className="w-[100px]" />
+                            <col className="w-[130px]" />
+                            <col className="w-[130px]" />
+                            <col className="w-[150px]" />
+                            <col className="w-[140px]" />
                           </colgroup>
                           <thead className="bg-slate-800 text-white">
                             <tr>
@@ -3462,10 +3461,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                               <th colSpan={3} className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Produção</th>
                               <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Salário Fixo</th>
                               <th colSpan={3} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Comissões</th>
-                              <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus produtividade</th>
-                              <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Bônus Adicional</th>
-                              <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-violet-600">Participação no resultado</th>
-                              <th rowSpan={2} className="bg-violet-700 px-3 py-2 text-center font-semibold whitespace-nowrap">Total remuneração</th>
+                              <th rowSpan={2} className="bg-violet-700 px-2 py-2 text-center text-[11px] leading-tight font-semibold whitespace-normal border-r border-violet-600">Bônus produtividade</th>
+                              <th rowSpan={2} className="bg-violet-700 px-2 py-2 text-center text-[11px] leading-tight font-semibold whitespace-normal border-r border-violet-600">Bônus adicional</th>
+                              <th rowSpan={2} className="bg-violet-700 px-2 py-2 text-center text-[11px] leading-tight font-semibold whitespace-normal border-r border-violet-600">Participação no resultado</th>
+                              <th rowSpan={2} className="bg-violet-700 px-2 py-2 text-center text-[11px] leading-tight font-semibold whitespace-normal">Total remuneração</th>
                             </tr>
                             <tr>
                               <th className="bg-emerald-700 px-3 py-2 text-center font-semibold whitespace-nowrap border-r border-emerald-600">Peças</th>
@@ -3510,7 +3509,6 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                               <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(totais.bonusProdutividade)}</td>
-                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                               <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(totais.premioProduto)}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                               <td className="px-3 py-2 text-center font-mono font-bold whitespace-nowrap bg-violet-200/90">R$ {fmtCurrency(totais.totalRemuneracao)}</td>
