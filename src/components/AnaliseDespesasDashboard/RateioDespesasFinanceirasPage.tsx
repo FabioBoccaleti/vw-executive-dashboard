@@ -121,6 +121,26 @@ function getSelectedAccounts(config: RateioCirculanteConfig, brand: AnaliseBrand
   return uniqueSorted([...(config.shared[group] ?? []), ...(config[brand][group] ?? [])]);
 }
 
+function getBrandMonthTotal(
+  brand: AnaliseBrand,
+  month: number,
+  config: RateioCirculanteConfig,
+  accountsByMonth: AccountsByMonth,
+  resultRows: RateioResultadoLinha[],
+): number {
+  const monthAccounts = accountsByMonth[month] ?? {};
+  const ativoTotal = getSelectedAccounts(config, brand, 'ativo').reduce(
+    (sum, conta) => sum + (monthAccounts[conta]?.saldoAtual ?? 0),
+    0,
+  );
+  const passivoTotal = getSelectedAccounts(config, brand, 'passivo').reduce(
+    (sum, conta) => sum + (monthAccounts[conta]?.saldoAtual ?? 0),
+    0,
+  );
+  const resultadoAjustado = resultRows.reduce((sum, row) => sum + row.value, 0);
+  return ativoTotal + passivoTotal + resultadoAjustado;
+}
+
 function ConfigSection({
   title,
   contas,
@@ -167,6 +187,7 @@ function BrandMonthTable({
   resultRows,
   onAddResultLine,
   onChangeResultLineValue,
+  circulantePercent,
 }: {
   brand: AnaliseBrand;
   month: number;
@@ -176,11 +197,12 @@ function BrandMonthTable({
   resultRows: RateioResultadoLinha[];
   onAddResultLine: (brand: AnaliseBrand, month: number, label: string, value: number) => void;
   onChangeResultLineValue: (brand: AnaliseBrand, month: number, lineId: string, value: number) => void;
+  circulantePercent: number;
 }) {
   const [newLineName, setNewLineName] = useState('');
   const [newLineValue, setNewLineValue] = useState('0');
 
-  function renderGroup(group: CirculanteGroup, title: string) {
+  function getGroupData(group: CirculanteGroup) {
     const selectedContas = getSelectedAccounts(config, brand, group);
     const monthAccounts = accountsByMonth[month] ?? {};
 
@@ -194,6 +216,18 @@ function BrandMonthTable({
     });
 
     const total = rows.reduce((sum, row) => sum + row.value, 0);
+
+    return { rows, total };
+  }
+
+  const ativoData = getGroupData('ativo');
+  const passivoData = getGroupData('passivo');
+  const resultadoPeriodo = 0;
+  const totalExtras = resultRows.reduce((sum, row) => sum + row.value, 0);
+  const resultadoAjustado = resultadoPeriodo + totalExtras;
+  const totalGeral = ativoData.total + passivoData.total + resultadoAjustado;
+
+  function renderGroup(title: string, rows: Array<{ conta: string; desc: string; value: number }>, total: number) {
 
     return (
       <div className="mb-4">
@@ -239,10 +273,6 @@ function BrandMonthTable({
   }
 
   function renderResultadosTable() {
-    const resultadoPeriodo = 0;
-    const totalExtras = resultRows.reduce((sum, row) => sum + row.value, 0);
-    const resultadoAjustado = resultadoPeriodo + totalExtras;
-
     return (
       <div className="mb-1">
         <h4 className="text-sm font-bold text-slate-700 mb-2">Tabela de Resultados</h4>
@@ -320,14 +350,59 @@ function BrandMonthTable({
     );
   }
 
+  function renderTotalTable() {
+    return (
+      <div className="mt-4">
+        <h4 className="text-sm font-bold text-slate-700 mb-2">Tabela de Total</h4>
+        <div className="overflow-x-auto border border-slate-200 rounded-lg">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="text-left px-3 py-2 font-semibold">Composição</th>
+                <th className="text-right px-3 py-2 font-semibold">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2 text-slate-700">Total Ativo Circulante</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(ativoData.total)}</td>
+              </tr>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2 text-slate-700">Total Passivo Circulante</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(passivoData.total)}</td>
+              </tr>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2 text-slate-700">Resultado do Periodo Ajustado</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(resultadoAjustado)}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-emerald-50">
+                <td className="px-3 py-2 text-right font-bold text-slate-800">Total Geral</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(totalGeral)}</td>
+              </tr>
+              <tr className="border-t border-slate-200 bg-sky-50">
+                <td className="px-3 py-2 text-right font-semibold text-slate-700">% Uso Circulante (VW + Audi)</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">
+                  {circulantePercent.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
       <h3 className="text-base font-bold text-slate-800 mb-3">
         {BRAND_LABEL[brand]} - {MONTH_NAMES[month - 1]}
       </h3>
-      {renderGroup('ativo', 'Ativo Circulante')}
-      {renderGroup('passivo', 'Passivo Circulante')}
+      {renderGroup('Ativo Circulante', ativoData.rows, ativoData.total)}
+      {renderGroup('Passivo Circulante', passivoData.rows, passivoData.total)}
       {renderResultadosTable()}
+      {renderTotalTable()}
     </div>
   );
 }
@@ -497,6 +572,20 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     return [selectedMonth];
   }, [selectedMonth]);
 
+  const monthTotals = useMemo(() => {
+    const out: Record<number, { vw: number; audi: number; total: number }> = {};
+    for (const month of MONTHS) {
+      const vwTotal = getBrandMonthTotal('vw', month, config, vwData, vwResults[month] ?? []);
+      const audiTotal = getBrandMonthTotal('audi', month, config, audiData, audiResults[month] ?? []);
+      out[month] = {
+        vw: vwTotal,
+        audi: audiTotal,
+        total: vwTotal + audiTotal,
+      };
+    }
+    return out;
+  }, [config, vwData, audiData, vwResults, audiResults]);
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
@@ -586,6 +675,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   resultRows={vwResults[month] ?? []}
                   onAddResultLine={handleAddResultLine}
                   onChangeResultLineValue={handleChangeResultLineValue}
+                  circulantePercent={monthTotals[month]?.total ? (monthTotals[month].vw / monthTotals[month].total) * 100 : 0}
                 />
                 <BrandMonthTable
                   brand="audi"
@@ -596,6 +686,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   resultRows={audiResults[month] ?? []}
                   onAddResultLine={handleAddResultLine}
                   onChangeResultLineValue={handleChangeResultLineValue}
+                  circulantePercent={monthTotals[month]?.total ? (monthTotals[month].audi / monthTotals[month].total) * 100 : 0}
                 />
               </div>
             </section>
