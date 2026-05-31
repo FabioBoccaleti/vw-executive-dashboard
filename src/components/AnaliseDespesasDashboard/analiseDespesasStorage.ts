@@ -29,6 +29,14 @@ export interface RateioCirculanteConfig {
   };
 }
 
+export interface RateioResultadoLinha {
+  id: string;
+  label: string;
+  value: number;
+}
+
+export type RateioResultadosBrandYearData = Record<number, RateioResultadoLinha[]>;
+
 function getKey(brand: AnaliseBrand, year: number, month: number): string {
   const mm = String(month).padStart(2, '0');
   return `analise_despesas_${brand}_${year}_${mm}`;
@@ -42,12 +50,24 @@ function getRateioConfigKey(): string {
   return 'analise_despesas_rateio_circulante_config';
 }
 
+function getRateioResultadosKey(brand: AnaliseBrand, year: number): string {
+  return `analise_despesas_rateio_resultados_${brand}_${year}`;
+}
+
 function getDefaultRateioConfig(): RateioCirculanteConfig {
   return {
     shared: { ativo: [], passivo: [] },
     vw: { ativo: [], passivo: [] },
     audi: { ativo: [], passivo: [] },
   };
+}
+
+function getDefaultRateioResultadosData(): RateioResultadosBrandYearData {
+  const out: RateioResultadosBrandYearData = {};
+  for (let month = 1; month <= 12; month++) {
+    out[month] = [];
+  }
+  return out;
 }
 
 /** Salva o texto bruto do balancete para marca/mês/ano. */
@@ -177,5 +197,51 @@ export async function saveRateioCirculanteConfig(config: RateioCirculanteConfig)
     await kvSet(getRateioConfigKey(), config);
   } catch (err) {
     console.error('Erro ao salvar configuração de rateio circulante:', err);
+  }
+}
+
+/** Carrega linhas de resultados (manuais) do módulo de rateio por marca/ano. */
+export async function loadRateioResultados(
+  brand: AnaliseBrand,
+  year: number,
+): Promise<RateioResultadosBrandYearData> {
+  try {
+    const saved = await kvGet<Record<string, RateioResultadoLinha[]>>(getRateioResultadosKey(brand, year));
+    const base = getDefaultRateioResultadosData();
+    if (!saved) return base;
+
+    for (let month = 1; month <= 12; month++) {
+      const monthRows = saved[String(month)];
+      if (!Array.isArray(monthRows)) continue;
+      base[month] = monthRows
+        .filter((row) => row && typeof row.id === 'string' && typeof row.label === 'string')
+        .map((row) => ({
+          id: row.id,
+          label: row.label,
+          value: Number.isFinite(Number(row.value)) ? Number(row.value) : 0,
+        }));
+    }
+
+    return base;
+  } catch (err) {
+    console.error('Erro ao carregar resultados de rateio:', err);
+    return getDefaultRateioResultadosData();
+  }
+}
+
+/** Salva linhas de resultados (manuais) do módulo de rateio por marca/ano. */
+export async function saveRateioResultados(
+  brand: AnaliseBrand,
+  year: number,
+  data: RateioResultadosBrandYearData,
+): Promise<void> {
+  try {
+    const payload: Record<string, RateioResultadoLinha[]> = {};
+    for (let month = 1; month <= 12; month++) {
+      payload[String(month)] = data[month] ?? [];
+    }
+    await kvSet(getRateioResultadosKey(brand, year), payload);
+  } catch (err) {
+    console.error('Erro ao salvar resultados de rateio:', err);
   }
 }

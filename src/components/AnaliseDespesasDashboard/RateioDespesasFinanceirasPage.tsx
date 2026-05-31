@@ -3,9 +3,13 @@ import { Loader2, Settings2 } from 'lucide-react';
 import {
   type AnaliseBrand,
   type RateioCirculanteConfig,
+  type RateioResultadoLinha,
+  type RateioResultadosBrandYearData,
   loadMultipleMonthsAnaliseDespesas,
   loadRateioCirculanteConfig,
+  loadRateioResultados,
   saveRateioCirculanteConfig,
+  saveRateioResultados,
 } from './analiseDespesasStorage';
 
 type CirculanteGroup = 'ativo' | 'passivo';
@@ -36,6 +40,21 @@ const DEFAULT_CONFIG: RateioCirculanteConfig = {
 const BRAND_LABEL: Record<AnaliseBrand, string> = {
   vw: 'VW',
   audi: 'Audi',
+};
+
+const EMPTY_RESULTS_BY_MONTH: RateioResultadosBrandYearData = {
+  1: [],
+  2: [],
+  3: [],
+  4: [],
+  5: [],
+  6: [],
+  7: [],
+  8: [],
+  9: [],
+  10: [],
+  11: [],
+  12: [],
 };
 
 function parseBalanceteCirculante(text: string): AccountsByConta {
@@ -78,6 +97,24 @@ function formatCurrency(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function cloneResultsByMonth(data?: RateioResultadosBrandYearData): RateioResultadosBrandYearData {
+  const out: RateioResultadosBrandYearData = {
+    1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: [], 9: [], 10: [], 11: [], 12: [],
+  };
+  if (!data) return out;
+  for (const month of MONTHS) {
+    out[month] = (data[month] ?? []).map((row) => ({ ...row }));
+  }
+  return out;
+}
+
+function parseManualValue(raw: string): number {
+  if (!raw.trim()) return 0;
+  const normalized = raw.replace(/\./g, '').replace(',', '.');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function getSelectedAccounts(config: RateioCirculanteConfig, brand: AnaliseBrand, group: CirculanteGroup): string[] {
@@ -127,13 +164,22 @@ function BrandMonthTable({
   config,
   accountsByMonth,
   descriptions,
+  resultRows,
+  onAddResultLine,
+  onChangeResultLineValue,
 }: {
   brand: AnaliseBrand;
   month: number;
   config: RateioCirculanteConfig;
   accountsByMonth: AccountsByMonth;
   descriptions: Record<string, string>;
+  resultRows: RateioResultadoLinha[];
+  onAddResultLine: (brand: AnaliseBrand, month: number, label: string, value: number) => void;
+  onChangeResultLineValue: (brand: AnaliseBrand, month: number, lineId: string, value: number) => void;
 }) {
+  const [newLineName, setNewLineName] = useState('');
+  const [newLineValue, setNewLineValue] = useState('0');
+
   function renderGroup(group: CirculanteGroup, title: string) {
     const selectedContas = getSelectedAccounts(config, brand, group);
     const monthAccounts = accountsByMonth[month] ?? {};
@@ -192,6 +238,88 @@ function BrandMonthTable({
     );
   }
 
+  function renderResultadosTable() {
+    const resultadoPeriodo = 0;
+    const totalExtras = resultRows.reduce((sum, row) => sum + row.value, 0);
+    const resultadoAjustado = resultadoPeriodo + totalExtras;
+
+    return (
+      <div className="mb-1">
+        <h4 className="text-sm font-bold text-slate-700 mb-2">Tabela de Resultados</h4>
+        <div className="overflow-x-auto border border-slate-200 rounded-lg">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="text-left px-3 py-2 font-semibold">Linha</th>
+                <th className="text-right px-3 py-2 font-semibold">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t border-slate-100 bg-slate-50/60">
+                <td className="px-3 py-2 font-semibold text-slate-700">Resultado do Período</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(resultadoPeriodo)}</td>
+              </tr>
+              {resultRows.map((row) => (
+                <tr key={row.id} className="border-t border-slate-100">
+                  <td className="px-3 py-2 text-slate-700">{row.label}</td>
+                  <td className="px-3 py-2 text-right">
+                    <input
+                      type="text"
+                      value={String(row.value).replace('.', ',')}
+                      onChange={(e) => onChangeResultLineValue(brand, month, row.id, parseManualValue(e.target.value))}
+                      className="w-36 h-8 px-2 text-sm text-right rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+              ))}
+              <tr className="border-t border-slate-100 bg-slate-50">
+                <td className="px-3 py-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={newLineName}
+                      onChange={(e) => setNewLineName(e.target.value)}
+                      placeholder="Nome da nova linha"
+                      className="h-8 px-2 text-sm rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="text"
+                      value={newLineValue}
+                      onChange={(e) => setNewLineValue(e.target.value)}
+                      placeholder="Valor"
+                      className="h-8 px-2 text-sm rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={() => {
+                        const cleanName = newLineName.trim();
+                        if (!cleanName) return;
+                        onAddResultLine(brand, month, cleanName, parseManualValue(newLineValue));
+                        setNewLineName('');
+                        setNewLineValue('0');
+                      }}
+                      className="h-8 px-3 text-xs font-semibold rounded bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      Incluir linha
+                    </button>
+                  </div>
+                </td>
+                <td className="px-3 py-2 text-right text-xs text-slate-500 align-middle">
+                  Replica automaticamente ate dezembro
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-blue-50">
+                <td className="px-3 py-2 text-right font-bold text-slate-800">Resultado do Periodo Ajustado</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(resultadoAjustado)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
       <h3 className="text-base font-bold text-slate-800 mb-3">
@@ -199,6 +327,7 @@ function BrandMonthTable({
       </h3>
       {renderGroup('ativo', 'Ativo Circulante')}
       {renderGroup('passivo', 'Passivo Circulante')}
+      {renderResultadosTable()}
     </div>
   );
 }
@@ -216,6 +345,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
   const [draftConfig, setDraftConfig] = useState<RateioCirculanteConfig>(DEFAULT_CONFIG);
   const [vwData, setVwData] = useState<AccountsByMonth>({});
   const [audiData, setAudiData] = useState<AccountsByMonth>({});
+  const [vwResults, setVwResults] = useState<RateioResultadosBrandYearData>(cloneResultsByMonth(EMPTY_RESULTS_BY_MONTH));
+  const [audiResults, setAudiResults] = useState<RateioResultadosBrandYearData>(cloneResultsByMonth(EMPTY_RESULTS_BY_MONTH));
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [ativoOptions, setAtivoOptions] = useState<Array<{ conta: string; desc: string }>>([]);
   const [passivoOptions, setPassivoOptions] = useState<Array<{ conta: string; desc: string }>>([]);
@@ -226,10 +357,12 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     async function loadAll() {
       setLoading(true);
       try {
-        const [savedConfig, rawVwMonths, rawAudiMonths] = await Promise.all([
+        const [savedConfig, rawVwMonths, rawAudiMonths, savedVwResults, savedAudiResults] = await Promise.all([
           loadRateioCirculanteConfig(),
           loadMultipleMonthsAnaliseDespesas('vw', selectedYear, MONTHS),
           loadMultipleMonthsAnaliseDespesas('audi', selectedYear, MONTHS),
+          loadRateioResultados('vw', selectedYear),
+          loadRateioResultados('audi', selectedYear),
         ]);
 
         if (cancelled) return;
@@ -262,6 +395,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         setDraftConfig(savedConfig);
         setVwData(nextVwData);
         setAudiData(nextAudiData);
+        setVwResults(cloneResultsByMonth(savedVwResults));
+        setAudiResults(cloneResultsByMonth(savedAudiResults));
         setDescriptions(descMap);
         setAtivoOptions(
           Array.from(ativoMap.entries())
@@ -308,6 +443,53 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     } finally {
       setSavingConfig(false);
     }
+  }
+
+  function applyResultsUpdate(
+    brand: AnaliseBrand,
+    updater: (current: RateioResultadosBrandYearData) => RateioResultadosBrandYearData,
+  ) {
+    const current = brand === 'vw' ? vwResults : audiResults;
+    const next = updater(cloneResultsByMonth(current));
+    if (brand === 'vw') {
+      setVwResults(next);
+    } else {
+      setAudiResults(next);
+    }
+    void saveRateioResultados(brand, selectedYear, next);
+  }
+
+  function handleAddResultLine(brand: AnaliseBrand, month: number, label: string, value: number) {
+    const cleanLabel = label.trim();
+    if (!cleanLabel) return;
+
+    applyResultsUpdate(brand, (current) => {
+      const lineTemplate: RateioResultadoLinha = {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        label: cleanLabel,
+        value,
+      };
+
+      for (let m = month; m <= 12; m++) {
+        current[m] = [...(current[m] ?? []), { ...lineTemplate }];
+      }
+
+      return current;
+    });
+  }
+
+  function handleChangeResultLineValue(
+    brand: AnaliseBrand,
+    month: number,
+    lineId: string,
+    value: number,
+  ) {
+    applyResultsUpdate(brand, (current) => {
+      current[month] = (current[month] ?? []).map((line) =>
+        line.id === lineId ? { ...line, value } : line,
+      );
+      return current;
+    });
   }
 
   const monthsToRender = useMemo(() => {
@@ -401,6 +583,9 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   config={config}
                   accountsByMonth={vwData}
                   descriptions={descriptions}
+                  resultRows={vwResults[month] ?? []}
+                  onAddResultLine={handleAddResultLine}
+                  onChangeResultLineValue={handleChangeResultLineValue}
                 />
                 <BrandMonthTable
                   brand="audi"
@@ -408,6 +593,9 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   config={config}
                   accountsByMonth={audiData}
                   descriptions={descriptions}
+                  resultRows={audiResults[month] ?? []}
+                  onAddResultLine={handleAddResultLine}
+                  onChangeResultLineValue={handleChangeResultLineValue}
                 />
               </div>
             </section>
