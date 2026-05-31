@@ -67,6 +67,10 @@ interface CalculoValorResumo {
   baseMecanicos: number;
   premioProduto: number;
   premioAdicional: number;
+  comissaoPecas: number;
+  comissaoAcessorios: number;
+  comissaoMaoObra: number;
+  bonusProdutividadeTotal: number;
   bonus: number;
   comissao: number;
   total: number;
@@ -1424,6 +1428,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
           baseMecanicos: 0,
           premioProduto: parseDecimal(record?.premioProduto ?? ''),
           premioAdicional: parseDecimal(record?.premioAdicional ?? ''),
+          comissaoPecas: 0,
+          comissaoAcessorios: 0,
+          comissaoMaoObra: 0,
+          bonusProdutividadeTotal: 0,
           bonus: 0,
           comissao: 0,
           total: parseDecimal(record?.salarioFixo ?? '') + parseDecimal(record?.premioProduto ?? '') + parseDecimal(record?.premioAdicional ?? ''),
@@ -1486,28 +1494,33 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const pctMecanico = parseDecimal(record.comissaoMecanicoPct ?? '');
       const pctTotalPecas = parseDecimal(record.comissaoTotalPecasPct ?? '');
       const baseTotalPecasApuracao = calculoResumoGeral.pecasAcessorios;
+      const nVend = Math.max(1, Math.trunc(parseDecimal(record.nVend ?? '1')));
       const diasFerias = Math.max(0, Math.min(30, Math.trunc(parseDecimal(record.diasFerias ?? '0'))));
       const fatorFerias = (30 - diasFerias) / 30;
-      const comissaoTotalPecasAjustada = baseTotalPecasApuracao * (pctTotalPecas / 100) * fatorFerias;
-      const comissao =
-        basePecasVendas * (pctPecas / 100) +
-        baseAcessorios * (pctAcessorios / 100) +
+      const comissaoTotalPecasAjustada = (baseTotalPecasApuracao * (pctTotalPecas / 100) * fatorFerias) / nVend;
+      const comissaoPecas = basePecasVendas * (pctPecas / 100) + comissaoTotalPecasAjustada;
+      const comissaoAcessorios = baseAcessorios * (pctAcessorios / 100);
+      const comissaoMaoObra =
         baseRpsOficina * (pctRps / 100) +
         baseRpsFunilaria * (pctRps / 100) +
-        baseMecanicos * (pctMecanico / 100) +
-        comissaoTotalPecasAjustada;
+        baseMecanicos * (pctMecanico / 100);
+      const comissao =
+        comissaoPecas +
+        comissaoAcessorios +
+        comissaoMaoObra;
 
       const volumeLiquido = countVenda - countDevolucao;
       const faixas = cleanBonusEscalas((record.bonusEscalas ?? []) as BonusEscalaDraft[]);
       const faixaAtiva = firstMatchingFaixa(basePecasVendas, faixas);
       const bonusFixo = parseDecimal(record.bonusProdutividade);
       const bonusEscala = faixaAtiva ? parseDecimal(faixaAtiva.bonus) : 0;
+      const bonusProdutividadeTotal = bonusFixo + bonusEscala;
       const salario = parseDecimal(record.salarioFixo);
       const premioProdutoUnitario = parseDecimal(record.premioProduto ?? '');
       const premioProduto = baseProdutosQuantidade * premioProdutoUnitario;
       const premioAdicionalBase = parseDecimal(record.premioAdicional ?? '');
       const premioAdicional = premioAdicionalBase * fatorFerias;
-      const bonus = bonusFixo + bonusEscala + premioProduto + premioAdicional;
+      const bonus = bonusProdutividadeTotal + premioProduto + premioAdicional;
       const feriasRegra = diasFerias > 0
         ? ` + Pró-rata férias (${diasFerias} dia(s), fator ${fmtCurrency(fatorFerias)})`
         : '';
@@ -1529,6 +1542,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         baseMecanicos,
         premioProduto,
         premioAdicional,
+        comissaoPecas,
+        comissaoAcessorios,
+        comissaoMaoObra,
+        bonusProdutividadeTotal,
         bonus,
         comissao,
         total: salario + comissao + bonus,
@@ -2022,7 +2039,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   function calcDemonstrativoTotais(rows: CalculoPosVendasRemuneracao[]) {
     return rows.reduce((acc, item) => {
       const salarioFixo = parseDecimal(item.salarioFixo ?? '');
-      const bonusProdutividade = parseDecimal(item.bonusProdutividade ?? '');
+      const bonusProdutividade = calculoValoresByVendor.get(vendorKey(item.vendedor))?.bonusProdutividadeTotal ?? parseDecimal(item.bonusProdutividade ?? '');
       const premioProduto = parseDecimal(item.premioProduto ?? '');
       acc.salarioFixo += salarioFixo;
       acc.bonusProdutividade += bonusProdutividade;
@@ -2048,11 +2065,21 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       funilaria: calcDemonstrativoTotais(demonstrativoRowsByTab.funilaria),
       acessorios: calcDemonstrativoTotais(demonstrativoRowsByTab.acessorios),
     };
-  }, [demonstrativoRowsByTab]);
+  }, [demonstrativoRowsByTab, calculoValoresByVendor]);
 
   const demonstrativoTabsComDados = useMemo(() => {
     return DEMONSTRATIVO_SUB_TABS.filter((tab) => demonstrativoRowsByTab[tab.id].length > 0);
   }, [demonstrativoRowsByTab]);
+
+  const demonstrativoComissoesTotais = useMemo(() => {
+    return demonstrativoFilteredRows.reduce((acc, item) => {
+      const valores = calculoValoresByVendor.get(vendorKey(item.vendedor));
+      acc.pecas += valores?.comissaoPecas ?? 0;
+      acc.acessorios += valores?.comissaoAcessorios ?? 0;
+      acc.maoObra += valores?.comissaoMaoObra ?? 0;
+      return acc;
+    }, { pecas: 0, acessorios: 0, maoObra: 0 });
+  }, [demonstrativoFilteredRows, calculoValoresByVendor]);
 
   function isPrintValueEmptyOrZero(text: string): boolean {
     const raw = String(text ?? '').trim();
@@ -3423,21 +3450,28 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       <tbody>
                         {demonstrativoFilteredRows.map((item, index) => {
                           const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+                          const valores = calculoValoresByVendor.get(vendorKey(item.vendedor));
+                          const basePecasProducao = valores?.basePecasVendas ?? 0;
+                          const baseAcessoriosProducao = valores?.baseAcessorios ?? 0;
+                          const baseMaoDeObraProducao = (valores?.baseRpsOficina ?? 0) + (valores?.baseRpsFunilaria ?? 0);
+                          const comissaoPecas = valores?.comissaoPecas ?? 0;
+                          const comissaoAcessorios = valores?.comissaoAcessorios ?? 0;
+                          const comissaoMaoObra = valores?.comissaoMaoObra ?? 0;
                           const salarioFixo = parseDecimal(item.salarioFixo ?? '');
-                          const bonusProdutividade = parseDecimal(item.bonusProdutividade ?? '');
+                          const bonusProdutividade = valores?.bonusProdutividadeTotal ?? parseDecimal(item.bonusProdutividade ?? '');
                           const premioProduto = parseDecimal(item.premioProduto ?? '');
                           const totalRemuneracao = salarioFixo + bonusProdutividade + premioProduto;
                           return (
                             <tr key={`${item.id}-${index}`} className={`${rowBg} border-t border-slate-100 hover:bg-slate-100/70`}>
                               <td className={`sticky-col px-3 py-2 text-center whitespace-nowrap font-semibold text-slate-800 ${rowBg}`} style={{ left: 0 }}>{item.vendedor}</td>
                               <td className={`sticky-col px-3 py-2 text-center whitespace-nowrap text-slate-700 ${rowBg}`} style={{ left: 220 }}>{item.cargoColaborador || ''}</td>
-                              <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
-                              <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
-                              <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-emerald-50/70">R$ {fmtCurrency(basePecasProducao)}</td>
+                              <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-emerald-50/70">R$ {fmtCurrency(baseAcessoriosProducao)}</td>
+                              <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-emerald-50/70">R$ {fmtCurrency(baseMaoDeObraProducao)}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{salarioFixo > 0 ? `R$ ${fmtCurrency(salarioFixo)}` : ''}</td>
-                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
-                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
-                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                              <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">R$ {fmtCurrency(comissaoPecas)}</td>
+                              <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">R$ {fmtCurrency(comissaoAcessorios)}</td>
+                              <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">R$ {fmtCurrency(comissaoMaoObra)}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{bonusProdutividade > 0 ? `R$ ${fmtCurrency(bonusProdutividade)}` : ''}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{premioProduto > 0 ? `R$ ${fmtCurrency(premioProduto)}` : ''}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
@@ -3450,9 +3484,9 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         <tr className="border-t-2 border-slate-300">
                           <td colSpan={5} className="px-3 py-2 text-center font-semibold whitespace-nowrap">Totais</td>
                           <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.salarioFixo)}</td>
-                          <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
-                          <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
-                          <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
+                          <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoComissoesTotais.pecas)}</td>
+                          <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoComissoesTotais.acessorios)}</td>
+                          <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoComissoesTotais.maoObra)}</td>
                           <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.bonusProdutividade)}</td>
                           <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.premioProduto)}</td>
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
@@ -3520,21 +3554,28 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <tbody>
                             {rows.map((item, index) => {
                               const rowBg = index % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+                              const valores = calculoValoresByVendor.get(vendorKey(item.vendedor));
+                              const basePecasProducao = valores?.basePecasVendas ?? 0;
+                              const baseAcessoriosProducao = valores?.baseAcessorios ?? 0;
+                              const baseMaoDeObraProducao = (valores?.baseRpsOficina ?? 0) + (valores?.baseRpsFunilaria ?? 0);
+                              const comissaoPecas = valores?.comissaoPecas ?? 0;
+                              const comissaoAcessorios = valores?.comissaoAcessorios ?? 0;
+                              const comissaoMaoObra = valores?.comissaoMaoObra ?? 0;
                               const salarioFixo = parseDecimal(item.salarioFixo ?? '');
-                              const bonusProdutividade = parseDecimal(item.bonusProdutividade ?? '');
+                              const bonusProdutividade = valores?.bonusProdutividadeTotal ?? parseDecimal(item.bonusProdutividade ?? '');
                               const premioProduto = parseDecimal(item.premioProduto ?? '');
                               const totalRemuneracao = salarioFixo + bonusProdutividade + premioProduto;
                               return (
                                 <tr key={`${tab.id}-${item.id}-${index}`} className={`${rowBg} border-t border-slate-100`}>
                                   <td className={`px-3 py-2 text-center whitespace-nowrap font-semibold text-slate-800 ${rowBg}`}>{item.vendedor}</td>
                                   <td className={`px-3 py-2 text-center whitespace-nowrap text-slate-700 ${rowBg}`}>{item.cargoColaborador || ''}</td>
-                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
-                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
-                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-emerald-50/70" />
+                                  <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-emerald-50/70">R$ {fmtCurrency(basePecasProducao)}</td>
+                                  <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-emerald-50/70">R$ {fmtCurrency(baseAcessoriosProducao)}</td>
+                                  <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-emerald-50/70">R$ {fmtCurrency(baseMaoDeObraProducao)}</td>
                                   <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{salarioFixo > 0 ? `R$ ${fmtCurrency(salarioFixo)}` : ''}</td>
-                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
-                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
-                                  <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
+                                  <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">R$ {fmtCurrency(comissaoPecas)}</td>
+                                  <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">R$ {fmtCurrency(comissaoAcessorios)}</td>
+                                  <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">R$ {fmtCurrency(comissaoMaoObra)}</td>
                                   <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{bonusProdutividade > 0 ? `R$ ${fmtCurrency(bonusProdutividade)}` : ''}</td>
                                   <td className="px-3 py-2 text-center whitespace-nowrap font-mono bg-violet-50/70">{premioProduto > 0 ? `R$ ${fmtCurrency(premioProduto)}` : ''}</td>
                                   <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-50/70" />
@@ -3545,15 +3586,28 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           </tbody>
                           <tfoot className="bg-slate-200 text-slate-900">
                             <tr className="border-t-2 border-slate-300">
+                              {(() => {
+                                const comissoesTotais = rows.reduce((acc, item) => {
+                                  const valores = calculoValoresByVendor.get(vendorKey(item.vendedor));
+                                  acc.pecas += valores?.comissaoPecas ?? 0;
+                                  acc.acessorios += valores?.comissaoAcessorios ?? 0;
+                                  acc.maoObra += valores?.comissaoMaoObra ?? 0;
+                                  return acc;
+                                }, { pecas: 0, acessorios: 0, maoObra: 0 });
+                                return (
+                                  <>
                               <td colSpan={5} className="px-3 py-2 text-center font-semibold whitespace-nowrap">Totais</td>
                               <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(totais.salarioFixo)}</td>
-                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
-                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
-                              <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
+                              <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(comissoesTotais.pecas)}</td>
+                              <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(comissoesTotais.acessorios)}</td>
+                              <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(comissoesTotais.maoObra)}</td>
                               <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(totais.bonusProdutividade)}</td>
                               <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(totais.premioProduto)}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                               <td className="px-3 py-2 text-center font-mono font-bold whitespace-nowrap bg-violet-200/90">R$ {fmtCurrency(totais.totalRemuneracao)}</td>
+                                  </>
+                                );
+                              })()}
                             </tr>
                           </tfoot>
                         </table>
