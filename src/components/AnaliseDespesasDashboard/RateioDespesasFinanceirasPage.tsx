@@ -293,9 +293,8 @@ function BrandMonthTable({
   onRemoveEndividamentoConta,
   circulantePercent,
   taxaJurosPercent,
-  endividamentoConsolidadoBase,
-  jurosTotalConsolidado,
-  jurosRateadoMarca,
+  endividamentoBaseMarca,
+  jurosCalculadoMarca,
 }: {
   brand: AnaliseBrand;
   month: number;
@@ -310,9 +309,8 @@ function BrandMonthTable({
   onRemoveEndividamentoConta: (brand: AnaliseBrand, month: number, conta: string) => void;
   circulantePercent: number;
   taxaJurosPercent: number;
-  endividamentoConsolidadoBase: number;
-  jurosTotalConsolidado: number;
-  jurosRateadoMarca: number;
+  endividamentoBaseMarca: number;
+  jurosCalculadoMarca: number;
 }) {
   const [newLineName, setNewLineName] = useState('');
   const [newLineValue, setNewLineValue] = useState('0');
@@ -622,8 +620,8 @@ function BrandMonthTable({
             </thead>
             <tbody>
               <tr className="border-t border-slate-100">
-                <td className="px-3 py-2 text-slate-700">Endividamento Consolidado Base (valor absoluto)</td>
-                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(endividamentoConsolidadoBase)}</td>
+                <td className="px-3 py-2 text-slate-700">Endividamento Base da Marca (valor absoluto)</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(endividamentoBaseMarca)}</td>
               </tr>
               <tr className="border-t border-slate-100">
                 <td className="px-3 py-2 text-slate-700">Taxa de Juros do Mês (%)</td>
@@ -632,8 +630,8 @@ function BrandMonthTable({
                 </td>
               </tr>
               <tr className="border-t border-slate-100">
-                <td className="px-3 py-2 text-slate-700">Juros Total Consolidado</td>
-                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(jurosTotalConsolidado)}</td>
+                <td className="px-3 py-2 text-slate-700">Juros Calculado da Marca</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(jurosCalculadoMarca)}</td>
               </tr>
               <tr className="border-t border-slate-100">
                 <td className="px-3 py-2 text-slate-700">% Uso Circulante da Marca</td>
@@ -644,8 +642,8 @@ function BrandMonthTable({
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-slate-200 bg-violet-50">
-                <td className="px-3 py-2 text-right font-bold text-slate-800">Juros Rateado da Marca</td>
-                <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(jurosRateadoMarca)}</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-800">Juros da Marca</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(jurosCalculadoMarca)}</td>
               </tr>
             </tfoot>
           </table>
@@ -914,21 +912,22 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       taxaPercent: number;
       vwEndividamento: number;
       audiEndividamento: number;
-      endividamentoConsolidadoBase: number;
-      jurosTotal: number;
+      vwEndividamentoBase: number;
+      audiEndividamentoBase: number;
+      vwJurosCalculado: number;
+      audiJurosCalculado: number;
       vwPercent: number;
       audiPercent: number;
-      vwJurosRateado: number;
-      audiJurosRateado: number;
     }> = {};
 
     for (const month of MONTHS) {
       const vwEnd = getBrandMonthEndividamentoTotal('vw', month, vwEndividamento[month] ?? [], vwData);
       const audiEnd = getBrandMonthEndividamentoTotal('audi', month, audiEndividamento[month] ?? [], audiData);
-      const endividamentoConsolidado = vwEnd + audiEnd;
-      const endividamentoBaseAbs = Math.abs(Math.min(0, endividamentoConsolidado));
+      const vwEndividamentoBase = Math.abs(Math.min(0, vwEnd));
+      const audiEndividamentoBase = Math.abs(Math.min(0, audiEnd));
       const taxaPercent = Number(taxaJurosByMonth[month] ?? 0);
-      const jurosTotal = endividamentoBaseAbs * (taxaPercent / 100);
+      const vwJurosCalculado = vwEndividamentoBase * (taxaPercent / 100);
+      const audiJurosCalculado = audiEndividamentoBase * (taxaPercent / 100);
       const totalMonth = monthTotals[month]?.total ?? 0;
       const vwPercent = totalMonth ? (monthTotals[month].vw / totalMonth) * 100 : 0;
       const audiPercent = totalMonth ? (monthTotals[month].audi / totalMonth) * 100 : 0;
@@ -937,12 +936,12 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         taxaPercent,
         vwEndividamento: vwEnd,
         audiEndividamento: audiEnd,
-        endividamentoConsolidadoBase: endividamentoBaseAbs,
-        jurosTotal,
+        vwEndividamentoBase,
+        audiEndividamentoBase,
+        vwJurosCalculado,
+        audiJurosCalculado,
         vwPercent,
         audiPercent,
-        vwJurosRateado: jurosTotal * (vwPercent / 100),
-        audiJurosRateado: jurosTotal * (audiPercent / 100),
       };
     }
 
@@ -1048,9 +1047,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   onRemoveEndividamentoConta={handleRemoveEndividamentoConta}
                   circulantePercent={monthFinancials[month]?.vwPercent ?? 0}
                   taxaJurosPercent={monthFinancials[month]?.taxaPercent ?? 0}
-                  endividamentoConsolidadoBase={monthFinancials[month]?.endividamentoConsolidadoBase ?? 0}
-                  jurosTotalConsolidado={monthFinancials[month]?.jurosTotal ?? 0}
-                  jurosRateadoMarca={monthFinancials[month]?.vwJurosRateado ?? 0}
+                  endividamentoBaseMarca={monthFinancials[month]?.vwEndividamentoBase ?? 0}
+                  jurosCalculadoMarca={monthFinancials[month]?.vwJurosCalculado ?? 0}
                 />
                 <BrandMonthTable
                   brand="audi"
@@ -1066,9 +1064,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   onRemoveEndividamentoConta={handleRemoveEndividamentoConta}
                   circulantePercent={monthFinancials[month]?.audiPercent ?? 0}
                   taxaJurosPercent={monthFinancials[month]?.taxaPercent ?? 0}
-                  endividamentoConsolidadoBase={monthFinancials[month]?.endividamentoConsolidadoBase ?? 0}
-                  jurosTotalConsolidado={monthFinancials[month]?.jurosTotal ?? 0}
-                  jurosRateadoMarca={monthFinancials[month]?.audiJurosRateado ?? 0}
+                  endividamentoBaseMarca={monthFinancials[month]?.audiEndividamentoBase ?? 0}
+                  jurosCalculadoMarca={monthFinancials[month]?.audiJurosCalculado ?? 0}
                 />
               </div>
             </section>
