@@ -66,6 +66,7 @@ interface CalculoValorResumo {
   baseRpsFunilaria: number;
   baseMecanicos: number;
   premioProduto: number;
+  premioAdicional: number;
   bonus: number;
   comissao: number;
   total: number;
@@ -1422,9 +1423,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
           baseRpsFunilaria: 0,
           baseMecanicos: 0,
           premioProduto: parseDecimal(record?.premioProduto ?? ''),
+          premioAdicional: parseDecimal(record?.premioAdicional ?? ''),
           bonus: 0,
           comissao: 0,
-          total: parseDecimal(record?.salarioFixo ?? '') + parseDecimal(record?.premioProduto ?? ''),
+          total: parseDecimal(record?.salarioFixo ?? '') + parseDecimal(record?.premioProduto ?? '') + parseDecimal(record?.premioAdicional ?? ''),
           volumeLiquido: 0,
           bonusRegra: 'Bônus inativo',
           filtros: 'Sem filtros aplicados',
@@ -1497,10 +1499,11 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const salario = parseDecimal(record.salarioFixo);
       const premioProdutoUnitario = parseDecimal(record.premioProduto ?? '');
       const premioProduto = baseProdutosQuantidade * premioProdutoUnitario;
-      const bonus = bonusFixo + bonusEscala + premioProduto;
+      const premioAdicional = parseDecimal(record.premioAdicional ?? '');
+      const bonus = bonusFixo + bonusEscala + premioProduto + premioAdicional;
       const bonusRegra = faixaAtiva
-        ? `Bônus fixo R$ ${fmtCurrency(bonusFixo)} + Escala (base peças em R$ ${fmtCurrency(basePecasVendas)}: faixa ${faixaAtiva.de || '0'}-${faixaAtiva.ate || 'em diante'} = R$ ${fmtCurrency(bonusEscala)}) + Prêmio Produto R$ ${fmtCurrency(premioProduto)}`
-        : `Bônus fixo R$ ${fmtCurrency(bonusFixo)} + Escala R$ 0,00 + Prêmio Produto R$ ${fmtCurrency(premioProduto)}`;
+        ? `Bônus fixo R$ ${fmtCurrency(bonusFixo)} + Escala (base peças em R$ ${fmtCurrency(basePecasVendas)}: faixa ${faixaAtiva.de || '0'}-${faixaAtiva.ate || 'em diante'} = R$ ${fmtCurrency(bonusEscala)}) + Prêmio Produto R$ ${fmtCurrency(premioProduto)} + Prêmio adicional R$ ${fmtCurrency(premioAdicional)}`
+        : `Bônus fixo R$ ${fmtCurrency(bonusFixo)} + Escala R$ 0,00 + Prêmio Produto R$ ${fmtCurrency(premioProduto)} + Prêmio adicional R$ ${fmtCurrency(premioAdicional)}`;
       const filtros = `${useDept ? `Departamentos: ${(record.departamentos ?? []).join(', ')}` : 'Departamentos: todos'} · ${useTx ? `Transações: ${(record.transacoes ?? []).join(', ')}` : 'Transações: todas'}`;
 
       map.set(vendorKey(item.vendedor), {
@@ -1515,6 +1518,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         baseRpsFunilaria,
         baseMecanicos,
         premioProduto,
+        premioAdicional,
         bonus,
         comissao,
         total: salario + comissao + bonus,
@@ -1591,6 +1595,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             comissaoTotalPecasPct: existing.comissaoTotalPecasPct ?? '',
             bonusProdutividade: existing.bonusProdutividade ?? '',
             premioProduto: existing.premioProduto ?? '',
+            premioAdicional: existing.premioAdicional ?? '',
             departamentos: existing.departamentos?.length ? existing.departamentos : departamentosDefault,
             transacoes: existing.transacoes?.length ? existing.transacoes : transacoesDefault,
             bonusEscalas: existing.bonusEscalas?.length ? existing.bonusEscalas : [createBonusEscalaDraft()],
@@ -1611,6 +1616,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             comissaoTotalPecasPct: '',
             bonusProdutividade: '',
             premioProduto: '',
+            premioAdicional: '',
             departamentos: departamentosDefault,
             transacoes: transacoesDefault,
             bonusEscalas: [createBonusEscalaDraft()],
@@ -1813,6 +1819,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       comissaoTotalPecasPct: String(calculoDraft.comissaoTotalPecasPct ?? '').trim(),
       bonusProdutividade: String(calculoDraft.bonusProdutividade ?? '').trim(),
       premioProduto: String(calculoDraft.premioProduto ?? '').trim(),
+      premioAdicional: String(calculoDraft.premioAdicional ?? '').trim(),
       departamentos: (calculoDraft.departamentos ?? []).map((item) => normalizeVendorName(item)).filter(Boolean),
       transacoes: (calculoDraft.transacoes ?? []).map((item) => normalizeVendorName(item)).filter(Boolean),
       bonusEscalas: cleanBonusEscalas((calculoDraft.bonusEscalas ?? []) as BonusEscalaDraft[]),
@@ -2863,8 +2870,9 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                                     <div className="space-y-1">
                                       <p><strong className="text-slate-700">Regra bônus:</strong> {valores?.bonusRegra ?? '—'}</p>
                                       <p><strong className="text-slate-700">Prêmio Produto:</strong> R$ {fmtCurrency(valores?.premioProduto ?? 0)}</p>
+                                      <p><strong className="text-slate-700">Prêmio adicional:</strong> R$ {fmtCurrency(valores?.premioAdicional ?? 0)}</p>
                                       <p><strong className="text-slate-700">Filtros:</strong> {valores?.filtros ?? '—'}</p>
-                                      <p><strong className="text-slate-700">Composição:</strong> Salário + Comissão + Bônus + Prêmio Produto</p>
+                                      <p><strong className="text-slate-700">Composição:</strong> Salário + Comissão + Bônus</p>
                                     </div>
                                   </div>
                                 </td>
@@ -3008,7 +3016,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-slate-600 mb-1">Bônus produtividade fixo (R$)</label>
                           <input
@@ -3033,7 +3041,19 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                             className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                           />
                         </div>
-                        <label className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-3 sm:col-span-1">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Prêmio adicional (R$)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={calculoDraft.premioAdicional ?? ''}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, premioAdicional: e.target.value })}
+                            disabled={calculoBloqueado}
+                            placeholder="0,00"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                        </div>
+                        <label className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-3 sm:col-span-4">
                           <input
                             type="checkbox"
                             checked={calculoDraft.descontarDevolucao}
