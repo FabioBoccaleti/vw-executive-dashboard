@@ -37,6 +37,7 @@ export interface RateioResultadoLinha {
 
 export type RateioResultadosBrandYearData = Record<number, RateioResultadoLinha[]>;
 export type RateioEndividamentoBrandYearData = Record<number, string[]>;
+export type RateioTaxaJurosYearData = Record<number, number>;
 
 function getKey(brand: AnaliseBrand, year: number, month: number): string {
   const mm = String(month).padStart(2, '0');
@@ -59,6 +60,10 @@ function getRateioEndividamentoKey(brand: AnaliseBrand, year: number): string {
   return `analise_despesas_rateio_endividamento_${brand}_${year}`;
 }
 
+function getRateioTaxaJurosKey(year: number): string {
+  return `analise_despesas_rateio_taxa_juros_${year}`;
+}
+
 function getDefaultRateioConfig(): RateioCirculanteConfig {
   return {
     shared: { ativo: [], passivo: [] },
@@ -79,6 +84,14 @@ function getDefaultRateioEndividamentoData(): RateioEndividamentoBrandYearData {
   const out: RateioEndividamentoBrandYearData = {};
   for (let month = 1; month <= 12; month++) {
     out[month] = [];
+  }
+  return out;
+}
+
+function getDefaultRateioTaxaJurosData(): RateioTaxaJurosYearData {
+  const out: RateioTaxaJurosYearData = {};
+  for (let month = 1; month <= 12; month++) {
+    out[month] = 0;
   }
   return out;
 }
@@ -296,5 +309,41 @@ export async function saveRateioEndividamento(
     await kvSet(getRateioEndividamentoKey(brand, year), payload);
   } catch (err) {
     console.error('Erro ao salvar endividamento de rateio:', err);
+  }
+}
+
+/** Carrega taxa de juros mensal do rateio (compartilhada entre marcas) por ano. */
+export async function loadRateioTaxaJuros(year: number): Promise<RateioTaxaJurosYearData> {
+  try {
+    const saved = await kvGet<Record<string, number>>(getRateioTaxaJurosKey(year));
+    const base = getDefaultRateioTaxaJurosData();
+    if (!saved) return base;
+
+    for (let month = 1; month <= 12; month++) {
+      const value = Number(saved[String(month)]);
+      base[month] = Number.isFinite(value) ? value : 0;
+    }
+
+    return base;
+  } catch (err) {
+    console.error('Erro ao carregar taxa de juros do rateio:', err);
+    return getDefaultRateioTaxaJurosData();
+  }
+}
+
+/** Salva taxa de juros mensal do rateio (compartilhada entre marcas) por ano. */
+export async function saveRateioTaxaJuros(
+  year: number,
+  data: RateioTaxaJurosYearData,
+): Promise<void> {
+  try {
+    const payload: Record<string, number> = {};
+    for (let month = 1; month <= 12; month++) {
+      const value = Number(data[month]);
+      payload[String(month)] = Number.isFinite(value) ? value : 0;
+    }
+    await kvSet(getRateioTaxaJurosKey(year), payload);
+  } catch (err) {
+    console.error('Erro ao salvar taxa de juros do rateio:', err);
   }
 }

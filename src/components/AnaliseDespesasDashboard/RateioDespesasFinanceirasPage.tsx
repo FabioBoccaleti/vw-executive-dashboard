@@ -6,13 +6,16 @@ import {
   type RateioEndividamentoBrandYearData,
   type RateioResultadoLinha,
   type RateioResultadosBrandYearData,
+  type RateioTaxaJurosYearData,
   loadRateioEndividamento,
   loadMultipleMonthsAnaliseDespesas,
   loadRateioCirculanteConfig,
   loadRateioResultados,
+  loadRateioTaxaJuros,
   saveRateioCirculanteConfig,
   saveRateioEndividamento,
   saveRateioResultados,
+  saveRateioTaxaJuros,
 } from './analiseDespesasStorage';
 
 type CirculanteGroup = 'ativo' | 'passivo';
@@ -73,6 +76,21 @@ const EMPTY_ENDIVIDAMENTO_BY_MONTH: RateioEndividamentoBrandYearData = {
   10: [],
   11: [],
   12: [],
+};
+
+const EMPTY_TAXA_JUROS_BY_MONTH: RateioTaxaJurosYearData = {
+  1: 0,
+  2: 0,
+  3: 0,
+  4: 0,
+  5: 0,
+  6: 0,
+  7: 0,
+  8: 0,
+  9: 0,
+  10: 0,
+  11: 0,
+  12: 0,
 };
 
 function parseBalanceteCirculante(text: string): AccountsByConta {
@@ -146,6 +164,14 @@ function parseManualValue(raw: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function parsePercentValue(raw: string): number {
+  if (!raw.trim()) return 0;
+  const normalized = raw.replace(/\./g, '').replace(',', '.');
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, parsed);
+}
+
 function getSelectedAccounts(config: RateioCirculanteConfig, brand: AnaliseBrand, group: CirculanteGroup): string[] {
   return uniqueSorted([...(config.shared[group] ?? []), ...(config[brand][group] ?? [])]);
 }
@@ -168,6 +194,17 @@ function getBrandMonthTotal(
   );
   const resultadoAjustado = resultRows.reduce((sum, row) => sum + row.value, 0);
   return ativoTotal + passivoTotal + resultadoAjustado;
+}
+
+function getBrandMonthEndividamentoTotal(
+  brand: AnaliseBrand,
+  month: number,
+  selectedContas: string[],
+  accountsByMonth: AccountsByMonth,
+): number {
+  const monthAccounts = accountsByMonth[month] ?? {};
+  const raw = selectedContas.reduce((sum, conta) => sum + (monthAccounts[conta]?.saldoAtual ?? 0), 0);
+  return raw > 0 ? 0 : raw;
 }
 
 function ConfigSection({
@@ -207,6 +244,41 @@ function ConfigSection({
   );
 }
 
+function MonthTaxaJurosControl({
+  month,
+  taxaPercent,
+  onApply,
+}: {
+  month: number;
+  taxaPercent: number;
+  onApply: (month: number, value: number) => void;
+}) {
+  const [draftTaxa, setDraftTaxa] = useState(String(taxaPercent).replace('.', ','));
+
+  useEffect(() => {
+    setDraftTaxa(String(taxaPercent).replace('.', ','));
+  }, [taxaPercent, month]);
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-3 flex flex-wrap items-center gap-2">
+      <span className="text-sm font-semibold text-slate-700">Taxa de Juros do Mês (%)</span>
+      <input
+        type="text"
+        value={draftTaxa}
+        onChange={(e) => setDraftTaxa(e.target.value)}
+        className="h-8 w-28 px-2 text-sm rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <button
+        onClick={() => onApply(month, parsePercentValue(draftTaxa))}
+        className="h-8 px-3 text-xs font-semibold rounded bg-blue-600 text-white hover:bg-blue-700"
+      >
+        Aplicar do mês em diante
+      </button>
+      <span className="text-xs text-slate-500">Atualiza este mês e os próximos meses do ano.</span>
+    </div>
+  );
+}
+
 function BrandMonthTable({
   brand,
   month,
@@ -220,6 +292,10 @@ function BrandMonthTable({
   onAddEndividamentoConta,
   onRemoveEndividamentoConta,
   circulantePercent,
+  taxaJurosPercent,
+  endividamentoConsolidadoBase,
+  jurosTotalConsolidado,
+  jurosRateadoMarca,
 }: {
   brand: AnaliseBrand;
   month: number;
@@ -233,6 +309,10 @@ function BrandMonthTable({
   onAddEndividamentoConta: (brand: AnaliseBrand, month: number, conta: string) => void;
   onRemoveEndividamentoConta: (brand: AnaliseBrand, month: number, conta: string) => void;
   circulantePercent: number;
+  taxaJurosPercent: number;
+  endividamentoConsolidadoBase: number;
+  jurosTotalConsolidado: number;
+  jurosRateadoMarca: number;
 }) {
   const [newLineName, setNewLineName] = useState('');
   const [newLineValue, setNewLineValue] = useState('0');
@@ -528,6 +608,52 @@ function BrandMonthTable({
     );
   }
 
+  function renderRateioJurosTable() {
+    return (
+      <div className="mt-4">
+        <h4 className="text-sm font-bold text-slate-700 mb-2">Tabela de Rateio de Juros do Rotativo</h4>
+        <div className="overflow-x-auto border border-slate-200 rounded-lg">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="text-left px-3 py-2 font-semibold">Composição</th>
+                <th className="text-right px-3 py-2 font-semibold">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2 text-slate-700">Endividamento Consolidado Base (valor absoluto)</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(endividamentoConsolidadoBase)}</td>
+              </tr>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2 text-slate-700">Taxa de Juros do Mês (%)</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">
+                  {taxaJurosPercent.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}%
+                </td>
+              </tr>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2 text-slate-700">Juros Total Consolidado</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(jurosTotalConsolidado)}</td>
+              </tr>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2 text-slate-700">% Uso Circulante da Marca</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">
+                  {circulantePercent.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-violet-50">
+                <td className="px-3 py-2 text-right font-bold text-slate-800">Juros Rateado da Marca</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(jurosRateadoMarca)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
       <h3 className="text-base font-bold text-slate-800 mb-3">
@@ -538,6 +664,7 @@ function BrandMonthTable({
       {renderResultadosTable()}
       {renderTotalTable()}
       {renderEndividamentoTable()}
+      {renderRateioJurosTable()}
     </div>
   );
 }
@@ -563,6 +690,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
   const [audiEndividamento, setAudiEndividamento] = useState<RateioEndividamentoBrandYearData>(
     cloneEndividamentoByMonth(EMPTY_ENDIVIDAMENTO_BY_MONTH),
   );
+  const [taxaJurosByMonth, setTaxaJurosByMonth] = useState<RateioTaxaJurosYearData>({ ...EMPTY_TAXA_JUROS_BY_MONTH });
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [ativoOptions, setAtivoOptions] = useState<Array<{ conta: string; desc: string }>>([]);
   const [passivoOptions, setPassivoOptions] = useState<Array<{ conta: string; desc: string }>>([]);
@@ -581,6 +709,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           savedAudiResults,
           savedVwEndividamento,
           savedAudiEndividamento,
+          savedTaxaJuros,
         ] = await Promise.all([
           loadRateioCirculanteConfig(),
           loadMultipleMonthsAnaliseDespesas('vw', selectedYear, MONTHS),
@@ -589,6 +718,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           loadRateioResultados('audi', selectedYear),
           loadRateioEndividamento('vw', selectedYear),
           loadRateioEndividamento('audi', selectedYear),
+          loadRateioTaxaJuros(selectedYear),
         ]);
 
         if (cancelled) return;
@@ -625,6 +755,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         setAudiResults(cloneResultsByMonth(savedAudiResults));
         setVwEndividamento(cloneEndividamentoByMonth(savedVwEndividamento));
         setAudiEndividamento(cloneEndividamentoByMonth(savedAudiEndividamento));
+        setTaxaJurosByMonth({ ...EMPTY_TAXA_JUROS_BY_MONTH, ...savedTaxaJuros });
         setDescriptions(descMap);
         setAtivoOptions(
           Array.from(ativoMap.entries())
@@ -749,6 +880,16 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     });
   }
 
+  function handleApplyTaxaFromMonth(month: number, taxaPercent: number) {
+    const sanitized = Number.isFinite(taxaPercent) ? Math.max(0, taxaPercent) : 0;
+    const next: RateioTaxaJurosYearData = { ...taxaJurosByMonth };
+    for (let m = month; m <= 12; m++) {
+      next[m] = sanitized;
+    }
+    setTaxaJurosByMonth(next);
+    void saveRateioTaxaJuros(selectedYear, next);
+  }
+
   const monthsToRender = useMemo(() => {
     if (selectedMonth === 'all') return MONTHS;
     return [selectedMonth];
@@ -767,6 +908,46 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     }
     return out;
   }, [config, vwData, audiData, vwResults, audiResults]);
+
+  const monthFinancials = useMemo(() => {
+    const out: Record<number, {
+      taxaPercent: number;
+      vwEndividamento: number;
+      audiEndividamento: number;
+      endividamentoConsolidadoBase: number;
+      jurosTotal: number;
+      vwPercent: number;
+      audiPercent: number;
+      vwJurosRateado: number;
+      audiJurosRateado: number;
+    }> = {};
+
+    for (const month of MONTHS) {
+      const vwEnd = getBrandMonthEndividamentoTotal('vw', month, vwEndividamento[month] ?? [], vwData);
+      const audiEnd = getBrandMonthEndividamentoTotal('audi', month, audiEndividamento[month] ?? [], audiData);
+      const endividamentoConsolidado = vwEnd + audiEnd;
+      const endividamentoBaseAbs = Math.abs(Math.min(0, endividamentoConsolidado));
+      const taxaPercent = Number(taxaJurosByMonth[month] ?? 0);
+      const jurosTotal = endividamentoBaseAbs * (taxaPercent / 100);
+      const totalMonth = monthTotals[month]?.total ?? 0;
+      const vwPercent = totalMonth ? (monthTotals[month].vw / totalMonth) * 100 : 0;
+      const audiPercent = totalMonth ? (monthTotals[month].audi / totalMonth) * 100 : 0;
+
+      out[month] = {
+        taxaPercent,
+        vwEndividamento: vwEnd,
+        audiEndividamento: audiEnd,
+        endividamentoConsolidadoBase: endividamentoBaseAbs,
+        jurosTotal,
+        vwPercent,
+        audiPercent,
+        vwJurosRateado: jurosTotal * (vwPercent / 100),
+        audiJurosRateado: jurosTotal * (audiPercent / 100),
+      };
+    }
+
+    return out;
+  }, [taxaJurosByMonth, vwEndividamento, audiEndividamento, vwData, audiData, monthTotals]);
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -847,6 +1028,11 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           monthsToRender.map((month) => (
             <section key={month} className="space-y-3">
               <h2 className="text-lg font-bold text-slate-800">{MONTH_NAMES[month - 1]} / {selectedYear}</h2>
+              <MonthTaxaJurosControl
+                month={month}
+                taxaPercent={monthFinancials[month]?.taxaPercent ?? 0}
+                onApply={handleApplyTaxaFromMonth}
+              />
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 <BrandMonthTable
                   brand="vw"
@@ -860,7 +1046,11 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   onChangeResultLineValue={handleChangeResultLineValue}
                   onAddEndividamentoConta={handleAddEndividamentoConta}
                   onRemoveEndividamentoConta={handleRemoveEndividamentoConta}
-                  circulantePercent={monthTotals[month]?.total ? (monthTotals[month].vw / monthTotals[month].total) * 100 : 0}
+                  circulantePercent={monthFinancials[month]?.vwPercent ?? 0}
+                  taxaJurosPercent={monthFinancials[month]?.taxaPercent ?? 0}
+                  endividamentoConsolidadoBase={monthFinancials[month]?.endividamentoConsolidadoBase ?? 0}
+                  jurosTotalConsolidado={monthFinancials[month]?.jurosTotal ?? 0}
+                  jurosRateadoMarca={monthFinancials[month]?.vwJurosRateado ?? 0}
                 />
                 <BrandMonthTable
                   brand="audi"
@@ -874,7 +1064,11 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   onChangeResultLineValue={handleChangeResultLineValue}
                   onAddEndividamentoConta={handleAddEndividamentoConta}
                   onRemoveEndividamentoConta={handleRemoveEndividamentoConta}
-                  circulantePercent={monthTotals[month]?.total ? (monthTotals[month].audi / monthTotals[month].total) * 100 : 0}
+                  circulantePercent={monthFinancials[month]?.audiPercent ?? 0}
+                  taxaJurosPercent={monthFinancials[month]?.taxaPercent ?? 0}
+                  endividamentoConsolidadoBase={monthFinancials[month]?.endividamentoConsolidadoBase ?? 0}
+                  jurosTotalConsolidado={monthFinancials[month]?.jurosTotal ?? 0}
+                  jurosRateadoMarca={monthFinancials[month]?.audiJurosRateado ?? 0}
                 />
               </div>
             </section>
