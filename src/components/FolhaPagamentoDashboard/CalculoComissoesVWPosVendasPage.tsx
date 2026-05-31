@@ -2329,13 +2329,25 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
   const demonstrativoKpis = useMemo(() => {
     const colaboradores = demonstrativoFilteredRows.length;
+    const comissaoTotal = demonstrativoComissoesTotais.pecas + demonstrativoComissoesTotais.acessorios + demonstrativoComissoesTotais.maoObra;
+    const bonusAdicional = demonstrativoFilteredRows.reduce((acc, item) => acc + parseDecimal(item.premioProduto ?? ''), 0);
+    const participacaoResultado = 0;
+    const totalRemuneracao =
+      demonstrativoTotais.salarioFixo +
+      comissaoTotal +
+      demonstrativoTotais.bonusProdutividade +
+      bonusAdicional +
+      participacaoResultado;
     return {
       colaboradores,
       salarioFixo: demonstrativoTotais.salarioFixo,
+      comissaoTotal,
       bonusProdutividade: demonstrativoTotais.bonusProdutividade,
-      totalRemuneracao: demonstrativoTotais.totalRemuneracao,
+      bonusAdicional,
+      participacaoResultado,
+      totalRemuneracao,
     };
-  }, [demonstrativoFilteredRows, demonstrativoTotais]);
+  }, [demonstrativoFilteredRows, demonstrativoTotais, demonstrativoComissoesTotais]);
 
   function printDemonstrativoAtual() {
     if (demonstrativoFilter.month === null) {
@@ -3383,7 +3395,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-7 gap-2">
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                       <p className="text-[11px] text-slate-500">Colaboradores</p>
                       <p className="text-sm font-bold text-slate-800">{demonstrativoKpis.colaboradores}</p>
@@ -3393,8 +3405,20 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       <p className="text-sm font-bold text-slate-800 font-mono">R$ {fmtCurrency(demonstrativoKpis.salarioFixo)}</p>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="text-[11px] text-slate-500">Comissão</p>
+                      <p className="text-sm font-bold text-slate-800 font-mono">R$ {fmtCurrency(demonstrativoKpis.comissaoTotal)}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                       <p className="text-[11px] text-slate-500">Bônus Produtividade</p>
                       <p className="text-sm font-bold text-slate-800 font-mono">R$ {fmtCurrency(demonstrativoKpis.bonusProdutividade)}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="text-[11px] text-slate-500">Bônus adicional</p>
+                      <p className="text-sm font-bold text-slate-800 font-mono">R$ {fmtCurrency(demonstrativoKpis.bonusAdicional)}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <p className="text-[11px] text-slate-500">Participação no resultado</p>
+                      <p className="text-sm font-bold text-slate-800 font-mono">R$ {fmtCurrency(demonstrativoKpis.participacaoResultado)}</p>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                       <p className="text-[11px] text-slate-500">Total Remuneração</p>
