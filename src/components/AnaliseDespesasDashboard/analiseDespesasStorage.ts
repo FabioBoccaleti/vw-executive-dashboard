@@ -14,6 +14,21 @@ export interface AnaliseDespesasRaw {
   timestamp?: number;
 }
 
+export interface RateioCirculanteConfig {
+  shared: {
+    ativo: string[];
+    passivo: string[];
+  };
+  vw: {
+    ativo: string[];
+    passivo: string[];
+  };
+  audi: {
+    ativo: string[];
+    passivo: string[];
+  };
+}
+
 function getKey(brand: AnaliseBrand, year: number, month: number): string {
   const mm = String(month).padStart(2, '0');
   return `analise_despesas_${brand}_${year}_${mm}`;
@@ -21,6 +36,18 @@ function getKey(brand: AnaliseBrand, year: number, month: number): string {
 
 function getTiposKey(brand: AnaliseBrand): string {
   return `analise_despesas_tipos_${brand}`;
+}
+
+function getRateioConfigKey(): string {
+  return 'analise_despesas_rateio_circulante_config';
+}
+
+function getDefaultRateioConfig(): RateioCirculanteConfig {
+  return {
+    shared: { ativo: [], passivo: [] },
+    vw: { ativo: [], passivo: [] },
+    audi: { ativo: [], passivo: [] },
+  };
 }
 
 /** Salva o texto bruto do balancete para marca/mês/ano. */
@@ -116,5 +143,39 @@ export async function saveAnaliseDespesasTipos(
     await kvSet(getTiposKey(brand), tipos);
   } catch (err) {
     console.error('Erro ao salvar tipos análise despesas:', err);
+  }
+}
+
+/** Carrega configuração de contas do módulo de rateio circulante. */
+export async function loadRateioCirculanteConfig(): Promise<RateioCirculanteConfig> {
+  try {
+    const saved = await kvGet<RateioCirculanteConfig>(getRateioConfigKey());
+    if (!saved) return getDefaultRateioConfig();
+    return {
+      shared: {
+        ativo: saved.shared?.ativo ?? [],
+        passivo: saved.shared?.passivo ?? [],
+      },
+      vw: {
+        ativo: saved.vw?.ativo ?? [],
+        passivo: saved.vw?.passivo ?? [],
+      },
+      audi: {
+        ativo: saved.audi?.ativo ?? [],
+        passivo: saved.audi?.passivo ?? [],
+      },
+    };
+  } catch (err) {
+    console.error('Erro ao carregar configuração de rateio circulante:', err);
+    return getDefaultRateioConfig();
+  }
+}
+
+/** Salva configuração de contas do módulo de rateio circulante. */
+export async function saveRateioCirculanteConfig(config: RateioCirculanteConfig): Promise<void> {
+  try {
+    await kvSet(getRateioConfigKey(), config);
+  } catch (err) {
+    console.error('Erro ao salvar configuração de rateio circulante:', err);
   }
 }
