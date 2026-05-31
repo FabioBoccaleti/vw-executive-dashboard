@@ -916,6 +916,12 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       audiEndividamentoBase: number;
       vwJurosCalculado: number;
       audiJurosCalculado: number;
+      vwAReceberDaAudi: number;
+      vwAPagarParaAudi: number;
+      vwSaldoLiquido: number;
+      audiAReceberDaVw: number;
+      audiAPagarParaVw: number;
+      audiSaldoLiquido: number;
       vwPercent: number;
       audiPercent: number;
     }> = {};
@@ -931,6 +937,12 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       const totalMonth = monthTotals[month]?.total ?? 0;
       const vwPercent = totalMonth ? (monthTotals[month].vw / totalMonth) * 100 : 0;
       const audiPercent = totalMonth ? (monthTotals[month].audi / totalMonth) * 100 : 0;
+      const vwAReceberDaAudi = vwJurosCalculado * (audiPercent / 100);
+      const vwAPagarParaAudi = audiJurosCalculado * (vwPercent / 100);
+      const vwSaldoLiquido = vwAReceberDaAudi - vwAPagarParaAudi;
+      const audiAReceberDaVw = audiJurosCalculado * (vwPercent / 100);
+      const audiAPagarParaVw = vwJurosCalculado * (audiPercent / 100);
+      const audiSaldoLiquido = audiAReceberDaVw - audiAPagarParaVw;
 
       out[month] = {
         taxaPercent,
@@ -940,6 +952,12 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         audiEndividamentoBase,
         vwJurosCalculado,
         audiJurosCalculado,
+        vwAReceberDaAudi,
+        vwAPagarParaAudi,
+        vwSaldoLiquido,
+        audiAReceberDaVw,
+        audiAPagarParaVw,
+        audiSaldoLiquido,
         vwPercent,
         audiPercent,
       };
@@ -947,6 +965,62 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
 
     return out;
   }, [taxaJurosByMonth, vwEndividamento, audiEndividamento, vwData, audiData, monthTotals]);
+
+  function renderLiquidezEntreMarcasTable(month: number) {
+    const financial = monthFinancials[month];
+    if (!financial) return null;
+
+    const transferencia = financial.vwSaldoLiquido > 0
+      ? { de: 'Audi', para: 'VW', valor: financial.vwSaldoLiquido }
+      : financial.vwSaldoLiquido < 0
+        ? { de: 'VW', para: 'Audi', valor: Math.abs(financial.vwSaldoLiquido) }
+        : { de: '-', para: '-', valor: 0 };
+
+    return (
+      <div className="mt-4 bg-white border border-slate-200 rounded-xl shadow-sm p-4">
+        <h4 className="text-sm font-bold text-slate-700 mb-2">Liquidação entre Marcas</h4>
+        <div className="overflow-x-auto border border-slate-200 rounded-lg">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="text-left px-3 py-2 font-semibold">Marca</th>
+                <th className="text-right px-3 py-2 font-semibold">Juros Calculado</th>
+                <th className="text-right px-3 py-2 font-semibold">% Uso Circulante</th>
+                <th className="text-right px-3 py-2 font-semibold">A Receber da Outra Marca</th>
+                <th className="text-right px-3 py-2 font-semibold">A Pagar</th>
+                <th className="text-right px-3 py-2 font-semibold">Saldo Líquido</th>
+              </tr>
+            </thead>
+            <tbody>
+              {([
+                { brand: 'VW', juros: financial.vwJurosCalculado, percent: financial.vwPercent, receber: financial.vwAReceberDaAudi, pagar: financial.vwAPagarParaAudi, saldo: financial.vwSaldoLiquido },
+                { brand: 'Audi', juros: financial.audiJurosCalculado, percent: financial.audiPercent, receber: financial.audiAReceberDaVw, pagar: financial.audiAPagarParaVw, saldo: financial.audiSaldoLiquido },
+              ]).map((row) => (
+                <tr key={row.brand} className="border-t border-slate-100">
+                  <td className="px-3 py-2 font-semibold text-slate-800">{row.brand}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(row.juros)}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-800">{row.percent.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</td>
+                  <td className="px-3 py-2 text-right font-semibold text-emerald-700">{formatCurrency(row.receber)}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-red-700">{formatCurrency(row.pagar)}</td>
+                  <td className={`px-3 py-2 text-right font-bold ${row.saldo >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {formatCurrency(Math.abs(row.saldo))} {row.saldo >= 0 ? 'a receber' : 'a pagar'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-amber-50">
+                <td colSpan={4} className="px-3 py-2 text-right font-bold text-slate-800">Liquidação Final do Mês</td>
+                <td colSpan={3} className="px-3 py-2 text-right font-bold text-slate-900">
+                  {transferencia.valor > 0 ? `${transferencia.de} paga para ${transferencia.para} ${formatCurrency(transferencia.valor)}` : 'Sem transferência entre marcas'}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -1068,6 +1142,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   jurosCalculadoMarca={monthFinancials[month]?.audiJurosCalculado ?? 0}
                 />
               </div>
+              {renderLiquidezEntreMarcasTable(month)}
             </section>
           ))
         )}
