@@ -1486,13 +1486,16 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const pctMecanico = parseDecimal(record.comissaoMecanicoPct ?? '');
       const pctTotalPecas = parseDecimal(record.comissaoTotalPecasPct ?? '');
       const baseTotalPecasApuracao = calculoResumoGeral.pecasAcessorios;
+      const diasFerias = Math.max(0, Math.min(30, Math.trunc(parseDecimal(record.diasFerias ?? '0'))));
+      const fatorFerias = (30 - diasFerias) / 30;
+      const comissaoTotalPecasAjustada = baseTotalPecasApuracao * (pctTotalPecas / 100) * fatorFerias;
       const comissao =
         basePecasVendas * (pctPecas / 100) +
         baseAcessorios * (pctAcessorios / 100) +
         baseRpsOficina * (pctRps / 100) +
         baseRpsFunilaria * (pctRps / 100) +
         baseMecanicos * (pctMecanico / 100) +
-        baseTotalPecasApuracao * (pctTotalPecas / 100);
+        comissaoTotalPecasAjustada;
 
       const volumeLiquido = countVenda - countDevolucao;
       const faixas = cleanBonusEscalas((record.bonusEscalas ?? []) as BonusEscalaDraft[]);
@@ -1502,11 +1505,15 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const salario = parseDecimal(record.salarioFixo);
       const premioProdutoUnitario = parseDecimal(record.premioProduto ?? '');
       const premioProduto = baseProdutosQuantidade * premioProdutoUnitario;
-      const premioAdicional = parseDecimal(record.premioAdicional ?? '');
+      const premioAdicionalBase = parseDecimal(record.premioAdicional ?? '');
+      const premioAdicional = premioAdicionalBase * fatorFerias;
       const bonus = bonusFixo + bonusEscala + premioProduto + premioAdicional;
+      const feriasRegra = diasFerias > 0
+        ? ` + Pró-rata férias (${diasFerias} dia(s), fator ${fmtCurrency(fatorFerias)})`
+        : '';
       const bonusRegra = faixaAtiva
-        ? `Bônus fixo R$ ${fmtCurrency(bonusFixo)} + Escala (base peças em R$ ${fmtCurrency(basePecasVendas)}: faixa ${faixaAtiva.de || '0'}-${faixaAtiva.ate || 'em diante'} = R$ ${fmtCurrency(bonusEscala)}) + Prêmio Produto R$ ${fmtCurrency(premioProduto)} + Prêmio adicional R$ ${fmtCurrency(premioAdicional)}`
-        : `Bônus fixo R$ ${fmtCurrency(bonusFixo)} + Escala R$ 0,00 + Prêmio Produto R$ ${fmtCurrency(premioProduto)} + Prêmio adicional R$ ${fmtCurrency(premioAdicional)}`;
+        ? `Bônus fixo R$ ${fmtCurrency(bonusFixo)} + Escala (base peças em R$ ${fmtCurrency(basePecasVendas)}: faixa ${faixaAtiva.de || '0'}-${faixaAtiva.ate || 'em diante'} = R$ ${fmtCurrency(bonusEscala)}) + Prêmio Produto R$ ${fmtCurrency(premioProduto)} + Prêmio adicional R$ ${fmtCurrency(premioAdicional)}${feriasRegra}`
+        : `Bônus fixo R$ ${fmtCurrency(bonusFixo)} + Escala R$ 0,00 + Prêmio Produto R$ ${fmtCurrency(premioProduto)} + Prêmio adicional R$ ${fmtCurrency(premioAdicional)}${feriasRegra}`;
       const filtros = `${useDept ? `Departamentos: ${(record.departamentos ?? []).join(', ')}` : 'Departamentos: todos'} · ${useTx ? `Transações: ${(record.transacoes ?? []).join(', ')}` : 'Transações: todas'}`;
 
       map.set(vendorKey(item.vendedor), {
@@ -1591,6 +1598,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             ...existing,
           departamentoColaborador: existing.departamentoColaborador ?? '',
           cargoColaborador: existing.cargoColaborador ?? '',
+            nVend: existing.nVend ?? '',
             diasFerias: existing.diasFerias ?? '',
             comissaoPecasPct: existing.comissaoPecasPct ?? '',
             comissaoAcessoriosPct: existing.comissaoAcessoriosPct ?? '',
@@ -1613,6 +1621,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             cargoColaborador: '',
             comissionado: false,
             salarioFixo: '',
+            nVend: '',
             diasFerias: '',
             comissaoPecasPct: '',
             comissaoAcessoriosPct: '',
@@ -1817,6 +1826,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         : '') as DepartamentoColaborador,
       cargoColaborador: String(calculoDraft.cargoColaborador ?? '').trim(),
       salarioFixo: String(calculoDraft.salarioFixo ?? '').trim(),
+      nVend: String(calculoDraft.nVend ?? '').trim(),
       diasFerias: String(calculoDraft.diasFerias ?? '').trim(),
       comissaoPecasPct: String(calculoDraft.comissaoPecasPct ?? '').trim(),
       comissaoAcessoriosPct: String(calculoDraft.comissaoAcessoriosPct ?? '').trim(),
@@ -2943,7 +2953,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                        <label className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-3 sm:col-span-5">
+                        <label className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-3 sm:col-span-4">
                           <input
                             type="checkbox"
                             checked={calculoDraft.comissionado}
@@ -2954,7 +2964,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <span className="text-sm text-slate-700">Comissionado</span>
                         </label>
 
-                        <div className="sm:col-span-4">
+                        <div className="sm:col-span-3">
                           <label className="block text-xs font-semibold text-slate-600 mb-1">Salário fixo</label>
                           <div className="relative">
                             <Wallet className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -2968,6 +2978,20 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                               className="w-full border border-slate-200 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                             />
                           </div>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">N.Vend</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={calculoDraft.nVend ?? ''}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, nVend: e.target.value })}
+                            disabled={calculoBloqueado}
+                            placeholder="0"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
                         </div>
 
                         <div className="sm:col-span-3">

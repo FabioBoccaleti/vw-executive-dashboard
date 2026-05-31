@@ -29,6 +29,7 @@ export interface CalculoPosVendasRemuneracao {
   cargoColaborador: string;
   comissionado: boolean;
   salarioFixo: string;
+  nVend: string;
   diasFerias: string;
   comissaoPecasPct: string;
   comissaoAcessoriosPct: string;
@@ -75,6 +76,7 @@ export async function loadCalculoPosVendasRemuneracoes(): Promise<CalculoPosVend
       cargoColaborador: String(item.cargoColaborador ?? '').trim(),
       comissionado: Boolean(item.comissionado),
       salarioFixo: String(item.salarioFixo ?? ''),
+      nVend: String(item.nVend ?? ''),
       diasFerias: String(item.diasFerias ?? ''),
       comissaoPecasPct: String(item.comissaoPecasPct ?? ''),
       comissaoAcessoriosPct: String(item.comissaoAcessoriosPct ?? ''),
