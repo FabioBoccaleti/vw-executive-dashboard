@@ -3,12 +3,15 @@ import { Loader2, Settings2 } from 'lucide-react';
 import {
   type AnaliseBrand,
   type RateioCirculanteConfig,
+  type RateioEndividamentoBrandYearData,
   type RateioResultadoLinha,
   type RateioResultadosBrandYearData,
+  loadRateioEndividamento,
   loadMultipleMonthsAnaliseDespesas,
   loadRateioCirculanteConfig,
   loadRateioResultados,
   saveRateioCirculanteConfig,
+  saveRateioEndividamento,
   saveRateioResultados,
 } from './analiseDespesasStorage';
 
@@ -43,6 +46,21 @@ const BRAND_LABEL: Record<AnaliseBrand, string> = {
 };
 
 const EMPTY_RESULTS_BY_MONTH: RateioResultadosBrandYearData = {
+  1: [],
+  2: [],
+  3: [],
+  4: [],
+  5: [],
+  6: [],
+  7: [],
+  8: [],
+  9: [],
+  10: [],
+  11: [],
+  12: [],
+};
+
+const EMPTY_ENDIVIDAMENTO_BY_MONTH: RateioEndividamentoBrandYearData = {
   1: [],
   2: [],
   3: [],
@@ -106,6 +124,17 @@ function cloneResultsByMonth(data?: RateioResultadosBrandYearData): RateioResult
   if (!data) return out;
   for (const month of MONTHS) {
     out[month] = (data[month] ?? []).map((row) => ({ ...row }));
+  }
+  return out;
+}
+
+function cloneEndividamentoByMonth(data?: RateioEndividamentoBrandYearData): RateioEndividamentoBrandYearData {
+  const out: RateioEndividamentoBrandYearData = {
+    1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: [], 9: [], 10: [], 11: [], 12: [],
+  };
+  if (!data) return out;
+  for (const month of MONTHS) {
+    out[month] = Array.from(new Set(data[month] ?? []));
   }
   return out;
 }
@@ -185,8 +214,11 @@ function BrandMonthTable({
   accountsByMonth,
   descriptions,
   resultRows,
+  endividamentoContas,
   onAddResultLine,
   onChangeResultLineValue,
+  onAddEndividamentoConta,
+  onRemoveEndividamentoConta,
   circulantePercent,
 }: {
   brand: AnaliseBrand;
@@ -195,12 +227,16 @@ function BrandMonthTable({
   accountsByMonth: AccountsByMonth;
   descriptions: Record<string, string>;
   resultRows: RateioResultadoLinha[];
+  endividamentoContas: string[];
   onAddResultLine: (brand: AnaliseBrand, month: number, label: string, value: number) => void;
   onChangeResultLineValue: (brand: AnaliseBrand, month: number, lineId: string, value: number) => void;
+  onAddEndividamentoConta: (brand: AnaliseBrand, month: number, conta: string) => void;
+  onRemoveEndividamentoConta: (brand: AnaliseBrand, month: number, conta: string) => void;
   circulantePercent: number;
 }) {
   const [newLineName, setNewLineName] = useState('');
   const [newLineValue, setNewLineValue] = useState('0');
+  const [endividamentoContaToAdd, setEndividamentoContaToAdd] = useState('');
 
   function getGroupData(group: CirculanteGroup) {
     const selectedContas = getSelectedAccounts(config, brand, group);
@@ -226,6 +262,21 @@ function BrandMonthTable({
   const totalExtras = resultRows.reduce((sum, row) => sum + row.value, 0);
   const resultadoAjustado = resultadoPeriodo + totalExtras;
   const totalGeral = ativoData.total + passivoData.total + resultadoAjustado;
+  const endividamentoSelectableContas = uniqueSorted([
+    ...ativoData.rows.map((row) => row.conta),
+    ...passivoData.rows.map((row) => row.conta),
+  ]);
+  const endividamentoRows = endividamentoContas.map((conta) => {
+    const monthAccounts = accountsByMonth[month] ?? {};
+    const hit = monthAccounts[conta];
+    return {
+      conta,
+      desc: hit?.desc || descriptions[conta] || 'Conta não encontrada no balancete do mês',
+      value: hit?.saldoAtual ?? 0,
+    };
+  });
+  const totalEndividamentoRaw = endividamentoRows.reduce((sum, row) => sum + row.value, 0);
+  const totalEndividamento = totalEndividamentoRaw > 0 ? 0 : totalEndividamentoRaw;
 
   function renderGroup(title: string, rows: Array<{ conta: string; desc: string; value: number }>, total: number) {
 
@@ -394,6 +445,89 @@ function BrandMonthTable({
     );
   }
 
+  function renderEndividamentoTable() {
+    const contasDisponiveisParaAdicionar = endividamentoSelectableContas.filter(
+      (conta) => !endividamentoContas.includes(conta),
+    );
+
+    return (
+      <div className="mt-4">
+        <h4 className="text-sm font-bold text-slate-700 mb-2">Tabela de Endividamento Banco Volks Credito Rotativo</h4>
+
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <select
+            value={endividamentoContaToAdd}
+            onChange={(e) => setEndividamentoContaToAdd(e.target.value)}
+            className="h-8 px-2 text-sm rounded border border-slate-300 bg-white text-slate-700"
+          >
+            <option value="">Selecionar conta de Ativo/Passivo</option>
+            {contasDisponiveisParaAdicionar.map((conta) => (
+              <option key={conta} value={conta}>
+                {conta} - {descriptions[conta] || 'Sem descrição'}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              if (!endividamentoContaToAdd) return;
+              onAddEndividamentoConta(brand, month, endividamentoContaToAdd);
+              setEndividamentoContaToAdd('');
+            }}
+            className="h-8 px-3 text-xs font-semibold rounded bg-blue-600 text-white hover:bg-blue-700"
+            disabled={!endividamentoContaToAdd}
+          >
+            Adicionar conta
+          </button>
+        </div>
+
+        <div className="overflow-x-auto border border-slate-200 rounded-lg">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="text-left px-3 py-2 font-semibold">Conta</th>
+                <th className="text-left px-3 py-2 font-semibold">Descrição</th>
+                <th className="text-right px-3 py-2 font-semibold">Saldo Atual</th>
+                <th className="text-center px-3 py-2 font-semibold">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {endividamentoRows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-3 text-slate-500 text-center">
+                    Nenhuma conta selecionada para endividamento.
+                  </td>
+                </tr>
+              ) : (
+                endividamentoRows.map((row) => (
+                  <tr key={row.conta} className="border-t border-slate-100">
+                    <td className="px-3 py-2 font-mono text-xs">{row.conta}</td>
+                    <td className="px-3 py-2 text-slate-700">{row.desc}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(row.value)}</td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        onClick={() => onRemoveEndividamentoConta(brand, month, row.conta)}
+                        className="h-7 px-2 text-xs rounded border border-slate-300 text-slate-600 hover:bg-slate-100"
+                      >
+                        Remover
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-amber-50">
+                <td colSpan={2} className="px-3 py-2 text-right font-bold text-slate-800">Total Endividamento Banco Volks</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(totalEndividamento)}</td>
+                <td className="px-3 py-2" />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
       <h3 className="text-base font-bold text-slate-800 mb-3">
@@ -403,6 +537,7 @@ function BrandMonthTable({
       {renderGroup('Passivo Circulante', passivoData.rows, passivoData.total)}
       {renderResultadosTable()}
       {renderTotalTable()}
+      {renderEndividamentoTable()}
     </div>
   );
 }
@@ -422,6 +557,12 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
   const [audiData, setAudiData] = useState<AccountsByMonth>({});
   const [vwResults, setVwResults] = useState<RateioResultadosBrandYearData>(cloneResultsByMonth(EMPTY_RESULTS_BY_MONTH));
   const [audiResults, setAudiResults] = useState<RateioResultadosBrandYearData>(cloneResultsByMonth(EMPTY_RESULTS_BY_MONTH));
+  const [vwEndividamento, setVwEndividamento] = useState<RateioEndividamentoBrandYearData>(
+    cloneEndividamentoByMonth(EMPTY_ENDIVIDAMENTO_BY_MONTH),
+  );
+  const [audiEndividamento, setAudiEndividamento] = useState<RateioEndividamentoBrandYearData>(
+    cloneEndividamentoByMonth(EMPTY_ENDIVIDAMENTO_BY_MONTH),
+  );
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [ativoOptions, setAtivoOptions] = useState<Array<{ conta: string; desc: string }>>([]);
   const [passivoOptions, setPassivoOptions] = useState<Array<{ conta: string; desc: string }>>([]);
@@ -432,12 +573,22 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     async function loadAll() {
       setLoading(true);
       try {
-        const [savedConfig, rawVwMonths, rawAudiMonths, savedVwResults, savedAudiResults] = await Promise.all([
+        const [
+          savedConfig,
+          rawVwMonths,
+          rawAudiMonths,
+          savedVwResults,
+          savedAudiResults,
+          savedVwEndividamento,
+          savedAudiEndividamento,
+        ] = await Promise.all([
           loadRateioCirculanteConfig(),
           loadMultipleMonthsAnaliseDespesas('vw', selectedYear, MONTHS),
           loadMultipleMonthsAnaliseDespesas('audi', selectedYear, MONTHS),
           loadRateioResultados('vw', selectedYear),
           loadRateioResultados('audi', selectedYear),
+          loadRateioEndividamento('vw', selectedYear),
+          loadRateioEndividamento('audi', selectedYear),
         ]);
 
         if (cancelled) return;
@@ -472,6 +623,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         setAudiData(nextAudiData);
         setVwResults(cloneResultsByMonth(savedVwResults));
         setAudiResults(cloneResultsByMonth(savedAudiResults));
+        setVwEndividamento(cloneEndividamentoByMonth(savedVwEndividamento));
+        setAudiEndividamento(cloneEndividamentoByMonth(savedAudiEndividamento));
         setDescriptions(descMap);
         setAtivoOptions(
           Array.from(ativoMap.entries())
@@ -563,6 +716,35 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       current[month] = (current[month] ?? []).map((line) =>
         line.id === lineId ? { ...line, value } : line,
       );
+      return current;
+    });
+  }
+
+  function applyEndividamentoUpdate(
+    brand: AnaliseBrand,
+    updater: (current: RateioEndividamentoBrandYearData) => RateioEndividamentoBrandYearData,
+  ) {
+    const current = brand === 'vw' ? vwEndividamento : audiEndividamento;
+    const next = updater(cloneEndividamentoByMonth(current));
+    if (brand === 'vw') {
+      setVwEndividamento(next);
+    } else {
+      setAudiEndividamento(next);
+    }
+    void saveRateioEndividamento(brand, selectedYear, next);
+  }
+
+  function handleAddEndividamentoConta(brand: AnaliseBrand, month: number, conta: string) {
+    if (!conta) return;
+    applyEndividamentoUpdate(brand, (current) => {
+      current[month] = uniqueSorted([...(current[month] ?? []), conta]);
+      return current;
+    });
+  }
+
+  function handleRemoveEndividamentoConta(brand: AnaliseBrand, month: number, conta: string) {
+    applyEndividamentoUpdate(brand, (current) => {
+      current[month] = (current[month] ?? []).filter((item) => item !== conta);
       return current;
     });
   }
@@ -673,8 +855,11 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   accountsByMonth={vwData}
                   descriptions={descriptions}
                   resultRows={vwResults[month] ?? []}
+                  endividamentoContas={vwEndividamento[month] ?? []}
                   onAddResultLine={handleAddResultLine}
                   onChangeResultLineValue={handleChangeResultLineValue}
+                  onAddEndividamentoConta={handleAddEndividamentoConta}
+                  onRemoveEndividamentoConta={handleRemoveEndividamentoConta}
                   circulantePercent={monthTotals[month]?.total ? (monthTotals[month].vw / monthTotals[month].total) * 100 : 0}
                 />
                 <BrandMonthTable
@@ -684,8 +869,11 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   accountsByMonth={audiData}
                   descriptions={descriptions}
                   resultRows={audiResults[month] ?? []}
+                  endividamentoContas={audiEndividamento[month] ?? []}
                   onAddResultLine={handleAddResultLine}
                   onChangeResultLineValue={handleChangeResultLineValue}
+                  onAddEndividamentoConta={handleAddEndividamentoConta}
+                  onRemoveEndividamentoConta={handleRemoveEndividamentoConta}
                   circulantePercent={monthTotals[month]?.total ? (monthTotals[month].audi / monthTotals[month].total) * 100 : 0}
                 />
               </div>
