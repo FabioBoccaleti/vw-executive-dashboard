@@ -1271,6 +1271,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
 
   function renderDepartamentoBrandPanel(brand: AnaliseBrand, month: number) {
     const monthData = departmentMonthData[brand][month];
+    const financial = monthFinancials[month];
     const ativoRows = monthData.ativo;
     const passivoRows = monthData.passivo;
     const allocations = monthData.allocations;
@@ -1286,6 +1287,16 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       if (baseCirculantePercent <= 0) return sum;
       return sum + (combinedDepartmentTotals[dept] / baseCirculantePercent) * 100;
     }, 0);
+    const jurosReconhecido = brand === 'vw' ? (financial?.vwJurosCalculado ?? 0) : (financial?.audiJurosCalculado ?? 0);
+    const valorAReceber = brand === 'vw' ? (financial?.vwAReceberDaAudi ?? 0) : (financial?.audiAReceberDaVw ?? 0);
+    const valorAPagar = brand === 'vw' ? (financial?.vwAPagarParaAudi ?? 0) : (financial?.audiAPagarParaVw ?? 0);
+    const jurosRatear = jurosReconhecido + valorAPagar - valorAReceber;
+    const jurosDeptos = DEPARTMENT_ORDER.reduce((acc, dept) => {
+      const pct = baseCirculantePercent > 0 ? (combinedDepartmentTotals[dept] / baseCirculantePercent) : 0;
+      acc[dept] = jurosRatear * pct;
+      return acc;
+    }, {} as Record<DepartmentKey, number>);
+    const totalJurosDeptos = DEPARTMENT_ORDER.reduce((sum, dept) => sum + jurosDeptos[dept], 0);
 
     return (
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 space-y-4">
@@ -1333,6 +1344,52 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                 <td className="px-3 py-2 text-right font-bold text-slate-900">
                   Soma %: {combinedPercentSum.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
                 </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div className="overflow-x-auto border border-slate-200 rounded-lg">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="text-left px-3 py-2 font-semibold">Rateio de Juros por Departamento</th>
+                <th className="text-right px-3 py-2 font-semibold">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2 text-slate-700">Juros Reconhecido da Marca</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(jurosReconhecido)}</td>
+              </tr>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2 text-slate-700">(+ ) Valor a Pagar na Liquidação</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(valorAPagar)}</td>
+              </tr>
+              <tr className="border-t border-slate-100">
+                <td className="px-3 py-2 text-slate-700">(-) Valor a Receber na Liquidação</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(valorAReceber)}</td>
+              </tr>
+              <tr className="border-t border-slate-100 bg-violet-50">
+                <td className="px-3 py-2 text-right font-bold text-slate-800">Juros a Ratear por Departamento</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(jurosRatear)}</td>
+              </tr>
+              {DEPARTMENT_ORDER.map((dept) => {
+                const deptPct = baseCirculantePercent > 0 ? (combinedDepartmentTotals[dept] / baseCirculantePercent) * 100 : 0;
+                return (
+                  <tr key={dept} className="border-t border-slate-100">
+                    <td className="px-3 py-2 text-slate-700">
+                      {DEPARTMENT_LABELS[dept]} ({deptPct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%)
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(jurosDeptos[dept])}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-slate-50">
+                <td className="px-3 py-2 text-right font-bold text-slate-800">Soma Rateada dos Departamentos</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(totalJurosDeptos)}</td>
               </tr>
             </tfoot>
           </table>
