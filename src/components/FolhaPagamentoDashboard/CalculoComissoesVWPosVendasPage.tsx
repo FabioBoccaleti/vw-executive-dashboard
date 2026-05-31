@@ -61,6 +61,7 @@ interface CalculoValorResumo {
   basePecasVendas: number;
   baseAcessorios: number;
   baseProdutos: number;
+  baseProdutosQuantidade: number;
   baseRpsOficina: number;
   baseRpsFunilaria: number;
   baseMecanicos: number;
@@ -1339,6 +1340,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     let pecas = 0;
     let acessorios = 0;
     let produtos = 0;
+    let produtosQuantidade = 0;
     let rpsOficina = 0;
     let rpsFunilaria = 0;
     let mecanicos = 0;
@@ -1347,7 +1349,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const amount = rowAmountForCalculo(row.origem, row.data);
       if (row.origem === 'Peças') pecas += amount;
       if (row.origem === 'Acessórios') acessorios += amount;
-      if (row.origem === 'Produto') produtos += amount;
+      if (row.origem === 'Produto') {
+        produtos += amount;
+        produtosQuantidade += Math.abs(n(row.data['QUANTIDADE']));
+      }
       if (row.origem === 'Oficina RPS') rpsOficina += amount;
       if (row.origem === 'Funilaria RPS') rpsFunilaria += amount;
       if (row.origem === 'Mecânicos') mecanicos += amount;
@@ -1357,6 +1362,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       pecas,
       acessorios,
       produtos,
+      produtosQuantidade,
       pecasAcessorios: pecas + acessorios,
       rpsOficina,
       rpsFunilaria,
@@ -1411,6 +1417,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
           basePecasVendas: 0,
           baseAcessorios: 0,
           baseProdutos: 0,
+          baseProdutosQuantidade: 0,
           baseRpsOficina: 0,
           baseRpsFunilaria: 0,
           baseMecanicos: 0,
@@ -1433,6 +1440,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       let basePecasVendas = 0;
       let baseAcessorios = 0;
       let baseProdutos = 0;
+      let baseProdutosQuantidade = 0;
       let baseRpsOficina = 0;
       let baseRpsFunilaria = 0;
       let baseMecanicos = 0;
@@ -1458,7 +1466,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
         if (row.origem === 'Peças') basePecasVendas += amount;
         if (row.origem === 'Acessórios') baseAcessorios += amount;
-        if (row.origem === 'Produto') baseProdutos += amount;
+        if (row.origem === 'Produto') {
+          baseProdutos += amount;
+          baseProdutosQuantidade += sign * Math.abs(n(row.data['QUANTIDADE']));
+        }
         if (row.origem === 'Oficina RPS') baseRpsOficina += amount;
         if (row.origem === 'Funilaria RPS') baseRpsFunilaria += amount;
         if (row.origem === 'Mecânicos') baseMecanicos += amount;
@@ -1495,6 +1506,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         basePecasVendas,
         baseAcessorios,
         baseProdutos,
+        baseProdutosQuantidade,
         baseRpsOficina,
         baseRpsFunilaria,
         baseMecanicos,
@@ -2663,6 +2675,10 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <p className="text-sm font-semibold font-mono text-slate-800">R$ {fmtCurrency(calculoResumoGeral.produtos)}</p>
                         </div>
                         <div className="rounded border border-blue-100 bg-white px-3 py-2">
+                          <p className="text-[11px] text-slate-500">Qtde Produtos</p>
+                          <p className="text-sm font-semibold font-mono text-slate-800">{calculoResumoGeral.produtosQuantidade.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
+                        </div>
+                        <div className="rounded border border-blue-100 bg-white px-3 py-2">
                           <p className="text-[11px] text-slate-500">Total mão de obra RPS Oficina</p>
                           <p className="text-sm font-semibold font-mono text-slate-800">R$ {fmtCurrency(calculoResumoGeral.rpsOficina)}</p>
                         </div>
@@ -2681,6 +2697,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <p><strong className="text-slate-800">Total de vendas de peças (sem depto 107):</strong> R$ {fmtCurrency(calculoResumoGeral.pecas)}</p>
                           <p><strong className="text-slate-800">Total de vendas acessórios (depto 107):</strong> R$ {fmtCurrency(calculoResumoGeral.acessorios)}</p>
                           <p><strong className="text-slate-800">Total de vendas produtos:</strong> R$ {fmtCurrency(calculoResumoGeral.produtos)}</p>
+                          <p><strong className="text-slate-800">Total de quantidade produtos:</strong> {calculoResumoGeral.produtosQuantidade.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                           <p><strong className="text-slate-800">Total mão de obra RPS oficina:</strong> R$ {fmtCurrency(calculoResumoGeral.rpsOficina)}</p>
                           <p><strong className="text-slate-800">Total mão de obra RPS funilaria:</strong> R$ {fmtCurrency(calculoResumoGeral.rpsFunilaria)}</p>
                           <p><strong className="text-slate-800">Total mão de obra mecânico:</strong> R$ {fmtCurrency(calculoResumoGeral.mecanicos)}</p>
@@ -2830,6 +2847,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                                       <p><strong className="text-slate-700">Base de Peças:</strong> R$ {fmtCurrency(valores?.basePecasVendas ?? 0)}</p>
                                       <p><strong className="text-slate-700">Base Acessórios:</strong> R$ {fmtCurrency(valores?.baseAcessorios ?? 0)}</p>
                                       <p><strong className="text-slate-700">Base Produtos:</strong> R$ {fmtCurrency(valores?.baseProdutos ?? 0)}</p>
+                                      <p><strong className="text-slate-700">Base Produto Quantidade:</strong> {(valores?.baseProdutosQuantidade ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                                       <p><strong className="text-slate-700">Base mão de Obra RPS Oficina:</strong> R$ {fmtCurrency(valores?.baseRpsOficina ?? 0)}</p>
                                       <p><strong className="text-slate-700">Base mão de Obra RPS Funilaria:</strong> R$ {fmtCurrency(valores?.baseRpsFunilaria ?? 0)}</p>
                                       <p><strong className="text-slate-700">Base Mão de Obra mecânico:</strong> R$ {fmtCurrency(valores?.baseMecanicos ?? 0)}</p>
