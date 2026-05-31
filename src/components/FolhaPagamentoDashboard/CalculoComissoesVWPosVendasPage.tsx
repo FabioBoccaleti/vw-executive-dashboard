@@ -1591,6 +1591,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             ...existing,
           departamentoColaborador: existing.departamentoColaborador ?? '',
           cargoColaborador: existing.cargoColaborador ?? '',
+            diasFerias: existing.diasFerias ?? '',
             comissaoPecasPct: existing.comissaoPecasPct ?? '',
             comissaoAcessoriosPct: existing.comissaoAcessoriosPct ?? '',
             comissaoRpsPct: existing.comissaoRpsPct ?? '',
@@ -1612,6 +1613,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             cargoColaborador: '',
             comissionado: false,
             salarioFixo: '',
+            diasFerias: '',
             comissaoPecasPct: '',
             comissaoAcessoriosPct: '',
             comissaoRpsPct: '',
@@ -1815,6 +1817,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         : '') as DepartamentoColaborador,
       cargoColaborador: String(calculoDraft.cargoColaborador ?? '').trim(),
       salarioFixo: String(calculoDraft.salarioFixo ?? '').trim(),
+      diasFerias: String(calculoDraft.diasFerias ?? '').trim(),
       comissaoPecasPct: String(calculoDraft.comissaoPecasPct ?? '').trim(),
       comissaoAcessoriosPct: String(calculoDraft.comissaoAcessoriosPct ?? '').trim(),
       comissaoRpsPct: String(calculoDraft.comissaoRpsPct ?? '').trim(),
@@ -2939,8 +2942,8 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         />
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <label className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                        <label className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-3 sm:col-span-5">
                           <input
                             type="checkbox"
                             checked={calculoDraft.comissionado}
@@ -2951,7 +2954,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <span className="text-sm text-slate-700">Comissionado</span>
                         </label>
 
-                        <div>
+                        <div className="sm:col-span-4">
                           <label className="block text-xs font-semibold text-slate-600 mb-1">Salário fixo</label>
                           <div className="relative">
                             <Wallet className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -2965,6 +2968,21 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                               className="w-full border border-slate-200 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                             />
                           </div>
+                        </div>
+
+                        <div className="sm:col-span-3">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Dias de Férias</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="31"
+                            step="1"
+                            value={calculoDraft.diasFerias ?? ''}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, diasFerias: e.target.value })}
+                            disabled={calculoBloqueado}
+                            placeholder="0"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
                         </div>
                       </div>
 
