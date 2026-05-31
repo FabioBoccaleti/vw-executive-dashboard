@@ -47,6 +47,12 @@ export interface CalculoPosVendasRemuneracao {
     ate: string;
     bonus: string;
   }>;
+  comissaoAcessoriosEscalas: Array<{
+    id: string;
+    de: string;
+    ate: string;
+    comissaoPct: string;
+  }>;
   descontarDevolucao: boolean;
   ativo: boolean;
   criadoEm: string;
@@ -94,6 +100,14 @@ export async function loadCalculoPosVendasRemuneracoes(): Promise<CalculoPosVend
             de: String((faixa as Record<string, unknown>).de ?? ''),
             ate: String((faixa as Record<string, unknown>).ate ?? ''),
             bonus: String((faixa as Record<string, unknown>).bonus ?? ''),
+          }))
+        : [],
+      comissaoAcessoriosEscalas: Array.isArray(item.comissaoAcessoriosEscalas)
+        ? item.comissaoAcessoriosEscalas.map((faixa) => ({
+            id: String((faixa as Record<string, unknown>).id ?? crypto.randomUUID()),
+            de: String((faixa as Record<string, unknown>).de ?? ''),
+            ate: String((faixa as Record<string, unknown>).ate ?? ''),
+            comissaoPct: String((faixa as Record<string, unknown>).comissaoPct ?? ''),
           }))
         : [],
       descontarDevolucao: Boolean(item.descontarDevolucao),

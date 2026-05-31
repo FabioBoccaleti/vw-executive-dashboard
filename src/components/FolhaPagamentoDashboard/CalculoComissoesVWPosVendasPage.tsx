@@ -54,6 +54,13 @@ interface BonusEscalaDraft {
   bonus: string;
 }
 
+interface ComissaoAcessoriosEscalaDraft {
+  id: string;
+  de: string;
+  ate: string;
+  comissaoPct: string;
+}
+
 interface CalculoValorResumo {
   basePecas: number;
   baseRps: number;
@@ -405,6 +412,10 @@ function createBonusEscalaDraft(): BonusEscalaDraft {
   return { id: crypto.randomUUID(), de: '', ate: '', bonus: '' };
 }
 
+function createComissaoAcessoriosEscalaDraft(): ComissaoAcessoriosEscalaDraft {
+  return { id: crypto.randomUUID(), de: '', ate: '', comissaoPct: '' };
+}
+
 function cleanBonusEscalas(value: BonusEscalaDraft[]): BonusEscalaDraft[] {
   return value
     .map((item) => ({
@@ -414,6 +425,17 @@ function cleanBonusEscalas(value: BonusEscalaDraft[]): BonusEscalaDraft[] {
       bonus: String(item.bonus ?? '').trim(),
     }))
     .filter((item) => item.de || item.ate || item.bonus);
+}
+
+function cleanComissaoAcessoriosEscalas(value: ComissaoAcessoriosEscalaDraft[]): ComissaoAcessoriosEscalaDraft[] {
+  return value
+    .map((item) => ({
+      id: item.id || crypto.randomUUID(),
+      de: String(item.de ?? '').trim(),
+      ate: String(item.ate ?? '').trim(),
+      comissaoPct: String(item.comissaoPct ?? '').trim(),
+    }))
+    .filter((item) => item.de || item.ate || item.comissaoPct);
 }
 
 function parseDecimal(value: string): number {
@@ -435,7 +457,7 @@ function isTransacaoDevolucao(value: string): boolean {
   return normalized.includes('DEVOL') || normalized.endsWith('07') || normalized === 'D';
 }
 
-function firstMatchingFaixa(volumeLiquido: number, faixas: BonusEscalaDraft[]): BonusEscalaDraft | null {
+function firstMatchingFaixa<T extends { de: string; ate: string }>(volumeLiquido: number, faixas: T[]): T | null {
   return faixas.find((faixa) => {
     const de = parseDecimal(faixa.de);
     const ateRaw = String(faixa.ate ?? '').trim();
@@ -1499,7 +1521,11 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const fatorFerias = (30 - diasFerias) / 30;
       const comissaoTotalPecasAjustada = (baseTotalPecasApuracao * (pctTotalPecas / 100) * fatorFerias) / nVend;
       const comissaoPecas = basePecasVendas * (pctPecas / 100) + comissaoTotalPecasAjustada;
-      const comissaoAcessorios = baseAcessorios * (pctAcessorios / 100);
+      const faixasComissaoAcessorios = cleanComissaoAcessoriosEscalas((record.comissaoAcessoriosEscalas ?? []) as ComissaoAcessoriosEscalaDraft[]);
+      const faixaComissaoAcessorioAtiva = firstMatchingFaixa(baseAcessorios, faixasComissaoAcessorios);
+      const pctComissaoAcessoriosEscala = faixaComissaoAcessorioAtiva ? parseDecimal(faixaComissaoAcessorioAtiva.comissaoPct) : 0;
+      const comissaoAcessoriosEscala = baseAcessorios * (pctComissaoAcessoriosEscala / 100);
+      const comissaoAcessorios = baseAcessorios * (pctAcessorios / 100) + comissaoAcessoriosEscala;
       const comissaoMaoObra =
         baseRpsOficina * (pctRps / 100) +
         baseRpsFunilaria * (pctRps / 100) +
@@ -1628,6 +1654,9 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             departamentos: existing.departamentos?.length ? existing.departamentos : departamentosDefault,
             transacoes: existing.transacoes?.length ? existing.transacoes : transacoesDefault,
             bonusEscalas: existing.bonusEscalas?.length ? existing.bonusEscalas : [createBonusEscalaDraft()],
+            comissaoAcessoriosEscalas: existing.comissaoAcessoriosEscalas?.length
+              ? existing.comissaoAcessoriosEscalas
+              : [createComissaoAcessoriosEscalaDraft()],
             descontarDevolucao: Boolean(existing.descontarDevolucao),
           }
         : {
@@ -1651,6 +1680,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             departamentos: departamentosDefault,
             transacoes: transacoesDefault,
             bonusEscalas: [createBonusEscalaDraft()],
+            comissaoAcessoriosEscalas: [createComissaoAcessoriosEscalaDraft()],
             descontarDevolucao: false,
             ativo: true,
             criadoEm: new Date().toISOString(),
@@ -1693,6 +1723,29 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       item.id === id ? { ...item, [field]: value } : item
     ));
     setCalculoDraft({ ...calculoDraft, bonusEscalas: next });
+  }
+
+  function addComissaoAcessoriosEscalaRow() {
+    if (!calculoDraft) return;
+    const next = [...(calculoDraft.comissaoAcessoriosEscalas ?? []), createComissaoAcessoriosEscalaDraft()];
+    setCalculoDraft({ ...calculoDraft, comissaoAcessoriosEscalas: next });
+  }
+
+  function removeComissaoAcessoriosEscalaRow(id: string) {
+    if (!calculoDraft) return;
+    const next = (calculoDraft.comissaoAcessoriosEscalas ?? []).filter((item) => item.id !== id);
+    setCalculoDraft({
+      ...calculoDraft,
+      comissaoAcessoriosEscalas: next.length ? next : [createComissaoAcessoriosEscalaDraft()],
+    });
+  }
+
+  function updateComissaoAcessoriosEscalaRow(id: string, field: 'de' | 'ate' | 'comissaoPct', value: string) {
+    if (!calculoDraft) return;
+    const next = (calculoDraft.comissaoAcessoriosEscalas ?? []).map((item) => (
+      item.id === id ? { ...item, [field]: value } : item
+    ));
+    setCalculoDraft({ ...calculoDraft, comissaoAcessoriosEscalas: next });
   }
 
   function updateCalculoPeriodoField(field: 'de' | 'ate', value: string) {
@@ -1856,6 +1909,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       departamentos: (calculoDraft.departamentos ?? []).map((item) => normalizeVendorName(item)).filter(Boolean),
       transacoes: (calculoDraft.transacoes ?? []).map((item) => normalizeVendorName(item)).filter(Boolean),
       bonusEscalas: cleanBonusEscalas((calculoDraft.bonusEscalas ?? []) as BonusEscalaDraft[]),
+      comissaoAcessoriosEscalas: cleanComissaoAcessoriosEscalas((calculoDraft.comissaoAcessoriosEscalas ?? []) as ComissaoAcessoriosEscalaDraft[]),
       descontarDevolucao: Boolean(calculoDraft.descontarDevolucao),
       atualizadoEm: now,
       criadoEm: calculoDraft.criadoEm || now,
@@ -3273,6 +3327,75 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                                     <button
                                       type="button"
                                       onClick={() => removeBonusEscalaRow(faixa.id)}
+                                      disabled={calculoBloqueado}
+                                      className="rounded border border-rose-300 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50"
+                                    >
+                                      Remover
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-semibold text-slate-600">Escala de comissão de acessórios (não acumulada)</p>
+                          <Button type="button" variant="outline" onClick={addComissaoAcessoriosEscalaRow} disabled={calculoBloqueado}>
+                            + Faixa
+                          </Button>
+                        </div>
+                        <div className="overflow-auto rounded-md border border-slate-200">
+                          <table className="w-full min-w-[420px] text-xs">
+                            <thead className="bg-slate-100 text-slate-600">
+                              <tr>
+                                <th className="px-2 py-2 text-left">De (base acessórios R$)</th>
+                                <th className="px-2 py-2 text-left">Até (base acessórios R$)</th>
+                                <th className="px-2 py-2 text-left">Comissão (%)</th>
+                                <th className="px-2 py-2 text-center">Ação</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(calculoDraft.comissaoAcessoriosEscalas ?? []).map((faixa, index) => (
+                                <tr key={faixa.id} className="border-t border-slate-100">
+                                  <td className="px-2 py-2">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={faixa.de}
+                                      onChange={(e) => updateComissaoAcessoriosEscalaRow(faixa.id, 'de', e.target.value)}
+                                      disabled={calculoBloqueado}
+                                      className="w-full rounded border border-slate-200 px-2 py-1"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={faixa.ate}
+                                      onChange={(e) => updateComissaoAcessoriosEscalaRow(faixa.id, 'ate', e.target.value)}
+                                      disabled={calculoBloqueado}
+                                      placeholder={index === (calculoDraft.comissaoAcessoriosEscalas ?? []).length - 1 ? 'Em diante' : ''}
+                                      className="w-full rounded border border-slate-200 px-2 py-1"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={faixa.comissaoPct}
+                                      onChange={(e) => updateComissaoAcessoriosEscalaRow(faixa.id, 'comissaoPct', e.target.value)}
+                                      disabled={calculoBloqueado}
+                                      className="w-full rounded border border-slate-200 px-2 py-1"
+                                    />
+                                  </td>
+                                  <td className="px-2 py-2 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => removeComissaoAcessoriosEscalaRow(faixa.id)}
                                       disabled={calculoBloqueado}
                                       className="rounded border border-rose-300 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50"
                                     >
