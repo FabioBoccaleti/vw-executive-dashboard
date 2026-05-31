@@ -1481,22 +1481,26 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const pctPecas = parseDecimal(record.comissaoPecasPct);
       const pctAcessorios = parseDecimal(record.comissaoAcessoriosPct ?? '');
       const pctRps = parseDecimal(record.comissaoRpsPct);
-      const pctTotalPecas = parseDecimal(record.comissaoTotalPecasPct);
+      const pctMecanico = parseDecimal(record.comissaoMecanicoPct ?? '');
       const comissao =
-        basePecas * (pctPecas / 100) +
+        basePecasVendas * (pctPecas / 100) +
         baseAcessorios * (pctAcessorios / 100) +
-        baseRps * (pctRps / 100) +
-        baseTotalPecas * (pctTotalPecas / 100);
+        baseRpsOficina * (pctRps / 100) +
+        baseRpsFunilaria * (pctRps / 100) +
+        baseMecanicos * (pctMecanico / 100);
 
       const volumeLiquido = countVenda - countDevolucao;
       const faixas = cleanBonusEscalas((record.bonusEscalas ?? []) as BonusEscalaDraft[]);
-      const faixaAtiva = firstMatchingFaixa(volumeLiquido, faixas);
-      const bonus = faixaAtiva ? parseDecimal(faixaAtiva.bonus) : parseDecimal(record.bonusProdutividade);
+      const faixaAtiva = firstMatchingFaixa(basePecasVendas, faixas);
+      const bonusFixo = parseDecimal(record.bonusProdutividade);
+      const bonusEscala = faixaAtiva ? parseDecimal(faixaAtiva.bonus) : 0;
       const salario = parseDecimal(record.salarioFixo);
-      const premioProduto = parseDecimal(record.premioProduto ?? '');
+      const premioProdutoUnitario = parseDecimal(record.premioProduto ?? '');
+      const premioProduto = baseProdutosQuantidade * premioProdutoUnitario;
+      const bonus = bonusFixo + bonusEscala + premioProduto;
       const bonusRegra = faixaAtiva
-        ? `Faixa ${faixaAtiva.de || '0'}-${faixaAtiva.ate || 'em diante'} = R$ ${fmtCurrency(parseDecimal(faixaAtiva.bonus))}`
-        : `Bônus fixo = R$ ${fmtCurrency(parseDecimal(record.bonusProdutividade))}`;
+        ? `Bônus fixo R$ ${fmtCurrency(bonusFixo)} + Escala (base peças em R$ ${fmtCurrency(basePecasVendas)}: faixa ${faixaAtiva.de || '0'}-${faixaAtiva.ate || 'em diante'} = R$ ${fmtCurrency(bonusEscala)}) + Prêmio Produto R$ ${fmtCurrency(premioProduto)}`
+        : `Bônus fixo R$ ${fmtCurrency(bonusFixo)} + Escala R$ 0,00 + Prêmio Produto R$ ${fmtCurrency(premioProduto)}`;
       const filtros = `${useDept ? `Departamentos: ${(record.departamentos ?? []).join(', ')}` : 'Departamentos: todos'} · ${useTx ? `Transações: ${(record.transacoes ?? []).join(', ')}` : 'Transações: todas'}`;
 
       map.set(vendorKey(item.vendedor), {
@@ -1513,7 +1517,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
         premioProduto,
         bonus,
         comissao,
-        total: salario + comissao + bonus + premioProduto,
+        total: salario + comissao + bonus,
         volumeLiquido,
         bonusRegra,
         filtros,
@@ -1583,6 +1587,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             comissaoPecasPct: existing.comissaoPecasPct ?? '',
             comissaoAcessoriosPct: existing.comissaoAcessoriosPct ?? '',
             comissaoRpsPct: existing.comissaoRpsPct ?? '',
+            comissaoMecanicoPct: existing.comissaoMecanicoPct ?? '',
             comissaoTotalPecasPct: existing.comissaoTotalPecasPct ?? '',
             bonusProdutividade: existing.bonusProdutividade ?? '',
             premioProduto: existing.premioProduto ?? '',
@@ -1602,6 +1607,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             comissaoPecasPct: '',
             comissaoAcessoriosPct: '',
             comissaoRpsPct: '',
+            comissaoMecanicoPct: '',
             comissaoTotalPecasPct: '',
             bonusProdutividade: '',
             premioProduto: '',
@@ -1803,6 +1809,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       comissaoPecasPct: String(calculoDraft.comissaoPecasPct ?? '').trim(),
       comissaoAcessoriosPct: String(calculoDraft.comissaoAcessoriosPct ?? '').trim(),
       comissaoRpsPct: String(calculoDraft.comissaoRpsPct ?? '').trim(),
+      comissaoMecanicoPct: String(calculoDraft.comissaoMecanicoPct ?? '').trim(),
       comissaoTotalPecasPct: String(calculoDraft.comissaoTotalPecasPct ?? '').trim(),
       bonusProdutividade: String(calculoDraft.bonusProdutividade ?? '').trim(),
       premioProduto: String(calculoDraft.premioProduto ?? '').trim(),
@@ -2988,12 +2995,12 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-600 mb-1">Comissão Total Peças (%)</label>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Comissão Mecânico (%)</label>
                           <input
                             type="number"
                             step="0.01"
-                            value={calculoDraft.comissaoTotalPecasPct}
-                            onChange={(e) => setCalculoDraft({ ...calculoDraft, comissaoTotalPecasPct: e.target.value })}
+                            value={calculoDraft.comissaoMecanicoPct ?? ''}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, comissaoMecanicoPct: e.target.value })}
                             disabled={calculoBloqueado}
                             placeholder="0,00"
                             className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -3104,8 +3111,8 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <table className="w-full min-w-[420px] text-xs">
                             <thead className="bg-slate-100 text-slate-600">
                               <tr>
-                                <th className="px-2 py-2 text-left">De (qtd)</th>
-                                <th className="px-2 py-2 text-left">Até (qtd)</th>
+                                <th className="px-2 py-2 text-left">De (base peças R$)</th>
+                                <th className="px-2 py-2 text-left">Até (base peças R$)</th>
                                 <th className="px-2 py-2 text-left">Bônus (R$)</th>
                                 <th className="px-2 py-2 text-center">Ação</th>
                               </tr>

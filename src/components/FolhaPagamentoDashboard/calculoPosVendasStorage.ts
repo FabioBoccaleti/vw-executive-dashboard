@@ -32,6 +32,7 @@ export interface CalculoPosVendasRemuneracao {
   comissaoPecasPct: string;
   comissaoAcessoriosPct: string;
   comissaoRpsPct: string;
+  comissaoMecanicoPct: string;
   comissaoTotalPecasPct: string;
   bonusProdutividade: string;
   premioProduto: string;
@@ -75,6 +76,7 @@ export async function loadCalculoPosVendasRemuneracoes(): Promise<CalculoPosVend
       comissaoPecasPct: String(item.comissaoPecasPct ?? ''),
       comissaoAcessoriosPct: String(item.comissaoAcessoriosPct ?? ''),
       comissaoRpsPct: String(item.comissaoRpsPct ?? ''),
+      comissaoMecanicoPct: String(item.comissaoMecanicoPct ?? ''),
       comissaoTotalPecasPct: String(item.comissaoTotalPecasPct ?? ''),
       bonusProdutividade: String(item.bonusProdutividade ?? ''),
       premioProduto: String(item.premioProduto ?? ''),
