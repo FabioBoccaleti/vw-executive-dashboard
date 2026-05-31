@@ -1468,10 +1468,12 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const baseRps = baseRpsOficina + baseRpsFunilaria;
       const baseTotalPecas = basePecas;
       const pctPecas = parseDecimal(record.comissaoPecasPct);
+      const pctAcessorios = parseDecimal(record.comissaoAcessoriosPct ?? '');
       const pctRps = parseDecimal(record.comissaoRpsPct);
       const pctTotalPecas = parseDecimal(record.comissaoTotalPecasPct);
       const comissao =
         basePecas * (pctPecas / 100) +
+        baseAcessorios * (pctAcessorios / 100) +
         baseRps * (pctRps / 100) +
         baseTotalPecas * (pctTotalPecas / 100);
 
@@ -1567,6 +1569,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
           departamentoColaborador: existing.departamentoColaborador ?? '',
           cargoColaborador: existing.cargoColaborador ?? '',
             comissaoPecasPct: existing.comissaoPecasPct ?? '',
+            comissaoAcessoriosPct: existing.comissaoAcessoriosPct ?? '',
             comissaoRpsPct: existing.comissaoRpsPct ?? '',
             comissaoTotalPecasPct: existing.comissaoTotalPecasPct ?? '',
             bonusProdutividade: existing.bonusProdutividade ?? '',
@@ -1585,6 +1588,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             comissionado: false,
             salarioFixo: '',
             comissaoPecasPct: '',
+            comissaoAcessoriosPct: '',
             comissaoRpsPct: '',
             comissaoTotalPecasPct: '',
             bonusProdutividade: '',
@@ -1785,6 +1789,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       cargoColaborador: String(calculoDraft.cargoColaborador ?? '').trim(),
       salarioFixo: String(calculoDraft.salarioFixo ?? '').trim(),
       comissaoPecasPct: String(calculoDraft.comissaoPecasPct ?? '').trim(),
+      comissaoAcessoriosPct: String(calculoDraft.comissaoAcessoriosPct ?? '').trim(),
       comissaoRpsPct: String(calculoDraft.comissaoRpsPct ?? '').trim(),
       comissaoTotalPecasPct: String(calculoDraft.comissaoTotalPecasPct ?? '').trim(),
       bonusProdutividade: String(calculoDraft.bonusProdutividade ?? '').trim(),
@@ -2850,7 +2855,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
               {calculoModalOpen && calculoDraft && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                  <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl">
+                  <div className="w-full max-w-4xl rounded-xl bg-white p-6 shadow-xl">
                     <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
                       <div>
                         <p className="text-sm font-bold text-slate-800">Cadastro de remuneração</p>
@@ -2927,7 +2932,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-slate-600 mb-1">Comissão Peças (%)</label>
                           <input
@@ -2935,6 +2940,18 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                             step="0.01"
                             value={calculoDraft.comissaoPecasPct}
                             onChange={(e) => setCalculoDraft({ ...calculoDraft, comissaoPecasPct: e.target.value })}
+                            disabled={calculoBloqueado}
+                            placeholder="0,00"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Comissão Acessórios (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={calculoDraft.comissaoAcessoriosPct ?? ''}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, comissaoAcessoriosPct: e.target.value })}
                             disabled={calculoBloqueado}
                             placeholder="0,00"
                             className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"

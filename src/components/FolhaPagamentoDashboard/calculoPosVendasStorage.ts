@@ -30,6 +30,7 @@ export interface CalculoPosVendasRemuneracao {
   comissionado: boolean;
   salarioFixo: string;
   comissaoPecasPct: string;
+  comissaoAcessoriosPct: string;
   comissaoRpsPct: string;
   comissaoTotalPecasPct: string;
   bonusProdutividade: string;
@@ -72,6 +73,7 @@ export async function loadCalculoPosVendasRemuneracoes(): Promise<CalculoPosVend
       comissionado: Boolean(item.comissionado),
       salarioFixo: String(item.salarioFixo ?? ''),
       comissaoPecasPct: String(item.comissaoPecasPct ?? ''),
+      comissaoAcessoriosPct: String(item.comissaoAcessoriosPct ?? ''),
       comissaoRpsPct: String(item.comissaoRpsPct ?? ''),
       comissaoTotalPecasPct: String(item.comissaoTotalPecasPct ?? ''),
       bonusProdutividade: String(item.bonusProdutividade ?? ''),
