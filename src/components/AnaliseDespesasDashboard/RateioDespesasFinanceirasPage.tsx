@@ -287,14 +287,32 @@ function ConfigSection({
   selected: string[];
   onToggle: (conta: string) => void;
 }) {
+  const [busca, setBusca] = useState('');
+  const filtered = busca.trim()
+    ? contas.filter(
+        (item) =>
+          item.conta.toLowerCase().includes(busca.toLowerCase()) ||
+          (item.desc || '').toLowerCase().includes(busca.toLowerCase()),
+      )
+    : contas;
+
   return (
     <div className="border border-slate-200 rounded-lg p-3">
       <h4 className="text-sm font-semibold text-slate-700 mb-2">{title}</h4>
+      <input
+        type="text"
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+        placeholder="Buscar conta ou descrição..."
+        className="w-full mb-2 h-8 px-2 text-sm rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
       <div className="max-h-64 overflow-auto space-y-1 pr-1">
-        {contas.length === 0 ? (
-          <p className="text-xs text-slate-500">Nenhuma conta disponível neste grupo para o ano selecionado.</p>
+        {filtered.length === 0 ? (
+          <p className="text-xs text-slate-500">
+            {contas.length === 0 ? 'Nenhuma conta disponível neste grupo para o ano selecionado.' : 'Nenhuma conta encontrada para a busca.'}
+          </p>
         ) : (
-          contas.map((item) => (
+          filtered.map((item) => (
             <label key={item.conta} className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
