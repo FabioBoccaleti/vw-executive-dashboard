@@ -2077,8 +2077,9 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       acc.pecas += valores?.comissaoPecas ?? 0;
       acc.acessorios += valores?.comissaoAcessorios ?? 0;
       acc.maoObra += valores?.comissaoMaoObra ?? 0;
+      acc.premioAdicional += valores?.premioAdicional ?? 0;
       return acc;
-    }, { pecas: 0, acessorios: 0, maoObra: 0 });
+    }, { pecas: 0, acessorios: 0, maoObra: 0, premioAdicional: 0 });
   }, [demonstrativoFilteredRows, calculoValoresByVendor]);
 
   function isPrintValueEmptyOrZero(text: string): boolean {
@@ -2330,7 +2331,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const demonstrativoKpis = useMemo(() => {
     const colaboradores = demonstrativoFilteredRows.length;
     const comissaoTotal = demonstrativoComissoesTotais.pecas + demonstrativoComissoesTotais.acessorios + demonstrativoComissoesTotais.maoObra;
-    const bonusAdicional = demonstrativoFilteredRows.reduce((acc, item) => acc + parseDecimal(item.premioProduto ?? ''), 0);
+    const bonusAdicional = demonstrativoComissoesTotais.premioAdicional;
     const participacaoResultado = 0;
     const totalRemuneracao =
       demonstrativoTotais.salarioFixo +
@@ -3483,7 +3484,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           const comissaoMaoObra = valores?.comissaoMaoObra ?? 0;
                           const salarioFixo = parseDecimal(item.salarioFixo ?? '');
                           const bonusProdutividade = valores?.bonusProdutividadeTotal ?? parseDecimal(item.bonusProdutividade ?? '');
-                          const premioProduto = parseDecimal(item.premioProduto ?? '');
+                          const premioProduto = valores?.premioAdicional ?? 0;
                           const totalRemuneracao = salarioFixo + bonusProdutividade + premioProduto;
                           return (
                             <tr key={`${item.id}-${index}`} className={`${rowBg} border-t border-slate-100 hover:bg-slate-100/70`}>
@@ -3512,7 +3513,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                           <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoComissoesTotais.acessorios)}</td>
                           <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoComissoesTotais.maoObra)}</td>
                           <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.bonusProdutividade)}</td>
-                          <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoTotais.premioProduto)}</td>
+                          <td className="px-3 py-2 text-center font-mono font-semibold whitespace-nowrap bg-violet-100/90">R$ {fmtCurrency(demonstrativoComissoesTotais.premioAdicional)}</td>
                           <td className="px-3 py-2 text-center whitespace-nowrap bg-violet-100/90" />
                           <td className="px-3 py-2 text-center font-mono font-bold whitespace-nowrap bg-violet-200/90">R$ {fmtCurrency(demonstrativoTotais.totalRemuneracao)}</td>
                         </tr>
