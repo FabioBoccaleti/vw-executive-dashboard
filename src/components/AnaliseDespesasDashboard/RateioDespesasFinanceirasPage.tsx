@@ -563,6 +563,8 @@ function BrandMonthTable({
   resultRows,
   endividamentoContas,
   onAddResultLine,
+  onRemoveResultLine,
+  canRemoveResultLine,
   onChangeResultLineValue,
   onAddEndividamentoConta,
   onRemoveEndividamentoConta,
@@ -580,6 +582,8 @@ function BrandMonthTable({
   resultRows: RateioResultadoLinha[];
   endividamentoContas: string[];
   onAddResultLine: (brand: AnaliseBrand, month: number, label: string, value: number) => void;
+  onRemoveResultLine: (brand: AnaliseBrand, month: number, lineId: string) => void;
+  canRemoveResultLine: (brand: AnaliseBrand, month: number, lineId: string) => boolean;
   onChangeResultLineValue: (brand: AnaliseBrand, month: number, lineId: string, value: number) => void;
   onAddEndividamentoConta: (brand: AnaliseBrand, month: number, conta: string) => void;
   onRemoveEndividamentoConta: (brand: AnaliseBrand, month: number, conta: string) => void;
@@ -697,12 +701,33 @@ function BrandMonthTable({
                 <tr key={row.id} className="border-t border-slate-100">
                   <td className="px-3 py-2 text-slate-700">{row.label}</td>
                   <td className="px-3 py-2 text-right">
-                    <input
-                      type="text"
-                      value={String(row.value).replace('.', ',')}
-                      onChange={(e) => onChangeResultLineValue(brand, month, row.id, parseManualValue(e.target.value))}
-                      className="w-36 h-8 px-2 text-sm text-right rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    {(() => {
+                      const isRemovable = canRemoveResultLine(brand, month, row.id);
+
+                      return (
+                    <div className="flex items-center justify-end gap-2">
+                      <input
+                        type="text"
+                        value={String(row.value).replace('.', ',')}
+                        onChange={(e) => onChangeResultLineValue(brand, month, row.id, parseManualValue(e.target.value))}
+                        className="w-36 h-8 px-2 text-sm text-right rounded border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => onRemoveResultLine(brand, month, row.id)}
+                        disabled={!isRemovable}
+                        title={isRemovable ? 'Excluir esta linha deste mês em diante' : 'Exclusao disponivel apenas no mes em que a linha foi criada'}
+                        className={`h-8 px-2 text-xs font-semibold rounded border ${
+                          isRemovable
+                            ? 'border-red-300 text-red-700 hover:bg-red-50'
+                            : 'border-slate-200 text-slate-400 cursor-not-allowed bg-slate-50'
+                        }`}
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))}
@@ -1354,6 +1379,28 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       );
       return current;
     });
+  }
+
+  function handleRemoveResultLine(brand: AnaliseBrand, month: number, lineId: string) {
+    const data = brand === 'vw' ? vwResults : audiResults;
+    const firstMonth = MONTHS.find((m) => (data[m] ?? []).some((line) => line.id === lineId));
+    if (firstMonth == null || month !== firstMonth) {
+      toast.warning('Esta linha so pode ser excluida no mes em que foi criada.');
+      return;
+    }
+
+    applyResultsUpdate(brand, (current) => {
+      for (let m = month; m <= 12; m++) {
+        current[m] = (current[m] ?? []).filter((line) => line.id !== lineId);
+      }
+      return current;
+    });
+  }
+
+  function canRemoveResultLine(brand: AnaliseBrand, month: number, lineId: string) {
+    const data = brand === 'vw' ? vwResults : audiResults;
+    const firstMonth = MONTHS.find((m) => (data[m] ?? []).some((line) => line.id === lineId));
+    return firstMonth != null && month === firstMonth;
   }
 
   function applyEndividamentoUpdate(
@@ -3014,6 +3061,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   resultRows={vwResults[month] ?? []}
                   endividamentoContas={vwEndividamento[month] ?? []}
                   onAddResultLine={handleAddResultLine}
+                  onRemoveResultLine={handleRemoveResultLine}
+                  canRemoveResultLine={canRemoveResultLine}
                   onChangeResultLineValue={handleChangeResultLineValue}
                   onAddEndividamentoConta={handleAddEndividamentoConta}
                   onRemoveEndividamentoConta={handleRemoveEndividamentoConta}
@@ -3032,6 +3081,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   resultRows={audiResults[month] ?? []}
                   endividamentoContas={audiEndividamento[month] ?? []}
                   onAddResultLine={handleAddResultLine}
+                  onRemoveResultLine={handleRemoveResultLine}
+                  canRemoveResultLine={canRemoveResultLine}
                   onChangeResultLineValue={handleChangeResultLineValue}
                   onAddEndividamentoConta={handleAddEndividamentoConta}
                   onRemoveEndividamentoConta={handleRemoveEndividamentoConta}
