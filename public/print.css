@@ -175,8 +175,69 @@
     color: #ffffff !important;
   }
 
+  #rateio-contabil-print-area {
+    font-size: 9px;
+  }
+
+  #rateio-contabil-print-area .contabil-print-month-title {
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+    margin-bottom: 1.5mm !important;
+  }
+
+  #rateio-contabil-print-area .contabil-print-warning {
+    padding: 1.2mm 1.8mm !important;
+    margin-bottom: 1.2mm !important;
+  }
+
+  #rateio-contabil-print-area .contabil-print-warning p {
+    font-size: 8.7px !important;
+    line-height: 1.2 !important;
+  }
+
+  #rateio-contabil-print-area .contabil-brand-print-block {
+    padding: 2.2mm !important;
+    gap: 1.8mm !important;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  #rateio-contabil-print-area .contabil-brand-print-block h3 {
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+  }
+
+  #rateio-contabil-print-area .contabil-brand-print-block p {
+    font-size: 8.7px !important;
+    line-height: 1.2 !important;
+  }
+
+  #rateio-contabil-print-area table {
+    font-size: 8.7px !important;
+    line-height: 1.15 !important;
+  }
+
+  #rateio-contabil-print-area th,
+  #rateio-contabil-print-area td {
+    padding: 1mm 1.5mm !important;
+  }
+
+  #rateio-contabil-print-area .contabil-print-brands > * + * {
+    margin-top: 2mm !important;
+  }
+
   #rateio-contabil-outros-bancos-print-area {
     font-size: 10px;
+  }
+
+  #rateio-contabil-print-area .contabil-brand-print-block {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  #rateio-contabil-print-area .contabil-brand-print-block + .contabil-brand-print-block {
+    break-before: page;
+    page-break-before: always;
   }
 
   #rateio-contabil-outros-bancos-print-area h2 {

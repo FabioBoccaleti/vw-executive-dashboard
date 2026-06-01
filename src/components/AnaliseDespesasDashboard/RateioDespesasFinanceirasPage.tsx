@@ -1205,8 +1205,15 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           }
         }
 
+        const lastMonthWithData = MONTHS.reduce((lastMonth, month) => {
+          const vwRaw = String(rawVwMonths[month] ?? '').trim();
+          const audiRaw = String(rawAudiMonths[month] ?? '').trim();
+          return vwRaw || audiRaw ? month : lastMonth;
+        }, 0);
+
         setConfig(savedConfig);
         setDraftConfig(savedConfig);
+        setSelectedMonth(lastMonthWithData > 0 ? lastMonthWithData : 'all');
         setVwData(nextVwData);
         setAudiData(nextAudiData);
         setVwResults(cloneResultsByMonth(savedVwResults));
@@ -2048,9 +2055,11 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       acc[dept] = jurosRatear * (departmentPercents[dept] / 100);
       return acc;
     }, {} as Record<DepartmentKey, number>);
-    const creditoNovosPorRateio = valorDebitoLiquidacao > 0
+    const creditoNovosPorRateio = brand === 'vw'
       ? (jurosDeptos.vendaDireta + jurosDeptos.usados + jurosDeptos.pecas + jurosDeptos.oficina + jurosDeptos.funilaria)
-      : 0;
+      : (valorDebitoLiquidacao > 0
+        ? (jurosDeptos.vendaDireta + jurosDeptos.usados + jurosDeptos.pecas + jurosDeptos.oficina + jurosDeptos.funilaria)
+        : 0);
 
     return {
       jurosReconhecido,
@@ -2071,6 +2080,55 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
   function renderContabilBrandSection(brand: AnaliseBrand, month: number) {
     const resumo = getDepartamentoResumo(brand, month);
     const brandLabel = BRAND_LABEL[brand];
+    const launchDebitRows = DEPARTMENT_ORDER.map((dept) => ({
+      departamento: DEPARTMENT_LABELS[dept],
+      conta: JUROS_CONTA_CONTABIL,
+      natureza: 'Débito' as const,
+      valor: resumo.jurosDeptos[dept] ?? 0,
+    }));
+    if (resumo.valorDebitoLiquidacao > 0) {
+      launchDebitRows.push({
+        departamento: 'Novos - Débito Liquidação Entre Marcas',
+        conta: JUROS_CONTA_CONTABIL,
+        natureza: 'Débito' as const,
+        valor: resumo.valorDebitoLiquidacao,
+      });
+    }
+
+    const launchCreditRows: Array<{
+      departamento: string;
+      conta: string;
+      natureza: 'Crédito';
+      valor: number;
+    }> = [];
+
+    if (resumo.creditoNovosPorRateio !== 0) {
+      launchCreditRows.push({
+        departamento: 'Novos',
+        conta: JUROS_CONTA_CONTABIL,
+        natureza: 'Crédito',
+        valor: resumo.creditoNovosPorRateio,
+      });
+    }
+
+    if (resumo.valorCreditoLiquidacao > 0) {
+      launchCreditRows.push({
+        departamento: 'Novos - Crédito Liquidação Entre Marcas',
+        conta: JUROS_CONTA_CONTABIL,
+        natureza: 'Crédito',
+        valor: resumo.valorCreditoLiquidacao,
+      });
+    }
+
+    const totalDebitoLancamentos = launchDebitRows.reduce((sum, row) => sum + row.valor, 0);
+    const totalCreditoLancamentos = launchCreditRows.reduce((sum, row) => sum + row.valor, 0);
+
+    const fallbackCreditRow = {
+      departamento: 'Novos',
+      conta: JUROS_CONTA_CONTABIL,
+      natureza: 'Crédito' as const,
+      valor: 0,
+    };
 
     return (
       <div className={`contabil-brand-print-block bg-white border-2 ${BRAND_PANEL_BORDER_CLASS[brand]} rounded-xl p-5 print:p-3 space-y-4 print:space-y-2`}>
@@ -2112,6 +2170,58 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
               <tr className="border-t-2 border-slate-200 bg-violet-50">
                 <td className="px-3 py-2 text-right font-bold">Juros a Ratear</td>
                 <td className="px-3 py-2 text-right font-bold">{formatCurrency(resumo.jurosRatear)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div className="overflow-x-auto border border-slate-200 rounded-lg">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-slate-700">
+              <tr>
+                <th className="text-left px-3 py-2 font-semibold">Marca</th>
+                <th className="text-left px-3 py-2 font-semibold">Departamento</th>
+                <th className="text-left px-3 py-2 font-semibold">Conta</th>
+                <th className="text-left px-3 py-2 font-semibold">Natureza</th>
+                <th className="text-right px-3 py-2 font-semibold">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {launchDebitRows.map((row) => (
+                <tr key={`${brand}-${month}-${row.departamento}`} className="border-t border-slate-100">
+                  <td className="px-3 py-2 font-semibold text-slate-800">{brandLabel}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.departamento}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-slate-700">{row.conta}</td>
+                  <td className="px-3 py-2 font-semibold text-red-700">{row.natureza}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-900">{formatCurrency(row.valor)}</td>
+                </tr>
+              ))}
+              {(launchCreditRows.length > 0 ? launchCreditRows : [fallbackCreditRow]).map((row, index) => (
+                <tr key={`${brand}-${month}-credit-${row.departamento}-${index}`} className="border-t-2 border-slate-200 bg-emerald-50">
+                  <td className="px-3 py-2 font-semibold text-slate-800">{brandLabel}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.departamento}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-slate-700">{row.conta}</td>
+                  <td className="px-3 py-2 font-semibold text-emerald-700">{row.natureza}</td>
+                  <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(row.valor)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-slate-50">
+                <td colSpan={4} className="px-3 py-2 text-right font-bold text-slate-800">Total Débito Departamentos</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">
+                  {formatCurrency(totalDebitoLancamentos)}
+                </td>
+              </tr>
+              <tr className="border-t border-slate-200 bg-slate-50">
+                <td colSpan={4} className="px-3 py-2 text-right font-bold text-slate-800">Total Crédito Novos</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(totalCreditoLancamentos)}</td>
+              </tr>
+              <tr className="border-t border-slate-200 bg-sky-50">
+                <td colSpan={4} className="px-3 py-2 text-right font-bold text-slate-800">Diferença (Débito - Crédito)</td>
+                <td className="px-3 py-2 text-right font-bold text-slate-900">
+                  {formatCurrency(totalDebitoLancamentos - totalCreditoLancamentos)}
+                </td>
               </tr>
             </tfoot>
           </table>
@@ -2734,9 +2844,15 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     printRoot.innerHTML = '';
     printRoot.appendChild(clone);
 
+    const orientationStyle = document.createElement('style');
+    orientationStyle.setAttribute('data-print-orientation', 'contabil-portrait');
+    orientationStyle.textContent = '@page { size: A4 portrait; margin: 0.5cm 0.5cm; }';
+    document.head.appendChild(orientationStyle);
+
     try {
       window.print();
     } finally {
+      orientationStyle.remove();
       printRoot.innerHTML = '';
     }
   }
@@ -2943,19 +3059,19 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
 
                 return (
                   <section key={month} className="space-y-4 print:space-y-2">
-                    <h2 className="text-lg font-bold text-slate-800">
+                    <h2 className="contabil-print-month-title text-lg font-bold text-slate-800">
                       <span className="print:hidden">Demonstrativo Contábil - {MONTH_NAMES[month - 1]} / {selectedYear}</span>
                       <span className="hidden print:inline">Rateio Despesa Financeira Credito Rotativo Banco Volks.</span>
                     </h2>
 
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                    <div className="contabil-print-warning rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                       <p className="text-xs font-semibold text-amber-900">
                         Reconhecimento contábil: a despesa apurada em {MONTH_NAMES[month - 1]}/{selectedYear} deve ser reconhecida no mês subsequente,
                         em {MONTH_NAMES[nextMonth - 1]}/{nextYear}.
                       </p>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="contabil-print-brands space-y-4">
                       {renderContabilBrandSection('vw', month)}
                       {renderContabilBrandSection('audi', month)}
                       {renderFinanceiroAssinaturaSection(month)}
