@@ -3,6 +3,8 @@ import { CheckCircle, Loader2, LockOpen, PenLine, Settings2, ShieldCheck } from 
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/useAuth';
 import { apiLogin } from '@/lib/authClient';
+import { loadDREDataAsync } from '@/lib/dbStorage';
+import type { Department } from '@/lib/dataStorage';
 import {
   type AnaliseBrand,
   type RateioCirculanteConfig,
@@ -28,11 +30,15 @@ import {
   saveRateioResultados,
   saveRateioTaxaJuros,
 } from './analiseDespesasStorage';
+import { loadDreVw, type DreVwRow } from '../ResumoDREDashboard/dreVwStorage';
+import { loadDreAudi, type DreAudiRow } from '../ResumoDREDashboard/dreAudiStorage';
 
 type CirculanteGroup = 'ativo' | 'passivo';
 type MonthChoice = 'all' | number;
 type MainTab = 'rotativo' | 'departamento' | 'contabil';
 type DepartmentKey = keyof RateioDepartamentoValores;
+type VwDreDeptKey = keyof Omit<DreVwRow, 'periodo' | 'ajustes'>;
+type AudiDreDeptKey = keyof Omit<DreAudiRow, 'periodo' | 'ajustes'>;
 
 interface ParsedAccount {
   conta: string;
@@ -161,6 +167,26 @@ const EMPTY_ASSINATURAS_FINANCEIRO_BY_MONTH: RateioContabilAssinaturasYearData =
   12: null,
 };
 
+const VW_DRE_DEPT_KEYS: VwDreDeptKey[] = ['novos', 'direta', 'usados', 'pecas', 'oficina', 'funilaria', 'adm'];
+const AUDI_DRE_DEPT_KEYS: AudiDreDeptKey[] = ['novos', 'usados', 'pecas', 'oficina', 'funilaria', 'adm'];
+const VW_DRE_DEPT_TO_DEPARTMENT: Record<VwDreDeptKey, Department> = {
+  novos: 'novos',
+  direta: 'vendaDireta',
+  usados: 'usados',
+  pecas: 'pecas',
+  oficina: 'oficina',
+  funilaria: 'funilaria',
+  adm: 'administracao',
+};
+const AUDI_DRE_DEPT_TO_DEPARTMENT: Record<AudiDreDeptKey, Department> = {
+  novos: 'novos',
+  usados: 'usados',
+  pecas: 'pecas',
+  oficina: 'oficina',
+  funilaria: 'funilaria',
+  adm: 'administracao',
+};
+
 function parseBalanceteCirculante(text: string): AccountsByConta {
   const out: AccountsByConta = {};
   const lines = text.split('\n').filter((line) => line.trim());
@@ -260,6 +286,47 @@ function parsePercentValue(raw: string): number {
   return Math.max(0, parsed);
 }
 
+function parseDreNumber(value: string | number | undefined): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value !== 'string') return 0;
+  const trimmed = value.trim();
+  if (!trimmed) return 0;
+  const normalized = trimmed.replace(/\./g, '').replace(',', '.');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeDreLabel(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .trim();
+}
+
+function getLucroLiquidoFromDreDataLines(lines: any[] | null, monthIndex: number): number {
+  if (!Array.isArray(lines)) return 0;
+  const target = lines.find((item) => {
+    const label = String(item?.descricao ?? item?.label ?? '');
+    return normalizeDreLabel(label) === 'LUCRO LIQUIDO DO EXERCICIO';
+  });
+  if (!target) return 0;
+
+  const meses = Array.isArray(target?.meses) ? target.meses : Array.isArray(target?.values) ? target.values : [];
+  const raw = meses[monthIndex];
+  return Number.isFinite(Number(raw)) ? Number(raw) : 0;
+}
+
+function hasVwDeptData(row: DreVwRow | null, deptKey: VwDreDeptKey): boolean {
+  if (!row) return false;
+  return Object.values(row[deptKey]).some((value) => String(value ?? '').trim() !== '');
+}
+
+function hasAudiDeptData(row: DreAudiRow | null, deptKey: AudiDreDeptKey): boolean {
+  if (!row) return false;
+  return Object.values(row[deptKey]).some((value) => String(value ?? '').trim() !== '');
+}
+
 function getSelectedAccounts(config: RateioCirculanteConfig, brand: AnaliseBrand, group: CirculanteGroup): string[] {
   return uniqueSorted([...(config.shared[group] ?? []), ...(config[brand][group] ?? [])]);
 }
@@ -270,6 +337,7 @@ function getBrandMonthTotal(
   config: RateioCirculanteConfig,
   accountsByMonth: AccountsByMonth,
   resultRows: RateioResultadoLinha[],
+  resultadoPeriodo: number,
 ): number {
   const monthAccounts = accountsByMonth[month] ?? {};
   const ativoTotal = getSelectedAccounts(config, brand, 'ativo').reduce(
@@ -280,7 +348,7 @@ function getBrandMonthTotal(
     (sum, conta) => sum + (monthAccounts[conta]?.saldoAtual ?? 0),
     0,
   );
-  const resultadoAjustado = resultRows.reduce((sum, row) => sum + row.value, 0);
+  const resultadoAjustado = resultadoPeriodo + resultRows.reduce((sum, row) => sum + row.value, 0);
   return ativoTotal + passivoTotal + resultadoAjustado;
 }
 
@@ -399,6 +467,7 @@ function BrandMonthTable({
   config,
   accountsByMonth,
   descriptions,
+  resultadoPeriodo,
   resultRows,
   endividamentoContas,
   onAddResultLine,
@@ -415,6 +484,7 @@ function BrandMonthTable({
   config: RateioCirculanteConfig;
   accountsByMonth: AccountsByMonth;
   descriptions: Record<string, string>;
+  resultadoPeriodo: number;
   resultRows: RateioResultadoLinha[];
   endividamentoContas: string[];
   onAddResultLine: (brand: AnaliseBrand, month: number, label: string, value: number) => void;
@@ -450,7 +520,6 @@ function BrandMonthTable({
 
   const ativoData = getGroupData('ativo');
   const passivoData = getGroupData('passivo');
-  const resultadoPeriodo = 0;
   const totalExtras = resultRows.reduce((sum, row) => sum + row.value, 0);
   const resultadoAjustado = resultadoPeriodo + totalExtras;
   const totalGeral = ativoData.total + passivoData.total + resultadoAjustado;
@@ -912,6 +981,12 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
   const [taxaJurosByMonth, setTaxaJurosByMonth] = useState<RateioTaxaJurosYearData>({ ...EMPTY_TAXA_JUROS_BY_MONTH });
   const [vwDepartamento, setVwDepartamento] = useState<RateioDepartamentoBrandYearData>(cloneDepartamentoByMonth(EMPTY_DEPARTAMENTO_BY_MONTH));
   const [audiDepartamento, setAudiDepartamento] = useState<RateioDepartamentoBrandYearData>(cloneDepartamentoByMonth(EMPTY_DEPARTAMENTO_BY_MONTH));
+  const [vwLucroLiquidoMensal, setVwLucroLiquidoMensal] = useState<Record<number, number>>({
+    1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0,
+  });
+  const [audiLucroLiquidoMensal, setAudiLucroLiquidoMensal] = useState<Record<number, number>>({
+    1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0,
+  });
   const [assinaturasFinanceiroByMonth, setAssinaturasFinanceiroByMonth] = useState<RateioContabilAssinaturasYearData>({
     ...EMPTY_ASSINATURAS_FINANCEIRO_BY_MONTH,
   });
@@ -949,6 +1024,10 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           savedVwDepartamento,
           savedAudiDepartamento,
           savedContabilAssinaturas,
+          loadedVwKvRows,
+          loadedAudiKvRows,
+          loadedVwDreByDept,
+          loadedAudiDreByDept,
         ] = await Promise.all([
           loadRateioCirculanteConfig(),
           loadMultipleMonthsAnaliseDespesas('vw', selectedYear, MONTHS),
@@ -961,6 +1040,18 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           loadRateioDepartamento('vw', selectedYear),
           loadRateioDepartamento('audi', selectedYear),
           loadRateioContabilAssinaturas(selectedYear),
+          Promise.all(MONTHS.map((m) => loadDreVw(selectedYear, m))),
+          Promise.all(MONTHS.map((m) => loadDreAudi(selectedYear, m))),
+          Promise.all(
+            VW_DRE_DEPT_KEYS.map((deptKey) =>
+              loadDREDataAsync(selectedYear as 2024 | 2025 | 2026 | 2027, VW_DRE_DEPT_TO_DEPARTMENT[deptKey], 'vw').then((dre) => ({ deptKey, dre })),
+            ),
+          ),
+          Promise.all(
+            AUDI_DRE_DEPT_KEYS.map((deptKey) =>
+              loadDREDataAsync(selectedYear as 2024 | 2025 | 2026 | 2027, AUDI_DRE_DEPT_TO_DEPARTMENT[deptKey], 'audi').then((dre) => ({ deptKey, dre })),
+            ),
+          ),
         ]);
 
         if (cancelled) return;
@@ -1000,6 +1091,40 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         setTaxaJurosByMonth({ ...EMPTY_TAXA_JUROS_BY_MONTH, ...savedTaxaJuros });
         setVwDepartamento(cloneDepartamentoByMonth(savedVwDepartamento));
         setAudiDepartamento(cloneDepartamentoByMonth(savedAudiDepartamento));
+        const vwDreLookup = loadedVwDreByDept.reduce((acc, item) => {
+          acc[item.deptKey] = item.dre;
+          return acc;
+        }, {} as Record<VwDreDeptKey, any[] | null>);
+        const audiDreLookup = loadedAudiDreByDept.reduce((acc, item) => {
+          acc[item.deptKey] = item.dre;
+          return acc;
+        }, {} as Record<AudiDreDeptKey, any[] | null>);
+
+        const nextVwMensal: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
+        const nextAudiMensal: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
+
+        for (const month of MONTHS) {
+          const monthIndex = month - 1;
+          const vwKv = loadedVwKvRows[monthIndex] ?? null;
+          const audiKv = loadedAudiKvRows[monthIndex] ?? null;
+
+          nextVwMensal[month] = VW_DRE_DEPT_KEYS.reduce((sum, deptKey) => {
+            if (hasVwDeptData(vwKv, deptKey)) {
+              return sum + parseDreNumber(vwKv?.[deptKey]?.lucroLiquidoExercicio);
+            }
+            return sum + getLucroLiquidoFromDreDataLines(vwDreLookup[deptKey] ?? null, monthIndex);
+          }, 0);
+
+          nextAudiMensal[month] = AUDI_DRE_DEPT_KEYS.reduce((sum, deptKey) => {
+            if (hasAudiDeptData(audiKv, deptKey)) {
+              return sum + parseDreNumber(audiKv?.[deptKey]?.lucroLiquidoExercicio);
+            }
+            return sum + getLucroLiquidoFromDreDataLines(audiDreLookup[deptKey] ?? null, monthIndex);
+          }, 0);
+        }
+
+        setVwLucroLiquidoMensal(nextVwMensal);
+        setAudiLucroLiquidoMensal(nextAudiMensal);
         setAssinaturasFinanceiroByMonth({ ...EMPTY_ASSINATURAS_FINANCEIRO_BY_MONTH, ...savedContabilAssinaturas });
         setDescriptions(descMap);
         setAtivoOptions(
@@ -1173,19 +1298,50 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     return [selectedMonth];
   }, [selectedMonth]);
 
+  const resultadoPeriodoByBrandMonth = useMemo(() => {
+    const vw: Record<number, number> = {};
+    const audi: Record<number, number> = {};
+
+    let vwAcumulado = 0;
+    let audiAcumulado = 0;
+
+    for (const month of MONTHS) {
+      vwAcumulado += vwLucroLiquidoMensal[month] ?? 0;
+      audiAcumulado += audiLucroLiquidoMensal[month] ?? 0;
+      vw[month] = vwAcumulado;
+      audi[month] = audiAcumulado;
+    }
+
+    return { vw, audi };
+  }, [vwLucroLiquidoMensal, audiLucroLiquidoMensal]);
+
   const monthTotals = useMemo(() => {
     const out: Record<number, { vw: number; audi: number; total: number }> = {};
     for (const month of MONTHS) {
-      const vwTotal = getBrandMonthTotal('vw', month, config, vwData, vwResults[month] ?? []);
-      const audiTotal = getBrandMonthTotal('audi', month, config, audiData, audiResults[month] ?? []);
+      const audiTotal = getBrandMonthTotal(
+        'audi',
+        month,
+        config,
+        audiData,
+        audiResults[month] ?? [],
+        resultadoPeriodoByBrandMonth.audi[month] ?? 0,
+      );
+      const vwTotalComResultado = getBrandMonthTotal(
+        'vw',
+        month,
+        config,
+        vwData,
+        vwResults[month] ?? [],
+        resultadoPeriodoByBrandMonth.vw[month] ?? 0,
+      );
       out[month] = {
-        vw: vwTotal,
+        vw: vwTotalComResultado,
         audi: audiTotal,
-        total: vwTotal + audiTotal,
+        total: vwTotalComResultado + audiTotal,
       };
     }
     return out;
-  }, [config, vwData, audiData, vwResults, audiResults]);
+  }, [config, vwData, audiData, vwResults, audiResults, resultadoPeriodoByBrandMonth]);
 
   const monthFinancials = useMemo(() => {
     const out: Record<number, {
@@ -1845,6 +2001,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   config={config}
                   accountsByMonth={vwData}
                   descriptions={descriptions}
+                  resultadoPeriodo={resultadoPeriodoByBrandMonth.vw[month] ?? 0}
                   resultRows={vwResults[month] ?? []}
                   endividamentoContas={vwEndividamento[month] ?? []}
                   onAddResultLine={handleAddResultLine}
@@ -1862,6 +2019,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   config={config}
                   accountsByMonth={audiData}
                   descriptions={descriptions}
+                  resultadoPeriodo={resultadoPeriodoByBrandMonth.audi[month] ?? 0}
                   resultRows={audiResults[month] ?? []}
                   endividamentoContas={audiEndividamento[month] ?? []}
                   onAddResultLine={handleAddResultLine}
