@@ -2102,11 +2102,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       acc[dept] = jurosRatear * (departmentPercents[dept] / 100);
       return acc;
     }, {} as Record<DepartmentKey, number>);
-    const creditoNovosPorRateio = brand === 'vw'
-      ? (jurosDeptos.vendaDireta + jurosDeptos.usados + jurosDeptos.pecas + jurosDeptos.oficina + jurosDeptos.funilaria)
-      : (valorDebitoLiquidacao > 0
-        ? (jurosDeptos.vendaDireta + jurosDeptos.usados + jurosDeptos.pecas + jurosDeptos.oficina + jurosDeptos.funilaria)
-        : 0);
+    const creditoNovosPorRateio = DEPARTMENT_ORDER.reduce((sum, dept) => sum + (jurosDeptos[dept] ?? 0), 0);
 
     return {
       jurosReconhecido,
