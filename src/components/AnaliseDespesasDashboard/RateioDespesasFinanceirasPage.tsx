@@ -2307,6 +2307,8 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     );
     const totalDebitoDepartamentos = roundCurrency(vwDeptTotalRateado + audiDeptTotalRateado);
     const totalCreditoAdministracaoVw = totalDebitoDepartamentos;
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? selectedYear + 1 : selectedYear;
     const assinaturaOutrosBancos = assinaturasFinanceiroOutrosBancosByMonth[month];
     const printSignatureTextOutrosBancos = assinaturaOutrosBancos
       ? `Assinado eletronicamente (Financeiro) por ${assinaturaOutrosBancos.name && assinaturaOutrosBancos.name !== assinaturaOutrosBancos.username ? `${assinaturaOutrosBancos.name} (${assinaturaOutrosBancos.username})` : assinaturaOutrosBancos.username} em ${new Date(assinaturaOutrosBancos.dataHora).toLocaleString('pt-BR')}.`
@@ -2341,6 +2343,14 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
             {printSignatureTextOutrosBancos}
           </div>
         )}
+
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+          <p className="text-xs font-semibold text-amber-900">
+            Reconhecimento contábil: a despesa apurada em {MONTH_NAMES[month - 1]}/{selectedYear} deve ser reconhecida no mês subsequente,
+            em {MONTH_NAMES[nextMonth - 1]}/{nextYear}. O valor da despesa é o que foi cobrado no mês subsequente,
+            em {MONTH_NAMES[nextMonth - 1]}/{nextYear}.
+          </p>
+        </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4 outros-bancos-print-main">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
