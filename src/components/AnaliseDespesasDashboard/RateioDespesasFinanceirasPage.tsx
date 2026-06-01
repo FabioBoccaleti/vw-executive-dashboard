@@ -1298,6 +1298,29 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     return [selectedMonth];
   }, [selectedMonth]);
 
+  const printSignatureText = useMemo(() => {
+    const signatures = monthsToRender
+      .map((month) => assinaturasFinanceiroByMonth[month])
+      .filter((item): item is RateioAssinaturaDigital => !!item);
+
+    if (signatures.length === 0) {
+      return 'Documento sem assinatura financeira registrada para o período selecionado.';
+    }
+
+    const uniqueKeys = new Set(signatures.map((ass) => `${ass.username}|${ass.dataHora}`));
+    if (uniqueKeys.size === 1) {
+      const ass = signatures[0];
+      const signedBy = ass.name && ass.name !== ass.username ? `${ass.name} (${ass.username})` : ass.username;
+      return `Assinado eletronicamente (Financeiro) por ${signedBy} em ${new Date(ass.dataHora).toLocaleString('pt-BR')}.`;
+    }
+
+    return 'Documento assinado eletronicamente pelo Financeiro. Existem múltiplas assinaturas para as competências selecionadas.';
+  }, [monthsToRender, assinaturasFinanceiroByMonth]);
+
+  const hasFinancialSignatureForPrint = useMemo(() => {
+    return monthsToRender.some((month) => !!assinaturasFinanceiroByMonth[month]);
+  }, [monthsToRender, assinaturasFinanceiroByMonth]);
+
   const resultadoPeriodoByBrandMonth = useMemo(() => {
     const vw: Record<number, number> = {};
     const audi: Record<number, number> = {};
@@ -1739,12 +1762,18 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     const brandLabel = BRAND_LABEL[brand];
 
     return (
-      <div className={`bg-white border-2 ${BRAND_PANEL_BORDER_CLASS[brand]} rounded-xl p-5 space-y-4`}>
+      <div className={`contabil-brand-print-block bg-white border-2 ${BRAND_PANEL_BORDER_CLASS[brand]} rounded-xl p-5 print:p-3 space-y-4 print:space-y-2`}>
         <div>
           <h3 className="text-lg font-bold text-slate-900">{brandLabel} - Demonstrativo Contábil</h3>
           <p className="text-xs text-slate-600">Período: {MONTH_NAMES[month - 1]}/{selectedYear}</p>
           <p className="text-xs text-slate-600">Conta Contábil: {JUROS_CONTA_CONTABIL}</p>
         </div>
+
+        {hasFinancialSignatureForPrint && (
+          <div className="hidden print:block border border-emerald-200 bg-emerald-50 rounded-lg px-3 py-2 print:py-1 text-[10px] print:text-[9px] font-semibold text-emerald-800 print:mb-1">
+            {printSignatureText}
+          </div>
+        )}
 
         <div className="overflow-x-auto border border-slate-200 rounded-lg">
           <table className="min-w-full text-sm">
@@ -1825,6 +1854,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
             </tfoot>
           </table>
         </div>
+
       </div>
     );
   }
@@ -1833,7 +1863,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     const assinatura = assinaturasFinanceiroByMonth[month];
 
     return (
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden print:break-before-page">
         <div className="px-4 py-3 border-b border-slate-100">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Assinaturas</p>
         </div>
@@ -2064,9 +2094,9 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
               </div>
             </section>
           )) : (
-            <div id="rateio-contabil-print-area" className="space-y-4 print:space-y-3">
+            <div id="rateio-contabil-print-area" className="space-y-4 print:space-y-2">
               {monthsToRender.map((month) => (
-                <section key={month} className="space-y-4 print:space-y-3">
+                <section key={month} className="space-y-4 print:space-y-2">
                   <h2 className="text-lg font-bold text-slate-800">
                     <span className="print:hidden">Demonstrativo Contábil - {MONTH_NAMES[month - 1]} / {selectedYear}</span>
                     <span className="hidden print:inline">Rateio Despesa Financeira Credito Rotativo Banco Volks.</span>

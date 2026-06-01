@@ -42,6 +42,39 @@
     background-color: #9a0827 !important;
     color: #ffffff !important;
   }
+
+  #rateio-contabil-print-area {
+    font-size: 10px;
+  }
+
+  #rateio-contabil-print-area .contabil-brand-print-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  #rateio-contabil-print-area .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  #rateio-contabil-print-area h2 {
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+  }
+
+  #rateio-contabil-print-area table {
+    font-size: 10px !important;
+    line-height: 1.15 !important;
+  }
+
+  #rateio-contabil-print-area th,
+  #rateio-contabil-print-area td {
+    padding: 1.6mm 1.8mm !important;
+  }
+
+  #rateio-contabil-print-area tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
 
 /* ─── Regras de impressão ───────────────────────────────────────────────────── */
