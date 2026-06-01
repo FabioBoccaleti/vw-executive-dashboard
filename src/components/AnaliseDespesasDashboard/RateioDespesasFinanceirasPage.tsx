@@ -13,6 +13,7 @@ import {
   type RateioDepartamentoValores,
   type RateioEndividamentoBrandYearData,
   type RateioOutrosBancosLinha,
+  type RateioOutrosBancosDepartamentosYearData,
   type RateioOutrosBancosYearData,
   type RateioResultadoLinha,
   type RateioResultadosBrandYearData,
@@ -22,12 +23,16 @@ import {
   loadRateioEndividamento,
   loadMultipleMonthsAnaliseDespesas,
   loadRateioContabilAssinaturas,
+  loadRateioContabilOutrosBancosAssinaturas,
   loadRateioContabilOutrosBancos,
+  loadRateioContabilOutrosBancosDepartamentos,
   loadRateioCirculanteConfig,
   loadRateioResultados,
   loadRateioTaxaJuros,
   saveRateioContabilAssinaturas,
+  saveRateioContabilOutrosBancosAssinaturas,
   saveRateioContabilOutrosBancos,
+  saveRateioContabilOutrosBancosDepartamentos,
   saveRateioCirculanteConfig,
   saveRateioDepartamento,
   saveRateioEndividamento,
@@ -86,6 +91,8 @@ const DEPARTMENT_LABELS: Record<DepartmentKey, string> = {
   funilaria: 'Funilaria',
 };
 const JUROS_CONTA_CONTABIL = '5.5.7.01.01.008 - Juros S/ Estoques';
+const OUTROS_BANCOS_DEBITO_CONTA = '5.5.7.01.01.008';
+const OUTROS_BANCOS_CREDITO_CONTA = '5.5.7.01.01.001';
 
 const EMPTY_RESULTS_BY_MONTH: RateioResultadosBrandYearData = {
   1: [],
@@ -184,6 +191,23 @@ const EMPTY_OUTROS_BANCOS_BY_MONTH: RateioOutrosBancosYearData = {
   10: [],
   11: [],
   12: [],
+};
+
+const DEFAULT_OUTROS_BANCOS_DEPARTMENTS = DEPARTMENT_ORDER;
+
+const EMPTY_OUTROS_BANCOS_DEPARTMENTS_BY_MONTH: RateioOutrosBancosDepartamentosYearData = {
+  1: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+  2: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+  3: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+  4: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+  5: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+  6: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+  7: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+  8: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+  9: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+  10: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+  11: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+  12: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
 };
 
 const VW_DRE_DEPT_KEYS: VwDreDeptKey[] = ['novos', 'direta', 'usados', 'pecas', 'oficina', 'funilaria', 'adm'];
@@ -302,6 +326,35 @@ function cloneOutrosBancosByMonth(data?: RateioOutrosBancosYearData): RateioOutr
       juros: Number.isFinite(Number(row.juros)) ? Number(row.juros) : 0,
     }));
   }
+  return out;
+}
+
+function cloneOutrosBancosDepartmentsByMonth(data?: RateioOutrosBancosDepartamentosYearData): RateioOutrosBancosDepartamentosYearData {
+  const out: RateioOutrosBancosDepartamentosYearData = {
+    1: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+    2: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+    3: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+    4: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+    5: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+    6: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+    7: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+    8: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+    9: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+    10: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+    11: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+    12: { vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS], audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS] },
+  };
+
+  if (!data) return out;
+
+  for (const month of MONTHS) {
+    const monthData = data[month] ?? { vw: [], audi: [] };
+    out[month] = {
+      vw: Array.from(new Set((monthData.vw ?? []).filter((dept): dept is DepartmentKey => DEPARTMENT_ORDER.includes(dept as DepartmentKey)))) as DepartmentKey[],
+      audi: Array.from(new Set((monthData.audi ?? []).filter((dept): dept is DepartmentKey => DEPARTMENT_ORDER.includes(dept as DepartmentKey)))) as DepartmentKey[],
+    };
+  }
+
   return out;
 }
 
@@ -1029,8 +1082,14 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
   const [assinaturasFinanceiroByMonth, setAssinaturasFinanceiroByMonth] = useState<RateioContabilAssinaturasYearData>({
     ...EMPTY_ASSINATURAS_FINANCEIRO_BY_MONTH,
   });
+  const [assinaturasFinanceiroOutrosBancosByMonth, setAssinaturasFinanceiroOutrosBancosByMonth] = useState<RateioContabilAssinaturasYearData>({
+    ...EMPTY_ASSINATURAS_FINANCEIRO_BY_MONTH,
+  });
   const [outrosBancosByMonth, setOutrosBancosByMonth] = useState<RateioOutrosBancosYearData>(
     cloneOutrosBancosByMonth(EMPTY_OUTROS_BANCOS_BY_MONTH),
+  );
+  const [outrosBancosDepartamentosByMonth, setOutrosBancosDepartamentosByMonth] = useState<RateioOutrosBancosDepartamentosYearData>(
+    cloneOutrosBancosDepartmentsByMonth(EMPTY_OUTROS_BANCOS_DEPARTMENTS_BY_MONTH),
   );
   const [newInstituicaoByMonth, setNewInstituicaoByMonth] = useState<Record<number, string>>({
     1: '', 2: '', 3: '', 4: '', 5: '', 6: '', 7: '', 8: '', 9: '', 10: '', 11: '', 12: '',
@@ -1045,6 +1104,18 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     erro: string | null;
   } | null>(null);
   const [reabrirAssinaturaDialog, setReabrirAssinaturaDialog] = useState<{
+    month: number;
+    senha: string;
+    loading: boolean;
+    erro: string | null;
+  } | null>(null);
+  const [assinaFinanceiroOutrosBancosDialog, setAssinaFinanceiroOutrosBancosDialog] = useState<{
+    month: number;
+    senha: string;
+    loading: boolean;
+    erro: string | null;
+  } | null>(null);
+  const [reabrirAssinaturaOutrosBancosDialog, setReabrirAssinaturaOutrosBancosDialog] = useState<{
     month: number;
     senha: string;
     loading: boolean;
@@ -1072,7 +1143,9 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           savedVwDepartamento,
           savedAudiDepartamento,
           savedContabilAssinaturas,
+          savedContabilOutrosBancosAssinaturas,
           savedOutrosBancos,
+          savedOutrosBancosDepartamentos,
           loadedVwKvRows,
           loadedAudiKvRows,
           loadedVwDreByDept,
@@ -1089,7 +1162,9 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           loadRateioDepartamento('vw', selectedYear),
           loadRateioDepartamento('audi', selectedYear),
           loadRateioContabilAssinaturas(selectedYear),
+          loadRateioContabilOutrosBancosAssinaturas(selectedYear),
           loadRateioContabilOutrosBancos(selectedYear),
+          loadRateioContabilOutrosBancosDepartamentos(selectedYear),
           Promise.all(MONTHS.map((m) => loadDreVw(selectedYear, m))),
           Promise.all(MONTHS.map((m) => loadDreAudi(selectedYear, m))),
           Promise.all(
@@ -1176,7 +1251,9 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         setVwLucroLiquidoMensal(nextVwMensal);
         setAudiLucroLiquidoMensal(nextAudiMensal);
         setAssinaturasFinanceiroByMonth({ ...EMPTY_ASSINATURAS_FINANCEIRO_BY_MONTH, ...savedContabilAssinaturas });
+        setAssinaturasFinanceiroOutrosBancosByMonth({ ...EMPTY_ASSINATURAS_FINANCEIRO_BY_MONTH, ...savedContabilOutrosBancosAssinaturas });
         setOutrosBancosByMonth(cloneOutrosBancosByMonth(savedOutrosBancos));
+        setOutrosBancosDepartamentosByMonth(cloneOutrosBancosDepartmentsByMonth(savedOutrosBancosDepartamentos));
         setDescriptions(descMap);
         setAtivoOptions(
           Array.from(ativoMap.entries())
@@ -1398,6 +1475,67 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       });
       return current;
     });
+  }
+
+  function applyOutrosBancosDepartmentsUpdate(
+    updater: (current: RateioOutrosBancosDepartamentosYearData) => RateioOutrosBancosDepartamentosYearData,
+  ) {
+    const next = updater(cloneOutrosBancosDepartmentsByMonth(outrosBancosDepartamentosByMonth));
+    setOutrosBancosDepartamentosByMonth(next);
+    void saveRateioContabilOutrosBancosDepartamentos(selectedYear, next);
+  }
+
+  function handleToggleOutrosBancosDepartamento(month: number, brand: AnaliseBrand, dept: DepartmentKey) {
+    applyOutrosBancosDepartmentsUpdate((current) => {
+      const monthData = current[month] ?? { vw: [], audi: [] };
+      const currentList = brand === 'vw' ? monthData.vw : monthData.audi;
+      const exists = currentList.includes(dept);
+      const nextList = exists ? currentList.filter((item) => item !== dept) : [...currentList, dept];
+      current[month] = {
+        ...monthData,
+        [brand]: DEPARTMENT_ORDER.filter((item) => nextList.includes(item)),
+      };
+      return current;
+    });
+  }
+
+  function allocateByRebasedPercent(
+    brandTotal: number,
+    selectedDepartments: DepartmentKey[],
+    departmentTotals: Record<DepartmentKey, number>,
+  ): Record<DepartmentKey, { percentRebased: number; valorRateado: number }> {
+    const result = DEPARTMENT_ORDER.reduce((acc, dept) => {
+      acc[dept] = { percentRebased: 0, valorRateado: 0 };
+      return acc;
+    }, {} as Record<DepartmentKey, { percentRebased: number; valorRateado: number }>);
+
+    if (selectedDepartments.length === 0) return result;
+
+    const baseSelecionada = selectedDepartments.reduce((sum, dept) => sum + (departmentTotals[dept] || 0), 0);
+    if (baseSelecionada === 0) return result;
+
+    const rows = selectedDepartments.map((dept) => {
+      const percentRebased = (departmentTotals[dept] / baseSelecionada) * 100;
+      return {
+        dept,
+        percentRebased,
+        valorRateadoRaw: brandTotal * (percentRebased / 100),
+      };
+    });
+
+    const roundedValues = rows.map((row) => roundCurrency(row.valorRateadoRaw));
+    const sumRounded = roundedValues.reduce((sum, value) => sum + value, 0);
+    const ajuste = roundCurrency(brandTotal - sumRounded);
+
+    rows.forEach((row, index) => {
+      const valorRateado = index === rows.length - 1 ? roundCurrency(roundedValues[index] + ajuste) : roundedValues[index];
+      result[row.dept] = {
+        percentRebased: row.percentRebased,
+        valorRateado,
+      };
+    });
+
+    return result;
   }
 
   const monthsToRender = useMemo(() => {
@@ -1627,6 +1765,72 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       setReabrirAssinaturaDialog(null);
     } catch {
       setReabrirAssinaturaDialog((prev) => (prev ? { ...prev, loading: false, erro: 'Erro ao reabrir. Verifique sua conexão e tente novamente.' } : prev));
+    }
+  }
+
+  function handleAbrirAssinaturaFinanceiroOutrosBancos(month: number) {
+    if (!session) return;
+    setAssinaFinanceiroOutrosBancosDialog({ month, senha: '', loading: false, erro: null });
+  }
+
+  async function handleConfirmarAssinaturaFinanceiroOutrosBancos() {
+    if (!assinaFinanceiroOutrosBancosDialog || !session) return;
+
+    setAssinaFinanceiroOutrosBancosDialog((prev) => (prev ? { ...prev, loading: true, erro: null } : prev));
+    try {
+      const result = await apiLogin(session.username, assinaFinanceiroOutrosBancosDialog.senha);
+      if ('error' in result) {
+        setAssinaFinanceiroOutrosBancosDialog((prev) => (prev ? { ...prev, loading: false, erro: 'Senha incorreta. Tente novamente.' } : prev));
+        return;
+      }
+
+      const assinatura: RateioAssinaturaDigital = {
+        username: session.username,
+        name: (result.session.name ?? '') || undefined,
+        dataHora: new Date().toISOString(),
+      };
+
+      const next: RateioContabilAssinaturasYearData = {
+        ...assinaturasFinanceiroOutrosBancosByMonth,
+        [assinaFinanceiroOutrosBancosDialog.month]: assinatura,
+      };
+
+      setAssinaturasFinanceiroOutrosBancosByMonth(next);
+      await saveRateioContabilOutrosBancosAssinaturas(selectedYear, next);
+      toast.success('Assinatura do Financeiro (Outros Bancos) registrada com sucesso!');
+      setAssinaFinanceiroOutrosBancosDialog(null);
+    } catch {
+      setAssinaFinanceiroOutrosBancosDialog((prev) => (prev ? { ...prev, loading: false, erro: 'Erro ao salvar. Verifique sua conexão e tente novamente.' } : prev));
+    }
+  }
+
+  function handleAbrirReabrirAssinaturaFinanceiroOutrosBancos(month: number) {
+    if (!session) return;
+    setReabrirAssinaturaOutrosBancosDialog({ month, senha: '', loading: false, erro: null });
+  }
+
+  async function handleConfirmarReabrirAssinaturaFinanceiroOutrosBancos() {
+    if (!reabrirAssinaturaOutrosBancosDialog || !session) return;
+
+    setReabrirAssinaturaOutrosBancosDialog((prev) => (prev ? { ...prev, loading: true, erro: null } : prev));
+    try {
+      const result = await apiLogin(session.username, reabrirAssinaturaOutrosBancosDialog.senha);
+      if ('error' in result) {
+        setReabrirAssinaturaOutrosBancosDialog((prev) => (prev ? { ...prev, loading: false, erro: 'Senha incorreta. Tente novamente.' } : prev));
+        return;
+      }
+
+      const next: RateioContabilAssinaturasYearData = {
+        ...assinaturasFinanceiroOutrosBancosByMonth,
+        [reabrirAssinaturaOutrosBancosDialog.month]: null,
+      };
+
+      setAssinaturasFinanceiroOutrosBancosByMonth(next);
+      await saveRateioContabilOutrosBancosAssinaturas(selectedYear, next);
+      toast.success('Assinatura do Financeiro (Outros Bancos) reaberta com sucesso!');
+      setReabrirAssinaturaOutrosBancosDialog(null);
+    } catch {
+      setReabrirAssinaturaOutrosBancosDialog((prev) => (prev ? { ...prev, loading: false, erro: 'Erro ao reabrir. Verifique sua conexão e tente novamente.' } : prev));
     }
   }
 
@@ -2018,6 +2222,58 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     );
   }
 
+  function renderFinanceiroAssinaturaOutrosBancosSection(month: number) {
+    const assinatura = assinaturasFinanceiroOutrosBancosByMonth[month];
+
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Assinaturas</p>
+        </div>
+        <div className="px-4 py-4">
+          <div className="max-w-[360px] flex flex-col gap-1.5">
+            <p className="text-xs text-slate-500 font-medium">Financeiro</p>
+            {assinatura ? (
+              <>
+                <div className="border border-emerald-200 rounded-lg px-4 py-3 bg-emerald-50 flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <div className="flex flex-col">
+                      {assinatura.name && assinatura.name !== assinatura.username && (
+                        <span className="text-sm font-bold text-emerald-900">{assinatura.name}</span>
+                      )}
+                      <span className="text-xs text-emerald-700">{assinatura.username}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-emerald-600">{new Date(assinatura.dataHora).toLocaleString('pt-BR')}</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-700" />
+                    <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Assinatura Eletrônica</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleAbrirReabrirAssinaturaFinanceiroOutrosBancos(month)}
+                  className="w-fit text-xs text-amber-700 hover:text-amber-800 border border-amber-300 rounded px-3 py-1.5 hover:bg-amber-50 transition-colors flex items-center gap-1.5"
+                >
+                  <LockOpen className="w-3.5 h-3.5" />
+                  Reabrir assinatura
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => handleAbrirAssinaturaFinanceiroOutrosBancos(month)}
+                className="border-2 border-dashed border-slate-300 rounded-lg px-4 py-3 text-sm text-slate-400 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50 transition-colors flex items-center gap-2 justify-center"
+              >
+                <PenLine className="w-4 h-4" />
+                Assinar
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderOutrosBancosSection(month: number) {
     const rows = outrosBancosByMonth[month] ?? [];
     const totalDespesaRateio = roundCurrency(rows.reduce((sum, row) => sum + (Number(row.juros) || 0), 0));
@@ -2029,11 +2285,64 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     const vwRateio = roundCurrency(totalDespesaRateio * (vwPercent / 100));
     const audiRateio = roundCurrency(totalDespesaRateio - vwRateio);
 
-    return (
-      <section key={month} className="space-y-4">
-        <h2 className="text-lg font-bold text-slate-800">Demonstrativo Contábil Outros Bancos - {MONTH_NAMES[month - 1]} / {selectedYear}</h2>
+    const vwDepartamentoResumo = getDepartamentoResumo('vw', month);
+    const audiDepartamentoResumo = getDepartamentoResumo('audi', month);
 
-        <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
+    const monthDepartmentSelection = outrosBancosDepartamentosByMonth[month] ?? {
+      vw: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS],
+      audi: [...DEFAULT_OUTROS_BANCOS_DEPARTMENTS],
+    };
+
+    const selectedVwDepartments = DEPARTMENT_ORDER.filter((dept) => monthDepartmentSelection.vw.includes(dept));
+    const selectedAudiDepartments = DEPARTMENT_ORDER.filter((dept) => monthDepartmentSelection.audi.includes(dept));
+
+    const vwDeptRateio = allocateByRebasedPercent(vwRateio, selectedVwDepartments, vwDepartamentoResumo.departmentTotals);
+    const audiDeptRateio = allocateByRebasedPercent(audiRateio, selectedAudiDepartments, audiDepartamentoResumo.departmentTotals);
+
+    const vwDeptTotalRateado = roundCurrency(
+      DEPARTMENT_ORDER.reduce((sum, dept) => sum + (vwDeptRateio[dept]?.valorRateado ?? 0), 0),
+    );
+    const audiDeptTotalRateado = roundCurrency(
+      DEPARTMENT_ORDER.reduce((sum, dept) => sum + (audiDeptRateio[dept]?.valorRateado ?? 0), 0),
+    );
+    const totalDebitoDepartamentos = roundCurrency(vwDeptTotalRateado + audiDeptTotalRateado);
+    const totalCreditoAdministracaoVw = totalDebitoDepartamentos;
+    const assinaturaOutrosBancos = assinaturasFinanceiroOutrosBancosByMonth[month];
+    const printSignatureTextOutrosBancos = assinaturaOutrosBancos
+      ? `Assinado eletronicamente (Financeiro) por ${assinaturaOutrosBancos.name && assinaturaOutrosBancos.name !== assinaturaOutrosBancos.username ? `${assinaturaOutrosBancos.name} (${assinaturaOutrosBancos.username})` : assinaturaOutrosBancos.username} em ${new Date(assinaturaOutrosBancos.dataHora).toLocaleString('pt-BR')}.`
+      : 'Documento sem assinatura financeira registrada para o período selecionado.';
+
+    const lancamentosDebito = [
+      ...selectedVwDepartments.map((dept) => ({
+        marca: 'VW' as const,
+        departamento: DEPARTMENT_LABELS[dept],
+        conta: OUTROS_BANCOS_DEBITO_CONTA,
+        natureza: 'Débito' as const,
+        valor: vwDeptRateio[dept]?.valorRateado ?? 0,
+      })),
+      ...selectedAudiDepartments.map((dept) => ({
+        marca: 'Audi' as const,
+        departamento: DEPARTMENT_LABELS[dept],
+        conta: OUTROS_BANCOS_DEBITO_CONTA,
+        natureza: 'Débito' as const,
+        valor: audiDeptRateio[dept]?.valorRateado ?? 0,
+      })),
+    ];
+
+    return (
+      <section key={month} className="space-y-4 outros-bancos-print-section">
+        <h2 className="text-lg font-bold text-slate-800">
+          <span className="print:hidden">Demonstrativo Contábil Outros Bancos - {MONTH_NAMES[month - 1]} / {selectedYear}</span>
+          <span className="hidden print:inline">Rateio Despesas Financeiras Outros Bancos</span>
+        </h2>
+
+        {!!assinaturaOutrosBancos && (
+          <div className="hidden print:block border border-emerald-200 bg-emerald-50 rounded-lg px-3 py-2 text-[10px] font-semibold text-emerald-800 print:mb-1">
+            {printSignatureTextOutrosBancos}
+          </div>
+        )}
+
+        <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4 outros-bancos-print-main">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Valor de Despesa Financeira de Rateio</p>
@@ -2063,7 +2372,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
               <h3 className="text-sm font-bold text-slate-800">Instituições Financeiras e Juros</h3>
               <p className="text-xs text-slate-500 mt-0.5">Inclua as instituições com seus respectivos juros para formar a base de rateio.</p>
             </div>
-            <div className="p-4 border-b border-slate-200 bg-slate-50/60">
+            <div className="p-4 border-b border-slate-200 bg-slate-50/60 no-print">
               <div className="grid grid-cols-1 xl:grid-cols-12 gap-2.5 items-center">
                 <input
                   type="text"
@@ -2096,13 +2405,13 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   <tr>
                     <th className="text-left px-4 py-2.5 font-semibold">Instituição Financeira</th>
                     <th className="text-right px-4 py-2.5 font-semibold">Juros</th>
-                    <th className="text-right px-4 py-2.5 font-semibold">Ação</th>
+                    <th className="text-right px-4 py-2.5 font-semibold no-print">Ação</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.length === 0 ? (
                     <tr className="border-t border-slate-100">
-                      <td colSpan={3} className="px-4 py-4 text-center text-slate-500">Sem lançamentos para o mês.</td>
+                      <td colSpan={2} className="px-4 py-4 text-center text-slate-500">Sem lançamentos para o mês.</td>
                     </tr>
                   ) : rows.map((row) => (
                     <tr key={row.id} className="border-t border-slate-100 hover:bg-slate-50/70">
@@ -2125,7 +2434,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                           />
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-right">
+                      <td className="px-4 py-2.5 text-right no-print">
                         <button
                           onClick={() => handleRemoveOutrosBancosLinha(month, row.id)}
                           className="inline-flex items-center h-8 px-2.5 text-xs font-semibold text-red-600 border border-red-200 rounded-md hover:text-red-700 hover:bg-red-50"
@@ -2140,14 +2449,14 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   <tr className="border-t-2 border-slate-200 bg-slate-100">
                     <td className="px-4 py-2.5 text-right font-bold text-slate-800">Total</td>
                     <td className="px-4 py-2.5 text-right font-bold text-slate-900">{formatCurrency(totalDespesaRateio)}</td>
-                    <td className="px-4 py-2.5" />
+                    <td className="px-4 py-2.5 no-print" />
                   </tr>
                 </tfoot>
               </table>
             </div>
           </div>
 
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
+          <div className="border border-slate-200 rounded-lg overflow-hidden outros-bancos-rateio-marca-block">
             <div className="px-3 py-2 border-b border-slate-200 bg-slate-50">
               <h3 className="text-sm font-bold text-slate-700">Rateio da Despesa por Marca</h3>
             </div>
@@ -2188,6 +2497,214 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
               </table>
             </div>
           </div>
+
+          <div className="border border-slate-200 rounded-lg overflow-hidden outros-bancos-rateio-entre-dept-block">
+            <div className="px-3 py-2 border-b border-slate-200 bg-slate-50">
+              <h3 className="text-sm font-bold text-slate-700">Rateio entre Departamentos (Base: % Uso do Circulante)</h3>
+            </div>
+
+            {!!assinaturaOutrosBancos && (
+              <div className="hidden print:block border-b border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-semibold text-emerald-800">
+                {printSignatureTextOutrosBancos}
+              </div>
+            )}
+
+            <div className="px-3 py-2 border-b border-slate-200 bg-amber-50 flex flex-wrap gap-2 items-center">
+              <span className="text-xs font-semibold text-amber-800">Débito dos departamentos:</span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded border border-amber-300 bg-white text-xs font-bold text-amber-900">Conta {OUTROS_BANCOS_DEBITO_CONTA}</span>
+              <span className="text-xs font-semibold text-amber-800 ml-2">Crédito na Administração VW:</span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded border border-amber-300 bg-white text-xs font-bold text-amber-900">Conta {OUTROS_BANCOS_CREDITO_CONTA}</span>
+            </div>
+
+            <div className="p-3 grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="border border-blue-200 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 border-b border-blue-200 bg-blue-50">
+                  <p className="text-sm font-bold text-blue-900">VW - Rateio por Departamento</p>
+                </div>
+                <div className="px-3 py-2 border-b border-blue-200 bg-blue-50/60 space-y-1.5 no-print">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-800">Selecionar departamentos VW</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DEPARTMENT_ORDER.map((dept) => {
+                      const selected = selectedVwDepartments.includes(dept);
+                      return (
+                        <button
+                          key={`vw-inline-${dept}`}
+                          onClick={() => handleToggleOutrosBancosDepartamento(month, 'vw', dept)}
+                          className={`px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-colors ${selected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-100'}`}
+                        >
+                          {DEPARTMENT_LABELS[dept]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-700">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-semibold">Departamento</th>
+                        <th className="text-right px-3 py-2 font-semibold">% Recalculado</th>
+                        <th className="text-right px-3 py-2 font-semibold">Despesa Rateada</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {DEPARTMENT_ORDER.map((dept) => {
+                        const selected = selectedVwDepartments.includes(dept);
+                        return (
+                          <tr key={`vw-dept-row-${dept}`} className="border-t border-slate-100">
+                            <td className={`px-3 py-2 font-semibold ${selected ? 'text-slate-800' : 'text-slate-400 line-through'}`}>{DEPARTMENT_LABELS[dept]}</td>
+                            <td className={`px-3 py-2 text-right font-semibold ${selected ? 'text-slate-800' : 'text-slate-400'}`}>
+                              {selected
+                                ? `${(vwDeptRateio[dept]?.percentRebased ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+                                : '-'}
+                            </td>
+                            <td className={`px-3 py-2 text-right font-semibold ${selected ? 'text-slate-900' : 'text-slate-400'}`}>
+                              {selected ? formatCurrency(vwDeptRateio[dept]?.valorRateado ?? 0) : '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-slate-200 bg-slate-50">
+                        <td className="px-3 py-2 text-right font-bold text-slate-800">Total</td>
+                        <td className="px-3 py-2 text-right font-bold text-slate-800">
+                          {selectedVwDepartments.length > 0
+                            ? `${selectedVwDepartments.reduce((sum, dept) => sum + (vwDeptRateio[dept]?.percentRebased ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+                            : '0,00%'}
+                        </td>
+                        <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(vwDeptTotalRateado)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              <div className="border border-red-200 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 border-b border-red-200 bg-red-50">
+                  <p className="text-sm font-bold text-red-900">Audi - Rateio por Departamento</p>
+                </div>
+                <div className="px-3 py-2 border-b border-red-200 bg-red-50/60 space-y-1.5 no-print">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-red-800">Selecionar departamentos Audi</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DEPARTMENT_ORDER.map((dept) => {
+                      const selected = selectedAudiDepartments.includes(dept);
+                      return (
+                        <button
+                          key={`audi-inline-${dept}`}
+                          onClick={() => handleToggleOutrosBancosDepartamento(month, 'audi', dept)}
+                          className={`px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-colors ${selected ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-700 border-red-200 hover:bg-red-100'}`}
+                        >
+                          {DEPARTMENT_LABELS[dept]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-700">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-semibold">Departamento</th>
+                        <th className="text-right px-3 py-2 font-semibold">% Recalculado</th>
+                        <th className="text-right px-3 py-2 font-semibold">Despesa Rateada</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {DEPARTMENT_ORDER.map((dept) => {
+                        const selected = selectedAudiDepartments.includes(dept);
+                        return (
+                          <tr key={`audi-dept-row-${dept}`} className="border-t border-slate-100">
+                            <td className={`px-3 py-2 font-semibold ${selected ? 'text-slate-800' : 'text-slate-400 line-through'}`}>{DEPARTMENT_LABELS[dept]}</td>
+                            <td className={`px-3 py-2 text-right font-semibold ${selected ? 'text-slate-800' : 'text-slate-400'}`}>
+                              {selected
+                                ? `${(audiDeptRateio[dept]?.percentRebased ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+                                : '-'}
+                            </td>
+                            <td className={`px-3 py-2 text-right font-semibold ${selected ? 'text-slate-900' : 'text-slate-400'}`}>
+                              {selected ? formatCurrency(audiDeptRateio[dept]?.valorRateado ?? 0) : '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-slate-200 bg-slate-50">
+                        <td className="px-3 py-2 text-right font-bold text-slate-800">Total</td>
+                        <td className="px-3 py-2 text-right font-bold text-slate-800">
+                          {selectedAudiDepartments.length > 0
+                            ? `${selectedAudiDepartments.reduce((sum, dept) => sum + (audiDeptRateio[dept]?.percentRebased ?? 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+                            : '0,00%'}
+                        </td>
+                        <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(audiDeptTotalRateado)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 p-3 outros-bancos-lancamentos-block">
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 border-b border-slate-200 bg-slate-50">
+                  <h4 className="text-sm font-bold text-slate-700">Lançamentos Contábeis de Fechamento</h4>
+                </div>
+
+                {!!assinaturaOutrosBancos && (
+                  <div className="hidden print:block border-b border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-semibold text-emerald-800">
+                    {printSignatureTextOutrosBancos}
+                  </div>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-700">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-semibold">Marca</th>
+                        <th className="text-left px-3 py-2 font-semibold">Departamento</th>
+                        <th className="text-left px-3 py-2 font-semibold">Conta</th>
+                        <th className="text-left px-3 py-2 font-semibold">Natureza</th>
+                        <th className="text-right px-3 py-2 font-semibold">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lancamentosDebito.map((row, idx) => (
+                        <tr key={`lcto-debito-${idx}`} className="border-t border-slate-100">
+                          <td className="px-3 py-2 font-semibold text-slate-800">{row.marca}</td>
+                          <td className="px-3 py-2 text-slate-700">{row.departamento}</td>
+                          <td className="px-3 py-2 font-mono text-xs text-slate-700">{row.conta}</td>
+                          <td className="px-3 py-2 font-semibold text-red-700">{row.natureza}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-slate-900">{formatCurrency(row.valor)}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-t-2 border-slate-200 bg-emerald-50">
+                        <td className="px-3 py-2 font-semibold text-slate-800">VW</td>
+                        <td className="px-3 py-2 text-slate-700">Administração</td>
+                        <td className="px-3 py-2 font-mono text-xs text-slate-700">{OUTROS_BANCOS_CREDITO_CONTA}</td>
+                        <td className="px-3 py-2 font-semibold text-emerald-700">Crédito</td>
+                        <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(totalCreditoAdministracaoVw)}</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-slate-200 bg-slate-50">
+                        <td colSpan={4} className="px-3 py-2 text-right font-bold text-slate-800">Total Débito Departamentos</td>
+                        <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(totalDebitoDepartamentos)}</td>
+                      </tr>
+                      <tr className="border-t border-slate-200 bg-slate-50">
+                        <td colSpan={4} className="px-3 py-2 text-right font-bold text-slate-800">Total Crédito Administração VW</td>
+                        <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(totalCreditoAdministracaoVw)}</td>
+                      </tr>
+                      <tr className="border-t border-slate-200 bg-sky-50">
+                        <td colSpan={4} className="px-3 py-2 text-right font-bold text-slate-800">Diferença (Débito - Crédito)</td>
+                        <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(totalDebitoDepartamentos - totalCreditoAdministracaoVw)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {renderFinanceiroAssinaturaOutrosBancosSection(month)}
         </div>
       </section>
     );
@@ -2214,6 +2731,33 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     }
   }
 
+  function handlePrintContabilOutrosBancos() {
+    const printRoot = document.getElementById('print-root');
+    const area = document.getElementById('rateio-contabil-outros-bancos-print-area');
+
+    if (!printRoot || !area) {
+      window.print();
+      return;
+    }
+
+    const clone = area.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('.no-print').forEach((el) => el.remove());
+    printRoot.innerHTML = '';
+    printRoot.appendChild(clone);
+
+    const orientationStyle = document.createElement('style');
+    orientationStyle.setAttribute('data-print-orientation', 'outros-bancos-portrait');
+    orientationStyle.textContent = '@page { size: A4 portrait; margin: 0.8cm 0.7cm; }';
+    document.head.appendChild(orientationStyle);
+
+    try {
+      window.print();
+    } finally {
+      orientationStyle.remove();
+      printRoot.innerHTML = '';
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
@@ -2222,9 +2766,9 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           <p className="text-xs text-slate-500 mt-0.5">Ativo circulante (1.1) e passivo circulante (2.1) por mês e por marca</p>
         </div>
         <div className="flex items-center gap-2">
-          {activeTab === 'contabil' && (
+          {(activeTab === 'contabil' || activeTab === 'contabilOutrosBancos') && (
             <button
-              onClick={handlePrintContabil}
+              onClick={activeTab === 'contabil' ? handlePrintContabil : handlePrintContabilOutrosBancos}
               className="inline-flex items-center gap-1.5 text-xs border border-slate-300 rounded px-3 py-1.5 text-slate-700 bg-white hover:bg-slate-50"
             >
               Imprimir / PDF
@@ -2398,7 +2942,9 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
               ))}
             </div>
           ) : (
-            monthsToRender.map((month) => renderOutrosBancosSection(month))
+            <div id="rateio-contabil-outros-bancos-print-area" className="space-y-4 print:space-y-2">
+              {monthsToRender.map((month) => renderOutrosBancosSection(month))}
+            </div>
           )
         )}
       </div>
@@ -2500,6 +3046,109 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
               >
                 <LockOpen className="w-3.5 h-3.5" />
                 {reabrirAssinaturaDialog.loading ? 'Reabrindo...' : 'Reabrir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {assinaFinanceiroOutrosBancosDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <PenLine className="w-4 h-4 text-teal-600" />
+                <h3 className="text-sm font-bold text-slate-800">Assinar - Financeiro (Outros Bancos)</h3>
+              </div>
+              <button onClick={() => setAssinaFinanceiroOutrosBancosDialog(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100">X</button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Usuário</label>
+                <div className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 bg-slate-50 select-none">
+                  {session?.username ?? '-'}
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Senha</label>
+                <input
+                  type="password"
+                  autoFocus
+                  value={assinaFinanceiroOutrosBancosDialog.senha}
+                  onChange={(e) => setAssinaFinanceiroOutrosBancosDialog((prev) => (prev ? { ...prev, senha: e.target.value, erro: null } : prev))}
+                  onKeyDown={(e) => e.key === 'Enter' && !assinaFinanceiroOutrosBancosDialog.loading && handleConfirmarAssinaturaFinanceiroOutrosBancos()}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  placeholder="Digite sua senha"
+                />
+                {assinaFinanceiroOutrosBancosDialog.erro && (
+                  <p className="text-xs text-red-500 mt-0.5">{assinaFinanceiroOutrosBancosDialog.erro}</p>
+                )}
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                onClick={() => setAssinaFinanceiroOutrosBancosDialog(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-500 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarAssinaturaFinanceiroOutrosBancos}
+                disabled={assinaFinanceiroOutrosBancosDialog.loading || !assinaFinanceiroOutrosBancosDialog.senha}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              >
+                <PenLine className="w-3.5 h-3.5" />
+                {assinaFinanceiroOutrosBancosDialog.loading ? 'Assinando...' : 'Assinar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reabrirAssinaturaOutrosBancosDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <LockOpen className="w-4 h-4 text-amber-600" />
+                <h3 className="text-sm font-bold text-slate-800">Reabrir assinatura - Financeiro (Outros Bancos)</h3>
+              </div>
+              <button onClick={() => setReabrirAssinaturaOutrosBancosDialog(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100">X</button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-3">
+              <p className="text-sm text-slate-600">
+                Isso irá remover a assinatura atual do Financeiro para {MONTH_NAMES[reabrirAssinaturaOutrosBancosDialog.month - 1]}/{selectedYear}.
+              </p>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Senha</label>
+                <input
+                  type="password"
+                  autoFocus
+                  value={reabrirAssinaturaOutrosBancosDialog.senha}
+                  onChange={(e) => setReabrirAssinaturaOutrosBancosDialog((prev) => (prev ? { ...prev, senha: e.target.value, erro: null } : prev))}
+                  onKeyDown={(e) => e.key === 'Enter' && !reabrirAssinaturaOutrosBancosDialog.loading && handleConfirmarReabrirAssinaturaFinanceiroOutrosBancos()}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  placeholder="Digite sua senha"
+                />
+                {reabrirAssinaturaOutrosBancosDialog.erro && (
+                  <p className="text-xs text-red-500 mt-0.5">{reabrirAssinaturaOutrosBancosDialog.erro}</p>
+                )}
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                onClick={() => setReabrirAssinaturaOutrosBancosDialog(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-500 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarReabrirAssinaturaFinanceiroOutrosBancos}
+                disabled={reabrirAssinaturaOutrosBancosDialog.loading || !reabrirAssinaturaOutrosBancosDialog.senha}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 disabled:opacity-50 transition-colors"
+              >
+                <LockOpen className="w-3.5 h-3.5" />
+                {reabrirAssinaturaOutrosBancosDialog.loading ? 'Reabrindo...' : 'Reabrir'}
               </button>
             </div>
           </div>

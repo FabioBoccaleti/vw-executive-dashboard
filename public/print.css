@@ -75,6 +75,44 @@
     break-inside: avoid;
     page-break-inside: avoid;
   }
+
+  #rateio-contabil-outros-bancos-print-area {
+    font-size: 10px;
+  }
+
+  #rateio-contabil-outros-bancos-print-area .outros-bancos-print-section,
+  #rateio-contabil-outros-bancos-print-area .outros-bancos-print-main {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  #rateio-contabil-outros-bancos-print-area h2 {
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+    margin-bottom: 2mm !important;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  #rateio-contabil-outros-bancos-print-area table {
+    font-size: 9.5px !important;
+    line-height: 1.15 !important;
+  }
+
+  #rateio-contabil-outros-bancos-print-area th,
+  #rateio-contabil-outros-bancos-print-area td {
+    padding: 1.5mm 1.8mm !important;
+  }
+
+  #rateio-contabil-outros-bancos-print-area .outros-bancos-dept-selection {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  #rateio-contabil-outros-bancos-print-area .outros-bancos-rateio-dept-block {
+    break-before: auto;
+    page-break-before: auto;
+  }
 }
 
 /* ─── Regras de impressão ───────────────────────────────────────────────────── */
@@ -135,5 +173,49 @@
     background-image: linear-gradient(to bottom, #9a0827 0%, #9a0827 100%) !important;
     background-color: #9a0827 !important;
     color: #ffffff !important;
+  }
+
+  #rateio-contabil-outros-bancos-print-area {
+    font-size: 10px;
+  }
+
+  #rateio-contabil-outros-bancos-print-area h2 {
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+    margin-bottom: 2mm !important;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  #rateio-contabil-outros-bancos-print-area table {
+    font-size: 9.5px !important;
+    line-height: 1.15 !important;
+  }
+
+  #rateio-contabil-outros-bancos-print-area th,
+  #rateio-contabil-outros-bancos-print-area td {
+    padding: 1.5mm 1.8mm !important;
+  }
+
+  #rateio-contabil-outros-bancos-print-area .outros-bancos-rateio-marca-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  #rateio-contabil-outros-bancos-print-area .outros-bancos-rateio-entre-dept-block {
+    break-before: page;
+    page-break-before: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  #rateio-contabil-outros-bancos-print-area .outros-bancos-lancamentos-block {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  #rateio-contabil-outros-bancos-print-area .outros-bancos-lancamentos-block tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

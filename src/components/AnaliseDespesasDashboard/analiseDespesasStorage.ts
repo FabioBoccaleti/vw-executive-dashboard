@@ -67,6 +67,13 @@ export interface RateioOutrosBancosLinha {
 
 export type RateioOutrosBancosYearData = Record<number, RateioOutrosBancosLinha[]>;
 
+export interface RateioOutrosBancosDepartamentosMonthData {
+  vw: RateioDepartamentoName[];
+  audi: RateioDepartamentoName[];
+}
+
+export type RateioOutrosBancosDepartamentosYearData = Record<number, RateioOutrosBancosDepartamentosMonthData>;
+
 function getKey(brand: AnaliseBrand, year: number, month: number): string {
   const mm = String(month).padStart(2, '0');
   return `analise_despesas_${brand}_${year}_${mm}`;
@@ -100,8 +107,16 @@ function getRateioContabilAssinaturasKey(year: number): string {
   return `analise_despesas_rateio_contabil_assinaturas_${year}`;
 }
 
+function getRateioContabilOutrosBancosAssinaturasKey(year: number): string {
+  return `analise_despesas_rateio_contabil_outros_bancos_assinaturas_${year}`;
+}
+
 function getRateioContabilOutrosBancosKey(year: number): string {
   return `analise_despesas_rateio_contabil_outros_bancos_${year}`;
+}
+
+function getRateioContabilOutrosBancosDepartamentosKey(year: number): string {
+  return `analise_despesas_rateio_contabil_outros_bancos_departamentos_${year}`;
 }
 
 function getDefaultRateioConfig(): RateioCirculanteConfig {
@@ -167,6 +182,21 @@ function getDefaultRateioContabilOutrosBancosData(): RateioOutrosBancosYearData 
   const out: RateioOutrosBancosYearData = {};
   for (let month = 1; month <= 12; month++) {
     out[month] = [];
+  }
+  return out;
+}
+
+function getDefaultRateioOutrosBancosDepartamentosMonthData(): RateioOutrosBancosDepartamentosMonthData {
+  return {
+    vw: ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria'],
+    audi: ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria'],
+  };
+}
+
+function getDefaultRateioOutrosBancosDepartamentosYearData(): RateioOutrosBancosDepartamentosYearData {
+  const out: RateioOutrosBancosDepartamentosYearData = {};
+  for (let month = 1; month <= 12; month++) {
+    out[month] = getDefaultRateioOutrosBancosDepartamentosMonthData();
   }
   return out;
 }
@@ -513,6 +543,49 @@ export async function saveRateioContabilAssinaturas(
   }
 }
 
+/** Carrega assinaturas do financeiro do demonstrativo contábil - outros bancos por ano. */
+export async function loadRateioContabilOutrosBancosAssinaturas(
+  year: number,
+): Promise<RateioContabilAssinaturasYearData> {
+  try {
+    const saved = await kvGet<Record<string, RateioAssinaturaDigital | null>>(getRateioContabilOutrosBancosAssinaturasKey(year));
+    const base = getDefaultRateioContabilAssinaturasData();
+    if (!saved) return base;
+
+    for (let month = 1; month <= 12; month++) {
+      const assinatura = saved[String(month)];
+      if (!assinatura || typeof assinatura !== 'object') continue;
+      if (typeof assinatura.username !== 'string' || typeof assinatura.dataHora !== 'string') continue;
+      base[month] = {
+        username: assinatura.username,
+        name: typeof assinatura.name === 'string' && assinatura.name.trim() ? assinatura.name : undefined,
+        dataHora: assinatura.dataHora,
+      };
+    }
+
+    return base;
+  } catch (err) {
+    console.error('Erro ao carregar assinaturas do demonstrativo contábil - outros bancos:', err);
+    return getDefaultRateioContabilAssinaturasData();
+  }
+}
+
+/** Salva assinaturas do financeiro do demonstrativo contábil - outros bancos por ano. */
+export async function saveRateioContabilOutrosBancosAssinaturas(
+  year: number,
+  data: RateioContabilAssinaturasYearData,
+): Promise<void> {
+  try {
+    const payload: Record<string, RateioAssinaturaDigital | null> = {};
+    for (let month = 1; month <= 12; month++) {
+      payload[String(month)] = data[month] ?? null;
+    }
+    await kvSet(getRateioContabilOutrosBancosAssinaturasKey(year), payload);
+  } catch (err) {
+    console.error('Erro ao salvar assinaturas do demonstrativo contábil - outros bancos:', err);
+  }
+}
+
 /** Carrega lançamentos de instituições/juros do demonstrativo contábil - outros bancos por ano. */
 export async function loadRateioContabilOutrosBancos(
   year: number,
@@ -558,5 +631,59 @@ export async function saveRateioContabilOutrosBancos(
     await kvSet(getRateioContabilOutrosBancosKey(year), payload);
   } catch (err) {
     console.error('Erro ao salvar dados de outros bancos do demonstrativo contábil:', err);
+  }
+}
+
+/** Carrega seleção de departamentos por marca para rateio de outros bancos por ano. */
+export async function loadRateioContabilOutrosBancosDepartamentos(
+  year: number,
+): Promise<RateioOutrosBancosDepartamentosYearData> {
+  try {
+    const saved = await kvGet<Record<string, RateioOutrosBancosDepartamentosMonthData>>(getRateioContabilOutrosBancosDepartamentosKey(year));
+    const base = getDefaultRateioOutrosBancosDepartamentosYearData();
+    if (!saved) return base;
+
+    for (let month = 1; month <= 12; month++) {
+      const monthData = saved[String(month)];
+      if (!monthData || typeof monthData !== 'object') continue;
+
+      const vw = Array.isArray(monthData.vw)
+        ? monthData.vw.filter((dept): dept is RateioDepartamentoName => typeof dept === 'string')
+        : [];
+      const audi = Array.isArray(monthData.audi)
+        ? monthData.audi.filter((dept): dept is RateioDepartamentoName => typeof dept === 'string')
+        : [];
+
+      base[month] = {
+        vw: Array.from(new Set(vw)),
+        audi: Array.from(new Set(audi)),
+      };
+    }
+
+    return base;
+  } catch (err) {
+    console.error('Erro ao carregar seleção de departamentos de outros bancos:', err);
+    return getDefaultRateioOutrosBancosDepartamentosYearData();
+  }
+}
+
+/** Salva seleção de departamentos por marca para rateio de outros bancos por ano. */
+export async function saveRateioContabilOutrosBancosDepartamentos(
+  year: number,
+  data: RateioOutrosBancosDepartamentosYearData,
+): Promise<void> {
+  try {
+    const payload: Record<string, RateioOutrosBancosDepartamentosMonthData> = {};
+    for (let month = 1; month <= 12; month++) {
+      const monthData = data[month] ?? getDefaultRateioOutrosBancosDepartamentosMonthData();
+      payload[String(month)] = {
+        vw: Array.from(new Set(monthData.vw ?? [])),
+        audi: Array.from(new Set(monthData.audi ?? [])),
+      };
+    }
+
+    await kvSet(getRateioContabilOutrosBancosDepartamentosKey(year), payload);
+  } catch (err) {
+    console.error('Erro ao salvar seleção de departamentos de outros bancos:', err);
   }
 }
