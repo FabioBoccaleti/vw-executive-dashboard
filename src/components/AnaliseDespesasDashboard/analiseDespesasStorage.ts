@@ -59,6 +59,14 @@ export interface RateioAssinaturaDigital {
 
 export type RateioContabilAssinaturasYearData = Record<number, RateioAssinaturaDigital | null>;
 
+export interface RateioOutrosBancosLinha {
+  id: string;
+  instituicao: string;
+  juros: number;
+}
+
+export type RateioOutrosBancosYearData = Record<number, RateioOutrosBancosLinha[]>;
+
 function getKey(brand: AnaliseBrand, year: number, month: number): string {
   const mm = String(month).padStart(2, '0');
   return `analise_despesas_${brand}_${year}_${mm}`;
@@ -90,6 +98,10 @@ function getRateioDepartamentoKey(brand: AnaliseBrand, year: number): string {
 
 function getRateioContabilAssinaturasKey(year: number): string {
   return `analise_despesas_rateio_contabil_assinaturas_${year}`;
+}
+
+function getRateioContabilOutrosBancosKey(year: number): string {
+  return `analise_despesas_rateio_contabil_outros_bancos_${year}`;
 }
 
 function getDefaultRateioConfig(): RateioCirculanteConfig {
@@ -147,6 +159,14 @@ function getDefaultRateioContabilAssinaturasData(): RateioContabilAssinaturasYea
   const out: RateioContabilAssinaturasYearData = {};
   for (let month = 1; month <= 12; month++) {
     out[month] = null;
+  }
+  return out;
+}
+
+function getDefaultRateioContabilOutrosBancosData(): RateioOutrosBancosYearData {
+  const out: RateioOutrosBancosYearData = {};
+  for (let month = 1; month <= 12; month++) {
+    out[month] = [];
   }
   return out;
 }
@@ -490,5 +510,53 @@ export async function saveRateioContabilAssinaturas(
     await kvSet(getRateioContabilAssinaturasKey(year), payload);
   } catch (err) {
     console.error('Erro ao salvar assinaturas do demonstrativo contábil:', err);
+  }
+}
+
+/** Carrega lançamentos de instituições/juros do demonstrativo contábil - outros bancos por ano. */
+export async function loadRateioContabilOutrosBancos(
+  year: number,
+): Promise<RateioOutrosBancosYearData> {
+  try {
+    const saved = await kvGet<Record<string, RateioOutrosBancosLinha[]>>(getRateioContabilOutrosBancosKey(year));
+    const base = getDefaultRateioContabilOutrosBancosData();
+    if (!saved) return base;
+
+    for (let month = 1; month <= 12; month++) {
+      const rows = saved[String(month)];
+      if (!Array.isArray(rows)) continue;
+      base[month] = rows
+        .filter((row) => row && typeof row.id === 'string')
+        .map((row) => ({
+          id: row.id,
+          instituicao: typeof row.instituicao === 'string' ? row.instituicao : '',
+          juros: Number.isFinite(Number(row.juros)) ? Number(row.juros) : 0,
+        }));
+    }
+
+    return base;
+  } catch (err) {
+    console.error('Erro ao carregar dados de outros bancos do demonstrativo contábil:', err);
+    return getDefaultRateioContabilOutrosBancosData();
+  }
+}
+
+/** Salva lançamentos de instituições/juros do demonstrativo contábil - outros bancos por ano. */
+export async function saveRateioContabilOutrosBancos(
+  year: number,
+  data: RateioOutrosBancosYearData,
+): Promise<void> {
+  try {
+    const payload: Record<string, RateioOutrosBancosLinha[]> = {};
+    for (let month = 1; month <= 12; month++) {
+      payload[String(month)] = (data[month] ?? []).map((row) => ({
+        id: row.id,
+        instituicao: String(row.instituicao ?? '').trim(),
+        juros: Number.isFinite(Number(row.juros)) ? Number(row.juros) : 0,
+      }));
+    }
+    await kvSet(getRateioContabilOutrosBancosKey(year), payload);
+  } catch (err) {
+    console.error('Erro ao salvar dados de outros bancos do demonstrativo contábil:', err);
   }
 }
