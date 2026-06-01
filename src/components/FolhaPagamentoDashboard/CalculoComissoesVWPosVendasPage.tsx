@@ -663,6 +663,9 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
   const [calculoResumoExpandido, setCalculoResumoExpandido] = useState(false);
   const [calculoModalOpen, setCalculoModalOpen] = useState(false);
   const [calculoDraft, setCalculoDraft] = useState<CalculoPosVendasRemuneracao | null>(null);
+  const [calculoCopyEnabled, setCalculoCopyEnabled] = useState(false);
+  const [calculoCopySearch, setCalculoCopySearch] = useState('');
+  const [calculoCopyTargets, setCalculoCopyTargets] = useState<string[]>([]);
   const [cadastroVendedores, setCadastroVendedores] = useState<CadastroVendedor[]>([]);
   const [salariosVwFuncionarios, setSalariosVwFuncionarios] = useState<SalarioFuncionario[]>([]);
   const mecanicosInputRef = useRef<HTMLInputElement>(null);
@@ -1431,6 +1434,26 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
   const calculoRegistered = useMemo(() => calculoVendors.filter((item) => Boolean(item.record)), [calculoVendors]);
   const calculoPending = useMemo(() => calculoVendors.filter((item) => !item.record), [calculoVendors]);
+  const calculoCopyCandidates = useMemo(() => {
+    const currentVendorKey = calculoDraft?.vendedor ? vendorKey(calculoDraft.vendedor) : '';
+    return calculoPending
+      .map((item) => normalizeVendorName(item.vendedor))
+      .filter((name) => name && vendorKey(name) !== currentVendorKey)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+  }, [calculoPending, calculoDraft]);
+  const calculoCopyFilteredCandidates = useMemo(() => {
+    const term = normalizeVendorName(calculoCopySearch).toLowerCase();
+    if (!term) return calculoCopyCandidates;
+    return calculoCopyCandidates.filter((name) => name.toLowerCase().includes(term));
+  }, [calculoCopyCandidates, calculoCopySearch]);
+
+  useEffect(() => {
+    setCalculoCopyTargets((prev) => {
+      const allowed = new Set(calculoCopyCandidates.map((name) => vendorKey(name)));
+      const next = prev.filter((name) => allowed.has(vendorKey(name)));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [calculoCopyCandidates]);
 
   const calculoValoresByVendor = useMemo(() => {
     const map = new Map<string, CalculoValorResumo>();
@@ -1687,12 +1710,30 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             atualizadoEm: new Date().toISOString(),
           },
     );
+    setCalculoCopyEnabled(false);
+    setCalculoCopySearch('');
+    setCalculoCopyTargets([]);
     setCalculoModalOpen(true);
   }
 
   function closeCalculoDraft() {
     setCalculoModalOpen(false);
     setCalculoDraft(null);
+    setCalculoCopyEnabled(false);
+    setCalculoCopySearch('');
+    setCalculoCopyTargets([]);
+  }
+
+  function toggleCalculoCopyTarget(vendedor: string) {
+    const normalized = normalizeVendorName(vendedor);
+    if (!normalized) return;
+    setCalculoCopyTargets((prev) => {
+      const currentKeys = new Set(prev.map((name) => vendorKey(name)));
+      if (currentKeys.has(vendorKey(normalized))) {
+        return prev.filter((name) => vendorKey(name) !== vendorKey(normalized));
+      }
+      return [...prev, normalized].sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+    });
   }
 
   function toggleDraftListField(field: 'departamentos' | 'transacoes', value: string) {
@@ -1925,7 +1966,43 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
 
     setCalculoSaving(true);
     try {
-      const next = upsertCalculoPosVendasRemuneracao(calculoRemuneracoes, payload);
+      let next = upsertCalculoPosVendasRemuneracao(calculoRemuneracoes, payload);
+
+      const copyTargets = calculoCopyEnabled
+        ? calculoCopyTargets
+            .map((name) => normalizeVendorName(name))
+            .filter((name) => name && vendorKey(name) !== vendorKey(payload.vendedor))
+        : [];
+      const uniqueCopyTargets = Array.from(new Map(copyTargets.map((name) => [vendorKey(name), name])).values());
+
+      if (uniqueCopyTargets.length > 0) {
+        const existingTargets = uniqueCopyTargets.filter((targetName) => (
+          calculoRemuneracoes.some((item) => item.periodo === calculoPeriodo && vendorKey(item.vendedor) === vendorKey(targetName))
+        ));
+
+        if (existingTargets.length > 0) {
+          const confirmedOverwrite = window.confirm(
+            `Já existe remuneração para ${existingTargets.length} vendedor(es) selecionado(s). Deseja sobrescrever?`,
+          );
+          if (!confirmedOverwrite) {
+            setCalculoSaving(false);
+            return;
+          }
+        }
+
+        uniqueCopyTargets.forEach((targetName) => {
+          next = upsertCalculoPosVendasRemuneracao(next, {
+            ...payload,
+            id: crypto.randomUUID(),
+            vendedor: targetName,
+            bonusEscalas: (payload.bonusEscalas ?? []).map((faixa) => ({ ...faixa, id: crypto.randomUUID() })),
+            comissaoAcessoriosEscalas: (payload.comissaoAcessoriosEscalas ?? []).map((faixa) => ({ ...faixa, id: crypto.randomUUID() })),
+            criadoEm: now,
+            atualizadoEm: now,
+          });
+        });
+      }
+
       const ok = await saveCalculoPosVendasRemuneracoes(next);
       if (!ok) {
         toast.error('Não foi possível salvar a remuneração.');
@@ -1933,7 +2010,13 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       }
       setCalculoRemuneracoes(next);
       closeCalculoDraft();
-      toast.success(`Remuneração de ${payload.vendedor} salva para ${MONTHS[calculoMonth - 1]}/${calculoYear}.`);
+      if (uniqueCopyTargets.length > 0) {
+        toast.success(
+          `Remuneração de ${payload.vendedor} salva e copiada para ${uniqueCopyTargets.length} vendedor(es) em ${MONTHS[calculoMonth - 1]}/${calculoYear}.`,
+        );
+      } else {
+        toast.success(`Remuneração de ${payload.vendedor} salva para ${MONTHS[calculoMonth - 1]}/${calculoYear}.`);
+      }
     } finally {
       setCalculoSaving(false);
     }
@@ -3269,6 +3352,104 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                             )}
                           </div>
                         </div>
+                      </div>
+
+                      <div className="space-y-3 rounded-lg border border-slate-200 p-3">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={calculoCopyEnabled}
+                            onChange={(e) => {
+                              const enabled = e.target.checked;
+                              setCalculoCopyEnabled(enabled);
+                              if (!enabled) {
+                                setCalculoCopySearch('');
+                                setCalculoCopyTargets([]);
+                              }
+                            }}
+                            disabled={calculoBloqueado}
+                            className="h-4 w-4"
+                          />
+                          <span className="text-sm font-semibold text-slate-700">Copiar esta remuneração para outros vendedores</span>
+                        </label>
+
+                        {calculoCopyEnabled ? (
+                          <div className="space-y-3">
+                            <div className="relative">
+                              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                              <input
+                                type="text"
+                                value={calculoCopySearch}
+                                onChange={(e) => setCalculoCopySearch(e.target.value)}
+                                disabled={calculoBloqueado}
+                                placeholder="Buscar vendedor para copiar..."
+                                className="w-full rounded border border-slate-200 py-2 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              />
+                            </div>
+
+                            {calculoCopyCandidates.length === 0 ? (
+                              <p className="text-xs text-slate-500">Não há vendedores pendentes de remuneração para esta competência.</p>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={calculoBloqueado || calculoCopyFilteredCandidates.length === 0}
+                                    onClick={() => {
+                                      const merged = new Map<string, string>();
+                                      calculoCopyTargets.forEach((name) => merged.set(vendorKey(name), name));
+                                      calculoCopyFilteredCandidates.forEach((name) => merged.set(vendorKey(name), name));
+                                      setCalculoCopyTargets(
+                                        [...merged.values()].sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })),
+                                      );
+                                    }}
+                                  >
+                                    Selecionar filtrados
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={calculoBloqueado || calculoCopyTargets.length === 0}
+                                    onClick={() => setCalculoCopyTargets([])}
+                                  >
+                                    Limpar seleção
+                                  </Button>
+                                  <span className="text-xs text-slate-500">
+                                    {calculoCopyTargets.length} selecionado(s)
+                                  </span>
+                                </div>
+
+                                <div className="max-h-28 overflow-auto rounded border border-slate-200 p-2">
+                                  {calculoCopyFilteredCandidates.length === 0 ? (
+                                    <p className="text-xs text-slate-500">Nenhum vendedor encontrado para o filtro.</p>
+                                  ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                      {calculoCopyFilteredCandidates.map((name) => {
+                                        const selected = calculoCopyTargets.some((item) => vendorKey(item) === vendorKey(name));
+                                        return (
+                                          <button
+                                            key={vendorKey(name)}
+                                            type="button"
+                                            onClick={() => toggleCalculoCopyTarget(name)}
+                                            disabled={calculoBloqueado}
+                                            className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                                              selected
+                                                ? 'border-violet-600 bg-violet-50 text-violet-700'
+                                                : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                                            }`}
+                                          >
+                                            {name}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="space-y-3 rounded-lg border border-slate-200 p-3">
