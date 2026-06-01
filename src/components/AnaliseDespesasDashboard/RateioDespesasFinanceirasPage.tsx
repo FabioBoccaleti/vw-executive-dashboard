@@ -1881,6 +1881,27 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     );
   }
 
+  function handlePrintContabil() {
+    const printRoot = document.getElementById('print-root');
+    const area = document.getElementById('rateio-contabil-print-area');
+
+    if (!printRoot || !area) {
+      window.print();
+      return;
+    }
+
+    const clone = area.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('.no-print').forEach((el) => el.remove());
+    printRoot.innerHTML = '';
+    printRoot.appendChild(clone);
+
+    try {
+      window.print();
+    } finally {
+      printRoot.innerHTML = '';
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
@@ -1891,7 +1912,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         <div className="flex items-center gap-2">
           {activeTab === 'contabil' && (
             <button
-              onClick={() => window.print()}
+              onClick={handlePrintContabil}
               className="inline-flex items-center gap-1.5 text-xs border border-slate-300 rounded px-3 py-1.5 text-slate-700 bg-white hover:bg-slate-50"
             >
               Imprimir / PDF
@@ -2042,16 +2063,23 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                 {renderDepartamentoBrandPanel('audi', month)}
               </div>
             </section>
-          )) : monthsToRender.map((month) => (
-            <section key={month} className="space-y-4 print:space-y-3">
-              <h2 className="text-lg font-bold text-slate-800">Demonstrativo Contábil - {MONTH_NAMES[month - 1]} / {selectedYear}</h2>
-              <div className="space-y-4">
-                {renderContabilBrandSection('vw', month)}
-                {renderContabilBrandSection('audi', month)}
-                {renderFinanceiroAssinaturaSection(month)}
-              </div>
-            </section>
-          ))
+          )) : (
+            <div id="rateio-contabil-print-area" className="space-y-4 print:space-y-3">
+              {monthsToRender.map((month) => (
+                <section key={month} className="space-y-4 print:space-y-3">
+                  <h2 className="text-lg font-bold text-slate-800">
+                    <span className="print:hidden">Demonstrativo Contábil - {MONTH_NAMES[month - 1]} / {selectedYear}</span>
+                    <span className="hidden print:inline">Rateio Despesa Financeira Credito Rotativo Banco Volks.</span>
+                  </h2>
+                  <div className="space-y-4">
+                    {renderContabilBrandSection('vw', month)}
+                    {renderContabilBrandSection('audi', month)}
+                    {renderFinanceiroAssinaturaSection(month)}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )
         )}
       </div>
 
