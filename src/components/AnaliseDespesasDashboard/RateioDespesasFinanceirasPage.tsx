@@ -1558,6 +1558,9 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       acc[dept] = jurosRatear * (departmentPercents[dept] / 100);
       return acc;
     }, {} as Record<DepartmentKey, number>);
+    const creditoNovosPorRateio = valorDebitoLiquidacao > 0
+      ? (jurosDeptos.vendaDireta + jurosDeptos.usados + jurosDeptos.pecas + jurosDeptos.oficina + jurosDeptos.funilaria)
+      : 0;
 
     return {
       jurosReconhecido,
@@ -1570,6 +1573,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       departmentTotals,
       departmentPercents,
       jurosDeptos,
+      creditoNovosPorRateio,
       somaJurosDeptos: DEPARTMENT_ORDER.reduce((sum, dept) => sum + jurosDeptos[dept], 0),
     };
   }
@@ -1633,7 +1637,9 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                   <td className="px-3 py-2">{DEPARTMENT_LABELS[dept]}</td>
                   <td className="px-3 py-2 text-right">{resumo.departmentPercents[dept].toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</td>
                   <td className="px-3 py-2 text-right font-semibold">{formatCurrency(resumo.jurosDeptos[dept])}</td>
-                  <td className="px-3 py-2 text-right">-</td>
+                  <td className="px-3 py-2 text-right font-semibold">
+                    {dept === 'novos' && resumo.creditoNovosPorRateio !== 0 ? formatCurrency(resumo.creditoNovosPorRateio) : '-'}
+                  </td>
                 </tr>
               ))}
               {resumo.valorDebitoLiquidacao > 0 && (
@@ -1658,7 +1664,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
                 <td className="px-3 py-2 text-right font-bold">Totais</td>
                 <td className="px-3 py-2" />
                 <td className="px-3 py-2 text-right font-bold">{formatCurrency(resumo.somaJurosDeptos + resumo.valorDebitoLiquidacao)}</td>
-                <td className="px-3 py-2 text-right font-bold">{formatCurrency(resumo.valorCreditoLiquidacao)}</td>
+                <td className="px-3 py-2 text-right font-bold">{formatCurrency(resumo.valorCreditoLiquidacao + resumo.creditoNovosPorRateio)}</td>
               </tr>
             </tfoot>
           </table>
