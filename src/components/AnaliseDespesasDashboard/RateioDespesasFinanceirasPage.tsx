@@ -54,6 +54,11 @@ const BRAND_LABEL: Record<AnaliseBrand, string> = {
   audi: 'Audi',
 };
 
+const BRAND_PANEL_BORDER_CLASS: Record<AnaliseBrand, string> = {
+  vw: 'border-blue-400',
+  audi: 'border-red-400',
+};
+
 const DEPARTMENT_ORDER: DepartmentKey[] = ['novos', 'vendaDireta', 'usados', 'pecas', 'oficina', 'funilaria'];
 const DEPARTMENT_LABELS: Record<DepartmentKey, string> = {
   novos: 'Novos',
@@ -740,7 +745,7 @@ function BrandMonthTable({
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
+    <div className={`bg-white border-2 ${BRAND_PANEL_BORDER_CLASS[brand]} rounded-xl shadow-sm p-4`}>
       <h3 className="text-base font-bold text-slate-800 mb-3">
         {BRAND_LABEL[brand]} - {MONTH_NAMES[month - 1]}
       </h3>
@@ -1318,7 +1323,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     const totalJurosDeptos = DEPARTMENT_ORDER.reduce((sum, dept) => sum + jurosDeptos[dept], 0);
 
     return (
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 space-y-4">
+      <div className={`bg-white border-2 ${BRAND_PANEL_BORDER_CLASS[brand]} rounded-xl shadow-sm p-4 space-y-4`}>
         <h3 className="text-base font-bold text-slate-800">{brandLabel} - {MONTH_NAMES[month - 1]}</h3>
         <DepartamentoLinhasTable
           brand={brand}
@@ -1467,7 +1472,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     const brandLabel = BRAND_LABEL[brand];
 
     return (
-      <div className="bg-white border border-slate-300 rounded-xl p-5 space-y-4">
+      <div className={`bg-white border-2 ${BRAND_PANEL_BORDER_CLASS[brand]} rounded-xl p-5 space-y-4`}>
         <div>
           <h3 className="text-lg font-bold text-slate-900">{brandLabel} - Demonstrativo Contábil</h3>
           <p className="text-xs text-slate-600">Período: {MONTH_NAMES[month - 1]}/{selectedYear}</p>
