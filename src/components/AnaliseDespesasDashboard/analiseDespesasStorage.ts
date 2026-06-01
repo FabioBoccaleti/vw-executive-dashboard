@@ -51,6 +51,14 @@ export interface RateioDepartamentoValores {
 
 export type RateioDepartamentoBrandYearData = Record<number, Record<string, RateioDepartamentoValores>>;
 
+export interface RateioAssinaturaDigital {
+  username: string;
+  name?: string;
+  dataHora: string;
+}
+
+export type RateioContabilAssinaturasYearData = Record<number, RateioAssinaturaDigital | null>;
+
 function getKey(brand: AnaliseBrand, year: number, month: number): string {
   const mm = String(month).padStart(2, '0');
   return `analise_despesas_${brand}_${year}_${mm}`;
@@ -78,6 +86,10 @@ function getRateioTaxaJurosKey(year: number): string {
 
 function getRateioDepartamentoKey(brand: AnaliseBrand, year: number): string {
   return `analise_despesas_rateio_departamento_${brand}_${year}`;
+}
+
+function getRateioContabilAssinaturasKey(year: number): string {
+  return `analise_despesas_rateio_contabil_assinaturas_${year}`;
 }
 
 function getDefaultRateioConfig(): RateioCirculanteConfig {
@@ -127,6 +139,14 @@ function getDefaultRateioDepartamentoData(): RateioDepartamentoBrandYearData {
   const out: RateioDepartamentoBrandYearData = {};
   for (let month = 1; month <= 12; month++) {
     out[month] = {};
+  }
+  return out;
+}
+
+function getDefaultRateioContabilAssinaturasData(): RateioContabilAssinaturasYearData {
+  const out: RateioContabilAssinaturasYearData = {};
+  for (let month = 1; month <= 12; month++) {
+    out[month] = null;
   }
   return out;
 }
@@ -427,5 +447,48 @@ export async function saveRateioDepartamento(
     await kvSet(getRateioDepartamentoKey(brand, year), data);
   } catch (err) {
     console.error('Erro ao salvar rateio por departamento:', err);
+  }
+}
+
+/** Carrega assinaturas do financeiro do demonstrativo contábil por ano. */
+export async function loadRateioContabilAssinaturas(
+  year: number,
+): Promise<RateioContabilAssinaturasYearData> {
+  try {
+    const saved = await kvGet<Record<string, RateioAssinaturaDigital | null>>(getRateioContabilAssinaturasKey(year));
+    const base = getDefaultRateioContabilAssinaturasData();
+    if (!saved) return base;
+
+    for (let month = 1; month <= 12; month++) {
+      const assinatura = saved[String(month)];
+      if (!assinatura || typeof assinatura !== 'object') continue;
+      if (typeof assinatura.username !== 'string' || typeof assinatura.dataHora !== 'string') continue;
+      base[month] = {
+        username: assinatura.username,
+        name: typeof assinatura.name === 'string' && assinatura.name.trim() ? assinatura.name : undefined,
+        dataHora: assinatura.dataHora,
+      };
+    }
+
+    return base;
+  } catch (err) {
+    console.error('Erro ao carregar assinaturas do demonstrativo contábil:', err);
+    return getDefaultRateioContabilAssinaturasData();
+  }
+}
+
+/** Salva assinaturas do financeiro do demonstrativo contábil por ano. */
+export async function saveRateioContabilAssinaturas(
+  year: number,
+  data: RateioContabilAssinaturasYearData,
+): Promise<void> {
+  try {
+    const payload: Record<string, RateioAssinaturaDigital | null> = {};
+    for (let month = 1; month <= 12; month++) {
+      payload[String(month)] = data[month] ?? null;
+    }
+    await kvSet(getRateioContabilAssinaturasKey(year), payload);
+  } catch (err) {
+    console.error('Erro ao salvar assinaturas do demonstrativo contábil:', err);
   }
 }

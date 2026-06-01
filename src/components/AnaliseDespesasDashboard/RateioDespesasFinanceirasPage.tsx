@@ -1,20 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Settings2 } from 'lucide-react';
+import { CheckCircle, Loader2, LockOpen, PenLine, Settings2, ShieldCheck } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/useAuth';
+import { apiLogin } from '@/lib/authClient';
 import {
   type AnaliseBrand,
   type RateioCirculanteConfig,
+  type RateioContabilAssinaturasYearData,
   type RateioDepartamentoBrandYearData,
   type RateioDepartamentoValores,
   type RateioEndividamentoBrandYearData,
   type RateioResultadoLinha,
   type RateioResultadosBrandYearData,
+  type RateioAssinaturaDigital,
   type RateioTaxaJurosYearData,
   loadRateioDepartamento,
   loadRateioEndividamento,
   loadMultipleMonthsAnaliseDespesas,
+  loadRateioContabilAssinaturas,
   loadRateioCirculanteConfig,
   loadRateioResultados,
   loadRateioTaxaJuros,
+  saveRateioContabilAssinaturas,
   saveRateioCirculanteConfig,
   saveRateioDepartamento,
   saveRateioEndividamento,
@@ -137,6 +144,21 @@ const EMPTY_DEPARTAMENTO_BY_MONTH: RateioDepartamentoBrandYearData = {
   10: {},
   11: {},
   12: {},
+};
+
+const EMPTY_ASSINATURAS_FINANCEIRO_BY_MONTH: RateioContabilAssinaturasYearData = {
+  1: null,
+  2: null,
+  3: null,
+  4: null,
+  5: null,
+  6: null,
+  7: null,
+  8: null,
+  9: null,
+  10: null,
+  11: null,
+  12: null,
 };
 
 function parseBalanceteCirculante(text: string): AccountsByConta {
@@ -865,6 +887,7 @@ function DepartamentoLinhasTable({
 }
 
 export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesasFinanceirasPageProps) {
+  const { session } = useAuth();
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 6 }, (_, i) => currentYear - 2 + i);
 
@@ -889,6 +912,21 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
   const [taxaJurosByMonth, setTaxaJurosByMonth] = useState<RateioTaxaJurosYearData>({ ...EMPTY_TAXA_JUROS_BY_MONTH });
   const [vwDepartamento, setVwDepartamento] = useState<RateioDepartamentoBrandYearData>(cloneDepartamentoByMonth(EMPTY_DEPARTAMENTO_BY_MONTH));
   const [audiDepartamento, setAudiDepartamento] = useState<RateioDepartamentoBrandYearData>(cloneDepartamentoByMonth(EMPTY_DEPARTAMENTO_BY_MONTH));
+  const [assinaturasFinanceiroByMonth, setAssinaturasFinanceiroByMonth] = useState<RateioContabilAssinaturasYearData>({
+    ...EMPTY_ASSINATURAS_FINANCEIRO_BY_MONTH,
+  });
+  const [assinaFinanceiroDialog, setAssinaFinanceiroDialog] = useState<{
+    month: number;
+    senha: string;
+    loading: boolean;
+    erro: string | null;
+  } | null>(null);
+  const [reabrirAssinaturaDialog, setReabrirAssinaturaDialog] = useState<{
+    month: number;
+    senha: string;
+    loading: boolean;
+    erro: string | null;
+  } | null>(null);
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [ativoOptions, setAtivoOptions] = useState<Array<{ conta: string; desc: string }>>([]);
   const [passivoOptions, setPassivoOptions] = useState<Array<{ conta: string; desc: string }>>([]);
@@ -910,6 +948,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           savedTaxaJuros,
           savedVwDepartamento,
           savedAudiDepartamento,
+          savedContabilAssinaturas,
         ] = await Promise.all([
           loadRateioCirculanteConfig(),
           loadMultipleMonthsAnaliseDespesas('vw', selectedYear, MONTHS),
@@ -921,6 +960,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           loadRateioTaxaJuros(selectedYear),
           loadRateioDepartamento('vw', selectedYear),
           loadRateioDepartamento('audi', selectedYear),
+          loadRateioContabilAssinaturas(selectedYear),
         ]);
 
         if (cancelled) return;
@@ -960,6 +1000,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         setTaxaJurosByMonth({ ...EMPTY_TAXA_JUROS_BY_MONTH, ...savedTaxaJuros });
         setVwDepartamento(cloneDepartamentoByMonth(savedVwDepartamento));
         setAudiDepartamento(cloneDepartamentoByMonth(savedAudiDepartamento));
+        setAssinaturasFinanceiroByMonth({ ...EMPTY_ASSINATURAS_FINANCEIRO_BY_MONTH, ...savedContabilAssinaturas });
         setDescriptions(descMap);
         setAtivoOptions(
           Array.from(ativoMap.entries())
@@ -1236,6 +1277,72 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       }, {} as Record<number, ReturnType<typeof mapData>>),
     };
   }, [config, vwData, audiData, vwDepartamento, audiDepartamento, descriptions]);
+
+  function handleAbrirAssinaturaFinanceiro(month: number) {
+    if (!session) return;
+    setAssinaFinanceiroDialog({ month, senha: '', loading: false, erro: null });
+  }
+
+  async function handleConfirmarAssinaturaFinanceiro() {
+    if (!assinaFinanceiroDialog || !session) return;
+
+    setAssinaFinanceiroDialog((prev) => (prev ? { ...prev, loading: true, erro: null } : prev));
+    try {
+      const result = await apiLogin(session.username, assinaFinanceiroDialog.senha);
+      if ('error' in result) {
+        setAssinaFinanceiroDialog((prev) => (prev ? { ...prev, loading: false, erro: 'Senha incorreta. Tente novamente.' } : prev));
+        return;
+      }
+
+      const assinatura: RateioAssinaturaDigital = {
+        username: session.username,
+        name: (result.session.name ?? '') || undefined,
+        dataHora: new Date().toISOString(),
+      };
+
+      const next: RateioContabilAssinaturasYearData = {
+        ...assinaturasFinanceiroByMonth,
+        [assinaFinanceiroDialog.month]: assinatura,
+      };
+
+      setAssinaturasFinanceiroByMonth(next);
+      await saveRateioContabilAssinaturas(selectedYear, next);
+      toast.success('Assinatura do Financeiro registrada com sucesso!');
+      setAssinaFinanceiroDialog(null);
+    } catch {
+      setAssinaFinanceiroDialog((prev) => (prev ? { ...prev, loading: false, erro: 'Erro ao salvar. Verifique sua conexão e tente novamente.' } : prev));
+    }
+  }
+
+  function handleAbrirReabrirAssinaturaFinanceiro(month: number) {
+    if (!session) return;
+    setReabrirAssinaturaDialog({ month, senha: '', loading: false, erro: null });
+  }
+
+  async function handleConfirmarReabrirAssinaturaFinanceiro() {
+    if (!reabrirAssinaturaDialog || !session) return;
+
+    setReabrirAssinaturaDialog((prev) => (prev ? { ...prev, loading: true, erro: null } : prev));
+    try {
+      const result = await apiLogin(session.username, reabrirAssinaturaDialog.senha);
+      if ('error' in result) {
+        setReabrirAssinaturaDialog((prev) => (prev ? { ...prev, loading: false, erro: 'Senha incorreta. Tente novamente.' } : prev));
+        return;
+      }
+
+      const next: RateioContabilAssinaturasYearData = {
+        ...assinaturasFinanceiroByMonth,
+        [reabrirAssinaturaDialog.month]: null,
+      };
+
+      setAssinaturasFinanceiroByMonth(next);
+      await saveRateioContabilAssinaturas(selectedYear, next);
+      toast.success('Assinatura do Financeiro reaberta com sucesso!');
+      setReabrirAssinaturaDialog(null);
+    } catch {
+      setReabrirAssinaturaDialog((prev) => (prev ? { ...prev, loading: false, erro: 'Erro ao reabrir. Verifique sua conexão e tente novamente.' } : prev));
+    }
+  }
 
   function renderLiquidezEntreMarcasTable(month: number) {
     const financial = monthFinancials[month];
@@ -1560,6 +1667,58 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     );
   }
 
+  function renderFinanceiroAssinaturaSection(month: number) {
+    const assinatura = assinaturasFinanceiroByMonth[month];
+
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Assinaturas</p>
+        </div>
+        <div className="px-4 py-4">
+          <div className="max-w-[360px] flex flex-col gap-1.5">
+            <p className="text-xs text-slate-500 font-medium">Financeiro</p>
+            {assinatura ? (
+              <>
+                <div className="border border-emerald-200 rounded-lg px-4 py-3 bg-emerald-50 flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <div className="flex flex-col">
+                      {assinatura.name && assinatura.name !== assinatura.username && (
+                        <span className="text-sm font-bold text-emerald-900">{assinatura.name}</span>
+                      )}
+                      <span className="text-xs text-emerald-700">{assinatura.username}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-emerald-600">{new Date(assinatura.dataHora).toLocaleString('pt-BR')}</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-700" />
+                    <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Assinatura Eletrônica</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleAbrirReabrirAssinaturaFinanceiro(month)}
+                  className="w-fit text-xs text-amber-700 hover:text-amber-800 border border-amber-300 rounded px-3 py-1.5 hover:bg-amber-50 transition-colors flex items-center gap-1.5"
+                >
+                  <LockOpen className="w-3.5 h-3.5" />
+                  Reabrir assinatura
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => handleAbrirAssinaturaFinanceiro(month)}
+                className="border-2 border-dashed border-slate-300 rounded-lg px-4 py-3 text-sm text-slate-400 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50 transition-colors flex items-center gap-2 justify-center"
+              >
+                <PenLine className="w-4 h-4" />
+                Assinar
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
@@ -1725,11 +1884,115 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
               <div className="space-y-4">
                 {renderContabilBrandSection('vw', month)}
                 {renderContabilBrandSection('audi', month)}
+                {renderFinanceiroAssinaturaSection(month)}
               </div>
             </section>
           ))
         )}
       </div>
+
+      {assinaFinanceiroDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <PenLine className="w-4 h-4 text-teal-600" />
+                <h3 className="text-sm font-bold text-slate-800">Assinar - Financeiro</h3>
+              </div>
+              <button onClick={() => setAssinaFinanceiroDialog(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100">X</button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Usuário</label>
+                <div className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 bg-slate-50 select-none">
+                  {session?.username ?? '-'}
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Senha</label>
+                <input
+                  type="password"
+                  autoFocus
+                  value={assinaFinanceiroDialog.senha}
+                  onChange={(e) => setAssinaFinanceiroDialog((prev) => (prev ? { ...prev, senha: e.target.value, erro: null } : prev))}
+                  onKeyDown={(e) => e.key === 'Enter' && !assinaFinanceiroDialog.loading && handleConfirmarAssinaturaFinanceiro()}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  placeholder="Digite sua senha"
+                />
+                {assinaFinanceiroDialog.erro && (
+                  <p className="text-xs text-red-500 mt-0.5">{assinaFinanceiroDialog.erro}</p>
+                )}
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                onClick={() => setAssinaFinanceiroDialog(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-500 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarAssinaturaFinanceiro}
+                disabled={assinaFinanceiroDialog.loading || !assinaFinanceiroDialog.senha}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              >
+                <PenLine className="w-3.5 h-3.5" />
+                {assinaFinanceiroDialog.loading ? 'Assinando...' : 'Assinar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reabrirAssinaturaDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <LockOpen className="w-4 h-4 text-amber-600" />
+                <h3 className="text-sm font-bold text-slate-800">Reabrir assinatura - Financeiro</h3>
+              </div>
+              <button onClick={() => setReabrirAssinaturaDialog(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100">X</button>
+            </div>
+            <div className="px-5 py-4 flex flex-col gap-3">
+              <p className="text-sm text-slate-600">
+                Isso irá remover a assinatura atual do Financeiro para {MONTH_NAMES[reabrirAssinaturaDialog.month - 1]}/{selectedYear}.
+              </p>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Senha</label>
+                <input
+                  type="password"
+                  autoFocus
+                  value={reabrirAssinaturaDialog.senha}
+                  onChange={(e) => setReabrirAssinaturaDialog((prev) => (prev ? { ...prev, senha: e.target.value, erro: null } : prev))}
+                  onKeyDown={(e) => e.key === 'Enter' && !reabrirAssinaturaDialog.loading && handleConfirmarReabrirAssinaturaFinanceiro()}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  placeholder="Digite sua senha"
+                />
+                {reabrirAssinaturaDialog.erro && (
+                  <p className="text-xs text-red-500 mt-0.5">{reabrirAssinaturaDialog.erro}</p>
+                )}
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                onClick={() => setReabrirAssinaturaDialog(null)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-500 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarReabrirAssinaturaFinanceiro}
+                disabled={reabrirAssinaturaDialog.loading || !reabrirAssinaturaDialog.senha}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 disabled:opacity-50 transition-colors"
+              >
+                <LockOpen className="w-3.5 h-3.5" />
+                {reabrirAssinaturaDialog.loading ? 'Reabrindo...' : 'Reabrir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showConfig && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
