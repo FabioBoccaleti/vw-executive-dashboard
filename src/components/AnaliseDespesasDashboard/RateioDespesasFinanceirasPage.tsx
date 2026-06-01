@@ -1885,7 +1885,7 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     <div className="min-h-screen bg-slate-100 flex flex-col">
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Rateio Despesa Financeiras - (Rotativo Banco Volks)</h1>
+          <h1 className="text-lg font-bold text-slate-800">Rateio Despesa Financeiras - (Rotativo Banco Volks e outros Bancos)</h1>
           <p className="text-xs text-slate-500 mt-0.5">Ativo circulante (1.1) e passivo circulante (2.1) por mês e por marca</p>
         </div>
         <div className="flex items-center gap-2">
@@ -1964,19 +1964,19 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
           onClick={() => setActiveTab('rotativo')}
           className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-colors ${activeTab === 'rotativo' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
         >
-          Rotativo
+          Rotativo Banco Volks
         </button>
         <button
           onClick={() => setActiveTab('departamento')}
           className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-colors ${activeTab === 'departamento' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
         >
-          Rateio Departamento
+          Rateio Departamento (Rot.Volks)
         </button>
         <button
           onClick={() => setActiveTab('contabil')}
           className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-colors ${activeTab === 'contabil' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
         >
-          Demonstrativo Contábil
+          Demonstrativo Contabil (Rot.Volks)
         </button>
       </div>
 
