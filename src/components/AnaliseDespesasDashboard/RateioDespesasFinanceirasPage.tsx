@@ -598,7 +598,7 @@ function BrandMonthTable({
                 <td className="px-3 py-2 text-right font-bold text-slate-900">{formatCurrency(totalGeral)}</td>
               </tr>
               <tr className="border-t border-slate-200 bg-sky-50">
-                <td className="px-3 py-2 text-right font-semibold text-slate-700">% Uso Circulante (VW + Audi)</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-700">% Uso Circulante {BRAND_LABEL[brand]}</td>
                 <td className="px-3 py-2 text-right font-bold text-slate-900">
                   {circulantePercent.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
                 </td>
