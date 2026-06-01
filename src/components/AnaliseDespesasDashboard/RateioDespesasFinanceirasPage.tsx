@@ -444,6 +444,28 @@ function getBrandMonthTotal(
   return ativoTotal + passivoTotal + resultadoAjustado;
 }
 
+function getBrandMonthTotalGeral(
+  brand: AnaliseBrand,
+  month: number,
+  config: RateioCirculanteConfig,
+  accountsByMonth: AccountsByMonth,
+  resultRows: RateioResultadoLinha[],
+  resultadoPeriodo: number,
+): number {
+  const monthAccounts = accountsByMonth[month] ?? {};
+  const ativoTotal = getSelectedAccounts(config, brand, 'ativo').reduce(
+    (sum, conta) => sum + (monthAccounts[conta]?.saldoAtual ?? 0),
+    0,
+  );
+  const passivoTotal = getSelectedAccounts(config, brand, 'passivo').reduce(
+    (sum, conta) => sum + (monthAccounts[conta]?.saldoAtual ?? 0),
+    0,
+  );
+  const resultadoAjustado = resultadoPeriodo + resultRows.reduce((sum, row) => sum + row.value, 0);
+  const resultadoUsoCirculante = -resultadoAjustado;
+  return ativoTotal + passivoTotal + resultadoUsoCirculante;
+}
+
 function getBrandMonthEndividamentoTotal(
   brand: AnaliseBrand,
   month: number,
@@ -618,7 +640,8 @@ function BrandMonthTable({
   const passivoData = getGroupData('passivo');
   const totalExtras = resultRows.reduce((sum, row) => sum + row.value, 0);
   const resultadoAjustado = resultadoPeriodo + totalExtras;
-  const totalGeral = ativoData.total + passivoData.total + resultadoAjustado;
+  const resultadoUsoCirculante = -resultadoAjustado;
+  const totalGeral = ativoData.total + passivoData.total + resultadoUsoCirculante;
   const endividamentoSelectableContas = uniqueSorted([
     ...ativoData.rows.map((row) => row.conta),
     ...passivoData.rows.map((row) => row.conta),
@@ -802,7 +825,7 @@ function BrandMonthTable({
               </tr>
               <tr className="border-t border-slate-100">
                 <td className="px-3 py-2 text-slate-700">Resultado do Periodo Ajustado</td>
-                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(resultadoAjustado)}</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(resultadoUsoCirculante)}</td>
               </tr>
             </tbody>
             <tfoot>
@@ -1692,9 +1715,25 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
       const taxaPercent = Number(taxaJurosByMonth[month] ?? 0);
       const vwJurosCalculado = vwEndividamentoBase * (taxaPercent / 100);
       const audiJurosCalculado = audiEndividamentoBase * (taxaPercent / 100);
-      const totalMonth = monthTotals[month]?.total ?? 0;
-      const vwPercent = totalMonth ? (monthTotals[month].vw / totalMonth) * 100 : 0;
-      const audiPercent = totalMonth ? (monthTotals[month].audi / totalMonth) * 100 : 0;
+      const vwTotalGeral = getBrandMonthTotalGeral(
+        'vw',
+        month,
+        config,
+        vwData,
+        vwResults[month] ?? [],
+        resultadoPeriodoByBrandMonth.vw[month] ?? 0,
+      );
+      const audiTotalGeral = getBrandMonthTotalGeral(
+        'audi',
+        month,
+        config,
+        audiData,
+        audiResults[month] ?? [],
+        resultadoPeriodoByBrandMonth.audi[month] ?? 0,
+      );
+      const totalGeralMes = vwTotalGeral + audiTotalGeral;
+      const vwPercent = totalGeralMes ? (vwTotalGeral / totalGeralMes) * 100 : 0;
+      const audiPercent = totalGeralMes ? (audiTotalGeral / totalGeralMes) * 100 : 0;
       const vwAReceberDaAudi = vwJurosCalculado * (audiPercent / 100);
       const vwAPagarParaAudi = audiJurosCalculado * (vwPercent / 100);
       const vwSaldoLiquido = vwAReceberDaAudi - vwAPagarParaAudi;
@@ -1722,7 +1761,17 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
     }
 
     return out;
-  }, [taxaJurosByMonth, vwEndividamento, audiEndividamento, vwData, audiData, monthTotals]);
+  }, [
+    taxaJurosByMonth,
+    vwEndividamento,
+    audiEndividamento,
+    config,
+    vwData,
+    audiData,
+    vwResults,
+    audiResults,
+    resultadoPeriodoByBrandMonth,
+  ]);
 
   const departmentMonthData = useMemo(() => {
     const mapData = (brand: AnaliseBrand, month: number) => {
