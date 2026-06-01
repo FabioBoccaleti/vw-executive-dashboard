@@ -4,7 +4,18 @@ import { loadProvisaoPivConfig, saveProvisaoPivConfig, periodoKey } from './prov
 import { Wrench, Car, Layers, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const n = (v?: string | null) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
+const n = (v?: string | null) => {
+  const raw = String(v ?? '').trim();
+  if (!raw) return 0;
+  const cleaned = raw
+    .replace(/\s+/g, '')
+    .replace(/R\$/gi, '')
+    .replace(/[^\d,.-]/g, '');
+  const normalized = cleaned.includes(',')
+    ? cleaned.replace(/\./g, '').replace(',', '.')
+    : cleaned;
+  return parseFloat(normalized) || 0;
+};
 
 const fmtBRL = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

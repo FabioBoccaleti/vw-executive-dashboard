@@ -25,7 +25,18 @@ import { loadVendasRows, type VendasRow as BlindagemRow } from './vendasStorage'
 import { loadRegistroRows, type RegistroVendasRow } from './registroVendasStorage';
 
 // ─── Helpers numéricos ────────────────────────────────────────────────────────
-function n(v: string): number { return parseFloat(String(v).replace(',', '.')) || 0; }
+function n(v: string | null | undefined): number {
+  const raw = String(v ?? '').trim();
+  if (!raw) return 0;
+  const cleaned = raw
+    .replace(/\s+/g, '')
+    .replace(/R\$/gi, '')
+    .replace(/[^\d,.-]/g, '');
+  const normalized = cleaned.includes(',')
+    ? cleaned.replace(/\./g, '').replace(',', '.')
+    : cleaned;
+  return parseFloat(normalized) || 0;
+}
 function fmt(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -463,6 +474,12 @@ function EditCell({
   );
 }
 
+function persistRowsIfChanged(tab: VendasResultadoSubTab, previousRows: VendasResultadoRow[], nextRows: VendasResultadoRow[]) {
+  if (JSON.stringify(previousRows) !== JSON.stringify(nextRows)) {
+    void saveVendasResultadoRows(tab, nextRows);
+  }
+}
+
 // ─── Célula calculada (somente leitura) ──────────────────────────────────────
 function CalcCell({ value, pct, negative }: { value: number; pct?: boolean; negative?: boolean }) {
   const color = value > 0 ? 'text-emerald-700' : value < 0 ? 'text-red-600' : 'text-slate-400';
@@ -658,7 +675,7 @@ export default function VendasResultadoDashboard() {
         const hasChanges = normalized.some((r, i) =>
           r.bonusVarejo !== rows[i].bonusVarejo || r.bonusTradeIn !== rows[i].bonusTradeIn
         );
-        if (hasChanges) saveVendasResultadoRows('novos', normalized);
+        persistRowsIfChanged('novos', loaded, normalized);
         setRows(normalized);
       });
     } else {
@@ -693,7 +710,9 @@ export default function VendasResultadoDashboard() {
     setRows(prev => {
       const withJuros = applyJurosAutoFill(prev, jurosMap);
       if (modelos.length === 0) return withJuros;
-      return applyAutoFill(withJuros, modelos, regras);
+      const next = applyAutoFill(withJuros, modelos, regras);
+      persistRowsIfChanged('novos', prev, next);
+      return next;
     });
   }, [modelos, regras, jurosMap, activeTab]);
 
