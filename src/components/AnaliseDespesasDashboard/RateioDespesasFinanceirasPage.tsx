@@ -2937,19 +2937,32 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
             </section>
           )) : activeTab === 'contabil' ? (
             <div id="rateio-contabil-print-area" className="space-y-4 print:space-y-2">
-              {monthsToRender.map((month) => (
-                <section key={month} className="space-y-4 print:space-y-2">
-                  <h2 className="text-lg font-bold text-slate-800">
-                    <span className="print:hidden">Demonstrativo Contábil - {MONTH_NAMES[month - 1]} / {selectedYear}</span>
-                    <span className="hidden print:inline">Rateio Despesa Financeira Credito Rotativo Banco Volks.</span>
-                  </h2>
-                  <div className="space-y-4">
-                    {renderContabilBrandSection('vw', month)}
-                    {renderContabilBrandSection('audi', month)}
-                    {renderFinanceiroAssinaturaSection(month)}
-                  </div>
-                </section>
-              ))}
+              {monthsToRender.map((month) => {
+                const nextMonth = month === 12 ? 1 : month + 1;
+                const nextYear = month === 12 ? selectedYear + 1 : selectedYear;
+
+                return (
+                  <section key={month} className="space-y-4 print:space-y-2">
+                    <h2 className="text-lg font-bold text-slate-800">
+                      <span className="print:hidden">Demonstrativo Contábil - {MONTH_NAMES[month - 1]} / {selectedYear}</span>
+                      <span className="hidden print:inline">Rateio Despesa Financeira Credito Rotativo Banco Volks.</span>
+                    </h2>
+
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                      <p className="text-xs font-semibold text-amber-900">
+                        Reconhecimento contábil: a despesa apurada em {MONTH_NAMES[month - 1]}/{selectedYear} deve ser reconhecida no mês subsequente,
+                        em {MONTH_NAMES[nextMonth - 1]}/{nextYear}.
+                      </p>
+                    </div>
+
+                    <div className="space-y-4">
+                      {renderContabilBrandSection('vw', month)}
+                      {renderContabilBrandSection('audi', month)}
+                      {renderFinanceiroAssinaturaSection(month)}
+                    </div>
+                  </section>
+                );
+              })}
             </div>
           ) : (
             <div id="rateio-contabil-outros-bancos-print-area" className="space-y-4 print:space-y-2">
