@@ -2479,8 +2479,22 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
   function renderOutrosBancosSection(month: number) {
     const rows = outrosBancosByMonth[month] ?? [];
     const totalDespesaRateio = roundCurrency(rows.reduce((sum, row) => sum + (Number(row.juros) || 0), 0));
-    const vwCapital = monthTotals[month]?.vw ?? 0;
-    const audiCapital = monthTotals[month]?.audi ?? 0;
+    const vwCapital = getBrandMonthTotalGeral(
+      'vw',
+      month,
+      config,
+      vwData,
+      vwResults[month] ?? [],
+      resultadoPeriodoByBrandMonth.vw[month] ?? 0,
+    );
+    const audiCapital = getBrandMonthTotalGeral(
+      'audi',
+      month,
+      config,
+      audiData,
+      audiResults[month] ?? [],
+      resultadoPeriodoByBrandMonth.audi[month] ?? 0,
+    );
     const vwPercent = monthFinancials[month]?.vwPercent ?? 0;
     const audiPercent = monthFinancials[month]?.audiPercent ?? 0;
 
