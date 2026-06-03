@@ -39,7 +39,7 @@ const TABS: { id: TabId; label: string; color: string; activeColor: string }[] =
   { id: 'analise-evolucao',       label: 'Evolução Despesas',      color: '#0f766e', activeColor: '#0d6660' },
   { id: 'receita-evolucao',        label: 'Evolução Receita',       color: '#0369a1', activeColor: '#025d91' },
   { id: 'volume-evolucao',          label: 'Evolução Volume',         color: '#6d28d9', activeColor: '#5b21b6' },
-  { id: 'diagnostivo',             label: 'Diagnostivo',            color: '#334155', activeColor: '#1e293b' },
+  { id: 'diagnostivo',             label: 'Radar de Variancia',     color: '#334155', activeColor: '#1e293b' },
 ];
 
 const MONTHS_LABEL = [

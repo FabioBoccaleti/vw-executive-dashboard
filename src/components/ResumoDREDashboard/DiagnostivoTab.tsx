@@ -453,7 +453,7 @@ export function DiagnostivoTab({ year, month }: DiagnostivoTabProps) {
     <div className="flex-1 overflow-y-auto bg-slate-50">
       <div className="max-w-[1440px] mx-auto p-4 flex flex-col gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-800">Diagnostivo</h2>
+          <h2 className="text-lg font-bold text-slate-800">Radar de Variancia</h2>
           <p className="text-sm text-slate-500">{periodLabel} — {marcaTab === 'vw' ? 'VW Norte' : 'Audi'}</p>
         </div>
 
@@ -503,7 +503,7 @@ export function DiagnostivoTab({ year, month }: DiagnostivoTabProps) {
           </div>
 
           <div className="px-6 py-3 text-white font-bold" style={{ backgroundColor: marcaTab === 'vw' ? '#001e50' : '#bb0a30' }}>
-            Diagnostivo — {marcaTab === 'vw' ? 'VW Norte' : 'Audi'}
+            Radar de Variancia — {marcaTab === 'vw' ? 'VW Norte' : 'Audi'}
           </div>
 
           {loading ? (
