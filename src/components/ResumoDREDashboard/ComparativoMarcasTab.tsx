@@ -77,9 +77,10 @@ const AUDI_DEPTS = ['novos','usados','pecas','oficina','funilaria','adm'] as con
 const VW_DEPT_TO_EXEC: Partial<Record<string, Department>> = {
   novos: 'novos', direta: 'vendaDireta', usados: 'usados',
   pecas: 'pecas', oficina: 'oficina', funilaria: 'funilaria',
+  adm: 'administracao',
 };
 const AUDI_DEPT_TO_EXEC: Partial<Record<string, Department>> = {
-  novos: 'novos', usados: 'usados', pecas: 'pecas', oficina: 'oficina', funilaria: 'funilaria',
+  novos: 'novos', usados: 'usados', pecas: 'pecas', oficina: 'oficina', funilaria: 'funilaria', adm: 'administracao',
 };
 
 const VW_DESCRICAO_TO_FIELD: Record<string, string> = {
