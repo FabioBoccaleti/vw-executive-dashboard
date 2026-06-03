@@ -165,188 +165,57 @@ function getROL(
   return sumTotals(depts, getDept, 'receitaOperacionalLiquida');
 }
 
-// ─── Sub-aba Resultado ────────────────────────────────────────────────────────
+type ResultadoPeriodo = 'mensal' | 'acumulado';
 
-function ResultadoTab({ year, month }: { year: number; month: number }) {
-  const [loading, setLoading] = useState(true);
-  const [vwData,   setVwData]   = useState<DreVwRow | null>(null);
-  const [audiData, setAudiData] = useState<DreAudiRow | null>(null);
+interface ResultadoBundle {
+  vw: DreVwRow;
+  audi: DreAudiRow;
+}
 
-  useEffect(() => {
-    setLoading(true);
+interface ComparativoTabelaProps {
+  vwData: DreVwRow | null;
+  audiData: DreAudiRow | null;
+  periodLabel: string;
+  rootId?: string;
+  showPrintButton?: boolean;
+  onPrint?: () => void;
+}
 
-    const isAnual = month === 0;
-    const yr = year as 2024 | 2025 | 2026 | 2027;
-    const months12 = Array.from({ length: 12 }, (_, i) => i + 1);
-
-    // ── Modo anual: soma todos os meses ──────────────────────────────────────
-    if (isAnual) {
-      const vwSyncable   = VW_DEPTS.filter(k => VW_DEPT_TO_EXEC[k]);
-      const audiSyncable = AUDI_DEPTS.filter(k => AUDI_DEPT_TO_EXEC[k]);
-      const DEPT_FIELDS = [
-        'quant','receitaOperacionalLiquida','custoOperacionalReceita',
-        'lucroPrejOperacionalBruto','outrasReceitasOperacionais','outrasDespesasOperacionais',
-        'margemContribuicao','despPessoal','despServTerceiros','despOcupacao','despFuncionamento',
-        'despVendas','lucroPrejOperacionalLiquido','amortizacoesDepreciacoes',
-        'outrasReceitasFinanceiras','despFinanceirasNaoOperacional','despesasNaoOperacionais',
-        'outrasRendasNaoOperacionais','lucroPrejAntesImpostos','provisoesIrpjCs',
-        'participacoes','lucroLiquidoExercicio',
-      ] as const;
-
-      Promise.all([
-        Promise.all(months12.map(m => loadDreVw(year, m))),
-        Promise.all(months12.map(m => loadDreAudi(year, m))),
-        Promise.all(vwSyncable.map(k => loadDREDataAsync(yr, VW_DEPT_TO_EXEC[k]!, 'vw').then(d => ({ k, d })))),
-        Promise.all(audiSyncable.map(k => loadDREDataAsync(yr, AUDI_DEPT_TO_EXEC[k]!, 'audi').then(d => ({ k, d })))),
-      ]).then(([vwMonths, audiMonths, vwExec, audiExec]) => {
-        const vwExecMap: Record<string, any[] | null> = {};
-        for (const { k, d } of vwExec) vwExecMap[k] = d;
-        const audiExecMap: Record<string, any[] | null> = {};
-        for (const { k, d } of audiExec) audiExecMap[k] = d;
-
-        function buildRow(
-          kvMonths: (DreVwRow | DreAudiRow | null)[],
-          depts: readonly string[],
-          execMap: Record<string, any[] | null>,
-          emptyFn: () => DreVwRow | DreAudiRow,
-        ) {
-          const summed = emptyFn();
-          for (let mi = 0; mi < 12; mi++) {
-            const kv = kvMonths[mi];
-            for (const dKey of depts) {
-              const kvDept = (kv as any)?.[dKey] as Record<string, string> | undefined;
-              const hasKv  = kvDept && Object.values(kvDept).some(v => v !== '');
-              const src: Record<string, string> = hasKv
-                ? (kvDept as Record<string, string>)
-                : buildDeptFromDREData(execMap[dKey] ?? null, mi);
-              for (const f of DEPT_FIELDS) {
-                const prev = parseVal((summed as any)[dKey][f]);
-                const add  = parseVal(src[f] ?? '');
-                if (add !== 0) (summed as any)[dKey][f] = (prev + add).toString();
-              }
-            }
-          }
-          return summed;
-        }
-
-        const vwSummed   = buildRow(vwMonths,   VW_DEPTS,   vwExecMap,   () => createEmptyDreVwRow(year, 0));
-        const audiSummed = buildRow(audiMonths,  AUDI_DEPTS, audiExecMap, () => createEmptyDreAudiRow(year, 0));
-        setVwData(vwSummed as DreVwRow);
-        setAudiData(audiSummed as DreAudiRow);
-        setLoading(false);
-      });
-      return;
-    }
-
-    // ── Modo mensal ──────────────────────────────────────────────────────────
-    const mIdx = month - 1;
-    const vwSyncable   = VW_DEPTS.filter(k => VW_DEPT_TO_EXEC[k]);
-    const audiSyncable = AUDI_DEPTS.filter(k => AUDI_DEPT_TO_EXEC[k]);
-
-    Promise.all([
-      loadDreVw(year, month),
-      loadDreAudi(year, month),
-      Promise.all(vwSyncable.map(k => loadDREDataAsync(yr, VW_DEPT_TO_EXEC[k]!, 'vw').then(d => ({ k, d })))),
-      Promise.all(audiSyncable.map(k => loadDREDataAsync(yr, AUDI_DEPT_TO_EXEC[k]!, 'audi').then(d => ({ k, d })))),
-    ]).then(([vwKv, audiKv, vwExec, audiExec]) => {
-      const vwExecMap: Record<string, any[] | null> = {};
-      for (const { k, d } of vwExec) vwExecMap[k] = d;
-      const audiExecMap: Record<string, any[] | null> = {};
-      for (const { k, d } of audiExec) audiExecMap[k] = d;
-
-      function mergeRow(
-        kv: DreVwRow | DreAudiRow | null,
-        depts: readonly string[],
-        execMap: Record<string, any[] | null>,
-        emptyFn: () => DreVwRow | DreAudiRow,
-      ) {
-        const row = emptyFn();
-        for (const dKey of depts) {
-          const kvDept = (kv as any)?.[dKey] as Record<string, string> | undefined;
-          const hasKv  = kvDept && Object.values(kvDept).some(v => v !== '');
-          const src    = hasKv ? kvDept : buildDeptFromDREData(execMap[dKey] ?? null, mIdx);
-          (row as any)[dKey] = { ...(row as any)[dKey], ...src };
-        }
-        return row;
-      }
-
-      setVwData(mergeRow(vwKv,   VW_DEPTS,   vwExecMap,   () => createEmptyDreVwRow(year, month))   as DreVwRow);
-      setAudiData(mergeRow(audiKv, AUDI_DEPTS, audiExecMap, () => createEmptyDreAudiRow(year, month)) as DreAudiRow);
-      setLoading(false);
-    });
-  }, [year, month]);
-
-  if (loading) {
+function ComparativoTabela({ vwData, audiData, periodLabel, rootId, showPrintButton = false, onPrint }: ComparativoTabelaProps) {
+  if (!vwData || !audiData) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-10 text-center">
+        <p className="text-sm text-slate-500">Dados indisponíveis para o período selecionado.</p>
       </div>
     );
   }
 
-  // ── Funções de acesso aos dados ────────────────────────────────────────────
-  const getVwDept  = (key: string): Record<string, string> => (vwData   as any)?.[key] ?? {};
+  const getVwDept = (key: string): Record<string, string> => (vwData as any)?.[key] ?? {};
   const getAudiDept = (key: string): Record<string, string> => (audiData as any)?.[key] ?? {};
 
-  const vwROL   = getROL(VW_DEPTS,   getVwDept);
+  const vwROL = getROL(VW_DEPTS, getVwDept);
   const audiROL = getROL(AUDI_DEPTS, getAudiDept);
-
-  const periodLabel = month === 0 ? `Ano ${year}` : `${MONTHS[month - 1]}/${year}`;
-
-  const NCOLS = 5; // Descrição | VW | Audi | Var R$ | Var %
+  const NCOLS = 5;
 
   return (
-    <div id="comparativo-marcas-print-area" className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      {/* Cabeçalho */}
+    <div id={rootId} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div
         className="px-6 py-3 text-white font-bold flex items-center justify-between"
         style={{ background: `linear-gradient(135deg, ${VW_COLOR} 50%, ${AUDI_COLOR} 100%)` }}
       >
         <div className="flex items-center gap-3">
           <span className="text-base">Comparativo de Marcas — Resultado</span>
-          <span className="text-xs opacity-75 font-normal">{periodLabel}</span>
+          <span className="text-base">{periodLabel}</span>
         </div>
-        <button
-          onClick={() => {
-            const area = document.getElementById('comparativo-marcas-print-area');
-            const root = document.getElementById('print-root');
-            if (area && root) {
-              const clone = area.cloneNode(true) as HTMLElement;
-              clone.querySelectorAll('.no-print').forEach(el => el.remove());
-              root.innerHTML = clone.outerHTML;
-
-              const style = document.createElement('style');
-              style.id = 'comparativo-print-override';
-              style.textContent = `
-                @page { size: A4 landscape; margin: 0.4cm !important; }
-                #print-root {
-                  zoom: 0.82;
-                  font-family: Inter, sans-serif;
-                }
-                #print-root, #print-root * {
-                  -webkit-print-color-adjust: exact !important;
-                  print-color-adjust: exact !important;
-                  forced-color-adjust: none !important;
-                  color-scheme: light !important;
-                }
-              `;
-              document.head.appendChild(style);
-
-              window.onafterprint = () => {
-                document.head.removeChild(style);
-                root.innerHTML = '';
-                window.onafterprint = null;
-              };
-              window.print();
-            } else {
-              window.print();
-            }
-          }}
-          className="no-print flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/20 hover:bg-white/30 transition-colors"
-        >
-          <Printer className="w-3.5 h-3.5" />
-          Imprimir PDF
-        </button>
+        {showPrintButton && (
+          <button
+            onClick={onPrint}
+            className="no-print flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/20 hover:bg-white/30 transition-colors"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            Imprimir PDF
+          </button>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -369,8 +238,8 @@ function ResultadoTab({ year, month }: { year: number; month: number }) {
               const isQuant = line.field === 'quant' && idx === 0;
 
               if (line.isPct) {
-                const vwV  = sumTotals(VW_DEPTS,   getVwDept,  line.field);
-                const auV  = sumTotals(AUDI_DEPTS, getAudiDept, line.field);
+                const vwV = sumTotals(VW_DEPTS, getVwDept, line.field);
+                const auV = sumTotals(AUDI_DEPTS, getAudiDept, line.field);
                 return (
                   <tr key={idx} className="border-b border-slate-100 bg-slate-50/50">
                     <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic text-slate-500">{line.label}</td>
@@ -382,14 +251,14 @@ function ResultadoTab({ year, month }: { year: number; month: number }) {
                 );
               }
 
-              const vwVal  = isQuant
+              const vwVal = isQuant
                 ? VW_DEPTS.reduce((s, k) => s + (parseInt(getVwDept(k)['quant'] || '0') || 0), 0)
-                : sumTotals(VW_DEPTS,   getVwDept,  line.field);
-              const auVal  = isQuant
+                : sumTotals(VW_DEPTS, getVwDept, line.field);
+              const auVal = isQuant
                 ? AUDI_DEPTS.reduce((s, k) => s + (parseInt(getAudiDept(k)['quant'] || '0') || 0), 0)
                 : sumTotals(AUDI_DEPTS, getAudiDept, line.field);
 
-              const varR   = auVal - vwVal;
+              const varR = auVal - vwVal;
               const varPct = vwVal !== 0 ? (varR / Math.abs(vwVal)) * 100 : 0;
 
               const fmtVal = (v: number) =>
@@ -404,9 +273,9 @@ function ResultadoTab({ year, month }: { year: number; month: number }) {
                 ? 'bg-slate-100 font-semibold text-slate-800'
                 : 'hover:bg-slate-50 text-slate-700';
 
-              const vwCellBg   = line.isTotal ? VW_COLOR_DRK  : undefined;
-              const auCellBg   = line.isTotal ? AUDI_COLOR_DRK : undefined;
-              const varCellBg  = line.isTotal ? '#1e293b'      : undefined;
+              const vwCellBg = line.isTotal ? VW_COLOR_DRK : undefined;
+              const auCellBg = line.isTotal ? AUDI_COLOR_DRK : undefined;
+              const varCellBg = line.isTotal ? '#1e293b' : undefined;
 
               return (
                 <tr key={idx} className={`border-b border-slate-100 ${rowClass}`} style={rowStyle}>
@@ -462,6 +331,255 @@ function ResultadoTab({ year, month }: { year: number; month: number }) {
   );
 }
 
+// ─── Sub-aba Resultado ────────────────────────────────────────────────────────
+
+function ResultadoTab({ year, month, periodo }: { year: number; month: number; periodo: ResultadoPeriodo }) {
+  const [loading, setLoading] = useState(true);
+  const [mensalData, setMensalData] = useState<ResultadoBundle | null>(null);
+  const [acumuladoData, setAcumuladoData] = useState<ResultadoBundle | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+
+    const selectedMonth = month === 0 ? 12 : month;
+    const yr = year as 2024 | 2025 | 2026 | 2027;
+
+    async function loadAccumulated(untilMonth: number): Promise<ResultadoBundle> {
+      const vwSyncable   = VW_DEPTS.filter(k => VW_DEPT_TO_EXEC[k]);
+      const audiSyncable = AUDI_DEPTS.filter(k => AUDI_DEPT_TO_EXEC[k]);
+      const monthsToLoad = Array.from({ length: untilMonth }, (_, i) => i + 1);
+      const DEPT_FIELDS = [
+        'quant','receitaOperacionalLiquida','custoOperacionalReceita',
+        'lucroPrejOperacionalBruto','outrasReceitasOperacionais','outrasDespesasOperacionais',
+        'margemContribuicao','despPessoal','despServTerceiros','despOcupacao','despFuncionamento',
+        'despVendas','lucroPrejOperacionalLiquido','amortizacoesDepreciacoes',
+        'outrasReceitasFinanceiras','despFinanceirasNaoOperacional','despesasNaoOperacionais',
+        'outrasRendasNaoOperacionais','lucroPrejAntesImpostos','provisoesIrpjCs',
+        'participacoes','lucroLiquidoExercicio',
+      ] as const;
+
+      const [vwMonths, audiMonths, vwExec, audiExec] = await Promise.all([
+        Promise.all(monthsToLoad.map(m => loadDreVw(year, m))),
+        Promise.all(monthsToLoad.map(m => loadDreAudi(year, m))),
+        Promise.all(vwSyncable.map(k => loadDREDataAsync(yr, VW_DEPT_TO_EXEC[k]!, 'vw').then(d => ({ k, d })))),
+        Promise.all(audiSyncable.map(k => loadDREDataAsync(yr, AUDI_DEPT_TO_EXEC[k]!, 'audi').then(d => ({ k, d })))),
+      ]);
+
+      const vwExecMap: Record<string, any[] | null> = {};
+      for (const { k, d } of vwExec) vwExecMap[k] = d;
+      const audiExecMap: Record<string, any[] | null> = {};
+      for (const { k, d } of audiExec) audiExecMap[k] = d;
+
+      function buildRow(
+        kvMonths: (DreVwRow | DreAudiRow | null)[],
+        depts: readonly string[],
+        execMap: Record<string, any[] | null>,
+        emptyFn: () => DreVwRow | DreAudiRow,
+      ) {
+        const summed = emptyFn();
+        for (let mi = 0; mi < monthsToLoad.length; mi++) {
+          const kv = kvMonths[mi];
+          for (const dKey of depts) {
+            const kvDept = (kv as any)?.[dKey] as Record<string, string> | undefined;
+            const hasKv  = kvDept && Object.values(kvDept).some(v => v !== '');
+            const src: Record<string, string> = hasKv
+              ? (kvDept as Record<string, string>)
+              : buildDeptFromDREData(execMap[dKey] ?? null, mi);
+            for (const f of DEPT_FIELDS) {
+              const prev = parseVal((summed as any)[dKey][f]);
+              const add  = parseVal(src[f] ?? '');
+              if (add !== 0) (summed as any)[dKey][f] = (prev + add).toString();
+            }
+          }
+        }
+        return summed;
+      }
+
+      const vwSummed   = buildRow(vwMonths, VW_DEPTS, vwExecMap, () => createEmptyDreVwRow(year, 0));
+      const audiSummed = buildRow(audiMonths, AUDI_DEPTS, audiExecMap, () => createEmptyDreAudiRow(year, 0));
+
+      return {
+        vw: vwSummed as DreVwRow,
+        audi: audiSummed as DreAudiRow,
+      };
+    }
+
+    async function loadMensal(targetMonth: number): Promise<ResultadoBundle> {
+      const mIdx = targetMonth - 1;
+      const vwSyncable   = VW_DEPTS.filter(k => VW_DEPT_TO_EXEC[k]);
+      const audiSyncable = AUDI_DEPTS.filter(k => AUDI_DEPT_TO_EXEC[k]);
+
+      const [vwKv, audiKv, vwExec, audiExec] = await Promise.all([
+        loadDreVw(year, targetMonth),
+        loadDreAudi(year, targetMonth),
+        Promise.all(vwSyncable.map(k => loadDREDataAsync(yr, VW_DEPT_TO_EXEC[k]!, 'vw').then(d => ({ k, d })))),
+        Promise.all(audiSyncable.map(k => loadDREDataAsync(yr, AUDI_DEPT_TO_EXEC[k]!, 'audi').then(d => ({ k, d })))),
+      ]);
+
+      const vwExecMap: Record<string, any[] | null> = {};
+      for (const { k, d } of vwExec) vwExecMap[k] = d;
+      const audiExecMap: Record<string, any[] | null> = {};
+      for (const { k, d } of audiExec) audiExecMap[k] = d;
+
+      function mergeRow(
+        kv: DreVwRow | DreAudiRow | null,
+        depts: readonly string[],
+        execMap: Record<string, any[] | null>,
+        emptyFn: () => DreVwRow | DreAudiRow,
+      ) {
+        const row = emptyFn();
+        for (const dKey of depts) {
+          const kvDept = (kv as any)?.[dKey] as Record<string, string> | undefined;
+          const hasKv  = kvDept && Object.values(kvDept).some(v => v !== '');
+          const src    = hasKv ? kvDept : buildDeptFromDREData(execMap[dKey] ?? null, mIdx);
+          (row as any)[dKey] = { ...(row as any)[dKey], ...src };
+        }
+        return row;
+      }
+
+      return {
+        vw: mergeRow(vwKv, VW_DEPTS, vwExecMap, () => createEmptyDreVwRow(year, targetMonth)) as DreVwRow,
+        audi: mergeRow(audiKv, AUDI_DEPTS, audiExecMap, () => createEmptyDreAudiRow(year, targetMonth)) as DreAudiRow,
+      };
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      if (month === 0) {
+        const acumulado = await loadAccumulated(12);
+        if (!cancelled) {
+          setMensalData(null);
+          setAcumuladoData(acumulado);
+          setLoading(false);
+        }
+        return;
+      }
+
+      const [mensal, acumulado] = await Promise.all([
+        loadMensal(month),
+        loadAccumulated(selectedMonth),
+      ]);
+
+      if (!cancelled) {
+        setMensalData(mensal);
+        setAcumuladoData(acumulado);
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [year, month]);
+
+  const mensalLabel = month === 0 ? `Mês não selecionado/${year}` : `${MONTHS[month - 1]}/${year}`;
+  const acumuladoLabel = `Acumulado de Janeiro a ${MONTHS[(month === 0 ? 12 : month) - 1]} de ${year}`;
+  const activeLabel = periodo === 'mensal' ? mensalLabel : acumuladoLabel;
+
+  const activeBundle = periodo === 'mensal' ? mensalData : acumuladoData;
+
+  const handlePrintBoth = () => {
+    const printSource = document.getElementById('comparativo-marcas-print-both');
+    const root = document.getElementById('print-root');
+    if (!printSource || !root) {
+      window.print();
+      return;
+    }
+
+    const clone = printSource.cloneNode(true) as HTMLElement;
+    clone.style.display = 'block';
+    root.innerHTML = clone.outerHTML;
+
+    const style = document.createElement('style');
+    style.id = 'comparativo-print-override';
+    style.textContent = `
+      @page { size: A4 landscape; margin: 0.4cm !important; }
+      #print-root {
+        zoom: 0.82;
+        font-family: Inter, sans-serif;
+      }
+      #print-root, #print-root * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        forced-color-adjust: none !important;
+        color-scheme: light !important;
+      }
+      #print-root .print-page {
+        page-break-after: always;
+        break-after: page;
+        margin-bottom: 0.4cm;
+      }
+      #print-root .print-page:last-child {
+        page-break-after: auto;
+        break-after: auto;
+        margin-bottom: 0;
+      }
+    `;
+    document.head.appendChild(style);
+
+    window.onafterprint = () => {
+      document.head.removeChild(style);
+      root.innerHTML = '';
+      window.onafterprint = null;
+    };
+
+    window.print();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  const NCOLS = 5; // Descrição | VW | Audi | Var R$ | Var %
+
+  if (periodo === 'mensal' && month === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-10 text-center">
+        <p className="text-sm text-slate-500">Selecione um mês para visualizar o comparativo mensal.</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <ComparativoTabela
+        rootId="comparativo-marcas-print-area"
+        vwData={activeBundle?.vw ?? null}
+        audiData={activeBundle?.audi ?? null}
+        periodLabel={activeLabel}
+        showPrintButton
+        onPrint={handlePrintBoth}
+      />
+
+      <div id="comparativo-marcas-print-both" style={{ display: 'none' }}>
+        {month !== 0 && mensalData && (
+          <div className="print-page">
+            <ComparativoTabela
+              vwData={mensalData.vw}
+              audiData={mensalData.audi}
+              periodLabel={mensalLabel}
+            />
+          </div>
+        )}
+        {acumuladoData && (
+          <div className="print-page">
+            <ComparativoTabela
+              vwData={acumuladoData.vw}
+              audiData={acumuladoData.audi}
+              periodLabel={acumuladoLabel}
+            />
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 // ─── Sub-aba Resultado Ajustado ───────────────────────────────────────────────
 function ResultadoAjustadoTab() {
   return (
@@ -479,6 +597,7 @@ interface Props { year: number; month: number; }
 
 export function ComparativoMarcasTab({ year, month }: Props) {
   const [subTab, setSubTab] = useState<SubTab>('resultado');
+  const [resultadoPeriodo, setResultadoPeriodo] = useState<ResultadoPeriodo>('mensal');
 
   const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const periodLabel = month === 0
@@ -516,10 +635,31 @@ export function ComparativoMarcasTab({ year, month }: Props) {
         </div>
 
         {/* Conteúdo */}
-        {subTab === 'resultado'
-          ? <ResultadoTab year={year} month={month} />
-          : <ResultadoAjustadoTab />
-        }
+        {subTab === 'resultado' ? (
+          <>
+            <div className="flex gap-2">
+              {([
+                ['mensal', 'Mensal'],
+                ['acumulado', 'Acumulado'],
+              ] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setResultadoPeriodo(id)}
+                  className={`px-4 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                    resultadoPeriodo === id
+                      ? 'text-white shadow-sm border-transparent bg-slate-700'
+                      : 'text-slate-500 bg-white border-slate-200 hover:bg-slate-50 hover:text-slate-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <ResultadoTab year={year} month={month} periodo={resultadoPeriodo} />
+          </>
+        ) : (
+          <ResultadoAjustadoTab />
+        )}
 
       </div>
     </div>
