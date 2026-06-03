@@ -23,8 +23,8 @@ interface DiagnostivoTabProps {
 }
 
 type MarcaTab = 'vw' | 'audi';
-type BaseComparacao = 'acumulada' | 'mes-anterior';
 type RadarLevel = 'ok' | 'yellow' | 'red' | 'na';
+type FiltroSeveridade = 'all' | 'red' | 'yellow';
 
 type DepartamentoTab = { id: string; label: string };
 
@@ -169,13 +169,40 @@ function hasDeptData(dept: Record<string, string>): boolean {
   return Object.values(dept).some(v => v !== '');
 }
 
-function getBaseIndices(i: number, base: BaseComparacao): number[] {
+function getBaseIndices(i: number): number[] {
   if (i === 0) return [];
-  return base === 'mes-anterior' ? [i - 1] : Array.from({ length: i }, (_, k) => k);
+  return [i - 1];
 }
 
 function isDeptSpecific(id: string): boolean {
   return !['resumo-geral', 'ajustes'].includes(id);
+}
+
+function isContaDespesa(conta: string): boolean {
+  return /custo|despesa/i.test(conta);
+}
+
+function labelImpacto(conta: string, impacto: number): string {
+  if (impacto === 0) return 'neutro';
+  const despesa = isContaDespesa(conta);
+  const desfavoravel = despesa ? impacto > 0 : impacto < 0;
+  return desfavoravel ? 'desfavoravel' : 'favoravel';
+}
+
+function causaProvavel(conta: string): string {
+  if (/vendas|volume/i.test(conta)) return 'Volume/comercial';
+  if (/pessoal|terceiros/i.test(conta)) return 'Equipe e prestadores';
+  if (/ocupacao|funcionamento/i.test(conta)) return 'Estrutura fixa';
+  if (/custo operacional/i.test(conta)) return 'Custo direto da operacao';
+  return 'Operacao do departamento';
+}
+
+function variacaoTexto(mom: number | null): string {
+  if (mom == null) return 'Sem base de variacao m/m';
+  if (Math.abs(mom) < 0.05) return 'Estavel vs mes anterior';
+  return mom > 0
+    ? `Subiu ${pct(mom)} vs mes anterior`
+    : `Caiu ${pct(Math.abs(mom))} vs mes anterior`;
 }
 
 function buildDeptFromExec(dreData: any[] | null, monthIndex: number): Record<string, string> {
@@ -198,10 +225,10 @@ function buildDeptFromExec(dreData: any[] | null, monthIndex: number): Record<st
 export function DiagnostivoTab({ year, month }: DiagnostivoTabProps) {
   const [marcaTab, setMarcaTab] = useState<MarcaTab>('vw');
   const [departamentoAtivo, setDepartamentoAtivo] = useState('resumo-geral');
-  const [baseComparacao, setBaseComparacao] = useState<BaseComparacao>('acumulada');
   const [limiteSigma, setLimiteSigma] = useState(1.3);
   const [limiteVertical, setLimiteVertical] = useState(0.1);
   const [limiteMoM, setLimiteMoM] = useState(20);
+  const [filtroSeveridade, setFiltroSeveridade] = useState<FiltroSeveridade>('all');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editando, setEditando] = useState(false);
@@ -210,8 +237,13 @@ export function DiagnostivoTab({ year, month }: DiagnostivoTabProps) {
   const [hoverCell, setHoverCell] = useState<string | null>(null);
 
   const selectedMonth = month === 0 ? 12 : month;
+  const currentMonthIdx = selectedMonth - 1;
+  const previousMonthIdx = currentMonthIdx > 0 ? currentMonthIdx - 1 : null;
   const visibleMonthIdx = useMemo(() => Array.from({ length: selectedMonth }, (_, i) => i), [selectedMonth]);
   const periodLabel = month === 0 ? `Ano ${year}` : `${MONTHS_LABEL[month - 1]}/${year}`;
+  const comparacaoLabel = previousMonthIdx == null
+    ? `Sem base comparativa para ${MONTHS_LABEL[currentMonthIdx]}/${year}`
+    : `Comparando ${MONTHS_LABEL[currentMonthIdx]}/${year} com ${MONTHS_LABEL[previousMonthIdx]}/${year}`;
 
   const departments = marcaTab === 'vw' ? VW_DEPARTMENTS : AUDI_DEPARTMENTS;
 
@@ -322,7 +354,7 @@ export function DiagnostivoTab({ year, month }: DiagnostivoTabProps) {
 
       const valsAbs = line.vals.map(v => Math.abs(v));
       const cells: RadarCell[] = line.vals.map((_, i) => {
-        const baseIdx = getBaseIndices(i, baseComparacao);
+        const baseIdx = getBaseIndices(i);
 
         if (!baseIdx.length) {
           return {
@@ -377,6 +409,8 @@ export function DiagnostivoTab({ year, month }: DiagnostivoTabProps) {
             deltaVert: cell.deltaVert,
             val: cell.val,
             base: cell.base,
+            monthIdx: visibleMonthIdx[i],
+            impacto: cell.val - cell.base,
             severidade: Math.abs(cell.z) + Math.abs(cell.deltaVert) * 2 + (cell.level === 'red' ? 5 : 0),
           })),
       )
@@ -403,7 +437,19 @@ export function DiagnostivoTab({ year, month }: DiagnostivoTabProps) {
     });
 
     return { linhas: analisadas, alertas, mcVals, mcPct, mcVar, decomp };
-  }, [rows, marcaTab, departamentoAtivo, activeDeptKey, visibleMonthIdx, baseComparacao, limiteSigma, limiteVertical, limiteMoM]);
+  }, [rows, marcaTab, departamentoAtivo, activeDeptKey, visibleMonthIdx, limiteSigma, limiteVertical, limiteMoM]);
+
+  const alertasMesAtual = useMemo(() => {
+    const base = (radar?.alertas ?? []).filter(a => a.monthIdx === currentMonthIdx);
+    if (filtroSeveridade === 'all') return base;
+    return base.filter(a => a.level === filtroSeveridade);
+  }, [radar, currentMonthIdx, filtroSeveridade]);
+
+  const topAlertasMesAtual = alertasMesAtual.slice(0, 5);
+  const alertasOcultos = Math.max(alertasMesAtual.length - topAlertasMesAtual.length, 0);
+  const impactoLiquido = alertasMesAtual.reduce((sum, a) => sum + a.impacto, 0);
+  const impactoAbsoluto = alertasMesAtual.reduce((sum, a) => sum + Math.abs(a.impacto), 0);
+  const qtdCriticos = alertasMesAtual.filter(a => a.level === 'red').length;
 
   async function saveEditedMonth(monthIdx: number) {
     if (!isDeptSpecific(departamentoAtivo)) return;
@@ -519,17 +565,10 @@ export function DiagnostivoTab({ year, month }: DiagnostivoTabProps) {
           ) : (
             <div className="p-4 flex flex-col gap-5">
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 flex flex-wrap items-end gap-4 text-xs">
-                <label className="flex flex-col gap-1">
-                  <span className="font-semibold text-slate-600">Base de comparação</span>
-                  <select
-                    value={baseComparacao}
-                    onChange={e => setBaseComparacao(e.target.value as BaseComparacao)}
-                    className="border border-slate-200 rounded-md px-2 py-1 text-sm"
-                  >
-                    <option value="acumulada">Média acumulada (Jan até mês anterior)</option>
-                    <option value="mes-anterior">Mês anterior</option>
-                  </select>
-                </label>
+                <div className="flex flex-col gap-1 min-w-[280px]">
+                  <span className="font-semibold text-slate-600">Base de comparação fixa</span>
+                  <span className="text-sm text-slate-700">{comparacaoLabel}</span>
+                </div>
 
                 <label className="flex flex-col gap-1 min-w-[180px]">
                   <span className="font-semibold text-slate-600">Sensibilidade σ: {limiteSigma.toFixed(1)}</span>
@@ -558,15 +597,54 @@ export function DiagnostivoTab({ year, month }: DiagnostivoTabProps) {
 
               {saving && <div className="text-xs text-emerald-700 font-medium">Salvando alterações...</div>}
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                  <div className="text-[11px] text-slate-500 uppercase tracking-wide">Impacto liquido do filtro</div>
+                  <div className={`text-lg font-bold ${impactoLiquido >= 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+                    {impactoLiquido >= 0 ? '+' : ''}R$ {fmt(impactoLiquido)}
+                  </div>
+                </div>
+                <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                  <div className="text-[11px] text-slate-500 uppercase tracking-wide">Impacto absoluto</div>
+                  <div className="text-lg font-bold text-slate-800">R$ {fmt(impactoAbsoluto)}</div>
+                </div>
+                <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                  <div className="text-[11px] text-slate-500 uppercase tracking-wide">Alertas criticos</div>
+                  <div className="text-lg font-bold text-slate-800">{qtdCriticos}</div>
+                </div>
+              </div>
+
               <div>
-                <h3 className="text-lg font-bold text-slate-800 mb-3">Alertas priorizados</h3>
-                {!radar || radar.alertas.length === 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <h3 className="text-lg font-bold text-slate-800">Top 5 alertas do mes</h3>
+                  <div className="flex items-center gap-1">
+                    {([
+                      { id: 'all', label: 'Todos' },
+                      { id: 'red', label: 'Criticos' },
+                      { id: 'yellow', label: 'Atencao' },
+                    ] as const).map(op => (
+                      <button
+                        key={op.id}
+                        onClick={() => setFiltroSeveridade(op.id)}
+                        className={`px-2.5 py-1 text-xs rounded-md border ${
+                          filtroSeveridade === op.id
+                            ? 'bg-slate-800 text-white border-slate-800'
+                            : 'bg-white text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {op.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {!radar || alertasMesAtual.length === 0 ? (
                   <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                    Nenhuma anomalia acima dos limites configurados.
+                    Nenhuma anomalia acima dos limites configurados para {MONTHS_LABEL[currentMonthIdx]}/{year}.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {radar.alertas.map((a, idx) => (
+                  <>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {topAlertasMesAtual.map((a, idx) => (
                       <div
                         key={idx}
                         className="rounded-md border px-3 py-2"
@@ -577,13 +655,31 @@ export function DiagnostivoTab({ year, month }: DiagnostivoTabProps) {
                           <span className="text-xs text-slate-500">{a.mes}</span>
                         </div>
                         <div className="text-xs text-slate-700 mt-1">
-                          {a.mom != null && <>Variação m/m: <b>{pct(a.mom)}</b> · </>}
-                          z-score: <b>{a.z.toFixed(1)}σ</b> · Δ vertical: <b>{a.deltaVert >= 0 ? '+' : ''}{a.deltaVert.toFixed(2)} p.p.</b>
-                          <div className="text-[11px] text-slate-600 mt-0.5">R$ {fmt(a.val)} vs esperado R$ {fmt(a.base)}</div>
+                          <div>
+                            <b>{variacaoTexto(a.mom)}</b>
+                          </div>
+                          <div>
+                            Impacto no resultado: <b className={labelImpacto(a.conta, a.impacto) === 'desfavoravel' ? 'text-red-700' : 'text-emerald-700'}>
+                              {a.impacto >= 0 ? '+' : ''}R$ {fmt(a.impacto)} ({labelImpacto(a.conta, a.impacto)})
+                            </b>
+                          </div>
+                          <div>
+                            Causa provavel: <b>{causaProvavel(a.conta)}</b>
+                          </div>
+                          <div className="text-[11px] text-slate-600 mt-0.5">
+                            Atual R$ {fmt(a.val)} vs base ({previousMonthIdx == null ? 'sem base' : `${MONTHS_LABEL[previousMonthIdx]}/${year}`}) R$ {fmt(a.base)} · Impacto {a.impacto >= 0 ? '+' : ''}R$ {fmt(a.impacto)}
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-0.5">
+                            Sinal tecnico: z {a.z.toFixed(1)}σ · delta vertical {a.deltaVert >= 0 ? '+' : ''}{a.deltaVert.toFixed(2)} p.p.
+                          </div>
                         </div>
                       </div>
                     ))}
-                  </div>
+                    </div>
+                    {alertasOcultos > 0 && (
+                      <div className="mt-2 text-xs text-slate-500">+ {alertasOcultos} alerta(s) menor(es) oculto(s) para simplificar a leitura.</div>
+                    )}
+                  </>
                 )}
               </div>
 
