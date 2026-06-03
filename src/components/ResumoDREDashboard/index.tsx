@@ -16,12 +16,13 @@ import { ReceitaVendasEvolucaoTab } from './ReceitaVendasEvolucaoTab';
 import { VolumeVendasEvolucaoTab } from './VolumeVendasEvolucaoTab';
 import { ComparativoMarcasTab } from './ComparativoMarcasTab';
 import { ResumoMarcasTab } from './ResumoMarcasTab';
+import { DiagnostivoTab } from './DiagnostivoTab';
 
 interface ResumoDREDashboardProps {
   onChangeBrand: () => void;
 }
 
-type TabId = 'comparativo-marcas' | 'resumo-marcas' | 'vw' | 'audi' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos' | 'mensal' | 'saidas-caixa' | 'endividamento-dre' | 'analise-evolucao' | 'receita-evolucao' | 'volume-evolucao';
+type TabId = 'comparativo-marcas' | 'resumo-marcas' | 'vw' | 'audi' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos' | 'mensal' | 'saidas-caixa' | 'endividamento-dre' | 'analise-evolucao' | 'receita-evolucao' | 'volume-evolucao' | 'diagnostivo';
 
 const TABS: { id: TabId; label: string; color: string; activeColor: string }[] = [
   { id: 'comparativo-marcas',    label: 'Comparativo Marcas',    color: '#334155', activeColor: '#1e293b' },
@@ -38,6 +39,7 @@ const TABS: { id: TabId; label: string; color: string; activeColor: string }[] =
   { id: 'analise-evolucao',       label: 'Evolução Despesas',      color: '#0f766e', activeColor: '#0d6660' },
   { id: 'receita-evolucao',        label: 'Evolução Receita',       color: '#0369a1', activeColor: '#025d91' },
   { id: 'volume-evolucao',          label: 'Evolução Volume',         color: '#6d28d9', activeColor: '#5b21b6' },
+  { id: 'diagnostivo',             label: 'Diagnostivo',            color: '#334155', activeColor: '#1e293b' },
 ];
 
 const MONTHS_LABEL = [
@@ -200,6 +202,8 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
           <ReceitaVendasEvolucaoTab year={year} month={month} />
         ) : activeTab === 'volume-evolucao' ? (
           <VolumeVendasEvolucaoTab year={year} month={month} />
+        ) : activeTab === 'diagnostivo' ? (
+          <DiagnostivoTab year={year} month={month} />
         ) : (
           <EndividamentoDRETab year={year} month={month} />
         )}
