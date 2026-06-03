@@ -15,15 +15,17 @@ import { AnaliseDespesasEvolucaoTab } from './AnaliseDespesasEvolucaoTab';
 import { ReceitaVendasEvolucaoTab } from './ReceitaVendasEvolucaoTab';
 import { VolumeVendasEvolucaoTab } from './VolumeVendasEvolucaoTab';
 import { ComparativoMarcasTab } from './ComparativoMarcasTab';
+import { ResumoMarcasTab } from './ResumoMarcasTab';
 
 interface ResumoDREDashboardProps {
   onChangeBrand: () => void;
 }
 
-type TabId = 'comparativo-marcas' | 'vw' | 'audi' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos' | 'mensal' | 'saidas-caixa' | 'endividamento-dre' | 'analise-evolucao' | 'receita-evolucao' | 'volume-evolucao';
+type TabId = 'comparativo-marcas' | 'resumo-marcas' | 'vw' | 'audi' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos' | 'mensal' | 'saidas-caixa' | 'endividamento-dre' | 'analise-evolucao' | 'receita-evolucao' | 'volume-evolucao';
 
 const TABS: { id: TabId; label: string; color: string; activeColor: string }[] = [
   { id: 'comparativo-marcas',    label: 'Comparativo Marcas',    color: '#334155', activeColor: '#1e293b' },
+  { id: 'resumo-marcas',         label: 'Resumo',                color: '#334155', activeColor: '#1e293b' },
   { id: 'vw',                    label: 'VW',                    color: '#001e50', activeColor: '#001e50' },
   { id: 'vw-graficos',           label: 'VW Gráficos',           color: '#001e50', activeColor: '#001233' },
   { id: 'audi',                  label: 'Audi',                  color: '#bb0a30', activeColor: '#bb0a30' },
@@ -174,6 +176,8 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {activeTab === 'comparativo-marcas' ? (
           <ComparativoMarcasTab year={year} month={month} />
+        ) : activeTab === 'resumo-marcas' ? (
+          <ResumoMarcasTab year={year} month={month} />
         ) : activeTab === 'vw' ? (
           <VwDreTab year={year} month={month} diasUteis={diasUteis} />
         ) : activeTab === 'vw-graficos' ? (
