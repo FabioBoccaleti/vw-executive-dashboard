@@ -209,6 +209,17 @@ function sumAudiDepts(row: DreAudiRow, field: keyof DreAudiDept): number {
   return AUDI_DEPTS.reduce((s, dk) => s + parseVal(row[dk][field as keyof DreAudiDept]), 0);
 }
 
+function sumMonthlyDeptValues<TDeptKey extends string, TDept extends Record<string, string>>(
+  deptKeys: readonly TDeptKey[],
+  deptValues: Partial<Record<TDeptKey, TDept>>,
+  field: keyof DreVwDept,
+): number {
+  return deptKeys.reduce((sum, deptKey) => {
+    if (field === 'receitaOperacionalLiquida' && deptKey === 'adm') return sum;
+    return sum + parseVal(deptValues[deptKey]?.[field]);
+  }, 0);
+}
+
 // ─── Tabela de Evolução Mensal ────────────────────────────────────────────────
 
 interface EvolucaoMensalTableProps {
@@ -357,7 +368,7 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
         const totals = Object.fromEntries(
           DEPT_FIELDS.map(f => [
             f,
-            VW_DEPTS.reduce((s, dk) => s + parseVal(deptValues[dk]?.[f]), 0),
+            sumMonthlyDeptValues(VW_DEPTS, deptValues, f),
           ])
         ) as Record<keyof DreVwDept, number>;
 
@@ -406,7 +417,7 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
         const totals = Object.fromEntries(
           DEPT_FIELDS.map(f => [
             f,
-            AUDI_DEPTS.reduce((s, dk) => s + parseVal((deptValues[dk] as any)?.[f]), 0),
+            sumMonthlyDeptValues(AUDI_DEPTS, deptValues as Partial<Record<AudiDeptKey, DreVwDept>>, f),
           ])
         ) as Record<keyof DreVwDept, number>;
 

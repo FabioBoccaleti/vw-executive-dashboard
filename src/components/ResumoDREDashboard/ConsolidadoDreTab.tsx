@@ -1102,8 +1102,13 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreVwRow; dep
               <tr key={idx} className={line.isTotal ? 'con-row-total' : ''} style={rowStyle}>
                 <td style={{ padding: `2px ${line.indent ? '14px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
                 {DEPTS.map(d => {
+                  const isAdmROL = d.key === 'adm' && line.field === 'receitaOperacionalLiquida';
                   const val = data[d.key][line.field];
-                  const display = isQuant ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—') : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
+                  const display = isAdmROL
+                    ? '0,00'
+                    : isQuant
+                      ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
+                      : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
                   return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{display}</td>;
                 })}
                 <td className={line.isTotal ? 'con-cell-total' : ''}
@@ -1114,7 +1119,12 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreVwRow; dep
                 >
                   {isQuant
                     ? (() => { const t = deptList.reduce((s, dep) => s + (parseInt(dep.quant) || 0), 0); return t > 0 ? t.toString() : '—'; })()
-                    : (() => { const s = sumDeptsArr(deptList, line.field); return s ? fmtNum(s) : '—'; })()
+                    : (() => {
+                        const s = line.field === 'receitaOperacionalLiquida'
+                          ? DEPTS.reduce((acc, dept) => dept.key === 'adm' ? acc : acc + parseVal(data[dept.key][line.field]), 0)
+                          : parseVal(sumDeptsArr(deptList, line.field));
+                        return s !== 0 ? s.toLocaleString('pt-BR') : '—';
+                      })()
                   }
                 </td>
               </tr>
