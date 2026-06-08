@@ -595,8 +595,8 @@ function ResumoTable({
                 return (
                   <tr key={idx} className="border-b border-slate-100 bg-slate-50/50 text-slate-500">
                     <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic">{line.label}</td>
-                    {DEPTS.map(d => <td key={d.key} className="px-3 py-0.5 text-right text-[0.68rem] italic">{pctStr(parseVal(data[d.key][line.field]), parseVal(data[d.key].receitaOperacionalLiquida))}</td>)}
-                    <td className="px-3 py-0.5 text-right bg-slate-50 text-[0.68rem] italic font-medium">{pctStr(_vT, _rT)}</td>
+                    {DEPTS.map(d => <td key={d.key} className="px-3 py-0.5 text-center text-[0.68rem] italic">{pctStr(parseVal(data[d.key][line.field]), parseVal(data[d.key].receitaOperacionalLiquida))}</td>)}
+                    <td className="px-3 py-0.5 text-center bg-slate-50 text-[0.68rem] italic font-medium">{pctStr(_vT, _rT)}</td>
                   </tr>
                 );
               }
@@ -621,13 +621,13 @@ function ResumoTable({
                       ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
                       : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
                     return (
-                      <td key={d.key} className="px-3 py-1.5 text-right">
+                      <td key={d.key} className="px-3 py-1.5 text-center">
                         {display}
                       </td>
                     );
                   })}
                   {/* Total */}
-                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-black' : 'bg-slate-50 text-black'}`} style={line.isTotal ? {backgroundColor:'#9a0827'} : undefined}>
+                  <td className={`px-3 py-1.5 text-center font-semibold ${line.isTotal ? 'text-black' : 'bg-slate-50 text-black'}`} style={line.isTotal ? {backgroundColor:'#9a0827'} : undefined}>
                     {isQuant
                       ? (() => {
                           const t = deptList.reduce((s, dep) => s + (parseInt(dep.quant) || 0), 0);
@@ -713,10 +713,10 @@ function DeptTable({
                 return (
                   <tr key={idx} className="border-b border-slate-100 bg-slate-50/50 text-slate-500">
                     <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic">{line.label}</td>
-                    {prevDepts.map((pd, pi) => <td key={pi} className="px-3 py-0.5 text-right text-[0.68rem] italic">{pctStr(parseVal(pd[line.field]), parseVal(pd.receitaOperacionalLiquida))}</td>)}
-                    <td className="px-2 py-0.5 text-right text-[0.68rem] italic">{pctStr(parseVal(dept[line.field]), parseVal(dept.receitaOperacionalLiquida))}</td>
-                    <td className="px-2 py-0.5 text-right text-[0.68rem] border-l border-slate-200">—</td>
-                    <td className="px-3 py-0.5 text-right bg-slate-50 text-[0.68rem] italic font-medium">{pctStr(_val, _rol)}</td>
+                    {prevDepts.map((pd, pi) => <td key={pi} className="px-3 py-0.5 text-center text-[0.68rem] italic">{pctStr(parseVal(pd[line.field]), parseVal(pd.receitaOperacionalLiquida))}</td>)}
+                    <td className="px-2 py-0.5 text-center text-[0.68rem] italic">{pctStr(parseVal(dept[line.field]), parseVal(dept.receitaOperacionalLiquida))}</td>
+                    <td className="px-2 py-0.5 text-center text-[0.68rem] border-l border-slate-200">—</td>
+                    <td className="px-3 py-0.5 text-center bg-slate-50 text-[0.68rem] italic font-medium">{pctStr(_val, _rol)}</td>
                   </tr>
                 );
               }
@@ -776,14 +776,14 @@ function DeptTable({
                       ? (num > 0 ? num.toString() : '—')
                       : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
                     return (
-                      <td key={pi} className={`px-3 py-1.5 text-right ${line.isTotal ? 'text-black' : 'text-black'}`}>
+                      <td key={pi} className={`px-3 py-1.5 text-center ${line.isTotal ? 'text-black' : 'text-black'}`}>
                         {display}
                       </td>
                     );
                   })}
-                  <td className="px-2 py-1 text-right">
+                  <td className="px-2 py-1 text-center">
                     {isAdmROL
-                      ? <span className="block w-full text-right px-1 py-0.5 min-w-[5rem]">0,00</span>
+                      ? <span className="block w-full text-center px-1 py-0.5 min-w-[5rem]">0,00</span>
                       : <EditableCell
                           value={dept[line.field]}
                           onChange={v => onChange(line.field, v)}
@@ -793,10 +793,10 @@ function DeptTable({
                         />
                     }
                   </td>
-                  <td className={`px-2 py-1.5 text-right text-[0.68rem] border-l border-slate-200 text-black`}>
+                  <td className={`px-2 py-1.5 text-center text-[0.68rem] border-l border-slate-200 text-black`}>
                     {varMM || '—'}
                   </td>
-                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-black' : 'bg-slate-50 text-black'}`} style={line.isTotal ? {backgroundColor:'#9a0827'} : undefined}>
+                  <td className={`px-3 py-1.5 text-center font-semibold ${line.isTotal ? 'text-black' : 'bg-slate-50 text-black'}`} style={line.isTotal ? {backgroundColor:'#9a0827'} : undefined}>
                     {totalStr}
                   </td>
                 </tr>
@@ -898,12 +898,12 @@ function AjustesTable({
               {DEPTS.map(d => {
                 const v = data[d.key].lucroLiquidoExercicio;
                 return (
-                  <td key={d.key} className="px-3 py-1.5 text-right">
+                  <td key={d.key} className="px-3 py-1.5 text-center">
                     {v ? fmtNum(v) : '—'}
                   </td>
                 );
               })}
-              <td className="px-3 py-1.5 text-right" style={{backgroundColor:'#9a0827'}}>
+              <td className="px-3 py-1.5 text-center" style={{backgroundColor:'#9a0827'}}>
                 {totalLiquido ? fmtNum(totalLiquido) : '—'}
               </td>
             </tr>
@@ -947,7 +947,7 @@ function AjustesTable({
                   </td>
                   {/* Valores por departamento */}
                   {DEPTS.map(d => (
-                    <td key={d.key} className="px-2 py-1 text-right">
+                    <td key={d.key} className="px-2 py-1 text-center">
                       <EditableCell
                         value={row.values[d.key]}
                         onChange={v => onChange(row.id, d.key, v)}
@@ -955,7 +955,7 @@ function AjustesTable({
                     </td>
                   ))}
                   {/* Total da linha */}
-                  <td className="px-3 py-1.5 text-right bg-slate-50 text-slate-700 font-semibold">
+                  <td className="px-3 py-1.5 text-center bg-slate-50 text-slate-700 font-semibold">
                     {rowTotal !== 0 ? rowTotal.toLocaleString('pt-BR') : '—'}
                   </td>
                 </tr>
@@ -971,12 +971,12 @@ function AjustesTable({
                 const adj = ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0);
                 const total = liq + adj;
                 return (
-                  <td key={d.key} className="px-3 py-2 text-right">
+                  <td key={d.key} className="px-3 py-2 text-center">
                     {total !== 0 ? total.toLocaleString('pt-BR') : '—'}
                   </td>
                 );
               })}
-              <td className="px-3 py-2 text-right" style={{backgroundColor:'#9a0827'}}>
+              <td className="px-3 py-2 text-center" style={{backgroundColor:'#9a0827'}}>
                 {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}
               </td>
             </tr>
@@ -1031,8 +1031,8 @@ function AudiEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreAudi
               if (line.isPct) return (
                 <tr key={idx} className="border-b border-slate-100 bg-slate-50/50 text-slate-500">
                   <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic">{line.label}</td>
-                  {monthlyTotals.map((mt, mi) => <td key={mi} className="px-2 py-0.5 text-right text-[0.68rem] italic">{pctStr(mt[line.field] ?? 0, mt.receitaOperacionalLiquida ?? 0)}</td>)}
-                  <td className="px-3 py-0.5 text-right bg-slate-50 text-[0.68rem] italic font-medium">{pctStr(annualTotal[line.field] ?? 0, annualTotal.receitaOperacionalLiquida ?? 0)}</td>
+                  {monthlyTotals.map((mt, mi) => <td key={mi} className="px-2 py-0.5 text-center text-[0.68rem] italic">{pctStr(mt[line.field] ?? 0, mt.receitaOperacionalLiquida ?? 0)}</td>)}
+                  <td className="px-3 py-0.5 text-center bg-slate-50 text-[0.68rem] italic font-medium">{pctStr(annualTotal[line.field] ?? 0, annualTotal.receitaOperacionalLiquida ?? 0)}</td>
                 </tr>
               );
               const isQuant = line.field === 'quant' && idx === 0;
@@ -1043,9 +1043,9 @@ function AudiEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreAudi
                   {monthlyTotals.map((mt, mi) => {
                     const val = mt[line.field] ?? 0;
                     const display = isQuant ? (Math.round(val) > 0 ? Math.round(val).toString() : '—') : (val !== 0 ? val.toLocaleString('pt-BR') : '—');
-                    return <td key={mi} className="px-2 py-1.5 text-right">{display}</td>;
+                    return <td key={mi} className="px-2 py-1.5 text-center">{display}</td>;
                   })}
-                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? '' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: '#9a0827' } : undefined}>
+                  <td className={`px-3 py-1.5 text-center font-semibold ${line.isTotal ? '' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: '#9a0827' } : undefined}>
                     {(() => { const v = annualTotal[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—'); })()}
                   </td>
                 </tr>
@@ -1088,9 +1088,9 @@ function AudiDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
               if (line.isPct) return (
                 <tr key={idx} className="border-b border-slate-100 bg-slate-50/50 text-slate-500">
                   <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic">{line.label}</td>
-                  {allMonthRows.map((row, mi) => <td key={mi} className="px-2 py-0.5 text-right text-[0.68rem] italic">{isAdm ? '—' : pctStr(parseVal(row[deptKey][line.field]), parseVal(row[deptKey].receitaOperacionalLiquida))}</td>)}
-                  <td className="px-2 py-0.5 text-right text-[0.68rem] border-l border-slate-200">—</td>
-                  <td className="px-3 py-0.5 text-right bg-slate-50 text-[0.68rem] italic font-medium">{isAdm ? '—' : pctStr(annualTotals[line.field] ?? 0, annualTotals.receitaOperacionalLiquida ?? 0)}</td>
+                  {allMonthRows.map((row, mi) => <td key={mi} className="px-2 py-0.5 text-center text-[0.68rem] italic">{isAdm ? '—' : pctStr(parseVal(row[deptKey][line.field]), parseVal(row[deptKey].receitaOperacionalLiquida))}</td>)}
+                  <td className="px-2 py-0.5 text-center text-[0.68rem] border-l border-slate-200">—</td>
+                  <td className="px-3 py-0.5 text-center bg-slate-50 text-[0.68rem] italic font-medium">{isAdm ? '—' : pctStr(annualTotals[line.field] ?? 0, annualTotals.receitaOperacionalLiquida ?? 0)}</td>
                 </tr>
               );
               const isQuant = line.field === 'quant' && idx === 0;
@@ -1105,10 +1105,10 @@ function AudiDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
                   {allMonthRows.map((row, mi) => {
                     const v = isAdmROL ? 0 : isQuant ? (parseInt(String(row[deptKey][line.field])) || 0) : parseVal(row[deptKey][line.field]);
-                    return <td key={mi} className="px-2 py-1.5 text-right">{isAdmROL ? '0,00' : isQuant ? (v > 0 ? v.toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—')}</td>;
+                    return <td key={mi} className="px-2 py-1.5 text-center">{isAdmROL ? '0,00' : isQuant ? (v > 0 ? v.toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—')}</td>;
                   })}
-                  <td className="px-2 py-1.5 text-right text-[0.68rem] border-l border-slate-200">{varMM || '—'}</td>
-                  <td className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? '' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: '#9a0827' } : undefined}>
+                  <td className="px-2 py-1.5 text-center text-[0.68rem] border-l border-slate-200">{varMM || '—'}</td>
+                  <td className={`px-3 py-1.5 text-center font-semibold ${line.isTotal ? '' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: '#9a0827' } : undefined}>
                     {(() => { const v = isAdmROL ? 0 : annualTotals[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—'); })()}
                   </td>
                 </tr>
@@ -1233,8 +1233,8 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
               return (
                 <tr key={idx} style={{ backgroundColor: '#f8fafc', color: '#64748b', borderBottom: '1px solid #f1f5f9', fontStyle: 'italic' }}>
                   <td style={{ padding: '2px 16px', fontSize: '6.5pt' }}>{line.label}</td>
-                  {DEPTS.map(d => <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px', fontSize: '6.5pt' }}>{pctStr(parseVal(data[d.key][line.field]), parseVal(data[d.key].receitaOperacionalLiquida))}</td>)}
-                  <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#374151', fontSize: '6.5pt' }}>{pctStr(_vT, _rT)}</td>
+                  {DEPTS.map(d => <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontSize: '6.5pt' }}>{pctStr(parseVal(data[d.key][line.field]), parseVal(data[d.key].receitaOperacionalLiquida))}</td>)}
+                  <td style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#374151', fontSize: '6.5pt' }}>{pctStr(_vT, _rT)}</td>
                 </tr>
               );
             }
@@ -1248,8 +1248,8 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
               ? { backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'black', borderBottom: '1px solid #f1f5f9' }
               : { backgroundColor: rowBg, color: rowColor, borderBottom: '1px solid #f1f5f9' };
             const totalCellStyle: React.CSSProperties = line.isTotal
-              ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827', color: 'black' }
-              : { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111111' };
+              ? { textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827', color: 'black' }
+              : { textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111111' };
             return (
               <tr key={idx} className={line.isTotal ? 'dre-row-total' : ''} style={rowStyle}>
                 <td style={{ padding: `2px ${line.indent ? '16px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
@@ -1258,7 +1258,7 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
                   const display = isQuant
                     ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
                     : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
-                  return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{display}</td>;
+                  return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{display}</td>;
                 })}
                 <td className={line.isTotal ? 'dre-cell-total' : ''} style={totalCellStyle}>{totalVal}</td>
               </tr>
@@ -1308,10 +1308,10 @@ function PrintDeptTable({
               return (
                 <tr key={idx} style={{ backgroundColor: '#f8fafc', color: '#64748b', borderBottom: '1px solid #f1f5f9', fontStyle: 'italic' }}>
                   <td style={{ padding: '2px 14px', fontSize: '6.5pt' }}>{line.label}</td>
-                  {prevDepts.map((pd, pi) => <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', fontSize: '6.5pt' }}>{_isAdm ? '—' : pctStr(parseVal(pd[line.field]), parseVal(pd.receitaOperacionalLiquida))}</td>)}
-                  <td style={{ textAlign: 'right', padding: '2px 4px', fontSize: '6.5pt' }}>{_isAdm ? '—' : pctStr(parseVal(dept[line.field]), parseVal(dept.receitaOperacionalLiquida))}</td>
-                  <td style={{ textAlign: 'right', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', fontSize: '6.5pt' }}>—</td>
-                  <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#374151', fontSize: '6.5pt' }}>—</td>
+                  {prevDepts.map((pd, pi) => <td key={pi} style={{ textAlign: 'center', padding: '2px 4px', fontSize: '6.5pt' }}>{_isAdm ? '—' : pctStr(parseVal(pd[line.field]), parseVal(pd.receitaOperacionalLiquida))}</td>)}
+                  <td style={{ textAlign: 'center', padding: '2px 4px', fontSize: '6.5pt' }}>{_isAdm ? '—' : pctStr(parseVal(dept[line.field]), parseVal(dept.receitaOperacionalLiquida))}</td>
+                  <td style={{ textAlign: 'center', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', fontSize: '6.5pt' }}>—</td>
+                  <td style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#374151', fontSize: '6.5pt' }}>—</td>
                 </tr>
               );
             }
@@ -1344,8 +1344,8 @@ function PrintDeptTable({
               ? { backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'black', borderBottom: '1px solid #f1f5f9' }
               : { backgroundColor: rowBg, color: rowColor, borderBottom: '1px solid #f1f5f9' };
             const deptTotalCellStyle: React.CSSProperties = line.isTotal
-              ? { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827', color: 'black' }
-              : { textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111111' };
+              ? { textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827', color: 'black' }
+              : { textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111111' };
             return (
               <tr key={idx} className={line.isTotal ? 'dre-row-total' : ''} style={deptRowStyle}>
                 <td style={{ padding: `2px ${line.indent ? '14px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
@@ -1354,16 +1354,16 @@ function PrintDeptTable({
                   const display = isAdmROL
                     ? '0,00'
                     : isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
-                  return <td key={pi} style={{ textAlign: 'right', padding: '2px 4px', color: '#111111', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{display}</td>;
+                  return <td key={pi} style={{ textAlign: 'center', padding: '2px 4px', color: '#111111', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{display}</td>;
                 })}
-                <td style={{ textAlign: 'right', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>
+                <td style={{ textAlign: 'center', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>
                   {isAdmROL
                     ? '0,00'
                     : isQuant
                     ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—')
                     : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')}
                 </td>
-                <td style={{ textAlign: 'right', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', color: '#111111', fontSize: '6.5pt' }}>{varMM || '—'}</td>
+                <td style={{ textAlign: 'center', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', color: '#111111', fontSize: '6.5pt' }}>{varMM || '—'}</td>
                 <td className={line.isTotal ? 'dre-cell-total' : ''} style={deptTotalCellStyle}>{totalStr}</td>
               </tr>
             );
@@ -1402,9 +1402,9 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
             <td style={{ padding: '2px 6px', fontWeight: 700 }}>Lucro Líquido do Exercício</td>
             {DEPTS.map(d => {
               const v = data[d.key].lucroLiquidoExercicio;
-              return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 700 }}>{v ? fmtNum(v) : '—'}</td>;
+              return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: 700 }}>{v ? fmtNum(v) : '—'}</td>;
             })}
-            <td className="dre-cell-total" style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827' }}>{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
+            <td className="dre-cell-total" style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827' }}>{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
           </tr>
           {/* Linhas dinâmicas */}
           {data.ajustes.map((row, i) => {
@@ -1413,11 +1413,11 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
               <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#111111' }}>
                 <td style={{ padding: '2px 14px' }}>{row.label || '—'}</td>
                 {DEPTS.map(d => (
-                  <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px' }}>
+                  <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px' }}>
                     {parseVal(row.values[d.key]) !== 0 ? parseVal(row.values[d.key]).toLocaleString('pt-BR') : '—'}
                   </td>
                 ))}
-                <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111111' }}>
+                <td style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111111' }}>
                   {rTotal !== 0 ? rTotal.toLocaleString('pt-BR') : '—'}
                 </td>
               </tr>
@@ -1430,9 +1430,9 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
               const liq = parseVal(data[d.key].lucroLiquidoExercicio);
               const adj = data.ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0);
               const total = liq + adj;
-              return <td key={d.key} style={{ textAlign: 'right', padding: '2px 4px', fontWeight: 700 }}>{total !== 0 ? total.toLocaleString('pt-BR') : '—'}</td>;
+              return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: 700 }}>{total !== 0 ? total.toLocaleString('pt-BR') : '—'}</td>;
             })}
-            <td className="dre-cell-total" style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827' }}>
+            <td className="dre-cell-total" style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827' }}>
               {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}
             </td>
           </tr>
@@ -1482,7 +1482,7 @@ function EditableCell({
         onChange={e => setDraft(e.target.value)}
         onBlur={commitEdit}
         onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
-        className={`w-full text-right bg-yellow-50 border border-yellow-300 rounded px-1 py-0.5 outline-none text-xs ${isTotal ? 'text-slate-800' : ''}`}
+        className={`w-full text-center bg-yellow-50 border border-yellow-300 rounded px-1 py-0.5 outline-none text-xs ${isTotal ? 'text-slate-800' : ''}`}
       />
     );
   }
@@ -1491,7 +1491,7 @@ function EditableCell({
     <span
       onClick={startEdit}
       title="Clique para editar"
-      className={`block w-full text-right cursor-pointer rounded px-1 py-0.5 hover:bg-yellow-50 hover:ring-1 hover:ring-yellow-200 transition-colors min-w-[5rem] ${
+      className={`block w-full text-center cursor-pointer rounded px-1 py-0.5 hover:bg-yellow-50 hover:ring-1 hover:ring-yellow-200 transition-colors min-w-[5rem] ${
         isTotal ? 'text-black' : ''
       } ${!value ? 'text-slate-300' : ''}`}
     >

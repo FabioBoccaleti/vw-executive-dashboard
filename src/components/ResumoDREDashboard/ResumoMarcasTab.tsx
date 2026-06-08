@@ -245,9 +245,9 @@ function ResumoTabela({ vwData, audiData, periodLabel, rootId, showPrintButton =
                 return (
                   <tr key={idx} className="border-b border-slate-100 bg-slate-50/50">
                     <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic text-slate-500">{line.label}</td>
-                    <td className="px-4 py-0.5 text-right text-[0.68rem] italic text-slate-500">{pctStr(vwVal, vwROL)}</td>
-                    <td className="px-4 py-0.5 text-right text-[0.68rem] italic text-slate-500">{pctStr(audiVal, audiROL)}</td>
-                    <td className="px-4 py-0.5 text-right text-[0.68rem] italic text-slate-500 bg-slate-50">{pctStr(totalVal, totalROL)}</td>
+                    <td className="px-4 py-0.5 text-center text-[0.68rem] italic text-slate-500">{pctStr(vwVal, vwROL)}</td>
+                    <td className="px-4 py-0.5 text-center text-[0.68rem] italic text-slate-500">{pctStr(audiVal, audiROL)}</td>
+                    <td className="px-4 py-0.5 text-center text-[0.68rem] italic text-slate-500 bg-slate-50">{pctStr(totalVal, totalROL)}</td>
                   </tr>
                 );
               }
@@ -272,19 +272,19 @@ function ResumoTabela({ vwData, audiData, periodLabel, rootId, showPrintButton =
                     {line.label}
                   </td>
                   <td
-                    className="px-4 py-1.5 text-right tabular-nums"
+                    className="px-4 py-1.5 text-center tabular-nums"
                     style={{ backgroundColor: line.isTotal ? VW_COLOR_DRK : undefined, color: line.isTotal ? 'white' : undefined }}
                   >
                     {fmtVal(vwVal)}
                   </td>
                   <td
-                    className="px-4 py-1.5 text-right tabular-nums"
+                    className="px-4 py-1.5 text-center tabular-nums"
                     style={{ backgroundColor: line.isTotal ? AUDI_COLOR_DRK : undefined, color: line.isTotal ? 'white' : undefined }}
                   >
                     {fmtVal(audiVal)}
                   </td>
                   <td
-                    className={`px-4 py-1.5 text-right tabular-nums font-medium bg-slate-50 ${line.isTotal ? 'text-white' : 'text-slate-700'}`}
+                    className={`px-4 py-1.5 text-center tabular-nums font-medium bg-slate-50 ${line.isTotal ? 'text-white' : 'text-slate-700'}`}
                     style={line.isTotal ? { backgroundColor: TOTAL_COLOR } : undefined}
                   >
                     {fmtVal(totalVal)}

@@ -251,8 +251,8 @@ function EvolucaoMensalTable({ title, subtitle, color, colorDrk, monthRows }: Ev
               if (line.isPct) return (
                 <tr key={idx} className="border-b border-slate-100 bg-slate-50/50 text-slate-500">
                   <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic">{line.label}</td>
-                  {monthRows.map((mr, mi) => <td key={mi} className="px-2 py-0.5 text-right text-[0.68rem] italic">{pctStr(mr.totals[line.field] ?? 0, mr.totals.receitaOperacionalLiquida ?? 0)}</td>)}
-                  <td className="px-3 py-0.5 text-right bg-slate-50 text-[0.68rem] italic font-medium">{pctStr(annualTotal[line.field] ?? 0, annualTotal.receitaOperacionalLiquida ?? 0)}</td>
+                  {monthRows.map((mr, mi) => <td key={mi} className="px-2 py-0.5 text-center text-[0.68rem] italic">{pctStr(mr.totals[line.field] ?? 0, mr.totals.receitaOperacionalLiquida ?? 0)}</td>)}
+                  <td className="px-3 py-0.5 text-center bg-slate-50 text-[0.68rem] italic font-medium">{pctStr(annualTotal[line.field] ?? 0, annualTotal.receitaOperacionalLiquida ?? 0)}</td>
                 </tr>
               );
 
@@ -274,12 +274,12 @@ function EvolucaoMensalTable({ title, subtitle, color, colorDrk, monthRows }: Ev
                       ? (Math.round(val) > 0 ? Math.round(val).toString() : '—')
                       : (val !== 0 ? val.toLocaleString('pt-BR') : '—');
                     return (
-                      <td key={mi} className="px-2 py-1.5 text-right">{display}</td>
+                      <td key={mi} className="px-2 py-1.5 text-center">{display}</td>
                     );
                   })}
 
                   <td
-                    className={`px-3 py-1.5 text-right font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-black'}`}
+                    className={`px-3 py-1.5 text-center font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-black'}`}
                     style={line.isTotal ? { backgroundColor: colorDrk } : undefined}
                   >
                     {(() => {
@@ -629,6 +629,27 @@ function PrintMensalTable({ title, subtitle, year, color, colorDrk, monthRows }:
 
   const NCOLS = visibleMonthIndexes.length + 2;
 
+  const lineHasValue = (field: keyof DreVwDept): boolean => {
+    if ((annualTotal[field] ?? 0) !== 0) return true;
+    return visibleMonthIndexes.some((mi) => (monthRows[mi]?.totals[field] ?? 0) !== 0);
+  };
+
+  const rawLines = DRE_LINES.filter((line) => {
+    if (line.separator) return true;
+    if (line.isTotal || line.isSubtotal) return true;
+    if (line.field === 'quant') return true;
+    return lineHasValue(line.field);
+  });
+
+  const printLines = rawLines.filter((line, idx, arr) => {
+    if (!line.separator) return true;
+    if (idx === 0 || idx === arr.length - 1) return false;
+    if (arr[idx - 1].separator || arr[idx + 1].separator) return false;
+    const hasBefore = arr.slice(0, idx).some((l) => !l.separator);
+    const hasAfter = arr.slice(idx + 1).some((l) => !l.separator);
+    return hasBefore && hasAfter;
+  });
+
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
       {/* Header */}
@@ -655,7 +676,7 @@ function PrintMensalTable({ title, subtitle, year, color, colorDrk, monthRows }:
           </tr>
         </thead>
         <tbody>
-          {DRE_LINES.map((line, idx) => {
+          {printLines.map((line, idx) => {
             if (line.separator) {
               return <tr key={idx}><td colSpan={NCOLS} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
             }
@@ -664,13 +685,13 @@ function PrintMensalTable({ title, subtitle, year, color, colorDrk, monthRows }:
                 <td style={{ padding: compactFewMonths ? '2px 16px' : '2px 14px', fontSize: '6.5pt' }}>{line.label}</td>
                 {visibleMonthIndexes.map((mi) => {
                   const mr = monthRows[mi];
-                  return <td key={mi} style={{ textAlign: 'right', padding: compactFewMonths ? '2px 6px' : '2px 3px', fontSize: '6.5pt' }}>{pctStr(mr?.totals[line.field] ?? 0, mr?.totals.receitaOperacionalLiquida ?? 0)}</td>;
+                  return <td key={mi} style={{ textAlign: 'center', padding: compactFewMonths ? '2px 6px' : '2px 3px', fontSize: '6.5pt' }}>{pctStr(mr?.totals[line.field] ?? 0, mr?.totals.receitaOperacionalLiquida ?? 0)}</td>;
                 })}
-                <td style={{ textAlign: 'right', padding: compactFewMonths ? '2px 8px' : '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#374151', fontSize: '6.5pt' }}>{pctStr(annualTotal[line.field] ?? 0, annualTotal.receitaOperacionalLiquida ?? 0)}</td>
+                <td style={{ textAlign: 'center', padding: compactFewMonths ? '2px 8px' : '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#374151', fontSize: '6.5pt' }}>{pctStr(annualTotal[line.field] ?? 0, annualTotal.receitaOperacionalLiquida ?? 0)}</td>
               </tr>
             );
 
-            const isQuant = line.field === 'quant' && idx === 0;
+            const isQuant = line.field === 'quant' && line.label === 'Volume de Vendas';
             const rowStyle: React.CSSProperties = line.isTotal
               ? {
                   backgroundImage: `linear-gradient(to bottom, ${color} 0%, ${color} 100%)`,
@@ -701,16 +722,16 @@ function PrintMensalTable({ title, subtitle, year, color, colorDrk, monthRows }:
                     ? (Math.round(val) > 0 ? Math.round(val).toString() : '—')
                     : (val !== 0 ? val.toLocaleString('pt-BR') : '—');
                   return (
-                    <td key={mi} style={{ textAlign: 'right', padding: compactFewMonths ? '2px 6px' : '2px 3px' }}>{display}</td>
+                    <td key={mi} style={{ textAlign: 'center', padding: compactFewMonths ? '2px 6px' : '2px 3px' }}>{display}</td>
                   );
                 })}
                 <td style={line.isTotal
                   ? {
-                      textAlign: 'right', padding: compactFewMonths ? '2px 8px' : '2px 5px', fontWeight: 700,
+                      textAlign: 'center', padding: compactFewMonths ? '2px 8px' : '2px 5px', fontWeight: 700,
                       backgroundImage: `linear-gradient(to bottom, ${colorDrk} 0%, ${colorDrk} 100%)`,
                       backgroundColor: colorDrk, color: 'white',
                     }
-                  : { textAlign: 'right', padding: compactFewMonths ? '2px 8px' : '2px 5px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111' }
+                  : { textAlign: 'center', padding: compactFewMonths ? '2px 8px' : '2px 5px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111' }
                 }>
                   {isQuant
                     ? (Math.round(annualVal) > 0 ? Math.round(annualVal).toString() : '—')

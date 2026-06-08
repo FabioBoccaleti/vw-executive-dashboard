@@ -243,10 +243,10 @@ function ComparativoTabela({ vwData, audiData, periodLabel, rootId, showPrintBut
                 return (
                   <tr key={idx} className="border-b border-slate-100 bg-slate-50/50">
                     <td className="px-4 py-0.5 pl-7 text-[0.68rem] italic text-slate-500">{line.label}</td>
-                    <td className="px-4 py-0.5 text-right text-[0.68rem] italic text-slate-500">{pctStr(vwV, vwROL)}</td>
-                    <td className="px-4 py-0.5 text-right text-[0.68rem] italic text-slate-500">{pctStr(auV, audiROL)}</td>
-                    <td className="px-4 py-0.5 text-right text-[0.68rem] italic text-slate-400 bg-slate-50">—</td>
-                    <td className="px-4 py-0.5 text-right text-[0.68rem] italic text-slate-400 bg-slate-50">—</td>
+                    <td className="px-4 py-0.5 text-center text-[0.68rem] italic text-slate-500">{pctStr(vwV, vwROL)}</td>
+                    <td className="px-4 py-0.5 text-center text-[0.68rem] italic text-slate-500">{pctStr(auV, audiROL)}</td>
+                    <td className="px-4 py-0.5 text-center text-[0.68rem] italic text-slate-400 bg-slate-50">—</td>
+                    <td className="px-4 py-0.5 text-center text-[0.68rem] italic text-slate-400 bg-slate-50">—</td>
                   </tr>
                 );
               }
@@ -286,19 +286,19 @@ function ComparativoTabela({ vwData, audiData, periodLabel, rootId, showPrintBut
                     {line.label}
                   </td>
                   <td
-                    className="px-4 py-1.5 text-right tabular-nums"
+                    className="px-4 py-1.5 text-center tabular-nums"
                     style={{ backgroundColor: vwCellBg ?? (line.isTotal ? VW_COLOR : undefined), color: line.isTotal ? 'white' : undefined }}
                   >
                     {fmtVal(vwVal)}
                   </td>
                   <td
-                    className="px-4 py-1.5 text-right tabular-nums"
+                    className="px-4 py-1.5 text-center tabular-nums"
                     style={{ backgroundColor: auCellBg ?? (line.isTotal ? AUDI_COLOR : undefined), color: line.isTotal ? 'white' : undefined }}
                   >
                     {fmtVal(auVal)}
                   </td>
                   <td
-                    className={`px-4 py-1.5 text-right tabular-nums font-medium bg-slate-50 ${
+                    className={`px-4 py-1.5 text-center tabular-nums font-medium bg-slate-50 ${
                       !line.isTotal
                         ? varR > 0 ? 'text-emerald-600' : varR < 0 ? 'text-red-600' : 'text-slate-400'
                         : 'text-white'
@@ -310,7 +310,7 @@ function ComparativoTabela({ vwData, audiData, periodLabel, rootId, showPrintBut
                       : '—'}
                   </td>
                   <td
-                    className={`px-4 py-1.5 text-right tabular-nums font-bold bg-slate-50 ${
+                    className={`px-4 py-1.5 text-center tabular-nums font-bold bg-slate-50 ${
                       !line.isTotal
                         ? varPct > 0 ? 'text-emerald-600' : varPct < 0 ? 'text-red-600' : 'text-slate-400'
                         : 'text-white'
