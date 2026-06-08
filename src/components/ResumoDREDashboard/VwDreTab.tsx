@@ -52,6 +52,11 @@ function getPrevPeriods(year: number, month: number, count: number): { year: num
   return periods;
 }
 
+function getYtdPeriods(year: number, month: number): { year: number; month: number }[] {
+  if (month <= 1) return [];
+  return Array.from({ length: month - 1 }, (_, i) => ({ year, month: i + 1 }));
+}
+
 function parseVal(v: string | number): number {
   return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
 }
@@ -266,7 +271,7 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
     }
 
     // ── MODO MENSAL ───────────────────────────────────────────────────────────
-    const periods = getPrevPeriods(year, month, 3);
+    const periods = getYtdPeriods(year, month);
     const allPeriods = [...periods, { year, month }];
     const uniqueYears = [...new Set(allPeriods.map(p => p.year))] as Array<2024 | 2025 | 2026 | 2027>;
 
@@ -513,7 +518,7 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
           activeSection === d.key ? (
             month === 0
               ? <VwDeptEvolucaoTable key={d.key} deptKey={d.key} deptLabel={d.label} allMonthRows={allMonthRows} year={year} />
-              : <DeptTable key={d.key} deptKey={d.key} deptLabel={d.label} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getPrevPeriods(year, month, 3)} year={year} month={month} onChange={(field, value) => handleCellChange(d.key, field, value)} />
+              : <DeptTable key={d.key} deptKey={d.key} deptLabel={d.label} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getYtdPeriods(year, month)} year={year} month={month} onChange={(field, value) => handleCellChange(d.key, field, value)} />
           ) : null
         )}
 
@@ -1049,7 +1054,7 @@ function PrintableReport({ data, prevData, year, month }: {
   data: DreVwRow; prevData: DreVwRow[]; year: number; month: number;
 }) {
   const deptList = DEPTS.map(d => data[d.key]);
-  const prevPeriods = getPrevPeriods(year, month, 3);
+  const prevPeriods = getYtdPeriods(year, month);
   const totalPages = DEPTS.length + 2; // 1 resumo + N depts + 1 ajustes
 
   return (
@@ -1183,6 +1188,7 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
   prevPeriods: { year: number; month: number }[];
   year: number; month: number;
 }) {
+  const totalCols = 1 + prevPeriods.length + 1 + 1 + 1;
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
       <PrintHeader title={`VW NORTE — ${deptLabel}`} subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} />
@@ -1202,7 +1208,7 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
         </thead>
         <tbody>
           {DRE_LINES.map((line, idx) => {
-            if (line.separator) return <tr key={idx}><td colSpan={7} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
+            if (line.separator) return <tr key={idx}><td colSpan={totalCols} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
             if (line.isPct) {
               const _isAdm = deptKey === 'adm';
               return (

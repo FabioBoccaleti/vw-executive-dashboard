@@ -48,6 +48,11 @@ function getPrevPeriods(year: number, month: number, count: number): { year: num
   return periods;
 }
 
+function getYtdPeriods(year: number, month: number): { year: number; month: number }[] {
+  if (month <= 1) return [];
+  return Array.from({ length: month - 1 }, (_, i) => ({ year, month: i + 1 }));
+}
+
 function parseVal(v: string | number): number {
   return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
 }
@@ -256,7 +261,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
     }
 
     // ── MODO MENSAL ───────────────────────────────────────────────────────────
-    const periods = getPrevPeriods(year, month, 3);
+    const periods = getYtdPeriods(year, month);
     const allPeriods = [...periods, { year, month }];
     const uniqueYears = [...new Set(allPeriods.map(p => p.year))] as Array<2024 | 2025 | 2026 | 2027>;
 
@@ -510,7 +515,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
           activeSection === d.key ? (
             month === 0
               ? <AudiDeptEvolucaoTable key={d.key} deptKey={d.key} deptLabel={d.label} allMonthRows={allMonthRows} year={year} />
-              : <DeptTable key={d.key} deptKey={d.key} deptLabel={d.label} deptColor={d.color} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getPrevPeriods(year, month, 3)} year={year} month={month} onChange={(field, value) => handleCellChange(d.key, field, value)} />
+              : <DeptTable key={d.key} deptKey={d.key} deptLabel={d.label} deptColor={d.color} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getYtdPeriods(year, month)} year={year} month={month} onChange={(field, value) => handleCellChange(d.key, field, value)} />
           ) : null
         )}
 
@@ -1132,7 +1137,7 @@ function PrintableReport({
   month: number;
 }) {
   const deptList = DEPTS.map(d => data[d.key]);
-  const prevPeriods = getPrevPeriods(year, month, 3);
+  const prevPeriods = getYtdPeriods(year, month);
 
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', colorScheme: 'only light' as any }}>
@@ -1277,6 +1282,7 @@ function PrintDeptTable({
   year: number;
   month: number;
 }) {
+  const totalCols = 1 + prevPeriods.length + 1 + 1 + 1;
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
       <PrintHeader title={`Audi Lapa/Pinheiros — ${deptLabel}`} subtitle={`${MONTHS[month - 1]} de ${year}`} />
@@ -1296,7 +1302,7 @@ function PrintDeptTable({
         </thead>
         <tbody>
           {DRE_LINES.map((line, idx) => {
-            if (line.separator) return <tr key={idx}><td colSpan={7} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
+            if (line.separator) return <tr key={idx}><td colSpan={totalCols} style={{ height: '2px', backgroundColor: '#f1f5f9' }} /></tr>;
             if (line.isPct) {
               const _isAdm = deptKey === 'adm';
               return (
