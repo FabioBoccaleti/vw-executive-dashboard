@@ -559,6 +559,7 @@ function PrintableMensalReport({ year, vwMonthData, audiMonthData, consolidadoMo
         <PrintMensalTable
           title="VW NORTE"
           subtitle={`Ano ${year} — Evolução Mensal (todos os departamentos)`}
+          year={year}
           color={VW_COLOR}
           colorDrk={VW_COLOR_DRK}
           monthRows={vwMonthData}
@@ -570,6 +571,7 @@ function PrintableMensalReport({ year, vwMonthData, audiMonthData, consolidadoMo
         <PrintMensalTable
           title="AUDI LAPA/PINHEIROS"
           subtitle={`Ano ${year} — Evolução Mensal (todos os departamentos)`}
+          year={year}
           color={AUDI_COLOR}
           colorDrk={AUDI_COLOR_DRK}
           monthRows={audiMonthData}
@@ -581,6 +583,7 @@ function PrintableMensalReport({ year, vwMonthData, audiMonthData, consolidadoMo
         <PrintMensalTable
           title="CONSOLIDADO — VW + AUDI"
           subtitle={`Ano ${year} — Evolução Mensal (todos os departamentos)`}
+          year={year}
           color={CON_COLOR}
           colorDrk={CON_COLOR_DRK}
           monthRows={consolidadoMonthData}
@@ -590,18 +593,41 @@ function PrintableMensalReport({ year, vwMonthData, audiMonthData, consolidadoMo
   );
 }
 
-function PrintMensalTable({ title, subtitle, color, colorDrk, monthRows }: {
+function PrintMensalTable({ title, subtitle, year, color, colorDrk, monthRows }: {
   title: string;
   subtitle: string;
+  year: number;
   color: string;
   colorDrk: string;
   monthRows: MonthTotals[];
 }) {
+  const visibleMonthIndexes = monthRows
+    .map((mr, idx) => ({
+      idx,
+      hasData: DEPT_FIELDS.some((field) => (mr.totals[field] ?? 0) !== 0),
+    }))
+    .filter((entry) => entry.hasData)
+    .map((entry) => entry.idx);
+
   const annualTotal = Object.fromEntries(
     DEPT_FIELDS.map(f => [f, monthRows.reduce((s, mr) => s + (mr.totals[f] ?? 0), 0)])
   ) as Record<keyof DreVwDept, number>;
 
-  const NCOLS = 14;
+  const visibleCount = Math.max(visibleMonthIndexes.length, 1);
+  const descriptionWidth = visibleMonthIndexes.length <= 3 ? 36 : visibleMonthIndexes.length <= 6 ? 40 : 30;
+  const totalWidth = visibleMonthIndexes.length <= 3 ? 14 : visibleMonthIndexes.length <= 6 ? 12 : 10;
+  const monthWidth = (100 - descriptionWidth - totalWidth) / visibleCount;
+  const compactFewMonths = visibleMonthIndexes.length <= 3;
+
+  const firstVisible = visibleMonthIndexes[0];
+  const lastVisible = visibleMonthIndexes[visibleMonthIndexes.length - 1];
+  const visiblePeriodLabel = visibleMonthIndexes.length === 0
+    ? `Sem movimento em ${year}`
+    : firstVisible === lastVisible
+      ? `${MONTHS_FULL[firstVisible]}/${year}`
+      : `${MONTHS_SHORT[firstVisible]}-${MONTHS_SHORT[lastVisible]}/${year}`;
+
+  const NCOLS = visibleMonthIndexes.length + 2;
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
@@ -613,17 +639,19 @@ function PrintMensalTable({ title, subtitle, color, colorDrk, monthRows }: {
         padding: '6px 12px',
       }}>
         <div style={{ fontWeight: 700, fontSize: '10pt' }}>{title}</div>
-        <div style={{ fontSize: '7.5pt', opacity: 0.8 }}>{subtitle}</div>
+        <div style={{ fontSize: '7.5pt', opacity: 0.8 }}>{subtitle} — {visiblePeriodLabel}</div>
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7pt' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: compactFewMonths ? '7.6pt' : '7pt' }}>
         <thead>
           <tr style={{ backgroundColor: '#e2e8f0', borderBottom: `2px solid ${color}` }}>
-            <th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 700, color: '#111', width: '18%' }}>Descrição</th>
-            {MONTHS_SHORT.map((m, i) => (
-              <th key={i} style={{ textAlign: 'center', padding: '3px 3px', fontWeight: 700, color: '#111', width: '5.5%' }}>{m}</th>
+            <th style={{ textAlign: 'left', padding: compactFewMonths ? '4px 8px' : '3px 6px', fontWeight: 700, color: '#111', width: `${descriptionWidth}%` }}>Descrição</th>
+            {visibleMonthIndexes.map((mi) => (
+              <th key={mi} style={{ textAlign: 'center', padding: compactFewMonths ? '4px 6px' : '3px 3px', fontWeight: 700, color: '#111', width: `${monthWidth}%` }}>
+                {MONTHS_SHORT[mi]}
+              </th>
             ))}
-            <th style={{ textAlign: 'center', padding: '3px 5px', fontWeight: 700, color: '#111', backgroundColor: '#cbd5e1', width: '7%' }}>Total</th>
+            <th style={{ textAlign: 'center', padding: compactFewMonths ? '4px 8px' : '3px 5px', fontWeight: 700, color: '#111', backgroundColor: '#cbd5e1', width: `${totalWidth}%` }}>Total</th>
           </tr>
         </thead>
         <tbody>
@@ -633,9 +661,12 @@ function PrintMensalTable({ title, subtitle, color, colorDrk, monthRows }: {
             }
             if (line.isPct) return (
               <tr key={idx} style={{ backgroundColor: '#f8fafc', color: '#64748b', borderBottom: '1px solid #f1f5f9', fontStyle: 'italic' }}>
-                <td style={{ padding: '2px 14px', fontSize: '6.5pt' }}>{line.label}</td>
-                {monthRows.map((mr, mi) => <td key={mi} style={{ textAlign: 'right', padding: '2px 3px', fontSize: '6.5pt' }}>{pctStr(mr.totals[line.field] ?? 0, mr.totals.receitaOperacionalLiquida ?? 0)}</td>)}
-                <td style={{ textAlign: 'right', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#374151', fontSize: '6.5pt' }}>{pctStr(annualTotal[line.field] ?? 0, annualTotal.receitaOperacionalLiquida ?? 0)}</td>
+                <td style={{ padding: compactFewMonths ? '2px 16px' : '2px 14px', fontSize: '6.5pt' }}>{line.label}</td>
+                {visibleMonthIndexes.map((mi) => {
+                  const mr = monthRows[mi];
+                  return <td key={mi} style={{ textAlign: 'right', padding: compactFewMonths ? '2px 6px' : '2px 3px', fontSize: '6.5pt' }}>{pctStr(mr?.totals[line.field] ?? 0, mr?.totals.receitaOperacionalLiquida ?? 0)}</td>;
+                })}
+                <td style={{ textAlign: 'right', padding: compactFewMonths ? '2px 8px' : '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#374151', fontSize: '6.5pt' }}>{pctStr(annualTotal[line.field] ?? 0, annualTotal.receitaOperacionalLiquida ?? 0)}</td>
               </tr>
             );
 
@@ -658,27 +689,28 @@ function PrintMensalTable({ title, subtitle, color, colorDrk, monthRows }: {
             return (
               <tr key={idx} style={rowStyle}>
                 <td style={{
-                  padding: `2px ${line.indent ? '12px' : '6px'}`,
+                  padding: `2px ${line.indent ? (compactFewMonths ? '14px' : '12px') : (compactFewMonths ? '8px' : '6px')}`,
                   fontWeight: line.isTotal || line.isSubtotal ? 700 : 400,
                 }}>
                   {line.label}
                 </td>
-                {monthRows.map((mr, mi) => {
+                {visibleMonthIndexes.map((mi) => {
+                  const mr = monthRows[mi];
                   const val = mr.totals[line.field] ?? 0;
                   const display = isQuant
                     ? (Math.round(val) > 0 ? Math.round(val).toString() : '—')
                     : (val !== 0 ? val.toLocaleString('pt-BR') : '—');
                   return (
-                    <td key={mi} style={{ textAlign: 'right', padding: '2px 3px' }}>{display}</td>
+                    <td key={mi} style={{ textAlign: 'right', padding: compactFewMonths ? '2px 6px' : '2px 3px' }}>{display}</td>
                   );
                 })}
                 <td style={line.isTotal
                   ? {
-                      textAlign: 'right', padding: '2px 5px', fontWeight: 700,
+                      textAlign: 'right', padding: compactFewMonths ? '2px 8px' : '2px 5px', fontWeight: 700,
                       backgroundImage: `linear-gradient(to bottom, ${colorDrk} 0%, ${colorDrk} 100%)`,
                       backgroundColor: colorDrk, color: 'white',
                     }
-                  : { textAlign: 'right', padding: '2px 5px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111' }
+                  : { textAlign: 'right', padding: compactFewMonths ? '2px 8px' : '2px 5px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111' }
                 }>
                   {isQuant
                     ? (Math.round(annualVal) > 0 ? Math.round(annualVal).toString() : '—')
