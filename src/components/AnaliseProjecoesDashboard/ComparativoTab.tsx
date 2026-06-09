@@ -254,12 +254,22 @@ export function ComparativoTab({
   const safeIdx   = Math.min(periodoIdx, periodoOptions.length - 1);
   const months    = periodoOptions[safeIdx]?.months ?? [0];
   const deptKey   = deptView as string;
+  const selectedPeriodLabel = (() => {
+    if (periodoType === 'mensal' && months.length === 1) return MONTHS_FULL[months[0]];
+    if (periodoType === 'bimestral') return `${safeIdx + 1}º Bim`;
+    if (periodoType === 'trimestral') return `${safeIdx + 1}º Trim`;
+    if (periodoType === 'semestral') return `${safeIdx + 1}º Sem`;
+    return null;
+  })();
+
+  const formatPeriodLabel = (prefix: 'Budget' | 'Real', year: string): string =>
+    selectedPeriodLabel ? `${prefix} ${selectedPeriodLabel} ${year}` : `${prefix} ${year}`;
 
   // Labels das colunas conforme tipo de comparação
   const [col1Label, col2Label] =
     compType === 'real2025_vs_budget2026'
-      ? ['Real 2025', 'Budget 2026']
-      : ['Budget 2026', 'Real 2026'];
+      ? [formatPeriodLabel('Real', '2025'), formatPeriodLabel('Budget', '2026')]
+      : [formatPeriodLabel('Budget', '2026'), formatPeriodLabel('Real', '2026')];
 
   // Função que retorna os valores coluna1 e coluna2 para um field + dept
   const getValues = useCallback((field: keyof DeptBudget): { v1: number; v2: number } => {

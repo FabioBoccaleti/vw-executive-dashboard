@@ -207,6 +207,16 @@ export function AnaliseProjecoesDashboard({ onChangeBrand }: AnaliseProjecoesDas
   // ── Período atual ─────────────────────────────────────────────────────────
   const periodoOptions = getPeriodoOptions(periodoType);
   const safeIdx = Math.min(periodoIdx, periodoOptions.length - 1);
+  const selectedPeriodLabel = (() => {
+    if (periodoType === 'mensal') return periodoOptions[safeIdx]?.label ?? null;
+    if (periodoType === 'bimestral') return `${safeIdx + 1}º Bim`;
+    if (periodoType === 'trimestral') return `${safeIdx + 1}º Trim`;
+    if (periodoType === 'semestral') return `${safeIdx + 1}º Sem`;
+    return null;
+  })();
+  const budgetLabel = selectedPeriodLabel ? `Budget ${selectedPeriodLabel} ${BUDGET_YEAR}` : `Budget ${BUDGET_YEAR}`;
+  const real2025Label = selectedPeriodLabel ? `Real ${selectedPeriodLabel} 2025` : 'Real 2025';
+  const real2026Label = selectedPeriodLabel ? `Real ${selectedPeriodLabel} 2026` : 'Real 2026';
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -511,8 +521,8 @@ export function AnaliseProjecoesDashboard({ onChangeBrand }: AnaliseProjecoesDas
                 <div>
                   <h2 className="text-sm font-semibold text-slate-700">
                     {activeComp === 'real2025_vs_budget2026'
-                      ? 'Comparativo: Real 2025 vs Budget 2026'
-                      : 'Comparativo: Budget 2026 vs Real 2026'}
+                      ? `Comparativo: ${real2025Label} vs ${budgetLabel}`
+                      : `Comparativo: ${budgetLabel} vs ${real2026Label}`}
                   </h2>
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     {MARCAS.find(m => m.value === marca)?.label} · {anualMode ? 'Visão Anual — 12 meses' : periodoOptions[safeIdx]?.label}
