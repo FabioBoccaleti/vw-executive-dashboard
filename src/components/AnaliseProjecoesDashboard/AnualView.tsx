@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { AlertTriangle, BarChart2, X } from 'lucide-react';
+import { AlertTriangle, BarChart2, X, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import {
   type BudgetVwRow,
@@ -17,6 +17,7 @@ import {
   type CompType,
   type MarcaType,
 } from './ComparativoTab';
+import { exportStyledExcelTable } from './excelUtils';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,88 @@ export function AnualView({
       real2025VwMonths, real2025AudiMonths,
       real2026VwMonths, real2026AudiMonths]);
 
+  const handleExportExcel = async () => {
+    const marcaLabel = marca === 'vw' ? 'VW Norte' : marca === 'audi' ? 'Audi' : 'Consolidado';
+    const modeLabel = showMode === 'budget' ? 'Budget 2026' : showMode === 'real' ? `Real ${realYear}` : 'Var %';
+    const rows = DRE_LINES.map(line => {
+      if (line.separator) {
+        return { values: Array(14).fill(''), separator: true as const };
+      }
+
+      const cells = Array.from({ length: 12 }, (_, mi) => {
+        const b = getB(mi, line.field);
+        const r = getR(mi, line.field);
+        const vp = varPctOf(b, r);
+        return { b, r, vp };
+      });
+
+      if (hideZeros && cells.every(c => c.b === 0 && c.r === 0)) return null;
+
+      const totalB  = cells.reduce((s, c) => s + c.b, 0);
+      const totalR  = cells.reduce((s, c) => s + c.r, 0);
+      const totalVp = varPctOf(totalB, totalR);
+      const fmtNum = (n: number) => (n === 0 ? '—' : n.toLocaleString('pt-BR', { maximumFractionDigits: 0 }));
+      const fmtPct = (n: number) => (n === 0 || !isFinite(n) ? '—' : `${n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`);
+      const fmtSignedPct = (n: number) => (n === 0 || !isFinite(n) ? '—' : `${n > 0 ? '+' : ''}${n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`);
+
+      if (line.isPct) {
+        const monthValues = cells.map(({ b, r }) => {
+          if (showMode === 'budget') {
+            const rolB = getB(0, 'receitaOperacionalLiquida') || 1;
+            return fmtPct((b / rolB) * 100);
+          }
+          if (showMode === 'real') {
+            const rolR = getR(0, 'receitaOperacionalLiquida') || 1;
+            return fmtPct((r / rolR) * 100);
+          }
+          return '—';
+        });
+
+        return {
+          values: [line.label, ...monthValues, '—'],
+          isPct: true,
+          indent: !!line.indent,
+          isBold: !!line.isBold,
+          isSubtotal: !!line.isSubtotal,
+          isTotal: !!line.isTotal,
+        };
+      }
+
+      const monthValues = cells.map(({ b, r, vp }) => {
+        if (showMode === 'budget') return fmtNum(b);
+        if (showMode === 'real') return fmtNum(r);
+        return fmtSignedPct(vp);
+      });
+
+      const totalDisplay = showMode === 'budget'
+        ? fmtNum(totalB)
+        : showMode === 'real'
+          ? fmtNum(totalR)
+          : fmtSignedPct(totalVp);
+
+      return {
+        values: [line.label, ...monthValues, totalDisplay],
+        indent: !!line.indent,
+        isBold: !!line.isBold,
+        isSubtotal: !!line.isSubtotal,
+        isTotal: !!line.isTotal,
+      };
+    }).filter(Boolean) as NonNullable<ReturnType<typeof DRE_LINES.map>> extends Array<infer T> ? Exclude<T, null> : never[];
+
+    await exportStyledExcelTable({
+      fileName: `Analise_Projecoes_Anual_${marcaLabel.replace(/\s+/g, '_')}.xlsx`,
+      sheetName: 'Visao Anual',
+      title: 'Análise de Projeções',
+      subtitle: `Visão Anual — ${modeLabel}`,
+      meta: `Marca: ${marcaLabel} | Depto: ${deptView}${threshold > 0 ? ` | Alerta ≥ ${threshold}%` : ''}`,
+      headers: ['Descrição', ...MONTHS_SHORT, 'Total'],
+      rows,
+      columnWidths: [38, ...Array(12).fill(12), 14],
+      accentColor: marca === 'vw' ? '#001e50' : marca === 'audi' ? '#bb0a30' : '#4c1d95',
+    });
+    toast.success('Planilha Excel exportada');
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -129,6 +212,14 @@ export function AnualView({
             {m.label}
           </button>
         ))}
+        <button
+          onClick={handleExportExcel}
+          className="no-print ml-auto flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+          title="Exportar a visão anual atual para Excel"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Excel
+        </button>
         {showMode === 'varpct' && (
           <span className="text-[10px] text-slate-400 ml-1">
             Verde = favorável · Vermelho = desfavorável

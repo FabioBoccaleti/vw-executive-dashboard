@@ -1,4 +1,6 @@
-﻿import * as XLSX from 'xlsx';
+﻿import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
 import {
   DEPT_FIELDS,
   FIELD_LABELS,
@@ -112,6 +114,162 @@ export interface ImportResult {
   monthsImported: number;
 }
 
+export type ExcelRowStyle = {
+  isTotal?: boolean;
+  isSubtotal?: boolean;
+  isBold?: boolean;
+  isPct?: boolean;
+  indent?: boolean;
+  separator?: boolean;
+};
+
+export interface StyledExcelTableOptions {
+  fileName: string;
+  sheetName: string;
+  title: string;
+  subtitle?: string;
+  meta?: string;
+  headers: string[];
+  rows: Array<{ values: (string | number | null)[] } & ExcelRowStyle>;
+  columnWidths: number[];
+  accentColor?: string;
+}
+
+const BRL_FMT = '#,##0';
+
+function toArgb(color: string): string {
+  const hex = color.replace('#', '').toUpperCase();
+  return hex.length === 8 ? hex : `FF${hex}`;
+}
+
+async function writeStyledWorkbook(options: StyledExcelTableOptions): Promise<void> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Sorana Executive Dashboard';
+  wb.created = new Date();
+
+  const accentColor = options.accentColor ?? '#001e50';
+  const accentArgb = toArgb(accentColor);
+  const ws = wb.addWorksheet(options.sheetName, {
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 4 }],
+    properties: { tabColor: { argb: accentArgb } },
+  });
+
+  ws.columns = options.columnWidths.map(width => ({ width }));
+
+  const rowCount = options.headers.length;
+
+  const titleRow = ws.addRow([options.title]);
+  ws.mergeCells(1, 1, 1, rowCount);
+  titleRow.height = 24;
+  titleRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+    cell.font = { bold: true, size: 12, color: { argb: 'FF1E293B' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+  });
+
+  const subtitleRow = ws.addRow([options.subtitle ?? '']);
+  ws.mergeCells(2, 1, 2, rowCount);
+  subtitleRow.height = 20;
+  subtitleRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+    cell.font = { size: 10.5, color: { argb: 'FF475569' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+  });
+
+  const metaRow = ws.addRow([options.meta ?? '']);
+  ws.mergeCells(3, 1, 3, rowCount);
+  metaRow.height = 18;
+  metaRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+    cell.font = { size: 9, color: { argb: 'FF64748B' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+  });
+
+  ws.addRow([]);
+
+  const headerRow = ws.addRow(options.headers);
+  headerRow.height = 22;
+  headerRow.eachCell((cell, ci) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: accentArgb } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 9.5 };
+    cell.alignment = {
+      vertical: 'middle',
+      horizontal: ci === 1 ? 'left' : 'right',
+      wrapText: true,
+    };
+    cell.border = {
+      top: { style: 'thin', color: { argb: accentArgb } },
+      bottom: { style: 'thin', color: { argb: accentArgb } },
+      left: { style: 'thin', color: { argb: accentArgb } },
+      right: { style: 'thin', color: { argb: accentArgb } },
+    };
+  });
+
+  const thinBorder = { style: 'thin' as const, color: { argb: 'FFE2E8F0' } };
+  const lightBg = 'FFF8FAFC';
+
+  options.rows.forEach((row, index) => {
+    if (row.separator) {
+      const sep = ws.addRow(Array(rowCount).fill(''));
+      sep.height = 5;
+      sep.eachCell(cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+        cell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } };
+      });
+      return;
+    }
+
+    const values = row.values.map(value => value ?? '—');
+    const dr = ws.addRow(values);
+    dr.height = row.isTotal ? 20 : row.isSubtotal ? 18 : 17;
+
+    const bg = row.isTotal ? accentColor : row.isSubtotal ? lightBg : index % 2 === 0 ? '#FFFFFF' : 'FFFDFEFF';
+    dr.eachCell({ includeEmpty: true }, (cell, ci) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: toArgb(bg) } };
+      cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+
+      const isFirst = ci === 1;
+      const text = String(cell.value ?? '');
+      if (isFirst) {
+        cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        cell.font = {
+          size: 9.5,
+          bold: !!(row.isTotal || row.isSubtotal || row.isBold),
+          italic: !!row.isPct && !row.isTotal,
+          color: { argb: row.isTotal ? 'FFFFFFFF' : row.isSubtotal ? 'FF0F172A' : 'FF334155' },
+        };
+      } else {
+        cell.alignment = { vertical: 'middle', horizontal: 'right', wrapText: false };
+        cell.font = {
+          size: 9.5,
+          bold: !!row.isTotal,
+          italic: !!row.isPct && !row.isTotal,
+          color: { argb: row.isTotal ? 'FFFFFFFF' : row.isSubtotal ? 'FF0F172A' : 'FF334155' },
+        };
+      }
+
+      if (row.indent && isFirst) {
+        cell.value = `· ${text}`;
+      }
+      if (row.isTotal) {
+        cell.font = { ...cell.font, bold: true, color: { argb: 'FFFFFFFF' } };
+      }
+    });
+  });
+
+  ws.autoFilter = { from: { row: 5, column: 1 }, to: { row: 5, column: rowCount } };
+
+  const buf = await wb.xlsx.writeBuffer();
+  saveAs(
+    new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    options.fileName,
+  );
+}
+
+export async function exportStyledExcelTable(options: StyledExcelTableOptions): Promise<void> {
+  await writeStyledWorkbook(options);
+}
+
 export function importBudgetFromExcel(file: File, year: number): Promise<ImportResult> {
   return new Promise(resolve => {
     const reader = new FileReader();
@@ -190,4 +348,36 @@ export function importBudgetFromExcel(file: File, year: number): Promise<ImportR
 
     reader.readAsArrayBuffer(file);
   });
+}
+
+// ─── Exportar a tabela visível atual para Excel ──────────────────────────────
+
+function normalizeTableCloneForExcel(table: HTMLTableElement): HTMLTableElement {
+  const clone = table.cloneNode(true) as HTMLTableElement;
+
+  clone.querySelectorAll('input').forEach(input => {
+    const value = (input as HTMLInputElement).value;
+    const parentCell = input.closest('td, th');
+    if (parentCell) parentCell.textContent = value || '—';
+  });
+
+  return clone;
+}
+
+export function exportVisibleAnaliseProjecoesTableToExcel(
+  table: HTMLTableElement,
+  fileName = 'Analise_Projecoes.xlsx',
+  sheetName = 'Analise de Projecoes',
+): void {
+  const tableClone = normalizeTableCloneForExcel(table);
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.table_to_sheet(tableClone);
+  const colCount = tableClone.querySelectorAll('tr:first-child th, tr:first-child td').length || 0;
+
+  if (colCount > 0) {
+    ws['!cols'] = Array.from({ length: colCount }, (_, idx) => ({ wch: idx === 0 ? 42 : 16 }));
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, fileName);
 }

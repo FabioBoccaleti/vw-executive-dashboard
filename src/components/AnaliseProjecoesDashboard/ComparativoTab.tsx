@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo } from 'react';
-import { AlertTriangle, Edit3, Check, X, BarChart2 } from 'lucide-react';
+import { AlertTriangle, Edit3, Check, X, BarChart2, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { toast } from 'sonner';
 import {
@@ -20,6 +20,7 @@ import {
   type VwDept,
   type AudiDept,
 } from './projecoesStorage';
+import { exportStyledExcelTable } from './excelUtils';
 import type { DreVwRow } from '../ResumoDREDashboard/dreVwStorage';
 import type { DreAudiRow } from '../ResumoDREDashboard/dreAudiStorage';
 
@@ -454,8 +455,83 @@ export function ComparativoTab({
       real2025VwMonths, real2025AudiMonths,
       real2026VwMonths, real2026AudiMonths]);
 
+  const handleExportExcel = async () => {
+    const marcaLabel = marca === 'vw' ? 'VW Norte' : marca === 'audi' ? 'Audi' : 'Consolidado';
+    const periodLabel = periodoOptions[safeIdx]?.label ?? '';
+    const rows = DRE_LINES.map(line => {
+      if (line.separator) {
+        return { values: ['', '', '', '', ''], separator: true as const };
+      }
+
+      const raw = getValues(line.field);
+      if (line.isPct) {
+        const rolV1 = rol.v1 || 1;
+        const rolV2 = rol.v2 || 1;
+        const pct1 = rolV1 !== 0 ? (raw.v1 / rolV1) * 100 : 0;
+        const pct2 = rolV2 !== 0 ? (raw.v2 / rolV2) * 100 : 0;
+        const varPct = pct2 - pct1;
+        return {
+          values: [
+            line.label,
+            pct1 === 0 ? '—' : `${pct1.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
+            pct2 === 0 ? '—' : `${pct2.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
+            '—',
+            `${varPct > 0 ? '+' : ''}${varPct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% pp`,
+          ],
+          isPct: true,
+          indent: !!line.indent,
+          isBold: !!line.isBold,
+          isSubtotal: !!line.isSubtotal,
+          isTotal: !!line.isTotal,
+        };
+      }
+
+      const varR = raw.v2 - raw.v1;
+      const varPct = raw.v1 !== 0 ? (varR / Math.abs(raw.v1)) * 100 : (raw.v2 !== 0 ? 100 : 0);
+      const fmtNum = (n: number) => (n === 0 ? '—' : n.toLocaleString('pt-BR', { maximumFractionDigits: 0 }));
+      return {
+        values: [
+          line.label,
+          fmtNum(raw.v1),
+          fmtNum(raw.v2),
+          fmtNum(varR),
+          varPct === 0 ? '—' : `${varPct > 0 ? '+' : ''}${varPct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`,
+        ],
+        isPct: false,
+        indent: !!line.indent,
+        isBold: !!line.isBold,
+        isSubtotal: !!line.isSubtotal,
+        isTotal: !!line.isTotal,
+      };
+    });
+
+    await exportStyledExcelTable({
+      fileName: `Analise_Projecoes_Comparativo_${periodLabel || 'Atual'}.xlsx`,
+      sheetName: 'Comparativo',
+      title: 'Análise de Projeções',
+      subtitle: `Comparativo: ${col1Label} vs ${col2Label}`,
+      meta: `Marca: ${marcaLabel}${periodLabel ? ` | Período: ${periodLabel}` : ''}${deptView !== 'all' ? ` | Depto: ${deptView}` : ''}`,
+      headers: ['Descrição', col1Label, col2Label, 'Var R$', 'Var %'],
+      rows,
+      columnWidths: [42, 18, 18, 16, 14],
+      accentColor: marca === 'vw' ? '#001e50' : marca === 'audi' ? '#bb0a30' : '#4c1d95',
+    });
+    toast.success('Planilha Excel exportada');
+  };
+
   return (
-    <div className="overflow-x-auto">
+    <div>
+      <div className="no-print mb-2 flex items-center justify-end px-1">
+        <button
+          onClick={handleExportExcel}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+          title="Exportar a tabela atual para Excel"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Excel
+        </button>
+      </div>
+      <div className="overflow-x-auto">
       <table className="w-full text-xs border-collapse">
         <thead>
           <tr style={{ backgroundColor: marcaColor }} className="text-white">
@@ -641,6 +717,7 @@ export function ComparativoTab({
           A edição inline está disponível apenas no modo <strong>Mensal</strong>. Selecione um mês específico para editar valores.
         </p>
       )}
+      </div>
     </div>
   );
 }
