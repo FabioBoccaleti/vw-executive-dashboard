@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Download, Upload, Edit3, Check, X,
-  BarChart2, AlertTriangle, Loader2, Settings, Eye, EyeOff,
+  BarChart2, AlertTriangle, Loader2, Settings, Eye, EyeOff, Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -201,6 +201,54 @@ export function AnaliseProjecoesDashboard({ onChangeBrand }: AnaliseProjecoesDas
     }
   };
 
+  const handlePrint = () => {
+    const area = document.getElementById('analise-projecoes-print-area');
+    const root = document.getElementById('print-root');
+
+    if (area && root) {
+      const clone = area.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll('.no-print').forEach(el => el.remove());
+      root.innerHTML = clone.outerHTML;
+
+      const style = document.createElement('style');
+      style.textContent = `
+        @page { size: A4 landscape; margin: 0.5cm; }
+        #print-root #analise-projecoes-print-area {
+          background: #ffffff !important;
+          min-height: auto !important;
+          zoom: 72%;
+        }
+        #print-root #analise-projecoes-print-area .overflow-x-auto {
+          overflow: visible !important;
+        }
+        #print-root #analise-projecoes-print-area table {
+          width: 100% !important;
+          min-width: 0 !important;
+        }
+        #print-root #analise-projecoes-print-area th,
+        #print-root #analise-projecoes-print-area td {
+          font-size: 9px !important;
+          padding: 3px 5px !important;
+        }
+        #print-root #analise-projecoes-print-area .sticky {
+          position: static !important;
+          left: auto !important;
+        }
+      `;
+      document.head.appendChild(style);
+
+      window.onafterprint = () => {
+        document.head.removeChild(style);
+        root.innerHTML = '';
+        window.onafterprint = null;
+      };
+      window.print();
+      return;
+    }
+
+    window.print();
+  };
+
   // ── Verifica se há dados de budget ────────────────────────────────────────
   const hasBudgetData = budgetVw.some(r => r !== null) || budgetAudi.some(r => r !== null);
 
@@ -220,7 +268,7 @@ export function AnaliseProjecoesDashboard({ onChangeBrand }: AnaliseProjecoesDas
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
+    <div id="analise-projecoes-print-area" className="min-h-screen bg-slate-100 flex flex-col">
 
       {/* ─── Header ─────────────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm sticky top-0 z-20">
@@ -280,6 +328,14 @@ export function AnaliseProjecoesDashboard({ onChangeBrand }: AnaliseProjecoesDas
               onChange={handleImport}
             />
           </div>
+
+          <button
+            onClick={handlePrint}
+            className="no-print flex items-center gap-1.5 px-3 py-1.5 text-[11px] border border-slate-200 rounded text-slate-600 hover:bg-slate-50 transition-colors"
+            title="Imprimir o conteúdo atual em PDF"
+          >
+            <Printer size={12} /> Imprimir PDF
+          </button>
 
           {/* Edição */}
           <button
