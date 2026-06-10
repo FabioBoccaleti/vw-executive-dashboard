@@ -12,6 +12,7 @@ type RecebidoChassiData = { piv: number; siq: number; mesRecebimento: string | n
 type RecebidoOverridesStore = Record<string, Record<string, RecebidoChassiData>>;
 
 const RECEBIDOS_OVERRIDE_KEY = 'provisao_piv_recebidos_overrides';
+const CHASSI_ALIASES_KEY = 'provisao_piv_chassi_aliases';
 
 const n = (v?: string | null) => {
   const raw = String(v ?? '').trim();
@@ -67,9 +68,10 @@ function formatPeriodoKeyToMesAno(pk?: string): string | null {
 interface Props {
   filterYear: number;
   filterMonth: number | null;
+  dataVersion?: number;
 }
 
-export function ConcilicacaoPIVAReceberView({ filterYear, filterMonth }: Props) {
+export function ConcilicacaoPIVAReceberView({ filterYear, filterMonth, dataVersion = 0 }: Props) {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [rows, setRows] = useState<VendasResultadoRow[]>([]);
@@ -89,8 +91,15 @@ export function ConcilicacaoPIVAReceberView({ filterYear, filterMonth }: Props) 
       loadVendasResultadoRows('novos'),
       loadArquivoPivData(key),
       kvGet(RECEBIDOS_OVERRIDE_KEY),
-    ]).then(([vendasRows, arquivoPivData, overridesRaw]) => {
+      kvGet(CHASSI_ALIASES_KEY),
+    ]).then(([vendasRows, arquivoPivData, overridesRaw, aliasesRaw]) => {
       setRows(vendasRows);
+
+      const aliases = (aliasesRaw as Record<string, string> | null) ?? {};
+      const resolveAlias = (rawChassi?: string | null): string => {
+        const normalized = normalizeChassi(rawChassi);
+        return normalized && aliases[normalized] ? normalizeChassi(aliases[normalized]) : normalized;
+      };
 
       const nextRecebidosByChassi: Record<string, RecebidoChassiData> = {};
       const mesRecebimentoDefault =
@@ -98,7 +107,7 @@ export function ConcilicacaoPIVAReceberView({ filterYear, filterMonth }: Props) 
         formatPeriodoKeyToMesAno(arquivoPivData?.periodoKey);
 
       for (const row of arquivoPivData?.rows ?? []) {
-        const chassi = normalizeChassi(row.chassi);
+        const chassi = resolveAlias(row.chassi);
         if (!chassi) continue;
         const piv = n(row.valorBonusAtacado);
         const siq = n(row.valorBonusSatisfacao);
@@ -121,7 +130,7 @@ export function ConcilicacaoPIVAReceberView({ filterYear, filterMonth }: Props) 
       setOverridesByChassi(overridesStore[key] ?? {});
       setLoading(false);
     });
-  }, [filterYear, filterMonth]);
+  }, [filterYear, filterMonth, dataVersion]);
 
   const filtered = useMemo(() => {
     return rows.filter(r => {

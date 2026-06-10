@@ -24,6 +24,7 @@ import { ProvisaoPIVDashboard } from './ProvisaoPIVDashboard';
 import { ArquivoPIVDashboard } from './ArquivoPIVDashboard';
 import { ConcilicacaoPIVAReceberView } from './ConcilicacaoPIVAReceberView';
 import { ConcilicacaoPIVRecebidosView } from './ConcilicacaoPIVRecebidosView';
+import { ConcilicacaoPIVChassisDuvidososView } from './ConcilicacaoPIVChassisDuvidososView';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
 import type { TabelaDadosRow } from './tabelaDadosStorage';
 
@@ -491,7 +492,8 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const [arquivoPivFilterMonth, setArquivoPivFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [conciliacaoPivYear, setConciliacaoPivYear] = useState<number>(new Date().getFullYear());
   const [conciliacaoPivMonth, setConciliacaoPivMonth] = useState<number | null>(new Date().getMonth() + 1);
-  const [conciliacaoPivSubTab, setConciliacaoPivSubTab] = useState<'a-receber' | 'recebidos'>('a-receber');
+  const [conciliacaoPivSubTab, setConciliacaoPivSubTab] = useState<'a-receber' | 'recebidos' | 'duvidosos'>('a-receber');
+  const [conciliacaoSyncVersion, setConciliacaoSyncVersion] = useState(0);
   const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const [pages, setPages] = useState<PageResult[] | null>(null);
   const [openPages, setOpenPages] = useState<Set<number>>(new Set([1]));
@@ -986,6 +988,16 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
                     >
                       Recebidos
                     </button>
+                    <button
+                      onClick={() => setConciliacaoPivSubTab('duvidosos')}
+                      className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+                        conciliacaoPivSubTab === 'duvidosos'
+                          ? 'border-blue-500 text-blue-700 bg-white'
+                          : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-white/60'
+                      }`}
+                    >
+                      Chassis Duvidosos
+                    </button>
                   </div>
 
                   {conciliacaoPivSubTab === 'a-receber' && (
@@ -993,6 +1005,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
                       <ConcilicacaoPIVAReceberView
                         filterYear={conciliacaoPivYear}
                         filterMonth={conciliacaoPivMonth}
+                        dataVersion={conciliacaoSyncVersion}
                       />
                     </div>
                   )}
@@ -1002,6 +1015,18 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
                       <ConcilicacaoPIVRecebidosView
                         filterYear={conciliacaoPivYear}
                         filterMonth={conciliacaoPivMonth}
+                        dataVersion={conciliacaoSyncVersion}
+                      />
+                    </div>
+                  )}
+
+                  {conciliacaoPivSubTab === 'duvidosos' && (
+                    <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+                      <ConcilicacaoPIVChassisDuvidososView
+                        filterYear={conciliacaoPivYear}
+                        filterMonth={conciliacaoPivMonth}
+                        dataVersion={conciliacaoSyncVersion}
+                        onConfirmed={() => setConciliacaoSyncVersion(v => v + 1)}
                       />
                     </div>
                   )}

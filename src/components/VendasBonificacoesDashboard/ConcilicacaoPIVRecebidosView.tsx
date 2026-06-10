@@ -6,14 +6,15 @@ import { kvGet } from '@/lib/kvClient';
 import { Button } from '@/components/ui/button';
 import { loadVendasResultadoRows, type VendasResultadoRow } from './vendasResultadoStorage';
 import { loadArquivoPivStore } from './arquivoPivStorage';
-import { periodoKey } from './provisaoPivStorage';
 
 type RecebidoChassiData = { piv: number; siq: number; mesRecebimento: string | null };
 type RecebidoOverridesStore = Record<string, Record<string, RecebidoChassiData>>;
 
 type RecebidosByPeriodo = Record<string, Record<string, RecebidoChassiData>>;
+type RecebidosByChassiGlobal = Record<string, RecebidoChassiData>;
 
 const RECEBIDOS_OVERRIDE_KEY = 'provisao_piv_recebidos_overrides';
+const CHASSI_ALIASES_KEY = 'provisao_piv_chassi_aliases';
 
 const n = (v?: string | null) => {
   const raw = String(v ?? '').trim();
@@ -82,13 +83,32 @@ function normalizeMesRecebimento(v?: string | null): string | null {
 interface Props {
   filterYear: number;
   filterMonth: number | null;
+  dataVersion?: number;
 }
 
-export function ConcilicacaoPIVRecebidosView({ filterYear, filterMonth }: Props) {
+export function ConcilicacaoPIVRecebidosView({ filterYear, filterMonth, dataVersion = 0 }: Props) {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [rows, setRows] = useState<VendasResultadoRow[]>([]);
-  const [recebidosByPeriodo, setRecebidosByPeriodo] = useState<RecebidosByPeriodo>({});
+  const [recebidosByChassiGlobal, setRecebidosByChassiGlobal] = useState<RecebidosByChassiGlobal>({});
+
+  const mesSortKey = (v?: string | null): number => {
+    const raw = String(v ?? '').trim();
+    if (!raw) return -1;
+    const mSlash = raw.match(/^(\d{1,2})\/(\d{4})$/);
+    if (mSlash) {
+      const m = Number(mSlash[1]);
+      const y = Number(mSlash[2]);
+      if (m >= 1 && m <= 12) return y * 100 + m;
+    }
+    const mDash = raw.match(/^(\d{4})-(\d{1,2})$/);
+    if (mDash) {
+      const y = Number(mDash[1]);
+      const m = Number(mDash[2]);
+      if (m >= 1 && m <= 12) return y * 100 + m;
+    }
+    return -1;
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -97,8 +117,15 @@ export function ConcilicacaoPIVRecebidosView({ filterYear, filterMonth }: Props)
       loadVendasResultadoRows('novos'),
       loadArquivoPivStore(),
       kvGet(RECEBIDOS_OVERRIDE_KEY),
-    ]).then(([vendasRows, arquivoStore, overridesRaw]) => {
+      kvGet(CHASSI_ALIASES_KEY),
+    ]).then(([vendasRows, arquivoStore, overridesRaw, aliasesRaw]) => {
       setRows(vendasRows);
+
+      const aliases = (aliasesRaw as Record<string, string> | null) ?? {};
+      const resolveAlias = (rawChassi?: string | null): string => {
+        const normalized = normalizeChassi(rawChassi);
+        return normalized && aliases[normalized] ? normalizeChassi(aliases[normalized]) : normalized;
+      };
 
       const importadosByPeriodo: RecebidosByPeriodo = {};
 
@@ -109,7 +136,7 @@ export function ConcilicacaoPIVRecebidosView({ filterYear, filterMonth }: Props)
           formatPeriodoKeyToMesAno(arquivoPivData?.periodoKey);
 
         for (const row of arquivoPivData?.rows ?? []) {
-          const chassi = normalizeChassi(row.chassi);
+          const chassi = resolveAlias(row.chassi);
           if (!chassi) continue;
 
           const piv = n(row.valorBonusAtacado);
@@ -146,10 +173,30 @@ export function ConcilicacaoPIVRecebidosView({ filterYear, filterMonth }: Props)
         };
       }
 
-      setRecebidosByPeriodo(mergedByPeriodo);
+      const globalByChassi: RecebidosByChassiGlobal = {};
+      for (const periodMap of Object.values(mergedByPeriodo)) {
+        for (const [chassi, recebido] of Object.entries(periodMap)) {
+          const current = globalByChassi[chassi];
+          if (current) {
+            current.piv += recebido.piv;
+            current.siq += recebido.siq;
+            if (mesSortKey(recebido.mesRecebimento) > mesSortKey(current.mesRecebimento)) {
+              current.mesRecebimento = recebido.mesRecebimento ?? null;
+            }
+          } else {
+            globalByChassi[chassi] = {
+              piv: recebido.piv,
+              siq: recebido.siq,
+              mesRecebimento: recebido.mesRecebimento ?? null,
+            };
+          }
+        }
+      }
+
+      setRecebidosByChassiGlobal(globalByChassi);
       setLoading(false);
     });
-  }, []);
+  }, [dataVersion]);
 
   const targetMesRecebimento = useMemo(() => {
     if (filterMonth === null) return null;
@@ -164,10 +211,9 @@ export function ConcilicacaoPIVRecebidosView({ filterYear, filterMonth }: Props)
         const siq = n(r.bonusSIQ);
         const yr = getYr(r);
         const mo = getMo(r);
-        const pk = yr > 0 && mo > 0 ? periodoKey(yr, mo) : null;
 
         const chassiNorm = normalizeChassi(r.chassi);
-        const recebido = pk && chassiNorm ? recebidosByPeriodo[pk]?.[chassiNorm] : null;
+        const recebido = chassiNorm ? recebidosByChassiGlobal[chassiNorm] : null;
 
         const recebidoPiv = recebido?.piv ?? null;
         const recebidoSiq = recebido?.siq ?? null;
@@ -196,7 +242,7 @@ export function ConcilicacaoPIVRecebidosView({ filterYear, filterMonth }: Props)
         if (targetMesRecebimento) return row.mesRecebimento === targetMesRecebimento;
         return row.mesRecebimento.endsWith(`/${filterYear}`);
       });
-  }, [rows, recebidosByPeriodo, targetMesRecebimento, filterYear]);
+  }, [rows, recebidosByChassiGlobal, targetMesRecebimento, filterYear]);
 
   const resumoPorCompetenciaData = useMemo(() => {
     const map = new Map<string, {
@@ -239,6 +285,21 @@ export function ConcilicacaoPIVRecebidosView({ filterYear, filterMonth }: Props)
       return bY - aY || bM - aM;
     });
   }, [detalheRecebidos]);
+
+  const resumoTotais = useMemo(() => {
+    return resumoPorCompetenciaData.reduce(
+      (acc, item) => {
+        acc.piv += item.piv;
+        acc.siq += item.siq;
+        acc.recebidoPiv += item.recebidoPiv;
+        acc.recebidoSiq += item.recebidoSiq;
+        acc.diferenca += item.diferenca;
+        acc.linhas += item.linhas;
+        return acc;
+      },
+      { piv: 0, siq: 0, recebidoPiv: 0, recebidoSiq: 0, diferenca: 0, linhas: 0 },
+    );
+  }, [resumoPorCompetenciaData]);
 
   const totalRecebidos = useMemo(
     () => detalheRecebidos.reduce((acc, row) => acc + (row.recebidoPiv ?? 0) + (row.recebidoSiq ?? 0), 0),
@@ -420,6 +481,15 @@ export function ConcilicacaoPIVRecebidosView({ filterYear, filterMonth }: Props)
                       <td className="px-3 py-2 text-right text-slate-600">{item.linhas}</td>
                     </tr>
                   ))}
+                  <tr className="border-t-2 border-blue-200 bg-blue-100/70">
+                    <td className="px-3 py-2 font-black text-slate-800 uppercase">Total</td>
+                    <td className="px-3 py-2 text-right font-black text-indigo-700">{fmtBRL(resumoTotais.piv)}</td>
+                    <td className="px-3 py-2 text-right font-black text-violet-700">{fmtBRL(resumoTotais.siq)}</td>
+                    <td className="px-3 py-2 text-right font-black text-emerald-700">{fmtBRL(resumoTotais.recebidoPiv)}</td>
+                    <td className="px-3 py-2 text-right font-black text-teal-700">{fmtBRL(resumoTotais.recebidoSiq)}</td>
+                    <td className="px-3 py-2 text-right font-black text-amber-700">{fmtBRL(resumoTotais.diferenca)}</td>
+                    <td className="px-3 py-2 text-right font-black text-slate-700">{resumoTotais.linhas}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>

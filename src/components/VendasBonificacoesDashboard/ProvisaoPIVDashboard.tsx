@@ -10,6 +10,7 @@ import { Wrench, Car, Layers, ArrowRight, ChevronDown, ChevronUp, Printer, Downl
 type RecebidoChassiData = { piv: number; siq: number; mesRecebimento: string | null };
 type RecebidoOverridesStore = Record<string, Record<string, RecebidoChassiData>>;
 const RECEBIDOS_OVERRIDE_KEY = 'provisao_piv_recebidos_overrides';
+const CHASSI_ALIASES_KEY = 'provisao_piv_chassi_aliases';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v?: string | null) => {
@@ -96,6 +97,48 @@ function normalizeChassi(v?: string | null): string {
   return String(v ?? '').trim().toUpperCase();
 }
 
+function isAmbiguousVinPair(a: string, b: string): boolean {
+  const pair = `${a}${b}`;
+  return new Set([
+    '1I', 'I1', '1L', 'L1', '1T', 'T1',
+    '0O', 'O0', '0Q', 'Q0',
+    '5S', 'S5', '2Z', 'Z2', '8B', 'B8',
+  ]).has(pair);
+}
+
+function findNearVinKey(
+  query: string,
+  availableKeys: string[],
+): string | null {
+  if (!query || query.length < 10) return null;
+
+  let found: string | null = null;
+
+  for (const key of availableKeys) {
+    if (key.length !== query.length) continue;
+
+    let diffCount = 0;
+    let ambiguousOnly = true;
+
+    for (let i = 0; i < query.length; i++) {
+      if (query[i] === key[i]) continue;
+      diffCount += 1;
+      if (diffCount > 1) break;
+      if (!isAmbiguousVinPair(query[i], key[i])) {
+        ambiguousOnly = false;
+        break;
+      }
+    }
+
+    if (diffCount === 1 && ambiguousOnly) {
+      if (found && found !== key) return null;
+      found = key;
+    }
+  }
+
+  return found;
+}
+
 function normalizeMesRecebimentoInput(v: string): string | null {
   const raw = String(v ?? '').trim();
   if (!raw) return null;
@@ -139,8 +182,14 @@ function mesRecebimentoSortKey(v?: string | null): number {
 function buildRecebidosByChassiGlobal(
   arquivoStore: Record<string, { header?: { mesApurado?: string }; periodoKey?: string; rows?: Array<{ chassi?: string; valorBonusAtacado?: string; valorBonusSatisfacao?: string }> }>,
   overridesStore: RecebidoOverridesStore,
+  aliasesStore: Record<string, string>,
 ): Record<string, RecebidoChassiData> {
   const mergedByPeriodo: Record<string, Record<string, RecebidoChassiData>> = {};
+
+  const resolveAlias = (rawChassi?: string | null): string => {
+    const normalized = normalizeChassi(rawChassi);
+    return normalized && aliasesStore[normalized] ? normalizeChassi(aliasesStore[normalized]) : normalized;
+  };
 
   for (const [pk, arquivoPivData] of Object.entries(arquivoStore ?? {})) {
     const periodMap: Record<string, RecebidoChassiData> = {};
@@ -149,7 +198,7 @@ function buildRecebidosByChassiGlobal(
       formatPeriodoKeyToMesAno(arquivoPivData?.periodoKey || pk);
 
     for (const row of arquivoPivData?.rows ?? []) {
-      const chassi = normalizeChassi(row.chassi);
+      const chassi = resolveAlias(row.chassi);
       if (!chassi) continue;
       const piv = n(row.valorBonusAtacado);
       const siq = n(row.valorBonusSatisfacao);
@@ -351,12 +400,14 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
       loadProvisaoPivConfig(),
       loadArquivoPivStore(),
       kvGet(RECEBIDOS_OVERRIDE_KEY),
-    ]).then(([vendasRows, cfg, arquivoStore, overridesRaw]) => {
+      kvGet(CHASSI_ALIASES_KEY),
+    ]).then(([vendasRows, cfg, arquivoStore, overridesRaw, aliasesRaw]) => {
       setRows(vendasRows);
       setPctInput(cfg.rateios[key] ?? '');
 
       const overridesStore = (overridesRaw as RecebidoOverridesStore | null) ?? {};
-      setRecebidosByChassi(buildRecebidosByChassiGlobal(arquivoStore, overridesStore));
+      const aliasesStore = (aliasesRaw as Record<string, string> | null) ?? {};
+      setRecebidosByChassi(buildRecebidosByChassiGlobal(arquivoStore, overridesStore, aliasesStore));
       setEditingChassi(null);
       setEditDraft({ piv: '', siq: '', mesRecebimento: '' });
 
@@ -416,21 +467,33 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
   const getValorRecebidoPiv = (row: VendasResultadoRow): number | null => {
     const chassi = normalizeChassi(row.chassi);
     if (!chassi) return null;
-    const recebido = recebidosByChassi[chassi];
+    const recebido = recebidosByChassi[chassi]
+      ?? (() => {
+        const nearKey = findNearVinKey(chassi, Object.keys(recebidosByChassi));
+        return nearKey ? recebidosByChassi[nearKey] : null;
+      })();
     return recebido ? recebido.piv : null;
   };
 
   const getValorRecebidoSiq = (row: VendasResultadoRow): number | null => {
     const chassi = normalizeChassi(row.chassi);
     if (!chassi) return null;
-    const recebido = recebidosByChassi[chassi];
+    const recebido = recebidosByChassi[chassi]
+      ?? (() => {
+        const nearKey = findNearVinKey(chassi, Object.keys(recebidosByChassi));
+        return nearKey ? recebidosByChassi[nearKey] : null;
+      })();
     return recebido ? recebido.siq : null;
   };
 
   const getMesRecebimento = (row: VendasResultadoRow): string | null => {
     const chassi = normalizeChassi(row.chassi);
     if (!chassi) return null;
-    const recebido = recebidosByChassi[chassi];
+    const recebido = recebidosByChassi[chassi]
+      ?? (() => {
+        const nearKey = findNearVinKey(chassi, Object.keys(recebidosByChassi));
+        return nearKey ? recebidosByChassi[nearKey] : null;
+      })();
     return recebido?.mesRecebimento ?? null;
   };
 
@@ -483,8 +546,12 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
 
     store[pk] = periodMap;
     await kvSet(RECEBIDOS_OVERRIDE_KEY, store);
-    const arquivoStore = await loadArquivoPivStore();
-    setRecebidosByChassi(buildRecebidosByChassiGlobal(arquivoStore, store));
+    const [arquivoStore, aliasesRaw] = await Promise.all([
+      loadArquivoPivStore(),
+      kvGet(CHASSI_ALIASES_KEY),
+    ]);
+    const aliasesStore = (aliasesRaw as Record<string, string> | null) ?? {};
+    setRecebidosByChassi(buildRecebidosByChassiGlobal(arquivoStore, store, aliasesStore));
     cancelEditRow();
   };
 
