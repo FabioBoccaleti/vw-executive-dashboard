@@ -4,7 +4,7 @@ import { saveAs } from 'file-saver';
 import { kvGet, kvSet } from '@/lib/kvClient';
 import { loadVendasResultadoRows, type VendasResultadoRow } from './vendasResultadoStorage';
 import { loadProvisaoPivConfig, saveProvisaoPivConfig, periodoKey } from './provisaoPivStorage';
-import { loadArquivoPivData } from './arquivoPivStorage';
+import { loadArquivoPivStore } from './arquivoPivStorage';
 import { Wrench, Car, Layers, ArrowRight, ChevronDown, ChevronUp, Printer, Download } from 'lucide-react';
 
 type RecebidoChassiData = { piv: number; siq: number; mesRecebimento: string | null };
@@ -116,6 +116,90 @@ function formatPeriodoKeyToMesAno(pk?: string): string | null {
   const yyyy = m[1];
   const mm = m[2].padStart(2, '0');
   return `${mm}/${yyyy}`;
+}
+
+function mesRecebimentoSortKey(v?: string | null): number {
+  const raw = String(v ?? '').trim();
+  if (!raw) return -1;
+  const mSlash = raw.match(/^(\d{1,2})\/(\d{4})$/);
+  if (mSlash) {
+    const month = Number(mSlash[1]);
+    const year = Number(mSlash[2]);
+    if (month >= 1 && month <= 12) return year * 100 + month;
+  }
+  const mDash = raw.match(/^(\d{4})-(\d{1,2})$/);
+  if (mDash) {
+    const year = Number(mDash[1]);
+    const month = Number(mDash[2]);
+    if (month >= 1 && month <= 12) return year * 100 + month;
+  }
+  return -1;
+}
+
+function buildRecebidosByChassiGlobal(
+  arquivoStore: Record<string, { header?: { mesApurado?: string }; periodoKey?: string; rows?: Array<{ chassi?: string; valorBonusAtacado?: string; valorBonusSatisfacao?: string }> }>,
+  overridesStore: RecebidoOverridesStore,
+): Record<string, RecebidoChassiData> {
+  const mergedByPeriodo: Record<string, Record<string, RecebidoChassiData>> = {};
+
+  for (const [pk, arquivoPivData] of Object.entries(arquivoStore ?? {})) {
+    const periodMap: Record<string, RecebidoChassiData> = {};
+    const mesRecebimentoDefault =
+      String(arquivoPivData?.header?.mesApurado ?? '').trim() ||
+      formatPeriodoKeyToMesAno(arquivoPivData?.periodoKey || pk);
+
+    for (const row of arquivoPivData?.rows ?? []) {
+      const chassi = normalizeChassi(row.chassi);
+      if (!chassi) continue;
+      const piv = n(row.valorBonusAtacado);
+      const siq = n(row.valorBonusSatisfacao);
+      const current = periodMap[chassi];
+
+      if (current) {
+        current.piv += piv;
+        current.siq += siq;
+      } else {
+        periodMap[chassi] = {
+          piv,
+          siq,
+          mesRecebimento: mesRecebimentoDefault || null,
+        };
+      }
+    }
+
+    mergedByPeriodo[pk] = {
+      ...periodMap,
+      ...(overridesStore[pk] ?? {}),
+    };
+  }
+
+  for (const [pk, periodOverrides] of Object.entries(overridesStore)) {
+    if (!mergedByPeriodo[pk]) {
+      mergedByPeriodo[pk] = { ...periodOverrides };
+    }
+  }
+
+  const globalByChassi: Record<string, RecebidoChassiData> = {};
+  for (const periodMap of Object.values(mergedByPeriodo)) {
+    for (const [chassi, recebido] of Object.entries(periodMap)) {
+      const current = globalByChassi[chassi];
+      if (current) {
+        current.piv += recebido.piv;
+        current.siq += recebido.siq;
+        if (mesRecebimentoSortKey(recebido.mesRecebimento) > mesRecebimentoSortKey(current.mesRecebimento)) {
+          current.mesRecebimento = recebido.mesRecebimento ?? null;
+        }
+      } else {
+        globalByChassi[chassi] = {
+          piv: recebido.piv,
+          siq: recebido.siq,
+          mesRecebimento: recebido.mesRecebimento ?? null,
+        };
+      }
+    }
+  }
+
+  return globalByChassi;
 }
 
 // ─── Barra bicolor animada ────────────────────────────────────────────────────
@@ -250,16 +334,13 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
   const [expanded, setExpanded]   = useState(false); // detalhe por veículo
   const [resumoExpanded, setResumoExpanded] = useState(false);
   const [exportingDetalhe, setExportingDetalhe] = useState(false);
-  const [importadosByChassi, setImportadosByChassi] = useState<Record<string, RecebidoChassiData>>({});
-  const [overridesByChassi, setOverridesByChassi] = useState<Record<string, RecebidoChassiData>>({});
+  const [recebidosByChassi, setRecebidosByChassi] = useState<Record<string, RecebidoChassiData>>({});
   const [editingChassi, setEditingChassi] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{ piv: string; siq: string; mesRecebimento: string }>({
     piv: '',
     siq: '',
     mesRecebimento: '',
   });
-
-  const recebidosByChassi = useMemo(() => ({ ...importadosByChassi, ...overridesByChassi }), [importadosByChassi, overridesByChassi]);
 
   // ── Carrega dados e config ────────────────────────────────────────────────
   useEffect(() => {
@@ -268,31 +349,14 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
     Promise.all([
       loadVendasResultadoRows('novos'),
       loadProvisaoPivConfig(),
-      loadArquivoPivData(key),
+      loadArquivoPivStore(),
       kvGet(RECEBIDOS_OVERRIDE_KEY),
-    ]).then(([vendasRows, cfg, arquivoPivData, overridesRaw]) => {
+    ]).then(([vendasRows, cfg, arquivoStore, overridesRaw]) => {
       setRows(vendasRows);
       setPctInput(cfg.rateios[key] ?? '');
 
-      const nextRecebidosByChassi: Record<string, { piv: number; siq: number; mesRecebimento: string | null }> = {};
-      const mesRecebimentoDefault = (arquivoPivData?.header?.mesApurado ?? '').trim() || formatPeriodoKeyToMesAno(arquivoPivData?.periodoKey);
-      for (const row of arquivoPivData?.rows ?? []) {
-        const chassi = normalizeChassi(row.chassi);
-        if (!chassi) continue;
-        const piv = n(row.valorBonusAtacado);
-        const siq = n(row.valorBonusSatisfacao);
-        const current = nextRecebidosByChassi[chassi];
-        if (current) {
-          current.piv += piv;
-          current.siq += siq;
-        } else {
-          nextRecebidosByChassi[chassi] = { piv, siq, mesRecebimento: mesRecebimentoDefault || null };
-        }
-      }
-      setImportadosByChassi(nextRecebidosByChassi);
-
       const overridesStore = (overridesRaw as RecebidoOverridesStore | null) ?? {};
-      setOverridesByChassi(overridesStore[key] ?? {});
+      setRecebidosByChassi(buildRecebidosByChassiGlobal(arquivoStore, overridesStore));
       setEditingChassi(null);
       setEditDraft({ piv: '', siq: '', mesRecebimento: '' });
 
@@ -419,7 +483,8 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
 
     store[pk] = periodMap;
     await kvSet(RECEBIDOS_OVERRIDE_KEY, store);
-    setOverridesByChassi(periodMap);
+    const arquivoStore = await loadArquivoPivStore();
+    setRecebidosByChassi(buildRecebidosByChassiGlobal(arquivoStore, store));
     cancelEditRow();
   };
 
