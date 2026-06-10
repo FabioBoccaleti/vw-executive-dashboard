@@ -5,6 +5,7 @@ import {
   deleteLancamento,
 } from './comissoesLancamentosStorage';
 import type { LancamentosMap, LinhaComissao, CampoAssinaturaComissao, AssinaturaDigital } from './comissoesLancamentosStorage';
+import type { VendasResultadoRow } from '@/components/VendasBonificacoesDashboard/vendasResultadoStorage';
 import { kvGet } from '@/lib/kvClient';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -21,6 +22,52 @@ const fmtBRL = (v: number) =>
 
 const sumLinhas = (linhas: Record<string, LinhaComissao>): number =>
   Object.values(linhas).reduce((s, l) => s + l.comVenda + l.comLB, 0);
+
+function normalizeKeyPart(v: string | undefined): string {
+  return String(v ?? '').trim().toUpperCase();
+}
+
+function stableRowKey(row: VendasResultadoRow, idx: number): string {
+  if (row.id) return `id:${row.id}`;
+  const chassi = normalizeKeyPart(row.chassi);
+  const nf     = normalizeKeyPart(row.nfVenda);
+  const data   = normalizeKeyPart(row.dataVenda);
+  const tx     = normalizeKeyPart(row.transacao);
+  if (chassi || nf || data || tx) return `txn:${chassi}|${nf}|${data}|${tx}`;
+  return `idx:${idx}`;
+}
+
+function legacyRowKey(row: VendasResultadoRow, idx: number): string {
+  return row.chassi ? `${row.chassi}_${idx}` : String(idx);
+}
+
+function buildChassiLookup(snapshotRows: VendasResultadoRow[] | undefined): Record<string, string> {
+  const lookup: Record<string, string> = {};
+  if (!snapshotRows || snapshotRows.length === 0) return lookup;
+
+  snapshotRows.forEach((row, idx) => {
+    const chassi = String(row.chassi ?? '').trim();
+    if (!chassi) return;
+    lookup[stableRowKey(row, idx)] = chassi;
+    lookup[legacyRowKey(row, idx)] = chassi;
+  });
+
+  return lookup;
+}
+
+function resolveChassiDisplay(rawKey: string, lookup: Record<string, string>): string {
+  if (lookup[rawKey]) return lookup[rawKey];
+
+  if (rawKey.startsWith('txn:')) {
+    const payload = rawKey.slice(4);
+    const [chassi] = payload.split('|');
+    if (chassi && chassi.trim()) return chassi.trim();
+  }
+
+  if (/^[A-Z0-9]{15,18}$/i.test(rawKey)) return rawKey;
+
+  return '—';
+}
 
 /** Corrige nomes com caracteres corrompidos no KV. */
 const NAME_FIXES: Record<string, string> = {
@@ -54,6 +101,8 @@ interface RowData {
   usadosPago:  boolean | undefined;
   novosLinhas:  Record<string, LinhaComissao>;
   usadosLinhas: Record<string, LinhaComissao>;
+  novosSnapshotRows?: VendasResultadoRow[];
+  usadosSnapshotRows?: VendasResultadoRow[];
   novosAssinaturas:  Partial<Record<CampoAssinaturaComissao, AssinaturaDigital>> | undefined;
   usadosAssinaturas: Partial<Record<CampoAssinaturaComissao, AssinaturaDigital>> | undefined;
 }
@@ -147,6 +196,8 @@ export function ComissoesResumoView() {
         usadosPago:   usadosLanc?.pago,
         novosLinhas:  novosLanc?.linhas  ?? {},
         usadosLinhas: usadosLanc?.linhas ?? {},
+        novosSnapshotRows: novosLanc?.snapshotRows,
+        usadosSnapshotRows: usadosLanc?.snapshotRows,
         novosAssinaturas:  novosLanc?.assinaturas,
         usadosAssinaturas: usadosLanc?.assinaturas,
       });
@@ -352,6 +403,8 @@ tfoot td { font-weight: bold; background: #f8fafc; border-top: 2px solid #cbd5e1
               <tbody>
                 {rows.map(r => {
                   const isExp = expanded.has(r.vendedor);
+                  const novosChassiLookup = buildChassiLookup(r.novosSnapshotRows);
+                  const usadosChassiLookup = buildChassiLookup(r.usadosSnapshotRows);
                   return (
                     <Fragment key={r.vendedor}>
                       {/* Linha principal */}
@@ -478,7 +531,7 @@ tfoot td { font-weight: bold; background: #f8fafc; border-top: 2px solid #cbd5e1
                                     <tbody>
                                       {Object.entries(r.novosLinhas).map(([chassi, l]) => (
                                         <tr key={chassi} className="border-t border-slate-100">
-                                          <td className="py-1 pr-3 font-mono text-slate-500">{chassi}</td>
+                                          <td className="py-1 pr-3 font-mono text-slate-500">{resolveChassiDisplay(chassi, novosChassiLookup)}</td>
                                           <td className="py-1 pr-3 text-right tabular-nums">{fmtBRL(l.comVenda)}</td>
                                           <td className="py-1 pr-3 text-right tabular-nums">{fmtBRL(l.comLB)}</td>
                                           <td className="py-1 text-right tabular-nums font-medium text-slate-700">
@@ -517,7 +570,7 @@ tfoot td { font-weight: bold; background: #f8fafc; border-top: 2px solid #cbd5e1
                                     <tbody>
                                       {Object.entries(r.usadosLinhas).map(([chassi, l]) => (
                                         <tr key={chassi} className="border-t border-slate-100">
-                                          <td className="py-1 pr-3 font-mono text-slate-500">{chassi}</td>
+                                          <td className="py-1 pr-3 font-mono text-slate-500">{resolveChassiDisplay(chassi, usadosChassiLookup)}</td>
                                           <td className="py-1 pr-3 text-right tabular-nums">{fmtBRL(l.comVenda)}</td>
                                           <td className="py-1 pr-3 text-right tabular-nums">{fmtBRL(l.comLB)}</td>
                                           <td className="py-1 text-right tabular-nums font-medium text-slate-700">

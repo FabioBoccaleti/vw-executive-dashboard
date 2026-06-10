@@ -389,6 +389,8 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
   const [printingAll, setPrintingAll] = useState(false);
   const [printingResumo, setPrintingResumo] = useState(false);
   const [resumoExpanded, setResumoExpanded] = useState(false);
+  const [resumoPorVendedorExpanded, setResumoPorVendedorExpanded] = useState(false);
+  const [resumoVendedorOpenSet, setResumoVendedorOpenSet] = useState<Set<string>>(new Set());
 
   // Bulk pagamento
   const [markingAllPaid,  setMarkingAllPaid]  = useState(false);
@@ -753,6 +755,72 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
       return acc;
     }, { comVenda: 0, comLB: 0, total: 0 });
   }, [resumoComissoesPorModelo]);
+
+  const resumoComissoesPorModeloVendedor = useMemo(() => {
+    if (tab !== 'novos' || filterMonth === null) return [] as Array<{
+      vendedor: string;
+      modelos: Array<{ modelo: string; comVenda: number; comLB: number; total: number }>;
+      totais: { comVenda: number; comLB: number; total: number };
+    }>;
+
+    const pk = `${filterYear}-${filterMonth}`;
+    const lancsPeriodo = lancamentosMap[pk] ?? {};
+    const result: Array<{
+      vendedor: string;
+      modelos: Array<{ modelo: string; comVenda: number; comLB: number; total: number }>;
+      totais: { comVenda: number; comLB: number; total: number };
+    }> = [];
+
+    for (const [vendedor, vRows] of vendedoresMap) {
+      const lanc = lancsPeriodo[vendedor];
+      if (!lanc?.pago) continue;
+
+      const rowsBase = (lanc.snapshotRows?.length ?? 0) > 0 ? lanc.snapshotRows! : vRows;
+      const map = new Map<string, { modelo: string; comVenda: number; comLB: number; total: number }>();
+
+      rowsBase.forEach((r, idx) => {
+        const linha = getLinhaComissao(lanc.linhas, r, idx);
+        if (!linha) return;
+
+        const modelo = normalizeModelBase(r.modelo);
+        const comVenda = linha.comVenda ?? 0;
+        const comLB = linha.comLB ?? 0;
+        const total = comVenda + comLB;
+        const current = map.get(modelo);
+
+        if (current) {
+          current.comVenda += comVenda;
+          current.comLB += comLB;
+          current.total += total;
+        } else {
+          map.set(modelo, { modelo, comVenda, comLB, total });
+        }
+      });
+
+      const modelos = Array.from(map.values()).sort((a, b) => a.modelo.localeCompare(b.modelo, 'pt-BR'));
+      if (modelos.length === 0) continue;
+
+      const totais = modelos.reduce((acc, item) => {
+        acc.comVenda += item.comVenda;
+        acc.comLB += item.comLB;
+        acc.total += item.total;
+        return acc;
+      }, { comVenda: 0, comLB: 0, total: 0 });
+
+      result.push({ vendedor, modelos, totais });
+    }
+
+    return result;
+  }, [tab, filterMonth, filterYear, lancamentosMap, vendedoresMap]);
+
+  function toggleResumoVendedor(vendedor: string) {
+    setResumoVendedorOpenSet(prev => {
+      const next = new Set(prev);
+      if (next.has(vendedor)) next.delete(vendedor);
+      else next.add(vendedor);
+      return next;
+    });
+  }
 
   function handlePrintResumoModelo() {
     if (tab !== 'novos' || filterMonth === null || resumoComissoesPorModelo.length === 0) return;
@@ -1355,6 +1423,95 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {tab === 'novos' && resumoComissoesPorModeloVendedor.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <button
+                  onClick={() => setResumoPorVendedorExpanded(v => !v)}
+                  className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-700">Resumo por Modelo de Cada Vendedor</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">
+                      {resumoComissoesPorModeloVendedor.length} vendedor{resumoComissoesPorModeloVendedor.length !== 1 ? 'es' : ''}
+                    </span>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${resumoPorVendedorExpanded ? 'rotate-180' : ''}`} />
+                </button>
+
+                {resumoPorVendedorExpanded && (
+                  <div className="border-t border-slate-100 divide-y divide-slate-100">
+                    {resumoComissoesPorModeloVendedor.map(item => {
+                      const isOpen = resumoVendedorOpenSet.has(item.vendedor);
+                      return (
+                        <div key={item.vendedor}>
+                          <button
+                            onClick={() => toggleResumoVendedor(item.vendedor)}
+                            className="w-full px-4 py-2.5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-slate-800 truncate">{item.vendedor}</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                {item.modelos.length} modelo{item.modelos.length !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3 ml-3">
+                              <span className="text-xs font-bold text-slate-800 tabular-nums">
+                                {item.totais.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </span>
+                              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                            </div>
+                          </button>
+
+                          {isOpen && (
+                            <div className="overflow-x-auto border-t border-slate-100">
+                              <table className="w-full text-xs border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-50 border-b border-slate-200">
+                                    <th className="px-4 py-2.5 text-left font-semibold text-slate-500 text-[10px] uppercase tracking-wide">Modelo</th>
+                                    <th className="px-4 py-2.5 text-right font-semibold text-indigo-600 text-[10px] uppercase tracking-wide">Com. s/ Venda</th>
+                                    <th className="px-4 py-2.5 text-right font-semibold text-violet-600 text-[10px] uppercase tracking-wide">Com. s/ LB</th>
+                                    <th className="px-4 py-2.5 text-right font-semibold text-slate-600 text-[10px] uppercase tracking-wide">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                  {item.modelos.map((modelo, idx) => (
+                                    <tr key={`${item.vendedor}-${modelo.modelo}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                                      <td className="px-4 py-2.5 font-medium text-slate-700">{modelo.modelo}</td>
+                                      <td className="px-4 py-2.5 text-right font-semibold text-indigo-700 tabular-nums">
+                                        {modelo.comVenda.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                      </td>
+                                      <td className="px-4 py-2.5 text-right font-semibold text-violet-700 tabular-nums">
+                                        {modelo.comLB.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                      </td>
+                                      <td className="px-4 py-2.5 text-right font-black text-slate-800 tabular-nums">
+                                        {modelo.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                  <tr className="bg-slate-100 border-t-2 border-slate-300">
+                                    <td className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">Total</td>
+                                    <td className="px-4 py-2.5 text-right font-black text-indigo-700 tabular-nums">
+                                      {item.totais.comVenda.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right font-black text-violet-700 tabular-nums">
+                                      {item.totais.comLB.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">
+                                      {item.totais.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
