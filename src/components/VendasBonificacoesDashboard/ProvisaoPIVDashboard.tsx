@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { loadVendasResultadoRows, type VendasResultadoRow } from './vendasResultadoStorage';
 import { loadProvisaoPivConfig, saveProvisaoPivConfig, periodoKey } from './provisaoPivStorage';
-import { Wrench, Car, Layers, ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { Wrench, Car, Layers, ArrowRight, ChevronDown, ChevronUp, Printer } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v?: string | null) => {
@@ -19,6 +19,14 @@ const n = (v?: string | null) => {
 
 const fmtBRL = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
 function getYr(r: VendasResultadoRow): number {
   if (r.periodoImport) {
@@ -304,6 +312,98 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
     ? String(filterYear)
     : `${['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][filterMonth - 1]}/${filterYear}`;
 
+  const handlePrintResumoModelo = () => {
+    const printRoot = document.getElementById('print-root');
+    if (!printRoot) {
+      window.print();
+      return;
+    }
+
+    const rowsHtml = resumoPorModelo.map(item => {
+      return `
+        <tr>
+          <td>${escapeHtml(item.modelo)}</td>
+          <td class="r">${fmtBRL(item.piv)}</td>
+          <td class="r">${fmtBRL(item.siq)}</td>
+          <td class="r strong">${fmtBRL(item.total)}</td>
+        </tr>`;
+    }).join('');
+
+    printRoot.innerHTML = `
+      <div class="print-page provisao-piv-print-page">
+        <div class="provisao-piv-print-wrap">
+          <h1>Provisao PIV + SIQ - Resumo por Modelo</h1>
+          <p>Periodo: ${escapeHtml(periodoLabel)}</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Modelo</th>
+                <th class="r">PIV</th>
+                <th class="r">SIQ</th>
+                <th class="r">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+              <tr class="total-row">
+                <td>Total</td>
+                <td class="r">${fmtBRL(totalPiv)}</td>
+                <td class="r">${fmtBRL(totalSiq)}</td>
+                <td class="r strong">${fmtBRL(totalGeral)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <style>
+        .provisao-piv-print-wrap {
+          font-family: Arial, sans-serif;
+          color: #0f172a;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          padding: 14px;
+        }
+        .provisao-piv-print-wrap h1 {
+          font-size: 16px;
+          margin: 0 0 4px;
+        }
+        .provisao-piv-print-wrap p {
+          font-size: 12px;
+          color: #475569;
+          margin: 0 0 12px;
+        }
+        .provisao-piv-print-wrap table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 11px;
+        }
+        .provisao-piv-print-wrap th,
+        .provisao-piv-print-wrap td {
+          border: 1px solid #e2e8f0;
+          padding: 6px 8px;
+        }
+        .provisao-piv-print-wrap th {
+          background: #f8fafc;
+          text-align: left;
+          font-weight: 700;
+          color: #334155;
+        }
+        .provisao-piv-print-wrap .r { text-align: right; }
+        .provisao-piv-print-wrap .strong { font-weight: 800; }
+        .provisao-piv-print-wrap .total-row td {
+          background: #f1f5f9;
+          font-weight: 700;
+        }
+      </style>
+    `;
+
+    window.print();
+    printRoot.innerHTML = '';
+  };
+
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50">
       <div className="max-w-4xl mx-auto px-6 py-6 flex flex-col gap-6">
@@ -318,12 +418,23 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
               {filtered.length} venda{filtered.length !== 1 ? 's' : ''} no período
             </p>
           </div>
-          {totalGeral > 0 && (
-            <div className="text-right">
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Total Geral</p>
-              <p className="text-2xl font-black text-slate-900 tabular-nums">{fmtBRL(totalGeral)}</p>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {resumoPorModelo.length > 0 && (
+              <button
+                onClick={handlePrintResumoModelo}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Imprimir PDF
+              </button>
+            )}
+            {totalGeral > 0 && (
+              <div className="text-right">
+                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Total Geral</p>
+                <p className="text-2xl font-black text-slate-900 tabular-nums">{fmtBRL(totalGeral)}</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── Fontes: PIV + SIQ ────────────────────────────────────────────── */}
