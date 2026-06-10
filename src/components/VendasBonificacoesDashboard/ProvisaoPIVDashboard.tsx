@@ -41,6 +41,40 @@ function getMo(r: VendasResultadoRow): number {
   return 0;
 }
 
+const MODEL_BASE_RULES: Array<{ pattern: RegExp; model: string }> = [
+  { pattern: /\bT[\s-]?CROSS\b/, model: 'T-CROSS' },
+  { pattern: /\bTIGUAN\b/, model: 'TIGUAN' },
+  { pattern: /\bNIVUS\b/, model: 'NIVUS' },
+  { pattern: /\bTAOS\b/, model: 'TAOS' },
+  { pattern: /\bPOLO\b/, model: 'POLO' },
+  { pattern: /\bJETTA\b/, model: 'JETTA' },
+  { pattern: /\bVIRTUS\b/, model: 'VIRTUS' },
+  { pattern: /\bSAVEIRO\b/, model: 'SAVEIRO' },
+  { pattern: /\bAMAROK\b/, model: 'AMAROK' },
+];
+
+function normalizeModelBase(modelo?: string | null): string {
+  const raw = String(modelo ?? '').trim().toUpperCase();
+  if (!raw) return 'SEM MODELO';
+
+  const normalized = raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9\s/-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  for (const rule of MODEL_BASE_RULES) {
+    if (rule.pattern.test(normalized)) return rule.model;
+  }
+
+  const ignoredPrefixes = new Set(['NOVO', 'NOVA']);
+  const tokens = normalized.split(' ').filter(Boolean);
+  const base = tokens.find(token => !ignoredPrefixes.has(token));
+
+  return base || normalized;
+}
+
 // ─── Barra bicolor animada ────────────────────────────────────────────────────
 function RatioBiBar({ pctOficina }: { pctOficina: number }) {
   const clampedOficina = Math.min(100, Math.max(0, pctOficina));
@@ -235,6 +269,29 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
     [filtered],
   );
 
+  // ── Resumo por modelo (sem versão) ──────────────────────────────────────
+  const resumoPorModelo = useMemo(() => {
+    const map = new Map<string, { modelo: string; piv: number; siq: number; total: number }>();
+
+    for (const r of rowsWithBonus) {
+      const modeloBase = normalizeModelBase(r.modelo);
+      const piv = n(r.bonusPIV);
+      const siq = n(r.bonusSIQ);
+      const total = piv + siq;
+
+      const current = map.get(modeloBase);
+      if (current) {
+        current.piv += piv;
+        current.siq += siq;
+        current.total += total;
+      } else {
+        map.set(modeloBase, { modelo: modeloBase, piv, siq, total });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.modelo.localeCompare(b.modelo, 'pt-BR'));
+  }, [rowsWithBonus]);
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
@@ -422,6 +479,52 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
             <span className="text-white font-black text-base tabular-nums">{fmtBRL(totalGeral)}</span>
           </div>
         </div>
+
+        {/* ── Resumo por modelo (sem versão) ─────────────────────────────── */}
+        {resumoPorModelo.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-3.5 flex items-center justify-between border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700">Resumo por Modelo</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">
+                  {resumoPorModelo.length} modelo{resumoPorModelo.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold">
+                Agrupado sem versão
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="px-4 py-2.5 text-left font-semibold text-slate-500 text-[10px] uppercase tracking-wide">Modelo</th>
+                    <th className="px-4 py-2.5 text-right font-semibold text-indigo-600 text-[10px] uppercase tracking-wide">PIV</th>
+                    <th className="px-4 py-2.5 text-right font-semibold text-violet-600 text-[10px] uppercase tracking-wide">SIQ</th>
+                    <th className="px-4 py-2.5 text-right font-semibold text-slate-600 text-[10px] uppercase tracking-wide">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {resumoPorModelo.map((item, i) => (
+                    <tr key={item.modelo} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                      <td className="px-4 py-2.5 font-medium text-slate-700">{item.modelo}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-indigo-700 tabular-nums">{fmtBRL(item.piv)}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-violet-700 tabular-nums">{fmtBRL(item.siq)}</td>
+                      <td className="px-4 py-2.5 text-right font-black text-slate-800 tabular-nums">{fmtBRL(item.total)}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-slate-100 border-t-2 border-slate-300">
+                    <td className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">Total</td>
+                    <td className="px-4 py-2.5 text-right font-black text-indigo-700 tabular-nums">{fmtBRL(totalPiv)}</td>
+                    <td className="px-4 py-2.5 text-right font-black text-violet-700 tabular-nums">{fmtBRL(totalSiq)}</td>
+                    <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">{fmtBRL(totalGeral)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* ── Detalhe por veículo (colapsável) ────────────────────────────── */}
         {rowsWithBonus.length > 0 && (
