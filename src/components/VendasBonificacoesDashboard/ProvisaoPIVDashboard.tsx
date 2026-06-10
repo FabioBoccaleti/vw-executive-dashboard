@@ -91,6 +91,15 @@ function normalizeChassi(v?: string | null): string {
   return String(v ?? '').trim().toUpperCase();
 }
 
+function formatPeriodoKeyToMesAno(pk?: string): string | null {
+  if (!pk) return null;
+  const m = pk.match(/^(\d{4})-(\d{1,2})$/);
+  if (!m) return null;
+  const yyyy = m[1];
+  const mm = m[2].padStart(2, '0');
+  return `${mm}/${yyyy}`;
+}
+
 // ─── Barra bicolor animada ────────────────────────────────────────────────────
 function RatioBiBar({ pctOficina }: { pctOficina: number }) {
   const clampedOficina = Math.min(100, Math.max(0, pctOficina));
@@ -223,7 +232,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
   const [expanded, setExpanded]   = useState(false); // detalhe por veículo
   const [resumoExpanded, setResumoExpanded] = useState(false);
   const [exportingDetalhe, setExportingDetalhe] = useState(false);
-  const [recebidosByChassi, setRecebidosByChassi] = useState<Record<string, { piv: number; siq: number }>>({});
+  const [recebidosByChassi, setRecebidosByChassi] = useState<Record<string, { piv: number; siq: number; mesRecebimento: string | null }>>({});
 
   // ── Carrega dados e config ────────────────────────────────────────────────
   useEffect(() => {
@@ -237,7 +246,8 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
       setRows(vendasRows);
       setPctInput(cfg.rateios[key] ?? '');
 
-      const nextRecebidosByChassi: Record<string, { piv: number; siq: number }> = {};
+      const nextRecebidosByChassi: Record<string, { piv: number; siq: number; mesRecebimento: string | null }> = {};
+      const mesRecebimentoDefault = (arquivoPivData?.header?.mesApurado ?? '').trim() || formatPeriodoKeyToMesAno(arquivoPivData?.periodoKey);
       for (const row of arquivoPivData?.rows ?? []) {
         const chassi = normalizeChassi(row.chassi);
         if (!chassi) continue;
@@ -248,7 +258,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
           current.piv += piv;
           current.siq += siq;
         } else {
-          nextRecebidosByChassi[chassi] = { piv, siq };
+          nextRecebidosByChassi[chassi] = { piv, siq, mesRecebimento: mesRecebimentoDefault || null };
         }
       }
       setRecebidosByChassi(nextRecebidosByChassi);
@@ -320,14 +330,23 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
     return recebido ? recebido.siq : null;
   };
 
+  const getMesRecebimento = (row: VendasResultadoRow): string | null => {
+    const chassi = normalizeChassi(row.chassi);
+    if (!chassi) return null;
+    const recebido = recebidosByChassi[chassi];
+    return recebido?.mesRecebimento ?? null;
+  };
+
   const detalheRecebidoTotais = useMemo(() => {
     let recebidoPiv = 0;
     let recebidoSiq = 0;
     let hasRecebido = false;
+    const mesesSet = new Set<string>();
 
     for (const r of rowsWithBonus) {
       const piv = getValorRecebidoPiv(r);
       const siq = getValorRecebidoSiq(r);
+      const mes = getMesRecebimento(r);
       if (piv !== null) {
         recebidoPiv += piv;
         hasRecebido = true;
@@ -336,13 +355,18 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
         recebidoSiq += siq;
         hasRecebido = true;
       }
+      if (mes) mesesSet.add(mes);
     }
 
     const diferenca = hasRecebido
       ? totalGeral - (recebidoPiv + recebidoSiq)
       : null;
 
-    return { recebidoPiv, recebidoSiq, diferenca, hasRecebido };
+    let mesRecebimentoResumo: string | null = null;
+    if (mesesSet.size === 1) mesRecebimentoResumo = [...mesesSet][0];
+    else if (mesesSet.size > 1) mesRecebimentoResumo = 'Vários';
+
+    return { recebidoPiv, recebidoSiq, diferenca, hasRecebido, mesRecebimentoResumo };
   }, [rowsWithBonus, totalGeral, recebidosByChassi]);
 
   // ── Resumo por modelo (sem versão) ──────────────────────────────────────
@@ -499,6 +523,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
         { header: 'Valor Recebido PIV', key: 'recebidoPiv', width: 18 },
         { header: 'Valor Recebido SIQ', key: 'recebidoSiq', width: 18 },
         { header: 'Diferença', key: 'diferenca', width: 15 },
+        { header: 'Mês Recebimento', key: 'mesRecebimento', width: 16 },
       ];
 
       const headerRow = ws.getRow(1);
@@ -512,6 +537,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
         const siq = n(r.bonusSIQ);
         const recebidoPiv = getValorRecebidoPiv(r);
         const recebidoSiq = getValorRecebidoSiq(r);
+        const mesRecebimento = getMesRecebimento(r);
         const hasRecebido = recebidoPiv !== null || recebidoSiq !== null;
         const diferenca = hasRecebido
           ? (piv + siq) - ((recebidoPiv ?? 0) + (recebidoSiq ?? 0))
@@ -526,6 +552,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
           recebidoPiv,
           recebidoSiq,
           diferenca,
+          mesRecebimento,
         });
       });
 
@@ -539,6 +566,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
         recebidoPiv: detalheRecebidoTotais.hasRecebido ? detalheRecebidoTotais.recebidoPiv : null,
         recebidoSiq: detalheRecebidoTotais.hasRecebido ? detalheRecebidoTotais.recebidoSiq : null,
         diferenca: detalheRecebidoTotais.diferenca,
+        mesRecebimento: detalheRecebidoTotais.mesRecebimentoResumo,
       });
       totalRow.font = { bold: true };
       totalRow.eachCell(cell => {
@@ -561,7 +589,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
             left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
             right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
           };
-          if (rowNumber > 1 && cell.col >= 4) {
+          if (rowNumber > 1 && cell.col >= 4 && cell.col <= 9) {
             cell.alignment = { horizontal: 'right', vertical: 'middle' };
           }
         });
@@ -584,7 +612,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50">
-      <div className="max-w-4xl mx-auto px-6 py-6 flex flex-col gap-6">
+      <div className="w-full max-w-[1680px] mx-auto px-4 lg:px-6 py-6 flex flex-col gap-6">
 
         {/* ── Cabeçalho ──────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between">
@@ -874,6 +902,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                       <th className="px-4 py-2.5 text-right font-semibold text-emerald-600 text-[10px] uppercase tracking-wide">Valor Recebido PIV</th>
                       <th className="px-4 py-2.5 text-right font-semibold text-teal-600 text-[10px] uppercase tracking-wide">Valor Recebido SIQ</th>
                       <th className="px-4 py-2.5 text-right font-semibold text-amber-600 text-[10px] uppercase tracking-wide">Diferença</th>
+                      <th className="px-4 py-2.5 text-left font-semibold text-sky-600 text-[10px] uppercase tracking-wide">Mês Recebimento</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -883,6 +912,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                       const tot = piv + siq;
                       const recebidoPiv = getValorRecebidoPiv(r);
                       const recebidoSiq = getValorRecebidoSiq(r);
+                      const mesRecebimento = getMesRecebimento(r);
                       const hasRecebido = recebidoPiv !== null || recebidoSiq !== null;
                       const diferenca = hasRecebido
                         ? tot - ((recebidoPiv ?? 0) + (recebidoSiq ?? 0))
@@ -910,6 +940,9 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                           <td className="px-4 py-2.5 text-right font-semibold text-amber-700 tabular-nums">
                             {diferenca !== null ? fmtBRL(diferenca) : <span className="text-slate-300">—</span>}
                           </td>
+                          <td className="px-4 py-2.5 text-sky-700 font-medium">
+                            {mesRecebimento ?? <span className="text-slate-300">—</span>}
+                          </td>
                         </tr>
                       );
                     })}
@@ -926,6 +959,9 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                       </td>
                       <td className="px-4 py-2.5 text-right font-black text-amber-700 tabular-nums">
                         {detalheRecebidoTotais.diferenca !== null ? fmtBRL(detalheRecebidoTotais.diferenca) : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-sky-700 font-black">
+                        {detalheRecebidoTotais.mesRecebimentoResumo ?? <span className="text-slate-300">—</span>}
                       </td>
                     </tr>
                   </tbody>
