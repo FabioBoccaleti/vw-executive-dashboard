@@ -88,6 +88,22 @@ function vinDistance(a: string, b: string): number {
   return dp[al][bl];
 }
 
+function commonPrefixLen(a: string, b: string): number {
+  const len = Math.min(a.length, b.length);
+  let i = 0;
+  while (i < len && a[i] === b[i]) i += 1;
+  return i;
+}
+
+function suffixEqualCount(a: string, b: string, tailLen = 6): number {
+  const len = Math.min(a.length, b.length, tailLen);
+  let eq = 0;
+  for (let i = 0; i < len; i++) {
+    if (a[a.length - 1 - i] === b[b.length - 1 - i]) eq += 1;
+  }
+  return eq;
+}
+
 type ProvisionCandidate = {
   chassi: string;
   modelo: string;
@@ -184,12 +200,27 @@ export function ConcilicacaoPIVChassisDuvidososView({
           const scored = provisionRows
             .map(c => {
               const distance = vinDistance(arquivoChassiRaw, c.chassi);
+              const prefixLen = commonPrefixLen(arquivoChassiRaw, c.chassi);
+              const suffixEq = suffixEqualCount(arquivoChassiRaw, c.chassi, 6);
               const totalBase = Math.max(1, Math.abs(c.total), Math.abs(arquivoTotal));
               const totalDiffRatio = Math.abs(c.total - arquivoTotal) / totalBase;
-              const score = (distance * 100) + (totalDiffRatio * 100);
-              return { c, distance, totalDiffRatio, score };
+              const score = (distance * 100) + (totalDiffRatio * 100) - (prefixLen * 3) - (suffixEq * 2);
+              return { c, distance, totalDiffRatio, prefixLen, suffixEq, score };
             })
-            .filter(s => s.distance >= 2 && s.distance <= 4 && s.totalDiffRatio <= 0.6)
+            .filter(s => {
+              if (s.distance < 2 || s.distance > 3) return false;
+              if (s.prefixLen < 10) return false;
+              if (s.suffixEq < 4) return false;
+
+              if (s.distance === 3) {
+                if (s.totalDiffRatio > 0.18) return false;
+                if (s.suffixEq < 5) return false;
+              } else {
+                if (s.totalDiffRatio > 0.35) return false;
+              }
+
+              return true;
+            })
             .sort((a, b) => a.score - b.score);
 
           if (!scored.length) continue;
