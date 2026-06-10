@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import { loadVendasResultadoRows, type VendasResultadoRow } from './vendasResultadoStorage';
 import { loadProvisaoPivConfig, saveProvisaoPivConfig, periodoKey } from './provisaoPivStorage';
-import { Wrench, Car, Layers, ArrowRight, ChevronDown, ChevronUp, Printer } from 'lucide-react';
+import { Wrench, Car, Layers, ArrowRight, ChevronDown, ChevronUp, Printer, Download } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v?: string | null) => {
@@ -214,6 +216,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
   const [configLoaded, setConfigLoaded] = useState(false);
   const [expanded, setExpanded]   = useState(false); // detalhe por veículo
   const [resumoExpanded, setResumoExpanded] = useState(false);
+  const [exportingDetalhe, setExportingDetalhe] = useState(false);
 
   // ── Carrega dados e config ────────────────────────────────────────────────
   useEffect(() => {
@@ -403,6 +406,91 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
 
     window.print();
     printRoot.innerHTML = '';
+  };
+
+  const handleExportDetalheExcel = async () => {
+    if (rowsWithBonus.length === 0) return;
+
+    setExportingDetalhe(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Sorana Executive Dashboard';
+      workbook.created = new Date();
+
+      const ws = workbook.addWorksheet('Detalhe PIV');
+      ws.columns = [
+        { header: 'Modelo', key: 'modelo', width: 34 },
+        { header: 'Chassi', key: 'chassi', width: 22 },
+        { header: 'Data', key: 'data', width: 14 },
+        { header: 'PIV', key: 'piv', width: 15 },
+        { header: 'SIQ', key: 'siq', width: 15 },
+        { header: 'Total', key: 'total', width: 15 },
+      ];
+
+      const headerRow = ws.getRow(1);
+      headerRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+      });
+
+      rowsWithBonus.forEach(r => {
+        const piv = n(r.bonusPIV);
+        const siq = n(r.bonusSIQ);
+        ws.addRow({
+          modelo: r.modelo || '—',
+          chassi: r.chassi || '—',
+          data: r.dataVenda || r.periodoImport || '—',
+          piv,
+          siq,
+          total: piv + siq,
+        });
+      });
+
+      const totalRow = ws.addRow({
+        modelo: 'TOTAL',
+        chassi: '',
+        data: '',
+        piv: totalPiv,
+        siq: totalSiq,
+        total: totalGeral,
+      });
+      totalRow.font = { bold: true };
+      totalRow.eachCell(cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      });
+
+      const moneyFmt = '"R$"\ #,##0.00';
+      ws.getColumn('piv').numFmt = moneyFmt;
+      ws.getColumn('siq').numFmt = moneyFmt;
+      ws.getColumn('total').numFmt = moneyFmt;
+
+      ws.eachRow((row, rowNumber) => {
+        row.eachCell(cell => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          };
+          if (rowNumber > 1 && cell.col >= 4) {
+            cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          }
+        });
+      });
+
+      const periodoFile = filterMonth === null
+        ? `${filterYear}`
+        : `${filterYear}-${String(filterMonth).padStart(2, '0')}`;
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        `Detalhe_PIV_${periodoFile}.xlsx`,
+      );
+    } finally {
+      setExportingDetalhe(false);
+    }
   };
 
   return (
@@ -650,20 +738,33 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
         {/* ── Detalhe por veículo (colapsável) ────────────────────────────── */}
         {rowsWithBonus.length > 0 && (
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <button
-              onClick={() => setExpanded(v => !v)}
-              className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
+            <div className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors">
+              <button
+                onClick={() => setExpanded(v => !v)}
+                className="flex-1 flex items-center gap-2 text-left"
+              >
                 <span className="text-xs font-bold text-slate-700">Detalhe por Veículo</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">
                   {rowsWithBonus.length} veículo{rowsWithBonus.length !== 1 ? 's' : ''}
                 </span>
+              </button>
+
+              <div className="flex items-center gap-2 ml-3">
+                <button
+                  onClick={handleExportDetalheExcel}
+                  disabled={exportingDetalhe}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {exportingDetalhe ? 'Exportando...' : 'Exportar Excel'}
+                </button>
+                <button onClick={() => setExpanded(v => !v)}>
+                  {expanded
+                    ? <ChevronUp className="w-4 h-4 text-slate-400" />
+                    : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                </button>
               </div>
-              {expanded
-                ? <ChevronUp className="w-4 h-4 text-slate-400" />
-                : <ChevronDown className="w-4 h-4 text-slate-400" />}
-            </button>
+            </div>
 
             {expanded && (
               <div className="overflow-x-auto border-t border-slate-100">
