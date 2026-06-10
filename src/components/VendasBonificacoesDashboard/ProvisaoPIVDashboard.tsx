@@ -56,6 +56,7 @@ const MODEL_BASE_RULES: Array<{ pattern: RegExp; model: string }> = [
   { pattern: /\bTIGUAN\b/, model: 'TIGUAN' },
   { pattern: /\bNIVUS\b/, model: 'NIVUS' },
   { pattern: /\bTAOS\b/, model: 'TAOS' },
+  { pattern: /\bTERA\b/, model: 'TERA' },
   { pattern: /\bPOLO\b/, model: 'POLO' },
   { pattern: /\bJETTA\b/, model: 'JETTA' },
   { pattern: /\bVIRTUS\b/, model: 'VIRTUS' },
@@ -283,21 +284,23 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
 
   // ── Resumo por modelo (sem versão) ──────────────────────────────────────
   const resumoPorModelo = useMemo(() => {
-    const map = new Map<string, { modelo: string; piv: number; siq: number; total: number }>();
+    const map = new Map<string, { modelo: string; piv: number; siq: number; total: number; bonusVarejo: number }>();
 
     for (const r of rowsWithBonus) {
       const modeloBase = normalizeModelBase(r.modelo);
       const piv = n(r.bonusPIV);
       const siq = n(r.bonusSIQ);
       const total = piv + siq;
+      const bonusVarejo = n(r.bonusVarejo);
 
       const current = map.get(modeloBase);
       if (current) {
         current.piv += piv;
         current.siq += siq;
         current.total += total;
+        current.bonusVarejo += bonusVarejo;
       } else {
-        map.set(modeloBase, { modelo: modeloBase, piv, siq, total });
+        map.set(modeloBase, { modelo: modeloBase, piv, siq, total, bonusVarejo });
       }
     }
 
@@ -330,8 +333,11 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
           <td class="r">${fmtBRL(item.piv)}</td>
           <td class="r">${fmtBRL(item.siq)}</td>
           <td class="r strong">${fmtBRL(item.total)}</td>
+          <td class="r">${fmtBRL(item.bonusVarejo)}</td>
         </tr>`;
     }).join('');
+
+    const totalBonusVarejo = resumoPorModelo.reduce((acc, item) => acc + item.bonusVarejo, 0);
 
     printRoot.innerHTML = `
       <div class="print-page provisao-piv-print-page">
@@ -346,6 +352,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                 <th class="r">PIV</th>
                 <th class="r">SIQ</th>
                 <th class="r">Total</th>
+                <th class="r">Bônus Varejo</th>
               </tr>
             </thead>
             <tbody>
@@ -355,6 +362,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                 <td class="r">${fmtBRL(totalPiv)}</td>
                 <td class="r">${fmtBRL(totalSiq)}</td>
                 <td class="r strong">${fmtBRL(totalGeral)}</td>
+                <td class="r">${fmtBRL(totalBonusVarejo)}</td>
               </tr>
             </tbody>
           </table>
@@ -710,6 +718,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                         <th className="px-4 py-2.5 text-right font-semibold text-indigo-600 text-[10px] uppercase tracking-wide">PIV</th>
                         <th className="px-4 py-2.5 text-right font-semibold text-violet-600 text-[10px] uppercase tracking-wide">SIQ</th>
                         <th className="px-4 py-2.5 text-right font-semibold text-slate-600 text-[10px] uppercase tracking-wide">Total</th>
+                            <th className="px-4 py-2.5 text-right font-semibold text-emerald-600 text-[10px] uppercase tracking-wide">Bônus Varejo</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -719,6 +728,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                           <td className="px-4 py-2.5 text-right font-semibold text-indigo-700 tabular-nums">{fmtBRL(item.piv)}</td>
                           <td className="px-4 py-2.5 text-right font-semibold text-violet-700 tabular-nums">{fmtBRL(item.siq)}</td>
                           <td className="px-4 py-2.5 text-right font-black text-slate-800 tabular-nums">{fmtBRL(item.total)}</td>
+                              <td className="px-4 py-2.5 text-right font-semibold text-emerald-700 tabular-nums">{fmtBRL(item.bonusVarejo)}</td>
                         </tr>
                       ))}
                       <tr className="bg-slate-100 border-t-2 border-slate-300">
@@ -726,6 +736,9 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                         <td className="px-4 py-2.5 text-right font-black text-indigo-700 tabular-nums">{fmtBRL(totalPiv)}</td>
                         <td className="px-4 py-2.5 text-right font-black text-violet-700 tabular-nums">{fmtBRL(totalSiq)}</td>
                         <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">{fmtBRL(totalGeral)}</td>
+                            <td className="px-4 py-2.5 text-right font-black text-emerald-700 tabular-nums">
+                              {fmtBRL(resumoPorModelo.reduce((acc, item) => acc + item.bonusVarejo, 0))}
+                            </td>
                       </tr>
                     </tbody>
                   </table>

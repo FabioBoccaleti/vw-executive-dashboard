@@ -82,6 +82,7 @@ const MODEL_BASE_RULES: Array<{ pattern: RegExp; model: string }> = [
   { pattern: /\bTIGUAN\b/, model: 'TIGUAN' },
   { pattern: /\bNIVUS\b/, model: 'NIVUS' },
   { pattern: /\bTAOS\b/, model: 'TAOS' },
+  { pattern: /\bTERA\b/, model: 'TERA' },
   { pattern: /\bPOLO\b/, model: 'POLO' },
   { pattern: /\bJETTA\b/, model: 'JETTA' },
   { pattern: /\bVIRTUS\b/, model: 'VIRTUS' },
