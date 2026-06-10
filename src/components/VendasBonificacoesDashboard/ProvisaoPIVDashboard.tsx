@@ -529,7 +529,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
       const piv = n(r.bonusPIV);
       const siq = n(r.bonusSIQ);
       const total = piv + siq;
-      const bonusVarejo = n(r.bonusVarejo);
+      const bonusVarejo = n(r.bonusVarejo) + n(r.bonusTradeIn);
 
       const current = map.get(modeloBase);
       if (current) {
