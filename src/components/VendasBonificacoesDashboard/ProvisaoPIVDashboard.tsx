@@ -1,10 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import { kvGet, kvSet } from '@/lib/kvClient';
 import { loadVendasResultadoRows, type VendasResultadoRow } from './vendasResultadoStorage';
 import { loadProvisaoPivConfig, saveProvisaoPivConfig, periodoKey } from './provisaoPivStorage';
 import { loadArquivoPivData } from './arquivoPivStorage';
 import { Wrench, Car, Layers, ArrowRight, ChevronDown, ChevronUp, Printer, Download } from 'lucide-react';
+
+type RecebidoChassiData = { piv: number; siq: number; mesRecebimento: string | null };
+type RecebidoOverridesStore = Record<string, Record<string, RecebidoChassiData>>;
+const RECEBIDOS_OVERRIDE_KEY = 'provisao_piv_recebidos_overrides';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v?: string | null) => {
@@ -89,6 +94,19 @@ function normalizeModelBase(modelo?: string | null): string {
 
 function normalizeChassi(v?: string | null): string {
   return String(v ?? '').trim().toUpperCase();
+}
+
+function normalizeMesRecebimentoInput(v: string): string | null {
+  const raw = String(v ?? '').trim();
+  if (!raw) return null;
+
+  const mSlash = raw.match(/^(\d{1,2})\/(\d{4})$/);
+  if (mSlash) return `${mSlash[1].padStart(2, '0')}/${mSlash[2]}`;
+
+  const mDash = raw.match(/^(\d{4})-(\d{1,2})$/);
+  if (mDash) return `${mDash[2].padStart(2, '0')}/${mDash[1]}`;
+
+  return raw;
 }
 
 function formatPeriodoKeyToMesAno(pk?: string): string | null {
@@ -232,7 +250,16 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
   const [expanded, setExpanded]   = useState(false); // detalhe por veículo
   const [resumoExpanded, setResumoExpanded] = useState(false);
   const [exportingDetalhe, setExportingDetalhe] = useState(false);
-  const [recebidosByChassi, setRecebidosByChassi] = useState<Record<string, { piv: number; siq: number; mesRecebimento: string | null }>>({});
+  const [importadosByChassi, setImportadosByChassi] = useState<Record<string, RecebidoChassiData>>({});
+  const [overridesByChassi, setOverridesByChassi] = useState<Record<string, RecebidoChassiData>>({});
+  const [editingChassi, setEditingChassi] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{ piv: string; siq: string; mesRecebimento: string }>({
+    piv: '',
+    siq: '',
+    mesRecebimento: '',
+  });
+
+  const recebidosByChassi = useMemo(() => ({ ...importadosByChassi, ...overridesByChassi }), [importadosByChassi, overridesByChassi]);
 
   // ── Carrega dados e config ────────────────────────────────────────────────
   useEffect(() => {
@@ -242,7 +269,8 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
       loadVendasResultadoRows('novos'),
       loadProvisaoPivConfig(),
       loadArquivoPivData(key),
-    ]).then(([vendasRows, cfg, arquivoPivData]) => {
+      kvGet(RECEBIDOS_OVERRIDE_KEY),
+    ]).then(([vendasRows, cfg, arquivoPivData, overridesRaw]) => {
       setRows(vendasRows);
       setPctInput(cfg.rateios[key] ?? '');
 
@@ -261,7 +289,12 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
           nextRecebidosByChassi[chassi] = { piv, siq, mesRecebimento: mesRecebimentoDefault || null };
         }
       }
-      setRecebidosByChassi(nextRecebidosByChassi);
+      setImportadosByChassi(nextRecebidosByChassi);
+
+      const overridesStore = (overridesRaw as RecebidoOverridesStore | null) ?? {};
+      setOverridesByChassi(overridesStore[key] ?? {});
+      setEditingChassi(null);
+      setEditDraft({ piv: '', siq: '', mesRecebimento: '' });
 
       setConfigLoaded(true);
       setLoading(false);
@@ -335,6 +368,59 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
     if (!chassi) return null;
     const recebido = recebidosByChassi[chassi];
     return recebido?.mesRecebimento ?? null;
+  };
+
+  const startEditRow = (row: VendasResultadoRow) => {
+    const chassi = normalizeChassi(row.chassi);
+    if (!chassi) return;
+    const recebidoPiv = getValorRecebidoPiv(row);
+    const recebidoSiq = getValorRecebidoSiq(row);
+    const mes = getMesRecebimento(row) ?? '';
+    setEditingChassi(chassi);
+    setEditDraft({
+      piv: recebidoPiv !== null
+        ? recebidoPiv.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '',
+      siq: recebidoSiq !== null
+        ? recebidoSiq.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '',
+      mesRecebimento: mes,
+    });
+  };
+
+  const cancelEditRow = () => {
+    setEditingChassi(null);
+    setEditDraft({ piv: '', siq: '', mesRecebimento: '' });
+  };
+
+  const saveEditRow = async (row: VendasResultadoRow) => {
+    const chassi = normalizeChassi(row.chassi);
+    if (!chassi) return;
+
+    const pivStr = editDraft.piv.trim();
+    const siqStr = editDraft.siq.trim();
+    const mesNorm = normalizeMesRecebimentoInput(editDraft.mesRecebimento);
+
+    const hasAny = !!pivStr || !!siqStr || !!mesNorm;
+    const pk = periodoKey(filterYear, filterMonth);
+    const raw = await kvGet(RECEBIDOS_OVERRIDE_KEY);
+    const store = ((raw as RecebidoOverridesStore | null) ?? {}) as RecebidoOverridesStore;
+    const periodMap = { ...(store[pk] ?? {}) };
+
+    if (hasAny) {
+      periodMap[chassi] = {
+        piv: n(pivStr),
+        siq: n(siqStr),
+        mesRecebimento: mesNorm,
+      };
+    } else {
+      delete periodMap[chassi];
+    }
+
+    store[pk] = periodMap;
+    await kvSet(RECEBIDOS_OVERRIDE_KEY, store);
+    setOverridesByChassi(periodMap);
+    cancelEditRow();
   };
 
   const detalheRecebidoTotais = useMemo(() => {
@@ -903,10 +989,13 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                       <th className="px-4 py-2.5 text-right font-semibold text-teal-600 text-[10px] uppercase tracking-wide">Valor Recebido SIQ</th>
                       <th className="px-4 py-2.5 text-right font-semibold text-amber-600 text-[10px] uppercase tracking-wide">Diferença</th>
                       <th className="px-4 py-2.5 text-left font-semibold text-sky-600 text-[10px] uppercase tracking-wide">Mês Recebimento</th>
+                      <th className="px-4 py-2.5 text-center font-semibold text-slate-500 text-[10px] uppercase tracking-wide">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {rowsWithBonus.map((r, i) => {
+                      const chassi = normalizeChassi(r.chassi);
+                      const isEditing = !!chassi && editingChassi === chassi;
                       const piv = n(r.bonusPIV);
                       const siq = n(r.bonusSIQ);
                       const tot = piv + siq;
@@ -931,17 +1020,79 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                           <td className="px-4 py-2.5 text-right font-black text-slate-800 tabular-nums">
                             {fmtBRL(tot)}
                           </td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-emerald-700 tabular-nums">
-                            {recebidoPiv !== null ? fmtBRL(recebidoPiv) : <span className="text-slate-300">—</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-teal-700 tabular-nums">
-                            {recebidoSiq !== null ? fmtBRL(recebidoSiq) : <span className="text-slate-300">—</span>}
-                          </td>
+                          {isEditing ? (
+                            <>
+                              <td className="px-4 py-2.5">
+                                <input
+                                  value={editDraft.piv}
+                                  onChange={e => setEditDraft(prev => ({ ...prev, piv: e.target.value }))}
+                                  placeholder="0,00"
+                                  className="w-28 border border-slate-200 rounded px-2 py-1 text-xs text-right text-slate-700 focus:outline-none focus:border-emerald-400"
+                                />
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <input
+                                  value={editDraft.siq}
+                                  onChange={e => setEditDraft(prev => ({ ...prev, siq: e.target.value }))}
+                                  placeholder="0,00"
+                                  className="w-28 border border-slate-200 rounded px-2 py-1 text-xs text-right text-slate-700 focus:outline-none focus:border-teal-400"
+                                />
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-4 py-2.5 text-right font-semibold text-emerald-700 tabular-nums">
+                                {recebidoPiv !== null ? fmtBRL(recebidoPiv) : <span className="text-slate-300">—</span>}
+                              </td>
+                              <td className="px-4 py-2.5 text-right font-semibold text-teal-700 tabular-nums">
+                                {recebidoSiq !== null ? fmtBRL(recebidoSiq) : <span className="text-slate-300">—</span>}
+                              </td>
+                            </>
+                          )}
                           <td className="px-4 py-2.5 text-right font-semibold text-amber-700 tabular-nums">
                             {diferenca !== null ? fmtBRL(diferenca) : <span className="text-slate-300">—</span>}
                           </td>
-                          <td className="px-4 py-2.5 text-sky-700 font-medium">
-                            {mesRecebimento ?? <span className="text-slate-300">—</span>}
+                          {isEditing ? (
+                            <td className="px-4 py-2.5">
+                              <input
+                                value={editDraft.mesRecebimento}
+                                onChange={e => setEditDraft(prev => ({ ...prev, mesRecebimento: e.target.value }))}
+                                placeholder="MM/AAAA"
+                                className="w-24 border border-slate-200 rounded px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-sky-400"
+                              />
+                            </td>
+                          ) : (
+                            <td className="px-4 py-2.5 text-sky-700 font-medium">
+                              {mesRecebimento ?? <span className="text-slate-300">—</span>}
+                            </td>
+                          )}
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center justify-center gap-2">
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    onClick={() => saveEditRow(r)}
+                                    className="px-2 py-1 rounded border border-emerald-200 text-emerald-700 text-[10px] font-semibold hover:bg-emerald-50"
+                                  >
+                                    Salvar
+                                  </button>
+                                  <button
+                                    onClick={cancelEditRow}
+                                    className="px-2 py-1 rounded border border-slate-200 text-slate-500 text-[10px] font-semibold hover:bg-slate-50"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => startEditRow(r)}
+                                  disabled={!chassi}
+                                  className="px-2 py-1 rounded border border-slate-200 text-slate-600 text-[10px] font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  Editar
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -963,6 +1114,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                       <td className="px-4 py-2.5 text-sky-700 font-black">
                         {detalheRecebidoTotais.mesRecebimentoResumo ?? <span className="text-slate-300">—</span>}
                       </td>
+                      <td className="px-4 py-2.5" />
                     </tr>
                   </tbody>
                 </table>
