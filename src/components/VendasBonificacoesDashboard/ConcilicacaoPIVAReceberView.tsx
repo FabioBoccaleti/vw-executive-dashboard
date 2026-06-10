@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+import { Download } from 'lucide-react';
 import { kvGet } from '@/lib/kvClient';
+import { Button } from '@/components/ui/button';
 import { loadVendasResultadoRows, type VendasResultadoRow } from './vendasResultadoStorage';
 import { loadArquivoPivData } from './arquivoPivStorage';
 import { periodoKey } from './provisaoPivStorage';
@@ -67,6 +71,7 @@ interface Props {
 
 export function ConcilicacaoPIVAReceberView({ filterYear, filterMonth }: Props) {
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [rows, setRows] = useState<VendasResultadoRow[]>([]);
   const [importadosByChassi, setImportadosByChassi] = useState<Record<string, RecebidoChassiData>>({});
   const [overridesByChassi, setOverridesByChassi] = useState<Record<string, RecebidoChassiData>>({});
@@ -168,6 +173,101 @@ export function ConcilicacaoPIVAReceberView({ filterYear, filterMonth }: Props) 
     [detalheAReceber],
   );
 
+  const handleExportExcel = async () => {
+    if (detalheAReceber.length === 0 || exporting) return;
+
+    setExporting(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Sorana Executive Dashboard';
+      workbook.created = new Date();
+
+      const ws = workbook.addWorksheet('A Receber');
+      ws.columns = [
+        { header: 'Modelo', key: 'modelo', width: 34 },
+        { header: 'Chassi', key: 'chassi', width: 22 },
+        { header: 'Data', key: 'data', width: 14 },
+        { header: 'PIV', key: 'piv', width: 15 },
+        { header: 'SIQ', key: 'siq', width: 15 },
+        { header: 'Total', key: 'total', width: 15 },
+        { header: 'Valor Recebido PIV', key: 'recebidoPiv', width: 18 },
+        { header: 'Valor Recebido SIQ', key: 'recebidoSiq', width: 18 },
+        { header: 'Diferenca', key: 'diferenca', width: 15 },
+        { header: 'Mes Recebimento', key: 'mesRecebimento', width: 16 },
+      ];
+
+      const headerRow = ws.getRow(1);
+      headerRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+      });
+
+      detalheAReceber.forEach(row => {
+        ws.addRow({
+          modelo: row.modelo,
+          chassi: row.chassi,
+          data: row.data,
+          piv: row.piv,
+          siq: row.siq,
+          total: row.total,
+          recebidoPiv: row.recebidoPiv,
+          recebidoSiq: row.recebidoSiq,
+          diferenca: row.diferenca,
+          mesRecebimento: row.mesRecebimento || '-',
+        });
+      });
+
+      const totalRow = ws.addRow({
+        modelo: 'TOTAL',
+        chassi: '',
+        data: '',
+        piv: detalheAReceber.reduce((acc, row) => acc + row.piv, 0),
+        siq: detalheAReceber.reduce((acc, row) => acc + row.siq, 0),
+        total: detalheAReceber.reduce((acc, row) => acc + row.total, 0),
+        recebidoPiv: detalheAReceber.reduce((acc, row) => acc + (row.recebidoPiv ?? 0), 0),
+        recebidoSiq: detalheAReceber.reduce((acc, row) => acc + (row.recebidoSiq ?? 0), 0),
+        diferenca: detalheAReceber.reduce((acc, row) => acc + row.diferenca, 0),
+        mesRecebimento: '',
+      });
+      totalRow.font = { bold: true };
+
+      const moneyFmt = '"R$"\ #,##0.00';
+      ws.getColumn('piv').numFmt = moneyFmt;
+      ws.getColumn('siq').numFmt = moneyFmt;
+      ws.getColumn('total').numFmt = moneyFmt;
+      ws.getColumn('recebidoPiv').numFmt = moneyFmt;
+      ws.getColumn('recebidoSiq').numFmt = moneyFmt;
+      ws.getColumn('diferenca').numFmt = moneyFmt;
+
+      ws.eachRow((row, rowNumber) => {
+        row.eachCell(cell => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          };
+          if (rowNumber > 1 && cell.col >= 4 && cell.col <= 9) {
+            cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          }
+        });
+      });
+
+      const periodoFile = filterMonth === null
+        ? `${filterYear}`
+        : `${filterYear}-${String(filterMonth).padStart(2, '0')}`;
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        `Conciliacao_PIV_A_Receber_${periodoFile}.xlsx`,
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
@@ -181,10 +281,22 @@ export function ConcilicacaoPIVAReceberView({ filterYear, filterMonth }: Props) 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
           <h3 className="text-sm font-bold text-slate-700">A Receber - Detalhe por Veiculo</h3>
-          <div className="text-xs text-slate-500">
-            <span className="font-semibold text-slate-700">{detalheAReceber.length}</span> linha{detalheAReceber.length !== 1 ? 's' : ''}
-            {' · '}
-            Total {fmtBRL(totalAReceber)}
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-slate-500">
+              <span className="font-semibold text-slate-700">{detalheAReceber.length}</span> linha{detalheAReceber.length !== 1 ? 's' : ''}
+              {' · '}
+              Total {fmtBRL(totalAReceber)}
+            </div>
+            <Button
+              onClick={handleExportExcel}
+              size="sm"
+              variant="outline"
+              disabled={detalheAReceber.length === 0 || exporting}
+              className="flex items-center gap-2"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {exporting ? 'Gerando...' : 'Exportar Excel'}
+            </Button>
           </div>
         </div>
 

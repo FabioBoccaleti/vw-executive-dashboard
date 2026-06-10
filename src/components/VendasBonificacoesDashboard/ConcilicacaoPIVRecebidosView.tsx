@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+import { Download } from 'lucide-react';
 import { kvGet } from '@/lib/kvClient';
+import { Button } from '@/components/ui/button';
 import { loadVendasResultadoRows, type VendasResultadoRow } from './vendasResultadoStorage';
 import { loadArquivoPivStore } from './arquivoPivStorage';
 import { periodoKey } from './provisaoPivStorage';
@@ -82,6 +86,7 @@ interface Props {
 
 export function ConcilicacaoPIVRecebidosView({ filterYear, filterMonth }: Props) {
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [rows, setRows] = useState<VendasResultadoRow[]>([]);
   const [recebidosByPeriodo, setRecebidosByPeriodo] = useState<RecebidosByPeriodo>({});
 
@@ -240,6 +245,118 @@ export function ConcilicacaoPIVRecebidosView({ filterYear, filterMonth }: Props)
     [detalheRecebidos],
   );
 
+  const handleExportExcel = async () => {
+    if (detalheRecebidos.length === 0 || exporting) return;
+
+    setExporting(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Sorana Executive Dashboard';
+      workbook.created = new Date();
+
+      const wsResumo = workbook.addWorksheet('Resumo Data');
+      wsResumo.columns = [
+        { header: 'Data (Mes/Ano)', key: 'competencia', width: 18 },
+        { header: 'PIV', key: 'piv', width: 16 },
+        { header: 'SIQ', key: 'siq', width: 16 },
+        { header: 'Valor Recebido PIV', key: 'recebidoPiv', width: 20 },
+        { header: 'Valor Recebido SIQ', key: 'recebidoSiq', width: 20 },
+        { header: 'Diferenca', key: 'diferenca', width: 16 },
+        { header: 'Linhas', key: 'linhas', width: 10 },
+      ];
+      const resumoHeader = wsResumo.getRow(1);
+      resumoHeader.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+      });
+      resumoPorCompetenciaData.forEach(item => {
+        wsResumo.addRow(item);
+      });
+      wsResumo.addRow({
+        competencia: 'TOTAL',
+        piv: resumoPorCompetenciaData.reduce((acc, item) => acc + item.piv, 0),
+        siq: resumoPorCompetenciaData.reduce((acc, item) => acc + item.siq, 0),
+        recebidoPiv: resumoPorCompetenciaData.reduce((acc, item) => acc + item.recebidoPiv, 0),
+        recebidoSiq: resumoPorCompetenciaData.reduce((acc, item) => acc + item.recebidoSiq, 0),
+        diferenca: resumoPorCompetenciaData.reduce((acc, item) => acc + item.diferenca, 0),
+        linhas: resumoPorCompetenciaData.reduce((acc, item) => acc + item.linhas, 0),
+      }).font = { bold: true };
+
+      const wsDetalhe = workbook.addWorksheet('Recebidos');
+      wsDetalhe.columns = [
+        { header: 'Modelo', key: 'modelo', width: 34 },
+        { header: 'Chassi', key: 'chassi', width: 22 },
+        { header: 'Data', key: 'data', width: 14 },
+        { header: 'PIV', key: 'piv', width: 15 },
+        { header: 'SIQ', key: 'siq', width: 15 },
+        { header: 'Total', key: 'total', width: 15 },
+        { header: 'Valor Recebido PIV', key: 'recebidoPiv', width: 18 },
+        { header: 'Valor Recebido SIQ', key: 'recebidoSiq', width: 18 },
+        { header: 'Diferenca', key: 'diferenca', width: 15 },
+        { header: 'Mes Recebimento', key: 'mesRecebimento', width: 16 },
+      ];
+      const detalheHeader = wsDetalhe.getRow(1);
+      detalheHeader.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+      });
+      detalheRecebidos.forEach(row => {
+        wsDetalhe.addRow({
+          ...row,
+          mesRecebimento: row.mesRecebimento || '-',
+        });
+      });
+      wsDetalhe.addRow({
+        modelo: 'TOTAL',
+        chassi: '',
+        data: '',
+        piv: detalheRecebidos.reduce((acc, row) => acc + row.piv, 0),
+        siq: detalheRecebidos.reduce((acc, row) => acc + row.siq, 0),
+        total: detalheRecebidos.reduce((acc, row) => acc + row.total, 0),
+        recebidoPiv: detalheRecebidos.reduce((acc, row) => acc + (row.recebidoPiv ?? 0), 0),
+        recebidoSiq: detalheRecebidos.reduce((acc, row) => acc + (row.recebidoSiq ?? 0), 0),
+        diferenca: detalheRecebidos.reduce((acc, row) => acc + row.diferenca, 0),
+        mesRecebimento: '',
+      }).font = { bold: true };
+
+      const moneyFmt = '"R$"\ #,##0.00';
+      ['piv', 'siq', 'recebidoPiv', 'recebidoSiq', 'diferenca'].forEach(col => {
+        wsResumo.getColumn(col).numFmt = moneyFmt;
+        wsDetalhe.getColumn(col).numFmt = moneyFmt;
+      });
+      wsDetalhe.getColumn('total').numFmt = moneyFmt;
+
+      [wsResumo, wsDetalhe].forEach(ws => {
+        ws.eachRow((row, rowNumber) => {
+          row.eachCell(cell => {
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            };
+            if (rowNumber > 1 && cell.col >= 2) {
+              cell.alignment = { horizontal: 'right', vertical: 'middle' };
+            }
+          });
+        });
+      });
+
+      const periodoFile = filterMonth === null
+        ? `${filterYear}`
+        : `${filterYear}-${String(filterMonth).padStart(2, '0')}`;
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        `Conciliacao_PIV_Recebidos_${periodoFile}.xlsx`,
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
@@ -253,10 +370,22 @@ export function ConcilicacaoPIVRecebidosView({ filterYear, filterMonth }: Props)
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
           <h3 className="text-sm font-bold text-slate-700">Recebidos - Detalhe por Veiculo</h3>
-          <div className="text-xs text-slate-500">
-            <span className="font-semibold text-slate-700">{detalheRecebidos.length}</span> linha{detalheRecebidos.length !== 1 ? 's' : ''}
-            {' · '}
-            Recebido {fmtBRL(totalRecebidos)}
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-slate-500">
+              <span className="font-semibold text-slate-700">{detalheRecebidos.length}</span> linha{detalheRecebidos.length !== 1 ? 's' : ''}
+              {' · '}
+              Recebido {fmtBRL(totalRecebidos)}
+            </div>
+            <Button
+              onClick={handleExportExcel}
+              size="sm"
+              variant="outline"
+              disabled={detalheRecebidos.length === 0 || exporting}
+              className="flex items-center gap-2"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {exporting ? 'Gerando...' : 'Exportar Excel'}
+            </Button>
           </div>
         </div>
 
