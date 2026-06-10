@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { createWorker as createTesseractWorker } from 'tesseract.js';
-import { Upload, FileText, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { Upload, FileText, ChevronDown, ChevronUp, Download, Trash2 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
-  loadArquivoPivData, saveArquivoPivData,
+  loadArquivoPivData, saveArquivoPivData, clearArquivoPivData,
   type ArquivoPivData, type ArquivoPivHeader,
   type ArquivoPivResumo, type ArquivoPivCriterioSat, type ArquivoPivRow,
 } from './arquivoPivStorage';
@@ -641,6 +641,20 @@ export function ArquivoPIVDashboard({ filterYear, filterMonth }: Props) {
     finally { setExporting(false); }
   };
 
+  const handleClear = async () => {
+    if (!data) return;
+    const confirmed = window.confirm(
+      'Tem certeza que deseja limpar os dados importados deste período? Esta ação não pode ser desfeita.',
+    );
+    if (!confirmed) return;
+
+    await clearArquivoPivData(pk);
+    setData(null);
+    setDebugLines([]);
+    setShowDebug(false);
+    toast.success('Dados do Arquivo PIV removidos para o período selecionado.');
+  };
+
   const pk = periodoKey(filterYear, filterMonth);
 
   useEffect(() => {
@@ -720,6 +734,17 @@ export function ArquivoPIVDashboard({ filterYear, filterMonth }: Props) {
           >
             <Download className="w-3.5 h-3.5" />
             {exporting ? 'Gerando...' : 'Exportar Excel'}
+          </Button>
+        )}
+        {data && !importing && (
+          <Button
+            onClick={handleClear}
+            size="sm"
+            variant="outline"
+            className="flex items-center gap-2 border-rose-300 text-rose-700 hover:bg-rose-50"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Limpar
           </Button>
         )}
         {data && !importing && (

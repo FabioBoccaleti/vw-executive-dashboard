@@ -80,3 +80,12 @@ export async function saveArquivoPivData(pk: string, data: ArquivoPivData): Prom
     await kvSet(KEY, store);
   } catch { /* ignore */ }
 }
+
+export async function clearArquivoPivData(pk: string): Promise<void> {
+  try {
+    const store = await loadArquivoPivStore();
+    if (!(pk in store)) return;
+    delete store[pk];
+    await kvSet(KEY, store);
+  } catch { /* ignore */ }
+}
