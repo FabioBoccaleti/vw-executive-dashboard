@@ -22,6 +22,8 @@ import { ManualRelatoriosPage } from './ManualRelatoriosPage';
 import { CentralVendasResumoPage } from './CentralVendasResumoPage';
 import { ProvisaoPIVDashboard } from './ProvisaoPIVDashboard';
 import { ArquivoPIVDashboard } from './ArquivoPIVDashboard';
+import { ConcilicacaoPIVAReceberView } from './ConcilicacaoPIVAReceberView';
+import { ConcilicacaoPIVRecebidosView } from './ConcilicacaoPIVRecebidosView';
 import { appendTabelaDadosRows } from './tabelaDadosStorage';
 import type { TabelaDadosRow } from './tabelaDadosStorage';
 
@@ -482,11 +484,15 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
   const [registroFilterYear, setRegistroFilterYear] = useState<number>(new Date().getFullYear());
   const [registroFilterMonth, setRegistroFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [financeiroTab, setFinanceiroTab] = useState<'piv'>('piv');
-  const [pivSubTab, setPivSubTab] = useState<'provisao-piv' | 'arquivo-piv'>('provisao-piv');
+  const [pivSubTab, setPivSubTab] = useState<'provisao-piv' | 'arquivo-piv' | 'conciliacao-piv'>('provisao-piv');
   const [pivFilterYear, setPivFilterYear] = useState<number>(new Date().getFullYear());
   const [pivFilterMonth, setPivFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [arquivoPivFilterYear, setArquivoPivFilterYear] = useState<number>(new Date().getFullYear());
   const [arquivoPivFilterMonth, setArquivoPivFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [conciliacaoPivYear, setConciliacaoPivYear] = useState<number>(new Date().getFullYear());
+  const [conciliacaoPivMonth, setConciliacaoPivMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [conciliacaoPivSubTab, setConciliacaoPivSubTab] = useState<'a-receber' | 'recebidos'>('a-receber');
+  const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const [pages, setPages] = useState<PageResult[] | null>(null);
   const [openPages, setOpenPages] = useState<Set<number>>(new Set([1]));
   const [loading, setLoading] = useState(false);
@@ -805,6 +811,17 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
                   <FileText className="w-3.5 h-3.5" />
                   Arquivo PIV Montadora
                 </button>
+                <button
+                  onClick={() => setPivSubTab('conciliacao-piv')}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+                    pivSubTab === 'conciliacao-piv'
+                      ? 'border-blue-500 text-blue-700 bg-white'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-white/60'
+                  }`}
+                >
+                  <LayoutList className="w-3.5 h-3.5" />
+                  Conciliação PIV
+                </button>
               </div>
 
               {/* Seletor de Ano/Mês + conteúdo — Provisão PIV */}
@@ -833,7 +850,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
                     >
                       Ano todo
                     </button>
-                    {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((name, idx) => {
+                    {monthNames.map((name, idx) => {
                       const m = idx + 1;
                       const isActive = pivFilterMonth === m;
                       return (
@@ -882,7 +899,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
                     >
                       Ano todo
                     </button>
-                    {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((name, idx) => {
+                    {monthNames.map((name, idx) => {
                       const m = idx + 1;
                       const isActive = arquivoPivFilterMonth === m;
                       return (
@@ -902,6 +919,92 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
                     filterYear={arquivoPivFilterYear}
                     filterMonth={arquivoPivFilterMonth}
                   />
+                </div>
+              )}
+
+              {/* Seletor de mês + sub-abas — Conciliação PIV */}
+              {pivSubTab === 'conciliacao-piv' && (
+                <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+                  <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
+                    <div className="relative mr-2">
+                      <select
+                        value={conciliacaoPivYear}
+                        onChange={e => setConciliacaoPivYear(Number(e.target.value))}
+                        className="appearance-none text-sm font-bold text-slate-700 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 cursor-pointer"
+                      >
+                        {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                    </div>
+                    <div className="w-px h-5 bg-slate-200 mr-1" />
+                    <button
+                      onClick={() => setConciliacaoPivMonth(null)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        conciliacaoPivMonth === null ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                      }`}
+                    >
+                      Ano todo
+                    </button>
+                    {monthNames.map((name, idx) => {
+                      const m = idx + 1;
+                      const isActive = conciliacaoPivMonth === m;
+                      return (
+                        <button
+                          key={m}
+                          onClick={() => setConciliacaoPivMonth(m)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                          }`}
+                        >
+                          {name}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="bg-slate-50 border-b border-slate-200 px-8 flex gap-0 flex-shrink-0">
+                    <button
+                      onClick={() => setConciliacaoPivSubTab('a-receber')}
+                      className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+                        conciliacaoPivSubTab === 'a-receber'
+                          ? 'border-blue-500 text-blue-700 bg-white'
+                          : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-white/60'
+                      }`}
+                    >
+                      A Receber
+                    </button>
+                    <button
+                      onClick={() => setConciliacaoPivSubTab('recebidos')}
+                      className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+                        conciliacaoPivSubTab === 'recebidos'
+                          ? 'border-blue-500 text-blue-700 bg-white'
+                          : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-white/60'
+                      }`}
+                    >
+                      Recebidos
+                    </button>
+                  </div>
+
+                  {conciliacaoPivSubTab === 'a-receber' && (
+                    <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+                      <ConcilicacaoPIVAReceberView
+                        filterYear={conciliacaoPivYear}
+                        filterMonth={conciliacaoPivMonth}
+                      />
+                    </div>
+                  )}
+
+                  {conciliacaoPivSubTab === 'recebidos' && (
+                    <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+                      <ConcilicacaoPIVRecebidosView
+                        filterYear={conciliacaoPivYear}
+                        filterMonth={conciliacaoPivMonth}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
