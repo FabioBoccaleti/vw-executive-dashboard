@@ -77,6 +77,48 @@ function normalizeKeyPart(v: string | undefined): string {
   return String(v ?? '').trim().toUpperCase();
 }
 
+const MODEL_BASE_RULES: Array<{ pattern: RegExp; model: string }> = [
+  { pattern: /\bT[\s-]?CROSS\b/, model: 'T-CROSS' },
+  { pattern: /\bTIGUAN\b/, model: 'TIGUAN' },
+  { pattern: /\bNIVUS\b/, model: 'NIVUS' },
+  { pattern: /\bTAOS\b/, model: 'TAOS' },
+  { pattern: /\bPOLO\b/, model: 'POLO' },
+  { pattern: /\bJETTA\b/, model: 'JETTA' },
+  { pattern: /\bVIRTUS\b/, model: 'VIRTUS' },
+  { pattern: /\bSAVEIRO\b/, model: 'SAVEIRO' },
+  { pattern: /\bAMAROK\b/, model: 'AMAROK' },
+];
+
+function normalizeModelBase(modelo?: string | null): string {
+  const raw = String(modelo ?? '').trim().toUpperCase();
+  if (!raw) return 'SEM MODELO';
+
+  const normalized = raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9\s/-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  for (const rule of MODEL_BASE_RULES) {
+    if (rule.pattern.test(normalized)) return rule.model;
+  }
+
+  const ignoredPrefixes = new Set(['NOVO', 'NOVA']);
+  const tokens = normalized.split(' ').filter(Boolean);
+  const base = tokens.find(token => !ignoredPrefixes.has(token));
+
+  return base || normalized;
+}
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 function stableRowKey(row: VendasResultadoRow, idx: number): string {
   if (row.id) return `id:${row.id}`;
   const chassi = normalizeKeyPart(row.chassi);
@@ -345,6 +387,8 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
 
   // Bulk print
   const [printingAll, setPrintingAll] = useState(false);
+  const [printingResumo, setPrintingResumo] = useState(false);
+  const [resumoExpanded, setResumoExpanded] = useState(false);
 
   // Bulk pagamento
   const [markingAllPaid,  setMarkingAllPaid]  = useState(false);
@@ -660,6 +704,164 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
     const paid  = vendedoresMap.filter(([v]) => lancs[v]?.pago).length;
     return [vendedoresMap.length, paid];
   }, [lancamentosMap, vendedoresMap, filterYear, filterMonth]);
+
+  const resumoComissoesPorModelo = useMemo(() => {
+    if (tab !== 'novos' || filterMonth === null) return [] as Array<{
+      modelo: string;
+      comVenda: number;
+      comLB: number;
+      total: number;
+    }>;
+
+    const pk = `${filterYear}-${filterMonth}`;
+    const lancsPeriodo = lancamentosMap[pk] ?? {};
+    const map = new Map<string, { modelo: string; comVenda: number; comLB: number; total: number }>();
+
+    for (const [vendedor, vRows] of vendedoresMap) {
+      const lanc = lancsPeriodo[vendedor];
+      if (!lanc?.pago) continue;
+
+      const rowsBase = (lanc.snapshotRows?.length ?? 0) > 0 ? lanc.snapshotRows! : vRows;
+      rowsBase.forEach((r, idx) => {
+        const linha = getLinhaComissao(lanc.linhas, r, idx);
+        if (!linha) return;
+
+        const modelo = normalizeModelBase(r.modelo);
+        const comVenda = linha.comVenda ?? 0;
+        const comLB = linha.comLB ?? 0;
+        const total = comVenda + comLB;
+
+        const current = map.get(modelo);
+        if (current) {
+          current.comVenda += comVenda;
+          current.comLB += comLB;
+          current.total += total;
+        } else {
+          map.set(modelo, { modelo, comVenda, comLB, total });
+        }
+      });
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.modelo.localeCompare(b.modelo, 'pt-BR'));
+  }, [tab, filterMonth, filterYear, lancamentosMap, vendedoresMap]);
+
+  const totaisResumoModelo = useMemo(() => {
+    return resumoComissoesPorModelo.reduce((acc, item) => {
+      acc.comVenda += item.comVenda;
+      acc.comLB += item.comLB;
+      acc.total += item.total;
+      return acc;
+    }, { comVenda: 0, comLB: 0, total: 0 });
+  }, [resumoComissoesPorModelo]);
+
+  function handlePrintResumoModelo() {
+    if (tab !== 'novos' || filterMonth === null || resumoComissoesPorModelo.length === 0) return;
+
+    setPrintingResumo(true);
+    const root = document.getElementById('print-root');
+    if (!root) {
+      window.print();
+      setPrintingResumo(false);
+      return;
+    }
+
+    const fmtBRL = (v: number) =>
+      v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const competencia = `${MONTH_NAMES[filterMonth - 1]} de ${filterYear}`;
+
+    const rowsHtml = resumoComissoesPorModelo.map(item => `
+      <tr>
+        <td>${escapeHtml(item.modelo)}</td>
+        <td class="r">${fmtBRL(item.comVenda)}</td>
+        <td class="r">${fmtBRL(item.comLB)}</td>
+        <td class="r strong">${fmtBRL(item.total)}</td>
+      </tr>
+    `).join('');
+
+    root.innerHTML = `
+      <div class="print-page comissoes-resumo-print-page">
+        <div class="comissoes-resumo-wrap">
+          <h1>Resumo de Comissoes Pagas por Modelo</h1>
+          <p>Competencia: ${escapeHtml(competencia)}</p>
+          <p>Apenas comissoes com status Pago</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Modelo</th>
+                <th class="r">Com. s/ Venda</th>
+                <th class="r">Com. s/ LB</th>
+                <th class="r">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+              <tr class="total-row">
+                <td>Total</td>
+                <td class="r">${fmtBRL(totaisResumoModelo.comVenda)}</td>
+                <td class="r">${fmtBRL(totaisResumoModelo.comLB)}</td>
+                <td class="r strong">${fmtBRL(totaisResumoModelo.total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      @page { size: A4 portrait; margin: 1cm; }
+      .comissoes-resumo-wrap {
+        font-family: Arial, sans-serif;
+        color: #0f172a;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 14px;
+      }
+      .comissoes-resumo-wrap h1 {
+        font-size: 16px;
+        margin: 0 0 6px;
+      }
+      .comissoes-resumo-wrap p {
+        font-size: 11px;
+        color: #475569;
+        margin: 0 0 6px;
+      }
+      .comissoes-resumo-wrap table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        font-size: 11px;
+      }
+      .comissoes-resumo-wrap th,
+      .comissoes-resumo-wrap td {
+        border: 1px solid #e2e8f0;
+        padding: 6px 8px;
+      }
+      .comissoes-resumo-wrap th {
+        background: #f8fafc;
+        text-align: left;
+        font-weight: 700;
+      }
+      .comissoes-resumo-wrap .r { text-align: right; }
+      .comissoes-resumo-wrap .strong { font-weight: 800; }
+      .comissoes-resumo-wrap .total-row td {
+        background: #f1f5f9;
+        font-weight: 700;
+      }
+    `;
+    document.head.appendChild(style);
+
+    window.onafterprint = () => {
+      if (style.parentNode) style.parentNode.removeChild(style);
+      root.innerHTML = '';
+      window.onafterprint = null;
+      setPrintingResumo(false);
+    };
+
+    window.print();
+  }
 
   // ─── Auto-cálculo em massa ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -1081,6 +1283,82 @@ export function ComissoesCalculoView({ tab }: ComissoesCalculoViewProps) {
                 </button>
               </div>
             </div>
+
+            {tab === 'novos' && resumoComissoesPorModelo.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <button
+                  onClick={() => setResumoExpanded(v => !v)}
+                  className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-700">Resumo de Comissões Pagas por Modelo</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">
+                      {resumoComissoesPorModelo.length} modelo{resumoComissoesPorModelo.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${resumoExpanded ? 'rotate-180' : ''}`} />
+                </button>
+
+                {resumoExpanded && (
+                  <div className="border-t border-slate-100">
+                    <div className="px-4 py-2.5 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold">
+                        Apenas status Pago
+                      </span>
+                      <button
+                        onClick={handlePrintResumoModelo}
+                        disabled={printingResumo}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        {printingResumo ? 'Gerando Resumo...' : 'Imprimir Resumo PDF'}
+                      </button>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            <th className="px-4 py-2.5 text-left font-semibold text-slate-500 text-[10px] uppercase tracking-wide">Modelo</th>
+                            <th className="px-4 py-2.5 text-right font-semibold text-indigo-600 text-[10px] uppercase tracking-wide">Com. s/ Venda</th>
+                            <th className="px-4 py-2.5 text-right font-semibold text-violet-600 text-[10px] uppercase tracking-wide">Com. s/ LB</th>
+                            <th className="px-4 py-2.5 text-right font-semibold text-slate-600 text-[10px] uppercase tracking-wide">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {resumoComissoesPorModelo.map((item, i) => (
+                            <tr key={item.modelo} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                              <td className="px-4 py-2.5 font-medium text-slate-700">{item.modelo}</td>
+                              <td className="px-4 py-2.5 text-right font-semibold text-indigo-700 tabular-nums">
+                                {item.comVenda.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </td>
+                              <td className="px-4 py-2.5 text-right font-semibold text-violet-700 tabular-nums">
+                                {item.comLB.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </td>
+                              <td className="px-4 py-2.5 text-right font-black text-slate-800 tabular-nums">
+                                {item.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="bg-slate-100 border-t-2 border-slate-300">
+                            <td className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">Total</td>
+                            <td className="px-4 py-2.5 text-right font-black text-indigo-700 tabular-nums">
+                              {totaisResumoModelo.comVenda.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </td>
+                            <td className="px-4 py-2.5 text-right font-black text-violet-700 tabular-nums">
+                              {totaisResumoModelo.comLB.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </td>
+                            <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">
+                              {totaisResumoModelo.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Cards de vendedores */}
             {vendedoresMap.map(([vendedor, vRows]) => {

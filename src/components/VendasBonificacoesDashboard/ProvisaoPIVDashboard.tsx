@@ -213,6 +213,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
   const [saved, setSaved]         = useState(false);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [expanded, setExpanded]   = useState(false); // detalhe por veículo
+  const [resumoExpanded, setResumoExpanded] = useState(false);
 
   // ── Carrega dados e config ────────────────────────────────────────────────
   useEffect(() => {
@@ -419,15 +420,6 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {resumoPorModelo.length > 0 && (
-              <button
-                onClick={handlePrintResumoModelo}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                Imprimir PDF
-              </button>
-            )}
             {totalGeral > 0 && (
               <div className="text-right">
                 <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Total Geral</p>
@@ -594,46 +586,64 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
         {/* ── Resumo por modelo (sem versão) ─────────────────────────────── */}
         {resumoPorModelo.length > 0 && (
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-3.5 flex items-center justify-between border-b border-slate-100">
+            <button
+              onClick={() => setResumoExpanded(v => !v)}
+              className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
+            >
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-700">Resumo por Modelo</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">
                   {resumoPorModelo.length} modelo{resumoPorModelo.length !== 1 ? 's' : ''}
                 </span>
               </div>
-              <span className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold">
-                Agrupado sem versão
-              </span>
-            </div>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${resumoExpanded ? 'rotate-180' : ''}`} />
+            </button>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="px-4 py-2.5 text-left font-semibold text-slate-500 text-[10px] uppercase tracking-wide">Modelo</th>
-                    <th className="px-4 py-2.5 text-right font-semibold text-indigo-600 text-[10px] uppercase tracking-wide">PIV</th>
-                    <th className="px-4 py-2.5 text-right font-semibold text-violet-600 text-[10px] uppercase tracking-wide">SIQ</th>
-                    <th className="px-4 py-2.5 text-right font-semibold text-slate-600 text-[10px] uppercase tracking-wide">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {resumoPorModelo.map((item, i) => (
-                    <tr key={item.modelo} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
-                      <td className="px-4 py-2.5 font-medium text-slate-700">{item.modelo}</td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-indigo-700 tabular-nums">{fmtBRL(item.piv)}</td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-violet-700 tabular-nums">{fmtBRL(item.siq)}</td>
-                      <td className="px-4 py-2.5 text-right font-black text-slate-800 tabular-nums">{fmtBRL(item.total)}</td>
-                    </tr>
-                  ))}
-                  <tr className="bg-slate-100 border-t-2 border-slate-300">
-                    <td className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">Total</td>
-                    <td className="px-4 py-2.5 text-right font-black text-indigo-700 tabular-nums">{fmtBRL(totalPiv)}</td>
-                    <td className="px-4 py-2.5 text-right font-black text-violet-700 tabular-nums">{fmtBRL(totalSiq)}</td>
-                    <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">{fmtBRL(totalGeral)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            {resumoExpanded && (
+              <div className="border-t border-slate-100">
+                <div className="px-5 py-2.5 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold">
+                    Agrupado sem versão
+                  </span>
+                  <button
+                    onClick={handlePrintResumoModelo}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    Imprimir Resumo PDF
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="px-4 py-2.5 text-left font-semibold text-slate-500 text-[10px] uppercase tracking-wide">Modelo</th>
+                        <th className="px-4 py-2.5 text-right font-semibold text-indigo-600 text-[10px] uppercase tracking-wide">PIV</th>
+                        <th className="px-4 py-2.5 text-right font-semibold text-violet-600 text-[10px] uppercase tracking-wide">SIQ</th>
+                        <th className="px-4 py-2.5 text-right font-semibold text-slate-600 text-[10px] uppercase tracking-wide">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {resumoPorModelo.map((item, i) => (
+                        <tr key={item.modelo} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                          <td className="px-4 py-2.5 font-medium text-slate-700">{item.modelo}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-indigo-700 tabular-nums">{fmtBRL(item.piv)}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-violet-700 tabular-nums">{fmtBRL(item.siq)}</td>
+                          <td className="px-4 py-2.5 text-right font-black text-slate-800 tabular-nums">{fmtBRL(item.total)}</td>
+                        </tr>
+                      ))}
+                      <tr className="bg-slate-100 border-t-2 border-slate-300">
+                        <td className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">Total</td>
+                        <td className="px-4 py-2.5 text-right font-black text-indigo-700 tabular-nums">{fmtBRL(totalPiv)}</td>
+                        <td className="px-4 py-2.5 text-right font-black text-violet-700 tabular-nums">{fmtBRL(totalSiq)}</td>
+                        <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">{fmtBRL(totalGeral)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
