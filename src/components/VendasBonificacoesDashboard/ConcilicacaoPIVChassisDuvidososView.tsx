@@ -126,6 +126,7 @@ type DuvidosoRow = {
   arquivoSiq: number;
   mesRecebimento: string;
   distancia: number;
+  matchTipo: 'typo' | 'truncado';
 };
 
 interface Props {
@@ -202,25 +203,47 @@ export function ConcilicacaoPIVChassisDuvidososView({
               const distance = vinDistance(arquivoChassiRaw, c.chassi);
               const prefixLen = commonPrefixLen(arquivoChassiRaw, c.chassi);
               const suffixEq = suffixEqualCount(arquivoChassiRaw, c.chassi, 6);
+              const lenDiff = Math.abs(arquivoChassiRaw.length - c.chassi.length);
+              const isSuffixMatch =
+                arquivoChassiRaw.endsWith(c.chassi)
+                || c.chassi.endsWith(arquivoChassiRaw);
               const totalBase = Math.max(1, Math.abs(c.total), Math.abs(arquivoTotal));
               const totalDiffRatio = Math.abs(c.total - arquivoTotal) / totalBase;
-              const score = (distance * 100) + (totalDiffRatio * 100) - (prefixLen * 3) - (suffixEq * 2);
-              return { c, distance, totalDiffRatio, prefixLen, suffixEq, score };
-            })
-            .filter(s => {
-              if (s.distance < 2 || s.distance > 3) return false;
-              if (s.prefixLen < 10) return false;
-              if (s.suffixEq < 4) return false;
+              const typoLike = distance >= 2
+                && distance <= 3
+                && prefixLen >= 10
+                && suffixEq >= 4
+                && (distance === 3 ? totalDiffRatio <= 0.18 && suffixEq >= 5 : totalDiffRatio <= 0.35);
 
-              if (s.distance === 3) {
-                if (s.totalDiffRatio > 0.18) return false;
-                if (s.suffixEq < 5) return false;
-              } else {
-                if (s.totalDiffRatio > 0.35) return false;
-              }
+              const truncatedLike = isSuffixMatch
+                && lenDiff >= 5
+                && suffixEq >= 6
+                && totalDiffRatio <= 0.08;
 
-              return true;
+              const shiftedSuffixLike = !isSuffixMatch
+                && lenDiff >= 1
+                && lenDiff <= 3
+                && suffixEq >= 8
+                && totalDiffRatio <= 0.08;
+
+              const baseScore = (distance * 100) + (totalDiffRatio * 100) - (prefixLen * 3) - (suffixEq * 2);
+              const score = (truncatedLike || shiftedSuffixLike) ? (baseScore - 500) : baseScore;
+
+              return {
+                c,
+                distance,
+                totalDiffRatio,
+                prefixLen,
+                suffixEq,
+                lenDiff,
+                isSuffixMatch,
+                typoLike,
+                truncatedLike,
+                shiftedSuffixLike,
+                score,
+              };
             })
+            .filter(s => s.typoLike || s.truncatedLike || s.shiftedSuffixLike)
             .sort((a, b) => a.score - b.score);
 
           if (!scored.length) continue;
@@ -242,6 +265,7 @@ export function ConcilicacaoPIVChassisDuvidososView({
             arquivoSiq,
             mesRecebimento,
             distancia: best.distance,
+            matchTipo: (best.truncatedLike || best.shiftedSuffixLike) ? 'truncado' : 'typo',
           });
         }
       }
@@ -306,6 +330,7 @@ export function ConcilicacaoPIVChassisDuvidososView({
                   <th className="text-right px-3 py-2">Total Arquivo</th>
                   <th className="text-right px-3 py-2">Total Provisao</th>
                   <th className="text-center px-3 py-2">Distancia</th>
+                  <th className="text-center px-3 py-2">Tipo</th>
                   <th className="text-left px-3 py-2">Mes Recebimento</th>
                   <th className="text-center px-3 py-2">Acao</th>
                 </tr>
@@ -320,6 +345,15 @@ export function ConcilicacaoPIVChassisDuvidososView({
                     <td className="px-3 py-2 text-right font-semibold text-indigo-600">{fmtBRL(item.arquivoTotal)}</td>
                     <td className="px-3 py-2 text-right font-semibold text-violet-600">{fmtBRL(item.sugestaoTotal)}</td>
                     <td className="px-3 py-2 text-center text-amber-700 font-semibold">{item.distancia}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span
+                        className={item.matchTipo === 'truncado'
+                          ? 'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800'
+                          : 'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-800'}
+                      >
+                        {item.matchTipo === 'truncado' ? 'Truncado' : 'Typo'}
+                      </span>
+                    </td>
                     <td className="px-3 py-2 text-slate-600">{item.mesRecebimento || '-'}</td>
                     <td className="px-3 py-2 text-center">
                       <Button
