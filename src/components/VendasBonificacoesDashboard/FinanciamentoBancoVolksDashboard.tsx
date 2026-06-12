@@ -170,6 +170,35 @@ function parseNum(val: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
+function normalizeHeaderName(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function resolveColumnName(columns: string[], aliases: string[], tokenFallback: string[] = []): string | null {
+  const normalizedToOriginal = new Map<string, string>();
+  columns.forEach((col) => normalizedToOriginal.set(normalizeHeaderName(col), col));
+
+  for (const alias of aliases) {
+    const exact = normalizedToOriginal.get(normalizeHeaderName(alias));
+    if (exact) return exact;
+  }
+
+  if (tokenFallback.length > 0) {
+    const fallback = columns.find((col) => {
+      const normalized = normalizeHeaderName(col);
+      return tokenFallback.every((token) => normalized.includes(token));
+    });
+    if (fallback) return fallback;
+  }
+
+  return null;
+}
+
 /** Formata número no padrão BRL */
 function fmtBRL(n: number): string {
   return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -721,10 +750,6 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
 
   // ── Rows agrupados para a aba Acelera ──
   const aceleraRows = useMemo(() => {
-    const VEND_COL = 'Vendedor CDC, PPS AV, GE, SEGUROS';
-    const CPF_COL  = 'CPF Vendedor CDC';
-    const INC_COL  = 'Valor Incentivo Vendedor';
-
     // Vendedores fixos que sempre aparecem na tabela Acelera
     const FIXED_VENDEDORES: { vendedor: string; cpf: string }[] = [
       { vendedor: 'ORLANDO CHODIN NETO',            cpf: '43543156888' },
@@ -733,6 +758,23 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     ];
 
     const rows = vendasData?.rows ?? [];
+    const columns = vendasData?.columns ?? (rows[0] ? Object.keys(rows[0]) : []);
+    const vendCol = resolveColumnName(
+      columns,
+      ['Vendedor CDC, PPS AV, GE, SEGUROS', 'Vendedor CDC PPS AV GE SEGUROS', 'Vendedor'],
+      ['vendedor']
+    );
+    const cpfCol = resolveColumnName(
+      columns,
+      ['CPF Vendedor CDC', 'CPF Vendedor', 'CPF'],
+      ['cpf', 'vendedor']
+    );
+    const incCol = resolveColumnName(
+      columns,
+      ['Valor Incentivo Vendedor', 'Valor incentivo vendedor', 'Incentivo Vendedor', 'Valor Incentivo'],
+      ['valor', 'incentivo', 'vendedor']
+    );
+
     const map = new Map<string, { cpf: string; incentivo: number }>();
 
     // Insere os fixos primeiro (garante CPF correto e ordem)
@@ -741,15 +783,15 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     }
 
     for (const row of rows) {
-      const vendedor = String(row[VEND_COL] ?? '').trim();
+      const vendedor = String(vendCol ? row[vendCol] ?? '' : '').trim();
       if (!vendedor) continue;
       if (!map.has(vendedor)) {
         map.set(vendedor, {
-          cpf: String(row[CPF_COL] ?? '').trim(),
+          cpf: String(cpfCol ? row[cpfCol] ?? '' : '').trim(),
           incentivo: 0,
         });
       }
-      map.get(vendedor)!.incentivo += parseNum(row[INC_COL]);
+      map.get(vendedor)!.incentivo += parseNum(incCol ? row[incCol] : 0);
     }
     return [...map.entries()].map(([vendedor, d]) => ({ vendedor, cpf: d.cpf, incentivo: d.incentivo }));
   }, [vendasData]);
