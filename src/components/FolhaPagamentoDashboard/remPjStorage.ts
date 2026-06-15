@@ -123,6 +123,8 @@ export interface LancamentoItem {
   percentualUsado?: number;
   /** Para itens variáveis: snapshot do label da base de cálculo */
   baseCalculoLabel?: string;
+  /** Para itens variáveis: base utilizada por departamento no cálculo do rateio */
+  rateioBases?: Partial<Record<LucroTrimestralDepartamento, number>>;
 }
 
 /** Lançamento mensal de um prestador */

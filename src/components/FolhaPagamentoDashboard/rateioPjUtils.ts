@@ -80,6 +80,37 @@ function splitByPercentages(total: number, rows: RateioDepartamentoRateio[]): Re
   return result;
 }
 
+function splitByGeneratedBases(item: LancamentoItem): Record<LucroTrimestralDepartamento, number> | null {
+  if (item.tipo !== 'variavel') return null;
+  const pct = Number(item.percentualUsado ?? 0);
+  const bases = item.rateioBases ?? {};
+  const entries = (Object.entries(bases) as Array<[LucroTrimestralDepartamento, number]>)
+    .map(([dep, base]) => [dep, Math.max(0, Number(base) || 0)] as const)
+    .filter(([, base]) => base > 0);
+
+  if (!entries.length || pct <= 0) return null;
+
+  const result = Object.fromEntries(DEPARTAMENTOS.map(dep => [dep, 0])) as Record<LucroTrimestralDepartamento, number>;
+  const generated = entries.map(([dep, base]) => ({
+    dep,
+    valor: roundToCents((base * pct) / 100),
+  }));
+  const generatedTotal = roundToCents(generated.reduce((sum, row) => sum + row.valor, 0));
+  const targetTotal = roundToCents(item.valor || generatedTotal);
+  const diff = roundToCents(targetTotal - generatedTotal);
+
+  if (generated.length > 0 && Math.abs(diff) > 0) {
+    generated.sort((a, b) => b.valor - a.valor);
+    generated[0].valor = roundToCents(Math.max(0, generated[0].valor + diff));
+  }
+
+  generated.forEach(row => {
+    result[row.dep] = roundToCents((result[row.dep] ?? 0) + row.valor);
+  });
+
+  return result;
+}
+
 function getItemRateio(item: LancamentoItem, prestadorItem?: PrestadorPJ['itens'][number]): RateioDepartamentoRateio[] {
   const rateioCadastro = normalizeRateioRows(prestadorItem?.rateio);
   if (rateioCadastro.length > 0) return rateioCadastro;
@@ -114,6 +145,30 @@ export function calcularRateioPJ(
     const rateio = getItemRateio(item, basePrestador);
     const valorItem = parseBRL(item.valor || 0);
     totalDemonstrativo += valorItem;
+
+    const generatedByBase = splitByGeneratedBases(item);
+    if (generatedByBase) {
+      const basesMap = item.rateioBases ?? {};
+      for (const [departamento, valorRateado] of Object.entries(generatedByBase) as Array<[LucroTrimestralDepartamento, number]>) {
+        if (valorRateado <= 0) continue;
+        const baseDept = Math.max(0, Number(basesMap[departamento] ?? 0));
+        const percentual = valorItem > 0 ? roundToCents((valorRateado / valorItem) * 100) : 0;
+        departamentos[departamento].base = roundToCents(departamentos[departamento].base + valorRateado);
+        departamentos[departamento].total = roundToCents(departamentos[departamento].total + valorRateado);
+        totalRateado = roundToCents(totalRateado + valorRateado);
+        linhas.push({
+          itemId: item.itemId,
+          itemDescricao: item.descricao,
+          tipo: item.tipo,
+          departamento,
+          percentual,
+          valorItem,
+          valorRateado,
+          formula: `${item.descricao} · ${item.percentualUsado ?? 0}% sobre base ${baseDept.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+        });
+      }
+      continue;
+    }
 
     if (rateio.length === 0) {
       itensSemRateio.push(item.descricao);

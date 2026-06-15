@@ -55,6 +55,16 @@ const CHIP_TO_DEPT: Record<string, string> = {
   'Funilaria':    'funilaria',
 };
 
+/** chave DRE → rótulo de departamento usado no rateio PJ */
+const DRE_TO_RATEIO_DEPT: Record<string, string> = {
+  novos: 'Novos Varejo',
+  direta: 'VD Direta',
+  usados: 'Usados',
+  pecas: 'Peças',
+  oficina: 'Oficina',
+  funilaria: 'Funilaria',
+};
+
 /** Mapeamento de chave de departamento DRE → Department do Dashboard Executivo */
 const DEPT_TO_EXEC_DEPT: Record<string, string> = {
   novos:     'novos',
@@ -815,6 +825,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
               valor: itemAtual?.valor ?? 0,
               valorBaseCalculo: itemAtual?.valorBaseCalculo,
               percentualUsado: itemAtual?.percentualUsado ?? prestItem.percentual,
+              rateioBases: itemAtual?.rateioBases,
               baseCalculoLabel: prestItem.descricao === DESCRICAO_TRIMESTRAL
                 ? 'Lucro Líquido do Trimestre'
                 : prestItem.baseCalculo ? BASE_CALCULO_LABELS[prestItem.baseCalculo] : undefined,
@@ -869,28 +880,46 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
             if (item.tipo !== 'variavel') return item;
             const prestItem = prestador.itens.find(pi => pi.id === item.itemId);
             let valorBase = 0;
+            const rateioBases: Record<string, number> = {};
+            const addBase = (dreKey: string, raw: number) => {
+              const departamento = DRE_TO_RATEIO_DEPT[dreKey];
+              if (!departamento) return;
+              const valorPositivo = Math.max(0, raw || 0);
+              if (valorPositivo <= 0) return;
+              rateioBases[departamento] = (rateioBases[departamento] ?? 0) + valorPositivo;
+            };
 
             if (item.descricao === DESCRICAO_TRIMESTRAL) {
               // Soma os departamentos selecionados nos chips
               const deps = prestItem?.departamentos ?? [];
               valorBase = deps.reduce((sum, dep) => {
                 const dk = CHIP_TO_DEPT[dep];
-                return sum + (dk ? parseValDre(dreRow[dk]?.lucroLiquidoExercicio) : 0);
+                const raw = dk ? parseValDre(dreRow[dk]?.lucroLiquidoExercicio) : 0;
+                if (dk) addBase(dk, raw);
+                return sum + Math.max(0, raw);
               }, 0);
             } else {
               const baseCalculo = prestItem?.baseCalculo;
               if (baseCalculo) {
                 if (baseCalculo === 'lucro_novos_usados') {
-                  valorBase =
-                    parseValDre(dreRow['novos']?.lucroLiquidoExercicio) +
-                    parseValDre(dreRow['usados']?.lucroLiquidoExercicio);
+                  const novos = parseValDre(dreRow['novos']?.lucroLiquidoExercicio);
+                  const usados = parseValDre(dreRow['usados']?.lucroLiquidoExercicio);
+                  addBase('novos', novos);
+                  addBase('usados', usados);
+                  valorBase = Math.max(0, novos) + Math.max(0, usados);
                 } else if (baseCalculo === 'lucro_pecas_oficina') {
-                  valorBase =
-                    parseValDre(dreRow['pecas']?.lucroLiquidoExercicio) +
-                    parseValDre(dreRow['oficina']?.lucroLiquidoExercicio);
+                  const pecas = parseValDre(dreRow['pecas']?.lucroLiquidoExercicio);
+                  const oficina = parseValDre(dreRow['oficina']?.lucroLiquidoExercicio);
+                  addBase('pecas', pecas);
+                  addBase('oficina', oficina);
+                  valorBase = Math.max(0, pecas) + Math.max(0, oficina);
                 } else {
                   const dk = BASE_TO_DEPT[baseCalculo];
-                  if (dk) valorBase = parseValDre(dreRow[dk]?.lucroLiquidoExercicio);
+                  if (dk) {
+                    const raw = parseValDre(dreRow[dk]?.lucroLiquidoExercicio);
+                    addBase(dk, raw);
+                    valorBase = Math.max(0, raw);
+                  }
                 }
               }
             }
@@ -901,7 +930,13 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
               .reduce((s, k) => s + k.percentualBonus, 0);
             const pctTotal = pctBase + kpiBonus;
             const valor = Math.max(0, Math.round((valorBase * pctTotal / 100) * 100) / 100);
-            return { ...item, valorBaseCalculo: valorBase, valor, percentualUsado: pctTotal };
+            return {
+              ...item,
+              valorBaseCalculo: valorBase,
+              valor,
+              percentualUsado: pctTotal,
+              rateioBases,
+            };
           });
         }
 
@@ -964,6 +999,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
           const pctTotal = pctBase + kpiBonus;
           updated.percentualUsado = pctTotal;
           updated.valor = Math.max(0, Math.round(((updated.valorBaseCalculo ?? 0) * pctTotal) / 100 * 100) / 100);
+          updated.rateioBases = undefined;
         }
         return updated;
       });
