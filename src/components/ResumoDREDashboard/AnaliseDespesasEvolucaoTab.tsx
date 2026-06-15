@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Loader2, Printer } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell, CartesianGrid, LabelList,
@@ -396,10 +396,68 @@ interface Props { year: number; month: number; }
 
 export function AnaliseDespesasEvolucaoTab({ year, month }: Props) {
   const [brand, setBrand] = useState<AnaliseBrand>('vw');
+  const printAreaRef = useRef<HTMLDivElement>(null);
 
   const periodoLabel = month === 0
     ? `Jan–Dez/${year} vs Jan–Dez/${year - 1}`
     : `Jan–${MONTHS_SHORT[month - 1]}/${year} vs Jan–${MONTHS_SHORT[month - 1]}/${year - 1}`;
+
+  const brandColor = brand === 'vw' ? VW_COLOR : AUDI_COLOR;
+  const brandLabel = brand === 'vw' ? 'VW Norte' : 'Audi';
+
+  function handlePrint() {
+    const printSource = printAreaRef.current;
+    const root = document.getElementById('print-root');
+    if (!printSource || !root) { window.print(); return; }
+
+    const clone = printSource.cloneNode(true) as HTMLElement;
+    clone.style.display = 'block';
+    root.innerHTML = clone.outerHTML;
+
+    const style = document.createElement('style');
+    style.id = 'analise-despesas-print-override';
+    style.textContent = `
+      @page { size: A4 landscape; margin: 0.5cm !important; }
+      #print-root {
+        zoom: 0.78;
+        font-family: Inter, sans-serif;
+      }
+      #print-root, #print-root * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        forced-color-adjust: none !important;
+        color-scheme: light !important;
+      }
+      #print-root table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      #print-root th, #print-root td {
+        font-size: 9px !important;
+        padding: 3px 5px !important;
+      }
+      #print-root .overflow-auto,
+      #print-root [style*="max-height"],
+      #print-root [style*="overflow"] {
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
+      }
+      #print-root .sticky {
+        position: static !important;
+      }
+      #print-root .no-print { display: none !important; }
+    `;
+    document.head.appendChild(style);
+
+    window.onafterprint = () => {
+      document.head.removeChild(style);
+      root.innerHTML = '';
+      window.onafterprint = null;
+    };
+
+    window.print();
+  }
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50">
@@ -413,29 +471,48 @@ export function AnaliseDespesasEvolucaoTab({ year, month }: Props) {
           </div>
         </div>
 
-        {/* Sub-tabs VW / Audi */}
-        <div className="flex gap-2">
-          {([
-            ['vw',   'VW Norte', VW_COLOR  ],
-            ['audi', 'Audi',     AUDI_COLOR],
-          ] as const).map(([b, label, color]) => (
-            <button
-              key={b}
-              onClick={() => setBrand(b)}
-              className={`px-5 py-2 text-sm font-semibold rounded-lg border transition-all ${
-                brand === b
-                  ? 'text-white shadow-sm border-transparent'
-                  : 'text-slate-500 bg-white border-slate-200 hover:bg-slate-50 hover:text-slate-700'
-              }`}
-              style={brand === b ? { backgroundColor: color, borderColor: color } : {}}
-            >
-              {label}
-            </button>
-          ))}
+        {/* Sub-tabs VW / Audi + botão Imprimir */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex gap-2">
+            {([
+              ['vw',   'VW Norte', VW_COLOR  ],
+              ['audi', 'Audi',     AUDI_COLOR],
+            ] as const).map(([b, label, color]) => (
+              <button
+                key={b}
+                onClick={() => setBrand(b)}
+                className={`px-5 py-2 text-sm font-semibold rounded-lg border transition-all ${
+                  brand === b
+                    ? 'text-white shadow-sm border-transparent'
+                    : 'text-slate-500 bg-white border-slate-200 hover:bg-slate-50 hover:text-slate-700'
+                }`}
+                style={brand === b ? { backgroundColor: color, borderColor: color } : {}}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={handlePrint}
+            className="no-print flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-sm"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimir PDF
+          </button>
         </div>
 
-        {/* Conteúdo */}
-        <EvolucaoContent brand={brand} year={year} month={month} />
+        {/* Conteúdo — área capturada para impressão */}
+        <div id="analise-despesas-evolucao-print-area" ref={printAreaRef}>
+          {/* Cabeçalho visível apenas no print */}
+          <div className="hidden print:block mb-2">
+            <p className="text-base font-bold" style={{ color: brandColor }}>
+              Análise Evolutiva de Despesas — {brandLabel}
+            </p>
+            <p className="text-xs text-slate-500">{periodoLabel}</p>
+          </div>
+          <EvolucaoContent brand={brand} year={year} month={month} />
+        </div>
 
       </div>
     </div>
