@@ -94,7 +94,11 @@ function fmtBRL(v: number) {
 function buildPrestadorSnapshot(prestador: PrestadorPJ): PrestadorSnapshotPJ {
   return {
     ...prestador,
-    itens: (prestador.itens ?? []).map(i => ({ ...i })),
+    itens: (prestador.itens ?? []).map(i => ({
+      ...i,
+      rateio: i.rateio ? i.rateio.map(row => ({ ...row })) : undefined,
+      departamentos: i.departamentos ? [...i.departamentos] : undefined,
+    })),
     kpis: (prestador.kpis ?? []).map(k => ({ ...k })),
     itensPremioIds: [...(prestador.itensPremioIds ?? [])],
   };
@@ -690,11 +694,17 @@ interface PrestadorDemonstrativoPageProps {
   prestador: PrestadorPJ;
   isAdmin: boolean;
   onBack: () => void;
+  onOpenRateio?: (ctx: {
+    year: number;
+    month: number;
+    lancamento: LancamentoPJ | null;
+    prestadorEfetivo: PrestadorPJ | PrestadorSnapshotPJ;
+  }) => void;
   initialYear?: number;
   initialMonth?: number;
 }
 
-export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initialYear, initialMonth }: PrestadorDemonstrativoPageProps) {
+export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenRateio, initialYear, initialMonth }: PrestadorDemonstrativoPageProps) {
   const now = new Date();
   const [year,  setYear]  = useState(initialYear  ?? now.getFullYear());
   const [month, setMonth] = useState(initialMonth ?? now.getMonth() + 1);
@@ -1248,6 +1258,21 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, initial
               <Printer className="w-3.5 h-3.5" />
               Imprimir PDF
             </button>
+
+            {onOpenRateio && (
+              <button
+                onClick={() => onOpenRateio({
+                  year,
+                  month,
+                  lancamento: lanc,
+                  prestadorEfetivo: effectivePrestador,
+                })}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 text-xs font-semibold transition-colors"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Rateio
+              </button>
+            )}
 
             {/* Status pago/pendente */}
             {!editing && lanc?.status !== 'pago' && (

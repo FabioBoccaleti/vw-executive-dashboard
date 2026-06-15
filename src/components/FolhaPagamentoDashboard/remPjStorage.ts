@@ -42,6 +42,13 @@ export interface ItemRemuneracao {
   baseCalculo?: BaseCalculoVariavel;
   /** Departamentos considerados — apenas para Lucro Operacional Trimestral */
   departamentos?: LucroTrimestralDepartamento[];
+  /** Rateio automático por departamento para este item */
+  rateio?: RateioDepartamentoRateio[];
+}
+
+export interface RateioDepartamentoRateio {
+  departamento: LucroTrimestralDepartamento;
+  percentual: number;
 }
 
 /** KPI vinculado a um item variável do prestador */
@@ -340,6 +347,16 @@ export function buildLancamentoVazio(
     year,
     month,
     status: 'pendente',
+    snapshotPrestador: {
+      ...prestador,
+      itens: prestador.itens.map(item => ({
+        ...item,
+        rateio: item.rateio ? item.rateio.map(row => ({ ...row })) : undefined,
+        departamentos: item.departamentos ? [...item.departamentos] : undefined,
+      })),
+      kpis: prestador.kpis ? prestador.kpis.map(kpi => ({ ...kpi })) : undefined,
+      itensPremioIds: prestador.itensPremioIds ? [...prestador.itensPremioIds] : undefined,
+    },
     itensPremioIds,
     kpisAtingidos: [],
     itens: [

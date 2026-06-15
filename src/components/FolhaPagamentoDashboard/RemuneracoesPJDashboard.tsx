@@ -4,9 +4,11 @@ import { useAuth } from '@/contexts/useAuth';
 import { PrestadoresListPage } from './PrestadoresListPage';
 import { DemonstrativosListPage } from './DemonstrativosListPage';
 import { PrestadorDemonstrativoPage } from './PrestadorDemonstrativoPage';
-import type { PrestadorPJ } from './remPjStorage';
+import { PrestadorRateioPage } from './PrestadorRateioPage';
+import type { PrestadorPJ, PrestadorSnapshotPJ, LancamentoPJ } from './remPjStorage';
 
 type Aba = 'cadastro' | 'demonstrativos';
+type ActiveView = 'demonstrativo' | 'rateio';
 
 interface RemuneracoesPJDashboardProps {
   onBack: () => void;
@@ -23,6 +25,9 @@ export function RemuneracoesPJDashboard({ onBack }: RemuneracoesPJDashboardProps
   const [activePrestador, setActivePrestador] = useState<PrestadorPJ | null>(null);
   const [activeYear,  setActiveYear]  = useState<number | undefined>();
   const [activeMonth, setActiveMonth] = useState<number | undefined>();
+  const [activeView, setActiveView] = useState<ActiveView>('demonstrativo');
+  const [rateioLancamento, setRateioLancamento] = useState<LancamentoPJ | null>(null);
+  const [rateioPrestador, setRateioPrestador] = useState<PrestadorPJ | PrestadorSnapshotPJ | null>(null);
 
   if (!canAccess) {
     return (
@@ -40,12 +45,18 @@ export function RemuneracoesPJDashboard({ onBack }: RemuneracoesPJDashboardProps
     setActivePrestador(prestador);
     setActiveYear(year);
     setActiveMonth(month);
+    setActiveView('demonstrativo');
+    setRateioLancamento(null);
+    setRateioPrestador(null);
   }
 
   function handleBack() {
     setActivePrestador(null);
     setActiveYear(undefined);
     setActiveMonth(undefined);
+    setActiveView('demonstrativo');
+    setRateioLancamento(null);
+    setRateioPrestador(null);
   }
 
   // Sub-view: demonstrativo individual
@@ -63,16 +74,34 @@ export function RemuneracoesPJDashboard({ onBack }: RemuneracoesPJDashboardProps
             onClick={handleBack}
             className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
           >
-            ← Demonstrativos
+            ← Voltar
           </button>
         </header>
-        <PrestadorDemonstrativoPage
-          prestador={activePrestador}
-          isAdmin={isAdmin()}
-          onBack={handleBack}
-          initialYear={activeYear}
-          initialMonth={activeMonth}
-        />
+            {activeView === 'rateio' ? (
+              <PrestadorRateioPage
+                prestador={activePrestador}
+                onBack={() => setActiveView('demonstrativo')}
+                initialYear={activeYear}
+                initialMonth={activeMonth}
+                initialLancamento={rateioLancamento}
+                initialPrestador={rateioPrestador}
+              />
+            ) : (
+              <PrestadorDemonstrativoPage
+                prestador={activePrestador}
+                isAdmin={isAdmin()}
+                onBack={handleBack}
+                onOpenRateio={(ctx) => {
+                  setActiveYear(ctx.year);
+                  setActiveMonth(ctx.month);
+                  setRateioLancamento(ctx.lancamento);
+                  setRateioPrestador(ctx.prestadorEfetivo);
+                  setActiveView('rateio');
+                }}
+                initialYear={activeYear}
+                initialMonth={activeMonth}
+              />
+            )}
       </div>
     );
   }

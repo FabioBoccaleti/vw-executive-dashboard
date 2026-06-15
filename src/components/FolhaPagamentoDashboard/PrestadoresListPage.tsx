@@ -16,6 +16,7 @@ import {
   type LucroTrimestralDepartamento,
   type PrestadorPJ,
   type ItemRemuneracao,
+  type RateioDepartamentoRateio,
   type KpiPrestador,
   type PjBrand,
   type TipoRemuneracao,
@@ -43,7 +44,49 @@ const DESCRICAO_TO_BASE: Record<string, BaseCalculoVariavel> = {
 };
 
 function newItem(): ItemRemuneracao {
-  return { id: crypto.randomUUID(), descricao: '', tipo: 'fixa', valorBase: 0 };
+  return { id: crypto.randomUUID(), descricao: '', tipo: 'fixa', valorBase: 0, rateio: [] };
+}
+
+function newRateioRow(): RateioDepartamentoRateio {
+  return { departamento: 'Novos Varejo', percentual: 100 };
+}
+
+function normalizeRateio(rateio?: RateioDepartamentoRateio[]): RateioDepartamentoRateio[] {
+  return (rateio ?? [])
+    .map(item => ({
+      departamento: item.departamento,
+      percentual: Number.isFinite(item.percentual) ? Number(item.percentual) : 0,
+    }))
+    .filter(item => item.departamento && item.percentual > 0);
+}
+
+function inferDefaultRateio(item: ItemRemuneracao): RateioDepartamentoRateio[] {
+  const existente = normalizeRateio(item.rateio);
+  if (existente.length > 0) return existente;
+
+  const full = (departamento: LucroTrimestralDepartamento): RateioDepartamentoRateio[] => ([{ departamento, percentual: 100 }]);
+  const split = (departamentos: LucroTrimestralDepartamento[]): RateioDepartamentoRateio[] => {
+    if (departamentos.length === 0) return [];
+    const percentual = 100 / departamentos.length;
+    return departamentos.map(departamento => ({ departamento, percentual }));
+  };
+
+  if (item.tipo === 'variavel') {
+    if (item.baseCalculo === 'lucro_novos_usados') return split(['Novos Varejo', 'Usados']);
+    if (item.baseCalculo === 'lucro_pecas_oficina') return split(['Peças', 'Oficina']);
+    if (item.baseCalculo === 'lucro_novos') return full('Novos Varejo');
+    if (item.baseCalculo === 'lucro_usados') return full('Usados');
+    if (item.baseCalculo === 'lucro_vd_direta') return full('VD Direta');
+    if (item.baseCalculo === 'lucro_pecas') return full('Peças');
+    if (item.baseCalculo === 'lucro_oficina') return full('Oficina');
+    if (item.baseCalculo === 'lucro_funilaria') return full('Funilaria');
+  }
+
+  if (item.descricao === DESCRICAO_TRIMESTRAL && item.departamentos?.length) {
+    return split(item.departamentos);
+  }
+
+  return [newRateioRow()];
 }
 
 // ─── Dialog de Cadastro / Edição ──────────────────────────────────────────────
@@ -79,7 +122,9 @@ function PrestadorDialog({
     }
   );
   const [itens, setItens] = useState<ItemRemuneracao[]>(
-    initial?.itens?.length ? initial.itens : [newItem()]
+    initial?.itens?.length
+      ? initial.itens.map(item => ({ ...item, rateio: inferDefaultRateio(item) }))
+      : [newItem()]
   );
   const [kpis, setKpis] = useState<KpiPrestador[]>(initial?.kpis ?? []);
   const [novaDescricao, setNovaDescricao] = useState('');
@@ -120,12 +165,25 @@ function PrestadorDialog({
     if (itens.length === 0) { toast.error('Adicione ao menos um item de remuneração.'); return; }
     for (const it of itens) {
       if (!it.descricao.trim()) { toast.error('Preencha a descrição de todos os itens.'); return; }
+      const rateio = normalizeRateio(it.rateio);
+      const totalRateio = rateio.reduce((sum, row) => sum + row.percentual, 0);
+      if (rateio.length === 0) {
+        toast.error(`Defina o rateio do item "${it.descricao}".`);
+        return;
+      }
+      if (Math.abs(totalRateio - 100) > 0.01) {
+        toast.error(`O rateio de "${it.descricao}" precisa somar 100%.`);
+        return;
+      }
     }
     onConfirm({
       id: initial?.id ?? crypto.randomUUID(),
       ...form,
       ativo: initial?.ativo ?? true,
-      itens,
+      itens: itens.map(item => ({
+        ...item,
+        rateio: normalizeRateio(item.rateio),
+      })),
       kpis,
       ordem: initial?.ordem,
     });
@@ -391,6 +449,7 @@ function PrestadorDialog({
                         percentual: e.target.value === 'variavel' ? (item.percentual ?? undefined) : undefined,
                         baseCalculo: e.target.value === 'variavel' ? (item.baseCalculo ?? undefined) : undefined,
                         departamentos: e.target.value === 'variavel' ? item.departamentos : undefined,
+                        rateio: item.rateio,
                       })}
                       className="border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
                     >
@@ -462,6 +521,76 @@ function PrestadorDialog({
                       </div>
                     </div>
                   )}
+
+                  {/* Rateio automático */}
+                  <div className="pl-7 flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-slate-500 font-medium">Rateio automático por departamento</span>
+                      <button
+                        type="button"
+                        onClick={() => updateItem(item.id, { rateio: [...normalizeRateio(item.rateio), newRateioRow()] })}
+                        className="text-[10px] text-teal-600 hover:text-teal-700 font-semibold"
+                      >
+                        + Adicionar rateio
+                      </button>
+                    </div>
+                    {normalizeRateio(item.rateio).length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {normalizeRateio(item.rateio).map((rateio, rateioIdx) => (
+                          <div key={`${item.id}-rateio-${rateioIdx}`} className="flex items-center gap-2">
+                            <select
+                              value={rateio.departamento}
+                              onChange={e => updateItem(item.id, {
+                                rateio: normalizeRateio(item.rateio).map((current, idx) => idx === rateioIdx
+                                  ? { ...current, departamento: e.target.value as LucroTrimestralDepartamento }
+                                  : current
+                                ),
+                              })}
+                              className="flex-1 border border-slate-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                            >
+                              {LUCRO_TRIMESTRAL_DEPARTAMENTOS.map(dep => (
+                                <option key={dep} value={dep}>{dep}</option>
+                              ))}
+                            </select>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                value={rateio.percentual}
+                                onChange={e => updateItem(item.id, {
+                                  rateio: normalizeRateio(item.rateio).map((current, idx) => idx === rateioIdx
+                                    ? { ...current, percentual: parseFloat(e.target.value) || 0 }
+                                    : current
+                                  ),
+                                })}
+                                className="w-20 border border-slate-300 rounded px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-teal-400"
+                                placeholder="0,00"
+                              />
+                              <span className="text-[10px] text-slate-400">%</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => updateItem(item.id, {
+                                rateio: normalizeRateio(item.rateio).filter((_, idx) => idx !== rateioIdx),
+                              })}
+                              className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        <p className="text-[10px] text-slate-400">
+                          Se houver mais de um departamento, o sistema distribui o valor automaticamente e soma tudo no rateio final.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-amber-600">
+                        Nenhuma regra definida. Adicione ao menos um departamento para este item.
+                      </p>
+                    )}
+                  </div>
 
                   {/* Chips de departamento — apenas para Lucro Operacional Trimestral */}
                   {item.descricao === DESCRICAO_TRIMESTRAL && (
