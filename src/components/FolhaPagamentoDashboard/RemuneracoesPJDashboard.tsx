@@ -3,11 +3,12 @@ import { Lock, Users, LayoutList } from 'lucide-react';
 import { useAuth } from '@/contexts/useAuth';
 import { PrestadoresListPage } from './PrestadoresListPage';
 import { DemonstrativosListPage } from './DemonstrativosListPage';
+import { ResumoRemuneracoesPJPage } from './ResumoRemuneracoesPJPage';
 import { PrestadorDemonstrativoPage } from './PrestadorDemonstrativoPage';
 import { PrestadorRateioPage } from './PrestadorRateioPage';
 import type { PrestadorPJ, PrestadorSnapshotPJ, LancamentoPJ } from './remPjStorage';
 
-type Aba = 'cadastro' | 'demonstrativos';
+type Aba = 'cadastro' | 'demonstrativos' | 'resumo';
 type ActiveView = 'demonstrativo' | 'rateio';
 
 interface RemuneracoesPJDashboardProps {
@@ -20,6 +21,7 @@ export function RemuneracoesPJDashboard({ onBack }: RemuneracoesPJDashboardProps
   const canAccess      = admin || canAccessFolhaSub('folha.pj');
   const canDemonst     = admin || canAccessFolhaSub('folha.pj.demonstrativos');
   const canCadastro    = admin || canAccessFolhaSub('folha.pj.cadastro');
+  const canResumo      = canDemonst;
 
   const [aba, setAba] = useState<Aba>(() => canDemonst ? 'demonstrativos' : 'cadastro');
   const [activePrestador, setActivePrestador] = useState<PrestadorPJ | null>(null);
@@ -127,6 +129,7 @@ export function RemuneracoesPJDashboard({ onBack }: RemuneracoesPJDashboardProps
         <div className="flex gap-0">
           {([
             { key: 'demonstrativos', label: 'Demonstrativos', icon: LayoutList, can: canDemonst },
+            { key: 'resumo',         label: 'Resumo',         icon: LayoutList, can: canResumo },
             { key: 'cadastro',       label: 'Cadastro',       icon: Users,       can: canCadastro },
           ] as { key: Aba; label: string; icon: React.ElementType; can: boolean }[])
             .filter(t => t.can)
@@ -153,6 +156,8 @@ export function RemuneracoesPJDashboard({ onBack }: RemuneracoesPJDashboardProps
           isAdmin={isAdmin()}
           onOpenPrestador={p => handleOpenPrestador(p)}
         />
+      ) : aba === 'resumo' ? (
+        <ResumoRemuneracoesPJPage />
       ) : (
         <DemonstrativosListPage
           onOpenPrestador={(p, y, m) => handleOpenPrestador(p, y, m)}
