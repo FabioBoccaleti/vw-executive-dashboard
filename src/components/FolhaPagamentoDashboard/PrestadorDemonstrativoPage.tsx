@@ -774,25 +774,26 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
         existing = migrated;
       }
 
-      // Fallback: se não houver dado no formato resumo_dre, tenta carregar do dashboard executivo
+      // Prioriza DRE do dashboard executivo (mais atual) e usa resumo_dre como fallback.
       let dreRow = kvDreRow;
-      if (!dreRow) {
-        const monthIndex = drePrev.month - 1;
-        const yr = drePrev.year as 2024 | 2025 | 2026 | 2027;
-        const brand = prestador.brand as 'vw' | 'audi';
-        const deptEntries = Object.entries(DEPT_TO_EXEC_DEPT);
-        const dreResults = await Promise.all(
-          deptEntries.map(([dk, dept]) =>
-            loadDREDataAsync(yr, dept as any, brand).then(d => ({ dk, d }))
-          )
-        );
-        const synthetic: Record<string, { lucroLiquidoExercicio: number }> = {};
-        for (const { dk, d } of dreResults) {
-          synthetic[dk] = { lucroLiquidoExercicio: extractLucroLiquido(d, monthIndex) };
-        }
-        if (Object.values(synthetic).some(v => v.lucroLiquidoExercicio !== 0)) {
-          dreRow = synthetic;
-        }
+      const monthIndex = drePrev.month - 1;
+      const yr = drePrev.year as 2024 | 2025 | 2026 | 2027;
+      const brand = prestador.brand as 'vw' | 'audi';
+      const deptEntries = Object.entries(DEPT_TO_EXEC_DEPT);
+      const dreResults = await Promise.all(
+        deptEntries.map(([dk, dept]) =>
+          loadDREDataAsync(yr, dept as any, brand).then(d => ({ dk, d }))
+        )
+      );
+
+      const synthetic: Record<string, { lucroLiquidoExercicio: number }> = {};
+      for (const { dk, d } of dreResults) {
+        synthetic[dk] = { lucroLiquidoExercicio: extractLucroLiquido(d, monthIndex) };
+      }
+
+      // Se o DRE executivo retornou dados válidos, usa ele para evitar defasagem do resumo_dre.
+      if (Object.values(synthetic).some(v => v.lucroLiquidoExercicio !== 0)) {
+        dreRow = synthetic;
       }
       const base = existing ?? buildLancamentoVazio(prestador, year, month);
 
