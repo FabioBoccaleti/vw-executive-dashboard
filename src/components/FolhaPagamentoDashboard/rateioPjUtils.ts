@@ -31,6 +31,10 @@ export interface RateioResultado {
 const DEPARTAMENTOS = [...LUCRO_TRIMESTRAL_DEPARTAMENTOS];
 const BASES_COM_RATEIO_AUTOMATICO = new Set(['lucro_novos_usados', 'lucro_pecas_oficina']);
 
+function isBaseComRateioAutomatico(baseCalculo?: string): boolean {
+  return !!baseCalculo && BASES_COM_RATEIO_AUTOMATICO.has(baseCalculo);
+}
+
 function parseBRL(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -74,31 +78,6 @@ function isPrestacaoServicoItem(item: LancamentoItem): boolean {
   return normalizeText(item.descricao).includes('PRESTACAO DE SERVICO');
 }
 
-function applyDeducaoOnAllocation(
-  allocation: Record<LucroTrimestralDepartamento, number>,
-  deducao: number,
-): { allocation: Record<LucroTrimestralDepartamento, number>; remaining: number } {
-  let remaining = roundToCents(Math.max(0, deducao));
-  if (remaining <= 0) return { allocation, remaining: 0 };
-
-  const adjusted = { ...allocation };
-  const orderedDeps = Object.entries(adjusted)
-    .filter(([, value]) => value > 0)
-    .sort((a, b) => b[1] - a[1])
-    .map(([dep]) => dep as LucroTrimestralDepartamento);
-
-  for (const dep of orderedDeps) {
-    if (remaining <= 0) break;
-    const current = adjusted[dep] ?? 0;
-    if (current <= 0) continue;
-    const deducted = Math.min(current, remaining);
-    adjusted[dep] = roundToCents(current - deducted);
-    remaining = roundToCents(remaining - deducted);
-  }
-
-  return { allocation: adjusted, remaining };
-}
-
 function splitByPercentages(total: number, rows: RateioDepartamentoRateio[]): Record<LucroTrimestralDepartamento, number> {
   const result = Object.fromEntries(DEPARTAMENTOS.map(dep => [dep, 0])) as Record<LucroTrimestralDepartamento, number>;
   const normalized = normalizeRateioRows(rows);
@@ -119,13 +98,17 @@ function splitByPercentages(total: number, rows: RateioDepartamentoRateio[]): Re
   return result;
 }
 
-function splitByGeneratedBases(item: LancamentoItem): Record<LucroTrimestralDepartamento, number> | null {
+function splitByGeneratedBases(
+  item: LancamentoItem,
+  prestadorItem?: PrestadorPJ['itens'][number],
+): Record<LucroTrimestralDepartamento, number> | null {
   if (item.tipo !== 'variavel') return null;
   const pct = Number(item.percentualUsado ?? 0);
   const bases = item.rateioBases ?? {};
+  const allowNegative = isBaseComRateioAutomatico(prestadorItem?.baseCalculo);
   const entries = (Object.entries(bases) as Array<[LucroTrimestralDepartamento, number]>)
-    .map(([dep, base]) => [dep, Math.max(0, Number(base) || 0)] as const)
-    .filter(([, base]) => base > 0);
+    .map(([dep, base]) => [dep, Number(base) || 0] as const)
+    .filter(([, base]) => (allowNegative ? base !== 0 : base > 0));
 
   if (!entries.length || pct <= 0) return null;
 
@@ -139,8 +122,13 @@ function splitByGeneratedBases(item: LancamentoItem): Record<LucroTrimestralDepa
   const diff = roundToCents(targetTotal - generatedTotal);
 
   if (generated.length > 0 && Math.abs(diff) > 0) {
-    generated.sort((a, b) => b.valor - a.valor);
-    generated[0].valor = roundToCents(Math.max(0, generated[0].valor + diff));
+    let adjustIdx = 0;
+    if (diff > 0) {
+      adjustIdx = generated.reduce((best, row, idx, arr) => (row.valor > arr[best].valor ? idx : best), 0);
+    } else {
+      adjustIdx = generated.reduce((best, row, idx, arr) => (row.valor < arr[best].valor ? idx : best), 0);
+    }
+    generated[adjustIdx].valor = roundToCents(generated[adjustIdx].valor + diff);
   }
 
   generated.forEach(row => {
@@ -151,7 +139,7 @@ function splitByGeneratedBases(item: LancamentoItem): Record<LucroTrimestralDepa
 }
 
 function getItemRateio(item: LancamentoItem, prestadorItem?: PrestadorPJ['itens'][number]): RateioDepartamentoRateio[] {
-  if (prestadorItem?.tipo === 'variavel' && prestadorItem.baseCalculo && BASES_COM_RATEIO_AUTOMATICO.has(prestadorItem.baseCalculo)) {
+  if (prestadorItem?.tipo === 'variavel' && isBaseComRateioAutomatico(prestadorItem.baseCalculo)) {
     return [];
   }
 
@@ -192,15 +180,10 @@ export function calcularRateioPJ(
     const valorItem = parseBRL(item.valor || 0);
     totalDemonstrativo += valorItem;
 
-    const generatedByBase = splitByGeneratedBases(item);
+    const generatedByBase = splitByGeneratedBases(item, basePrestador);
     if (generatedByBase) {
       let allocationForPremio = generatedByBase;
       if (itensPremioIds.has(item.itemId)) {
-        if (deducaoPremioRestante > 0 && isPrestacaoServicoItem(item)) {
-          const adjusted = applyDeducaoOnAllocation(allocationForPremio, deducaoPremioRestante);
-          allocationForPremio = adjusted.allocation;
-          deducaoPremioRestante = adjusted.remaining;
-        }
         for (const dep of DEPARTAMENTOS) {
           premioBaseByDept[dep] = roundToCents(premioBaseByDept[dep] + (allocationForPremio[dep] ?? 0));
         }
@@ -208,8 +191,8 @@ export function calcularRateioPJ(
 
       const basesMap = item.rateioBases ?? {};
       for (const [departamento, valorRateado] of Object.entries(generatedByBase) as Array<[LucroTrimestralDepartamento, number]>) {
-        if (valorRateado <= 0) continue;
-        const baseDept = Math.max(0, Number(basesMap[departamento] ?? 0));
+        if (valorRateado === 0) continue;
+        const baseDept = Number(basesMap[departamento] ?? 0);
         const percentual = valorItem > 0 ? roundToCents((valorRateado / valorItem) * 100) : 0;
         departamentos[departamento].base = roundToCents(departamentos[departamento].base + valorRateado);
         departamentos[departamento].total = roundToCents(departamentos[departamento].total + valorRateado);
@@ -237,9 +220,10 @@ export function calcularRateioPJ(
     let allocationForPremio = allocation;
     if (itensPremioIds.has(item.itemId)) {
       if (deducaoPremioRestante > 0 && isPrestacaoServicoItem(item)) {
-        const adjusted = applyDeducaoOnAllocation(allocationForPremio, deducaoPremioRestante);
-        allocationForPremio = adjusted.allocation;
-        deducaoPremioRestante = adjusted.remaining;
+        const deducaoAplicada = Math.min(valorItem, deducaoPremioRestante);
+        const valorLiquidoParaPremio = roundToCents(Math.max(0, valorItem - deducaoAplicada));
+        deducaoPremioRestante = roundToCents(deducaoPremioRestante - deducaoAplicada);
+        allocationForPremio = splitByPercentages(valorLiquidoParaPremio, rateio);
       }
       for (const dep of DEPARTAMENTOS) {
         premioBaseByDept[dep] = roundToCents(premioBaseByDept[dep] + (allocationForPremio[dep] ?? 0));
@@ -272,9 +256,9 @@ export function calcularRateioPJ(
     const baseTotal = roundToCents(DEPARTAMENTOS.reduce((sum, dep) => sum + (premioBaseByDept[dep] ?? 0), 0));
     const departamentosElegiveis = DEPARTAMENTOS
       .map(dep => ({ departamento: dep, basePremio: premioBaseByDept[dep] ?? 0 }))
-      .filter(dep => dep.basePremio > 0);
+      .filter(dep => dep.basePremio !== 0);
 
-    if (valorPremio > 0 && baseTotal > 0 && departamentosElegiveis.length > 0) {
+    if (valorPremio > 0 && baseTotal !== 0 && departamentosElegiveis.length > 0) {
       let allocatedPremio = 0;
       departamentosElegiveis.forEach((dep, index) => {
         const isLast = index === departamentosElegiveis.length - 1;

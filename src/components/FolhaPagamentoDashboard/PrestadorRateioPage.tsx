@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight, Printer, Loader2, Calculator, FileText } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Printer, Loader2, Calculator, FileText, AlertTriangle } from 'lucide-react';
 import { buildLancamentoVazio, loadLancamento, type LancamentoPJ, type PrestadorPJ, type PrestadorSnapshotPJ } from './remPjStorage';
 import { buildRateioTitulo, calcularRateioPJ } from './rateioPjUtils';
 
@@ -72,6 +72,39 @@ interface PrestadorRateioPageProps {
   initialPrestador?: PrestadorPJ | PrestadorSnapshotPJ | null;
 }
 
+type FonteRateio = 'contexto' | 'salvo' | 'vazio';
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function totalLancamentoBruto(lanc: LancamentoPJ | null | undefined): number {
+  if (!lanc) return 0;
+  return round2((lanc.itens ?? []).reduce((sum, item) => sum + Number(item.valor || 0), 0));
+}
+
+function lancamentoSignature(lanc: LancamentoPJ | null | undefined): string {
+  if (!lanc) return '';
+  return JSON.stringify({
+    prestadorId: lanc.prestadorId,
+    year: lanc.year,
+    month: lanc.month,
+    status: lanc.status,
+    itensPremioIds: [...(lanc.itensPremioIds ?? [])].sort(),
+    itens: (lanc.itens ?? [])
+      .map(item => ({
+        itemId: item.itemId,
+        descricao: item.descricao,
+        tipo: item.tipo,
+        valor: round2(Number(item.valor || 0)),
+        valorBaseCalculo: round2(Number(item.valorBaseCalculo || 0)),
+        percentualUsado: round2(Number(item.percentualUsado || 0)),
+        rateioBases: item.rateioBases ?? {},
+      }))
+      .sort((a, b) => `${a.itemId}-${a.tipo}`.localeCompare(`${b.itemId}-${b.tipo}`)),
+  });
+}
+
 export function PrestadorRateioPage({
   prestador,
   onBack,
@@ -86,11 +119,15 @@ export function PrestadorRateioPage({
   const [lanc, setLanc] = useState<LancamentoPJ | null>(null);
   const [loading, setLoading] = useState(true);
   const [printing, setPrinting] = useState(false);
+  const [fonteRateio, setFonteRateio] = useState<FonteRateio>('vazio');
+  const [conflitoContextoSalvo, setConflitoContextoSalvo] = useState<{ totalContexto: number; totalSalvo: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setLanc(null);
+    setFonteRateio('vazio');
+    setConflitoContextoSalvo(null);
     loadLancamento(prestador.id, year, month).then(result => {
       if (!cancelled) {
         const isInitialMatch =
@@ -99,12 +136,23 @@ export function PrestadorRateioPage({
           initialLancamento.year === year &&
           initialLancamento.month === month;
 
-        if (result) {
-          setLanc(result);
-        } else if (isInitialMatch) {
+        // Prioriza o contexto vindo do demonstrativo para manter consistência
+        // com o que o usuário acabou de visualizar/editar.
+        if (isInitialMatch) {
           setLanc(initialLancamento);
+          setFonteRateio('contexto');
+          if (result && lancamentoSignature(result) !== lancamentoSignature(initialLancamento)) {
+            setConflitoContextoSalvo({
+              totalContexto: totalLancamentoBruto(initialLancamento),
+              totalSalvo: totalLancamentoBruto(result),
+            });
+          }
+        } else if (result) {
+          setLanc(result);
+          setFonteRateio('salvo');
         } else {
           setLanc(buildLancamentoVazio(prestador, year, month));
+          setFonteRateio('vazio');
         }
         setLoading(false);
       }
@@ -117,6 +165,18 @@ export function PrestadorRateioPage({
     if (!lanc) return null;
     return calcularRateioPJ(effectivePrestador, lanc);
   }, [effectivePrestador, lanc]);
+
+  const origemDisponivel = !!(
+    initialLancamento &&
+    initialLancamento.prestadorId === prestador.id &&
+    initialLancamento.year === year &&
+    initialLancamento.month === month
+  );
+  const totalOrigem = totalLancamentoBruto(origemDisponivel ? initialLancamento : null);
+  const diferencaOrigem = rateio ? round2(rateio.totalDemonstrativo - totalOrigem) : 0;
+  const conferenciaInternaOk = rateio ? Math.abs(rateio.diferenca) < 0.01 : false;
+  const conferenciaOrigemOk = !origemDisponivel || Math.abs(diferencaOrigem) < 0.01;
+  const conferenciaOk = conferenciaInternaOk && conferenciaOrigemOk;
 
   const title = buildRateioTitulo(effectivePrestador, year, month);
 
@@ -274,6 +334,31 @@ export function PrestadorRateioPage({
           </div>
 
           <div className="p-6 flex flex-col gap-4">
+            {conflitoContextoSalvo && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <p className="font-semibold mb-1 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Divergência entre demonstrativo atual e lançamento salvo
+                </p>
+                <p className="text-xs">
+                  O rateio está usando a versão atual do demonstrativo desta tela.
+                  Total atual: {fmtBRL(conflitoContextoSalvo.totalContexto)} · Total salvo: {fmtBRL(conflitoContextoSalvo.totalSalvo)}.
+                </p>
+              </div>
+            )}
+
+            {fonteRateio === 'salvo' && (
+              <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-800">
+                Rateio exibindo a versão salva do lançamento para esta competência.
+              </div>
+            )}
+
+            {fonteRateio === 'contexto' && !conflitoContextoSalvo && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
+                Rateio exibindo a versão atual do demonstrativo aberto nesta tela.
+              </div>
+            )}
+
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                 <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider">Total demonstrativo</p>
@@ -283,13 +368,19 @@ export function PrestadorRateioPage({
                 <p className="text-[0.65rem] font-semibold text-slate-400 uppercase tracking-wider">Total rateado</p>
                 <p className="text-xl font-extrabold text-slate-800 mt-1">{fmtBRL(rateio.totalRateado)}</p>
               </div>
-              <div className={`border rounded-xl p-4 ${Math.abs(rateio.diferenca) < 0.01 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+              <div className={`border rounded-xl p-4 ${conferenciaOk ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
                 <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">Conferência</p>
-                <p className={`text-xl font-extrabold mt-1 ${Math.abs(rateio.diferenca) < 0.01 ? 'text-emerald-700' : 'text-red-700'}`}>
-                  {Math.abs(rateio.diferenca) < 0.01 ? 'OK' : fmtBRL(rateio.diferenca)}
+                <p className={`text-xl font-extrabold mt-1 ${conferenciaOk ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {conferenciaOk
+                    ? 'OK'
+                    : fmtBRL(conferenciaInternaOk ? diferencaOrigem : rateio.diferenca)}
                 </p>
-                <p className={`text-[0.6rem] mt-0.5 ${Math.abs(rateio.diferenca) < 0.01 ? 'text-emerald-500' : 'text-red-500'}`}>
-                  {Math.abs(rateio.diferenca) < 0.01 ? 'Soma dos rateios bate com o total' : 'Diferença apurada entre total e rateio'}
+                <p className={`text-[0.6rem] mt-0.5 ${conferenciaOk ? 'text-emerald-500' : 'text-red-500'}`}>
+                  {conferenciaOk
+                    ? 'Soma dos rateios bate com o total'
+                    : (conferenciaInternaOk
+                      ? 'Diferença entre total exibido no rateio e total da origem do demonstrativo'
+                      : 'Diferença apurada entre total e rateio')}
                 </p>
               </div>
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">

@@ -913,12 +913,12 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
             const prestItem = prestador.itens.find(pi => pi.id === item.itemId);
             let valorBase = 0;
             const rateioBases: Record<string, number> = {};
-            const addBase = (dreKey: string, raw: number) => {
+            const addBase = (dreKey: string, raw: number, allowNegative = false) => {
               const departamento = DRE_TO_RATEIO_DEPT[dreKey];
               if (!departamento) return;
-              const valorPositivo = Math.max(0, raw || 0);
-              if (valorPositivo <= 0) return;
-              rateioBases[departamento] = (rateioBases[departamento] ?? 0) + valorPositivo;
+              const valor = allowNegative ? Number(raw || 0) : Math.max(0, raw || 0);
+              if (valor === 0) return;
+              rateioBases[departamento] = (rateioBases[departamento] ?? 0) + valor;
             };
 
             if (item.descricao === DESCRICAO_TRIMESTRAL) {
@@ -936,15 +936,15 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
                 if (baseCalculo === 'lucro_novos_usados') {
                   const novos = parseValDre(dreRow['novos']?.lucroLiquidoExercicio);
                   const usados = parseValDre(dreRow['usados']?.lucroLiquidoExercicio);
-                  addBase('novos', novos);
-                  addBase('usados', usados);
-                  valorBase = Math.max(0, novos) + Math.max(0, usados);
+                  addBase('novos', novos, true);
+                  addBase('usados', usados, true);
+                  valorBase = Math.max(0, novos + usados);
                 } else if (baseCalculo === 'lucro_pecas_oficina') {
                   const pecas = parseValDre(dreRow['pecas']?.lucroLiquidoExercicio);
                   const oficina = parseValDre(dreRow['oficina']?.lucroLiquidoExercicio);
-                  addBase('pecas', pecas);
-                  addBase('oficina', oficina);
-                  valorBase = Math.max(0, pecas) + Math.max(0, oficina);
+                  addBase('pecas', pecas, true);
+                  addBase('oficina', oficina, true);
+                  valorBase = Math.max(0, pecas + oficina);
                 } else {
                   const dk = BASE_TO_DEPT[baseCalculo];
                   if (dk) {
