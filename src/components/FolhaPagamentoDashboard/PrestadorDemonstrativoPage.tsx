@@ -97,6 +97,36 @@ function parseValDre(v: string | number | undefined | null): number {
   return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
 }
 
+function normalizeText(value: string | undefined | null): string {
+  return String(value ?? '')
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function inferBaseCalculoFromItem(
+  prestItem?: PrestadorPJ['itens'][number],
+  itemAtual?: LancamentoItem,
+): keyof typeof BASE_CALCULO_LABELS | undefined {
+  if (prestItem?.baseCalculo) return prestItem.baseCalculo;
+
+  const merged = `${prestItem?.descricao ?? ''} ${itemAtual?.descricao ?? ''} ${itemAtual?.baseCalculoLabel ?? ''}`;
+  const text = normalizeText(merged);
+
+  if (text.includes('NOVOS') && text.includes('USADOS')) return 'lucro_novos_usados';
+  if (text.includes('PECAS') && text.includes('OFICINA')) return 'lucro_pecas_oficina';
+  if (text.includes('VD') || text.includes('DIRETA')) return 'lucro_vd_direta';
+  if (text.includes('FUNILARIA')) return 'lucro_funilaria';
+  if (text.includes('OFICINA')) return 'lucro_oficina';
+  if (text.includes('PECAS')) return 'lucro_pecas';
+  if (text.includes('USADOS')) return 'lucro_usados';
+  if (text.includes('NOVOS')) return 'lucro_novos';
+
+  return undefined;
+}
+
 function fmtBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -819,6 +849,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
           }
 
           if (prestItem.tipo === 'variavel') {
+            const inferredBaseCalculo = inferBaseCalculoFromItem(prestItem, itemAtual);
             return {
               itemId: prestItem.id,
               descricao: prestItem.descricao,
@@ -829,7 +860,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
               rateioBases: itemAtual?.rateioBases,
               baseCalculoLabel: prestItem.descricao === DESCRICAO_TRIMESTRAL
                 ? 'Lucro Líquido do Trimestre'
-                : prestItem.baseCalculo ? BASE_CALCULO_LABELS[prestItem.baseCalculo] : undefined,
+                : inferredBaseCalculo ? BASE_CALCULO_LABELS[inferredBaseCalculo] : itemAtual?.baseCalculoLabel,
             };
           }
 
@@ -900,7 +931,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
                 return sum + Math.max(0, raw);
               }, 0);
             } else {
-              const baseCalculo = prestItem?.baseCalculo;
+              const baseCalculo = inferBaseCalculoFromItem(prestItem, item);
               if (baseCalculo) {
                 if (baseCalculo === 'lucro_novos_usados') {
                   const novos = parseValDre(dreRow['novos']?.lucroLiquidoExercicio);
