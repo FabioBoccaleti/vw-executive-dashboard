@@ -1400,6 +1400,23 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
     };
   }, [calculoSourceRows]);
 
+  const calculoResumoAcessorios = useMemo(() => {
+    let bruto = 0;
+    let liquidoComDevolucao = 0;
+
+    calculoSourceRows.forEach((row) => {
+      if (row.origem !== 'Acessórios') return;
+      const amount = rowAmountForCalculo(row.origem, row.data);
+      bruto += amount;
+
+      const txRaw = String(row.data['TIPO_TRANSACAO'] ?? row.data['TRANSACAO'] ?? '');
+      const isDevolucao = isTransacaoDevolucao(txRaw);
+      liquidoComDevolucao += isDevolucao ? -amount : amount;
+    });
+
+    return { bruto, liquidoComDevolucao };
+  }, [calculoSourceRows]);
+
   const calculoVendors = useMemo<CalculoVendorCard[]>(() => {
     const map = new Map<string, { vendedor: string; registros: number; fontes: Set<string> }>();
     const addVendor = (name: string, source: string) => {
@@ -1538,17 +1555,22 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       const pctRps = parseDecimal(record.comissaoRpsPct);
       const pctMecanico = parseDecimal(record.comissaoMecanicoPct ?? '');
       const pctTotalPecas = parseDecimal(record.comissaoTotalPecasPct ?? '');
+      const pctTotalAcessorios = parseDecimal(record.comissaoTotalAcessoriosPct ?? '');
       const baseTotalPecasApuracao = calculoResumoGeral.pecasAcessorios;
+      const baseTotalAcessoriosApuracao = record.descontarDevolucao
+        ? calculoResumoAcessorios.liquidoComDevolucao
+        : calculoResumoAcessorios.bruto;
       const nVend = Math.max(1, Math.trunc(parseDecimal(record.nVend ?? '1')));
       const diasFerias = Math.max(0, Math.min(30, Math.trunc(parseDecimal(record.diasFerias ?? '0'))));
       const fatorFerias = (30 - diasFerias) / 30;
       const comissaoTotalPecasAjustada = (baseTotalPecasApuracao * (pctTotalPecas / 100) * fatorFerias) / nVend;
+      const comissaoTotalAcessoriosAjustada = (baseTotalAcessoriosApuracao * (pctTotalAcessorios / 100) * fatorFerias) / nVend;
       const comissaoPecas = basePecasVendas * (pctPecas / 100) + comissaoTotalPecasAjustada;
       const faixasComissaoAcessorios = cleanComissaoAcessoriosEscalas((record.comissaoAcessoriosEscalas ?? []) as ComissaoAcessoriosEscalaDraft[]);
       const faixaComissaoAcessorioAtiva = firstMatchingFaixa(baseAcessorios, faixasComissaoAcessorios);
       const pctComissaoAcessoriosEscala = faixaComissaoAcessorioAtiva ? parseDecimal(faixaComissaoAcessorioAtiva.comissaoPct) : 0;
       const comissaoAcessoriosEscala = baseAcessorios * (pctComissaoAcessoriosEscala / 100);
-      const comissaoAcessorios = baseAcessorios * (pctAcessorios / 100) + comissaoAcessoriosEscala;
+      const comissaoAcessorios = baseAcessorios * (pctAcessorios / 100) + comissaoAcessoriosEscala + comissaoTotalAcessoriosAjustada;
       const comissaoMaoObra =
         baseRpsOficina * (pctRps / 100) +
         baseRpsFunilaria * (pctRps / 100) +
@@ -1604,7 +1626,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       });
     });
     return map;
-  }, [calculoVendors, calculoSourceRows, vendorLookup, calculoResumoGeral.pecasAcessorios]);
+  }, [calculoVendors, calculoSourceRows, vendorLookup, calculoResumoGeral.pecasAcessorios, calculoResumoAcessorios.bruto, calculoResumoAcessorios.liquidoComDevolucao]);
 
   const calculoRulesByVendor = useMemo(() => {
     const rules = new Map<string, { departamentos: Set<string>; transacoes: Set<string> }>();
@@ -1671,6 +1693,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             comissaoRpsPct: existing.comissaoRpsPct ?? '',
             comissaoMecanicoPct: existing.comissaoMecanicoPct ?? '',
             comissaoTotalPecasPct: existing.comissaoTotalPecasPct ?? '',
+            comissaoTotalAcessoriosPct: existing.comissaoTotalAcessoriosPct ?? '',
             bonusProdutividade: existing.bonusProdutividade ?? '',
             premioProduto: existing.premioProduto ?? '',
             premioAdicional: existing.premioAdicional ?? '',
@@ -1697,6 +1720,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
             comissaoRpsPct: '',
             comissaoMecanicoPct: '',
             comissaoTotalPecasPct: '',
+            comissaoTotalAcessoriosPct: '',
             bonusProdutividade: '',
             premioProduto: '',
             premioAdicional: '',
@@ -1944,6 +1968,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
       comissaoRpsPct: String(calculoDraft.comissaoRpsPct ?? '').trim(),
       comissaoMecanicoPct: String(calculoDraft.comissaoMecanicoPct ?? '').trim(),
       comissaoTotalPecasPct: String(calculoDraft.comissaoTotalPecasPct ?? '').trim(),
+      comissaoTotalAcessoriosPct: String(calculoDraft.comissaoTotalAcessoriosPct ?? '').trim(),
       bonusProdutividade: String(calculoDraft.bonusProdutividade ?? '').trim(),
       premioProduto: String(calculoDraft.premioProduto ?? '').trim(),
       premioAdicional: String(calculoDraft.premioAdicional ?? '').trim(),
@@ -3187,7 +3212,7 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                         <div>
                           <label className="block text-xs font-semibold text-slate-600 mb-1">Comissão Peças (%)</label>
                           <input
@@ -3243,6 +3268,18 @@ export function CalculoComissoesVWPosVendasPage({ onBack }: CalculoComissoesVWPo
                             step="0.01"
                             value={calculoDraft.comissaoTotalPecasPct ?? ''}
                             onChange={(e) => setCalculoDraft({ ...calculoDraft, comissaoTotalPecasPct: e.target.value })}
+                            disabled={calculoBloqueado}
+                            placeholder="0,00"
+                            className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Comissão Total Acessórios (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={calculoDraft.comissaoTotalAcessoriosPct ?? ''}
+                            onChange={(e) => setCalculoDraft({ ...calculoDraft, comissaoTotalAcessoriosPct: e.target.value })}
                             disabled={calculoBloqueado}
                             placeholder="0,00"
                             className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
