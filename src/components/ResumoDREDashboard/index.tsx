@@ -14,6 +14,7 @@ import { EndividamentoDRETab } from './EndividamentoDRETab';
 import { AnaliseDespesasEvolucaoTab } from './AnaliseDespesasEvolucaoTab';
 import { ReceitaVendasEvolucaoTab } from './ReceitaVendasEvolucaoTab';
 import { DespesasDepartamentoEvolucaoTab } from './DespesasDepartamentoEvolucaoTab';
+import { DespesasFinanceirasTab } from './DespesasFinanceirasTab';
 import { VolumeVendasEvolucaoTab } from './VolumeVendasEvolucaoTab';
 import { ComparativoMarcasTab } from './ComparativoMarcasTab';
 import { ResumoMarcasTab } from './ResumoMarcasTab';
@@ -23,7 +24,7 @@ interface ResumoDREDashboardProps {
   onChangeBrand: () => void;
 }
 
-type TabId = 'comparativo-marcas' | 'resumo-marcas' | 'vw' | 'audi' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos' | 'mensal' | 'saidas-caixa' | 'endividamento-dre' | 'analise-evolucao' | 'receita-evolucao' | 'despesas-departamento-evolucao' | 'volume-evolucao' | 'diagnostivo';
+type TabId = 'comparativo-marcas' | 'resumo-marcas' | 'vw' | 'audi' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos' | 'mensal' | 'saidas-caixa' | 'endividamento-dre' | 'despesas-financeiras' | 'analise-evolucao' | 'receita-evolucao' | 'despesas-departamento-evolucao' | 'volume-evolucao' | 'diagnostivo';
 
 const TABS: { id: TabId; label: string; color: string; activeColor: string }[] = [
   { id: 'comparativo-marcas',    label: 'Comparativo Marcas',    color: '#334155', activeColor: '#1e293b' },
@@ -37,6 +38,7 @@ const TABS: { id: TabId; label: string; color: string; activeColor: string }[] =
   { id: 'mensal',                label: 'Mensal',                color: '#0f766e', activeColor: '#0d6660' },
   { id: 'saidas-caixa',          label: 'Saídas de Caixa',       color: '#dc2626', activeColor: '#b91c1c' },
   { id: 'endividamento-dre',     label: 'Endividamento',          color: '#0284c7', activeColor: '#0369a1' },
+  { id: 'despesas-financeiras',  label: 'Despesas Financeiras',   color: '#0f766e', activeColor: '#0d6660' },
   { id: 'volume-evolucao',          label: 'Evolução Volume',         color: '#6d28d9', activeColor: '#5b21b6' },
   { id: 'receita-evolucao',        label: 'Evolução Receita',       color: '#0369a1', activeColor: '#025d91' },
   { id: 'despesas-departamento-evolucao', label: 'Evolução Despesas por Departamento', color: '#b45309', activeColor: '#92400e' },
@@ -204,6 +206,8 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
           <ReceitaVendasEvolucaoTab year={year} month={month} />
         ) : activeTab === 'despesas-departamento-evolucao' ? (
           <DespesasDepartamentoEvolucaoTab year={year} month={month} />
+        ) : activeTab === 'despesas-financeiras' ? (
+          <DespesasFinanceirasTab year={year} month={month} />
         ) : activeTab === 'volume-evolucao' ? (
           <VolumeVendasEvolucaoTab year={year} month={month} />
         ) : activeTab === 'diagnostivo' ? (
