@@ -80,8 +80,17 @@ const PRINT_CSS = `
   tr:nth-child(even) td { background: #f8faff; }
   .tfoot-row td { font-weight: 700; border-top: 2px solid #312e81; background: #eef2ff !important; }
   .total-box { background: #312e81; color: #fff; border-radius: 6px; padding: 10px 14px; display: inline-block; margin-bottom: 20px; font-size: 11pt; font-weight: 700; }
-  .sigs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 32px; margin-top: 40px; }
-  .sig-line { border-top: 1px solid #555; padding-top: 6px; font-size: 8.5pt; color: #444; text-align: center; }
+  .sigs { margin-top: 20px; }
+  .sigs-title { font-size: 8pt; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+  .sigs-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .sig-wrap { display: flex; flex-direction: column; gap: 4px; }
+  .sig-label { font-size: 8.5pt; color: #64748b; font-weight: 600; }
+  .sig-card { border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 10px; background: #ecfdf5; }
+  .sig-name { font-size: 9.5pt; color: #065f46; font-weight: 700; line-height: 1.2; }
+  .sig-user { font-size: 8.5pt; color: #047857; line-height: 1.2; }
+  .sig-date { font-size: 8.5pt; color: #059669; margin-top: 4px; }
+  .sig-badge { font-size: 7.5pt; color: #047857; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; }
+  .sig-empty { border: 1px dashed #cbd5e1; border-radius: 8px; padding: 14px 10px; text-align: center; color: #94a3b8; font-size: 8.5pt; background: #f8fafc; }
   .badge { display: inline-block; font-size: 7.5pt; padding: 1px 6px; border-radius: 999px; font-weight: 700; }
   .badge-v { background: #dbeafe; color: #1e40af; }
   .badge-a { background: #dcfce7; color: #166534; }
@@ -195,6 +204,9 @@ export function EsteticaDemonstrativo({ rows, onPagar, onClose }: Props) {
   const [assinarTodosDialog, setAssinarTodosDialog] = useState<{
     campo: CampoAssinatura; senha: string; loading: boolean; erro: string | null;
   } | null>(null);
+  const [cancelarAssinaturaDialog, setCancelarAssinaturaDialog] = useState<{
+    pessoa: string; campo: CampoAssinatura; senha: string; loading: boolean; erro: string | null;
+  } | null>(null);
 
   const activeKvKey = useMemo(() => {
     if (view === 'pagas' && mesFiltro) {
@@ -268,6 +280,38 @@ export function EsteticaDemonstrativo({ rows, onPagar, onClose }: Props) {
     }
   };
 
+  const handleCancelarAssinatura = async () => {
+    if (!cancelarAssinaturaDialog || !session) return;
+    setCancelarAssinaturaDialog(prev => prev ? { ...prev, loading: true, erro: null } : prev);
+    try {
+      const res = await apiLogin(session.username, cancelarAssinaturaDialog.senha);
+      if ('error' in res) {
+        setCancelarAssinaturaDialog(prev => prev ? { ...prev, loading: false, erro: 'Senha incorreta.' } : prev);
+        return;
+      }
+
+      const pessoaAssinaturas = assinaturas[cancelarAssinaturaDialog.pessoa];
+      if (!pessoaAssinaturas?.[cancelarAssinaturaDialog.campo]) {
+        setCancelarAssinaturaDialog(prev => prev ? { ...prev, loading: false, erro: 'Esta assinatura já foi removida.' } : prev);
+        return;
+      }
+
+      const nextPessoa = { ...pessoaAssinaturas };
+      delete nextPessoa[cancelarAssinaturaDialog.campo];
+
+      const updated = { ...assinaturas };
+      if (Object.keys(nextPessoa).length > 0) updated[cancelarAssinaturaDialog.pessoa] = nextPessoa;
+      else delete updated[cancelarAssinaturaDialog.pessoa];
+
+      await kvSet(activeKvKey, updated);
+      setAssinaturas(updated);
+      setCancelarAssinaturaDialog(null);
+      toast.success(`Assinatura de ${CAMPO_LABELS[cancelarAssinaturaDialog.campo]} cancelada com sucesso!`);
+    } catch {
+      setCancelarAssinaturaDialog(prev => prev ? { ...prev, loading: false, erro: 'Erro ao cancelar assinatura.' } : prev);
+    }
+  };
+
   // ── Pagar ─────────────────────────────────────────────────────────────────
   const pagarEntries = (entries: EntryItem[]) => {
     const today = todayISO();
@@ -323,9 +367,26 @@ export function EsteticaDemonstrativo({ rows, onPagar, onClose }: Props) {
         </table>
         <div class="total-box">Total a receber: ${fmtBRL(demo.totalComissao)}</div>
         <div class="sigs">
-          <div class="sig-line">Diretoria Comercial</div>
-          <div class="sig-line">Diretoria</div>
-          <div class="sig-line">Financeiro</div>
+          <div class="sigs-title">Assinaturas</div>
+          <div class="sigs-grid">
+            ${CAMPOS.map(([campo, label]) => {
+              const ass = assinaturas[demo.pessoa]?.[campo];
+              const nomeAssinatura = ass?.name && ass.name !== ass.username ? ass.name : '';
+              return `
+                <div class="sig-wrap">
+                  <div class="sig-label">${label}</div>
+                  ${ass
+                    ? `<div class="sig-card">
+                        ${nomeAssinatura ? `<div class="sig-name">${nomeAssinatura}</div>` : ''}
+                        <div class="sig-user">${ass.username}</div>
+                        <div class="sig-date">${new Date(ass.dataHora).toLocaleString('pt-BR')}</div>
+                        <div class="sig-badge">Assinatura Eletrônica</div>
+                      </div>`
+                    : '<div class="sig-empty">Não assinado</div>'}
+                </div>
+              `;
+            }).join('')}
+          </div>
         </div>
       </div>
     `).join('');
@@ -581,6 +642,12 @@ export function EsteticaDemonstrativo({ rows, onPagar, onClose }: Props) {
                                   <ShieldCheck className="w-3 h-3 text-emerald-700" />
                                   <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Assinatura Eletrônica</p>
                                 </div>
+                                <button
+                                  onClick={() => setCancelarAssinaturaDialog({ pessoa: demo.pessoa, campo, senha: '', loading: false, erro: null })}
+                                  className="mt-1 self-end text-[10px] font-bold text-rose-700 hover:text-rose-800 transition-colors"
+                                >
+                                  Cancelar assinatura
+                                </button>
                               </div>
                             ) : (
                               <button
@@ -675,6 +742,39 @@ export function EsteticaDemonstrativo({ rows, onPagar, onClose }: Props) {
             >
               <PenLine className="w-3.5 h-3.5" />
               {assinarTodosDialog.loading ? 'Assinando...' : 'Assinar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ── Dialog: Cancelar assinatura ── */}
+    {cancelarAssinaturaDialog && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-bold text-slate-800">Cancelar assinatura - {CAMPO_LABELS[cancelarAssinaturaDialog.campo]}</p>
+            <button onClick={() => setCancelarAssinaturaDialog(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100"><X className="w-4 h-4" /></button>
+          </div>
+          <p className="text-xs text-slate-500 mb-1">{cancelarAssinaturaDialog.pessoa}</p>
+          <p className="text-xs text-slate-400 mb-3">Confirme com sua senha para cancelar esta assinatura:</p>
+          <input
+            type="password" autoFocus
+            placeholder="Sua senha"
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
+            value={cancelarAssinaturaDialog.senha}
+            onChange={e => setCancelarAssinaturaDialog(prev => prev ? { ...prev, senha: e.target.value, erro: null } : prev)}
+            onKeyDown={e => e.key === 'Enter' && !cancelarAssinaturaDialog.loading && handleCancelarAssinatura()}
+          />
+          {cancelarAssinaturaDialog.erro && <p className="text-xs text-red-500 mt-1">{cancelarAssinaturaDialog.erro}</p>}
+          <div className="flex gap-2 mt-4">
+            <button onClick={() => setCancelarAssinaturaDialog(null)} className="flex-1 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200 transition-colors">Voltar</button>
+            <button
+              onClick={handleCancelarAssinatura}
+              disabled={cancelarAssinaturaDialog.loading || !cancelarAssinaturaDialog.senha}
+              className="flex-1 px-3 py-2 bg-rose-600 text-white rounded-lg text-sm font-semibold hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {cancelarAssinaturaDialog.loading ? 'Cancelando...' : 'Cancelar assinatura'}
             </button>
           </div>
         </div>
