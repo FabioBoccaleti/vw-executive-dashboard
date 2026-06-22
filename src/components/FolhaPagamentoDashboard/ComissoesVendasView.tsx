@@ -235,21 +235,24 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
     const { form, editId } = rowDialog;
     setSavingRow(true);
     try {
+      const currentRow = editId ? rows.find(r => r.id === editId) : null;
+
       const newRow: VendasResultadoRow = {
         ...emptyVendasResultadoRow(),
+        ...(currentRow ?? {}),
         id:           editId ?? crypto.randomUUID(),
-        chassi:       form.chassi,
-        modelo:       form.modelo,
-        nfVenda:      form.nfVenda,
-        dataVenda:    form.dataVenda,
-        vendedor:     form.vendedor,
-        transacao:    form.transacao,
+        chassi:       editId ? (currentRow?.chassi ?? form.chassi) : form.chassi,
+        modelo:       editId ? (currentRow?.modelo ?? form.modelo) : form.modelo,
+        nfVenda:      editId ? (currentRow?.nfVenda ?? form.nfVenda) : form.nfVenda,
+        dataVenda:    editId ? (currentRow?.dataVenda ?? form.dataVenda) : form.dataVenda,
+        vendedor:     editId ? (currentRow?.vendedor ?? form.vendedor) : form.vendedor,
+        transacao:    editId ? (currentRow?.transacao ?? form.transacao) : form.transacao,
         valorVenda:   form.valorVenda,
-        impostos:     form.impostos,
+        impostos:     isUsados ? (currentRow?.impostos ?? form.impostos) : form.impostos,
         valorCusto:   form.valorCusto,
         bonusVarejo:  form.bonusVarejo,
-        bonusTradeIn: form.bonusTradeIn,
-        manualEntry:  true,
+        bonusTradeIn: isUsados ? (currentRow?.bonusTradeIn ?? form.bonusTradeIn) : form.bonusTradeIn,
+        manualEntry:  currentRow?.manualEntry ?? true,
       };
       const updated = editId
         ? rows.map(r => r.id === editId ? newRow : r)
@@ -408,16 +411,16 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
                   return (
                     <tr key={row.id} className={`${bg} hover:bg-emerald-50/40 transition-colors`}>
                       <td className={`${tdBase} ${bg} px-1.5`}>
-                        {row.manualEntry && (
-                          <div className="flex items-center gap-0.5">
-                            <button onClick={() => openEditDialog(row)} className="p-1 rounded hover:bg-emerald-100 text-emerald-600 transition-colors" title="Editar">
-                              <Pencil className="w-3 h-3" />
-                            </button>
+                        <div className="flex items-center gap-0.5">
+                          <button onClick={() => openEditDialog(row)} className="p-1 rounded hover:bg-emerald-100 text-emerald-600 transition-colors" title="Editar valores">
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          {row.manualEntry && (
                             <button onClick={() => handleDeleteRow(row.id)} className="p-1 rounded hover:bg-red-100 text-red-500 transition-colors" title="Excluir">
                               <Trash2 className="w-3 h-3" />
                             </button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </td>
                       <td className={tdd}>{row.chassi || '—'}</td>
                       <td className={tdd}>{row.modelo || '—'}</td>
@@ -499,9 +502,14 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
             className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
+            {(() => {
+              const isEditMode = Boolean(rowDialog.editId);
+              const readonlyCls = isEditMode ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : '';
+              return (
+                <>
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-sm font-bold text-slate-800">
-                {rowDialog.editId ? 'Editar Linha' : 'Incluir Linha'}
+                {rowDialog.editId ? 'Editar Valores da Linha' : 'Incluir Linha'}
               </h3>
               <button
                 onClick={() => setRowDialog(prev => ({ ...prev, open: false }))}
@@ -515,32 +523,37 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Chassi</label>
                 <input type="text" value={rowDialog.form.chassi}
+                  disabled={isEditMode}
                   onChange={e => setRowDialog(prev => ({ ...prev, form: { ...prev.form, chassi: e.target.value } }))}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 font-mono" />
+                  className={`w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 font-mono ${readonlyCls}`} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Modelo</label>
                 <input type="text" value={rowDialog.form.modelo}
+                  disabled={isEditMode}
                   onChange={e => setRowDialog(prev => ({ ...prev, form: { ...prev.form, modelo: e.target.value } }))}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+                  className={`w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 ${readonlyCls}`} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">NF Venda</label>
                 <input type="text" value={rowDialog.form.nfVenda}
+                  disabled={isEditMode}
                   onChange={e => setRowDialog(prev => ({ ...prev, form: { ...prev.form, nfVenda: e.target.value } }))}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 font-mono" />
+                  className={`w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 font-mono ${readonlyCls}`} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Data da Venda</label>
                 <input type="date" value={rowDialog.form.dataVenda}
+                  disabled={isEditMode}
                   onChange={e => setRowDialog(prev => ({ ...prev, form: { ...prev.form, dataVenda: e.target.value } }))}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+                  className={`w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 ${readonlyCls}`} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Vendedor</label>
                 <select value={rowDialog.form.vendedor}
+                  disabled={isEditMode}
                   onChange={e => setRowDialog(prev => ({ ...prev, form: { ...prev.form, vendedor: e.target.value } }))}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white">
+                  className={`w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white ${readonlyCls}`}>
                   <option value="">Selecione...</option>
                   {vendedoresList.map(v => <option key={v} value={v}>{v}</option>)}
                 </select>
@@ -548,8 +561,9 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Transação</label>
                 <select value={rowDialog.form.transacao}
+                  disabled={isEditMode}
                   onChange={e => setRowDialog(prev => ({ ...prev, form: { ...prev.form, transacao: e.target.value } }))}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white">
+                  className={`w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white ${readonlyCls}`}>
                   {isUsados
                     ? <><option value="U21">U21</option><option value="U07">U07</option></>
                     : <><option value="V21">V21</option><option value="V07">V07</option></>
@@ -612,6 +626,9 @@ export function ComissoesVendasView({ tab }: ComissoesVendasViewProps) {
                 {savingRow ? 'Salvando...' : (rowDialog.editId ? 'Atualizar' : 'Incluir')}
               </button>
             </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
