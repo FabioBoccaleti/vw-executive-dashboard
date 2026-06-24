@@ -36,6 +36,12 @@ const BANK_COLORS = [
   '#db2777', // pink     — extra
 ];
 
+function getBankColor(bank: BankDef): string {
+  // Cor fixa para evitar colisão visual com outras séries quando há muitos bancos.
+  if (bank.id === 'VW_GIRO') return '#d946ef'; // fuchsia — Banco VW - Capital de Giro
+  return BANK_COLORS[bank.colorIdx % BANK_COLORS.length];
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Acc {
@@ -454,7 +460,7 @@ export function EndividamentoDRETab({ year, month }: Props) {
                   dataKey={bank.id}
                   name={bank.label}
                   stackId="stack"
-                  fill={BANK_COLORS[bank.colorIdx % BANK_COLORS.length]}
+                  fill={getBankColor(bank)}
                   radius={bank === activeBanks[activeBanks.length - 1] ? [3, 3, 0, 0] : [0, 0, 0, 0]}
                 />
               ))}
@@ -501,7 +507,7 @@ export function EndividamentoDRETab({ year, month }: Props) {
                         <div className="flex items-center gap-2">
                           <span
                             className="w-2.5 h-2.5 rounded-sm shrink-0"
-                            style={{ backgroundColor: BANK_COLORS[bank.colorIdx % BANK_COLORS.length] }}
+                            style={{ backgroundColor: getBankColor(bank) }}
                           />
                           <span className="text-xs font-mono text-slate-400 mr-1">{bank.conta}</span>
                           <span className="text-slate-700">{bank.label}</span>
@@ -573,7 +579,7 @@ export function EndividamentoDRETab({ year, month }: Props) {
                         <div className="flex items-center gap-2">
                           <span
                             className="w-2.5 h-2.5 rounded-sm shrink-0"
-                            style={{ backgroundColor: BANK_COLORS[bank.colorIdx % BANK_COLORS.length] }}
+                            style={{ backgroundColor: getBankColor(bank) }}
                           />
                           <span className="text-slate-700 font-medium">{bank.label}</span>
                         </div>
