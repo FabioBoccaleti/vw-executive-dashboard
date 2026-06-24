@@ -36,6 +36,7 @@ const VW_DEPTS: DeptConfig[] = [
   { key: 'pecas',     label: 'Peças e Acessórios',        color: '#059669' },
   { key: 'oficina',   label: 'Oficina / Assist. Técnica', color: '#d97706' },
   { key: 'funilaria', label: 'Funilaria',                 color: '#db2777' },
+  { key: 'adm',       label: 'Administração',             color: '#64748b' },
 ];
 
 const AUDI_DEPTS: DeptConfig[] = [
@@ -44,6 +45,7 @@ const AUDI_DEPTS: DeptConfig[] = [
   { key: 'pecas',     label: 'Peças e Acessórios',        color: '#059669' },
   { key: 'oficina',   label: 'Oficina / Assist. Técnica', color: '#d97706' },
   { key: 'funilaria', label: 'Funilaria',                 color: '#db2777' },
+  { key: 'adm',       label: 'Administração',             color: '#64748b' },
 ];
 
 const CON_DEPTS: DeptConfig[] = [
@@ -62,6 +64,7 @@ const VW_DEPT_TO_DEPT: Record<string, Department> = {
   pecas: 'pecas',
   oficina: 'oficina',
   funilaria: 'funilaria',
+  adm: 'administracao',
 };
 
 const AUDI_DEPT_TO_DEPT: Record<string, Department> = {
@@ -70,6 +73,7 @@ const AUDI_DEPT_TO_DEPT: Record<string, Department> = {
   pecas: 'pecas',
   oficina: 'oficina',
   funilaria: 'funilaria',
+  adm: 'administracao',
 };
 
 const EXPENSE_GROUPS: ExpenseGroup[] = [
