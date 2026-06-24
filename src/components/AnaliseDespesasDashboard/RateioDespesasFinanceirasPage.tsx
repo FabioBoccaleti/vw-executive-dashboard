@@ -294,6 +294,16 @@ function cloneEndividamentoByMonth(data?: RateioEndividamentoBrandYearData): Rat
   return out;
 }
 
+function carryForwardEndividamentoSelection(data?: RateioEndividamentoBrandYearData): RateioEndividamentoBrandYearData {
+  const out = cloneEndividamentoByMonth(data);
+  for (let month = 2; month <= 12; month++) {
+    if ((out[month] ?? []).length === 0 && (out[month - 1] ?? []).length > 0) {
+      out[month] = [...(out[month - 1] ?? [])];
+    }
+  }
+  return out;
+}
+
 function cloneDepartamentoByMonth(data?: RateioDepartamentoBrandYearData): RateioDepartamentoBrandYearData {
   const out: RateioDepartamentoBrandYearData = {
     1: {}, 2: {}, 3: {}, 4: {}, 5: {}, 6: {}, 7: {}, 8: {}, 9: {}, 10: {}, 11: {}, 12: {},
@@ -642,10 +652,11 @@ function BrandMonthTable({
   const resultadoAjustado = resultadoPeriodo + totalExtras;
   const resultadoUsoCirculante = -resultadoAjustado;
   const totalGeral = ativoData.total + passivoData.total + resultadoUsoCirculante;
-  const endividamentoSelectableContas = uniqueSorted([
-    ...ativoData.rows.map((row) => row.conta),
-    ...passivoData.rows.map((row) => row.conta),
-  ]);
+  const endividamentoSelectableContas = uniqueSorted(
+    Object.keys(accountsByMonth[month] ?? {}).filter(
+      (conta) => conta.startsWith('1.1') || conta.startsWith('2.1'),
+    ),
+  );
   const endividamentoRows = endividamentoContas.map((conta) => {
     const monthAccounts = accountsByMonth[month] ?? {};
     const hit = monthAccounts[conta];
@@ -1266,8 +1277,12 @@ export function RateioDespesasFinanceirasPage({ onBackToRateios }: RateioDespesa
         setAudiData(nextAudiData);
         setVwResults(cloneResultsByMonth(savedVwResults));
         setAudiResults(cloneResultsByMonth(savedAudiResults));
-        setVwEndividamento(cloneEndividamentoByMonth(savedVwEndividamento));
-        setAudiEndividamento(cloneEndividamentoByMonth(savedAudiEndividamento));
+        const nextVwEndividamento = carryForwardEndividamentoSelection(savedVwEndividamento);
+        const nextAudiEndividamento = carryForwardEndividamentoSelection(savedAudiEndividamento);
+        setVwEndividamento(nextVwEndividamento);
+        setAudiEndividamento(nextAudiEndividamento);
+        void saveRateioEndividamento('vw', selectedYear, nextVwEndividamento);
+        void saveRateioEndividamento('audi', selectedYear, nextAudiEndividamento);
         setTaxaJurosByMonth({ ...EMPTY_TAXA_JUROS_BY_MONTH, ...savedTaxaJuros });
         setVwDepartamento(cloneDepartamentoByMonth(savedVwDepartamento));
         setAudiDepartamento(cloneDepartamentoByMonth(savedAudiDepartamento));
