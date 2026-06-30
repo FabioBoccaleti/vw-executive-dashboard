@@ -10,6 +10,7 @@ import { RegistroVendasDashboard } from './RegistroVendasDashboard';
 import { BonusVarejoDashboard } from './BonusVarejoDashboard';
 import { BonusTradeInDashboard } from './BonusTradeInDashboard';
 import { JurosRotativoDashboard } from './JurosRotativoDashboard';
+import { EntradaPecasImportacaoTab } from './EntradaPecasImportacaoTab';
 import VendasResultadoDashboard from './VendasResultadoDashboard';
 import { CadastrosVWPage } from './CadastrosVWPage';
 import { VendasNovoAnalise } from './VendasNovoAnalise';
@@ -1130,6 +1131,7 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
           {/* Conteúdo das sub-abas */}
           {entradaPecasSubTab === 'importacao' && (
             <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+              {/* Seletor de Ano/Mês */}
               <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
                 <div className="relative mr-2">
@@ -1169,13 +1171,11 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
                   );
                 })}
               </div>
-              <div className="flex-1 flex items-center justify-center p-8">
-                <div className="text-center space-y-2">
-                  <Upload className="w-10 h-10 text-slate-300 mx-auto" />
-                  <p className="text-sm font-semibold text-slate-600">Importação de Arquivo de Compra</p>
-                  <p className="text-xs text-slate-400">Conteúdo será definido em seguida.</p>
-                </div>
-              </div>
+              {/* Tabela de importação */}
+              <EntradaPecasImportacaoTab
+                filterYear={importacaoFilterYear}
+                filterMonth={importacaoFilterMonth}
+              />
             </div>
           )}
           {entradaPecasSubTab === 'resumo' && (
