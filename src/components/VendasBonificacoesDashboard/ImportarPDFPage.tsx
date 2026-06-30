@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag, TrendingUp, BarChart2, TrendingDown, BookOpen } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag, TrendingUp, BarChart2, TrendingDown, BookOpen, PackagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -480,7 +480,12 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
       if (first) setMainView(first);
     }
   }, [mainView, canResumo, canAnalises, canVendas, canFinanceiro, canRegistros, canCadastros]);
-  const [activeTab, setActiveTab] = useState<'guia' | 'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros'>('importar');
+  const [activeTab, setActiveTab] = useState<'guia' | 'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros' | 'entradaPecas'>('importar');
+  const [entradaPecasSubTab, setEntradaPecasSubTab] = useState<'importacao' | 'resumo'>('importacao');
+  const [importacaoFilterYear, setImportacaoFilterYear] = useState<number>(new Date().getFullYear());
+  const [importacaoFilterMonth, setImportacaoFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [resumoComprasFilterYear, setResumoComprasFilterYear] = useState<number>(new Date().getFullYear());
+  const [resumoComprasFilterMonth, setResumoComprasFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
   const [registroFilterYear, setRegistroFilterYear] = useState<number>(new Date().getFullYear());
   const [registroFilterMonth, setRegistroFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
@@ -758,6 +763,17 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
         >
           <TrendingDown className="w-4 h-4" />
           Juros Rotativo
+        </button>
+        <button
+          onClick={() => setActiveTab('entradaPecas')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'entradaPecas'
+              ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50'
+              : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <PackagePlus className="w-4 h-4" />
+          Entrada de Peças (Compra)
         </button>
       </div>
       )}
@@ -1083,6 +1099,137 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
       {mainView === 'registros' && activeTab === 'bonus' && <BonusVarejoDashboard />}
       {mainView === 'registros' && activeTab === 'tradein' && <BonusTradeInDashboard />}
       {mainView === 'registros' && activeTab === 'juros' && <JurosRotativoDashboard />}
+      {mainView === 'registros' && activeTab === 'entradaPecas' && (
+        <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+          {/* Sub-abas de Entrada de Peças (Compra) */}
+          <div className="bg-slate-50 border-b border-slate-200 px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
+            <button
+              onClick={() => setEntradaPecasSubTab('importacao')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+                entradaPecasSubTab === 'importacao'
+                  ? 'border-emerald-500 text-emerald-700 bg-white'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-white/60'
+              }`}
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Importação de Arquivo de Compra
+            </button>
+            <button
+              onClick={() => setEntradaPecasSubTab('resumo')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+                entradaPecasSubTab === 'resumo'
+                  ? 'border-emerald-500 text-emerald-700 bg-white'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-white/60'
+              }`}
+            >
+              <LayoutList className="w-3.5 h-3.5" />
+              Resumo de Compras Fornecedores
+            </button>
+          </div>
+
+          {/* Conteúdo das sub-abas */}
+          {entradaPecasSubTab === 'importacao' && (
+            <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+              <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
+                <div className="relative mr-2">
+                  <select
+                    value={importacaoFilterYear}
+                    onChange={e => setImportacaoFilterYear(Number(e.target.value))}
+                    className="appearance-none text-sm font-bold text-slate-700 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
+                  >
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                </div>
+                <div className="w-px h-5 bg-slate-200 mr-1" />
+                <button
+                  onClick={() => setImportacaoFilterMonth(null)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    importacaoFilterMonth === null ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                  }`}
+                >
+                  Ano todo
+                </button>
+                {monthNames.map((name, idx) => {
+                  const m = idx + 1;
+                  const isActive = importacaoFilterMonth === m;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => setImportacaoFilterMonth(m)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        isActive ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex-1 flex items-center justify-center p-8">
+                <div className="text-center space-y-2">
+                  <Upload className="w-10 h-10 text-slate-300 mx-auto" />
+                  <p className="text-sm font-semibold text-slate-600">Importação de Arquivo de Compra</p>
+                  <p className="text-xs text-slate-400">Conteúdo será definido em seguida.</p>
+                </div>
+              </div>
+            </div>
+          )}
+          {entradaPecasSubTab === 'resumo' && (
+            <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+              <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
+                <div className="relative mr-2">
+                  <select
+                    value={resumoComprasFilterYear}
+                    onChange={e => setResumoComprasFilterYear(Number(e.target.value))}
+                    className="appearance-none text-sm font-bold text-slate-700 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
+                  >
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                </div>
+                <div className="w-px h-5 bg-slate-200 mr-1" />
+                <button
+                  onClick={() => setResumoComprasFilterMonth(null)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    resumoComprasFilterMonth === null ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                  }`}
+                >
+                  Ano todo
+                </button>
+                {monthNames.map((name, idx) => {
+                  const m = idx + 1;
+                  const isActive = resumoComprasFilterMonth === m;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => setResumoComprasFilterMonth(m)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        isActive ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex-1 flex items-center justify-center p-8">
+                <div className="text-center space-y-2">
+                  <LayoutList className="w-10 h-10 text-slate-300 mx-auto" />
+                  <p className="text-sm font-semibold text-slate-600">Resumo de Compras Fornecedores</p>
+                  <p className="text-xs text-slate-400">Conteúdo será definido em seguida.</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Aba: Tabela de Dados */}
       {mainView === 'registros' && activeTab === 'tabela' && (
