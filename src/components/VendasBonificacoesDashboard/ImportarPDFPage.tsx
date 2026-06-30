@@ -11,6 +11,7 @@ import { BonusVarejoDashboard } from './BonusVarejoDashboard';
 import { BonusTradeInDashboard } from './BonusTradeInDashboard';
 import { JurosRotativoDashboard } from './JurosRotativoDashboard';
 import { EntradaPecasImportacaoTab } from './EntradaPecasImportacaoTab';
+import { ResumoPecasFornecedoresTab } from './ResumoPecasFornecedoresTab';
 import VendasResultadoDashboard from './VendasResultadoDashboard';
 import { CadastrosVWPage } from './CadastrosVWPage';
 import { VendasNovoAnalise } from './VendasNovoAnalise';
@@ -1219,13 +1220,10 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
                   );
                 })}
               </div>
-              <div className="flex-1 flex items-center justify-center p-8">
-                <div className="text-center space-y-2">
-                  <LayoutList className="w-10 h-10 text-slate-300 mx-auto" />
-                  <p className="text-sm font-semibold text-slate-600">Resumo de Compras Fornecedores</p>
-                  <p className="text-xs text-slate-400">Conteúdo será definido em seguida.</p>
-                </div>
-              </div>
+              <ResumoPecasFornecedoresTab
+                filterYear={resumoComprasFilterYear}
+                filterMonth={resumoComprasFilterMonth}
+              />
             </div>
           )}
         </div>
