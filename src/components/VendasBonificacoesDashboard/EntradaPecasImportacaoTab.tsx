@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Upload, X, ChevronDown, AlertCircle, FileDown } from 'lucide-react';
+import { Upload, X, ChevronDown, AlertCircle, FileDown, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import {
   loadEntradaPecasRows,
   mergeEntradaPecasByPeriod,
   parseEntradaPecasTXT,
+  clearEntradaPecasByPeriod,
 } from './entradaPecasStorage';
 
 interface Props {
@@ -249,6 +250,18 @@ export function EntradaPecasImportacaoTab({ filterYear, filterMonth }: Props) {
     }
   }
 
+  // ─── Limpar mês ──────────────────────────────────────────────────────────────
+  async function handleClearMonth() {
+    if (filterMonth === null) return;
+    const label = `${MONTH_NAMES[filterMonth - 1]}/${filterYear}`;
+    const confirmed = window.confirm(`Deseja apagar todos os itens importados de ${label}? Esta ação não pode ser desfeita.`);
+    if (!confirmed) return;
+    await clearEntradaPecasByPeriod(filterMonth, filterYear);
+    const allRows = await loadEntradaPecasRows();
+    setRows(allRows);
+    toast.success(`Dados de ${label} removidos com sucesso.`);
+  }
+
   // ─── Render ─────────────────────────────────────────────────────────────────
   const periodLabel = filterMonth !== null
     ? `${MONTH_NAMES[filterMonth - 1]}/${filterYear}`
@@ -298,6 +311,17 @@ export function EntradaPecasImportacaoTab({ filterYear, filterMonth }: Props) {
             </span>
           </>
         )}
+
+        <Button
+          onClick={handleClearMonth}
+          disabled={filterMonth === null || importing}
+          variant="outline"
+          className="ml-auto text-xs h-8 px-4 gap-1.5 border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          title={filterMonth === null ? 'Selecione um mês específico para limpar' : `Apagar dados de ${periodLabel}`}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          Limpar Mês
+        </Button>
       </div>
 
       {/* Conteúdo */}
