@@ -1,60 +1,70 @@
 import { kvGet, kvSet } from '@/lib/kvClient';
 
-const KEY = 'entrada_pecas_compra';
+// ─── Types ────────────────────────────────────────────────────────────────────
 
+/** Item enxuto — 10 campos por linha (salvo por mês/ano) */
+export interface EntradaPecasItemLite {
+  nf:    string;   // numeroNF
+  cod:   string;   // codItem
+  ncm:   string;
+  desc:  string;   // descricao
+  qtde:  number;
+  unit:  number;   // valUnitario
+  forn:  string;   // nomeCliente (fornecedor)
+  tipo:  string;   // tipoTransacao (ex: P01, P27)
+  custo: number;   // custoMedio
+  liqNF: number;   // liqNotaFiscal
+  mes:   number;
+  ano:   number;
+}
+
+export interface FornecedorResumoItem {
+  nomeCliente:   string;
+  nfs:           number;
+  totalCusto:    number;
+  temDevolucao:  boolean;
+}
+
+export interface TipoResumoItem {
+  tipo:          string;
+  totalCusto:    number;
+  nfs:           number;
+}
+
+export interface EntradaPecasResumo {
+  byFornecedor:  FornecedorResumoItem[];
+  byTipo:        TipoResumoItem[];
+  totalNFs:      number;
+  totalItens:    number;
+  totalCusto:    number;  // soma líquida (P27 já descontado)
+  mes:           number;
+  ano:           number;
+}
+
+// ─── Key helpers ──────────────────────────────────────────────────────────────
+
+function keyItens(mes: number, ano: number): string {
+  return `ep_itens_${ano}_${String(mes).padStart(2, '0')}`;
+}
+function keyResumo(mes: number, ano: number): string {
+  return `ep_resumo_${ano}_${String(mes).padStart(2, '0')}`;
+}
+
+// ─── Backwards-compat placeholder (não usado mais, mas evita erros de import) ─
 export interface EntradaPecasRow {
   id: string;
-  // ─── Cabeçalho da NF ──────────────────────────────────────────────────────
-  numeroNF: string;
-  serieNF: string;
-  tipoTransacao: string;    // TIPO_TRANSACAO (ex: P01)
-  nfeChaveAcesso: string;
-  dtaEntrada: string;       // DD/MM/YYYY
-  dtaDocumento: string;     // DD/MM/YYYY
-  modalidade: string;       // A=Avista, V=Vista...
-  nomeDepartamento: string; // NOME_DEPARTAMENTO
-  nomeUsuario: string;      // NOME_USUARIO (quem lançou)
-  nomeFonte: string;        // NOME_FONTE
-  nomeCliente: string;      // NOME_CLIENTE (fornecedor)
-  cgccpf: string;
-  cidade: string;
-  estado: string;
-  status: string;
-  nomeCategoriaCliente: string;
-  totNotaFiscal: number;
-  liqNotaFiscal: number;
-  totMercadoria: number;
-  valDescontoNF: number;
-  valIcmsNF: number;           // VAL_ICMS (base)
-  valIcmsAuxOutros: number;    // VALOR_ICMS_AUX_OUTROS (total ICMS c/ ST)
-  valFrete: number;
-  valPisNF: number;
-  valCofinsNF: number;
-  totIpi: number;
-  // ─── Item (peça) ──────────────────────────────────────────────────────────
-  codItem: string;
-  descricao: string;
-  ordem: number;
-  liqTotalItem: number;       // LIQ_TOTAL (valor líquido do item)
-  valTotalItem: number;
-  valUnitario: number;
-  qtde: number;
-  cfop: string;
-  custoMedio: number;
-  valDescontoItem: number;
-  valIcmsItem: number;        // VAL_ICMS do item
-  valIcmsRetidoItem: number;  // VAL_ICMS_RETIDO (ICMS-ST) do item
-  valIpiItem: number;
-  valPisItem: number;
-  valCofinsItem: number;
-  valIcmsAuxItem: number;     // VALOR_ICMS_AUX_OUTROS do item
-  ncm: string;                // POSICAO_FISCAL (código NCM)
-  baseIcms: number;           // BASE_ICMS do item
-  aliquotaIcms: number;       // ALIQUOTA_ICMS do item (%)
-  cfopOperacao: string;       // DES_CODFISCAL_OPERACAO
-  // ─── Período de classificação ─────────────────────────────────────────────
-  mes: number;
-  ano: number;
+  numeroNF: string; serieNF: string; tipoTransacao: string; nfeChaveAcesso: string;
+  dtaEntrada: string; dtaDocumento: string; modalidade: string; nomeDepartamento: string;
+  nomeUsuario: string; nomeFonte: string; nomeCliente: string; cgccpf: string;
+  cidade: string; estado: string; status: string; nomeCategoriaCliente: string;
+  totNotaFiscal: number; liqNotaFiscal: number; totMercadoria: number; valDescontoNF: number;
+  valIcmsNF: number; valIcmsAuxOutros: number; valFrete: number; valPisNF: number;
+  valCofinsNF: number; totIpi: number; codItem: string; descricao: string; ordem: number;
+  liqTotalItem: number; valTotalItem: number; valUnitario: number; qtde: number; cfop: string;
+  custoMedio: number; valDescontoItem: number; valIcmsItem: number; valIcmsRetidoItem: number;
+  valIpiItem: number; valPisItem: number; valCofinsItem: number; valIcmsAuxItem: number;
+  ncm: string; baseIcms: number; aliquotaIcms: number; cfopOperacao: string;
+  mes: number; ano: number;
 }
 
 // ─── Parse helper ─────────────────────────────────────────────────────────────
@@ -64,9 +74,7 @@ function n(s: string | undefined): number {
 }
 
 /**
- * Faz o parse do conteúdo TXT (separado por ponto-e-vírgula) e retorna
- * as linhas de item com contexto do cabeçalho da NF.
- *
+ * Faz o parse do conteúdo TXT e retorna itens lite + resumo pré-calculado.
  * Estrutura do arquivo:
  *  - Linha 1: definição de colunas do cabeçalho (começa com EMPRESA;)
  *  - Linha 2: definição de colunas do item (começa com ;TIPO;)
@@ -76,190 +84,171 @@ export function parseEntradaPecasTXT(
   content: string,
   mes: number,
   ano: number,
-): EntradaPecasRow[] {
-  const rows: EntradaPecasRow[] = [];
-  const lines = content
-    .split(/\r?\n/)
-    .filter(l => l.trim());
+): { itens: EntradaPecasItemLite[]; resumo: EntradaPecasResumo } {
+  const itens: EntradaPecasItemLite[] = [];
+  const lines = content.split(/\r?\n/).filter(l => l.trim());
 
   let hdr: string[] | null = null;
 
   for (const line of lines) {
-    // Pula linhas de definição de colunas
     if (line.startsWith('EMPRESA;') || line.startsWith(';TIPO;')) continue;
-
     const f = line.split(';');
-
     if (f[0] === '1') {
-      // Linha de cabeçalho da NF
       hdr = f;
     } else if (f[1] === 'P' && hdr) {
-      // Linha de item da NF
-      const nf     = hdr[2]  || '';
-      const serie  = hdr[3]  || '';
-      const cod    = (f[3]   || '').trim();
-      const ordem  = parseInt(f[5] || '0') || 0;
-
-      const id = `${hdr[0]}-${hdr[1]}-${nf}-${serie}-${cod}-${ordem}`;
-
-      rows.push({
-        id,
-        // cabeçalho
-        numeroNF:             nf,
-        serieNF:              serie,
-        tipoTransacao:        hdr[7]  || '',
-        nfeChaveAcesso:       hdr[4]  || '',
-        dtaEntrada:           hdr[9]  || '',
-        dtaDocumento:         (hdr[10] || '').split(' ')[0],
-        modalidade:           hdr[11] || '',
-        nomeDepartamento:     hdr[18] || '',
-        nomeUsuario:          hdr[27] || '',
-        nomeFonte:            hdr[20] || '',
-        nomeCliente:          hdr[84] || '',
-        cgccpf:               hdr[87] || '',
-        cidade:               hdr[88] || '',
-        estado:               hdr[89] || '',
-        status:               hdr[90] || '',
-        nomeCategoriaCliente: hdr[78] || '',
-        totNotaFiscal:        n(hdr[34]),
-        liqNotaFiscal:        n(hdr[35]),
-        totMercadoria:        n(hdr[37]),
-        valDescontoNF:        n(hdr[38]),
-        valIcmsNF:            n(hdr[43]),
-        valIcmsAuxOutros:     n(hdr[44]),
-        valFrete:             n(hdr[45]),
-        valPisNF:             n(hdr[51]),
-        valCofinsNF:          n(hdr[52]),
-        totIpi:               n(hdr[58]),
-        // item
-        codItem:              cod,
-        descricao:            f[4]  || '',
-        ordem,
-        liqTotalItem:         n(f[9]),
-        valTotalItem:         n(f[8]),
-        valUnitario:          n(f[10]),
-        qtde:                 n(f[11]),
-        cfop:                 f[12] || '',
-        custoMedio:           n(f[13]),
-        valDescontoItem:      n(f[14]),
-        valIcmsItem:          n(f[17]),
-        valIcmsRetidoItem:    n(f[18]),
-        valIpiItem:           n(f[28]),
-        valPisItem:           n(f[20]),
-        valCofinsItem:        n(f[21]),
-        valIcmsAuxItem:       n(f[37]),
-        ncm:                  f[38] || '',
-        baseIcms:             n(f[53]),
-        aliquotaIcms:         n(f[52]),
-        cfopOperacao:         f[35] || '',
-        // período
+      itens.push({
+        nf:    hdr[2]  || '',
+        forn:  hdr[84] || '',
+        tipo:  hdr[7]  || '',
+        cod:   (f[3]   || '').trim(),
+        ncm:   f[38]   || '',
+        desc:  f[4]    || '',
+        qtde:  n(f[11]),
+        unit:  n(f[10]),
+        custo: n(f[13]),
+        liqNF: n(hdr[35]),
         mes,
         ano,
       });
     }
   }
 
-  return rows;
-}
+  // ── Resumo pré-calculado ─────────────────────────────────────────────────
+  const byFornMap = new Map<string, { nfsSet: Set<string>; total: number; temDev: boolean }>();
+  const byTipoMap = new Map<string, { nfsSet: Set<string>; total: number }>();
 
-// ─── Storage CRUD ─────────────────────────────────────────────────────────────
+  for (const item of itens) {
+    if (!byFornMap.has(item.forn)) byFornMap.set(item.forn, { nfsSet: new Set(), total: 0, temDev: false });
+    const fe = byFornMap.get(item.forn)!;
+    fe.nfsSet.add(item.nf);
+    if (item.tipo === 'P27') { fe.total -= item.custo; fe.temDev = true; }
+    else { fe.total += item.custo; }
 
-function normalize(r: Record<string, unknown> & { id: string }): EntradaPecasRow {
-  const num = (k: string) => Number(r[k] ?? 0);
-  return {
-    id:                   String(r.id),
-    numeroNF:             String(r.numeroNF             ?? ''),
-    serieNF:              String(r.serieNF              ?? ''),
-    tipoTransacao:        String(r.tipoTransacao        ?? ''),
-    nfeChaveAcesso:       String(r.nfeChaveAcesso       ?? ''),
-    dtaEntrada:           String(r.dtaEntrada           ?? ''),
-    dtaDocumento:         String(r.dtaDocumento         ?? ''),
-    modalidade:           String(r.modalidade           ?? ''),
-    nomeDepartamento:     String(r.nomeDepartamento     ?? ''),
-    nomeUsuario:          String(r.nomeUsuario          ?? ''),
-    nomeFonte:            String(r.nomeFonte            ?? ''),
-    nomeCliente:          String(r.nomeCliente          ?? ''),
-    cgccpf:               String(r.cgccpf               ?? ''),
-    cidade:               String(r.cidade               ?? ''),
-    estado:               String(r.estado               ?? ''),
-    status:               String(r.status               ?? ''),
-    nomeCategoriaCliente: String(r.nomeCategoriaCliente ?? ''),
-    totNotaFiscal:        num('totNotaFiscal'),
-    liqNotaFiscal:        num('liqNotaFiscal'),
-    totMercadoria:        num('totMercadoria'),
-    valDescontoNF:        num('valDescontoNF'),
-    valIcmsNF:            num('valIcmsNF'),
-    valIcmsAuxOutros:     num('valIcmsAuxOutros'),
-    valFrete:             num('valFrete'),
-    valPisNF:             num('valPisNF'),
-    valCofinsNF:          num('valCofinsNF'),
-    totIpi:               num('totIpi'),
-    codItem:              String(r.codItem              ?? ''),
-    descricao:            String(r.descricao            ?? ''),
-    ordem:                num('ordem'),
-    liqTotalItem:         num('liqTotalItem'),
-    valTotalItem:         num('valTotalItem'),
-    valUnitario:          num('valUnitario'),
-    qtde:                 num('qtde'),
-    cfop:                 String(r.cfop                 ?? ''),
-    custoMedio:           num('custoMedio'),
-    valDescontoItem:      num('valDescontoItem'),
-    valIcmsItem:          num('valIcmsItem'),
-    valIcmsRetidoItem:    num('valIcmsRetidoItem'),
-    valIpiItem:           num('valIpiItem'),
-    valPisItem:           num('valPisItem'),
-    valCofinsItem:        num('valCofinsItem'),
-    valIcmsAuxItem:       num('valIcmsAuxItem'),
-    ncm:                  String(r.ncm                  ?? ''),
-    baseIcms:             num('baseIcms'),
-    aliquotaIcms:         num('aliquotaIcms'),
-    cfopOperacao:         String(r.cfopOperacao         ?? ''),
-    mes:                  num('mes'),
-    ano:                  num('ano'),
+    if (!byTipoMap.has(item.tipo)) byTipoMap.set(item.tipo, { nfsSet: new Set(), total: 0 });
+    const te = byTipoMap.get(item.tipo)!;
+    te.nfsSet.add(item.nf);
+    te.total += item.custo;
+  }
+
+  const byFornecedor: FornecedorResumoItem[] = Array.from(byFornMap.entries())
+    .map(([nome, d]) => ({ nomeCliente: nome, nfs: d.nfsSet.size, totalCusto: d.total, temDevolucao: d.temDev }))
+    .sort((a, b) => b.totalCusto - a.totalCusto);
+
+  const byTipo: TipoResumoItem[] = Array.from(byTipoMap.entries())
+    .map(([tipo, d]) => ({ tipo, totalCusto: d.total, nfs: d.nfsSet.size }))
+    .sort((a, b) => b.totalCusto - a.totalCusto);
+
+  const resumo: EntradaPecasResumo = {
+    byFornecedor,
+    byTipo,
+    totalNFs:   new Set(itens.map(i => i.nf)).size,
+    totalItens: itens.length,
+    totalCusto: byFornecedor.reduce((s, f) => s + f.totalCusto, 0),
+    mes,
+    ano,
   };
+
+  return { itens, resumo };
 }
 
-export async function loadEntradaPecasRows(): Promise<EntradaPecasRow[]> {
+// ─── Storage ──────────────────────────────────────────────────────────────────
+
+export async function loadEntradaPecasItens(mes: number, ano: number): Promise<EntradaPecasItemLite[]> {
   try {
-    const data = await kvGet(KEY);
-    if (Array.isArray(data))
-      return (data as (Record<string, unknown> & { id: string })[]).map(normalize);
+    const data = await kvGet(keyItens(mes, ano));
+    if (Array.isArray(data)) return data as EntradaPecasItemLite[];
     return [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
-export async function saveEntradaPecasRows(rows: EntradaPecasRow[]): Promise<boolean> {
+export async function loadEntradaPecasResumo(mes: number, ano: number): Promise<EntradaPecasResumo | null> {
   try {
-    await kvSet(KEY, rows);
-    return true;
-  } catch {
-    return false;
-  }
+    const data = await kvGet(keyResumo(mes, ano));
+    if (data && typeof data === 'object' && !Array.isArray(data) && Array.isArray((data as EntradaPecasResumo).byFornecedor))
+      return data as EntradaPecasResumo;
+    return null;
+  } catch { return null; }
 }
 
-/**
- * Acumula os novos itens, substituindo apenas os que pertencem ao mesmo
- * mês/ano de classificação. Itens de outros períodos são preservados.
- */
-export async function mergeEntradaPecasByPeriod(
-  newRows: EntradaPecasRow[],
-): Promise<{ added: number; replaced: number }> {
-  const existing = await loadEntradaPecasRows();
-
-  if (newRows.length === 0) return { added: 0, replaced: 0 };
-
-  const { mes, ano } = newRows[0];
-
-  const kept     = existing.filter(r => !(r.mes === mes && r.ano === ano));
-  const replaced = existing.length - kept.length;
-
-  await saveEntradaPecasRows([...kept, ...newRows]);
-  return { added: newRows.length, replaced };
+export async function saveEntradaPecasPeriod(
+  mes: number,
+  ano: number,
+  itens: EntradaPecasItemLite[],
+  resumo: EntradaPecasResumo,
+): Promise<void> {
+  await Promise.all([
+    kvSet(keyItens(mes, ano), itens),
+    kvSet(keyResumo(mes, ano), resumo),
+  ]);
 }
 
 export async function clearEntradaPecasByPeriod(mes: number, ano: number): Promise<void> {
-  const existing = await loadEntradaPecasRows();
-  await saveEntradaPecasRows(existing.filter(r => !(r.mes === mes && r.ano === ano)));
+  await Promise.all([
+    kvSet(keyItens(mes, ano), []),
+    kvSet(keyResumo(mes, ano), {}),
+  ]);
 }
+
+// ─── Agregação multi-mês (para a aba Resumo com "Ano todo") ───────────────────
+
+export async function loadAndAggregateResumo(
+  mes: number | null,
+  ano: number,
+): Promise<EntradaPecasResumo> {
+  const months = mes !== null ? [mes] : Array.from({ length: 12 }, (_, i) => i + 1);
+  const resumos = (
+    await Promise.all(months.map(m => loadEntradaPecasResumo(m, ano)))
+  ).filter((r): r is EntradaPecasResumo => r !== null);
+
+  if (resumos.length === 0)
+    return { byFornecedor: [], byTipo: [], totalNFs: 0, totalItens: 0, totalCusto: 0, mes: mes ?? 0, ano };
+
+  const byFornMap = new Map<string, { nfs: number; total: number; temDev: boolean }>();
+  const byTipoMap = new Map<string, { nfs: number; total: number }>();
+
+  for (const r of resumos) {
+    for (const f of r.byFornecedor) {
+      if (!byFornMap.has(f.nomeCliente)) byFornMap.set(f.nomeCliente, { nfs: 0, total: 0, temDev: false });
+      const e = byFornMap.get(f.nomeCliente)!;
+      e.nfs   += f.nfs;
+      e.total += f.totalCusto;
+      if (f.temDevolucao) e.temDev = true;
+    }
+    for (const t of r.byTipo) {
+      if (!byTipoMap.has(t.tipo)) byTipoMap.set(t.tipo, { nfs: 0, total: 0 });
+      const e = byTipoMap.get(t.tipo)!;
+      e.nfs   += t.nfs;
+      e.total += t.totalCusto;
+    }
+  }
+
+  const byFornecedor = Array.from(byFornMap.entries())
+    .map(([nome, d]) => ({ nomeCliente: nome, nfs: d.nfs, totalCusto: d.total, temDevolucao: d.temDev }))
+    .sort((a, b) => b.totalCusto - a.totalCusto);
+
+  const byTipo = Array.from(byTipoMap.entries())
+    .map(([tipo, d]) => ({ tipo, totalCusto: d.total, nfs: d.nfs }))
+    .sort((a, b) => b.totalCusto - a.totalCusto);
+
+  return {
+    byFornecedor,
+    byTipo,
+    totalNFs:   resumos.reduce((s, r) => s + r.totalNFs,   0),
+    totalItens: resumos.reduce((s, r) => s + r.totalItens, 0),
+    totalCusto: byFornecedor.reduce((s, f) => s + f.totalCusto, 0),
+    mes: mes ?? 0,
+    ano,
+  };
+}
+
+// ─── Stubs de compatibilidade (não usados, mas evitam erros de importação) ────
+/** @deprecated use saveEntradaPecasPeriod */
+export async function mergeEntradaPecasByPeriod(
+  _rows: EntradaPecasRow[],
+): Promise<{ added: number; replaced: number }> {
+  return { added: 0, replaced: 0 };
+}
+/** @deprecated use loadEntradaPecasItens */
+export async function loadEntradaPecasRows(): Promise<EntradaPecasRow[]> { return []; }
+/** @deprecated */
+export async function saveEntradaPecasRows(_rows: EntradaPecasRow[]): Promise<boolean> { return false; }
