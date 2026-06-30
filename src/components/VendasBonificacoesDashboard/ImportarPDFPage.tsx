@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag, TrendingUp, BarChart2, TrendingDown, BookOpen, PackagePlus } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, Table2, ChevronDown, ChevronRight, Download, LayoutList, TableProperties, ClipboardList, Banknote, Archive, Tag, TrendingUp, BarChart2, TrendingDown, BookOpen, PackagePlus, Boxes } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -12,6 +12,7 @@ import { BonusTradeInDashboard } from './BonusTradeInDashboard';
 import { JurosRotativoDashboard } from './JurosRotativoDashboard';
 import { EntradaPecasImportacaoTab } from './EntradaPecasImportacaoTab';
 import { ResumoPecasFornecedoresTab } from './ResumoPecasFornecedoresTab';
+import { ItensFornecedorTab } from './ItensFornecedorTab';
 import VendasResultadoDashboard from './VendasResultadoDashboard';
 import { CadastrosVWPage } from './CadastrosVWPage';
 import { VendasNovoAnalise } from './VendasNovoAnalise';
@@ -483,11 +484,13 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
     }
   }, [mainView, canResumo, canAnalises, canVendas, canFinanceiro, canRegistros, canCadastros]);
   const [activeTab, setActiveTab] = useState<'guia' | 'importar' | 'tabela' | 'registro' | 'bonus' | 'tradein' | 'juros' | 'entradaPecas'>('importar');
-  const [entradaPecasSubTab, setEntradaPecasSubTab] = useState<'importacao' | 'resumo'>('importacao');
+  const [entradaPecasSubTab, setEntradaPecasSubTab] = useState<'importacao' | 'resumo' | 'itens'>('importacao');
   const [importacaoFilterYear, setImportacaoFilterYear] = useState<number>(new Date().getFullYear());
   const [importacaoFilterMonth, setImportacaoFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [resumoComprasFilterYear, setResumoComprasFilterYear] = useState<number>(new Date().getFullYear());
   const [resumoComprasFilterMonth, setResumoComprasFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [itensFornFilterYear, setItensFornFilterYear] = useState<number>(new Date().getFullYear());
+  const [itensFornFilterMonth, setItensFornFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [registroSubTab, setRegistroSubTab] = useState<'novos' | 'frotista' | 'usados'>('novos');
   const [registroFilterYear, setRegistroFilterYear] = useState<number>(new Date().getFullYear());
   const [registroFilterMonth, setRegistroFilterMonth] = useState<number | null>(new Date().getMonth() + 1);
@@ -1127,6 +1130,17 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
               <LayoutList className="w-3.5 h-3.5" />
               Resumo de Compras Fornecedores
             </button>
+            <button
+              onClick={() => setEntradaPecasSubTab('itens')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+                entradaPecasSubTab === 'itens'
+                  ? 'border-emerald-500 text-emerald-700 bg-white'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-white/60'
+              }`}
+            >
+              <Boxes className="w-3.5 h-3.5" />
+              Itens Compras por Fornecedor
+            </button>
           </div>
 
           {/* Conteúdo das sub-abas */}
@@ -1215,6 +1229,54 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
               <ResumoPecasFornecedoresTab
                 filterYear={resumoComprasFilterYear}
                 filterMonth={resumoComprasFilterMonth}
+              />
+            </div>
+          )}
+          {entradaPecasSubTab === 'itens' && (
+            <div className="flex-1 flex flex-col" style={{ minHeight: 0 }}>
+              {/* Seletor de Ano/Mês */}
+              <div className="bg-white border-b border-slate-100 px-4 py-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">ANO</span>
+                <div className="relative mr-2">
+                  <select
+                    value={itensFornFilterYear}
+                    onChange={e => setItensFornFilterYear(Number(e.target.value))}
+                    className="appearance-none text-sm font-bold text-slate-700 border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
+                  >
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                </div>
+                <div className="w-px h-5 bg-slate-200 mr-1" />
+                <button
+                  onClick={() => setItensFornFilterMonth(null)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    itensFornFilterMonth === null ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                  }`}
+                >
+                  Ano todo
+                </button>
+                {monthNames.map((name, idx) => {
+                  const m = idx + 1;
+                  const isActive = itensFornFilterMonth === m;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => setItensFornFilterMonth(m)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        isActive ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+              <ItensFornecedorTab
+                filterYear={itensFornFilterYear}
+                filterMonth={itensFornFilterMonth}
               />
             </div>
           )}
