@@ -1148,14 +1148,6 @@ export function ImportarPDFPage({ onBack }: ImportarPDFPageProps) {
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                 </div>
                 <div className="w-px h-5 bg-slate-200 mr-1" />
-                <button
-                  onClick={() => setImportacaoFilterMonth(null)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    importacaoFilterMonth === null ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                  }`}
-                >
-                  Ano todo
-                </button>
                 {monthNames.map((name, idx) => {
                   const m = idx + 1;
                   const isActive = importacaoFilterMonth === m;
