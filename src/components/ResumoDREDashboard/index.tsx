@@ -3,8 +3,10 @@ import { kvKeys } from '@/lib/kvClient';
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import { ArrowLeft } from 'lucide-react';
 import { AudiDreTab } from './AudiDreTab';
+import { AudiComparativoTab } from './AudiComparativoTab';
 import { AudiGraficosTab } from './AudiGraficosTab';
 import { VwDreTab } from './VwDreTab';
+import { VwComparativoTab } from './VwComparativoTab';
 import { VwGraficosTab } from './VwGraficosTab';
 import { ConsolidadoDreTab } from './ConsolidadoDreTab';
 import { ConsolidadoGraficosTab } from './ConsolidadoGraficosTab';
@@ -24,14 +26,16 @@ interface ResumoDREDashboardProps {
   onChangeBrand: () => void;
 }
 
-type TabId = 'comparativo-marcas' | 'resumo-marcas' | 'vw' | 'audi' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos' | 'mensal' | 'saidas-caixa' | 'endividamento-dre' | 'despesas-financeiras' | 'analise-evolucao' | 'receita-evolucao' | 'despesas-departamento-evolucao' | 'volume-evolucao' | 'diagnostivo';
+type TabId = 'comparativo-marcas' | 'resumo-marcas' | 'vw' | 'vw-comparativo' | 'audi' | 'audi-comparativo' | 'consolidado' | 'audi-graficos' | 'vw-graficos' | 'consolidado-graficos' | 'mensal' | 'saidas-caixa' | 'endividamento-dre' | 'despesas-financeiras' | 'analise-evolucao' | 'receita-evolucao' | 'despesas-departamento-evolucao' | 'volume-evolucao' | 'diagnostivo';
 
 const TABS: { id: TabId; label: string; color: string; activeColor: string }[] = [
   { id: 'comparativo-marcas',    label: 'Comparativo Marcas',    color: '#334155', activeColor: '#1e293b' },
   { id: 'resumo-marcas',         label: 'Resumo',                color: '#334155', activeColor: '#1e293b' },
   { id: 'vw',                    label: 'VW',                    color: '#001e50', activeColor: '#001e50' },
+  { id: 'vw-comparativo',        label: 'VW Comparativo',        color: '#001e50', activeColor: '#001238' },
   { id: 'vw-graficos',           label: 'VW Gráficos',           color: '#001e50', activeColor: '#001233' },
   { id: 'audi',                  label: 'Audi',                  color: '#bb0a30', activeColor: '#bb0a30' },
+  { id: 'audi-comparativo',      label: 'Audi Comparativo',      color: '#bb0a30', activeColor: '#9a0827' },
   { id: 'audi-graficos',         label: 'Audi Gráficos',         color: '#bb0a30', activeColor: '#9a0827' },
   { id: 'consolidado',           label: 'Consolidado',           color: '#7c3aed', activeColor: '#7c3aed' },
   { id: 'consolidado-graficos',  label: 'Consol. Gráficos',      color: '#7c3aed', activeColor: '#5b21b6' },
@@ -186,10 +190,14 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
           <ResumoMarcasTab year={year} month={month} />
         ) : activeTab === 'vw' ? (
           <VwDreTab year={year} month={month} diasUteis={diasUteis} />
+        ) : activeTab === 'vw-comparativo' ? (
+          <VwComparativoTab year={year} month={month} />
         ) : activeTab === 'vw-graficos' ? (
           <VwGraficosTab year={year} month={month} />
         ) : activeTab === 'audi' ? (
           <AudiDreTab year={year} month={month} diasUteis={diasUteis} />
+        ) : activeTab === 'audi-comparativo' ? (
+          <AudiComparativoTab year={year} month={month} />
         ) : activeTab === 'audi-graficos' ? (
           <AudiGraficosTab year={year} month={month} />
         ) : activeTab === 'consolidado' ? (
