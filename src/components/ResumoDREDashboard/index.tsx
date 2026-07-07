@@ -47,7 +47,7 @@ const TABS: { id: TabId; label: string; color: string; activeColor: string }[] =
   { id: 'receita-evolucao',        label: 'Evolução Receita',       color: '#0369a1', activeColor: '#025d91' },
   { id: 'despesas-departamento-evolucao', label: 'Evolução Despesas por Departamento', color: '#b45309', activeColor: '#92400e' },
   { id: 'analise-evolucao',       label: 'Evolução Despesas por Tipo',      color: '#0f766e', activeColor: '#0d6660' },
-  { id: 'diagnostivo',             label: 'Radar de Variancia',     color: '#334155', activeColor: '#1e293b' },
+  // { id: 'diagnostivo', label: 'Radar de Variancia', color: '#334155', activeColor: '#1e293b' }, // oculto
 ];
 
 const MONTHS_LABEL = [
