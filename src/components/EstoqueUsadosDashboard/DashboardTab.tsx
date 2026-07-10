@@ -49,9 +49,9 @@ function PainelEstoque({
       {/* Seção de Meta */}
       {showMeta && (
       <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50">
-        <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
-          <span className="font-medium">OBJETIVO — META DE ESTOQUE</span>
-          <span className="font-semibold text-slate-700">{fmtBRL(meta)}</span>
+        <div className="flex items-center justify-between text-xs text-slate-600 mb-2">
+          <span className="font-bold">OBJETIVO — META DE ESTOQUE</span>
+          <span className="font-bold text-slate-800">{fmtBRL(meta)}</span>
         </div>
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xs text-slate-400 w-8 shrink-0">META</span>
