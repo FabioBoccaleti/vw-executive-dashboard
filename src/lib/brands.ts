@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados';
 
 // Interface de configuraÃ§Ã£o visual da marca
 export interface BrandConfig {
@@ -363,10 +363,35 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-accent': '#2dd4bf',
     }
   },
+  numeros_estoque_usados: {
+    id: 'numeros_estoque_usados',
+    name: 'Números de Estoque de Usados',
+    shortName: 'Estoque Usados',
+    colors: {
+      primary: '#4f46e5',
+      primaryHover: '#4338ca',
+      primaryLight: '#eef2ff',
+      secondary: '#818cf8',
+      accent: '#a5b4fc',
+      headerBg: 'bg-[#4f46e5]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#4f46e5] hover:bg-[#4338ca]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-indigo-100 dark:bg-indigo-900/30',
+      badgeText: 'text-indigo-800 dark:text-indigo-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#4f46e5',
+      '--brand-primary-hover': '#4338ca',
+      '--brand-primary-light': '#eef2ff',
+      '--brand-secondary': '#818cf8',
+      '--brand-accent': '#a5b4fc',
+    }
+  },
 };
 
 // Lista de marcas disponiveis
-export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas'];
+export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados'];
 
 // Chave de armazenamento para marca selecionada
 export const SELECTED_BRAND_KEY = 'selected_brand';

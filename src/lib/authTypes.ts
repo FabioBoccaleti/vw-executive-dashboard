@@ -2,11 +2,11 @@
 
 export type UserRole = 'admin' | 'gestor' | 'leitura';
 
-export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'central_vendas_vw' | 'custos_alugueis' | 'analise_evolutiva_despesas';
+export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'central_vendas_vw' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados';
 
 export type BrandId = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'vw_outros' | 'audi_outros';
 
-export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw', 'custos_alugueis', 'analise_evolutiva_despesas'];
+export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados'];
 
 export const ALL_BRANDS: BrandId[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'vw_outros', 'audi_outros'];
 
@@ -19,6 +19,7 @@ export const MODULE_LABELS: Record<ModuleId, string> = {
   central_vendas_vw: 'Central de Vendas VW',
   custos_alugueis: 'Custos com Aluguéis',
   analise_evolutiva_despesas: 'Análise Evolutiva de Despesas',
+  numeros_estoque_usados: 'Números de Estoque de Usados',
 };
 
 export const BRAND_LABELS: Record<BrandId, string> = {

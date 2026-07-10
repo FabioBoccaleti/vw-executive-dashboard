@@ -27,6 +27,7 @@ import { CustosAlugueisDashboard } from '@/components/CustosAlugueisDashboard'
 import { ResumoDREDashboard } from '@/components/ResumoDREDashboard'
 import { AnaliseProjecoesDashboard } from '@/components/AnaliseProjecoesDashboard'
 import { AnaliseDespesasDashboard } from '@/components/AnaliseDespesasDashboard'
+import { EstoqueUsadosDashboard } from '@/components/EstoqueUsadosDashboard'
 
 function AppContent() {
   const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
@@ -298,6 +299,8 @@ function AppContent() {
             onOpenCadastros={() => { setCadastrosVariant('blindagem'); setCurrentPage('cadastros'); }}
           />
         )
+      ) : brand === 'numeros_estoque_usados' ? (
+        <EstoqueUsadosDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'custos_alugueis' ? (
         <CustosAlugueisDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'analise_evolutiva_despesas' ? (
