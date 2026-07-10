@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { kvBulkGet } from '@/lib/kvClient';
 import {
   EstoqueUsadosEntry, EstoqueUsadosMeta,
   calcTotalVW, calcTotalAudi, formatDateBR, fmtBRL,
@@ -10,6 +11,7 @@ import {
 interface Props {
   entry: EstoqueUsadosEntry | null;
   meta: EstoqueUsadosMeta;
+  historyDates: string[];
   onEditMeta: () => void;
   onZerar: () => void;
 }
@@ -192,19 +194,72 @@ function exportExcel(entry: EstoqueUsadosEntry, meta: EstoqueUsadosMeta) {
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
-export function DashboardTab({ entry, meta, onEditMeta, onZerar }: Props) {
+export function DashboardTab({ entry, meta, historyDates, onEditMeta, onZerar }: Props) {
   const totalVW   = entry ? calcTotalVW(entry)   : 0;
   const totalAudi = entry ? calcTotalAudi(entry) : 0;
   const printRef  = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
 
-  const handlePDF = () => {
+  const handlePDF = async () => {
     const printSource = printRef.current;
     const root = document.getElementById('print-root');
     if (!printSource || !root) return;
 
+    setPrinting(true);
+
+    // ── Página 1: dashboard atual ─────────────────────────────────────────
     const clone = printSource.cloneNode(true) as HTMLElement;
     clone.style.display = 'block';
-    root.innerHTML = clone.outerHTML;
+    let printHTML = clone.outerHTML;
+
+    // ── Página 2: histórico (até 10 lançamentos) ──────────────────────────
+    const recentDates = historyDates.slice(0, 10);
+    if (recentDates.length > 0) {
+      const keys = recentDates.map(d => `estoque_usados:entry:${d}`);
+      let histEntries: EstoqueUsadosEntry[] = [];
+      try {
+        const map = await kvBulkGet<EstoqueUsadosEntry>(keys);
+        histEntries = keys
+          .map(k => map[k])
+          .filter((e): e is EstoqueUsadosEntry => !!e)
+          .sort((a, b) => b.date.localeCompare(a.date));
+      } catch { /* silencia erro — página 2 não aparece */ }
+
+      if (histEntries.length > 0) {
+        const cols = [
+          { label: 'Data',              fn: (e: EstoqueUsadosEntry) => formatDateBR(e.date) },
+          { label: 'Total VW',          fn: (e: EstoqueUsadosEntry) => fmtBRL(calcTotalVW(e)) },
+          { label: 'Total Audi',        fn: (e: EstoqueUsadosEntry) => fmtBRL(calcTotalAudi(e)) },
+          { label: 'Total Geral',       fn: (e: EstoqueUsadosEntry) => fmtBRL(calcTotalVW(e) + calcTotalAudi(e)) },
+          { label: 'A Pagar VW',        fn: (e: EstoqueUsadosEntry) => fmtBRL(e.vwUsadosLMVendidoaPagar ?? 0) },
+          { label: 'A Pagar Audi',      fn: (e: EstoqueUsadosEntry) => fmtBRL(e.audiUsadosMontadoraaPagar ?? 0) },
+          { label: 'Novos Venc. VW',    fn: (e: EstoqueUsadosEntry) => fmtBRL(e.vwNovosProximoVencimento ?? 0) },
+          { label: 'Novos Venc. Audi',  fn: (e: EstoqueUsadosEntry) => fmtBRL(e.audiNovosProximoVencimento ?? 0) },
+        ];
+
+        const theadCells = cols.map(c => `<th>${c.label}</th>`).join('');
+        const tbodyRows  = histEntries.map((e, i) => {
+          const cells = cols.map((c, ci) =>
+            `<td style="${ci === 0 ? 'font-weight:600' : ci === 3 ? 'font-weight:700' : ''}">${c.fn(e)}</td>`
+          ).join('');
+          return `<tr class="${i % 2 === 0 ? 'even' : ''}">${cells}</tr>`;
+        }).join('');
+
+        printHTML += `
+          <div class="hist-page">
+            <div class="hist-header">
+              <div class="hist-title">Histórico</div>
+              <div class="hist-subtitle">Últimos ${histEntries.length} lançamento${histEntries.length > 1 ? 's' : ''} registrado${histEntries.length > 1 ? 's' : ''}</div>
+            </div>
+            <table class="hist-table">
+              <thead><tr>${theadCells}</tr></thead>
+              <tbody>${tbodyRows}</tbody>
+            </table>
+          </div>`;
+      }
+    }
+
+    root.innerHTML = printHTML;
 
     const style = document.createElement('style');
     style.id = '__estoque-print-override__';
@@ -229,8 +284,60 @@ export function DashboardTab({ entry, meta, onEditMeta, onZerar }: Props) {
       }
       #print-root .flex-1 { flex: none !important; height: auto !important; }
       #print-root .min-h-0 { min-height: 0 !important; }
+
+      /* ── Página 2: Histórico ── */
+      .hist-page {
+        page-break-before: always;
+        padding: 0;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      .hist-header {
+        background: linear-gradient(135deg, #001e50 0%, #6b0018 100%);
+        padding: 14px 20px;
+        color: white;
+        margin-bottom: 16px;
+      }
+      .hist-title {
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .hist-subtitle {
+        font-size: 10px;
+        opacity: 0.7;
+        margin-top: 2px;
+      }
+      .hist-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+      }
+      .hist-table thead tr {
+        background: #f1f5f9;
+      }
+      .hist-table th {
+        padding: 8px 12px;
+        text-align: center;
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #475569;
+        border-bottom: 2px solid #e2e8f0;
+      }
+      .hist-table th:first-child { text-align: left; }
+      .hist-table td {
+        padding: 7px 12px;
+        text-align: center;
+        color: #334155;
+        border-bottom: 1px solid #f1f5f9;
+        font-variant-numeric: tabular-nums;
+      }
+      .hist-table td:first-child { text-align: left; }
+      .hist-table tr.even td { background: #f8fafc; }
     `;
     document.head.appendChild(style);
+
+    setPrinting(false);
 
     window.onafterprint = () => {
       document.head.querySelector('#__estoque-print-override__')?.remove();
@@ -400,10 +507,10 @@ export function DashboardTab({ entry, meta, onEditMeta, onZerar }: Props) {
           </button>
           <button
             onClick={handlePDF}
-            disabled={!entry}
+            disabled={!entry || printing}
             className="px-3 py-1.5 text-xs font-medium rounded-md bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            Imprimir / Salvar PDF
+            {printing ? 'Carregando...' : 'Imprimir / Salvar PDF'}
           </button>
           <button
             onClick={onZerar}

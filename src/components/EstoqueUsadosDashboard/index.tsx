@@ -190,6 +190,7 @@ export function EstoqueUsadosDashboard({ onChangeBrand }: Props) {
           <DashboardTab
             entry={currentEntry}
             meta={meta}
+            historyDates={historyDates}
             onEditMeta={() => setActiveTab('lancar')}
             onZerar={() => setShowZeroConfirm(true)}
           />
