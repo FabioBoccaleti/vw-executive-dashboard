@@ -993,6 +993,8 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
 
 function PosicaoEstoquesTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, selectedMonth, selectedYear }: any) {
   const [showCharts, setShowCharts] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
   const accounts = data.accounts as Record<string, any>;
   const getAcc = (id: string) => accounts[id] || { saldoAnt: 0, saldoAtual: 0 };
 
@@ -1081,15 +1083,67 @@ function PosicaoEstoquesTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colA
     return <PosicaoEstoquesCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
   }
 
+  const handlePDF = () => {
+    const printSource = printRef.current;
+    const root = document.getElementById('print-root');
+    if (!printSource || !root) return;
+
+    setPrinting(true);
+
+    const clone = printSource.cloneNode(true) as HTMLElement;
+    clone.style.display = 'block';
+    root.innerHTML = clone.outerHTML;
+
+    const style = document.createElement('style');
+    style.id = '__posicao-estoques-print-override__';
+    style.textContent = `
+      @page { size: A4 portrait; margin: 1cm; }
+      body > *:not(#print-root) { display: none !important; }
+      #print-root {
+        display: block !important;
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 10px;
+      }
+      #print-root, #print-root * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        forced-color-adjust: none !important;
+        color-scheme: light !important;
+      }
+      #print-root .overflow-x-auto { overflow: visible !important; }
+      #print-root table { width: 100%; border-collapse: collapse; }
+      #print-root th, #print-root td { font-size: 8px !important; padding: 3px 6px !important; }
+    `;
+    document.head.appendChild(style);
+
+    setPrinting(false);
+
+    window.onafterprint = () => {
+      document.head.querySelector('#__posicao-estoques-print-override__')?.remove();
+      root.innerHTML = '';
+      window.onafterprint = null;
+    };
+
+    window.print();
+  };
+
   return (
     <div className="space-y-6">
-      {/* Botão Gráficos */}
-      <div className="flex justify-end">
+      {/* Botões de ação */}
+      <div className="flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={() => setShowCharts(true)} className="gap-2">
           <BarChart3 className="h-4 w-4" />
           Evolução Mensal
         </Button>
+        <button
+          onClick={handlePDF}
+          disabled={printing}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-slate-800 text-white border-slate-700 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <span>🖨️</span> {printing ? 'Preparando...' : 'Imprimir / Salvar PDF'}
+        </button>
       </div>
+      <div ref={printRef}>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1158,6 +1212,7 @@ function PosicaoEstoquesTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colA
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
@@ -1183,19 +1238,59 @@ function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAt
   const varTotal = totalAtu - totalAnt;
   const varTotalPct = totalAnt !== 0 ? (varTotal / totalAnt) * 100 : null;
 
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
+
+  const handlePDF = () => {
+    const printSource = printRef.current;
+    const root = document.getElementById('print-root');
+    if (!printSource || !root) return;
+    setPrinting(true);
+    const clone = printSource.cloneNode(true) as HTMLElement;
+    clone.style.display = 'block';
+    root.innerHTML = clone.outerHTML;
+    const style = document.createElement('style');
+    style.id = '__valores-receber-print-override__';
+    style.textContent = `
+      @page { size: A4 portrait; margin: 1cm; }
+      body > *:not(#print-root) { display: none !important; }
+      #print-root { display: block !important; font-family: Inter, system-ui, sans-serif; font-size: 10px; }
+      #print-root, #print-root * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; forced-color-adjust: none !important; color-scheme: light !important; }
+      #print-root .overflow-x-auto { overflow: visible !important; }
+      #print-root table { width: 100%; border-collapse: collapse; }
+      #print-root th, #print-root td { font-size: 8px !important; padding: 3px 6px !important; }
+    `;
+    document.head.appendChild(style);
+    setPrinting(false);
+    window.onafterprint = () => {
+      document.head.querySelector('#__valores-receber-print-override__')?.remove();
+      root.innerHTML = '';
+      window.onafterprint = null;
+    };
+    window.print();
+  };
+
   if (showCharts) {
     return <ValoresReceberCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Botão Gráficos */}
-      <div className="flex justify-end">
+      {/* Botões de ação */}
+      <div className="flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={() => setShowCharts(true)} className="gap-2">
           <BarChart3 className="h-4 w-4" />
           Evolução Mensal
         </Button>
+        <button
+          onClick={handlePDF}
+          disabled={printing}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-slate-800 text-white border-slate-700 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <span>🖨️</span> {printing ? 'Preparando...' : 'Imprimir / Salvar PDF'}
+        </button>
       </div>
+      <div ref={printRef}>
 
       {/* KPI Total */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1274,6 +1369,7 @@ function ValoresReceberTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAt
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
@@ -1828,19 +1924,59 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
     </>;
   };
 
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
+
+  const handlePDF = () => {
+    const printSource = printRef.current;
+    const root = document.getElementById('print-root');
+    if (!printSource || !root) return;
+    setPrinting(true);
+    const clone = printSource.cloneNode(true) as HTMLElement;
+    clone.style.display = 'block';
+    root.innerHTML = clone.outerHTML;
+    const style = document.createElement('style');
+    style.id = '__endividamento-print-override__';
+    style.textContent = `
+      @page { size: A4 portrait; margin: 1cm; }
+      body > *:not(#print-root) { display: none !important; }
+      #print-root { display: block !important; font-family: Inter, system-ui, sans-serif; font-size: 10px; }
+      #print-root, #print-root * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; forced-color-adjust: none !important; color-scheme: light !important; }
+      #print-root .overflow-x-auto { overflow: visible !important; }
+      #print-root table { width: 100%; border-collapse: collapse; }
+      #print-root th, #print-root td { font-size: 8px !important; padding: 3px 6px !important; }
+    `;
+    document.head.appendChild(style);
+    setPrinting(false);
+    window.onafterprint = () => {
+      document.head.querySelector('#__endividamento-print-override__')?.remove();
+      root.innerHTML = '';
+      window.onafterprint = null;
+    };
+    window.print();
+  };
+
   if (showCharts) {
     return <EndividamentoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Botão Gráficos */}
-      <div className="flex justify-end">
+      {/* Botões de ação */}
+      <div className="flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={() => setShowCharts(true)} className="gap-2">
           <BarChart3 className="h-4 w-4" />
           Evolução Mensal
         </Button>
+        <button
+          onClick={handlePDF}
+          disabled={printing}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-slate-800 text-white border-slate-700 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <span>🖨️</span> {printing ? 'Preparando...' : 'Imprimir / Salvar PDF'}
+        </button>
       </div>
+      <div ref={printRef}>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2058,6 +2194,7 @@ function EndividamentoTab({ data, fmtBRL, SectionTitle, KPI, TableRow2, colAnter
           </>}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
@@ -2091,19 +2228,59 @@ function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
   const totalAtu = Math.abs(groupAcc.saldoAtual);
   const subs = subAccs(accounts, '2.2.1.01.01');
 
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
+
+  const handlePDF = () => {
+    const printSource = printRef.current;
+    const root = document.getElementById('print-root');
+    if (!printSource || !root) return;
+    setPrinting(true);
+    const clone = printSource.cloneNode(true) as HTMLElement;
+    clone.style.display = 'block';
+    root.innerHTML = clone.outerHTML;
+    const style = document.createElement('style');
+    style.id = '__mutuo-socios-print-override__';
+    style.textContent = `
+      @page { size: A4 portrait; margin: 1cm; }
+      body > *:not(#print-root) { display: none !important; }
+      #print-root { display: block !important; font-family: Inter, system-ui, sans-serif; font-size: 10px; }
+      #print-root, #print-root * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; forced-color-adjust: none !important; color-scheme: light !important; }
+      #print-root .overflow-x-auto { overflow: visible !important; }
+      #print-root table { width: 100%; border-collapse: collapse; }
+      #print-root th, #print-root td { font-size: 8px !important; padding: 3px 6px !important; }
+    `;
+    document.head.appendChild(style);
+    setPrinting(false);
+    window.onafterprint = () => {
+      document.head.querySelector('#__mutuo-socios-print-override__')?.remove();
+      root.innerHTML = '';
+      window.onafterprint = null;
+    };
+    window.print();
+  };
+
   if (showCharts) {
     return <MutuoSociosCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Botão Gráficos */}
-      <div className="flex justify-end">
+      {/* Botões de ação */}
+      <div className="flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={() => setShowCharts(true)} className="gap-2">
           <BarChart3 className="h-4 w-4" />
           Evolução Mensal
         </Button>
+        <button
+          onClick={handlePDF}
+          disabled={printing}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-slate-800 text-white border-slate-700 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <span>🖨️</span> {printing ? 'Preparando...' : 'Imprimir / Salvar PDF'}
+        </button>
       </div>
+      <div ref={printRef}>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2230,6 +2407,7 @@ function MutuoSociosTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
           </Card>
         );
       })()}
+      </div>
     </div>
   );
 }
@@ -2280,19 +2458,59 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, co
     { desc: mergedDesc, ant: totalAnt, atu: totalAtu },
   ];
 
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
+
+  const handlePDF = () => {
+    const printSource = printRef.current;
+    const root = document.getElementById('print-root');
+    if (!printSource || !root) return;
+    setPrinting(true);
+    const clone = printSource.cloneNode(true) as HTMLElement;
+    clone.style.display = 'block';
+    root.innerHTML = clone.outerHTML;
+    const style = document.createElement('style');
+    style.id = '__parcelamento-refis-print-override__';
+    style.textContent = `
+      @page { size: A4 portrait; margin: 1cm; }
+      body > *:not(#print-root) { display: none !important; }
+      #print-root { display: block !important; font-family: Inter, system-ui, sans-serif; font-size: 10px; }
+      #print-root, #print-root * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; forced-color-adjust: none !important; color-scheme: light !important; }
+      #print-root .overflow-x-auto { overflow: visible !important; }
+      #print-root table { width: 100%; border-collapse: collapse; }
+      #print-root th, #print-root td { font-size: 8px !important; padding: 3px 6px !important; }
+    `;
+    document.head.appendChild(style);
+    setPrinting(false);
+    window.onafterprint = () => {
+      document.head.querySelector('#__parcelamento-refis-print-override__')?.remove();
+      root.innerHTML = '';
+      window.onafterprint = null;
+    };
+    window.print();
+  };
+
   if (showCharts) {
     return <ParcelamentoRefisCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Botão Gráficos */}
-      <div className="flex justify-end">
+      {/* Botões de ação */}
+      <div className="flex justify-end gap-2">
         <Button variant="outline" size="sm" onClick={() => setShowCharts(true)} className="gap-2">
           <BarChart3 className="h-4 w-4" />
           Evolução Mensal
         </Button>
+        <button
+          onClick={handlePDF}
+          disabled={printing}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-slate-800 text-white border-slate-700 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <span>🖨️</span> {printing ? 'Preparando...' : 'Imprimir / Salvar PDF'}
+        </button>
       </div>
+      <div ref={printRef}>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2443,6 +2661,7 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, co
           </Card>
         );
       })()}
+      </div>
     </div>
   );
 }
@@ -3361,6 +3580,60 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
   const da = dAcum ?? d;
 
   const [showCharts, setShowCharts] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
+
+  const handlePDF = () => {
+    const printSource = printRef.current;
+    const root = document.getElementById('print-root');
+    if (!printSource || !root) return;
+
+    setPrinting(true);
+
+    const clone = printSource.cloneNode(true) as HTMLElement;
+    clone.style.display = 'block';
+    root.innerHTML = clone.outerHTML;
+
+    const style = document.createElement('style');
+    style.id = '__dfc-indireto-print-override__';
+    style.textContent = `
+      @page { size: A4 portrait; margin: 1cm; }
+      body > *:not(#print-root) { display: none !important; }
+      #print-root {
+        display: block !important;
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 10px;
+      }
+      #print-root, #print-root * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        forced-color-adjust: none !important;
+        color-scheme: light !important;
+      }
+      #print-root .overflow-auto,
+      #print-root [class*="overflow-auto"],
+      #print-root [class*="overflow-y"] {
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
+      }
+      #print-root .grid { display: grid !important; }
+      #print-root .dfc-table { width: 100%; border-collapse: collapse; }
+      #print-root .dfc-table th,
+      #print-root .dfc-table td { font-size: 8px !important; padding: 3px 6px !important; }
+    `;
+    document.head.appendChild(style);
+
+    setPrinting(false);
+
+    window.onafterprint = () => {
+      document.head.querySelector('#__dfc-indireto-print-override__')?.remove();
+      root.innerHTML = '';
+      window.onafterprint = null;
+    };
+
+    window.print();
+  };
 
   if (showCharts) {
     return <FCCaixaDiretoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} title="FC Indireto" />;
@@ -3368,15 +3641,23 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
 
   return (
     <div>
-      {/* Botão Evolução Mensal */}
-      <div className="flex justify-end mb-4">
+      {/* Botões de ação */}
+      <div className="flex justify-end gap-2 mb-4">
         <button
           onClick={() => setShowCharts(true)}
           className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
         >
           <span>📈</span> Evolução Mensal
         </button>
+        <button
+          onClick={handlePDF}
+          disabled={printing}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-slate-800 text-white border-slate-700 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <span>🖨️</span> {printing ? 'Preparando...' : 'Imprimir / Salvar PDF'}
+        </button>
       </div>
+      <div ref={printRef}>
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
@@ -3559,6 +3840,7 @@ function CaixaTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, colAtu
         </p>
         </CardContent>
       </Card>
+      </div>
 
       <ProjecaoCaixaChart currentYear={selectedYear} currentMonth={selectedMonth} />
     </div>
@@ -3743,21 +4025,84 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
   const diffAcum = acum ? Math.abs(acum.fluxoOperDireto - (acum.fluxoInvest + acum.fluxoFinanc + acum.fluxoTotal - acum.fluxoTotal)) : 0;
   // Validação cruzada acum: compara com fluxo indireto acumulado (não disponível aqui — skip)
 
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
+
+  const handlePDF = () => {
+    const printSource = printRef.current;
+    const root = document.getElementById('print-root');
+    if (!printSource || !root) return;
+
+    setPrinting(true);
+
+    const clone = printSource.cloneNode(true) as HTMLElement;
+    clone.style.display = 'block';
+    root.innerHTML = clone.outerHTML;
+
+    const style = document.createElement('style');
+    style.id = '__dfc-direto-print-override__';
+    style.textContent = `
+      @page { size: A4 portrait; margin: 1cm; }
+      body > *:not(#print-root) { display: none !important; }
+      #print-root {
+        display: block !important;
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 10px;
+      }
+      #print-root, #print-root * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        forced-color-adjust: none !important;
+        color-scheme: light !important;
+      }
+      #print-root .overflow-auto,
+      #print-root [class*="overflow-auto"],
+      #print-root [class*="overflow-y"] {
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
+      }
+      #print-root .grid { display: grid !important; }
+      #print-root .dfc-table { width: 100%; border-collapse: collapse; }
+      #print-root .dfc-table th,
+      #print-root .dfc-table td { font-size: 8px !important; padding: 3px 6px !important; }
+    `;
+    document.head.appendChild(style);
+
+    setPrinting(false);
+
+    window.onafterprint = () => {
+      document.head.querySelector('#__dfc-direto-print-override__')?.remove();
+      root.innerHTML = '';
+      window.onafterprint = null;
+    };
+
+    window.print();
+  };
+
   if (showCharts) {
     return <FCCaixaDiretoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
   }
 
   return (
     <div>
-      {/* Botão Evolução Mensal */}
-      <div className="flex justify-end mb-4">
+      {/* Botões de ação */}
+      <div className="flex justify-end gap-2 mb-4">
         <button
           onClick={() => setShowCharts(true)}
           className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
         >
           <span>📈</span> Evolução Mensal
         </button>
+        <button
+          onClick={handlePDF}
+          disabled={printing}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-slate-800 text-white border-slate-700 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <span>🖨️</span> {printing ? 'Preparando...' : 'Imprimir / Salvar PDF'}
+        </button>
       </div>
+      <div ref={printRef}>
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
@@ -3948,6 +4293,7 @@ function CaixaDiretoTab({ data, fmtBRL, SectionTitle, DFCRow, KPI, colAnterior, 
           </p>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
