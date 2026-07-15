@@ -22,6 +22,7 @@ import { ImobilizadoCharts } from "./ImobilizadoCharts";
 import { ResultadoCharts } from "./ResultadoCharts";
 import { ComparativoReceitas } from "./ComparativoReceitas";
 import { ProjecaoCaixaChart } from "./ProjecaoCaixaChart";
+import { ProjecaoTab } from './ProjecaoTab';
 import { PerguntasRespostasTab } from "./PerguntasRespostasTab";
 
 // ─── PARSER ─────────────────────────────────────────────────────────────────
@@ -765,6 +766,7 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
     { id: 'indicadores', label: 'Indicadores', icon: <Target className="w-4 h-4" />, requiresData: true },
     { id: 'diagnostico', label: selectedMonth === 0 ? 'Diagnóstico Ano' : 'Diagnóstico Mês', icon: <Activity className="w-4 h-4" />, requiresData: true },
     { id: 'comparativos', label: 'Comparativos', icon: <BarChart3 className="w-4 h-4" />, requiresData: false },
+    { id: 'projecao', label: 'Projeção', icon: <TrendingUp className="w-4 h-4" />, requiresData: false },
     { id: 'perguntasRespostas', label: 'Perguntas e Respostas', icon: <Sparkles className="w-4 h-4" />, requiresData: false },
   ];
 
@@ -916,6 +918,15 @@ export function FluxoCaixaDashboard({ onChangeBrand }: FluxoCaixaDashboardProps)
           {activeTab === 'comparativos' ? (
             <div className="animate-in fade-in duration-500">
               <ComparativosTab selectedYear={selectedYear} selectedMonth={selectedMonth} />
+            </div>
+          ) : activeTab === 'projecao' ? (
+            <div className="animate-in fade-in duration-500">
+              <ProjecaoTab
+                allMonthsAccounts={allMonthsAccounts}
+                selectedYear={selectedYear}
+                selectedMonth={selectedMonth}
+                fmtBRL={fmtBRL}
+              />
             </div>
           ) : activeTab === 'perguntasRespostas' ? (
             <div className="animate-in fade-in duration-500">
