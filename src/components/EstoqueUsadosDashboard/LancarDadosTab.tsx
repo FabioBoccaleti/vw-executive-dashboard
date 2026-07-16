@@ -232,7 +232,7 @@ export function LancarDadosTab({ meta, initialDate, onSaved, onMetaChanged }: Pr
           <CurrencyField label="Estoque de Veículos Usados VW Pagos"    fieldKey="vwUsadosPagos"          values={values} onChange={handleChange} />
           <CurrencyField label="Estoque de Veículos Novos VW Pagos"     fieldKey="vwNovosPagos"           values={values} onChange={handleChange} />
           <CurrencyField label="Valores em Cheque VW"                   fieldKey="vwValoresCheque"        values={values} onChange={handleChange} />
-          <CurrencyField label="Estoque Veículos Usados VW LM a Pagar"  fieldKey="vwUsadosLMaPagar"       values={values} onChange={handleChange} />
+          <CurrencyField label="Estoque Veículos Usados VW LM Vendido a Pagar"  fieldKey="vwUsadosLMaPagar"       values={values} onChange={handleChange} />
           <CurrencyField label="Veículos Usados Pendente de Entrada"    fieldKey="vwUsadosPendenteEntrada" values={values} onChange={handleChange} />
         </FormSection>
 
@@ -246,7 +246,7 @@ export function LancarDadosTab({ meta, initialDate, onSaved, onMetaChanged }: Pr
         {/* ESTOQUE A PAGAR VW */}
         <FormSection cor="#001e50" titulo="ESTOQUE A PAGAR VW">
           <div className="pb-1">
-            <CurrencyField label="Estoque Veículos Usados VW LM Vendido a Pagar" fieldKey="vwUsadosLMVendidoaPagar" values={values} onChange={handleChange} />
+            <CurrencyField label="Estoque Veículos Usados VW LM a Pagar" fieldKey="vwUsadosLMVendidoaPagar" values={values} onChange={handleChange} />
           </div>
           {/* Campo informativo — destaque âmbar */}
           <div className="mx-0 mb-3 rounded-lg border border-amber-200 bg-amber-50 overflow-hidden">

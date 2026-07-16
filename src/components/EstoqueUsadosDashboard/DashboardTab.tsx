@@ -155,7 +155,7 @@ function exportExcel(entry: EstoqueUsadosEntry, meta: EstoqueUsadosMeta) {
     ['Estoque de Veículos Usados VW Pagos', '', entry.vwUsadosPagos],
     ['Estoque de Veículos Novos VW Pagos', '', entry.vwNovosPagos],
     ['Valores em Cheque VW', '', entry.vwValoresCheque],
-    ['Estoque Veículos Usados VW LM a Pagar', '', entry.vwUsadosLMaPagar],
+    ['Estoque Veículos Usados VW LM Vendido a Pagar', '', entry.vwUsadosLMaPagar],
     ['Veículos Usados Pendente de Entrada', '', entry.vwUsadosPendenteEntrada],
     ['TOTAL VW', '', totalVW],
     ['Meta VW', '', meta.metaVW],
@@ -168,7 +168,7 @@ function exportExcel(entry: EstoqueUsadosEntry, meta: EstoqueUsadosMeta) {
     ['Meta Audi', '', meta.metaAudi],
     [],
     ['ESTOQUE A PAGAR VW', '', 'Valor (R$)'],
-    ['Estoque Veículos Usados VW LM Vendido a Pagar', '', entry.vwUsadosLMVendidoaPagar],
+    ['Estoque Veículos Usados VW LM a Pagar', '', entry.vwUsadosLMVendidoaPagar],
     ['[Informativo] Valores próximos do vencimento (em até 30 dias)', '', entry.vwVencimento30Dias ?? 0],
     ['(Não compõe total VW/Outros)'],
     [],
@@ -404,7 +404,7 @@ export function DashboardTab({ entry, meta, historyDates, onEditMeta, onZerar }:
                 { label: 'Estoque de Veículos Usados VW Pagos', value: entry.vwUsadosPagos },
                 { label: 'Estoque de Veículos Novos VW Pagos', value: entry.vwNovosPagos },
                 { label: 'Valores em Cheque VW', value: entry.vwValoresCheque },
-                { label: 'Estoque Veículos Usados VW LM a Pagar', value: entry.vwUsadosLMaPagar },
+                { label: 'Estoque Veículos Usados VW LM Vendido a Pagar', value: entry.vwUsadosLMaPagar },
                 { label: 'Veículos Usados Pendente de Entrada', value: entry.vwUsadosPendenteEntrada },
               ]}
             />
@@ -430,7 +430,7 @@ export function DashboardTab({ entry, meta, historyDates, onEditMeta, onZerar }:
               meta={0}
               showMeta={false}
               items={[
-                { label: 'Estoque Veículos Usados VW LM Vendido a Pagar', value: entry.vwUsadosLMVendidoaPagar },
+                { label: 'Estoque Veículos Usados VW LM a Pagar', value: entry.vwUsadosLMVendidoaPagar },
               ]}
               infoItems={[
                 { label: 'Valores próximos do vencimento (em até 30 dias)', value: entry.vwVencimento30Dias ?? 0 },
