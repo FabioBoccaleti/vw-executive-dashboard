@@ -5,7 +5,14 @@ import { kvGet, kvSet } from '@/lib/kvClient';
 import { loadVendasResultadoRows, type VendasResultadoRow } from './vendasResultadoStorage';
 import { loadProvisaoPivConfig, saveProvisaoPivConfig, periodoKey } from './provisaoPivStorage';
 import { loadArquivoPivStore } from './arquivoPivStorage';
-import { Wrench, Car, Layers, ArrowRight, ChevronDown, ChevronUp, Printer, Download } from 'lucide-react';
+import {
+  loadSnapshotStore,
+  saveSnapshotForPeriod,
+  deleteSnapshotForPeriod,
+  verifyUnlockPassword,
+  type ProvisaoPivSnapshot,
+} from './provisaoPivSnapshotStorage';
+import { Wrench, Car, Layers, ArrowRight, ChevronDown, ChevronUp, Printer, Download, Lock, LockOpen } from 'lucide-react';
 
 type RecebidoChassiData = { piv: number; siq: number; mesRecebimento: string | null };
 type RecebidoOverridesStore = Record<string, Record<string, RecebidoChassiData>>;
@@ -390,6 +397,12 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
     siq: '',
     mesRecebimento: '',
   });
+  // ── Lock / Provisão ───────────────────────────────────────────────────────
+  const [snapshot, setSnapshot]                     = useState<ProvisaoPivSnapshot | null>(null);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [passwordInput, setPasswordInput]           = useState('');
+  const [passwordError, setPasswordError]           = useState('');
+  const [verifying, setVerifying]                   = useState(false);
 
   // ── Carrega dados e config ────────────────────────────────────────────────
   useEffect(() => {
@@ -401,7 +414,8 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
       loadArquivoPivStore(),
       kvGet(RECEBIDOS_OVERRIDE_KEY),
       kvGet(CHASSI_ALIASES_KEY),
-    ]).then(([vendasRows, cfg, arquivoStore, overridesRaw, aliasesRaw]) => {
+      loadSnapshotStore(),
+    ]).then(([vendasRows, cfg, arquivoStore, overridesRaw, aliasesRaw, snapStoreRaw]) => {
       setRows(vendasRows);
       setPctInput(cfg.rateios[key] ?? '');
 
@@ -410,6 +424,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
       setRecebidosByChassi(buildRecebidosByChassiGlobal(arquivoStore, overridesStore, aliasesStore));
       setEditingChassi(null);
       setEditDraft({ piv: '', siq: '', mesRecebimento: '' });
+      setSnapshot((snapStoreRaw as Record<string, ProvisaoPivSnapshot> | null)?.[key] ?? null);
 
       setConfigLoaded(true);
       setLoading(false);
@@ -624,6 +639,91 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
     ? String(filterYear)
     : `${['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][filterMonth - 1]}/${filterYear}`;
 
+  const isLocked = snapshot !== null;
+
+  const display = {
+    totalPiv:              isLocked ? snapshot!.totalPiv              : totalPiv,
+    totalSiq:              isLocked ? snapshot!.totalSiq              : totalSiq,
+    totalGeral:            isLocked ? snapshot!.totalGeral            : totalGeral,
+    pctOficina:            isLocked ? snapshot!.pctOficina            : pctOficina,
+    pctNovos:              isLocked ? snapshot!.pctNovos              : pctNovos,
+    valorOficina:          isLocked ? snapshot!.valorOficina          : valorOficina,
+    valorNovos:            isLocked ? snapshot!.valorNovos            : valorNovos,
+    countPiv:              isLocked ? snapshot!.countPiv              : countPiv,
+    countSiq:              isLocked ? snapshot!.countSiq              : countSiq,
+    filteredCount:         isLocked ? snapshot!.filteredCount         : filtered.length,
+    resumoPorModelo:       isLocked ? snapshot!.resumoPorModelo       : resumoPorModelo,
+    detalheRecebidoTotais: isLocked ? snapshot!.detalheRecebidoTotais : detalheRecebidoTotais,
+    rowsWithBonusCount:    isLocked ? snapshot!.rowsWithBonus.length  : rowsWithBonus.length,
+  };
+
+  // ── Travar provisão ───────────────────────────────────────────────────────
+  const handleLock = async () => {
+    const snapshotRowsData = rowsWithBonus.map(r => {
+      const pivVal = n(r.bonusPIV);
+      const siqVal = n(r.bonusSIQ);
+      const tot    = pivVal + siqVal;
+      const recPiv = getValorRecebidoPiv(r);
+      const recSiq = getValorRecebidoSiq(r);
+      const mes    = getMesRecebimento(r);
+      return {
+        id:             String(r.id ?? Math.random()),
+        modelo:         r.modelo ?? '',
+        chassi:         r.chassi ?? '',
+        date:           r.dataVenda || r.periodoImport || '',
+        piv:            pivVal,
+        siq:            siqVal,
+        total:          tot,
+        recebidoPiv:    recPiv,
+        recebidoSiq:    recSiq,
+        mesRecebimento: mes,
+        diferenca:      (recPiv !== null || recSiq !== null)
+          ? tot - ((recPiv ?? 0) + (recSiq ?? 0))
+          : null,
+      };
+    });
+
+    const snap: ProvisaoPivSnapshot = {
+      lockedAt:              new Date().toISOString(),
+      periodoLabel,
+      totalPiv,
+      totalSiq,
+      totalGeral,
+      pctInput,
+      pctOficina,
+      pctNovos,
+      valorOficina,
+      valorNovos,
+      countPiv,
+      countSiq,
+      filteredCount:         filtered.length,
+      rowsWithBonus:         snapshotRowsData,
+      resumoPorModelo,
+      detalheRecebidoTotais,
+    };
+
+    const key = periodoKey(filterYear, filterMonth);
+    await saveSnapshotForPeriod(key, snap);
+    setSnapshot(snap);
+  };
+
+  const handleUnlockConfirm = async () => {
+    setVerifying(true);
+    setPasswordError('');
+    const ok = await verifyUnlockPassword(passwordInput);
+    if (!ok) {
+      setPasswordError('Senha incorreta.');
+      setVerifying(false);
+      return;
+    }
+    const key = periodoKey(filterYear, filterMonth);
+    await deleteSnapshotForPeriod(key);
+    setSnapshot(null);
+    setShowPasswordDialog(false);
+    setPasswordInput('');
+    setVerifying(false);
+  };
+
   const handlePrintResumoModelo = () => {
     const printRoot = document.getElementById('print-root');
     if (!printRoot) {
@@ -631,7 +731,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
       return;
     }
 
-    const rowsHtml = resumoPorModelo.map(item => {
+    const rowsHtml = display.resumoPorModelo.map(item => {
       return `
         <tr>
           <td>${escapeHtml(item.modelo)}</td>
@@ -642,7 +742,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
         </tr>`;
     }).join('');
 
-    const totalBonusVarejo = resumoPorModelo.reduce((acc, item) => acc + item.bonusVarejo, 0);
+    const totalBonusVarejo = display.resumoPorModelo.reduce((acc, item) => acc + item.bonusVarejo, 0);
 
     printRoot.innerHTML = `
       <div class="print-page provisao-piv-print-page">
@@ -664,9 +764,9 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
               ${rowsHtml}
               <tr class="total-row">
                 <td>Total</td>
-                <td class="r">${fmtBRL(totalPiv)}</td>
-                <td class="r">${fmtBRL(totalSiq)}</td>
-                <td class="r strong">${fmtBRL(totalGeral)}</td>
+                <td class="r">${fmtBRL(display.totalPiv)}</td>
+                <td class="r">${fmtBRL(display.totalSiq)}</td>
+                <td class="r strong">${fmtBRL(display.totalGeral)}</td>
                 <td class="r">${fmtBRL(totalBonusVarejo)}</td>
               </tr>
             </tbody>
@@ -722,7 +822,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
   };
 
   const handleExportDetalheExcel = async () => {
-    if (rowsWithBonus.length === 0) return;
+    if (display.rowsWithBonusCount === 0) return;
 
     setExportingDetalhe(true);
     try {
@@ -750,41 +850,58 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
       });
 
-      rowsWithBonus.forEach(r => {
-        const piv = n(r.bonusPIV);
-        const siq = n(r.bonusSIQ);
-        const recebidoPiv = getValorRecebidoPiv(r);
-        const recebidoSiq = getValorRecebidoSiq(r);
-        const mesRecebimento = getMesRecebimento(r);
-        const hasRecebido = recebidoPiv !== null || recebidoSiq !== null;
-        const diferenca = hasRecebido
-          ? (piv + siq) - ((recebidoPiv ?? 0) + (recebidoSiq ?? 0))
-          : null;
-        ws.addRow({
-          modelo: r.modelo || '—',
-          chassi: r.chassi || '—',
-          data: r.dataVenda || r.periodoImport || '—',
-          piv,
-          siq,
-          total: piv + siq,
-          recebidoPiv,
-          recebidoSiq,
-          diferenca,
-          mesRecebimento,
+      if (isLocked && snapshot) {
+        snapshot.rowsWithBonus.forEach(sr => {
+          ws.addRow({
+            modelo:         sr.modelo || '—',
+            chassi:         sr.chassi || '—',
+            data:           sr.date || '—',
+            piv:            sr.piv,
+            siq:            sr.siq,
+            total:          sr.total,
+            recebidoPiv:    sr.recebidoPiv,
+            recebidoSiq:    sr.recebidoSiq,
+            diferenca:      sr.diferenca,
+            mesRecebimento: sr.mesRecebimento,
+          });
         });
-      });
+      } else {
+        rowsWithBonus.forEach(r => {
+          const piv = n(r.bonusPIV);
+          const siq = n(r.bonusSIQ);
+          const recebidoPiv = getValorRecebidoPiv(r);
+          const recebidoSiq = getValorRecebidoSiq(r);
+          const mesRecebimento = getMesRecebimento(r);
+          const hasRecebido = recebidoPiv !== null || recebidoSiq !== null;
+          const diferenca = hasRecebido
+            ? (piv + siq) - ((recebidoPiv ?? 0) + (recebidoSiq ?? 0))
+            : null;
+          ws.addRow({
+            modelo: r.modelo || '—',
+            chassi: r.chassi || '—',
+            data: r.dataVenda || r.periodoImport || '—',
+            piv,
+            siq,
+            total: piv + siq,
+            recebidoPiv,
+            recebidoSiq,
+            diferenca,
+            mesRecebimento,
+          });
+        });
+      }
 
       const totalRow = ws.addRow({
         modelo: 'TOTAL',
         chassi: '',
         data: '',
-        piv: totalPiv,
-        siq: totalSiq,
-        total: totalGeral,
-        recebidoPiv: detalheRecebidoTotais.hasRecebido ? detalheRecebidoTotais.recebidoPiv : null,
-        recebidoSiq: detalheRecebidoTotais.hasRecebido ? detalheRecebidoTotais.recebidoSiq : null,
-        diferenca: detalheRecebidoTotais.diferenca,
-        mesRecebimento: detalheRecebidoTotais.mesRecebimentoResumo,
+        piv:            display.totalPiv,
+        siq:            display.totalSiq,
+        total:          display.totalGeral,
+        recebidoPiv:    display.detalheRecebidoTotais.hasRecebido ? display.detalheRecebidoTotais.recebidoPiv : null,
+        recebidoSiq:    display.detalheRecebidoTotais.hasRecebido ? display.detalheRecebidoTotais.recebidoSiq : null,
+        diferenca:      display.detalheRecebidoTotais.diferenca,
+        mesRecebimento: display.detalheRecebidoTotais.mesRecebimentoResumo,
       });
       totalRow.font = { bold: true };
       totalRow.eachCell(cell => {
@@ -829,26 +946,47 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
   };
 
   return (
+    <>
     <div className="flex-1 overflow-y-auto bg-slate-50">
       <div className="w-full max-w-[1680px] mx-auto px-4 lg:px-6 py-6 flex flex-col gap-6">
 
         {/* ── Cabeçalho ──────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-black text-slate-800 tracking-tight">Provisão PIV + SIQ</h2>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-lg font-black text-slate-800 tracking-tight">Provisão PIV + SIQ</h2>
+              {isLocked && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold uppercase tracking-widest">
+                  <Lock className="w-3 h-3" />
+                  Valores Provisionados
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500 mt-0.5">
               Período: <span className="font-semibold text-slate-700">{periodoLabel}</span>
               {' · '}
-              {filtered.length} venda{filtered.length !== 1 ? 's' : ''} no período
+              {display.filteredCount} venda{display.filteredCount !== 1 ? 's' : ''} no período
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {totalGeral > 0 && (
+            {display.totalGeral > 0 && (
               <div className="text-right">
                 <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Total Geral</p>
-                <p className="text-2xl font-black text-slate-900 tabular-nums">{fmtBRL(totalGeral)}</p>
+                <p className="text-2xl font-black text-slate-900 tabular-nums">{fmtBRL(display.totalGeral)}</p>
               </div>
             )}
+            <button
+              onClick={isLocked ? () => setShowPasswordDialog(true) : handleLock}
+              title={isLocked ? 'Destravar provisão' : 'Travar provisão'}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                isLocked
+                  ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              {isLocked ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
+              {isLocked ? 'Travado' : 'Travar'}
+            </button>
           </div>
         </div>
 
@@ -858,40 +996,40 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <SourceCard
               label="PIV"
-              value={totalPiv}
-              count={countPiv}
+              value={display.totalPiv}
+              count={display.countPiv}
               color="indigo"
-              pct={totalGeral > 0 ? (totalPiv / totalGeral) * 100 : 0}
+              pct={display.totalGeral > 0 ? (display.totalPiv / display.totalGeral) * 100 : 0}
             />
             <SourceCard
               label="SIQ"
-              value={totalSiq}
-              count={countSiq}
+              value={display.totalSiq}
+              count={display.countSiq}
               color="violet"
-              pct={totalGeral > 0 ? (totalSiq / totalGeral) * 100 : 0}
+              pct={display.totalGeral > 0 ? (display.totalSiq / display.totalGeral) * 100 : 0}
             />
           </div>
 
           {/* Barra proporcional PIV vs SIQ */}
-          {totalGeral > 0 && (
+          {display.totalGeral > 0 && (
             <div className="mt-3 flex flex-col gap-1">
               <div className="relative w-full h-2.5 rounded-full overflow-hidden bg-slate-100 flex">
                 <div
                   className="h-full bg-indigo-500 transition-all duration-500"
-                  style={{ width: `${(totalPiv / totalGeral) * 100}%` }}
+                  style={{ width: `${(display.totalPiv / display.totalGeral) * 100}%` }}
                 />
                 <div
                   className="h-full bg-violet-500 transition-all duration-500"
-                  style={{ width: `${(totalSiq / totalGeral) * 100}%` }}
+                  style={{ width: `${(display.totalSiq / display.totalGeral) * 100}%` }}
                 />
               </div>
               <div className="flex justify-between text-[10px] text-slate-400">
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" />
-                  PIV {totalGeral > 0 ? ((totalPiv / totalGeral) * 100).toFixed(0) : 0}%
+                  PIV {display.totalGeral > 0 ? ((display.totalPiv / display.totalGeral) * 100).toFixed(0) : 0}%
                 </span>
                 <span className="flex items-center gap-1">
-                  SIQ {totalGeral > 0 ? ((totalSiq / totalGeral) * 100).toFixed(0) : 0}%
+                  SIQ {display.totalGeral > 0 ? ((display.totalSiq / display.totalGeral) * 100).toFixed(0) : 0}%
                   <span className="w-2 h-2 rounded-full bg-violet-500 inline-block" />
                 </span>
               </div>
@@ -924,41 +1062,46 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                     min={0}
                     max={100}
                     step={0.1}
-                    value={pctInput}
-                    onChange={e => { setPctInput(e.target.value); setSaved(false); }}
+                    value={isLocked ? snapshot!.pctInput : pctInput}
+                    onChange={e => { if (!isLocked) { setPctInput(e.target.value); setSaved(false); } }}
                     placeholder="0"
-                    className="w-24 text-2xl font-black text-slate-800 border-2 border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-orange-400 text-center tabular-nums appearance-none"
+                    disabled={isLocked}
+                    className={`w-24 text-2xl font-black text-slate-800 border-2 rounded-xl px-3 py-2 focus:outline-none text-center tabular-nums appearance-none ${
+                      isLocked ? 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed' : 'border-slate-200 focus:border-orange-400'
+                    }`}
                     style={{ MozAppearance: 'textfield' } as React.CSSProperties}
                   />
                   <span className="ml-1.5 text-xl font-black text-slate-400">%</span>
                 </div>
                 <button
                   onClick={handleSave}
-                  disabled={!configLoaded}
+                  disabled={!configLoaded || isLocked}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                     saved
                       ? 'bg-emerald-500 text-white'
-                      : 'bg-slate-800 text-white hover:bg-slate-700'
+                      : isLocked
+                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'bg-slate-800 text-white hover:bg-slate-700'
                   }`}
                 >
                   {saved ? '✓ Salvo' : 'Salvar'}
                 </button>
               </div>
               <p className="text-[10px] text-slate-400">
-                Novos receberá <span className="font-semibold text-blue-600">{pctNovos.toFixed(1)}%</span>
+                Novos receberá <span className="font-semibold text-blue-600">{display.pctNovos.toFixed(1)}%</span>
               </p>
             </div>
 
             {/* Preview da barra + legenda */}
             <div className="flex-1 flex flex-col gap-3 pt-5">
-              <RatioBiBar pctOficina={pctOficina} />
+              <RatioBiBar pctOficina={display.pctOficina} />
               <div className="flex justify-between text-[10px] font-semibold">
                 <span className="flex items-center gap-1 text-blue-600">
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
-                  Novos — {pctNovos.toFixed(1)}%
+                  Novos — {display.pctNovos.toFixed(1)}%
                 </span>
                 <span className="flex items-center gap-1 text-orange-500">
-                  Oficina — {pctOficina.toFixed(1)}%
+                  Oficina — {display.pctOficina.toFixed(1)}%
                   <span className="w-2.5 h-2.5 rounded-full bg-orange-400 inline-block" />
                 </span>
               </div>
@@ -979,15 +1122,15 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
           <RateioCard
             label="Novos"
             icon={<Car className="w-4 h-4" />}
-            value={valorNovos}
-            pct={pctNovos}
+            value={display.valorNovos}
+            pct={display.pctNovos}
             color="blue"
           />
           <RateioCard
             label="Oficina"
             icon={<Wrench className="w-4 h-4" />}
-            value={valorOficina}
-            pct={pctOficina}
+            value={display.valorOficina}
+            pct={display.pctOficina}
             color="orange"
           />
         </div>
@@ -998,16 +1141,16 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
             Conferência Total
           </span>
           <div className="flex items-center gap-4 text-sm">
-            <span className="text-blue-300 font-semibold tabular-nums">{fmtBRL(valorNovos)}</span>
+            <span className="text-blue-300 font-semibold tabular-nums">{fmtBRL(display.valorNovos)}</span>
             <span className="text-slate-500 text-xs">+</span>
-            <span className="text-orange-300 font-semibold tabular-nums">{fmtBRL(valorOficina)}</span>
+            <span className="text-orange-300 font-semibold tabular-nums">{fmtBRL(display.valorOficina)}</span>
             <span className="text-slate-500 text-xs">=</span>
-            <span className="text-white font-black text-base tabular-nums">{fmtBRL(totalGeral)}</span>
+            <span className="text-white font-black text-base tabular-nums">{fmtBRL(display.totalGeral)}</span>
           </div>
         </div>
 
         {/* ── Resumo por modelo (sem versão) ─────────────────────────────── */}
-        {resumoPorModelo.length > 0 && (
+        {display.resumoPorModelo.length > 0 && (
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             <button
               onClick={() => setResumoExpanded(v => !v)}
@@ -1016,7 +1159,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-700">Resumo por Modelo</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">
-                  {resumoPorModelo.length} modelo{resumoPorModelo.length !== 1 ? 's' : ''}
+                  {display.resumoPorModelo.length} modelo{display.resumoPorModelo.length !== 1 ? 's' : ''}
                 </span>
               </div>
               <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${resumoExpanded ? 'rotate-180' : ''}`} />
@@ -1049,7 +1192,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {resumoPorModelo.map((item, i) => (
+                      {display.resumoPorModelo.map((item, i) => (
                         <tr key={item.modelo} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
                           <td className="px-4 py-2.5 font-medium text-slate-700">{item.modelo}</td>
                           <td className="px-4 py-2.5 text-right font-semibold text-indigo-700 tabular-nums">{fmtBRL(item.piv)}</td>
@@ -1060,11 +1203,11 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                       ))}
                       <tr className="bg-slate-100 border-t-2 border-slate-300">
                         <td className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">Total</td>
-                        <td className="px-4 py-2.5 text-right font-black text-indigo-700 tabular-nums">{fmtBRL(totalPiv)}</td>
-                        <td className="px-4 py-2.5 text-right font-black text-violet-700 tabular-nums">{fmtBRL(totalSiq)}</td>
-                        <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">{fmtBRL(totalGeral)}</td>
+                        <td className="px-4 py-2.5 text-right font-black text-indigo-700 tabular-nums">{fmtBRL(display.totalPiv)}</td>
+                        <td className="px-4 py-2.5 text-right font-black text-violet-700 tabular-nums">{fmtBRL(display.totalSiq)}</td>
+                        <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">{fmtBRL(display.totalGeral)}</td>
                             <td className="px-4 py-2.5 text-right font-black text-emerald-700 tabular-nums">
-                              {fmtBRL(resumoPorModelo.reduce((acc, item) => acc + item.bonusVarejo, 0))}
+                              {fmtBRL(display.resumoPorModelo.reduce((acc, item) => acc + item.bonusVarejo, 0))}
                             </td>
                       </tr>
                     </tbody>
@@ -1076,7 +1219,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
         )}
 
         {/* ── Detalhe por veículo (colapsável) ────────────────────────────── */}
-        {rowsWithBonus.length > 0 && (
+        {display.rowsWithBonusCount > 0 && (
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             <div className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors">
               <button
@@ -1085,7 +1228,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
               >
                 <span className="text-xs font-bold text-slate-700">Detalhe por Veículo</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">
-                  {rowsWithBonus.length} veículo{rowsWithBonus.length !== 1 ? 's' : ''}
+                  {display.rowsWithBonusCount} veículo{display.rowsWithBonusCount !== 1 ? 's' : ''}
                 </span>
               </button>
 
@@ -1125,7 +1268,37 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {rowsWithBonus.map((r, i) => {
+                    {isLocked ? (
+                      snapshot!.rowsWithBonus.map((sr, i) => (
+                        <tr key={sr.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                          <td className="px-4 py-2.5 font-medium text-slate-700">{sr.modelo || '—'}</td>
+                          <td className="px-4 py-2.5 text-slate-500 font-mono">{sr.chassi || '—'}</td>
+                          <td className="px-4 py-2.5 text-slate-400">{sr.date || '—'}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-indigo-700 tabular-nums">
+                            {sr.piv !== 0 ? fmtBRL(sr.piv) : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-violet-700 tabular-nums">
+                            {sr.siq !== 0 ? fmtBRL(sr.siq) : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-black text-slate-800 tabular-nums">{fmtBRL(sr.total)}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-emerald-700 tabular-nums">
+                            {sr.recebidoPiv !== null ? fmtBRL(sr.recebidoPiv) : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-teal-700 tabular-nums">
+                            {sr.recebidoSiq !== null ? fmtBRL(sr.recebidoSiq) : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-amber-700 tabular-nums">
+                            {sr.diferenca !== null ? fmtBRL(sr.diferenca) : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-sky-700 font-medium">
+                            {sr.mesRecebimento ?? <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <span className="text-slate-300 text-[10px]">—</span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : rowsWithBonus.map((r, i) => {
                       const chassi = normalizeChassi(r.chassi);
                       const isEditing = !!chassi && editingChassi === chassi;
                       const piv = n(r.bonusPIV);
@@ -1231,20 +1404,20 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
                     })}
                     <tr className="bg-slate-100 border-t-2 border-slate-300">
                       <td colSpan={3} className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">Total</td>
-                      <td className="px-4 py-2.5 text-right font-black text-indigo-700 tabular-nums">{fmtBRL(totalPiv)}</td>
-                      <td className="px-4 py-2.5 text-right font-black text-violet-700 tabular-nums">{fmtBRL(totalSiq)}</td>
-                      <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">{fmtBRL(totalGeral)}</td>
+                      <td className="px-4 py-2.5 text-right font-black text-indigo-700 tabular-nums">{fmtBRL(display.totalPiv)}</td>
+                      <td className="px-4 py-2.5 text-right font-black text-violet-700 tabular-nums">{fmtBRL(display.totalSiq)}</td>
+                      <td className="px-4 py-2.5 text-right font-black text-slate-900 tabular-nums">{fmtBRL(display.totalGeral)}</td>
                       <td className="px-4 py-2.5 text-right font-black text-emerald-700 tabular-nums">
-                        {detalheRecebidoTotais.hasRecebido ? fmtBRL(detalheRecebidoTotais.recebidoPiv) : <span className="text-slate-300">—</span>}
+                        {display.detalheRecebidoTotais.hasRecebido ? fmtBRL(display.detalheRecebidoTotais.recebidoPiv) : <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-4 py-2.5 text-right font-black text-teal-700 tabular-nums">
-                        {detalheRecebidoTotais.hasRecebido ? fmtBRL(detalheRecebidoTotais.recebidoSiq) : <span className="text-slate-300">—</span>}
+                        {display.detalheRecebidoTotais.hasRecebido ? fmtBRL(display.detalheRecebidoTotais.recebidoSiq) : <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-4 py-2.5 text-right font-black text-amber-700 tabular-nums">
-                        {detalheRecebidoTotais.diferenca !== null ? fmtBRL(detalheRecebidoTotais.diferenca) : <span className="text-slate-300">—</span>}
+                        {display.detalheRecebidoTotais.diferenca !== null ? fmtBRL(display.detalheRecebidoTotais.diferenca) : <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-4 py-2.5 text-sky-700 font-black">
-                        {detalheRecebidoTotais.mesRecebimentoResumo ?? <span className="text-slate-300">—</span>}
+                        {display.detalheRecebidoTotais.mesRecebimentoResumo ?? <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-4 py-2.5" />
                     </tr>
@@ -1256,7 +1429,7 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
         )}
 
         {/* ── Estado vazio ─────────────────────────────────────────────────── */}
-        {totalGeral === 0 && (
+        {display.totalGeral === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-slate-300 gap-3">
             <Layers className="w-12 h-12" />
             <p className="text-sm">Nenhum valor de PIV ou SIQ no período selecionado.</p>
@@ -1265,5 +1438,58 @@ export function ProvisaoPIVDashboard({ filterYear, filterMonth }: Props) {
 
       </div>
     </div>
+
+    {/* ── Diálogo de senha para destravar ──────────────────────────────────── */}
+    {showPasswordDialog && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        onClick={() => { setShowPasswordDialog(false); setPasswordInput(''); setPasswordError(''); }}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 flex flex-col gap-4"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <Lock className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Destravar Provisão</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {periodoLabel} · Digite a senha para destravar.
+              </p>
+            </div>
+          </div>
+          <input
+            type="password"
+            value={passwordInput}
+            onChange={e => { setPasswordInput(e.target.value); setPasswordError(''); }}
+            onKeyDown={e => e.key === 'Enter' && !verifying && handleUnlockConfirm()}
+            placeholder="Senha"
+            autoFocus
+            className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none focus:border-amber-400 text-center tracking-widest"
+          />
+          {passwordError && (
+            <p className="text-xs text-red-500 text-center font-semibold -mt-2">{passwordError}</p>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setShowPasswordDialog(false); setPasswordInput(''); setPasswordError(''); }}
+              className="flex-1 px-4 py-2 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleUnlockConfirm}
+              disabled={verifying || !passwordInput}
+              className="flex-1 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {verifying ? 'Verificando...' : 'Confirmar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 }
