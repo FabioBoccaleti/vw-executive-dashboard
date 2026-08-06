@@ -2680,6 +2680,8 @@ function ParcelamentoRefisTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, co
 function ImobilizadoTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual, selectedMonth, selectedYear }: any) {
   const accounts = data.accounts as Record<string, any>;
   const [showCharts, setShowCharts] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+  const [printing, setPrinting] = useState(false);
 
   if (showCharts) {
     return <ImobilizadoCharts selectedYear={selectedYear} selectedMonth={selectedMonth} onClose={() => setShowCharts(false)} />;
@@ -2756,15 +2758,59 @@ function ImobilizadoTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
 
   return (
     <div className="space-y-6">
-      {/* Botão Evolução Mensal */}
-      <div className="flex justify-end">
+      {/* Botões de ação */}
+      <div className="flex justify-end gap-2">
         <button
           onClick={() => setShowCharts(true)}
           className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700 dark:hover:bg-blue-900/50"
         >
           <span>📈</span> Evolução Mensal
         </button>
+        <button
+          onClick={() => {
+            const printSource = printRef.current;
+            const root = document.getElementById('print-root');
+            if (!printSource || !root) return;
+            setPrinting(true);
+            const clone = printSource.cloneNode(true) as HTMLElement;
+            clone.style.display = 'block';
+            root.innerHTML = clone.outerHTML;
+            const style = document.createElement('style');
+            style.id = '__imobilizado-print-override__';
+            style.textContent = `
+              @page { size: A4 portrait; margin: 1cm; }
+              body > *:not(#print-root) { display: none !important; }
+              #print-root {
+                display: block !important;
+                font-family: Inter, system-ui, sans-serif;
+                font-size: 10px;
+              }
+              #print-root, #print-root * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                forced-color-adjust: none !important;
+                color-scheme: light !important;
+              }
+              #print-root .overflow-x-auto { overflow: visible !important; }
+              #print-root table { width: 100%; border-collapse: collapse; }
+              #print-root th, #print-root td { font-size: 8px !important; padding: 3px 6px !important; }
+            `;
+            document.head.appendChild(style);
+            setPrinting(false);
+            window.onafterprint = () => {
+              document.head.querySelector('#__imobilizado-print-override__')?.remove();
+              root.innerHTML = '';
+              window.onafterprint = null;
+            };
+            window.print();
+          }}
+          disabled={printing}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors shadow-sm bg-slate-800 text-white border-slate-700 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <span>🖨️</span> {printing ? 'Preparando...' : 'Imprimir / Salvar PDF'}
+        </button>
       </div>
+      <div ref={printRef}>
 
       {/* KPI Total */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2827,6 +2873,8 @@ function ImobilizadoTab({ data, fmtBRL, SectionTitle, KPI, colAnterior, colAtual
           </table>
         </CardContent>
       </Card>
+
+      </div>
     </div>
   );
 }
