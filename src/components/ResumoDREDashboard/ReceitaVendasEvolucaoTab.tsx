@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, FileDown } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Cell, LabelList, Legend,
@@ -247,6 +248,74 @@ export function ReceitaVendasEvolucaoTab({ year, month }: Props) {
       ? `Jan–Dez/${year} vs Jan–Dez/${prevYear}`
       : `Jan–${MONTHS_SHORT[month - 1]}/${year} vs Jan–${MONTHS_SHORT[month - 1]}/${prevYear}`;
 
+  function exportTableToExcel(params: {
+    tableRows: typeof tableRows;
+    totalMonthVals: number[];
+    totalCurr: number;
+    totalPrev: number;
+    totalVar: number;
+    totalPct: number;
+    ytdIdxs: number[];
+    year: number;
+    prevYear: number;
+    upToMonth: number;
+    brandLabel: string;
+  }) {
+    const { tableRows: rows, totalMonthVals: totals, totalCurr: tCurr, totalPrev: tPrev,
+            totalVar: tVar, totalPct: tPct, ytdIdxs: idxs, year: y, prevYear: py,
+            upToMonth: upm, brandLabel } = params;
+
+    const monthHeaders = idxs.map(i => MONTHS_SHORT[i]);
+    const header = ['Departamento', ...monthHeaders, 'Total YTD', `vs ${py}`, 'Var R$', 'Var %'];
+
+    const dataRows = rows.map(r => [
+      r.label,
+      ...r.monthVals,
+      r.ytdCurr,
+      r.ytdPrev,
+      r.varR,
+      r.ytdPrev !== 0 ? r.varPct / 100 : null,
+    ]);
+
+    const totalRow = [
+      'TOTAL',
+      ...totals,
+      tCurr,
+      tPrev,
+      tVar,
+      tPrev !== 0 ? tPct / 100 : null,
+    ];
+
+    const aoa = [header, ...dataRows, totalRow];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Format numeric columns as BRL currency and last column as percentage
+    const numCols = header.length;
+    const numDataRows = dataRows.length + 1; // +1 for total
+    for (let r = 1; r <= numDataRows; r++) {
+      for (let c = 1; c < numCols - 1; c++) {
+        const cellRef = XLSX.utils.encode_cell({ r, c });
+        if (ws[cellRef]) ws[cellRef].z = '#,##0';
+      }
+      const pctRef = XLSX.utils.encode_cell({ r, c: numCols - 1 });
+      if (ws[pctRef] && ws[pctRef].v != null) ws[pctRef].z = '+0.0%;-0.0%;0.0%';
+    }
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: 28 },
+      ...idxs.map(() => ({ wch: 14 })),
+      { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 10 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const sheetName = `Receita ${brandLabel} ${y}`;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31));
+
+    const period = upm === 12 ? `Jan-Dez${y}` : `Jan-${MONTHS_SHORT[upm - 1]}${y}`;
+    XLSX.writeFile(wb, `ROL_por_Departamento_${brandLabel.replace(' ', '_')}_${period}.xlsx`);
+  }
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center gap-2">
@@ -392,9 +461,18 @@ export function ReceitaVendasEvolucaoTab({ year, month }: Props) {
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100">
-          <h3 className="text-sm font-bold text-slate-700">Receita Operacional Líquida por Departamento</h3>
-          <p className="text-xs text-slate-400 mt-0.5">R$ — acumulado Jan a {MONTHS_SHORT[upToMonth - 1]}/{year} · comparação com {prevYear}</p>
+        <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-bold text-slate-700">Receita Operacional Líquida por Departamento</h3>
+            <p className="text-xs text-slate-400 mt-0.5">R$ — acumulado Jan a {MONTHS_SHORT[upToMonth - 1]}/{year} · comparação com {prevYear}</p>
+          </div>
+          <button
+            onClick={() => exportTableToExcel({ tableRows, totalMonthVals, totalCurr, totalPrev, totalVar, totalPct, ytdIdxs, year, prevYear, upToMonth, brandLabel: subBrand === 'vw' ? 'VW Norte' : subBrand === 'audi' ? 'Audi' : 'Consolidado' })}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors whitespace-nowrap"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            Exportar Excel
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
