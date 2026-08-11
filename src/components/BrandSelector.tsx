@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BRAND_CONFIGS, type Brand } from '@/lib/brands';
-import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, TrendingUp, Settings, LogOut, Users, Home, Activity, Package } from 'lucide-react';
+import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, TrendingUp, Settings, LogOut, Users, Home, Activity, Package, CreditCard } from 'lucide-react';
 import { PasswordDialog } from '@/components/PasswordDialog';
 import { useAuth } from '@/contexts/useAuth';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
 
 const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'vw_outros', 'audi_outros'];
-const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados'];
+const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_pagamentos_evora'];
 const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despesas'];
 
 interface BrandSelectorProps {
@@ -29,6 +29,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
   const showCustosAlugueis       = canAccessModule('custos_alugueis');
   const showAnaliseDespesas      = canAccessModule('analise_evolutiva_despesas');
   const showEstoqueUsados        = canAccessModule('numeros_estoque_usados');
+  const showControlePagamentosEvora = canAccessModule('controle_pagamentos_evora');
 
   const allowedDemoBrands = DEMONSTRATIVO_BRANDS.filter(b => canAccessBrand(b as any));
   const allowedDirectBrands = DIRECT_BRANDS.filter(b => {
@@ -39,6 +40,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
     if (b === 'custos_alugueis')              return showCustosAlugueis;
     if (b === 'analise_evolutiva_despesas')   return showAnaliseDespesas;
     if (b === 'numeros_estoque_usados')       return showEstoqueUsados;
+    if (b === 'controle_pagamentos_evora')    return showControlePagamentosEvora;
     return false;
   });
 
@@ -86,6 +88,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
     if (brand === 'custos_alugueis')                 return <Home className={size} />;
     if (brand === 'analise_evolutiva_despesas')      return <Activity className={size} />;
     if (brand === 'numeros_estoque_usados')          return <Package className={size} />;
+    if (brand === 'controle_pagamentos_evora')       return <CreditCard className={size} />;
     if (brand === 'analise_projecoes')             return <BarChart2 className={size} />;
     if (brand.includes('vw'))                        return <Car className={size} />;
     return <Building2 className={size} />;

@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora';
 
 // Interface de configuraÃ§Ã£o visual da marca
 export interface BrandConfig {
@@ -388,10 +388,35 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-accent': '#a5b4fc',
     }
   },
+  controle_pagamentos_evora: {
+    id: 'controle_pagamentos_evora',
+    name: 'Controle de Pagamentos Evora',
+    shortName: 'Pag. Evora',
+    colors: {
+      primary: '#7c3aed',
+      primaryHover: '#6d28d9',
+      primaryLight: '#f5f3ff',
+      secondary: '#a78bfa',
+      accent: '#8b5cf6',
+      headerBg: 'bg-[#7c3aed]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#7c3aed] hover:bg-[#6d28d9]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-violet-100 dark:bg-violet-900/30',
+      badgeText: 'text-violet-800 dark:text-violet-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#7c3aed',
+      '--brand-primary-hover': '#6d28d9',
+      '--brand-primary-light': '#f5f3ff',
+      '--brand-secondary': '#a78bfa',
+      '--brand-accent': '#8b5cf6',
+    },
+  },
 };
 
 // Lista de marcas disponiveis
-export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados'];
+export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_pagamentos_evora'];
 
 // Chave de armazenamento para marca selecionada
 export const SELECTED_BRAND_KEY = 'selected_brand';

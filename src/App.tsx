@@ -28,6 +28,7 @@ import { ResumoDREDashboard } from '@/components/ResumoDREDashboard'
 import { AnaliseProjecoesDashboard } from '@/components/AnaliseProjecoesDashboard'
 import { AnaliseDespesasDashboard } from '@/components/AnaliseDespesasDashboard'
 import { EstoqueUsadosDashboard } from '@/components/EstoqueUsadosDashboard'
+import { ControlePagamentosEvoraDashboard } from '@/components/ControlePagamentosEvoraDashboard'
 
 function AppContent() {
   const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
@@ -301,6 +302,8 @@ function AppContent() {
         )
       ) : brand === 'numeros_estoque_usados' ? (
         <EstoqueUsadosDashboard onChangeBrand={handleChangeBrand} />
+      ) : brand === 'controle_pagamentos_evora' ? (
+        <ControlePagamentosEvoraDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'custos_alugueis' ? (
         <CustosAlugueisDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'analise_evolutiva_despesas' ? (
