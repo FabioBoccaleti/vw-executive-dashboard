@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Pencil, X, Check, CreditCard, FileText, AlertCircle, Settings } from 'lucide-react';
+import { Plus, Trash2, Pencil, X, Check, CreditCard, FileText, AlertCircle, Settings, Printer } from 'lucide-react';
 import { kvGet, kvSet } from '@/lib/kvClient';
 import { toast } from 'sonner';
 import { PasswordDialog } from '@/components/PasswordDialog';
@@ -221,7 +221,41 @@ export function ControlePagamentosEvoraDashboard({ onChangeBrand }: Props) {
 
   const totalPago = pagamentos.reduce((s, p) => s + p.valor, 0);
   const saldo     = valorContrato - totalPago;
+  // ── Print ─────────────────────────────────────────────────────────────
 
+  function handlePrint() {
+    const printSource = document.getElementById('evora-print-area');
+    const root = document.getElementById('print-root');
+    if (!printSource || !root) { window.print(); return; }
+
+    const clone = printSource.cloneNode(true) as HTMLElement;
+    clone.style.display = 'block';
+    root.innerHTML = clone.outerHTML;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      @page { size: A4 portrait; margin: 1cm; }
+      #print-root {
+        font-family: Inter, sans-serif;
+        background: white;
+      }
+      #print-root, #print-root * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        forced-color-adjust: none !important;
+        color-scheme: light !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    window.onafterprint = () => {
+      document.head.removeChild(style);
+      root.innerHTML = '';
+      window.onafterprint = null;
+    };
+
+    window.print();
+  }
   // ── Render ──────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -251,9 +285,24 @@ export function ControlePagamentosEvoraDashboard({ onChangeBrand }: Props) {
         >
           ← Voltar ao menu
         </button>
+        <button
+          onClick={handlePrint}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white rounded text-xs font-semibold hover:bg-violet-700 transition-colors"
+        >
+          <Printer className="w-3.5 h-3.5" />
+          Imprimir PDF
+        </button>
       </header>
 
       <div className="flex-1 p-6 space-y-6 max-w-5xl mx-auto w-full">
+
+        {/* Área de impressão */}
+        <div id="evora-print-area">
+          {/* Título visível apenas na impressão */}
+          <div className="hidden print:block mb-6">
+            <h1 className="text-2xl font-bold text-slate-800">Controle de Pagamentos Evora</h1>
+            <p className="text-sm text-slate-500 mt-1">Controle Financeiro Sorana</p>
+          </div>
 
         {/* ── Valor do Contrato ─────────────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
@@ -262,7 +311,7 @@ export function ControlePagamentosEvoraDashboard({ onChangeBrand }: Props) {
             {!editandoContrato && (
               <button
                 onClick={() => promptSenha(() => setEditandoContrato(true))}
-                className="flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-800 font-medium"
+                className="no-print flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-800 font-medium"
               >
                 <Pencil className="w-3.5 h-3.5" /> Editar
               </button>
@@ -321,8 +370,8 @@ export function ControlePagamentosEvoraDashboard({ onChangeBrand }: Props) {
           />
         </div>
 
-        {/* ── Registrar Pagamento ───────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+        {/* ── Registrar Pagamento — oculto na impressão ─────────────────────── */}
+        <div className="no-print bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-4">Registrar Pagamento</h2>
           <div className="flex flex-wrap gap-3 items-end">
             {/* Data */}
@@ -498,7 +547,9 @@ export function ControlePagamentosEvoraDashboard({ onChangeBrand }: Props) {
             </div>
           )}
         </div>
+        </div> {/* fim evora-print-area */}
 
+        {/* ── Registrar Pagamento — fora da área de impressão ──────────────── */}
         {/* ── Gerenciar Descrições ──────────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-4 flex items-center gap-2">
