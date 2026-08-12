@@ -37,14 +37,15 @@ interface TabConfig {
   label: string;
   companies: string[];
   depts: string[];
+  color: string;
   loadObs: (year: number, month: number) => Promise<Record<string, string>>;
 }
 
 const TABS_CONFIG: TabConfig[] = [
-  { label: 'ADM VW',                              companies: ['1 -'],               depts: ['105 -'],                                         loadObs: loadObsVw         },
-  { label: 'ADM Audi',                            companies: ['4 -', '6 -'],        depts: ['105 -', '120 -'],                                loadObs: loadObsAudi       },
-  { label: 'Diretoria',                           companies: ['1 -', '4 -', '6 -'], depts: ['205 -', '167 -', '168 -'],                       loadObs: loadObsDiretoria  },
-  { label: 'Consolidado (Total ADM - Diretoria)', companies: ['1 -', '4 -', '6 -'], depts: ['105 -', '120 -', '205 -', '167 -', '168 -'],     loadObs: loadObsConsolidado },
+  { label: 'ADM VW',                              color: '#1e40af', companies: ['1 -'],               depts: ['105 -'],                                         loadObs: loadObsVw         },
+  { label: 'ADM Audi',                            color: '#b91c1c', companies: ['4 -', '6 -'],        depts: ['105 -', '120 -'],                                loadObs: loadObsAudi       },
+  { label: 'Diretoria',                           color: '#15803d', companies: ['1 -', '4 -', '6 -'], depts: ['205 -', '167 -', '168 -'],                       loadObs: loadObsDiretoria  },
+  { label: 'Consolidado (Total ADM - Diretoria)', color: '#6d28d9', companies: ['1 -', '4 -', '6 -'], depts: ['105 -', '120 -', '205 -', '167 -', '168 -'],     loadObs: loadObsConsolidado },
 ];
 
 type ContaRow = { conta: string; valor: number };
@@ -69,7 +70,7 @@ function buildGroups(
 }
 
 function buildMonthHTML(
-  tabLabel: string, year: number, month: number,
+  tabLabel: string, tabColor: string, year: number, month: number,
   valorMap: Map<string, number>, classif: Record<string, TipoClassificacao>,
   obs: Record<string, string>,
 ): string {
@@ -77,7 +78,7 @@ function buildMonthHTML(
   if (activeGroups.length === 0) return '';
 
   const periodoLabel = `${MONTHS_FULL[month - 1]} / ${year}`;
-  let html = `<div class="header"><h1>Despesas na Administração</h1><h2>${tabLabel} — ${periodoLabel}</h2></div><div class="content">`;
+  let html = `<div class="header" style="background:${tabColor}"><h1>Despesas na Administração &ndash; ${tabLabel}</h1><h2>${tabLabel} — ${periodoLabel}</h2></div><div class="content">`;
 
   for (const tipo of activeGroups) {
     const rows = groups.get(tipo)!;
@@ -107,14 +108,14 @@ function buildMonthHTML(
 }
 
 function buildYearHTML(
-  tabLabel: string, year: number,
+  tabLabel: string, tabColor: string, year: number,
   yearMaps: Map<string, number>[], monthsWithData: number[],
   yearTotal: Map<string, number>, classif: Record<string, TipoClassificacao>,
 ): string {
   const { activeGroups, groups, grandTotal } = buildGroups(yearTotal, classif);
   if (activeGroups.length === 0) return '';
 
-  let html = `<div class="header"><h1>Despesas na Administração</h1><h2>${tabLabel} — Ano ${year} — Evolução Mensal</h2></div><div class="content">`;
+  let html = `<div class="header" style="background:${tabColor}"><h1>Despesas na Administração &ndash; ${tabLabel}</h1><h2>${tabLabel} — Ano ${year} — Evolução Mensal</h2></div><div class="content">`;
 
   for (const tipo of activeGroups) {
     const rows = groups.get(tipo)!;
@@ -170,7 +171,7 @@ export async function printDespesasAdm(year: number, month: number): Promise<voi
 
     // Página do mês selecionado
     if (month > 0 && currentData) {
-      const html = buildMonthHTML(tab.label, year, month, extract(currentData), classif, obsData);
+      const html = buildMonthHTML(tab.label, tab.color, year, month, extract(currentData), classif, obsData);
       if (html) pages.push(`<div class="page portrait">${html}</div>`);
     }
 
@@ -186,7 +187,7 @@ export async function printDespesasAdm(year: number, month: number): Promise<voi
       monthsWithData.push(i + 1);
       for (const [k, v] of mMap) yearTotal.set(k, (yearTotal.get(k) ?? 0) + v);
     }
-    const htmlYear = buildYearHTML(tab.label, year, yearMaps, monthsWithData, yearTotal, classif);
+    const htmlYear = buildYearHTML(tab.label, tab.color, year, yearMaps, monthsWithData, yearTotal, classif);
     if (htmlYear) pages.push(`<div class="page landscape">${htmlYear}</div>`);
   }
 
@@ -215,9 +216,9 @@ export async function printDespesasAdm(year: number, month: number): Promise<voi
       .page.landscape { width: 297mm; min-height: 210mm; }
     }
 
-    .header { margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid #334155; }
-    .header h1 { font-size: 13pt; font-weight: 800; margin: 0 0 2px; }
-    .header h2 { font-size: 10pt; font-weight: 600; color: #475569; margin: 0; }
+    .header { margin-bottom: 10px; padding: 8px 12px; border-bottom: none; border-radius: 3px; }
+    .header h1 { font-size: 14pt; font-weight: 800; margin: 0 0 2px; color: white; }
+    .header h2 { font-size: 9pt; font-weight: 500; color: rgba(255,255,255,0.8); margin: 0; }
 
     table { width: 100%; border-collapse: collapse; margin-bottom: 5px; font-size: 8pt; table-layout: fixed; }
     th, td { padding: 3px 6px; border-bottom: 1px solid #e2e8f0; overflow: hidden; }
