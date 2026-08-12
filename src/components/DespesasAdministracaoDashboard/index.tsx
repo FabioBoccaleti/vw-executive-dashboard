@@ -1,19 +1,28 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Upload, Trash2, FileText } from 'lucide-react';
+import { Upload, Trash2, FileText, Tag, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getDespesasAdmMes,
   setDespesasAdmMes,
   deleteDespesasAdmMes,
+  loadClassificacoes,
+  saveClassificacoes,
+  getAllImportedMonthsData,
   type DespesaAdmRow,
   type DespesasAdmMesData,
   type DespesasAdmTotalRow,
+  type TipoClassificacao,
+  TIPO_LABELS,
+  TIPOS_ORDENADOS,
 } from './despesasAdmStorage';
+import { AdmVwTab } from './AdmVwTab';
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
+
+const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 2 + i);
@@ -95,10 +104,244 @@ interface Props {
 }
 
 type ActiveTab = 'importar' | 'adm_vw' | 'adm_audi' | 'consolidado';
+type ImportarSubTab = 'dados' | 'classificacao';
+
+// ─── Seletor de Ano e Mês (estilo pill) ─────────────────────────────────────
+
+interface YearMonthSelectorProps {
+  year: number;
+  month: number; // 0 = Ano todo, 1-12
+  onYearChange: (y: number) => void;
+  onMonthChange: (m: number) => void;
+}
+
+function YearMonthSelector({ year, month, onYearChange, onMonthChange }: YearMonthSelectorProps) {
+  return (
+    <div className="flex items-center gap-3 flex-wrap py-1">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ANO</span>
+        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 shadow-sm">
+          <button
+            onClick={() => onYearChange(year - 1)}
+            className="text-slate-400 hover:text-slate-700 font-bold px-0.5 transition-colors"
+          >
+            ‹
+          </button>
+          <span className="text-sm font-bold text-slate-700 min-w-[38px] text-center select-none">
+            {year}
+          </span>
+          <button
+            onClick={() => onYearChange(year + 1)}
+            className="text-slate-400 hover:text-slate-700 font-bold px-0.5 transition-colors"
+          >
+            ›
+          </button>
+        </div>
+      </div>
+      <div className="w-px h-5 bg-slate-200 shrink-0" />
+      <div className="flex items-center gap-1 flex-wrap">
+        <button
+          onClick={() => onMonthChange(0)}
+          className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+            month === 0 ? 'bg-slate-700 text-white' : 'text-slate-500 hover:bg-slate-100'
+          }`}
+        >
+          Ano todo
+        </button>
+        {MONTHS_SHORT.map((m, i) => (
+          <button
+            key={i}
+            onClick={() => onMonthChange(i + 1)}
+            className={`px-2.5 py-1 text-xs font-semibold rounded-full transition-colors ${
+              month === i + 1
+                ? 'bg-[#475569] text-white'
+                : 'text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            {m}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+
+function ClassificacaoTab() {
+  const [loading, setLoading] = useState(true);
+  const [accounts, setAccounts] = useState<string[]>([]);
+  const [classificacoes, setClassificacoes] = useState<Record<string, TipoClassificacao>>({});
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'classified'>('all');
+
+  useEffect(() => {
+    Promise.all([getAllImportedMonthsData(), loadClassificacoes()])
+      .then(([allData, classif]) => {
+        // Coleta contas principais com pelo menos um valor não-zero em qualquer mês
+        const seen = new Map<string, boolean>();
+        for (const data of allData) {
+          for (const row of data.rows) {
+            if (!row.isMain) continue;
+            if (!isAllZero(row)) seen.set(row.conta, true);
+            else if (!seen.has(row.conta)) seen.set(row.conta, false);
+          }
+        }
+        const accs = [...seen.entries()]
+          .filter(([, hasValue]) => hasValue)
+          .map(([conta]) => conta)
+          .sort();
+        setAccounts(accs);
+        setClassificacoes(classif);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleClassify(conta: string, tipo: TipoClassificacao | '') {
+    const next = { ...classificacoes };
+    if (tipo === '') {
+      delete next[conta];
+    } else {
+      next[conta] = tipo as TipoClassificacao;
+    }
+    setClassificacoes(next);
+    setSaving(true);
+    try {
+      await saveClassificacoes(next);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const pending   = accounts.filter(a => !classificacoes[a]);
+  const classified = accounts.filter(a =>  classificacoes[a]);
+
+  const displayed = filter === 'pending'    ? pending
+                  : filter === 'classified' ? classified
+                  : [...pending, ...classified]; // pendentes primeiro
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-16">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-500" />
+      </div>
+    );
+  }
+
+  if (accounts.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-16">
+        <div className="text-center space-y-2">
+          <Tag className="w-10 h-10 text-slate-300 mx-auto" />
+          <p className="text-slate-500 font-medium">Nenhum dado importado ainda</p>
+          <p className="text-slate-400 text-sm">Importe ao menos um mês para classificar as contas.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Resumo + filtro */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          {pending.length > 0 ? (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs font-semibold text-amber-700">
+              <AlertCircle className="w-3.5 h-3.5" />
+              {pending.length} conta{pending.length !== 1 ? 's' : ''} sem classificação
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg text-xs font-semibold text-green-700">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Todas as contas classificadas
+            </div>
+          )}
+          <span className="text-xs text-slate-400">{classified.length}/{accounts.length} classificadas</span>
+          {saving && <span className="text-xs text-slate-400 italic">Salvando...</span>}
+        </div>
+        <div className="flex items-center gap-1">
+          {(['all', 'pending', 'classified'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
+                filter === f
+                  ? 'bg-slate-700 text-white'
+                  : 'text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              {f === 'all' ? 'Todas' : f === 'pending' ? 'Pendentes' : 'Classificadas'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tabela */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-slate-100 border-b-2 border-slate-200">
+              <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Conta / Descrição</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-slate-600 w-72">Tipo de Despesa</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayed.map((conta, i) => {
+              const isPending = !classificacoes[conta];
+              return (
+                <tr
+                  key={conta}
+                  className={`border-b last:border-0 ${
+                    isPending
+                      ? 'bg-amber-50 border-amber-100'
+                      : i % 2 === 0 ? 'bg-white border-slate-100' : 'bg-slate-50/50 border-slate-100'
+                  }`}
+                >
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      {isPending && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold shrink-0">
+                          <AlertCircle className="w-2.5 h-2.5" />
+                          Classificar
+                        </span>
+                      )}
+                      <span className={`font-${isPending ? 'semibold' : 'medium'} ${isPending ? 'text-slate-800' : 'text-slate-600'}`}>
+                        {conta}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">
+                    <select
+                      value={classificacoes[conta] ?? ''}
+                      onChange={e => handleClassify(conta, e.target.value as TipoClassificacao | '')}
+                      className={`w-full text-xs border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-slate-400 ${
+                        isPending
+                          ? 'border-amber-300 bg-amber-50 text-amber-800'
+                          : 'border-slate-200 bg-white text-slate-700'
+                      }`}
+                    >
+                      <option value="">— Selecione —</option>
+                      {TIPOS_ORDENADOS.map(tipo => (
+                        <option key={tipo} value={tipo}>{TIPO_LABELS[tipo]}</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('importar');
+  const [importarSubTab, setImportarSubTab] = useState<ImportarSubTab>('dados');
+  const [admYear, setAdmYear] = useState(CURRENT_YEAR);
+  const [admMonth, setAdmMonth] = useState(new Date().getMonth() + 1); // compartilhado entre ADM VW, ADM Audi, Consolidado
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [mesData, setMesData] = useState<DespesasAdmMesData | null>(null);
@@ -210,21 +453,61 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
           ))}
         </div>
 
-        {/* Toolbar — só aparece na aba Importar */}
+        {/* Sub-tabs da aba Importar */}
+        {activeTab === 'importar' && (
+          <div className="flex items-center gap-0 border-b border-slate-100 -mt-2">
+            {([
+              { id: 'dados',         label: 'Dados do Mês' },
+              { id: 'classificacao', label: 'Classificação de Tipo de Despesas' },
+            ] as { id: ImportarSubTab; label: string }[]).map(sub => (
+              <button
+                key={sub.id}
+                onClick={() => setImportarSubTab(sub.id)}
+                className={`px-4 py-1.5 text-xs font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                  importarSubTab === sub.id
+                    ? 'text-slate-700 border-slate-500'
+                    : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                {sub.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Seletor + placeholder para as abas ADM */}
         {activeTab !== 'importar' && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center space-y-2 py-20">
-              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
-                <svg className="w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l5.653-4.655m5.24-6.029-.79 2.895M5.28 8.28l2.895-.79M15 3h2.25M15 3v2.25M3 15h2.25M3 15v2.25" />
-                </svg>
-              </div>
-              <p className="text-slate-500 font-medium">Em desenvolvimento</p>
-              <p className="text-slate-400 text-sm">O conteúdo desta aba estará disponível em breve.</p>
+          <div className="flex flex-col gap-4 flex-1">
+            <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
+              <YearMonthSelector
+                year={admYear}
+                month={admMonth}
+                onYearChange={setAdmYear}
+                onMonthChange={setAdmMonth}
+              />
             </div>
+            {activeTab === 'adm_vw' && (
+              <AdmVwTab year={admYear} month={admMonth} />
+            )}
+            {(activeTab === 'adm_audi' || activeTab === 'consolidado') && (
+            <div className="flex-1 flex items-center justify-center py-16">
+              <div className="text-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
+                  <svg className="w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l5.653-4.655m5.24-6.029-.79 2.895M5.28 8.28l2.895-.79M15 3h2.25M15 3v2.25M3 15h2.25M3 15v2.25" />
+                  </svg>
+                </div>
+                <p className="text-slate-500 font-medium">Em desenvolvimento</p>
+                <p className="text-slate-400 text-sm">O conteúdo desta aba estará disponível em breve.</p>
+              </div>
+            </div>
+            )}
           </div>
         )}
         {activeTab === 'importar' && (
+        <>
+        {importarSubTab === 'classificacao' && <ClassificacaoTab />}
+        {importarSubTab === 'dados' && (
         <>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
@@ -381,6 +664,8 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
               </table>
             </div>
           </div>
+        )}
+        </> // fim do bloco da sub-aba dados
         )}
         </> // fim do bloco da aba importar
         )}
