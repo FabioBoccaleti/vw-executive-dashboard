@@ -86,6 +86,7 @@ function buildMonthHTML(
     const { bg, text } = GRUPO_STYLE[tipo];
     html += `<div class="group-block">`;
     html += `<table>
+      <colgroup><col class="col-desc"><col class="col-val"><col></colgroup>
       <thead><tr style="background:${bg}">
         <th class="desc" style="color:${text}">${TIPO_LABELS[tipo]}</th>
         <th class="val" style="color:${text}">Valor (R$)</th>
@@ -213,8 +214,9 @@ export async function printDespesasAdm(year: number, month: number): Promise<voi
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
     body { font-family: Arial, sans-serif; font-size: 9pt; color: #1e293b; background: white; margin: 0; padding: 0; }
 
-    .page { padding: 1cm; }
-    .page.portrait { padding: 1.2cm 3cm; }
+    .page { padding: 1cm; box-sizing: border-box; }
+    .page.portrait  { padding: 1cm 1.5cm; width: 210mm; }
+    .page.landscape { padding: 1cm; width: 297mm; }
     @media print {
       .page.portrait  { page-break-after: always; break-after: page; }
       .page.landscape { page-break-after: always; break-after: page; }
@@ -229,13 +231,15 @@ export async function printDespesasAdm(year: number, month: number): Promise<voi
     .header h2 { font-size: 9pt; font-weight: 500; color: rgba(255,255,255,0.8); margin: 0; }
 
     table { width: 100%; border-collapse: collapse; margin-bottom: 5px; font-size: 8pt; table-layout: fixed; }
+    col.col-desc { width: 220px; }
+    col.col-val  { width: 80px; }
     th, td { padding: 3px 6px; border-bottom: 1px solid #e2e8f0; overflow: hidden; }
     th { font-weight: 700; }
-    td.desc, th.desc { text-align: left; width: auto; }
-    td.val,  th.val  { text-align: right; width: 100px; font-variant-numeric: tabular-nums; }
-    td.mon,  th.mon  { text-align: right; width: 64px;  font-variant-numeric: tabular-nums; }
-    td.tot,  th.tot  { text-align: right; width: 86px;  font-weight: 700; font-variant-numeric: tabular-nums; }
-    td.obs,  th.obs  { text-align: left; width: 170px; white-space: nowrap; text-overflow: ellipsis; }
+    td.desc, th.desc { text-align: left; white-space: nowrap; text-overflow: ellipsis; }
+    td.val,  th.val  { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    td.mon,  th.mon  { text-align: right; width: 64px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    td.tot,  th.tot  { text-align: right; width: 86px; white-space: nowrap; font-weight: 700; font-variant-numeric: tabular-nums; }
+    td.obs,  th.obs  { text-align: left; white-space: normal; word-wrap: break-word; }
     td.neg { color: #dc2626; }
     td.zero { color: #94a3b8; }
     tfoot td { font-weight: 700; }
