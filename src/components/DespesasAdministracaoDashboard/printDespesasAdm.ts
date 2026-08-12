@@ -238,7 +238,6 @@ export async function printDespesasAdm(year: number, month: number): Promise<voi
     td.obs,  th.obs  { text-align: left; width: 170px; white-space: nowrap; text-overflow: ellipsis; }
     td.neg { color: #dc2626; }
     td.zero { color: #94a3b8; }
-    td.obs, th.obs { text-align: left; color: #64748b; font-style: italic; }
     tfoot td { font-weight: 700; }
 
     .grand-total {
