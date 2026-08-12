@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Upload, Trash2, FileText, Tag, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, Trash2, FileText, Tag, AlertCircle, CheckCircle2, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { kvKeys } from '@/lib/kvClient';
+import { printDespesasAdm } from './printDespesasAdm';
 import {
   getDespesasAdmMes,
   setDespesasAdmMes,
@@ -352,6 +353,18 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  async function handlePrint() {
+    setPrinting(true);
+    try {
+      await printDespesasAdm(admYear, admMonth);
+    } catch {
+      toast.error('Erro ao gerar impressão.');
+    } finally {
+      setPrinting(false);
+    }
+  }
 
   // Ao montar, detecta o último mês com dado importado e pré-seleciona no seletor ADM
   useEffect(() => {
@@ -441,12 +454,23 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
           <h1 className="text-sm font-bold text-white leading-tight">Despesas na Administração</h1>
           <p className="text-xs text-slate-300 mt-0.5">Demonstrativo de Resultados</p>
         </div>
-        <button
-          onClick={onChangeBrand}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-600 transition-colors"
-        >
-          ← Voltar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handlePrint}
+            disabled={printing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-white transition-colors disabled:opacity-50"
+            style={{ backgroundColor: printing ? '#94a3b8' : '#475569' }}
+          >
+            <Printer className="w-3.5 h-3.5" />
+            {printing ? 'Gerando...' : 'Imprimir PDF'}
+          </button>
+          <button
+            onClick={onChangeBrand}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-600 transition-colors"
+          >
+            ← Voltar
+          </button>
+        </div>
       </header>
 
       {/* Body */}
