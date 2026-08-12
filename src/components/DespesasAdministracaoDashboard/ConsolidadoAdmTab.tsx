@@ -12,14 +12,13 @@ import {
   TIPOS_ORDENADOS,
 } from './despesasAdmStorage';
 
-// Consolidado = VW (empresa 1, depto 105) + Audi (empresas 4+6, deptos 105+120)
+// Consolidado = todas as empresas (1, 4, 6) + todos os deptos ADM (105, 120, 205, 167)
 function extractConsolidadoValues(data: DespesasAdmMesData): Map<string, number> {
-  const vw   = extractByCompaniesAndDepts(data, ['1 -'],        ['105 -']);
-  const audi = extractByCompaniesAndDepts(data, ['4 -', '6 -'], ['105 -', '120 -']);
-  const result = new Map<string, number>();
-  for (const [k, v] of vw)   result.set(k, (result.get(k) ?? 0) + v);
-  for (const [k, v] of audi) result.set(k, (result.get(k) ?? 0) + v);
-  return result;
+  return extractByCompaniesAndDepts(
+    data,
+    ['1 -', '4 -', '6 -'],
+    ['105 -', '120 -', '205 -', '167 -'],
+  );
 }
 
 const MONTHS_FULL = [
@@ -281,7 +280,7 @@ export function ConsolidadoAdmTab({ year, month }: Props) {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Período</p>
           <p className="text-lg font-bold text-slate-800 mt-1">{periodoLabel}</p>
-          <p className="text-xs text-slate-400 mt-0.5">Consolidado — Norte + Audi + Lapa</p>
+          <p className="text-xs text-slate-400 mt-0.5">Consolidado — Norte + Audi + Lapa (CC 105 · 120 · 205 · 167)</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total de Despesas</p>
@@ -322,7 +321,7 @@ export function ConsolidadoAdmTab({ year, month }: Props) {
         <div>
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total Geral de Despesas</p>
           <p className="text-xs text-slate-400 mt-0.5">
-            {periodoLabel} · Consolidado ADM (Norte + Audi + Lapa) · {totalContas} conta{totalContas !== 1 ? 's' : ''} em {activeGroups.length} grupo{activeGroups.length !== 1 ? 's' : ''}
+            {periodoLabel} · Consolidado ADM (Norte + Audi + Lapa, CC 105+120+205+167) · {totalContas} conta{totalContas !== 1 ? 's' : ''} em {activeGroups.length} grupo{activeGroups.length !== 1 ? 's' : ''}
           </p>
         </div>
         <p className="text-2xl font-bold text-white tabular-nums">R$&nbsp;{fmtBRL(grandTotal)}</p>
