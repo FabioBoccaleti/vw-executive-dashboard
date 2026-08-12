@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Upload, Trash2, FileText, Tag, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { kvKeys } from '@/lib/kvClient';
 import {
   getDespesasAdmMes,
   setDespesasAdmMes,
@@ -17,6 +18,7 @@ import {
 } from './despesasAdmStorage';
 import { AdmVwTab } from './AdmVwTab';
 import { AdmAudiTab } from './AdmAudiTab';
+import { ConsolidadoAdmTab } from './ConsolidadoAdmTab';
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -339,7 +341,7 @@ function ClassificacaoTab() {
 
 export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('importar');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('consolidado');
   const [importarSubTab, setImportarSubTab] = useState<ImportarSubTab>('dados');
   const [admYear, setAdmYear] = useState(CURRENT_YEAR);
   const [admMonth, setAdmMonth] = useState(new Date().getMonth() + 1); // compartilhado entre ADM VW, ADM Audi, Consolidado
@@ -349,6 +351,23 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Ao montar, detecta o último mês com dado importado e pré-seleciona no seletor ADM
+  useEffect(() => {
+    kvKeys('despesas_adm:*').then(keys => {
+      const monthKeys = keys.filter(k => /^despesas_adm:\d{4}:\d{2}$/.test(k));
+      if (monthKeys.length === 0) return;
+      const parsed = monthKeys.map(k => {
+        const [, y, m] = k.split(':'); // despesas_adm:2026:07 → ['despesas_adm','2026','07']
+        return { year: Number(y), month: Number(m) };
+      });
+      const last = parsed.reduce((acc, cur) =>
+        cur.year > acc.year || (cur.year === acc.year && cur.month > acc.month) ? cur : acc
+      );
+      setAdmYear(last.year);
+      setAdmMonth(last.month);
+    });
+  }, []);
 
   const loadMes = useCallback(async () => {
     setLoading(true);
@@ -494,17 +513,7 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
               <AdmAudiTab year={admYear} month={admMonth} />
             )}
             {activeTab === 'consolidado' && (
-            <div className="flex-1 flex items-center justify-center py-16">
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
-                  <svg className="w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l5.653-4.655m5.24-6.029-.79 2.895M5.28 8.28l2.895-.79M15 3h2.25M15 3v2.25M3 15h2.25M3 15v2.25" />
-                  </svg>
-                </div>
-                <p className="text-slate-500 font-medium">Em desenvolvimento</p>
-                <p className="text-slate-400 text-sm">O conteúdo desta aba estará disponível em breve.</p>
-              </div>
-            </div>
+              <ConsolidadoAdmTab year={admYear} month={admMonth} />
             )}
           </div>
         )}
