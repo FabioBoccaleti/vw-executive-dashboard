@@ -7,6 +7,7 @@ import {
   loadObsAudi,
   saveObsAudi,
   extractByCompaniesAndDepts,
+  mergeAssistenciaMedica,
   type DespesasAdmMesData,
   type TipoClassificacao,
   TIPO_LABELS,
@@ -196,6 +197,7 @@ export function AdmAudiTab({ year, month }: Props) {
           const data = allMonths[i];
           if (!data) continue;
           const mMap = extractAudiValues(data);
+          mergeAssistenciaMedica(mMap);
           maps[i] = mMap;
           withData.push(i + 1);
           for (const [conta, val] of mMap) valMap.set(conta, (valMap.get(conta) ?? 0) + val);
@@ -209,6 +211,7 @@ export function AdmAudiTab({ year, month }: Props) {
           loadObsAudi(year, month),
         ]);
         valMap = data ? extractAudiValues(data) : new Map();
+        mergeAssistenciaMedica(valMap);
         setObs(obsData);
       }
       setValorMap(valMap);

@@ -7,6 +7,7 @@ import {
   loadObsVw,
   saveObsVw,
   extractByCompaniesAndDepts,
+  mergeAssistenciaMedica,
   type DespesasAdmMesData,
   type TipoClassificacao,
   TIPO_LABELS,
@@ -225,6 +226,7 @@ export function AdmVwTab({ year, month }: Props) {
           const data = allMonths[i];
           if (!data) continue;
           const mMap = extractSoranaVwValues(data);
+          mergeAssistenciaMedica(mMap);
           maps[i] = mMap;
           withData.push(i + 1);
           for (const [conta, val] of mMap) valMap.set(conta, (valMap.get(conta) ?? 0) + val);
@@ -238,6 +240,7 @@ export function AdmVwTab({ year, month }: Props) {
           loadObsVw(year, month),
         ]);
         valMap = data ? extractSoranaVwValues(data) : new Map();
+        mergeAssistenciaMedica(valMap);
         setObs(obsData);
       }
 

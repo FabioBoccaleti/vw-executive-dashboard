@@ -84,6 +84,22 @@ export async function saveClassificacoes(data: Record<string, TipoClassificacao>
   await kvSet(CLASSIFICACOES_KEY, data);
 }
 
+// Merge 5510102013 → 5520103001 (ambas "ASSISTÊNCIA MÉDICA") antes de exibir
+export function mergeAssistenciaMedica(valorMap: Map<string, number>): void {
+  let sourceKey: string | null = null;
+  let targetKey: string | null = null;
+  for (const k of valorMap.keys()) {
+    if (k.startsWith('5510102013')) sourceKey = k;
+    if (k.startsWith('5520103001')) targetKey = k;
+  }
+  if (!sourceKey) return;
+  const sourceVal = valorMap.get(sourceKey) ?? 0;
+  if (targetKey) {
+    valorMap.set(targetKey, (valorMap.get(targetKey) ?? 0) + sourceVal);
+  }
+  valorMap.delete(sourceKey);
+}
+
 export async function getAllImportedMonthsData(): Promise<DespesasAdmMesData[]> {
   const keys = await kvKeys('despesas_adm:*');
   const monthKeys = keys.filter(k => /^despesas_adm:\d{4}:\d{2}$/.test(k));
