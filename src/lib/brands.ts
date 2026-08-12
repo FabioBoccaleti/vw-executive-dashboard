@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora';
 
 // Interface de configuraÃ§Ã£o visual da marca
 export interface BrandConfig {
@@ -160,6 +160,31 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-primary-light': '#fff7ed',
       '--brand-secondary': '#fb923c',
       '--brand-accent': '#fdba74',
+    }
+  },
+  despesas_administracao: {
+    id: 'despesas_administracao',
+    name: 'Despesas na Administração',
+    shortName: 'Desp. Adm.',
+    colors: {
+      primary: '#475569',
+      primaryHover: '#334155',
+      primaryLight: '#f1f5f9',
+      secondary: '#64748b',
+      accent: '#94a3b8',
+      headerBg: 'bg-[#475569]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#475569] hover:bg-[#334155]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-slate-100 dark:bg-slate-900/30',
+      badgeText: 'text-slate-800 dark:text-slate-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#475569',
+      '--brand-primary-hover': '#334155',
+      '--brand-primary-light': '#f1f5f9',
+      '--brand-secondary': '#64748b',
+      '--brand-accent': '#94a3b8',
     }
   },
   vw_outros: {
