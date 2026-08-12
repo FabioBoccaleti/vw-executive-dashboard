@@ -103,3 +103,11 @@ export async function loadObsVw(year: number, month: number): Promise<Record<str
 export async function saveObsVw(year: number, month: number, obs: Record<string, string>): Promise<void> {
   await kvSet(makeObsKey('vw', year, month), obs);
 }
+
+export async function loadObsAudi(year: number, month: number): Promise<Record<string, string>> {
+  return (await kvGet<Record<string, string>>(makeObsKey('audi', year, month))) ?? {};
+}
+
+export async function saveObsAudi(year: number, month: number, obs: Record<string, string>): Promise<void> {
+  await kvSet(makeObsKey('audi', year, month), obs);
+}

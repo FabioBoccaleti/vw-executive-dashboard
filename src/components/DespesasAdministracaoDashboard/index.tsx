@@ -16,6 +16,7 @@ import {
   TIPOS_ORDENADOS,
 } from './despesasAdmStorage';
 import { AdmVwTab } from './AdmVwTab';
+import { AdmAudiTab } from './AdmAudiTab';
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -489,7 +490,10 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
             {activeTab === 'adm_vw' && (
               <AdmVwTab year={admYear} month={admMonth} />
             )}
-            {(activeTab === 'adm_audi' || activeTab === 'consolidado') && (
+            {activeTab === 'adm_audi' && (
+              <AdmAudiTab year={admYear} month={admMonth} />
+            )}
+            {activeTab === 'consolidado' && (
             <div className="flex-1 flex items-center justify-center py-16">
               <div className="text-center space-y-2">
                 <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto">
