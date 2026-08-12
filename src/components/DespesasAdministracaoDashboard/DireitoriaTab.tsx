@@ -14,7 +14,7 @@ import {
 } from './despesasAdmStorage';
 
 const DIRETORIA_COMPANIES = ['1 -', '4 -', '6 -'];
-const DIRETORIA_DEPTS     = ['205 -', '167 -'];
+const DIRETORIA_DEPTS     = ['205 -', '167 -', '168 -'];
 
 function extractDiretoriaValues(data: DespesasAdmMesData): Map<string, number> {
   return extractByCompaniesAndDepts(data, DIRETORIA_COMPANIES, DIRETORIA_DEPTS);
@@ -287,7 +287,7 @@ export function DireitoriaTab({ year, month }: Props) {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Período</p>
           <p className="text-lg font-bold text-slate-800 mt-1">{periodoLabel}</p>
-          <p className="text-xs text-slate-400 mt-0.5">Diretoria — Norte + Audi + Lapa (CC 205 · 167)</p>
+          <p className="text-xs text-slate-400 mt-0.5">Diretoria — Norte + Audi + Lapa (CC 205 · 167 · 168)</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total de Despesas</p>
@@ -339,7 +339,7 @@ export function DireitoriaTab({ year, month }: Props) {
         <div>
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total Geral de Despesas</p>
           <p className="text-xs text-slate-400 mt-0.5">
-            {periodoLabel} · Diretoria (CC 205 + 167) · {totalContas} conta{totalContas !== 1 ? 's' : ''} em {activeGroups.length} grupo{activeGroups.length !== 1 ? 's' : ''}
+            {periodoLabel} · Diretoria (CC 205 + 167 + 168) · {totalContas} conta{totalContas !== 1 ? 's' : ''} em {activeGroups.length} grupo{activeGroups.length !== 1 ? 's' : ''}
           </p>
         </div>
         <p className="text-2xl font-bold text-white tabular-nums">R$&nbsp;{fmtBRL(grandTotal)}</p>

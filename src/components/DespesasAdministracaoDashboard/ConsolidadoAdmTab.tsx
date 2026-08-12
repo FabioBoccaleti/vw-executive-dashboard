@@ -18,7 +18,7 @@ function extractConsolidadoValues(data: DespesasAdmMesData): Map<string, number>
   return extractByCompaniesAndDepts(
     data,
     ['1 -', '4 -', '6 -'],
-    ['105 -', '120 -', '205 -', '167 -'],
+    ['105 -', '120 -', '205 -', '167 -', '168 -'],
   );
 }
 
@@ -289,7 +289,7 @@ export function ConsolidadoAdmTab({ year, month }: Props) {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Período</p>
           <p className="text-lg font-bold text-slate-800 mt-1">{periodoLabel}</p>
-          <p className="text-xs text-slate-400 mt-0.5">Consolidado — Norte + Audi + Lapa (CC 105 · 120 · 205 · 167)</p>
+          <p className="text-xs text-slate-400 mt-0.5">Consolidado (Total ADM - Diretoria) — Norte + Audi + Lapa (CC 105 · 120 · 205 · 167 · 168)</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total de Despesas</p>
@@ -341,7 +341,7 @@ export function ConsolidadoAdmTab({ year, month }: Props) {
         <div>
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total Geral de Despesas</p>
           <p className="text-xs text-slate-400 mt-0.5">
-            {periodoLabel} · Consolidado ADM (Norte + Audi + Lapa, CC 105+120+205+167) · {totalContas} conta{totalContas !== 1 ? 's' : ''} em {activeGroups.length} grupo{activeGroups.length !== 1 ? 's' : ''}
+            {periodoLabel} · Consolidado ADM (Norte + Audi + Lapa, CC 105+120+205+167+168) · {totalContas} conta{totalContas !== 1 ? 's' : ''} em {activeGroups.length} grupo{activeGroups.length !== 1 ? 's' : ''}
           </p>
         </div>
         <p className="text-2xl font-bold text-white tabular-nums">R$&nbsp;{fmtBRL(grandTotal)}</p>

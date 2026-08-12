@@ -458,7 +458,7 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
             { id: 'adm_vw',      label: 'ADM VW',                     icon: null },
             { id: 'adm_audi',    label: 'ADM Audi',                   icon: null },
             { id: 'diretoria',   label: 'Diretoria',                  icon: null },
-            { id: 'consolidado', label: 'Consolidado ADM (Audi / VW)', icon: null },
+            { id: 'consolidado', label: 'Consolidado (Total ADM - Diretoria)', icon: null },
           ] as { id: ActiveTab; label: string; icon: React.ReactNode }[]).map(tab => (
             <button
               key={tab.id}
@@ -581,9 +581,11 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>
-            O arquivo gerado deve considerar apenas os departamentos: <strong>105 · 205 · 120 · 167</strong>
+            O arquivo gerado deve considerar apenas os departamentos: <strong>105 · 205 · 120 · 167 · 168</strong>
             &nbsp;&nbsp;|&nbsp;&nbsp;
             Revendas: <strong>1.1 · 1.6 · 1.4</strong>
+            &nbsp;&nbsp;|&nbsp;&nbsp;
+            Divisões: <strong>Centro de Custo e Revenda</strong>
           </span>
         </div>
 
