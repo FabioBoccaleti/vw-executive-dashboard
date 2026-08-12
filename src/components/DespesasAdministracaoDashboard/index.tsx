@@ -570,6 +570,18 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
           </div>
         </div>
 
+        {/* Aviso sobre filtros do arquivo */}
+        <div className="flex items-start gap-2.5 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+          <svg className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>
+            O arquivo gerado deve considerar apenas os departamentos: <strong>105 · 205 · 120 · 167</strong>
+            &nbsp;&nbsp;|&nbsp;&nbsp;
+            Revendas: <strong>1.1 · 1.6 · 1.4</strong>
+          </span>
+        </div>
+
         {/* Content area */}
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
@@ -678,9 +690,9 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
             </div>
           </div>
         )}
-        </> // fim do bloco da sub-aba dados
+        </>
         )}
-        </> // fim do bloco da aba importar
+        </>
         )}
       </div>
 

@@ -92,6 +92,75 @@ export async function getAllImportedMonthsData(): Promise<DespesasAdmMesData[]> 
   return results.filter((d): d is DespesasAdmMesData => d !== null);
 }
 
+// ─── Extrator hierárquico (empresa → depto) ───────────────────────────────────
+// Detecta nível pela forma do código: "1 -" = empresa, "105 -" = depto (CCusto)
+// Se não encontrar linhas de depto, usa o valor da linha da empresa (retrocompat.)
+
+export function extractByCompaniesAndDepts(
+  data: DespesasAdmMesData,
+  companies: string[], // prefixos do conta trimado, ex: ['1 -']
+  depts: string[],     // prefixos do conta trimado, ex: ['105 -', '120 -']
+): Map<string, number> {
+  const result = new Map<string, number>();
+  let currentMain: string | null = null;
+  let currentEntryKey: string | null = null;
+  let isTargetCompany = false;
+
+  // chave = "mainAccount\x00companyRow"
+  const entries = new Map<string, {
+    companyValor: number;
+    deptTotal: number;
+    hasAnyDept: boolean;    // existem linhas de depto (qualquer)
+    hasMatchingDept: boolean; // existem linhas de depto que batem nos critérios
+  }>();
+
+  for (const row of data.rows) {
+    if (row.isMain) {
+      currentMain = row.conta;
+      currentEntryKey = null;
+      isTargetCompany = false;
+    } else if (currentMain) {
+      const isCompany = /^\d{1,2} -/.test(row.conta);
+      const isDept    = /^\d{3,} -/.test(row.conta);
+
+      if (isCompany) {
+        isTargetCompany = companies.some(p => row.conta.startsWith(p));
+        currentEntryKey = `${currentMain}\x00${row.conta}`;
+        if (isTargetCompany) {
+          entries.set(currentEntryKey, {
+            companyValor: row.valDebito - row.valCredito,
+            deptTotal: 0,
+            hasAnyDept: false,
+            hasMatchingDept: false,
+          });
+        }
+      } else if (isDept && isTargetCompany && currentEntryKey) {
+        const e = entries.get(currentEntryKey)!;
+        e.hasAnyDept = true; // registra que há linhas de depto (mesmo que não batam)
+        if (depts.some(d => row.conta.startsWith(d))) {
+          e.deptTotal += row.valDebito - row.valCredito;
+          e.hasMatchingDept = true;
+        }
+      }
+    }
+  }
+
+  for (const [key, e] of entries) {
+    const mainAccount = key.split('\x00')[0];
+    let valor: number;
+    if (e.hasMatchingDept) {
+      valor = e.deptTotal;                  // usa só os deptos que batem
+    } else if (!e.hasAnyDept) {
+      valor = e.companyValor;               // sem deptos no arquivo → formato antigo, usa empresa
+    } else {
+      valor = 0;                            // tem deptos mas nenhum bate → não inclui
+    }
+    if (valor !== 0) result.set(mainAccount, (result.get(mainAccount) ?? 0) + valor);
+  }
+
+  return result;
+}
+
 function makeObsKey(prefix: string, year: number, month: number): string {
   return `despesas_adm:obs_${prefix}:${year}:${String(month).padStart(2, '0')}`;
 }

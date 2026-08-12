@@ -5,18 +5,25 @@ import {
   loadClassificacoes,
   loadObsVw,
   saveObsVw,
+  extractByCompaniesAndDepts,
   type DespesasAdmMesData,
   type TipoClassificacao,
   TIPO_LABELS,
   TIPOS_ORDENADOS,
 } from './despesasAdmStorage';
 
+const VW_COMPANIES = ['1 -'];
+const VW_DEPTS     = ['105 -'];
+
+function extractSoranaVwValues(data: DespesasAdmMesData): Map<string, number> {
+  return extractByCompaniesAndDepts(data, VW_COMPANIES, VW_DEPTS);
+}
+
 const MONTHS_FULL = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 
-// Visual config por grupo de despesa
 const GRUPO_CONFIG: Record<TipoClassificacao, { color: string; light: string; badge: string }> = {
   pessoal:             { color: '#1e40af', light: '#eff6ff', badge: '#dbeafe' },
   servicos_terceiros:  { color: '#5b21b6', light: '#faf5ff', badge: '#ede9fe' },
@@ -27,21 +34,6 @@ const GRUPO_CONFIG: Record<TipoClassificacao, { color: string; light: string; ba
   financeiras:         { color: '#991b1b', light: '#fef2f2', badge: '#fee2e2' },
   outras_operacionais: { color: '#374151', light: '#fafafa', badge: '#f3f4f6' },
 };
-
-// Extrai valor de Sorana Norte (empresa 1) por conta principal: Débito - Crédito
-function extractSoranaVwValues(data: DespesasAdmMesData): Map<string, number> {
-  const result = new Map<string, number>();
-  let currentMain: string | null = null;
-  for (const row of data.rows) {
-    if (row.isMain) {
-      currentMain = row.conta;
-    } else if (currentMain && row.conta.startsWith('1 -')) {
-      const valor = row.valDebito - row.valCredito;
-      result.set(currentMain, (result.get(currentMain) ?? 0) + valor);
-    }
-  }
-  return result;
-}
 
 function fmtBRL(n: number): string {
   return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

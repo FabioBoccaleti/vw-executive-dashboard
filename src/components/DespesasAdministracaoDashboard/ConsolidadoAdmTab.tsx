@@ -5,11 +5,22 @@ import {
   loadClassificacoes,
   loadObsConsolidado,
   saveObsConsolidado,
+  extractByCompaniesAndDepts,
   type DespesasAdmMesData,
   type TipoClassificacao,
   TIPO_LABELS,
   TIPOS_ORDENADOS,
 } from './despesasAdmStorage';
+
+// Consolidado = VW (empresa 1, depto 105) + Audi (empresas 4+6, deptos 105+120)
+function extractConsolidadoValues(data: DespesasAdmMesData): Map<string, number> {
+  const vw   = extractByCompaniesAndDepts(data, ['1 -'],        ['105 -']);
+  const audi = extractByCompaniesAndDepts(data, ['4 -', '6 -'], ['105 -', '120 -']);
+  const result = new Map<string, number>();
+  for (const [k, v] of vw)   result.set(k, (result.get(k) ?? 0) + v);
+  for (const [k, v] of audi) result.set(k, (result.get(k) ?? 0) + v);
+  return result;
+}
 
 const MONTHS_FULL = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -26,23 +37,6 @@ const GRUPO_CONFIG: Record<TipoClassificacao, { color: string; light: string; ba
   financeiras:         { color: '#991b1b', light: '#fef2f2', badge: '#fee2e2' },
   outras_operacionais: { color: '#374151', light: '#fafafa', badge: '#f3f4f6' },
 };
-
-// Consolidado: Sorana Norte (1) + Sorana Audi (4) + Sorana Lapa (6)
-const CONSOLIDADO_PREFIXES = ['1 -', '4 -', '6 -'];
-
-function extractConsolidadoValues(data: DespesasAdmMesData): Map<string, number> {
-  const result = new Map<string, number>();
-  let currentMain: string | null = null;
-  for (const row of data.rows) {
-    if (row.isMain) {
-      currentMain = row.conta;
-    } else if (currentMain && CONSOLIDADO_PREFIXES.some(p => row.conta.startsWith(p))) {
-      const valor = row.valDebito - row.valCredito;
-      result.set(currentMain, (result.get(currentMain) ?? 0) + valor);
-    }
-  }
-  return result;
-}
 
 function fmtBRL(n: number): string {
   return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

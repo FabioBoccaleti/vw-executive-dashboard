@@ -5,11 +5,19 @@ import {
   loadClassificacoes,
   loadObsAudi,
   saveObsAudi,
+  extractByCompaniesAndDepts,
   type DespesasAdmMesData,
   type TipoClassificacao,
   TIPO_LABELS,
   TIPOS_ORDENADOS,
 } from './despesasAdmStorage';
+
+const AUDI_COMPANIES = ['4 -', '6 -'];
+const AUDI_DEPTS     = ['105 -', '120 -'];
+
+function extractAudiValues(data: DespesasAdmMesData): Map<string, number> {
+  return extractByCompaniesAndDepts(data, AUDI_COMPANIES, AUDI_DEPTS);
+}
 
 const MONTHS_FULL = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -26,23 +34,6 @@ const GRUPO_CONFIG: Record<TipoClassificacao, { color: string; light: string; ba
   financeiras:         { color: '#991b1b', light: '#fef2f2', badge: '#fee2e2' },
   outras_operacionais: { color: '#374151', light: '#fafafa', badge: '#f3f4f6' },
 };
-
-// Empresas Audi: 4 - SORANA AUDI e 6 - SORANA LAPA
-const AUDI_PREFIXES = ['4 -', '6 -'];
-
-function extractAudiValues(data: DespesasAdmMesData): Map<string, number> {
-  const result = new Map<string, number>();
-  let currentMain: string | null = null;
-  for (const row of data.rows) {
-    if (row.isMain) {
-      currentMain = row.conta;
-    } else if (currentMain && AUDI_PREFIXES.some(p => row.conta.startsWith(p))) {
-      const valor = row.valDebito - row.valCredito;
-      result.set(currentMain, (result.get(currentMain) ?? 0) + valor);
-    }
-  }
-  return result;
-}
 
 function fmtBRL(n: number): string {
   return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
