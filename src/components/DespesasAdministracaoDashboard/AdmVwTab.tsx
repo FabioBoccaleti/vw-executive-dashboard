@@ -126,7 +126,13 @@ function GroupSection({
       </div>
 
       {/* Tabela de contas */}
-      <table className="w-full text-xs">
+      <div className="overflow-x-auto">
+      <table className="table-fixed w-full text-xs">
+        <colgroup>
+          <col style={{ width: '40%' }} />
+          <col style={{ width: '15%' }} />
+          <col style={{ width: '45%' }} />
+        </colgroup>
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50/60">
             <th className="text-left px-4 py-2 font-semibold text-slate-500">Conta / Descrição</th>
@@ -148,7 +154,7 @@ function GroupSection({
                 i % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'
               }`}
             >
-              <td className="px-4 py-2 text-slate-700 font-medium">{row.conta}</td>
+              <td className="px-4 py-2 text-slate-700 font-medium truncate" title={row.conta}>{row.conta}</td>
               <td
                 className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${
                   row.valor < 0 ? 'text-red-600' : 'text-slate-800'
@@ -164,6 +170,7 @@ function GroupSection({
             </tr>
           ))}
         </tbody>
+        {/* subtotal */}
         <tfoot>
           <tr style={{ backgroundColor: cfg.badge }}>
             <td className="px-4 py-2 text-xs font-bold" style={{ color: cfg.color }}>
@@ -179,6 +186,7 @@ function GroupSection({
           </tr>
         </tfoot>
       </table>
+      </div>
     </div>
   );
 }

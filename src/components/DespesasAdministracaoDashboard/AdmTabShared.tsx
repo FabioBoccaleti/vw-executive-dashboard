@@ -56,10 +56,10 @@ export function YearModeGroupSection({ tipo, rows, monthMaps, monthsWithData }: 
 
       {/* Tabela com colunas por mês */}
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="table-fixed text-xs w-auto min-w-full">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
-              <th className="text-left px-4 py-2 font-semibold text-slate-500 min-w-[260px] sticky left-0 bg-slate-50 z-10">
+              <th className="text-left px-4 py-2 font-semibold text-slate-500 w-64 sticky left-0 bg-slate-50 z-10">
                 Conta / Descrição
               </th>
               {monthsWithData.map(m => (
@@ -80,7 +80,7 @@ export function YearModeGroupSection({ tipo, rows, monthMaps, monthsWithData }: 
                   i % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'
                 }`}
               >
-                <td className="px-4 py-1.5 text-slate-700 font-medium sticky left-0 bg-inherit z-10">
+                <td className="px-4 py-1.5 text-slate-700 font-medium sticky left-0 bg-inherit z-10 truncate" title={row.conta}>
                   {row.conta}
                 </td>
                 {monthsWithData.map(m => {
