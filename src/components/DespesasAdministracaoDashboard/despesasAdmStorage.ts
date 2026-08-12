@@ -188,3 +188,11 @@ export async function loadObsConsolidado(year: number, month: number): Promise<R
 export async function saveObsConsolidado(year: number, month: number, obs: Record<string, string>): Promise<void> {
   await kvSet(makeObsKey('consolidado', year, month), obs);
 }
+
+export async function loadObsDiretoria(year: number, month: number): Promise<Record<string, string>> {
+  return (await kvGet<Record<string, string>>(makeObsKey('diretoria', year, month))) ?? {};
+}
+
+export async function saveObsDiretoria(year: number, month: number, obs: Record<string, string>): Promise<void> {
+  await kvSet(makeObsKey('diretoria', year, month), obs);
+}

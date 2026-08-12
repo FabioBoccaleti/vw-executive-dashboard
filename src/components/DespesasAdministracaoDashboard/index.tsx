@@ -18,6 +18,7 @@ import {
 } from './despesasAdmStorage';
 import { AdmVwTab } from './AdmVwTab';
 import { AdmAudiTab } from './AdmAudiTab';
+import { DireitoriaTab } from './DireitoriaTab';
 import { ConsolidadoAdmTab } from './ConsolidadoAdmTab';
 
 const MONTHS = [
@@ -106,7 +107,7 @@ interface Props {
   onChangeBrand: () => void;
 }
 
-type ActiveTab = 'importar' | 'adm_vw' | 'adm_audi' | 'consolidado';
+type ActiveTab = 'importar' | 'adm_vw' | 'adm_audi' | 'diretoria' | 'consolidado';
 type ImportarSubTab = 'dados' | 'classificacao';
 
 // ─── Seletor de Ano e Mês (estilo pill) ─────────────────────────────────────
@@ -453,10 +454,11 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
         {/* Tab bar */}
         <div className="flex items-center gap-0 border-b border-slate-200">
           {([
-            { id: 'importar',   label: 'Importar Dados',             icon: <FileText className="w-3.5 h-3.5" /> },
-            { id: 'adm_vw',     label: 'ADM VW',                     icon: null },
-            { id: 'adm_audi',   label: 'ADM Audi',                   icon: null },
-            { id: 'consolidado',label: 'Consolidado ADM (Audi / VW)', icon: null },
+            { id: 'importar',    label: 'Importar Dados',             icon: <FileText className="w-3.5 h-3.5" /> },
+            { id: 'adm_vw',      label: 'ADM VW',                     icon: null },
+            { id: 'adm_audi',    label: 'ADM Audi',                   icon: null },
+            { id: 'diretoria',   label: 'Diretoria',                  icon: null },
+            { id: 'consolidado', label: 'Consolidado ADM (Audi / VW)', icon: null },
           ] as { id: ActiveTab; label: string; icon: React.ReactNode }[]).map(tab => (
             <button
               key={tab.id}
@@ -511,6 +513,9 @@ export function DespesasAdministracaoDashboard({ onChangeBrand }: Props) {
             )}
             {activeTab === 'adm_audi' && (
               <AdmAudiTab year={admYear} month={admMonth} />
+            )}
+            {activeTab === 'diretoria' && (
+              <DireitoriaTab year={admYear} month={admMonth} />
             )}
             {activeTab === 'consolidado' && (
               <ConsolidadoAdmTab year={admYear} month={admMonth} />
