@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FileText } from 'lucide-react';
+import { YearModeGroupSection } from './AdmTabShared';
 import {
   getDespesasAdmMes,
   loadClassificacoes,
@@ -194,6 +195,8 @@ export function AdmVwTab({ year, month }: Props) {
 
   const [loading, setLoading] = useState(true);
   const [valorMap, setValorMap] = useState<Map<string, number>>(new Map());
+  const [monthMaps, setMonthMaps] = useState<Map<string, number>[]>(Array.from({ length: 12 }, () => new Map()));
+  const [monthsWithData, setMonthsWithData] = useState<number[]>([]);
   const [classificacoes, setClassificacoes] = useState<Record<string, TipoClassificacao>>({});
   const [obs, setObs] = useState<Record<string, string>>({});
 
@@ -207,13 +210,19 @@ export function AdmVwTab({ year, month }: Props) {
         const allMonths = await Promise.all(
           Array.from({ length: 12 }, (_, i) => getDespesasAdmMes(year, i + 1))
         );
+        const maps: Map<string, number>[] = Array.from({ length: 12 }, () => new Map());
+        const withData: number[] = [];
         valMap = new Map();
-        for (const data of allMonths) {
+        for (let i = 0; i < 12; i++) {
+          const data = allMonths[i];
           if (!data) continue;
-          for (const [conta, val] of extractSoranaVwValues(data)) {
-            valMap.set(conta, (valMap.get(conta) ?? 0) + val);
-          }
+          const mMap = extractSoranaVwValues(data);
+          maps[i] = mMap;
+          withData.push(i + 1);
+          for (const [conta, val] of mMap) valMap.set(conta, (valMap.get(conta) ?? 0) + val);
         }
+        setMonthMaps(maps);
+        setMonthsWithData(withData);
         setObs({});
       } else {
         const [data, obsData] = await Promise.all([
@@ -351,18 +360,29 @@ export function AdmVwTab({ year, month }: Props) {
       </div>
 
       {/* Grupos de despesa */}
-      {activeGroups.map(tipo => (
-        <GroupSection
-          key={tipo}
-          tipo={tipo}
-          rows={groups.get(tipo)!}
-          obs={obs}
-          year={year}
-          month={month}
-          isYearMode={isYearMode}
-          onObsChange={handleObsChange}
-        />
-      ))}
+      {isYearMode
+        ? activeGroups.map(tipo => (
+            <YearModeGroupSection
+              key={tipo}
+              tipo={tipo}
+              rows={groups.get(tipo)!}
+              monthMaps={monthMaps}
+              monthsWithData={monthsWithData}
+            />
+          ))
+        : activeGroups.map(tipo => (
+            <GroupSection
+              key={tipo}
+              tipo={tipo}
+              rows={groups.get(tipo)!}
+              obs={obs}
+              year={year}
+              month={month}
+              isYearMode={false}
+              onObsChange={handleObsChange}
+            />
+          ))
+      }
 
       {/* Rodapé — Total Geral */}
       <div className="bg-slate-800 rounded-xl px-5 py-3.5 flex items-center justify-between shadow-md">
