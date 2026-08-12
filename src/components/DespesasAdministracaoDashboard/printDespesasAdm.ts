@@ -84,6 +84,7 @@ function buildMonthHTML(
     const rows = groups.get(tipo)!;
     const subtotal = rows.reduce((s, r) => s + r.valor, 0);
     const { bg, text } = GRUPO_STYLE[tipo];
+    html += `<div class="group-block">`;
     html += `<table>
       <thead><tr style="background:${bg}">
         <th class="desc" style="color:${text}">${TIPO_LABELS[tipo]}</th>
@@ -102,6 +103,7 @@ function buildMonthHTML(
         <td class="obs"></td>
       </tr></tfoot>
     </table>`;
+    html += `</div>`;
   }
   html += `<div class="grand-total"><span>${tabLabel} — ${periodoLabel}</span><span>R$&nbsp;${fmtBRL(grandTotal)}</span></div></div>`;
   return html;
@@ -121,6 +123,11 @@ function buildYearHTML(
     const rows = groups.get(tipo)!;
     const subtotal = rows.reduce((s, r) => s + r.valor, 0);
     const { bg, text } = GRUPO_STYLE[tipo];
+    // Força nova página antes de "Outras Despesas Operacionais"
+    if (tipo === 'outras_operacionais') {
+      html += `<div style="page-break-before:always;break-before:page"></div>`;
+    }
+    html += `<div class="group-block">`;
     html += `<table>
       <thead><tr style="background:${bg}">
         <th class="desc" style="color:${text}">${TIPO_LABELS[tipo]}</th>
@@ -144,6 +151,7 @@ function buildYearHTML(
     }
     html += `<td class="tot" style="color:${text};font-weight:700">${fmtBRL(subtotal)}</td></tr>`;
     html += `</tbody></table>`;
+    html += `</div>`;
   }
   html += `<div class="grand-total"><span>${tabLabel} — Ano ${year}</span><span>R$&nbsp;${fmtBRL(grandTotal)}</span></div></div>`;
   return html;
@@ -240,6 +248,7 @@ export async function printDespesasAdm(year: number, month: number): Promise<voi
       font-weight: 700; font-size: 9pt; margin-top: 4px;
     }
     .content { }
+    .group-block { page-break-inside: avoid; break-inside: avoid; margin-bottom: 2px; }
     .page.portrait .content { max-width: 160mm; margin: 0 auto; }
     .page.portrait .header  { max-width: 160mm; margin-left: auto; margin-right: auto; }
   </style>
