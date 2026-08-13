@@ -50,15 +50,15 @@ interface TabConfig {
 }
 
 const TABS_CONFIG: TabConfig[] = [
-  { label: 'Veículos Novos',  deptoTab: 'veiculos_novos',  color: '#1e40af', loadObs: loadObsVw            },
-  { label: 'Venda Direta',    deptoTab: 'venda_direta',    color: '#059669', loadObs: loadObsVendaDireta   },
-  { label: 'Veículos Usados', deptoTab: 'veiculos_usados', color: '#b91c1c', loadObs: loadObsAudi          },
-  { label: 'Peças',           deptoTab: 'pecas',           color: '#d97706', loadObs: loadObsPecas         },
-  { label: 'Oficina',         deptoTab: 'oficina',         color: '#7c3aed', loadObs: loadObsOficina       },
-  { label: 'Funilaria',       deptoTab: 'funilaria',       color: '#0891b2', loadObs: loadObsFunilaria     },
-  { label: 'Administração',   deptoTab: 'administracao',   color: '#be185d', loadObs: loadObsAdministracao },
-  { label: 'Diretoria',       deptoTab: 'diretoria',       color: '#15803d', loadObs: loadObsDiretoria     },
-  { label: 'Consolidado (Total)', deptoTab: 'consolidado', color: '#6d28d9', loadObs: loadObsConsolidado  },
+  { label: 'Veículos Novos',  deptoTab: 'veiculos_novos',  color: '#fbbf24', loadObs: loadObsVw            },
+  { label: 'Venda Direta',    deptoTab: 'venda_direta',    color: '#6b7280', loadObs: loadObsVendaDireta   },
+  { label: 'Veículos Usados', deptoTab: 'veiculos_usados', color: '#f97316', loadObs: loadObsAudi          },
+  { label: 'Peças',           deptoTab: 'pecas',           color: '#06b6d4', loadObs: loadObsPecas         },
+  { label: 'Oficina',         deptoTab: 'oficina',         color: '#ec4899', loadObs: loadObsOficina       },
+  { label: 'Funilaria',       deptoTab: 'funilaria',       color: '#92400e', loadObs: loadObsFunilaria     },
+  { label: 'Administração',   deptoTab: 'administracao',   color: '#9333ea', loadObs: loadObsAdministracao },
+  { label: 'Diretoria',       deptoTab: 'diretoria',       color: '#16a34a', loadObs: loadObsDiretoria     },
+  { label: 'Consolidado (Total)', deptoTab: 'consolidado', color: '#dc2626', loadObs: loadObsConsolidado  },
 ];
 
 type ContaRow = { conta: string; valor: number };
