@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, TrendingUp, TrendingDown, Minus, AlertCircle, BarChart3, LayoutGrid, Table2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -160,12 +160,41 @@ export function ComparativosTab({ year, month }: ComparativosTabProps) {
   const [contasSelecionadas, setContasSelecionadas] = useState<string[]>([]);
   const [todasContas, setTodasContas] = useState<string[]>([]);
   const [buscaConta, setBuscaConta] = useState('');
+  const [classificacoes, setClassificacoes] = useState<Record<string, TipoClassificacao>>({});
   
   const [visualizacao, setVisualizacao] = useState<VisualizationType>('tabela');
   const [detalhamento, setDetalhamento] = useState<DetalhamentoType>('total');
   
   const [comparando, setComparando] = useState(false);
   const [resultados, setResultados] = useState<any>(null);
+
+  // Carregar classificações ao montar
+  useEffect(() => {
+    loadClassificacoes().then(cls => setClassificacoes(cls));
+  }, []);
+
+  // Filtrar contas com base nos tipos selecionados
+  const contasFiltradas = useMemo(() => {
+    if (todasContas.length === 0) return [];
+    
+    // Se todos os tipos estão selecionados, mostrar todas as contas
+    const todosOsTiposSelecionados = tiposSelecionados.length === TIPOS_ORDENADOS.length;
+    if (todosOsTiposSelecionados) return todasContas;
+    
+    // Filtrar apenas contas dos tipos selecionados
+    return todasContas.filter(conta => {
+      const prefix = conta.match(/^(\d+ -)/)?.[1] ?? '';
+      const tipoConta = classificacoes[prefix];
+      // Incluir contas sem classificação ou contas do tipo selecionado
+      return !tipoConta || tiposSelecionados.includes(tipoConta);
+    });
+  }, [todasContas, tiposSelecionados, classificacoes]);
+
+  // Atualizar contas selecionadas quando filtro de tipos mudar
+  useEffect(() => {
+    // Remover contas selecionadas que não estão mais na lista filtrada
+    setContasSelecionadas(prev => prev.filter(conta => contasFiltradas.includes(conta)));
+  }, [contasFiltradas]);
 
   const adicionarPeriodo = () => {
     if (periodos.length >= 4) {
@@ -268,9 +297,8 @@ export function ComparativosTab({ year, month }: ComparativosTabProps) {
 
     setComparando(true);
     try {
-      // Carregar regras e classificações
+      // Carregar regras
       const regras = await loadRegrasDeptos();
-      const classificacoes = await loadClassificacoes();
 
       const resultadosPeriodos: ResultadoPeriodo[] = [];
       const todasContasSet = new Set<string>();
@@ -325,9 +353,10 @@ export function ComparativosTab({ year, month }: ComparativosTabProps) {
                 incluirConta = true;
               } else {
                 // Se tipos específicos, filtrar por classificação
+                // Contas sem classificação são SEMPRE incluídas
                 const prefix = conta.match(/^(\d+ -)/)?.[1] ?? '';
                 const tipoConta = classificacoes[prefix];
-                incluirConta = tipoConta ? tiposSelecionados.includes(tipoConta) : false;
+                incluirConta = tipoConta ? tiposSelecionados.includes(tipoConta) : true;
               }
 
               if (incluirConta) {
@@ -623,10 +652,10 @@ export function ComparativosTab({ year, month }: ComparativosTabProps) {
           <label className="flex items-center gap-2 mb-2 cursor-pointer border-b border-slate-100 pb-2">
             <input
               type="checkbox"
-              checked={contasSelecionadas.length === todasContas.length && todasContas.length > 0}
+              checked={contasSelecionadas.length === contasFiltradas.length && contasFiltradas.length > 0}
               onChange={(e) => {
                 if (e.target.checked) {
-                  setContasSelecionadas([...todasContas]);
+                  setContasSelecionadas([...contasFiltradas]);
                 } else {
                   setContasSelecionadas([]);
                 }
@@ -634,17 +663,17 @@ export function ComparativosTab({ year, month }: ComparativosTabProps) {
               className="rounded"
             />
             <span className="text-xs font-bold text-slate-700">
-              Todas as contas {todasContas.length > 0 && `(${todasContas.length})`}
+              Todas as contas {contasFiltradas.length > 0 && `(${contasFiltradas.length})`}
             </span>
           </label>
 
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
-            {todasContas.length === 0 ? (
+            {contasFiltradas.length === 0 ? (
               <p className="text-xs text-slate-400 text-center py-4">
                 Configure os filtros e compare para ver as contas
               </p>
             ) : (
-              todasContas
+              contasFiltradas
                 .filter(conta => 
                   buscaConta === '' || 
                   conta.toLowerCase().includes(buscaConta.toLowerCase())
