@@ -9,6 +9,7 @@ import {
   extractByDeptoRule,
   loadRegrasDeptos,
   mergeAssistenciaMedica,
+  mergeFgtsMulta,
   type DespesasAdmMesData,
   type TipoClassificacao,
   TIPO_LABELS,
@@ -222,10 +223,14 @@ export function AdmVwTab({ year, month }: Props) {
           if (!data) continue;
           const mMap = extractByDeptoRule(data, 'veiculos_novos', regras);
           mergeAssistenciaMedica(mMap);
+          mergeFgtsMulta(mMap);
           maps[i] = mMap;
           withData.push(i + 1);
           for (const [conta, val] of mMap) valMap.set(conta, (valMap.get(conta) ?? 0) + val);
         }
+        // Aplica merge no valMap acumulado
+        mergeAssistenciaMedica(valMap);
+        mergeFgtsMulta(valMap);
         setMonthMaps(maps);
         setMonthsWithData(withData);
         setObs({});
@@ -236,6 +241,7 @@ export function AdmVwTab({ year, month }: Props) {
         ]);
         valMap = data ? extractByDeptoRule(data, 'veiculos_novos', regras) : new Map();
         mergeAssistenciaMedica(valMap);
+        mergeFgtsMulta(valMap);
         setObs(obsData);
       }
 

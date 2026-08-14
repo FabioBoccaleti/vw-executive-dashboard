@@ -18,6 +18,7 @@ import {
   mergeFerias,
   mergeInss,
   mergeFgts,
+  mergeFgtsMulta,
   mergeAssistenciaMedicaNova,
   mergeValeTransporte,
   mergePremiosGratificacoes,
@@ -243,6 +244,7 @@ export function AdministracaoTab({ year, month }: Props) {
           mergeFerias(mMap);
           mergeInss(mMap);
           mergeFgts(mMap);
+          mergeFgtsMulta(mMap);
           mergeAssistenciaMedicaNova(mMap);
           mergeValeTransporte(mMap);
           mergePremiosGratificacoes(mMap);
@@ -250,6 +252,21 @@ export function AdministracaoTab({ year, month }: Props) {
           withData.push(i + 1);
           for (const [conta, val] of mMap) valMap.set(conta, (valMap.get(conta) ?? 0) + val);
         }
+        // Aplica merges no valMap acumulado
+        mergeAssistenciaMedica(valMap);
+        mergeSalariosOrdenados(valMap);
+        mergeHorasExtras(valMap);
+        mergeAdicionais(valMap);
+        mergeIndenizacoesTrabalistas(valMap);
+        merge13Salario(valMap);
+        mergeFeriasIndenizadas(valMap);
+        mergeFerias(valMap);
+        mergeInss(valMap);
+        mergeFgts(valMap);
+        mergeFgtsMulta(valMap);
+        mergeAssistenciaMedicaNova(valMap);
+        mergeValeTransporte(valMap);
+        mergePremiosGratificacoes(valMap);
         setMonthMaps(maps);
         setMonthsWithData(withData);
         setObs({});
@@ -269,6 +286,7 @@ export function AdministracaoTab({ year, month }: Props) {
         mergeFerias(valMap);
         mergeInss(valMap);
         mergeFgts(valMap);
+        mergeFgtsMulta(valMap);
         mergeAssistenciaMedicaNova(valMap);
         mergeValeTransporte(valMap);
         mergePremiosGratificacoes(valMap);

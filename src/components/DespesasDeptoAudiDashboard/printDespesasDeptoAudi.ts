@@ -23,6 +23,7 @@ import {
   mergeFerias,
   mergeInss,
   mergeFgts,
+  mergeFgtsMulta,
   mergeAssistenciaMedicaNova,
   mergeValeTransporte,
   mergePremiosGratificacoes,
@@ -212,6 +213,7 @@ export async function printDespesasDeptoAudi(year: number, month: number): Promi
       mergeFerias(m);
       mergeInss(m);
       mergeFgts(m);
+      mergeFgtsMulta(m);
       mergeAssistenciaMedicaNova(m);
       mergeValeTransporte(m);
       mergePremiosGratificacoes(m);

@@ -330,6 +330,30 @@ export function mergeFgts(valorMap: Map<string, number>): void {
   if (conta4150) valorMap.delete(conta4150);
 }
 
+// Merge F.G.T.S. - MULTA: soma 4150102013 → 5520102013
+export function mergeFgtsMulta(valorMap: Map<string, number>): void {
+  let conta4150: string | null = null;
+  let conta5520: string | null = null;
+  
+  for (const k of valorMap.keys()) {
+    if (k.startsWith('4150102013')) conta4150 = k;
+    if (k.startsWith('5520102013')) conta5520 = k;
+  }
+  
+  // Se não existe a conta principal, não faz nada
+  if (!conta5520) return;
+  
+  // Soma o valor da conta 4150102013 na conta 5520102013
+  const val4150 = conta4150 ? (valorMap.get(conta4150) ?? 0) : 0;
+  
+  if (val4150 !== 0) {
+    valorMap.set(conta5520, (valorMap.get(conta5520) ?? 0) + val4150);
+  }
+  
+  // Remove a conta que foi somada
+  if (conta4150) valorMap.delete(conta4150);
+}
+
 // Merge ASSISTÊNCIA MÉDICA (nova regra): soma 4150103001 → 5520103001
 export function mergeAssistenciaMedicaNova(valorMap: Map<string, number>): void {
   let conta4150: string | null = null;
@@ -382,12 +406,14 @@ export function mergeValeTransporte(valorMap: Map<string, number>): void {
   if (conta5510) valorMap.delete(conta5510);
 }
 
-// Merge PRÊMIOS E GRATIFICAÇÕES: soma 5510101002 → 5520101004
+// Merge PRÊMIOS E GRATIFICAÇÕES: soma 5510101002 + 4150101003 → 5520101004
 export function mergePremiosGratificacoes(valorMap: Map<string, number>): void {
+  let conta4150: string | null = null;
   let conta5510: string | null = null;
   let conta5520: string | null = null;
   
   for (const k of valorMap.keys()) {
+    if (k.startsWith('4150101003')) conta4150 = k;
     if (k.startsWith('5510101002')) conta5510 = k;
     if (k.startsWith('5520101004')) conta5520 = k;
   }
@@ -395,14 +421,16 @@ export function mergePremiosGratificacoes(valorMap: Map<string, number>): void {
   // Se não existe a conta principal, não faz nada
   if (!conta5520) return;
   
-  // Soma o valor da conta 5510101002 na conta 5520101004
+  // Soma os valores das contas 5510101002 e 4150101003 na conta 5520101004
+  const val4150 = conta4150 ? (valorMap.get(conta4150) ?? 0) : 0;
   const val5510 = conta5510 ? (valorMap.get(conta5510) ?? 0) : 0;
   
-  if (val5510 !== 0) {
-    valorMap.set(conta5520, (valorMap.get(conta5520) ?? 0) + val5510);
+  if (val4150 !== 0 || val5510 !== 0) {
+    valorMap.set(conta5520, (valorMap.get(conta5520) ?? 0) + val4150 + val5510);
   }
   
-  // Remove a conta que foi somada
+  // Remove as contas que foram somadas
+  if (conta4150) valorMap.delete(conta4150);
   if (conta5510) valorMap.delete(conta5510);
 }
 
