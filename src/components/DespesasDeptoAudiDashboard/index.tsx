@@ -21,6 +21,7 @@ import { AdmVwTab } from './AdmVwTab';
 import { AdmAudiTab } from './AdmAudiTab';
 import { DireitoriaTab } from './DireitoriaTab';
 import { ConsolidadoAdmTab } from './ConsolidadoAdmTab';
+import { ComparativosTab } from './ComparativosTab';
 import { VendaDiretaTab } from './VendaDiretaTab';
 import { PecasTab } from './PecasTab';
 import { OficinaTab } from './OficinaTab';
@@ -114,7 +115,7 @@ interface Props {
   onChangeBrand: () => void;
 }
 
-type ActiveTab = 'importar' | 'adm_vw' | 'venda_direta' | 'adm_audi' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'diretoria' | 'consolidado';
+type ActiveTab = 'importar' | 'adm_vw' | 'venda_direta' | 'adm_audi' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'diretoria' | 'consolidado' | 'comparativos';
 type ImportarSubTab = 'dados' | 'classificacao' | 'regras_departamentos';
 
 // ─── Seletor de Ano e Mês (estilo pill) ─────────────────────────────────────
@@ -494,6 +495,7 @@ export function DespesasDeptoAudiDashboard({ onChangeBrand }: Props) {
             { id: 'administracao',  label: 'Administração',   icon: null },
             { id: 'diretoria',      label: 'Diretoria',        icon: null },
             { id: 'consolidado',    label: 'Consolidado (Total)', icon: null },
+            { id: 'comparativos',   label: 'Comparativos',     icon: null },
           ] as { id: ActiveTab; label: string; icon: React.ReactNode }[]).map(tab => (
             <button
               key={tab.id}
@@ -536,14 +538,16 @@ export function DespesasDeptoAudiDashboard({ onChangeBrand }: Props) {
         {/* Seletor + placeholder para as abas ADM */}
         {activeTab !== 'importar' && (
           <div className="flex flex-col gap-4 flex-1">
-            <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
-              <YearMonthSelector
-                year={admYear}
-                month={admMonth}
-                onYearChange={setAdmYear}
-                onMonthChange={setAdmMonth}
-              />
-            </div>
+            {activeTab !== 'comparativos' && (
+              <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
+                <YearMonthSelector
+                  year={admYear}
+                  month={admMonth}
+                  onYearChange={setAdmYear}
+                  onMonthChange={setAdmMonth}
+                />
+              </div>
+            )}
             {activeTab === 'adm_vw' && (
               <AdmVwTab year={admYear} month={admMonth} />
             )}
@@ -570,6 +574,9 @@ export function DespesasDeptoAudiDashboard({ onChangeBrand }: Props) {
             )}
             {activeTab === 'consolidado' && (
               <ConsolidadoAdmTab year={admYear} month={admMonth} />
+            )}
+            {activeTab === 'comparativos' && (
+              <ComparativosTab year={admYear} month={admMonth} />
             )}
           </div>
         )}
