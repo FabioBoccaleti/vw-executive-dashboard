@@ -14,6 +14,7 @@ import {
   mergeAdicionais,
   mergeIndenizacoesTrabalistas,
   merge13Salario,
+  merge13SalarioIndenizado,
   mergeFeriasIndenizadas,
   mergeFerias,
   mergeInss,
@@ -240,6 +241,7 @@ export function PecasTab({ year, month }: Props) {
           mergeAdicionais(mMap);
           mergeIndenizacoesTrabalistas(mMap);
           merge13Salario(mMap);
+          merge13SalarioIndenizado(mMap);
           mergeFeriasIndenizadas(mMap);
           mergeFerias(mMap);
           mergeInss(mMap);
@@ -259,6 +261,7 @@ export function PecasTab({ year, month }: Props) {
         mergeAdicionais(valMap);
         mergeIndenizacoesTrabalistas(valMap);
         merge13Salario(valMap);
+        merge13SalarioIndenizado(valMap);
         mergeFeriasIndenizadas(valMap);
         mergeFerias(valMap);
         mergeInss(valMap);
@@ -282,6 +285,7 @@ export function PecasTab({ year, month }: Props) {
         mergeAdicionais(valMap);
         mergeIndenizacoesTrabalistas(valMap);
         merge13Salario(valMap);
+        merge13SalarioIndenizado(valMap);
         mergeFeriasIndenizadas(valMap);
         mergeFerias(valMap);
         mergeInss(valMap);

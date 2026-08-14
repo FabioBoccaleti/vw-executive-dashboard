@@ -206,20 +206,44 @@ export function mergeIndenizacoesTrabalistas(valorMap: Map<string, number>): voi
   if (conta5510) valorMap.delete(conta5510);
 }
 
-// Merge 13º SALÁRIO: soma 4150102001 → 5520102001
+// Merge 13º SALÁRIO: soma 4150102001 → 5510102001
 export function merge13Salario(valorMap: Map<string, number>): void {
+  let conta4150: string | null = null;
+  let conta5510: string | null = null;
+  
+  for (const k of valorMap.keys()) {
+    if (k.startsWith('4150102001')) conta4150 = k;
+    if (k.startsWith('5510102001')) conta5510 = k;
+  }
+  
+  // Se não existe a conta principal, não faz nada
+  if (!conta5510) return;
+  
+  // Soma o valor da conta 4150102001 na conta 5510102001
+  const val4150 = conta4150 ? (valorMap.get(conta4150) ?? 0) : 0;
+  
+  if (val4150 !== 0) {
+    valorMap.set(conta5510, (valorMap.get(conta5510) ?? 0) + val4150);
+  }
+  
+  // Remove a conta que foi somada
+  if (conta4150) valorMap.delete(conta4150);
+}
+
+// Merge 13º SALÁRIO INDENIZADO: soma 4150102002 → 5520102002
+export function merge13SalarioIndenizado(valorMap: Map<string, number>): void {
   let conta4150: string | null = null;
   let conta5520: string | null = null;
   
   for (const k of valorMap.keys()) {
-    if (k.startsWith('4150102001')) conta4150 = k;
-    if (k.startsWith('5520102001')) conta5520 = k;
+    if (k.startsWith('4150102002')) conta4150 = k;
+    if (k.startsWith('5520102002')) conta5520 = k;
   }
   
   // Se não existe a conta principal, não faz nada
   if (!conta5520) return;
   
-  // Soma o valor da conta 4150102001 na conta 5520102001
+  // Soma o valor da conta 4150102002 na conta 5520102002
   const val4150 = conta4150 ? (valorMap.get(conta4150) ?? 0) : 0;
   
   if (val4150 !== 0) {
@@ -258,72 +282,72 @@ export function mergeFeriasIndenizadas(valorMap: Map<string, number>): void {
   if (conta5510) valorMap.delete(conta5510);
 }
 
-// Merge FÉRIAS: soma 4150102003 → 5520102003
+// Merge FÉRIAS: soma 4150102003 → 5510102003
 export function mergeFerias(valorMap: Map<string, number>): void {
   let conta4150: string | null = null;
-  let conta5520: string | null = null;
+  let conta5510: string | null = null;
   
   for (const k of valorMap.keys()) {
     if (k.startsWith('4150102003')) conta4150 = k;
-    if (k.startsWith('5520102003')) conta5520 = k;
+    if (k.startsWith('5510102003')) conta5510 = k;
   }
   
   // Se não existe a conta principal, não faz nada
-  if (!conta5520) return;
+  if (!conta5510) return;
   
-  // Soma o valor da conta 4150102003 na conta 5520102003
+  // Soma o valor da conta 4150102003 na conta 5510102003
   const val4150 = conta4150 ? (valorMap.get(conta4150) ?? 0) : 0;
   
   if (val4150 !== 0) {
-    valorMap.set(conta5520, (valorMap.get(conta5520) ?? 0) + val4150);
+    valorMap.set(conta5510, (valorMap.get(conta5510) ?? 0) + val4150);
   }
   
   // Remove a conta que foi somada
   if (conta4150) valorMap.delete(conta4150);
 }
 
-// Merge I.N.S.S.: soma 4150102010 → 5520102010
+// Merge I.N.S.S.: soma 4150102010 → 5510102010
 export function mergeInss(valorMap: Map<string, number>): void {
   let conta4150: string | null = null;
-  let conta5520: string | null = null;
+  let conta5510: string | null = null;
   
   for (const k of valorMap.keys()) {
     if (k.startsWith('4150102010')) conta4150 = k;
-    if (k.startsWith('5520102010')) conta5520 = k;
+    if (k.startsWith('5510102010')) conta5510 = k;
   }
   
   // Se não existe a conta principal, não faz nada
-  if (!conta5520) return;
+  if (!conta5510) return;
   
-  // Soma o valor da conta 4150102010 na conta 5520102010
+  // Soma o valor da conta 4150102010 na conta 5510102010
   const val4150 = conta4150 ? (valorMap.get(conta4150) ?? 0) : 0;
   
   if (val4150 !== 0) {
-    valorMap.set(conta5520, (valorMap.get(conta5520) ?? 0) + val4150);
+    valorMap.set(conta5510, (valorMap.get(conta5510) ?? 0) + val4150);
   }
   
   // Remove a conta que foi somada
   if (conta4150) valorMap.delete(conta4150);
 }
 
-// Merge F.G.T.S.: soma 4150102012 → 5520102012
+// Merge F.G.T.S.: soma 4150102012 → 5510102011
 export function mergeFgts(valorMap: Map<string, number>): void {
   let conta4150: string | null = null;
-  let conta5520: string | null = null;
+  let conta5510: string | null = null;
   
   for (const k of valorMap.keys()) {
     if (k.startsWith('4150102012')) conta4150 = k;
-    if (k.startsWith('5520102012')) conta5520 = k;
+    if (k.startsWith('5510102011')) conta5510 = k;
   }
   
   // Se não existe a conta principal, não faz nada
-  if (!conta5520) return;
+  if (!conta5510) return;
   
-  // Soma o valor da conta 4150102012 na conta 5520102012
+  // Soma o valor da conta 4150102012 na conta 5510102011
   const val4150 = conta4150 ? (valorMap.get(conta4150) ?? 0) : 0;
   
   if (val4150 !== 0) {
-    valorMap.set(conta5520, (valorMap.get(conta5520) ?? 0) + val4150);
+    valorMap.set(conta5510, (valorMap.get(conta5510) ?? 0) + val4150);
   }
   
   // Remove a conta que foi somada

@@ -19,6 +19,7 @@ import {
   mergeAdicionais,
   mergeIndenizacoesTrabalistas,
   merge13Salario,
+  merge13SalarioIndenizado,
   mergeFeriasIndenizadas,
   mergeFerias,
   mergeInss,
@@ -209,6 +210,7 @@ export async function printDespesasDeptoAudi(year: number, month: number): Promi
       mergeAdicionais(m);
       mergeIndenizacoesTrabalistas(m);
       merge13Salario(m);
+      merge13SalarioIndenizado(m);
       mergeFeriasIndenizadas(m);
       mergeFerias(m);
       mergeInss(m);
