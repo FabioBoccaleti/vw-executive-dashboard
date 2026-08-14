@@ -10,6 +10,7 @@ import {
   loadRegrasDeptos,
   mergeAssistenciaMedica,
   mergeSalariosOrdenados,
+  mergeComissoesEmpregados,
   mergeHorasExtras,
   mergeAdicionais,
   mergeIndenizacoesTrabalistas,
@@ -208,6 +209,7 @@ export function ConsolidadoAdmTab({ year, month }: Props) {
           const mMap = extractByDeptoRuleAll(data, regras);
           mergeAssistenciaMedica(mMap);
           mergeSalariosOrdenados(mMap);
+          mergeComissoesEmpregados(mMap);
           mergeHorasExtras(mMap);
           mergeAdicionais(mMap);
           mergeIndenizacoesTrabalistas(mMap);
@@ -228,6 +230,7 @@ export function ConsolidadoAdmTab({ year, month }: Props) {
         // Aplica merges no valMap acumulado
         mergeAssistenciaMedica(valMap);
         mergeSalariosOrdenados(valMap);
+        mergeComissoesEmpregados(valMap);
         mergeHorasExtras(valMap);
         mergeAdicionais(valMap);
         mergeIndenizacoesTrabalistas(valMap);
@@ -252,6 +255,7 @@ export function ConsolidadoAdmTab({ year, month }: Props) {
         valMap = data ? extractByDeptoRuleAll(data, regras) : new Map();
         mergeAssistenciaMedica(valMap);
         mergeSalariosOrdenados(valMap);
+        mergeComissoesEmpregados(valMap);
         mergeHorasExtras(valMap);
         mergeAdicionais(valMap);
         mergeIndenizacoesTrabalistas(valMap);
@@ -402,7 +406,7 @@ export function ConsolidadoAdmTab({ year, month }: Props) {
         <div>
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total Geral de Despesas</p>
           <p className="text-xs text-slate-400 mt-0.5">
-            {periodoLabel} · Consolidado ADM (Norte + Audi + Lapa, CC 105+120+205+167+168) · {totalContas} conta{totalContas !== 1 ? 's' : ''} em {activeGroups.length} grupo{activeGroups.length !== 1 ? 's' : ''}
+            {periodoLabel} · Consolidado · {totalContas} conta{totalContas !== 1 ? 's' : ''} em {activeGroups.length} grupo{activeGroups.length !== 1 ? 's' : ''}
           </p>
         </div>
         <p className="text-2xl font-bold text-white tabular-nums">R$&nbsp;{fmtBRL(grandTotal)}</p>

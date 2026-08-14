@@ -10,6 +10,7 @@ import {
   loadRegrasDeptos,
   mergeAssistenciaMedica,
   mergeSalariosOrdenados,
+  mergeComissoesEmpregados,
   mergeHorasExtras,
   mergeAdicionais,
   mergeIndenizacoesTrabalistas,
@@ -237,6 +238,7 @@ export function FunalariaTab({ year, month }: Props) {
           const mMap = extractByDeptoRule(data, 'funilaria', regras);
           mergeAssistenciaMedica(mMap);
           mergeSalariosOrdenados(mMap);
+          mergeComissoesEmpregados(mMap);
           mergeHorasExtras(mMap);
           mergeAdicionais(mMap);
           mergeIndenizacoesTrabalistas(mMap);
@@ -257,6 +259,7 @@ export function FunalariaTab({ year, month }: Props) {
         // Aplica merges no valMap acumulado
         mergeAssistenciaMedica(valMap);
         mergeSalariosOrdenados(valMap);
+        mergeComissoesEmpregados(valMap);
         mergeHorasExtras(valMap);
         mergeAdicionais(valMap);
         mergeIndenizacoesTrabalistas(valMap);
@@ -281,6 +284,7 @@ export function FunalariaTab({ year, month }: Props) {
         valMap = data ? extractByDeptoRule(data, 'funilaria', regras) : new Map();
         mergeAssistenciaMedica(valMap);
         mergeSalariosOrdenados(valMap);
+        mergeComissoesEmpregados(valMap);
         mergeHorasExtras(valMap);
         mergeAdicionais(valMap);
         mergeIndenizacoesTrabalistas(valMap);

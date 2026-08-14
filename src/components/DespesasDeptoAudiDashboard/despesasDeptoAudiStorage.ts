@@ -130,6 +130,30 @@ export function mergeSalariosOrdenados(valorMap: Map<string, number>): void {
   if (conta5520) valorMap.delete(conta5520);
 }
 
+// Merge COMISSÕES A EMPREGADOS: soma 4150101002 → 5510101001
+export function mergeComissoesEmpregados(valorMap: Map<string, number>): void {
+  let conta4150: string | null = null;
+  let conta5510: string | null = null;
+  
+  for (const k of valorMap.keys()) {
+    if (k.startsWith('4150101002')) conta4150 = k;
+    if (k.startsWith('5510101001')) conta5510 = k;
+  }
+  
+  // Se não existe a conta principal, não faz nada
+  if (!conta5510) return;
+  
+  // Soma o valor da conta 4150101002 na conta 5510101001
+  const val4150 = conta4150 ? (valorMap.get(conta4150) ?? 0) : 0;
+  
+  if (val4150 !== 0) {
+    valorMap.set(conta5510, (valorMap.get(conta5510) ?? 0) + val4150);
+  }
+  
+  // Remove a conta que foi somada
+  if (conta4150) valorMap.delete(conta4150);
+}
+
 // Merge HORAS EXTRAS: soma 4150101004 → 5520101002
 export function mergeHorasExtras(valorMap: Map<string, number>): void {
   let conta4150: string | null = null;

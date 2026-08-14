@@ -11,6 +11,7 @@ import {
   mergeAssistenciaMedica,
   mergeFgtsMulta,
   merge13SalarioIndenizado,
+  mergeComissoesEmpregados,
   type DespesasAdmMesData,
   type TipoClassificacao,
   TIPO_LABELS,
@@ -226,6 +227,7 @@ export function AdmVwTab({ year, month }: Props) {
           mergeAssistenciaMedica(mMap);
           mergeFgtsMulta(mMap);
           merge13SalarioIndenizado(mMap);
+          mergeComissoesEmpregados(mMap);
           maps[i] = mMap;
           withData.push(i + 1);
           for (const [conta, val] of mMap) valMap.set(conta, (valMap.get(conta) ?? 0) + val);
@@ -234,6 +236,7 @@ export function AdmVwTab({ year, month }: Props) {
         mergeAssistenciaMedica(valMap);
         mergeFgtsMulta(valMap);
         merge13SalarioIndenizado(valMap);
+        mergeComissoesEmpregados(valMap);
         setMonthMaps(maps);
         setMonthsWithData(withData);
         setObs({});
@@ -246,6 +249,7 @@ export function AdmVwTab({ year, month }: Props) {
         mergeAssistenciaMedica(valMap);
         mergeFgtsMulta(valMap);
         merge13SalarioIndenizado(valMap);
+        mergeComissoesEmpregados(valMap);
         setObs(obsData);
       }
 

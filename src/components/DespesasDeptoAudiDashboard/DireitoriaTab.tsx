@@ -10,6 +10,7 @@ import {
   loadRegrasDeptos,
   mergeAssistenciaMedica,
   mergeSalariosOrdenados,
+  mergeComissoesEmpregados,
   mergeHorasExtras,
   mergeAdicionais,
   mergeIndenizacoesTrabalistas,
@@ -208,6 +209,7 @@ export function DireitoriaTab({ year, month }: Props) {
           const mMap = extractByDeptoRule(data, 'diretoria', regras);
           mergeAssistenciaMedica(mMap);
           mergeSalariosOrdenados(mMap);
+          mergeComissoesEmpregados(mMap);
           mergeHorasExtras(mMap);
           mergeAdicionais(mMap);
           mergeIndenizacoesTrabalistas(mMap);
@@ -228,6 +230,7 @@ export function DireitoriaTab({ year, month }: Props) {
         // Aplica merges no valMap acumulado
         mergeAssistenciaMedica(valMap);
         mergeSalariosOrdenados(valMap);
+        mergeComissoesEmpregados(valMap);
         mergeHorasExtras(valMap);
         mergeAdicionais(valMap);
         mergeIndenizacoesTrabalistas(valMap);
@@ -252,6 +255,7 @@ export function DireitoriaTab({ year, month }: Props) {
         valMap = data ? extractByDeptoRule(data, 'diretoria', regras) : new Map();
         mergeAssistenciaMedica(valMap);
         mergeSalariosOrdenados(valMap);
+        mergeComissoesEmpregados(valMap);
         mergeHorasExtras(valMap);
         mergeAdicionais(valMap);
         mergeIndenizacoesTrabalistas(valMap);

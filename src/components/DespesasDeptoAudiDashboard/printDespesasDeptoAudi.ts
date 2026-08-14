@@ -15,6 +15,7 @@ import {
   loadObsConsolidado,
   mergeAssistenciaMedica,
   mergeSalariosOrdenados,
+  mergeComissoesEmpregados,
   mergeHorasExtras,
   mergeAdicionais,
   mergeIndenizacoesTrabalistas,
@@ -206,6 +207,7 @@ export async function printDespesasDeptoAudi(year: number, month: number): Promi
       }
       mergeAssistenciaMedica(m);
       mergeSalariosOrdenados(m);
+      mergeComissoesEmpregados(m);
       mergeHorasExtras(m);
       mergeAdicionais(m);
       mergeIndenizacoesTrabalistas(m);
