@@ -73,6 +73,12 @@ const MONTHS_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'S
 type VisualizationType = 'tabela' | 'cards' | 'grafico';
 type DetalhamentoType = 'total' | 'departamento' | 'tipo' | 'conta';
 
+// Labels locais incluindo "Sem Classificação"
+const TIPO_LABELS_LOCAL: Record<string, string> = {
+  ...TIPO_LABELS,
+  sem_classificacao: 'Sem Classificação',
+};
+
 // Função helper para aplicar todas as regras de merge
 function applyAllMerges(valorMap: Map<string, number>): void {
   mergeAssistenciaMedica(valorMap);
@@ -285,7 +291,12 @@ export function ComparativosTab({ year, month }: ComparativosTabProps) {
 
         for (const mes of mesesParaCarregar) {
           const data = await getDespesasAdmMes(periodo.ano, mes);
-          if (!data) continue;
+          if (!data) {
+            console.log(`⚠️ Sem dados para ${periodo.ano}/${mes}`);
+            continue;
+          }
+
+          console.log(`✅ Dados encontrados para ${periodo.ano}/${mes}:`, data.rows.length, 'linhas');
 
           // Extrair dados por cada departamento selecionado
           for (const depto of departamentosSelecionados) {
@@ -301,13 +312,25 @@ export function ComparativosTab({ year, month }: ComparativosTabProps) {
             // Aplicar regras de merge
             applyAllMerges(valorMap);
 
-            // Filtrar por tipos de despesa usando classificações
-            for (const [conta, valor] of valorMap) {
-              const prefix = conta.match(/^(\d+ -)/)?.[1] ?? '';
-              const tipoConta = classificacoes[prefix];
+            console.log(`📊 Após merges para ${depto}:`, valorMap.size, 'contas');
 
-              // Interseção: só incluir se a conta está nos tipos selecionados
-              if (tipoConta && tiposSelecionados.includes(tipoConta)) {
+            // Filtrar por tipos de despesa usando classificações
+            const todosOsTiposSelecionados = tiposSelecionados.length === TIPOS_ORDENADOS.length;
+
+            for (const [conta, valor] of valorMap) {
+              let incluirConta = false;
+
+              if (todosOsTiposSelecionados) {
+                // Se todos os tipos estão selecionados, incluir todas as contas
+                incluirConta = true;
+              } else {
+                // Se tipos específicos, filtrar por classificação
+                const prefix = conta.match(/^(\d+ -)/)?.[1] ?? '';
+                const tipoConta = classificacoes[prefix];
+                incluirConta = tipoConta ? tiposSelecionados.includes(tipoConta) : false;
+              }
+
+              if (incluirConta) {
                 // Se há contas específicas selecionadas, aplicar mais um filtro
                 if (contasSelecionadas.length > 0) {
                   if (contasSelecionadas.includes(conta)) {
@@ -323,6 +346,9 @@ export function ComparativosTab({ year, month }: ComparativosTabProps) {
           }
         }
 
+        console.log(`💰 Consolidado para período ${periodo.ano}:`, valorMapConsolidado.size, 'contas');
+        console.log('Total consolidado:', Array.from(valorMapConsolidado.values()).reduce((a, b) => a + b, 0));
+
         // Calcular totais
         let total = 0;
         const porDepartamento: Record<string, number> = {};
@@ -335,11 +361,14 @@ export function ComparativosTab({ year, month }: ComparativosTabProps) {
           porConta[conta] = valor;
           contas.push(conta);
 
-          // Agrupar por tipo
+          // Agrupar por tipo (se a conta tiver classificação)
           const prefix = conta.match(/^(\d+ -)/)?.[1] ?? '';
           const tipoConta = classificacoes[prefix];
           if (tipoConta) {
             porTipo[tipoConta] = (porTipo[tipoConta] ?? 0) + valor;
+          } else {
+            // Contas sem classificação vão para "Sem Classificação"
+            porTipo['sem_classificacao'] = (porTipo['sem_classificacao'] ?? 0) + valor;
           }
 
           // Não agrupamos por departamento aqui pois já somamos tudo
@@ -787,15 +816,14 @@ export function ComparativosTab({ year, month }: ComparativosTabProps) {
                       
                       {detalhamento === 'tipo' && resultados.periodos.length > 0 && (
                         <div className="space-y-4">
-                          {TIPOS_ORDENADOS
-                            .filter(tipo => tiposSelecionados.includes(tipo))
+                          {[...TIPOS_ORDENADOS.filter(tipo => tiposSelecionados.includes(tipo)), 'sem_classificacao' as any]
                             .map(tipo => {
-                              const temDados = resultados.periodos.some((r: ResultadoPeriodo) => r.porTipo[tipo] > 0);
+                              const temDados = resultados.periodos.some((r: ResultadoPeriodo) => (r.porTipo[tipo] ?? 0) > 0);
                               if (!temDados) return null;
 
                               return (
                                 <div key={tipo} className="bg-slate-50 rounded-lg p-4">
-                                  <h5 className="text-xs font-bold text-slate-600 mb-3">{TIPO_LABELS[tipo]}</h5>
+                                  <h5 className="text-xs font-bold text-slate-600 mb-3">{TIPO_LABELS_LOCAL[tipo] || tipo}</h5>
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                     {resultados.periodos.map((resultado: ResultadoPeriodo, idx: number) => {
                                       const valor = resultado.porTipo[tipo] ?? 0;
