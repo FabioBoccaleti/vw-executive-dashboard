@@ -9,6 +9,18 @@ import {
   extractByDeptoRule,
   loadRegrasDeptos,
   mergeAssistenciaMedica,
+  mergeSalariosOrdenados,
+  mergeHorasExtras,
+  mergeAdicionais,
+  mergeIndenizacoesTrabalistas,
+  merge13Salario,
+  mergeFeriasIndenizadas,
+  mergeFerias,
+  mergeInss,
+  mergeFgts,
+  mergeAssistenciaMedicaNova,
+  mergeValeTransporte,
+  mergePremiosGratificacoes,
   type DespesasAdmMesData,
   type TipoClassificacao,
   TIPO_LABELS,
@@ -222,6 +234,18 @@ export function FunalariaTab({ year, month }: Props) {
           if (!data) continue;
           const mMap = extractByDeptoRule(data, 'funilaria', regras);
           mergeAssistenciaMedica(mMap);
+          mergeSalariosOrdenados(mMap);
+          mergeHorasExtras(mMap);
+          mergeAdicionais(mMap);
+          mergeIndenizacoesTrabalistas(mMap);
+          merge13Salario(mMap);
+          mergeFeriasIndenizadas(mMap);
+          mergeFerias(mMap);
+          mergeInss(mMap);
+          mergeFgts(mMap);
+          mergeAssistenciaMedicaNova(mMap);
+          mergeValeTransporte(mMap);
+          mergePremiosGratificacoes(mMap);
           maps[i] = mMap;
           withData.push(i + 1);
           for (const [conta, val] of mMap) valMap.set(conta, (valMap.get(conta) ?? 0) + val);
@@ -236,6 +260,18 @@ export function FunalariaTab({ year, month }: Props) {
         ]);
         valMap = data ? extractByDeptoRule(data, 'funilaria', regras) : new Map();
         mergeAssistenciaMedica(valMap);
+        mergeSalariosOrdenados(valMap);
+        mergeHorasExtras(valMap);
+        mergeAdicionais(valMap);
+        mergeIndenizacoesTrabalistas(valMap);
+        merge13Salario(valMap);
+        mergeFeriasIndenizadas(valMap);
+        mergeFerias(valMap);
+        mergeInss(valMap);
+        mergeFgts(valMap);
+        mergeAssistenciaMedicaNova(valMap);
+        mergeValeTransporte(valMap);
+        mergePremiosGratificacoes(valMap);
         setObs(obsData);
       }
 

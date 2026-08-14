@@ -14,6 +14,18 @@ import {
   loadObsDiretoria,
   loadObsConsolidado,
   mergeAssistenciaMedica,
+  mergeSalariosOrdenados,
+  mergeHorasExtras,
+  mergeAdicionais,
+  mergeIndenizacoesTrabalistas,
+  merge13Salario,
+  mergeFeriasIndenizadas,
+  mergeFerias,
+  mergeInss,
+  mergeFgts,
+  mergeAssistenciaMedicaNova,
+  mergeValeTransporte,
+  mergePremiosGratificacoes,
   TIPO_LABELS,
   TIPOS_ORDENADOS,
   DEPTO_TAB_LABELS,
@@ -191,6 +203,18 @@ export async function printDespesasDeptoAudi(year: number, month: number): Promi
         m = extractByDeptoRule(data, tab.deptoTab, regras);
       }
       mergeAssistenciaMedica(m);
+      mergeSalariosOrdenados(m);
+      mergeHorasExtras(m);
+      mergeAdicionais(m);
+      mergeIndenizacoesTrabalistas(m);
+      merge13Salario(m);
+      mergeFeriasIndenizadas(m);
+      mergeFerias(m);
+      mergeInss(m);
+      mergeFgts(m);
+      mergeAssistenciaMedicaNova(m);
+      mergeValeTransporte(m);
+      mergePremiosGratificacoes(m);
       return m;
     };
 
