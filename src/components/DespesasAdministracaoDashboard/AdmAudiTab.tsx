@@ -355,7 +355,7 @@ export function AdmAudiTab({ year, month }: Props) {
         />
       )}
 
-      {/* Total Geral */}}
+      {/* Total Geral */}
       <div className="bg-slate-800 rounded-xl px-5 py-3.5 flex items-center justify-between shadow-md">
         <div>
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total Geral de Despesas</p>

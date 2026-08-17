@@ -154,6 +154,28 @@ function buildYearHTML(
     html += `</tbody></table>`;
     html += `</div>`;
   }
+
+  // Linha Total do Mês
+  const monthlyTotals = monthsWithData.map(m => {
+    let total = 0;
+    for (const tipo of activeGroups) {
+      const rows = groups.get(tipo)!;
+      for (const r of rows) {
+        total += yearMaps[m - 1].get(r.conta) ?? 0;
+      }
+    }
+    return total;
+  });
+  html += `<div class="group-block" style="background:linear-gradient(to right, #334155, #475569);border-radius:8px;overflow:hidden;margin-top:8px">`;
+  html += `<table>
+    <tbody><tr style="background:#334155">
+      <td class="desc" style="color:white;font-weight:700">Total do Mês</td>
+      ${monthsWithData.map((m, idx) => `<td class="mon" style="color:white;font-weight:700">${monthlyTotals[idx] === 0 ? '—' : fmtBRL(monthlyTotals[idx])}</td>`).join('')}
+      <td class="tot" style="color:white;font-weight:700;background:#1e293b">${fmtBRL(grandTotal)}</td>
+    </tr></tbody>
+  </table>`;
+  html += `</div>`;
+
   html += `<div class="grand-total"><span>${tabLabel} — Ano ${year}</span><span>R$&nbsp;${fmtBRL(grandTotal)}</span></div></div>`;
   return html;
 }
