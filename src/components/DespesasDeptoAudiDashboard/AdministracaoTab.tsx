@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FileText } from 'lucide-react';
-import { YearModeGroupSection } from './AdmTabShared';
+import { YearModeGroupSection, MonthlyTotalsSummary } from './AdmTabShared';
 import {
   getDespesasAdmMes,
   loadClassificacoes,
@@ -451,6 +451,17 @@ export function AdministracaoTab({ year, month }: Props) {
             />
           ))
       }
+
+      {/* Total do Mês (apenas no modo ano todo) */}
+      {isYearMode && (
+        <MonthlyTotalsSummary
+          groups={groups}
+          monthMaps={monthMaps}
+          monthsWithData={monthsWithData}
+          activeGroups={activeGroups}
+          grandTotal={grandTotal}
+        />
+      )}
 
       {/* Rodapé — Total Geral */}
       <div className="bg-slate-800 rounded-xl px-5 py-3.5 flex items-center justify-between shadow-md">

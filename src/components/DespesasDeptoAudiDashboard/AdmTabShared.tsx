@@ -56,18 +56,25 @@ export function YearModeGroupSection({ tipo, rows, monthMaps, monthsWithData }: 
 
       {/* Tabela com colunas por mês */}
       <div className="overflow-x-auto">
-        <table className="table-fixed text-xs w-auto min-w-full">
+        <table className="text-xs w-full" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '256px' }} />
+            {monthsWithData.map(m => (
+              <col key={m} style={{ width: '96px' }} />
+            ))}
+            <col style={{ width: '112px' }} />
+          </colgroup>
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
-              <th className="text-left px-4 py-2 font-semibold text-slate-500 w-64 sticky left-0 bg-slate-50 z-10">
+              <th className="text-left px-4 py-2 font-semibold text-slate-500 sticky left-0 bg-slate-50 z-10">
                 Conta / Descrição
               </th>
               {monthsWithData.map(m => (
-                <th key={m} className="text-right px-3 py-2 font-semibold text-slate-500 w-24 whitespace-nowrap">
+                <th key={m} className="text-right px-3 py-2 font-semibold text-slate-500 whitespace-nowrap">
                   {MONTHS_SHORT[m - 1]}
                 </th>
               ))}
-              <th className="text-right px-4 py-2 font-bold text-slate-600 w-28 whitespace-nowrap bg-slate-100">
+              <th className="text-right px-4 py-2 font-bold text-slate-600 whitespace-nowrap bg-slate-100">
                 Total
               </th>
             </tr>
@@ -129,6 +136,68 @@ export function YearModeGroupSection({ tipo, rows, monthMaps, monthsWithData }: 
               </td>
             </tr>
           </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+interface MonthlyTotalsSummaryProps {
+  groups: Map<TipoClassificacao, { conta: string; valor: number }[]>;
+  monthMaps: Map<string, number>[];
+  monthsWithData: number[];
+  activeGroups: TipoClassificacao[];
+  grandTotal: number;
+}
+
+export function MonthlyTotalsSummary({ 
+  groups, 
+  monthMaps, 
+  monthsWithData, 
+  activeGroups,
+  grandTotal 
+}: MonthlyTotalsSummaryProps) {
+  // Calcular totais por mês somando todos os grupos
+  const monthlyTotals = monthsWithData.map(m => {
+    let total = 0;
+    for (const tipo of activeGroups) {
+      const rows = groups.get(tipo) || [];
+      for (const row of rows) {
+        total += monthMaps[m - 1].get(row.conta) ?? 0;
+      }
+    }
+    return total;
+  });
+
+  return (
+    <div className="bg-gradient-to-r from-slate-700 to-slate-600 rounded-xl overflow-hidden shadow-lg border-2 border-slate-500">
+      <div className="overflow-x-auto">
+        <table className="text-xs w-full" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '256px' }} />
+            {monthsWithData.map(m => (
+              <col key={m} style={{ width: '96px' }} />
+            ))}
+            <col style={{ width: '112px' }} />
+          </colgroup>
+          <tbody>
+            <tr style={{ backgroundColor: '#334155' }}>
+              <td className="px-4 py-2 text-xs font-bold text-white sticky left-0 z-10" style={{ backgroundColor: '#334155' }}>
+                Total do Mês
+              </td>
+              {monthlyTotals.map((total, idx) => (
+                <td
+                  key={monthsWithData[idx]}
+                  className="px-3 py-2 text-right text-xs font-bold tabular-nums text-white"
+                >
+                  {total === 0 ? '—' : fmtBRL(total)}
+                </td>
+              ))}
+              <td className="px-4 py-2 text-right text-xs font-bold tabular-nums text-white bg-slate-700">
+                {fmtBRL(grandTotal)}
+              </td>
+            </tr>
+          </tbody>
         </table>
       </div>
     </div>
