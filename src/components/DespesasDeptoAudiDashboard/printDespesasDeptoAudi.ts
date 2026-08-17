@@ -308,8 +308,8 @@ export async function printDespesasDeptoAudi(year: number, month: number): Promi
     th { font-weight: 700; }
     td.desc, th.desc { text-align: left; white-space: nowrap; text-overflow: ellipsis; }
     td.val,  th.val  { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-    td.mon,  th.mon  { text-align: right; width: 64px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-    td.tot,  th.tot  { text-align: right; width: 86px; white-space: nowrap; font-weight: 700; font-variant-numeric: tabular-nums; }
+    td.mon,  th.mon  { text-align: right; width: 64px; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 7pt; }
+    td.tot,  th.tot  { text-align: right; width: 86px; white-space: nowrap; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 7pt; }
     td.obs,  th.obs  { text-align: left; white-space: normal; word-wrap: break-word; }
     td.neg { color: #dc2626; }
     td.zero { color: #94a3b8; }
