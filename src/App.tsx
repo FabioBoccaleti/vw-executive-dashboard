@@ -31,6 +31,7 @@ import { EstoqueUsadosDashboard } from '@/components/EstoqueUsadosDashboard'
 import { ControlePagamentosEvoraDashboard } from '@/components/ControlePagamentosEvoraDashboard'
 import { DespesasAdministracaoDashboard } from '@/components/DespesasAdministracaoDashboard'
 import { DespesasDeptoAudiDashboard } from '@/components/DespesasDeptoAudiDashboard'
+import { DespesasDeptoVwDashboard } from '@/components/DespesasDeptoVwDashboard'
 
 function AppContent() {
   const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
@@ -314,6 +315,8 @@ function AppContent() {
         <DespesasAdministracaoDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'despesas_depto_audi' ? (
         <DespesasDeptoAudiDashboard onChangeBrand={handleChangeBrand} />
+      ) : brand === 'despesas_depto_vw' ? (
+        <DespesasDeptoVwDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'resumo_dre' ? (
         <ResumoDREDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'analise_projecoes' ? (

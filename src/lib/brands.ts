@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora';
 
 // Interface de configuraÃ§Ã£o visual da marca
 export interface BrandConfig {
@@ -235,6 +235,31 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-primary-light': '#fce8ec',
       '--brand-secondary': '#4a4a4a',
       '--brand-accent': '#e2001a',
+    }
+  },
+  despesas_depto_vw: {
+    id: 'despesas_depto_vw',
+    name: 'Despesas por Departamento na Sorana VW',
+    shortName: 'Desp. Depto VW',
+    colors: {
+      primary: '#0066b3',
+      primaryHover: '#0052a3',
+      primaryLight: '#e0f0ff',
+      secondary: '#5cb8e8',
+      accent: '#99d6ff',
+      headerBg: 'bg-[#0066b3]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#0066b3] hover:bg-[#0052a3]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-sky-100 dark:bg-sky-900/30',
+      badgeText: 'text-sky-800 dark:text-sky-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#0066b3',
+      '--brand-primary-hover': '#0052a3',
+      '--brand-primary-light': '#e0f0ff',
+      '--brand-secondary': '#5cb8e8',
+      '--brand-accent': '#99d6ff',
     }
   },
   audi_outros: {

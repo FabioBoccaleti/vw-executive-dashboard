@@ -7,7 +7,7 @@ import { PasswordDialog } from '@/components/PasswordDialog';
 import { useAuth } from '@/contexts/useAuth';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
 
-const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'vw_outros', 'audi_outros'];
+const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'despesas_depto_vw', 'vw_outros', 'audi_outros'];
 const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_pagamentos_evora'];
 const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despesas'];
 
