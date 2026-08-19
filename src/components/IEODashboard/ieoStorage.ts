@@ -125,3 +125,62 @@ export async function loadRegrasDeptos(): Promise<Record<string, RegraDepto>> {
 export async function saveRegrasDeptos(data: Record<string, RegraDepto>): Promise<void> {
   await kvSet(REGRAS_KEY, data);
 }
+
+// ─── Classificação de Tipo de Conta ──────────────────────────────────────────
+
+export type TipoContaClassificacao =
+  | 'receita_vendas'
+  | 'receitas_operacionais'
+  | 'receitas_financeiras'
+  | 'receitas_nao_operacionais'
+  | 'custos_operacionais'
+  | 'despesas_pessoal'
+  | 'despesas_servicos_terceiros'
+  | 'despesas_ocupacao'
+  | 'despesas_funcionamento'
+  | 'despesas_vendas'
+  | 'amortizacoes_depreciacoes'
+  | 'despesas_financeiras'
+  | 'outras_despesas_operacionais';
+
+export const TIPO_CONTA_LABELS: Record<TipoContaClassificacao, string> = {
+  receita_vendas:                'Receita de Vendas',
+  receitas_operacionais:         'Receitas Operacionais',
+  receitas_financeiras:          'Receitas Financeiras',
+  receitas_nao_operacionais:     'Receitas não Operacionais',
+  custos_operacionais:           'Custos Operacionais',
+  despesas_pessoal:              'Despesas c/ Pessoal',
+  despesas_servicos_terceiros:   'Despesas c/ Serviços de Terceiros',
+  despesas_ocupacao:             'Despesas c/ Ocupação',
+  despesas_funcionamento:        'Despesas de Funcionamento',
+  despesas_vendas:               'Despesas c/ Vendas',
+  amortizacoes_depreciacoes:     'Amortizações de Depreciações',
+  despesas_financeiras:          'Despesas Financeiras',
+  outras_despesas_operacionais:  'Outras Despesas Operacionais',
+};
+
+export const TIPOS_CONTA_ORDENADOS: TipoContaClassificacao[] = [
+  'receita_vendas',
+  'receitas_operacionais',
+  'receitas_financeiras',
+  'receitas_nao_operacionais',
+  'custos_operacionais',
+  'despesas_pessoal',
+  'despesas_servicos_terceiros',
+  'despesas_ocupacao',
+  'despesas_funcionamento',
+  'despesas_vendas',
+  'amortizacoes_depreciacoes',
+  'despesas_financeiras',
+  'outras_despesas_operacionais',
+];
+
+const CLASSIFICACOES_CONTA_KEY = `${KEY_PREFIX}:classificacoes_conta`;
+
+export async function loadClassificacoesConta(): Promise<Record<string, TipoContaClassificacao>> {
+  return (await kvGet<Record<string, TipoContaClassificacao>>(CLASSIFICACOES_CONTA_KEY)) ?? {};
+}
+
+export async function saveClassificacoesConta(data: Record<string, TipoContaClassificacao>): Promise<void> {
+  await kvSet(CLASSIFICACOES_CONTA_KEY, data);
+}

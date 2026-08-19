@@ -1,14 +1,20 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Upload, Trash2, FileText, AlertCircle, Printer } from 'lucide-react';
+import { Upload, Trash2, FileText, AlertCircle, Printer, CheckCircle2, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { kvKeys } from '@/lib/kvClient';
 import {
   getIEOSemestre,
   setIEOSemestre,
   deleteIEOSemestre,
+  getAllImportedSemestresData,
   type IEORow,
   type IEOSemestreData,
   type IEOTotalRow,
+  type TipoContaClassificacao,
+  TIPO_CONTA_LABELS,
+  TIPOS_CONTA_ORDENADOS,
+  loadClassificacoesConta,
+  saveClassificacoesConta,
 } from './ieoStorage';
 import { ClassificacaoRevendasTab } from './ClassificacaoRevendasTab';
 import { RegrasDepartamentosTab } from './RegrasDepartamentosTab';
@@ -90,12 +96,180 @@ function NumCell({ value }: { value: number }) {
   );
 }
 
+function ClassificacaoTipoContaTab() {
+  const [loading, setLoading] = useState(true);
+  const [accounts, setAccounts] = useState<string[]>([]);
+  const [classificacoes, setClassificacoes] = useState<Record<string, TipoContaClassificacao>>({});
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'classified'>('all');
+
+  useEffect(() => {
+    Promise.all([getAllImportedSemestresData(), loadClassificacoesConta()])
+      .then(([allData, classif]) => {
+        // Coleta contas principais com pelo menos um valor não-zero em qualquer semestre
+        const seen = new Map<string, boolean>();
+        for (const data of allData) {
+          for (const row of data.rows) {
+            if (!row.isMain) continue;
+            if (!isAllZero(row)) seen.set(row.conta, true);
+            else if (!seen.has(row.conta)) seen.set(row.conta, false);
+          }
+        }
+        const accs = [...seen.entries()]
+          .filter(([, hasValue]) => hasValue)
+          .map(([conta]) => conta)
+          .sort();
+        setAccounts(accs);
+        setClassificacoes(classif);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleClassify(conta: string, tipo: TipoContaClassificacao | '') {
+    const next = { ...classificacoes };
+    if (tipo === '') {
+      delete next[conta];
+    } else {
+      next[conta] = tipo as TipoContaClassificacao;
+    }
+    setClassificacoes(next);
+    setSaving(true);
+    try {
+      await saveClassificacoesConta(next);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const pending   = accounts.filter(a => !classificacoes[a]);
+  const classified = accounts.filter(a =>  classificacoes[a]);
+
+  const displayed = filter === 'pending'    ? pending
+                  : filter === 'classified' ? classified
+                  : [...pending, ...classified]; // pendentes primeiro
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-16">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
+      </div>
+    );
+  }
+
+  if (accounts.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-16">
+        <div className="text-center space-y-2">
+          <Tag className="w-10 h-10 text-slate-300 mx-auto" />
+          <p className="text-slate-500 font-medium">Nenhum dado importado ainda</p>
+          <p className="text-slate-400 text-sm">Importe ao menos um semestre para classificar as contas.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Resumo + filtro */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          {pending.length > 0 ? (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs font-semibold text-amber-700">
+              <AlertCircle className="w-3.5 h-3.5" />
+              {pending.length} conta{pending.length !== 1 ? 's' : ''} sem classificação
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg text-xs font-semibold text-green-700">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Todas as contas classificadas
+            </div>
+          )}
+          <span className="text-xs text-slate-400">{classified.length}/{accounts.length} classificadas</span>
+          {saving && <span className="text-xs text-slate-400 italic">Salvando...</span>}
+        </div>
+        <div className="flex items-center gap-1">
+          {(['all', 'pending', 'classified'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
+                filter === f
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              {f === 'all' ? 'Todas' : f === 'pending' ? 'Pendentes' : 'Classificadas'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tabela */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-slate-100 border-b-2 border-slate-200">
+              <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Conta / Descrição</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-slate-600 w-72">Classificação de Conta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayed.map((conta, i) => {
+              const isPending = !classificacoes[conta];
+              return (
+                <tr
+                  key={conta}
+                  className={`border-b last:border-0 ${
+                    isPending
+                      ? 'bg-amber-50 border-amber-100'
+                      : i % 2 === 0 ? 'bg-white border-slate-100' : 'bg-slate-50/50 border-slate-100'
+                  }`}
+                >
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      {isPending && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold shrink-0">
+                          <AlertCircle className="w-2.5 h-2.5" />
+                          Classificar
+                        </span>
+                      )}
+                      <span className={`font-${isPending ? 'semibold' : 'medium'} ${isPending ? 'text-slate-800' : 'text-slate-600'}`}>
+                        {conta}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">
+                    <select
+                      value={classificacoes[conta] ?? ''}
+                      onChange={e => handleClassify(conta, e.target.value as TipoContaClassificacao | '')}
+                      className={`w-full text-xs border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-400 ${
+                        isPending
+                          ? 'border-amber-300 bg-amber-50 text-amber-800'
+                          : 'border-slate-200 bg-white text-slate-700'
+                      }`}
+                    >
+                      <option value="">— Selecione —</option>
+                      {TIPOS_CONTA_ORDENADOS.map(tipo => (
+                        <option key={tipo} value={tipo}>{TIPO_CONTA_LABELS[tipo]}</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   onChangeBrand: () => void;
 }
 
 type ActiveTab = 'importar';
-type ImportarSubTab = 'dados' | 'revendas' | 'departamentos';
+type ImportarSubTab = 'dados' | 'classificacao' | 'revendas' | 'departamentos';
 
 export function IEODashboard({ onChangeBrand }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -254,6 +428,16 @@ export function IEODashboard({ onChangeBrand }: Props) {
                 }`}
               >
                 Dados do Semestre
+              </button>
+              <button
+                onClick={() => setImportarSubTab('classificacao')}
+                className={`px-4 py-2 text-xs font-semibold rounded transition-colors ${
+                  importarSubTab === 'classificacao'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                Classificação de Tipo de Conta
               </button>
               <button
                 onClick={() => setImportarSubTab('revendas')}
@@ -431,6 +615,13 @@ export function IEODashboard({ onChangeBrand }: Props) {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Classificação de Tipo de Conta */}
+            {importarSubTab === 'classificacao' && (
+              <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
+                <ClassificacaoTipoContaTab />
               </div>
             )}
 
