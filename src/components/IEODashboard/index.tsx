@@ -10,6 +10,8 @@ import {
   type IEOSemestreData,
   type IEOTotalRow,
 } from './ieoStorage';
+import { ClassificacaoRevendasTab } from './ClassificacaoRevendasTab';
+import { RegrasDepartamentosTab } from './RegrasDepartamentosTab';
 
 const SEMESTRES = ['1º Semestre', '2º Semestre'];
 
@@ -93,7 +95,7 @@ interface Props {
 }
 
 type ActiveTab = 'importar';
-type ImportarSubTab = 'dados';
+type ImportarSubTab = 'dados' | 'revendas' | 'departamentos';
 
 export function IEODashboard({ onChangeBrand }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -253,6 +255,26 @@ export function IEODashboard({ onChangeBrand }: Props) {
               >
                 Dados do Semestre
               </button>
+              <button
+                onClick={() => setImportarSubTab('revendas')}
+                className={`px-4 py-2 text-xs font-semibold rounded transition-colors ${
+                  importarSubTab === 'revendas'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                Classificação de Revendas
+              </button>
+              <button
+                onClick={() => setImportarSubTab('departamentos')}
+                className={`px-4 py-2 text-xs font-semibold rounded transition-colors ${
+                  importarSubTab === 'departamentos'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                Regra por Departamento
+              </button>
             </div>
 
             {/* Dados do Semestre */}
@@ -409,6 +431,20 @@ export function IEODashboard({ onChangeBrand }: Props) {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Classificação de Revendas */}
+            {importarSubTab === 'revendas' && (
+              <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
+                <ClassificacaoRevendasTab />
+              </div>
+            )}
+
+            {/* Regra por Departamento */}
+            {importarSubTab === 'departamentos' && (
+              <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
+                <RegrasDepartamentosTab />
               </div>
             )}
           </div>
