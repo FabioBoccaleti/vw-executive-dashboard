@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 // Tipos inline (evita importação cross-directory que pode falhar no bundler Vercel)
 export type UserRole = 'admin' | 'gestor' | 'leitura';
 export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'central_vendas_vw' | 'custos_alugueis';
-export type BrandId = 'vw' | 'audi' | 'consolidado' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'vw_outros' | 'audi_outros';
+export type BrandId = 'vw' | 'audi' | 'consolidado' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'vw_outros' | 'audi_outros';
 export type VendasSubModuleId =
   | 'blindagem.tabela'
   | 'blindagem.analise'

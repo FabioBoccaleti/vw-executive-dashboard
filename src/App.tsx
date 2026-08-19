@@ -32,6 +32,7 @@ import { ControlePagamentosEvoraDashboard } from '@/components/ControlePagamento
 import { DespesasAdministracaoDashboard } from '@/components/DespesasAdministracaoDashboard'
 import { DespesasDeptoAudiDashboard } from '@/components/DespesasDeptoAudiDashboard'
 import { DespesasDeptoVwDashboard } from '@/components/DespesasDeptoVwDashboard'
+import { IEODashboard } from '@/components/IEODashboard'
 
 function AppContent() {
   const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
@@ -317,6 +318,8 @@ function AppContent() {
         <DespesasDeptoAudiDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'despesas_depto_vw' ? (
         <DespesasDeptoVwDashboard onChangeBrand={handleChangeBrand} />
+      ) : brand === 'ieo' ? (
+        <IEODashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'resumo_dre' ? (
         <ResumoDREDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'analise_projecoes' ? (

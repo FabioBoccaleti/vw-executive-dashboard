@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora';
 
 // Interface de configuraÃ§Ã£o visual da marca
 export interface BrandConfig {
@@ -260,6 +260,31 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-primary-light': '#e0f0ff',
       '--brand-secondary': '#5cb8e8',
       '--brand-accent': '#99d6ff',
+    }
+  },
+  ieo: {
+    id: 'ieo',
+    name: 'Índice de Eficiência Operacional (IEO)',
+    shortName: 'IEO',
+    colors: {
+      primary: '#10b981',
+      primaryHover: '#059669',
+      primaryLight: '#d1fae5',
+      secondary: '#34d399',
+      accent: '#6ee7b7',
+      headerBg: 'bg-[#10b981]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#10b981] hover:bg-[#059669]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-emerald-100 dark:bg-emerald-900/30',
+      badgeText: 'text-emerald-800 dark:text-emerald-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#10b981',
+      '--brand-primary-hover': '#059669',
+      '--brand-primary-light': '#d1fae5',
+      '--brand-secondary': '#34d399',
+      '--brand-accent': '#6ee7b7',
     }
   },
   audi_outros: {

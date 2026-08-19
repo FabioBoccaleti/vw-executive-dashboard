@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BRAND_CONFIGS, type Brand } from '@/lib/brands';
-import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, TrendingUp, Settings, LogOut, Users, Home, Activity, Package, CreditCard } from 'lucide-react';
+import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, TrendingUp, Settings, LogOut, Users, Home, Activity, Package, CreditCard, Target } from 'lucide-react';
 import { PasswordDialog } from '@/components/PasswordDialog';
 import { useAuth } from '@/contexts/useAuth';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
 
-const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'despesas_depto_vw', 'vw_outros', 'audi_outros'];
+const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'despesas_depto_vw', 'ieo', 'vw_outros', 'audi_outros'];
 const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_pagamentos_evora'];
 const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despesas'];
 
@@ -90,6 +90,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
     if (brand === 'numeros_estoque_usados')          return <Package className={size} />;
     if (brand === 'controle_pagamentos_evora')       return <CreditCard className={size} />;
     if (brand === 'analise_projecoes')             return <BarChart2 className={size} />;
+    if (brand === 'ieo')                             return <Target className={size} />;
     if (brand.includes('vw'))                        return <Car className={size} />;
     return <Building2 className={size} />;
   };
