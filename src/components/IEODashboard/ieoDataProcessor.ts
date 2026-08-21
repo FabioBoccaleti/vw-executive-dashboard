@@ -118,11 +118,8 @@ function extractHierarchy(
     if (!result.contaPrincipal && 
         !/(Revenda|CCusto|Tipo)/i.test(conta) &&
         /^\d+/.test(conta)) {
-      // Extrair apenas o número da conta
-      const match = conta.match(/^(\d+)/);
-      if (match) {
-        result.contaPrincipal = match[1];
-      }
+      // Salvar a conta principal completa (ex: "3110101001 - VEÍCULOS NACIONAIS/ IMPORTADOS")
+      result.contaPrincipal = conta;
       break; // Encontramos tudo que precisamos
     }
   }
