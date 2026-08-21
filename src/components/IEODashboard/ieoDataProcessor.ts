@@ -36,6 +36,7 @@ export interface GrupoData {
 
 export interface ContaDetail {
   conta: string;
+  ccusto?: string; // Centro de custo (opcional - só aparece quando não é consolidado)
   valor: number;
 }
 
@@ -253,13 +254,26 @@ export async function processDepartamentoData(
 
       console.log(`[IEO DEBUG] ✓ Tipo de classificação OK: ${hierarchy.contaPrincipal || hierarchy.conta} → ${tipoClassificacao}`);
 
+      // Usar a conta principal (ou a conta de valor se não tiver principal)
+      const contaParaExibir = hierarchy.contaPrincipal || hierarchy.conta;
+
       // Adicionar aos grupos
       if (!grupos[tipoClassificacao]) continue;
 
-      grupos[tipoClassificacao].contas.push({
-        conta: hierarchy.conta,
-        valor: hierarchy.valor,
-      });
+      // Para consolidado: agrupar por conta, somando valores
+      // Para departamentos específicos: agrupar por conta, somando valores do mesmo departamento
+      const contaExistente = grupos[tipoClassificacao].contas.find(c => c.conta === contaParaExibir);
+      
+      if (contaExistente) {
+        contaExistente.valor += hierarchy.valor;
+      } else {
+        grupos[tipoClassificacao].contas.push({
+          conta: contaParaExibir,
+          ccusto: depto === 'consolidado' ? undefined : hierarchy.ccusto,
+          valor: hierarchy.valor,
+        });
+      }
+      
       grupos[tipoClassificacao].subtotal += hierarchy.valor;
       
       console.log(`[IEO DEBUG] ✓✓✓ Conta adicionada com sucesso!`);

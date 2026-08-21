@@ -208,7 +208,14 @@ export function DepartamentoTab({ marca, departamento, year, semestre }: Props) 
                       key={idx}
                       className="flex items-center justify-between py-1.5 px-3 hover:bg-slate-50 rounded transition-colors"
                     >
-                      <div className="flex-1 text-xs text-slate-600">{conta.conta}</div>
+                      <div className="flex-1 text-xs text-slate-600">
+                        {conta.conta}
+                        {conta.ccusto && (
+                          <span className="ml-2 text-[10px] text-slate-400 font-normal">
+                            [{conta.ccusto}]
+                          </span>
+                        )}
+                      </div>
                       <div
                         className={`text-xs font-mono tabular-nums ${
                           conta.valor < 0 ? 'text-red-600' : 'text-slate-700'
