@@ -63,8 +63,6 @@ function extractHierarchy(
   
   for (let i = rowIndex - 1; i >= 0; i--) {
     const parentRow = rows[i];
-    if (!parentRow.isMain) continue;
-    
     const conta = parentRow.conta;
     
     // Tipo Item (Exemplo: "V - Veículos (Tipo)")
