@@ -184,13 +184,21 @@ export async function processDepartamentoData(
         console.log(`[IEO DEBUG] ❌ CCusto não encontrado`);
         continue;
       }
-      const regra = regrasMap[hierarchy.ccusto];
+      
+      // Extrair chave do CCusto (número + hífen, ex: "101 -")
+      const ccustoKey = hierarchy.ccusto.match(/^(\d+\s*-)/)?.[1];
+      if (!ccustoKey) {
+        console.log(`[IEO DEBUG] ❌ Não foi possível extrair chave do CCusto: ${hierarchy.ccusto}`);
+        continue;
+      }
+      
+      const regra = regrasMap[ccustoKey];
       if (!regra) {
-        console.log(`[IEO DEBUG] ❌ Regra não encontrada para CCusto: ${hierarchy.ccusto}`);
+        console.log(`[IEO DEBUG] ❌ Regra não encontrada para CCusto: ${ccustoKey} (original: ${hierarchy.ccusto})`);
         continue;
       }
 
-      console.log(`[IEO DEBUG] ✓ CCusto OK: ${hierarchy.ccusto}`);
+      console.log(`[IEO DEBUG] ✓ CCusto OK: ${ccustoKey}`);
 
       let deptoClassificado: DeptoClassificacao | undefined;
 
