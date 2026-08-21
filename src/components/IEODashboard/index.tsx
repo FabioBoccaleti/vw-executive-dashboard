@@ -24,6 +24,8 @@ const SEMESTRES = ['1º Semestre', '2º Semestre'];
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 2 + i);
 
+const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
 function parseNum(s: string): number {
   const cleaned = (s ?? '0').trim().replace(',', '.');
   return parseFloat(cleaned) || 0;
@@ -268,8 +270,69 @@ interface Props {
   onChangeBrand: () => void;
 }
 
-type ActiveTab = 'importar';
+type ActiveTab = 'importar' | 'vw' | 'audi';
 type ImportarSubTab = 'dados' | 'classificacao' | 'revendas' | 'departamentos';
+type DepartamentoSubTab = 'veiculos_novos' | 'venda_direta' | 'veiculos_usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'diretoria' | 'consolidado';
+
+// ─── Seletor de Ano e Mês ───────────────────────────────────────────────────
+
+interface YearMonthSelectorProps {
+  year: number;
+  month: number; // 0 = Ano todo, 1-12
+  onYearChange: (y: number) => void;
+  onMonthChange: (m: number) => void;
+}
+
+function YearMonthSelector({ year, month, onYearChange, onMonthChange }: YearMonthSelectorProps) {
+  return (
+    <div className="flex items-center gap-3 flex-wrap py-1">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ANO</span>
+        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 shadow-sm">
+          <button
+            onClick={() => onYearChange(year - 1)}
+            className="text-slate-400 hover:text-slate-700 font-bold px-0.5 transition-colors"
+          >
+            ‹
+          </button>
+          <span className="text-sm font-bold text-slate-700 min-w-[38px] text-center select-none">
+            {year}
+          </span>
+          <button
+            onClick={() => onYearChange(year + 1)}
+            className="text-slate-400 hover:text-slate-700 font-bold px-0.5 transition-colors"
+          >
+            ›
+          </button>
+        </div>
+      </div>
+      <div className="w-px h-5 bg-slate-200 shrink-0" />
+      <div className="flex items-center gap-1 flex-wrap">
+        <button
+          onClick={() => onMonthChange(0)}
+          className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+            month === 0 ? 'bg-slate-700 text-white' : 'text-slate-500 hover:bg-slate-100'
+          }`}
+        >
+          Ano todo
+        </button>
+        {MONTHS_SHORT.map((m, i) => (
+          <button
+            key={i}
+            onClick={() => onMonthChange(i + 1)}
+            className={`px-2.5 py-1 text-xs font-semibold rounded-full transition-colors ${
+              month === i + 1
+                ? 'bg-emerald-600 text-white'
+                : 'text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            {m}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function IEODashboard({ onChangeBrand }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -282,6 +345,14 @@ export function IEODashboard({ onChangeBrand }: Props) {
   const [importing, setImporting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [printing, setPrinting] = useState(false);
+  
+  // States para abas VW e Audi
+  const [vwSubTab, setVwSubTab] = useState<DepartamentoSubTab>('veiculos_novos');
+  const [audiSubTab, setAudiSubTab] = useState<DepartamentoSubTab>('veiculos_novos');
+  const [vwYear, setVwYear] = useState(CURRENT_YEAR);
+  const [vwMonth, setVwMonth] = useState(0); // 0 = ano todo
+  const [audiYear, setAudiYear] = useState(CURRENT_YEAR);
+  const [audiMonth, setAudiMonth] = useState(0);
 
   async function handlePrint() {
     setPrinting(true);
@@ -411,6 +482,26 @@ export function IEODashboard({ onChangeBrand }: Props) {
           >
             <FileText className="w-3.5 h-3.5" />
             Importar Dados
+          </button>
+          <button
+            onClick={() => setActiveTab('vw')}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'vw'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            VW
+          </button>
+          <button
+            onClick={() => setActiveTab('audi')}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'audi'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Audi
           </button>
         </div>
 
@@ -638,6 +729,130 @@ export function IEODashboard({ onChangeBrand }: Props) {
                 <RegrasDepartamentosTab />
               </div>
             )}
+          </div>
+        )}
+
+        {/* Tab VW */}
+        {activeTab === 'vw' && (
+          <div className="flex-1 flex flex-col gap-4 min-h-0">
+            {/* Sub-tabs VW */}
+            <div className="flex items-center gap-0 border-b border-slate-200 overflow-x-auto">
+              {([
+                { id: 'veiculos_novos', label: 'Veículos Novos' },
+                { id: 'venda_direta', label: 'Venda Direta' },
+                { id: 'veiculos_usados', label: 'Veículos Usados' },
+                { id: 'pecas', label: 'Peças' },
+                { id: 'oficina', label: 'Oficina' },
+                { id: 'funilaria', label: 'Funilaria' },
+                { id: 'administracao', label: 'Administração' },
+                { id: 'diretoria', label: 'Diretoria' },
+                { id: 'consolidado', label: 'Consolidado (Total)' },
+              ] as { id: DepartamentoSubTab; label: string }[]).map(sub => (
+                <button
+                  key={sub.id}
+                  onClick={() => setVwSubTab(sub.id)}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                    vwSubTab === sub.id
+                      ? 'text-slate-700 border-emerald-600'
+                      : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Seletor de Ano e Mês */}
+            <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
+              <YearMonthSelector
+                year={vwYear}
+                month={vwMonth}
+                onYearChange={setVwYear}
+                onMonthChange={setVwMonth}
+              />
+            </div>
+
+            {/* Conteúdo das sub-abas VW */}
+            <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
+              <div className="text-center py-8">
+                <p className="text-slate-500 text-sm">Conteúdo de <strong>{[
+                  { id: 'veiculos_novos', label: 'Veículos Novos' },
+                  { id: 'venda_direta', label: 'Venda Direta' },
+                  { id: 'veiculos_usados', label: 'Veículos Usados' },
+                  { id: 'pecas', label: 'Peças' },
+                  { id: 'oficina', label: 'Oficina' },
+                  { id: 'funilaria', label: 'Funilaria' },
+                  { id: 'administracao', label: 'Administração' },
+                  { id: 'diretoria', label: 'Diretoria' },
+                  { id: 'consolidado', label: 'Consolidado (Total)' },
+                ].find(s => s.id === vwSubTab)?.label}</strong> - VW</p>
+                <p className="text-slate-400 text-xs mt-2">
+                  {vwMonth === 0 ? `Ano ${vwYear} (todo)` : `${MONTHS_SHORT[vwMonth - 1]}/${vwYear}`}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab Audi */}
+        {activeTab === 'audi' && (
+          <div className="flex-1 flex flex-col gap-4 min-h-0">
+            {/* Sub-tabs Audi */}
+            <div className="flex items-center gap-0 border-b border-slate-200 overflow-x-auto">
+              {([
+                { id: 'veiculos_novos', label: 'Veículos Novos' },
+                { id: 'venda_direta', label: 'Venda Direta' },
+                { id: 'veiculos_usados', label: 'Veículos Usados' },
+                { id: 'pecas', label: 'Peças' },
+                { id: 'oficina', label: 'Oficina' },
+                { id: 'funilaria', label: 'Funilaria' },
+                { id: 'administracao', label: 'Administração' },
+                { id: 'diretoria', label: 'Diretoria' },
+                { id: 'consolidado', label: 'Consolidado (Total)' },
+              ] as { id: DepartamentoSubTab; label: string }[]).map(sub => (
+                <button
+                  key={sub.id}
+                  onClick={() => setAudiSubTab(sub.id)}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                    audiSubTab === sub.id
+                      ? 'text-slate-700 border-emerald-600'
+                      : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Seletor de Ano e Mês */}
+            <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
+              <YearMonthSelector
+                year={audiYear}
+                month={audiMonth}
+                onYearChange={setAudiYear}
+                onMonthChange={setAudiMonth}
+              />
+            </div>
+
+            {/* Conteúdo das sub-abas Audi */}
+            <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
+              <div className="text-center py-8">
+                <p className="text-slate-500 text-sm">Conteúdo de <strong>{[
+                  { id: 'veiculos_novos', label: 'Veículos Novos' },
+                  { id: 'venda_direta', label: 'Venda Direta' },
+                  { id: 'veiculos_usados', label: 'Veículos Usados' },
+                  { id: 'pecas', label: 'Peças' },
+                  { id: 'oficina', label: 'Oficina' },
+                  { id: 'funilaria', label: 'Funilaria' },
+                  { id: 'administracao', label: 'Administração' },
+                  { id: 'diretoria', label: 'Diretoria' },
+                  { id: 'consolidado', label: 'Consolidado (Total)' },
+                ].find(s => s.id === audiSubTab)?.label}</strong> - Audi</p>
+                <p className="text-slate-400 text-xs mt-2">
+                  {audiMonth === 0 ? `Ano ${audiYear} (todo)` : `${MONTHS_SHORT[audiMonth - 1]}/${audiYear}`}
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>
