@@ -57,7 +57,31 @@ function extractHierarchy(
     valor,
   };
 
-  // Navegar para cima para encontrar revenda, ccusto e tipo item
+  // Primeiro, verificar se a linha atual já é um dos tipos de hierarquia
+  const currentConta = row.conta;
+  
+  // Se a linha atual é um Tipo (ex: "V - Veículos (Tipo)")
+  if (/\(Tipo\)/i.test(currentConta)) {
+    const match = currentConta.match(/^([PSV])\s*-/i);
+    if (match) {
+      result.tipoItem = match[1].toUpperCase() as 'P' | 'S' | 'V';
+    }
+  }
+  
+  // Se a linha atual é um CCusto (ex: "101 - VEÍCULOS NOVOS (CCusto)")
+  if (/\(CCusto\)/i.test(currentConta)) {
+    result.ccusto = currentConta.replace(/\s*\(CCusto\)/i, '').trim();
+  }
+  
+  // Se a linha atual é uma Revenda (ex: "1 - SORANA NORTE (Revenda)")
+  if (/\(Revenda\)/i.test(currentConta)) {
+    const match = currentConta.match(/^(\d+)\s*-/);
+    if (match) {
+      result.revenda = match[1];
+    }
+  }
+
+  // Navegar para cima para encontrar revenda, ccusto e tipo item que ainda não foram encontrados
   // A hierarquia é: conta principal -> revenda -> ccusto -> tipo item -> conta final
   // Vamos encontrar o primeiro pai de cada tipo
   
