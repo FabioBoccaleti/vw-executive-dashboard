@@ -18,13 +18,12 @@ import {
 } from './ieoStorage';
 import { ClassificacaoRevendasTab } from './ClassificacaoRevendasTab';
 import { RegrasDepartamentosTab } from './RegrasDepartamentosTab';
+import { DepartamentoTab } from './DepartamentoTab';
 
 const SEMESTRES = ['1º Semestre', '2º Semestre'];
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 2 + i);
-
-const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function parseNum(s: string): number {
   const cleaned = (s ?? '0').trim().replace(',', '.');
@@ -274,16 +273,16 @@ type ActiveTab = 'importar' | 'vw' | 'audi';
 type ImportarSubTab = 'dados' | 'classificacao' | 'revendas' | 'departamentos';
 type DepartamentoSubTab = 'veiculos_novos' | 'venda_direta' | 'veiculos_usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'diretoria' | 'consolidado';
 
-// ─── Seletor de Ano e Mês ───────────────────────────────────────────────────
+// ─── Seletor de Ano e Semestre ───────────────────────────────────────────────
 
-interface YearMonthSelectorProps {
+interface YearSemestreSelectorProps {
   year: number;
-  month: number; // 0 = Ano todo, 1-12
+  semestre: number; // 0 = Ano todo, 1 = 1º Semestre, 2 = 2º Semestre
   onYearChange: (y: number) => void;
-  onMonthChange: (m: number) => void;
+  onSemestreChange: (s: number) => void;
 }
 
-function YearMonthSelector({ year, month, onYearChange, onMonthChange }: YearMonthSelectorProps) {
+function YearSemestreSelector({ year, semestre, onYearChange, onSemestreChange }: YearSemestreSelectorProps) {
   return (
     <div className="flex items-center gap-3 flex-wrap py-1">
       <div className="flex items-center gap-1.5">
@@ -309,26 +308,29 @@ function YearMonthSelector({ year, month, onYearChange, onMonthChange }: YearMon
       <div className="w-px h-5 bg-slate-200 shrink-0" />
       <div className="flex items-center gap-1 flex-wrap">
         <button
-          onClick={() => onMonthChange(0)}
+          onClick={() => onSemestreChange(0)}
           className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
-            month === 0 ? 'bg-slate-700 text-white' : 'text-slate-500 hover:bg-slate-100'
+            semestre === 0 ? 'bg-slate-700 text-white' : 'text-slate-500 hover:bg-slate-100'
           }`}
         >
           Ano todo
         </button>
-        {MONTHS_SHORT.map((m, i) => (
-          <button
-            key={i}
-            onClick={() => onMonthChange(i + 1)}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-full transition-colors ${
-              month === i + 1
-                ? 'bg-emerald-600 text-white'
-                : 'text-slate-500 hover:bg-slate-100'
-            }`}
-          >
-            {m}
-          </button>
-        ))}
+        <button
+          onClick={() => onSemestreChange(1)}
+          className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+            semestre === 1 ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+          }`}
+        >
+          1º Semestre
+        </button>
+        <button
+          onClick={() => onSemestreChange(2)}
+          className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+            semestre === 2 ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+          }`}
+        >
+          2º Semestre
+        </button>
       </div>
     </div>
   );
@@ -350,9 +352,9 @@ export function IEODashboard({ onChangeBrand }: Props) {
   const [vwSubTab, setVwSubTab] = useState<DepartamentoSubTab>('veiculos_novos');
   const [audiSubTab, setAudiSubTab] = useState<DepartamentoSubTab>('veiculos_novos');
   const [vwYear, setVwYear] = useState(CURRENT_YEAR);
-  const [vwMonth, setVwMonth] = useState(0); // 0 = ano todo
+  const [vwSemestre, setVwSemestre] = useState(0); // 0 = ano todo, 1 = 1º sem, 2 = 2º sem
   const [audiYear, setAudiYear] = useState(CURRENT_YEAR);
-  const [audiMonth, setAudiMonth] = useState(0);
+  const [audiSemestre, setAudiSemestre] = useState(0);
 
   async function handlePrint() {
     setPrinting(true);
@@ -762,35 +764,23 @@ export function IEODashboard({ onChangeBrand }: Props) {
               ))}
             </div>
 
-            {/* Seletor de Ano e Mês */}
+            {/* Seletor de Ano e Semestre */}
             <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
-              <YearMonthSelector
+              <YearSemestreSelector
                 year={vwYear}
-                month={vwMonth}
+                semestre={vwSemestre}
                 onYearChange={setVwYear}
-                onMonthChange={setVwMonth}
+                onSemestreChange={setVwSemestre}
               />
             </div>
 
             {/* Conteúdo das sub-abas VW */}
-            <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
-              <div className="text-center py-8">
-                <p className="text-slate-500 text-sm">Conteúdo de <strong>{[
-                  { id: 'veiculos_novos', label: 'Veículos Novos' },
-                  { id: 'venda_direta', label: 'Venda Direta' },
-                  { id: 'veiculos_usados', label: 'Veículos Usados' },
-                  { id: 'pecas', label: 'Peças' },
-                  { id: 'oficina', label: 'Oficina' },
-                  { id: 'funilaria', label: 'Funilaria' },
-                  { id: 'administracao', label: 'Administração' },
-                  { id: 'diretoria', label: 'Diretoria' },
-                  { id: 'consolidado', label: 'Consolidado (Total)' },
-                ].find(s => s.id === vwSubTab)?.label}</strong> - VW</p>
-                <p className="text-slate-400 text-xs mt-2">
-                  {vwMonth === 0 ? `Ano ${vwYear} (todo)` : `${MONTHS_SHORT[vwMonth - 1]}/${vwYear}`}
-                </p>
-              </div>
-            </div>
+            <DepartamentoTab
+              marca="vw"
+              departamento={vwSubTab}
+              year={vwYear}
+              semestre={vwSemestre}
+            />
           </div>
         )}
 
@@ -824,35 +814,23 @@ export function IEODashboard({ onChangeBrand }: Props) {
               ))}
             </div>
 
-            {/* Seletor de Ano e Mês */}
+            {/* Seletor de Ano e Semestre */}
             <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
-              <YearMonthSelector
+              <YearSemestreSelector
                 year={audiYear}
-                month={audiMonth}
+                semestre={audiSemestre}
                 onYearChange={setAudiYear}
-                onMonthChange={setAudiMonth}
+                onSemestreChange={setAudiSemestre}
               />
             </div>
 
             {/* Conteúdo das sub-abas Audi */}
-            <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
-              <div className="text-center py-8">
-                <p className="text-slate-500 text-sm">Conteúdo de <strong>{[
-                  { id: 'veiculos_novos', label: 'Veículos Novos' },
-                  { id: 'venda_direta', label: 'Venda Direta' },
-                  { id: 'veiculos_usados', label: 'Veículos Usados' },
-                  { id: 'pecas', label: 'Peças' },
-                  { id: 'oficina', label: 'Oficina' },
-                  { id: 'funilaria', label: 'Funilaria' },
-                  { id: 'administracao', label: 'Administração' },
-                  { id: 'diretoria', label: 'Diretoria' },
-                  { id: 'consolidado', label: 'Consolidado (Total)' },
-                ].find(s => s.id === audiSubTab)?.label}</strong> - Audi</p>
-                <p className="text-slate-400 text-xs mt-2">
-                  {audiMonth === 0 ? `Ano ${audiYear} (todo)` : `${MONTHS_SHORT[audiMonth - 1]}/${audiYear}`}
-                </p>
-              </div>
-            </div>
+            <DepartamentoTab
+              marca="audi"
+              departamento={audiSubTab}
+              year={audiYear}
+              semestre={audiSemestre}
+            />
           </div>
         )}
       </div>
