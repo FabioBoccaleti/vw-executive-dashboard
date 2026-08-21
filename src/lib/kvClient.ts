@@ -83,7 +83,17 @@ export async function kvGet<T = unknown>(key: string): Promise<T | null> {
 }
 
 export async function kvSet(key: string, value: unknown): Promise<boolean> {
-  if (IS_DEV) { await idbSet(key, value); return true; }
+  if (IS_DEV) { 
+    console.log('[KV] Setting key in IndexedDB:', key);
+    try {
+      await idbSet(key, value); 
+      console.log('[KV] Successfully set key:', key);
+      return true;
+    } catch (error) {
+      console.error('[KV] Error setting key:', key, error);
+      throw error;
+    }
+  }
   try {
     const response = await fetch(`${getApiBaseUrl()}/api/kv/set`, {
       method: 'POST',

@@ -14,7 +14,8 @@ import {
 // ─── Estrutura hierárquica do arquivo importado ──────────────────────────────
 
 interface ContaHierarchy {
-  conta: string;
+  conta: string; // Conta com valor
+  contaPrincipal?: string; // Conta principal (para buscar classificação)
   revenda?: string;
   ccusto?: string;
   tipoItem?: 'P' | 'S' | 'V';
@@ -87,8 +88,20 @@ function extractHierarchy(
       if (match) {
         result.revenda = match[1];
       }
-      // Se já encontramos a revenda, podemos parar
-      break;
+      continue; // Não parar aqui, continuar buscando a conta principal
+    }
+    
+    // Conta Principal (não tem marcador)
+    // É a conta mais acima que não tem (Revenda), (CCusto) ou (Tipo)
+    if (!result.contaPrincipal && 
+        !/(Revenda|CCusto|Tipo)/i.test(conta) &&
+        /^\d+/.test(conta)) {
+      // Extrair apenas o número da conta
+      const match = conta.match(/^(\d+)/);
+      if (match) {
+        result.contaPrincipal = match[1];
+      }
+      break; // Encontramos tudo que precisamos
     }
   }
   
@@ -109,6 +122,11 @@ export async function processDepartamentoData(
     loadClassificacoesConta(),
     loadRegrasDeptos(),
   ]);
+
+  console.log(`[IEO DEBUG] ========== Processando ${marca} / ${depto} / ${year} / S${semestre} ==========`);
+  console.log(`[IEO DEBUG] Revendas classificadas:`, Object.keys(revendasMap).length, revendasMap);
+  console.log(`[IEO DEBUG] Contas classificadas:`, Object.keys(contasMap).length, Object.keys(contasMap).slice(0, 20));
+  console.log(`[IEO DEBUG] Regras de departamento:`, Object.keys(regrasMap).length, regrasMap);
 
   // Determinar quais semestres carregar
   const semestres: number[] = semestre === 0 ? [1, 2] : [semestre];
@@ -139,6 +157,8 @@ export async function processDepartamentoData(
   for (const semestreData of semestreDataList) {
     if (!semestreData) continue;
 
+    console.log(`[IEO DEBUG] Processando semestre. Total de linhas: ${semestreData.rows.length}`);
+
     // Processar cada linha do arquivo
     for (let i = 0; i < semestreData.rows.length; i++) {
       const row = semestreData.rows[i];
@@ -147,14 +167,32 @@ export async function processDepartamentoData(
       const hierarchy = extractHierarchy(semestreData.rows, i);
       if (!hierarchy) continue;
 
+      console.log(`[IEO DEBUG] Conta: ${hierarchy.conta}, Principal: ${hierarchy.contaPrincipal || 'N/A'}, Revenda: ${hierarchy.revenda}, CCusto: ${hierarchy.ccusto}, Tipo: ${hierarchy.tipoItem}, Valor: ${hierarchy.valor}`);
+
       // Filtrar por marca
-      if (!hierarchy.revenda || !revendasMap[hierarchy.revenda]) continue;
-      if (revendasMap[hierarchy.revenda] !== marca) continue;
+      if (!hierarchy.revenda || !revendasMap[hierarchy.revenda]) {
+        console.log(`[IEO DEBUG] ❌ Revenda não encontrada ou não classificada: ${hierarchy.revenda}`);
+        continue;
+      }
+      if (revendasMap[hierarchy.revenda] !== marca) {
+        console.log(`[IEO DEBUG] ❌ Revenda ${hierarchy.revenda} não pertence à marca ${marca} (é ${revendasMap[hierarchy.revenda]})`);
+        continue;
+      }
+
+      console.log(`[IEO DEBUG] ✓ Revenda OK: ${hierarchy.revenda} → ${marca}`);
 
       // Filtrar por departamento
-      if (!hierarchy.ccusto) continue;
+      if (!hierarchy.ccusto) {
+        console.log(`[IEO DEBUG] ❌ CCusto não encontrado`);
+        continue;
+      }
       const regra = regrasMap[hierarchy.ccusto];
-      if (!regra) continue;
+      if (!regra) {
+        console.log(`[IEO DEBUG] ❌ Regra não encontrada para CCusto: ${hierarchy.ccusto}`);
+        continue;
+      }
+
+      console.log(`[IEO DEBUG] ✓ CCusto OK: ${hierarchy.ccusto}`);
 
       let deptoClassificado: DeptoClassificacao | undefined;
 
@@ -173,8 +211,20 @@ export async function processDepartamentoData(
       if (deptoClassificado !== depto && depto !== 'consolidado') continue;
 
       // Obter classificação da conta
-      const tipoClassificacao = contasMap[hierarchy.conta];
-      if (!tipoClassificacao) continue;
+      // Tentar primeiro pela conta de valor, depois pela conta principal
+      let tipoClassificacao = contasMap[hierarchy.conta];
+      
+      if (!tipoClassificacao && hierarchy.contaPrincipal) {
+        tipoClassificacao = contasMap[hierarchy.contaPrincipal];
+        console.log(`[IEO DEBUG] 🔍 Tentando conta principal: ${hierarchy.contaPrincipal}`);
+      }
+      
+      if (!tipoClassificacao) {
+        console.log(`[IEO DEBUG] ❌ Tipo de classificação não encontrado para conta: ${hierarchy.conta}${hierarchy.contaPrincipal ? ` nem para conta principal: ${hierarchy.contaPrincipal}` : ''}`);
+        continue;
+      }
+
+      console.log(`[IEO DEBUG] ✓ Tipo de classificação OK: ${hierarchy.contaPrincipal || hierarchy.conta} → ${tipoClassificacao}`);
 
       // Adicionar aos grupos
       if (!grupos[tipoClassificacao]) continue;
@@ -184,6 +234,8 @@ export async function processDepartamentoData(
         valor: hierarchy.valor,
       });
       grupos[tipoClassificacao].subtotal += hierarchy.valor;
+      
+      console.log(`[IEO DEBUG] ✓✓✓ Conta adicionada com sucesso!`);
     }
   }
 

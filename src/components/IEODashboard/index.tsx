@@ -406,20 +406,40 @@ export function IEODashboard({ onChangeBrand }: Props) {
     e.target.value = '';
     setImporting(true);
     try {
+      console.log('[IEO IMPORT] Iniciando importação...', { file: file.name, size: file.size, type: file.type, year: selectedYear, semestre: selectedSemestre });
       const buffer = await file.arrayBuffer();
+      console.log('[IEO IMPORT] Arquivo lido, tamanho:', buffer.byteLength, 'bytes');
+      
       let text: string;
       try {
         text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+        console.log('[IEO IMPORT] Decodificado como UTF-8');
       } catch {
         text = new TextDecoder('windows-1252').decode(buffer);
+        console.log('[IEO IMPORT] Decodificado como Windows-1252');
       }
+      console.log('[IEO IMPORT] Texto decodificado, primeiras 500 chars:', text.substring(0, 500));
+      console.log('[IEO IMPORT] Parseando...');
+      
       const data = parseTxt(text, file.name);
+      console.log('[IEO IMPORT] Parse concluído:', { 
+        rows: data.rows.length, 
+        totalRow: !!data.totalRow,
+        firstRows: data.rows.slice(0, 3).map(r => ({ conta: r.conta, isMain: r.isMain }))
+      });
+      
+      console.log('[IEO IMPORT] Salvando no KV store com key:', `ieo:${selectedYear}:S${selectedSemestre}`);
       await setIEOSemestre(selectedYear, selectedSemestre, data);
+      console.log('[IEO IMPORT] Salvo com sucesso! Atualizando estado local...');
+      
       setSemestreData(data);
       const nonZero = data.rows.filter(r => !isAllZero(r)).length;
+      console.log('[IEO IMPORT] Importação concluída:', { nonZero });
       toast.success(`Dados importados: ${nonZero} registros com valores.`);
-    } catch {
-      toast.error('Erro ao importar arquivo. Verifique o formato TXT.');
+    } catch (err) {
+      console.error('[IEO IMPORT] Erro completo:', err);
+      console.error('[IEO IMPORT] Stack trace:', err instanceof Error ? err.stack : 'N/A');
+      toast.error(`Erro ao importar arquivo: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
     } finally {
       setImporting(false);
     }
