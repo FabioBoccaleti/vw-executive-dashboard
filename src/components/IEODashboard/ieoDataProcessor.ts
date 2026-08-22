@@ -82,6 +82,11 @@ function extractHierarchy(
     }
   }
 
+  // Se a linha atual é uma linha intermediária da hierarquia (CCusto ou Revenda),
+  // ela NÃO deve buscar tipoItem nos pais, pois representa um total agregado
+  // Apenas linhas de Tipo (P, S, V) devem ter tipoItem
+  const isLinhaIntermediaria = /\(CCusto\)|(\(Revenda\))/i.test(currentConta);
+
   // Navegar para cima para encontrar revenda, ccusto e tipo item que ainda não foram encontrados
   // A hierarquia é: conta principal -> revenda -> ccusto -> tipo item -> conta final
   // Vamos encontrar o primeiro pai de cada tipo
@@ -91,7 +96,8 @@ function extractHierarchy(
     const conta = parentRow.conta;
     
     // Tipo Item (Exemplo: "V - Veículos (Tipo)")
-    if (!result.tipoItem && /\(Tipo\)/i.test(conta)) {
+    // Não buscar tipoItem se a linha atual for intermediária (CCusto ou Revenda)
+    if (!result.tipoItem && !isLinhaIntermediaria && /\(Tipo\)/i.test(conta)) {
       const match = conta.match(/^([PSV])\s*-/i);
       if (match) {
         result.tipoItem = match[1].toUpperCase() as 'P' | 'S' | 'V';
@@ -289,7 +295,7 @@ export async function processDepartamentoData(
       const contaExistente = grupos[tipoClassificacao].contas.find(c => c.conta === contaParaExibir);
       
       console.log(`[IEO DEBUG] 💰 Adicionando valor R$ ${hierarchy.valor.toFixed(2)} à conta ${contaParaExibir} no grupo ${tipoClassificacao}`);
-      additionLogs.push(`VALOR: R$ ${hierarchy.valor.toFixed(2)} | CONTA: ${contaParaExibir} | GRUPO: ${tipoClassificacao} | CCUSTO: ${hierarchy.ccusto} | TIPO: ${hierarchy.tipoItem} | DEPTO: ${deptoClassificado}`);
+      additionLogs.push(`LINHA: ${i} | VALOR: R$ ${hierarchy.valor.toFixed(2)} | CONTA: ${contaParaExibir} | CONTA_RAW: ${row.conta} | REVENDA: ${hierarchy.revenda} | GRUPO: ${tipoClassificacao} | CCUSTO: ${hierarchy.ccusto} | TIPO: ${hierarchy.tipoItem} | DEPTO: ${deptoClassificado}`);
       
       if (contaExistente) {
         console.log(`[IEO DEBUG] 📊 Conta já existe com R$ ${contaExistente.valor.toFixed(2)}, somando...`);
