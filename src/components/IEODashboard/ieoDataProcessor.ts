@@ -147,6 +147,9 @@ export async function processDepartamentoData(
   console.log(`[IEO DEBUG] Revendas classificadas:`, Object.keys(revendasMap).length, revendasMap);
   console.log(`[IEO DEBUG] Contas classificadas:`, Object.keys(contasMap).length, Object.keys(contasMap).slice(0, 20));
   console.log(`[IEO DEBUG] Regras de departamento:`, Object.keys(regrasMap).length, regrasMap);
+  
+  // Inicializar array de logs de adição
+  const additionLogs: string[] = [];
 
   // Determinar quais semestres carregar
   const semestres: number[] = semestre === 0 ? [1, 2] : [semestre];
@@ -187,7 +190,11 @@ export async function processDepartamentoData(
       const hierarchy = extractHierarchy(semestreData.rows, i);
       if (!hierarchy) continue;
 
-      console.log(`[IEO DEBUG] Conta: ${hierarchy.conta}, Principal: ${hierarchy.contaPrincipal || 'N/A'}, Revenda: ${hierarchy.revenda}, CCusto: ${hierarchy.ccusto}, Tipo: ${hierarchy.tipoItem}, Valor: ${hierarchy.valor}`);
+      // IMPORTANTE: Processar apenas linhas de "Tipo Item" (P, S, V) para evitar duplicação
+      // As linhas de Revenda e CCusto intermediárias contêm os mesmos valores somados
+      if (!hierarchy.tipoItem) {
+        continue;
+      }
 
       // Filtrar por marca
       if (!hierarchy.revenda || !revendasMap[hierarchy.revenda]) {
@@ -220,23 +227,40 @@ export async function processDepartamentoData(
         continue;
       }
 
-      console.log(`[IEO DEBUG] ✓ CCusto OK: ${ccustoKey}`);
+      console.log(`[IEO DEBUG] ✓ CCusto OK: ${ccustoKey}, Regra:`, JSON.stringify(regra));
 
       let deptoClassificado: DeptoClassificacao | undefined;
 
       // Determinar departamento baseado na regra
-      const ccustoNum = hierarchy.ccusto.match(/^\d+/)?.[0];
-      const isContas3ou4 = ccustoNum && (ccustoNum.startsWith('3') || ccustoNum.startsWith('4'));
+      // Verificar se a CONTA CONTÁBIL começa com 3 ou 4 (não o CCusto)
+      const contaPrincipalNum = (hierarchy.contaPrincipal || hierarchy.conta).match(/^\d+/)?.[0];
+      const isContas3ou4 = contaPrincipalNum && (contaPrincipalNum.startsWith('3') || contaPrincipalNum.startsWith('4'));
+
+      console.log(`[IEO DEBUG] Conta: ${hierarchy.contaPrincipal || hierarchy.conta}, Num: ${contaPrincipalNum}, isContas3ou4: ${isContas3ou4}, TipoItem: ${hierarchy.tipoItem}`);
 
       if (isContas3ou4 && hierarchy.tipoItem && regra.byTipoItem) {
         deptoClassificado = regra.byTipoItem[hierarchy.tipoItem];
-      }
-      
-      if (!deptoClassificado) {
+        console.log(`[IEO DEBUG] Usando byTipoItem[${hierarchy.tipoItem}] = ${deptoClassificado}`);
+        
+        // Se não tem regra específica para este tipo de item, não adicionar em nenhum departamento
+        if (!deptoClassificado) {
+          console.log(`[IEO DEBUG] ❌ Sem regra específica para TipoItem ${hierarchy.tipoItem}, pulando...`);
+          continue;
+        }
+      } else if (!deptoClassificado) {
+        // Apenas usar default se NÃO for contas 3 ou 4
         deptoClassificado = regra.default;
+        console.log(`[IEO DEBUG] Usando default = ${deptoClassificado}`);
       }
 
-      if (deptoClassificado !== depto && depto !== 'consolidado') continue;
+      console.log(`[IEO DEBUG] Departamento classificado: ${deptoClassificado}, Filtro depto: ${depto}`);
+
+      if (deptoClassificado !== depto && depto !== 'consolidado') {
+        console.log(`[IEO DEBUG] ❌ Pulando: ${deptoClassificado} !== ${depto}`);
+        continue;
+      }
+      
+      console.log(`[IEO DEBUG] ✅ PASSOU NO FILTRO! Será adicionado.`);
 
       // Obter classificação da conta
       // Tentar primeiro pela conta de valor, depois pela conta principal
@@ -264,8 +288,13 @@ export async function processDepartamentoData(
       // Para departamentos específicos: agrupar por conta, somando valores do mesmo departamento
       const contaExistente = grupos[tipoClassificacao].contas.find(c => c.conta === contaParaExibir);
       
+      console.log(`[IEO DEBUG] 💰 Adicionando valor R$ ${hierarchy.valor.toFixed(2)} à conta ${contaParaExibir} no grupo ${tipoClassificacao}`);
+      additionLogs.push(`VALOR: R$ ${hierarchy.valor.toFixed(2)} | CONTA: ${contaParaExibir} | GRUPO: ${tipoClassificacao} | CCUSTO: ${hierarchy.ccusto} | TIPO: ${hierarchy.tipoItem} | DEPTO: ${deptoClassificado}`);
+      
       if (contaExistente) {
+        console.log(`[IEO DEBUG] 📊 Conta já existe com R$ ${contaExistente.valor.toFixed(2)}, somando...`);
         contaExistente.valor += hierarchy.valor;
+        console.log(`[IEO DEBUG] 📊 Novo total da conta: R$ ${contaExistente.valor.toFixed(2)}`);
       } else {
         grupos[tipoClassificacao].contas.push({
           conta: contaParaExibir,
@@ -282,6 +311,16 @@ export async function processDepartamentoData(
 
   // Calcular total
   const total = Object.values(grupos).reduce((sum, grupo) => sum + grupo.subtotal, 0);
+
+  // Salvar logs para debug
+  if (additionLogs.length > 0) {
+    try {
+      localStorage.setItem(`ieo_debug_logs_${marca}_${depto}_${year}`, JSON.stringify(additionLogs));
+      console.log(`[IEO DEBUG] 📝 ${additionLogs.length} logs salvos em localStorage`);
+    } catch (e) {
+      console.error('[IEO DEBUG] Erro ao salvar logs:', e);
+    }
+  }
 
   return { grupos, total };
 }
