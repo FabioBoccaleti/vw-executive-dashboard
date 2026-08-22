@@ -210,11 +210,6 @@ export function DepartamentoTab({ marca, departamento, year, semestre }: Props) 
                     >
                       <div className="flex-1 text-xs text-slate-600">
                         {conta.conta}
-                        {conta.ccusto && (
-                          <span className="ml-2 text-[10px] text-slate-400 font-normal">
-                            [{conta.ccusto}]
-                          </span>
-                        )}
                       </div>
                       <div
                         className={`text-xs font-mono tabular-nums ${
