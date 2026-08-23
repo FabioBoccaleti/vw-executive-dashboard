@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit3, X, TrendingUp, TrendingDown, BarChart2, Save, AlertCircle, Settings } from 'lucide-react';
+import { Plus, Trash2, Edit3, X, TrendingUp, TrendingDown, BarChart2, Save, AlertCircle, Settings, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   type Marca,
@@ -177,14 +177,33 @@ interface CenarioSectionProps {
   periodos: Periodo[];
   deptoDataMap: Record<string, DepartamentoData | null>;
   allDadosOp: Record<string, DadosOperacionais>;
+  semFin: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }
 
 function CenarioSection({
-  cenario, periodos, deptoDataMap, allDadosOp, onEdit, onDelete,
+  cenario, periodos, deptoDataMap, allDadosOp, semFin, onEdit, onDelete,
 }: CenarioSectionProps) {
   const hasMultiple = periodos.length > 1;
+
+  // Pré-calcula dados das despesas financeiras para a linha de impacto
+  const impactRows = periodos.map(p => {
+    const data = deptoDataMap[`${p.year}:S${p.semestre}`];
+    if (!data) return null;
+    return {
+      finVal: data.grupos.despesas_financeiras?.subtotal ?? 0,
+      resultVal: data.total,
+    };
+  });
+  const hasAnyFin = impactRows.some(r => r !== null && r.finVal !== 0);
+  const deltaFin = hasMultiple && impactRows[0] && impactRows[impactRows.length - 1]
+    ? calcDelta(
+        Math.abs(impactRows[0]!.finVal),
+        Math.abs(impactRows[impactRows.length - 1]!.finVal),
+        'menor',
+      )
+    : null;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -245,8 +264,11 @@ function CenarioSection({
                   const data = deptoDataMap[key];
                   if (!data) return null;
                   const dadosOp = allDadosOp[dadosOpKey(p.year, p.semestre, cenario.departamento)] ?? {};
-                  const num = extractValue(data, ind.numerador, dadosOp);
-                  const den = extractValue(data, ind.denominador, dadosOp);
+                  // Quando semFin ativo, 'resultado' é tratado como 'resultado_sem_fin'
+                  const numTipo = semFin && ind.numerador.tipo === 'resultado' ? { tipo: 'resultado_sem_fin' as const } : ind.numerador;
+                  const denTipo = semFin && ind.denominador.tipo === 'resultado' ? { tipo: 'resultado_sem_fin' as const } : ind.denominador;
+                  const num = extractValue(data, numTipo, dadosOp);
+                  const den = extractValue(data, denTipo, dadosOp);
                   if (num === null || den === null || den === 0) return null;
                   return num / den;
                 });
@@ -293,6 +315,69 @@ function CenarioSection({
                   </tr>
                 );
               })}
+              {/* Linha de impacto das Despesas Financeiras — sempre visível quando há dados */}
+              {hasAnyFin && (
+                <>
+                  <tr className="border-t-2 border-amber-200 bg-amber-50/50">
+                    <td
+                      colSpan={periodos.length + (hasMultiple ? 1 : 0) + 2}
+                      className="py-1.5 px-4"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-3 h-3 text-amber-600" />
+                        <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+                          Despesas Financeiras
+                        </span>
+                        {semFin && (
+                          <span className="text-xs text-amber-600 font-normal italic">
+                            (excluídas do cálculo acima)
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  <tr className="bg-amber-50/30 hover:bg-amber-50/60 transition-colors">
+                    <td className="py-2.5 px-4 text-sm text-amber-700 font-medium pl-8">Valor</td>
+                    {impactRows.map((r, idx) => (
+                      <td key={idx} className={`py-2.5 px-4 text-right font-mono tabular-nums text-xs ${
+                        r === null || r.finVal === 0 ? 'text-slate-300' : 'text-amber-700'
+                      }`}>
+                        {r === null ? '—' : r.finVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </td>
+                    ))}
+                    {hasMultiple && deltaFin && (
+                      <td className={`py-2.5 px-4 text-right font-mono tabular-nums text-xs font-semibold whitespace-nowrap ${
+                        deltaFin.isPositive === null ? 'text-slate-400' :
+                        deltaFin.isPositive ? 'text-emerald-600' : 'text-red-500'
+                      }`}>
+                        <div className="flex items-center justify-end gap-1">
+                          {deltaFin.isPositive === true  && <TrendingUp   className="w-3 h-3" />}
+                          {deltaFin.isPositive === false && <TrendingDown className="w-3 h-3" />}
+                          {deltaFin.text}
+                        </div>
+                      </td>
+                    )}
+                    <td className="py-2.5 px-4" />
+                  </tr>
+                  <tr className="bg-amber-50/30 hover:bg-amber-50/60 transition-colors">
+                    <td className="py-2.5 px-4 text-sm text-amber-700 font-medium pl-8">% do Resultado</td>
+                    {impactRows.map((r, idx) => {
+                      const pct = r && r.resultVal !== 0
+                        ? Math.abs(r.finVal) / Math.abs(r.resultVal) * 100
+                        : null;
+                      return (
+                        <td key={idx} className={`py-2.5 px-4 text-right font-mono tabular-nums text-xs ${
+                          pct === null ? 'text-slate-300' : 'text-amber-700'
+                        }`}>
+                          {pct === null ? '—' : `${pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`}
+                        </td>
+                      );
+                    })}
+                    {hasMultiple && <td className="py-2.5 px-4" />}
+                    <td className="py-2.5 px-4" />
+                  </tr>
+                </>
+              )}
             </tbody>
           </table>
         </div>
@@ -310,16 +395,18 @@ interface MarcaAnaliseProps {
   allDadosOp: Record<string, DadosOperacionais>;
   periodos: Periodo[];
   depto: DeptoFiltro;
+  semFin: boolean;
   onPeriodosChange: (p: Periodo[]) => void;
   onDeptoChange: (d: DeptoFiltro) => void;
+  onSemFinChange: (v: boolean) => void;
   onEdit: (c: IEOCenario) => void;
   onDelete: (id: string) => void;
   onNew: (depto: DeptoFiltro) => void;
 }
 
 function MarcaAnalise({
-  marca, cenarios, allDadosOp, periodos, depto,
-  onPeriodosChange, onDeptoChange, onEdit, onDelete, onNew,
+  marca, cenarios, allDadosOp, periodos, depto, semFin,
+  onPeriodosChange, onDeptoChange, onSemFinChange, onEdit, onDelete, onNew,
 }: MarcaAnaliseProps) {
   const [deptoDataMap, setDeptoDataMap] = useState<Record<string, DepartamentoData | null>>({});
   const [loading, setLoading] = useState(false);
@@ -424,6 +511,19 @@ function MarcaAnalise({
         {loading && (
           <span className="text-xs text-slate-400 italic ml-2">Calculando...</span>
         )}
+        {/* Toggle global: inclui ou exclui despesas financeiras do resultado */}
+        <button
+          onClick={() => onSemFinChange(!semFin)}
+          className={`flex items-center gap-1.5 ml-auto px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+            semFin
+              ? 'bg-amber-500 text-white shadow-sm'
+              : 'text-slate-500 bg-slate-100 hover:bg-slate-200'
+          }`}
+          title={semFin ? 'Resultado sem despesas financeiras (clique para incluir)' : 'Resultado com despesas financeiras (clique para excluir)'}
+        >
+          <Zap className="w-3.5 h-3.5" />
+          {semFin ? 's/ Desp. Financeiras' : 'c/ Desp. Financeiras'}
+        </button>
       </div>
 
       {/* Cenários do departamento — todos expandidos */}
@@ -436,6 +536,7 @@ function MarcaAnalise({
               periodos={periodos}
               deptoDataMap={deptoDataMap}
               allDadosOp={allDadosOp}
+              semFin={semFin}
               onEdit={() => onEdit(c)}
               onDelete={() => onDelete(c.id)}
             />
@@ -923,6 +1024,7 @@ export function AnaliseCenariosTab() {
   // Períodos e departamento compartilhados entre VW e Audi para facilitar comparação
   const [periodos, setPeriodos] = useState<Periodo[]>(DEFAULT_PERIODOS);
   const [depto, setDepto] = useState<DeptoFiltro>('consolidado');
+  const [semFin, setSemFin] = useState(false);
   const [editing, setEditing] = useState<{
     cenario?: IEOCenario;
     defaultDepto?: DeptoFiltro;
@@ -983,8 +1085,10 @@ export function AnaliseCenariosTab() {
             allDadosOp={allDadosOp}
             periodos={periodos}
             depto={depto}
+            semFin={semFin}
             onPeriodosChange={setPeriodos}
             onDeptoChange={setDepto}
+            onSemFinChange={setSemFin}
             onEdit={c => setEditing({ cenario: c })}
             onDelete={handleDelete}
             onNew={d => setEditing({ defaultDepto: d })}
