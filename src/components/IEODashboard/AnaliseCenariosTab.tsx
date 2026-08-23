@@ -19,6 +19,7 @@ import {
   dadosOpKey,
   loadCenarios,
   saveCenarios,
+  loadClassificacoesConta,
 } from './ieoStorage';
 import {
   processDepartamentoData,
@@ -115,6 +116,7 @@ const DENOMINADOR_OPTS: Array<{ key: string; label: string }> = [
 function numeradorToKey(n: NumeradorTipo): string {
   if (n.tipo === 'resultado') return 'resultado';
   if (n.tipo === 'resultado_sem_fin') return 'resultado_sem_fin';
+  if (n.tipo === 'conta') return `conta:${n.conta}`;
   return `grupo:${n.grupo}`;
 }
 
@@ -123,12 +125,14 @@ function denominadorToKey(d: DenominadorTipo): string {
   if (d.tipo === 'volume_vendas') return 'volume_vendas';
   if (d.tipo === 'resultado') return 'resultado';
   if (d.tipo === 'resultado_sem_fin') return 'resultado_sem_fin';
+  if (d.tipo === 'conta') return `conta:${d.conta}`;
   return `grupo:${d.grupo}`;
 }
 
 function keyToNumerador(key: string): NumeradorTipo {
   if (key === 'resultado') return { tipo: 'resultado' };
   if (key === 'resultado_sem_fin') return { tipo: 'resultado_sem_fin' };
+  if (key.startsWith('conta:')) return { tipo: 'conta', conta: key.slice(6) };
   return { tipo: 'grupo', grupo: key.replace('grupo:', '') as TipoContaClassificacao };
 }
 
@@ -137,6 +141,7 @@ function keyToDenominador(key: string): DenominadorTipo {
   if (key === 'volume_vendas') return { tipo: 'volume_vendas' };
   if (key === 'resultado') return { tipo: 'resultado' };
   if (key === 'resultado_sem_fin') return { tipo: 'resultado_sem_fin' };
+  if (key.startsWith('conta:')) return { tipo: 'conta', conta: key.slice(6) };
   return { tipo: 'grupo', grupo: key.replace('grupo:', '') as TipoContaClassificacao };
 }
 
@@ -152,6 +157,15 @@ function extractValue(
   }
   if (tipo.tipo === 'funcionarios') return dadosOp.funcionarios ?? null;
   if (tipo.tipo === 'volume_vendas') return dadosOp.volumeVendas ?? null;
+  if (tipo.tipo === 'conta') {
+    // Soma o valor da conta em todos os grupos (pode aparecer em apenas um)
+    let total = 0;
+    for (const grupo of Object.values(data.grupos)) {
+      const found = grupo.contas.find(c => c.conta === tipo.conta);
+      if (found) total += found.valor;
+    }
+    return total;
+  }
   return null;
 }
 
@@ -673,6 +687,53 @@ function CenarioEditorDialog({ initial, defaultDepto, onSave, onClose }: EditorP
   const [indicadores, setIndicadores] = useState<IEOIndicadorConfig[]>(
     initial?.indicadores ?? [],
   );
+  const [contasDisponiveis, setContasDisponiveis] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadClassificacoesConta().then(map => {
+      setContasDisponiveis(Object.keys(map).sort());
+    });
+  }, []);
+
+  // Select reutilizável com optgroups: Resultados | Dados Operacionais (opcional) | Grupos | Contas
+  function IndicadorSelect({
+    value, onChange, includeDadosOp = false,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    includeDadosOp?: boolean;
+  }) {
+    return (
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
+      >
+        <optgroup label="Resultados">
+          <option value="resultado">Resultado Operacional (todos os grupos)</option>
+          <option value="resultado_sem_fin">Resultado s/ Despesas Financeiras</option>
+        </optgroup>
+        {includeDadosOp && (
+          <optgroup label="Dados Operacionais">
+            <option value="funcionarios">Nº de Funcionários</option>
+            <option value="volume_vendas">Volume de Vendas / OS (unidades)</option>
+          </optgroup>
+        )}
+        <optgroup label="Grupos de Contas">
+          {TIPOS_CONTA_ORDENADOS.map(g => (
+            <option key={g} value={`grupo:${g}`}>{TIPO_CONTA_LABELS[g]}</option>
+          ))}
+        </optgroup>
+        {contasDisponiveis.length > 0 && (
+          <optgroup label="Contas Específicas">
+            {contasDisponiveis.map(c => (
+              <option key={c} value={`conta:${c}`}>{c}</option>
+            ))}
+          </optgroup>
+        )}
+      </select>
+    );
+  }
 
   function addIndicador() {
     setIndicadores(prev => [
@@ -783,23 +844,18 @@ function CenarioEditorDialog({ initial, defaultDepto, onSave, onClose }: EditorP
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 mb-1">Numerador</label>
-                      <select
+                      <IndicadorSelect
                         value={numeradorToKey(ind.numerador)}
-                        onChange={e => updateIndicador(ind.id, { numerador: keyToNumerador(e.target.value) })}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                      >
-                        {NUMERADOR_OPTS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
-                      </select>
+                        onChange={v => updateIndicador(ind.id, { numerador: keyToNumerador(v) })}
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 mb-1">Denominador (divisor)</label>
-                      <select
+                      <IndicadorSelect
                         value={denominadorToKey(ind.denominador)}
-                        onChange={e => updateIndicador(ind.id, { denominador: keyToDenominador(e.target.value) })}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                      >
-                        {DENOMINADOR_OPTS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
-                      </select>
+                        onChange={v => updateIndicador(ind.id, { denominador: keyToDenominador(v) })}
+                        includeDadosOp
+                      />
                     </div>
                   </div>
 
