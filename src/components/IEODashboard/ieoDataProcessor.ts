@@ -196,10 +196,16 @@ export async function processDepartamentoData(
       const hierarchy = extractHierarchy(semestreData.rows, i);
       if (!hierarchy) continue;
 
-      // IMPORTANTE: Processar apenas linhas de "Tipo Item" (P, S, V) para evitar duplicação
-      // As linhas de Revenda e CCusto intermediárias contêm os mesmos valores somados
-      if (!hierarchy.tipoItem) {
-        continue;
+      // Determinar prefixo da conta para decidir a lógica de processamento
+      const contaPrincipalNum = (hierarchy.contaPrincipal || hierarchy.conta).match(/^\d+/)?.[0];
+      const isContas3ou4 = contaPrincipalNum && (contaPrincipalNum.startsWith('3') || contaPrincipalNum.startsWith('4'));
+
+      // Contas 3/4: processar apenas linhas de TipoItem (o CCusto é subtotal, evita duplicação)
+      // Contas 5 e outras: processar apenas linhas de CCusto (não possuem TipoItem como folha)
+      if (isContas3ou4) {
+        if (!hierarchy.tipoItem) continue;
+      } else {
+        if (!hierarchy.ccusto || hierarchy.tipoItem) continue;
       }
 
       // Filtrar por marca
@@ -236,11 +242,6 @@ export async function processDepartamentoData(
       console.log(`[IEO DEBUG] ✓ CCusto OK: ${ccustoKey}, Regra:`, JSON.stringify(regra));
 
       let deptoClassificado: DeptoClassificacao | undefined;
-
-      // Determinar departamento baseado na regra
-      // Verificar se a CONTA CONTÁBIL começa com 3 ou 4 (não o CCusto)
-      const contaPrincipalNum = (hierarchy.contaPrincipal || hierarchy.conta).match(/^\d+/)?.[0];
-      const isContas3ou4 = contaPrincipalNum && (contaPrincipalNum.startsWith('3') || contaPrincipalNum.startsWith('4'));
 
       console.log(`[IEO DEBUG] Conta: ${hierarchy.contaPrincipal || hierarchy.conta}, Num: ${contaPrincipalNum}, isContas3ou4: ${isContas3ou4}, TipoItem: ${hierarchy.tipoItem}`);
 
