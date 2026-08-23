@@ -19,6 +19,7 @@ import {
 import { ClassificacaoRevendasTab } from './ClassificacaoRevendasTab';
 import { RegrasDepartamentosTab } from './RegrasDepartamentosTab';
 import { DepartamentoTab } from './DepartamentoTab';
+import { AnaliseCenariosTab } from './AnaliseCenariosTab';
 
 const SEMESTRES = ['1º Semestre', '2º Semestre'];
 
@@ -269,7 +270,7 @@ interface Props {
   onChangeBrand: () => void;
 }
 
-type ActiveTab = 'importar' | 'vw' | 'audi';
+type ActiveTab = 'importar' | 'vw' | 'audi' | 'analise';
 type ImportarSubTab = 'dados' | 'classificacao' | 'revendas' | 'departamentos';
 type DepartamentoSubTab = 'veiculos_novos' | 'venda_direta' | 'veiculos_usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'diretoria' | 'consolidado';
 
@@ -524,6 +525,16 @@ export function IEODashboard({ onChangeBrand }: Props) {
             }`}
           >
             Audi
+          </button>
+          <button
+            onClick={() => setActiveTab('analise')}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'analise'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Análise
           </button>
         </div>
 
@@ -803,6 +814,9 @@ export function IEODashboard({ onChangeBrand }: Props) {
             />
           </div>
         )}
+
+        {/* Tab Análise */}
+        {activeTab === 'analise' && <AnaliseCenariosTab />}
 
         {/* Tab Audi */}
         {activeTab === 'audi' && (
