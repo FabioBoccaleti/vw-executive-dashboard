@@ -184,3 +184,72 @@ export async function loadClassificacoesConta(): Promise<Record<string, TipoCont
 export async function saveClassificacoesConta(data: Record<string, TipoContaClassificacao>): Promise<void> {
   await kvSet(CLASSIFICACOES_CONTA_KEY, data);
 }
+
+// ─── Dados Operacionais por Período e Departamento ───────────────────────────
+
+export interface DadosOperacionais {
+  funcionarios?: number;
+  volumeVendas?: number;
+}
+
+const DADOS_OP_KEY = `${KEY_PREFIX}:dados_operacionais`;
+
+export function dadosOpKey(
+  year: number,
+  semestre: number,
+  departamento: DeptoClassificacao | 'consolidado',
+): string {
+  return `${year}:S${semestre}:${departamento}`;
+}
+
+export async function loadAllDadosOperacionais(): Promise<Record<string, DadosOperacionais>> {
+  return (await kvGet<Record<string, DadosOperacionais>>(DADOS_OP_KEY)) ?? {};
+}
+
+export async function saveAllDadosOperacionais(
+  data: Record<string, DadosOperacionais>,
+): Promise<void> {
+  await kvSet(DADOS_OP_KEY, data);
+}
+
+// ─── Cenários de Análise de Eficiência ───────────────────────────────────────
+
+export type NumeradorTipo =
+  | { tipo: 'resultado' }         // soma de todos os grupos
+  | { tipo: 'resultado_sem_fin' } // soma sem despesas_financeiras
+  | { tipo: 'grupo'; grupo: TipoContaClassificacao };
+
+export type DenominadorTipo =
+  | { tipo: 'funcionarios' }
+  | { tipo: 'volume_vendas' }
+  | { tipo: 'resultado' }
+  | { tipo: 'resultado_sem_fin' }
+  | { tipo: 'grupo'; grupo: TipoContaClassificacao };
+
+export interface IEOIndicadorConfig {
+  id: string;
+  nome: string;
+  numerador: NumeradorTipo;
+  denominador: DenominadorTipo;
+  formato: 'reais' | 'percentual' | 'reais_por_unidade';
+  meta?: number; // em reais ou em % (ex: 15 significa 15%)
+  melhorQuando: 'maior' | 'menor';
+}
+
+export interface IEOCenario {
+  id: string;
+  nome: string;
+  departamento: DeptoClassificacao | 'consolidado'; // sem marca: cenário se aplica a VW e Audi
+  indicadores: IEOIndicadorConfig[];
+  criadoEm: string;
+}
+
+const CENARIOS_KEY = `${KEY_PREFIX}:cenarios`;
+
+export async function loadCenarios(): Promise<IEOCenario[]> {
+  return (await kvGet<IEOCenario[]>(CENARIOS_KEY)) ?? [];
+}
+
+export async function saveCenarios(cenarios: IEOCenario[]): Promise<void> {
+  await kvSet(CENARIOS_KEY, cenarios);
+}
