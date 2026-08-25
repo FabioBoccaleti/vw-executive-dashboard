@@ -133,10 +133,10 @@ export function DepartamentoTab({ marca, departamento, year, semestre }: Props) 
           </div>
         </div>
 
-        {/* Total */}
+        {/* Resultado do Período */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            Total
+            Resultado do Período
           </div>
           <div
             className={`text-lg font-bold ${
@@ -154,24 +154,30 @@ export function DepartamentoTab({ marca, departamento, year, semestre }: Props) 
           </div>
         </div>
 
-        {/* Maior Grupo */}
-        {maiorGrupo && (
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-              Maior Grupo
+        {/* Total das Receitas Líquidas */}
+        {(() => {
+          const receitasLiquidas =
+            (data.grupos.receita_vendas?.subtotal ?? 0) +
+            (data.grupos.receitas_operacionais?.subtotal ?? 0) +
+            (data.grupos.receitas_financeiras?.subtotal ?? 0);
+          return (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                Total das Receitas Líquidas
+              </div>
+              <div className="text-xs text-slate-500 mb-1">
+                Rec. Vendas + Rec. Operacionais + Rec. Financeiras
+              </div>
+              <div
+                className={`text-lg font-bold ${
+                  receitasLiquidas < 0 ? 'text-red-600' : 'text-emerald-600'
+                }`}
+              >
+                {fmtCurrency(receitasLiquidas)}
+              </div>
             </div>
-            <div className="text-sm font-bold text-slate-700">
-              {TIPO_CONTA_LABELS[maiorGrupo]}
-            </div>
-            <div
-              className={`text-lg font-bold ${
-                data.grupos[maiorGrupo].subtotal < 0 ? 'text-red-600' : 'text-emerald-600'
-              }`}
-            >
-              {fmtCurrency(data.grupos[maiorGrupo].subtotal)}
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Lista de Grupos */}
