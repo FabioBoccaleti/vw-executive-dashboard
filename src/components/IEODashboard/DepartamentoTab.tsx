@@ -121,7 +121,7 @@ export function DepartamentoTab({ marca, departamento, year, semestre }: Props) 
   return (
     <div className="flex-1 flex flex-col gap-4 min-h-0">
       {/* Cabeçalho */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Período */}
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
@@ -174,6 +174,37 @@ export function DepartamentoTab({ marca, departamento, year, semestre }: Props) 
                 }`}
               >
                 {fmtCurrency(receitasLiquidas)}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Total de Custos e Despesas */}
+        {(() => {
+          const custosDespesas =
+            (data.grupos.custos_operacionais?.subtotal ?? 0) +
+            (data.grupos.despesas_pessoal?.subtotal ?? 0) +
+            (data.grupos.despesas_servicos_terceiros?.subtotal ?? 0) +
+            (data.grupos.despesas_ocupacao?.subtotal ?? 0) +
+            (data.grupos.despesas_funcionamento?.subtotal ?? 0) +
+            (data.grupos.despesas_vendas?.subtotal ?? 0) +
+            (data.grupos.amortizacoes_depreciacoes?.subtotal ?? 0) +
+            (data.grupos.despesas_financeiras?.subtotal ?? 0) +
+            (data.grupos.outras_despesas_operacionais?.subtotal ?? 0);
+          return (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                Total de Custos e Despesas
+              </div>
+              <div className="text-xs text-slate-500 mb-1">
+                Custos + Despesas Operacionais + Financeiras
+              </div>
+              <div
+                className={`text-lg font-bold ${
+                  custosDespesas < 0 ? 'text-red-600' : 'text-emerald-600'
+                }`}
+              >
+                {fmtCurrency(custosDespesas)}
               </div>
             </div>
           );
