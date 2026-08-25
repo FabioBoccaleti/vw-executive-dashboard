@@ -209,10 +209,13 @@ export async function processDepartamentoData(
         ? (contaPrincipalNum != null && contasTipoItemNums.has(contaPrincipalNum))
         : (contaPrincipalNum != null && (contaPrincipalNum.startsWith('3') || contaPrincipalNum.startsWith('4')));
 
-      // Contas com TipoItem: processar apenas linhas de TipoItem (o CCusto é subtotal, evita duplicação)
+      // Contas com TipoItem: processa linhas de TipoItem E linhas sem tipo (usa default do CCusto)
       // Demais contas: processar apenas linhas de CCusto
       if (usaTipoItem) {
-        if (!hierarchy.tipoItem) continue;
+        // Ignorar linhas-cabeçalho de agregação (CCusto e Revenda são subtotais)
+        if (/\(CCusto\)|\(Revenda\)/i.test(hierarchy.conta)) continue;
+        // Exige ao menos CCusto para ter contexto de classificação
+        if (!hierarchy.ccusto) continue;
       } else {
         if (!hierarchy.ccusto || hierarchy.tipoItem) continue;
       }
