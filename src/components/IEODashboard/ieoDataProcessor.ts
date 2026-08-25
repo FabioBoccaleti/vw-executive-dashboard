@@ -124,7 +124,7 @@ function extractHierarchy(
     // Conta Principal (não tem marcador)
     // É a conta mais acima que não tem (Revenda), (CCusto) ou (Tipo)
     if (!result.contaPrincipal && 
-        !/(Revenda|CCusto|Tipo)/i.test(conta) &&
+        !/\(Revenda\)|\(CCusto\)|\(Tipo\)/i.test(conta) &&
         /^\d+/.test(conta)) {
       // Salvar a conta principal completa (ex: "3110101001 - VEÍCULOS NACIONAIS/ IMPORTADOS")
       result.contaPrincipal = conta;
@@ -218,7 +218,8 @@ export async function processDepartamentoData(
         const ex = ccustoGapMap.get(k);
         if (ex) ex.valor += ph.valor;
         else ccustoGapMap.set(k, { valor: ph.valor, ccustoKey: ccKey, contaPrincipal: ph.contaPrincipal, revenda: ph.revenda });
-      } else if (ph.tipoItem && ph.ccusto) {
+      } else if (ph.tipoItem && /\(Tipo\)/i.test(ph.conta) && ph.ccusto) {
+        // Coletar apenas a linha (Tipo) em si, não sub-linhas que herdam tipoItem
         const k = _gapKey(ph.revenda, ph.ccusto, ph.contaPrincipal);
         tipoSumMap.set(k, (tipoSumMap.get(k) ?? 0) + ph.valor);
       }
@@ -243,6 +244,8 @@ export async function processDepartamentoData(
       if (usaTipoItem) {
         // Ignorar linhas-cabeçalho de agregação (CCusto e Revenda são subtotais)
         if (/\(CCusto\)|\(Revenda\)/i.test(hierarchy.conta)) continue;
+        // Sub-linhas sob (Tipo) já estão somadas na linha (Tipo) — pular para evitar dupla contagem
+        if (hierarchy.tipoItem && !/\(Tipo\)/i.test(hierarchy.conta)) continue;
         // Exige ao menos CCusto para ter contexto de classificação
         if (!hierarchy.ccusto) continue;
       } else {
