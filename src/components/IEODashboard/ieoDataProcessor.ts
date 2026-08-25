@@ -189,11 +189,40 @@ export async function processDepartamentoData(
     outras_despesas_operacionais: { contas: [], subtotal: 0 },
   };
 
+  // Maps para computação de gap (itens sem Tipo no arquivo-fonte)
+  const ccustoGapMap = new Map<string, { valor: number; ccustoKey: string; contaPrincipal: string; revenda: string }>();
+  const tipoSumMap = new Map<string, number>();
+  const _gapKey = (rev: string, cc: string, cp: string) => `${rev}|${cc}|${cp}`;
+
   // Processar cada semestre
   for (const semestreData of semestreDataList) {
     if (!semestreData) continue;
 
     console.log(`[IEO DEBUG] Processando semestre. Total de linhas: ${semestreData.rows.length}`);
+
+    // Pre-pass: coleta totais de CCusto e somas de Tipo para gap computation
+    for (let i = 0; i < semestreData.rows.length; i++) {
+      const pr = semestreData.rows[i];
+      if (pr.isMain) continue;
+      const ph = extractHierarchy(semestreData.rows, i);
+      if (!ph || !ph.revenda || !ph.contaPrincipal) continue;
+      if (!revendasMap[ph.revenda] || revendasMap[ph.revenda] !== marca) continue;
+      const pcNum = (ph.contaPrincipal || ph.conta).match(/^\d+/)?.[0];
+      if (!pcNum) continue;
+      const pUsaTipo = contasTipoItemNums !== null ? contasTipoItemNums.has(pcNum) : (pcNum.startsWith('3') || pcNum.startsWith('4'));
+      if (!pUsaTipo) continue;
+      if (/\(CCusto\)/i.test(ph.conta) && ph.ccusto) {
+        const ccKey = ph.ccusto.match(/^(\d+\s*-)/)?.[1];
+        if (!ccKey || !regrasMap[ccKey]?.default) continue;
+        const k = _gapKey(ph.revenda, ph.ccusto, ph.contaPrincipal);
+        const ex = ccustoGapMap.get(k);
+        if (ex) ex.valor += ph.valor;
+        else ccustoGapMap.set(k, { valor: ph.valor, ccustoKey: ccKey, contaPrincipal: ph.contaPrincipal, revenda: ph.revenda });
+      } else if (ph.tipoItem && ph.ccusto) {
+        const k = _gapKey(ph.revenda, ph.ccusto, ph.contaPrincipal);
+        tipoSumMap.set(k, (tipoSumMap.get(k) ?? 0) + ph.valor);
+      }
+    }
 
     // Processar cada linha do arquivo
     for (let i = 0; i < semestreData.rows.length; i++) {
@@ -325,6 +354,26 @@ export async function processDepartamentoData(
       
       console.log(`[IEO DEBUG] ✓✓✓ Conta adicionada com sucesso!`);
     }
+  }
+
+  // Post-pass: adiciona gap (itens sem Tipo no arquivo) classificado pelo default do CCusto
+  for (const [k, info] of ccustoGapMap.entries()) {
+    const gap = info.valor - (tipoSumMap.get(k) ?? 0);
+    if (Math.abs(gap) < 0.01) continue;
+    const gapRegra = regrasMap[info.ccustoKey];
+    const gapDepto = gapRegra?.default;
+    if (!gapDepto) continue;
+    if (gapDepto !== depto && depto !== 'consolidado') continue;
+    const gapTipo = contasMap[info.contaPrincipal];
+    if (!gapTipo || !grupos[gapTipo]) continue;
+    const gapContaExistente = grupos[gapTipo].contas.find(c => c.conta === info.contaPrincipal);
+    if (gapContaExistente) {
+      gapContaExistente.valor += gap;
+    } else {
+      grupos[gapTipo].contas.push({ conta: info.contaPrincipal, valor: gap });
+    }
+    grupos[gapTipo].subtotal += gap;
+    additionLogs.push(`GAP: ${info.ccustoKey} | R$ ${gap.toFixed(2)} | CONTA: ${info.contaPrincipal} | DEPTO: ${gapDepto}`);
   }
 
   // Calcular total
