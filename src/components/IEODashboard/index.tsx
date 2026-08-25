@@ -18,6 +18,7 @@ import {
 } from './ieoStorage';
 import { ClassificacaoRevendasTab } from './ClassificacaoRevendasTab';
 import { RegrasDepartamentosTab } from './RegrasDepartamentosTab';
+import { ContasTipoItemTab } from './ContasTipoItemTab';
 import { DepartamentoTab } from './DepartamentoTab';
 import { AnaliseCenariosTab } from './AnaliseCenariosTab';
 
@@ -271,7 +272,7 @@ interface Props {
 }
 
 type ActiveTab = 'importar' | 'vw' | 'audi' | 'analise';
-type ImportarSubTab = 'dados' | 'classificacao' | 'revendas' | 'departamentos';
+type ImportarSubTab = 'dados' | 'classificacao' | 'revendas' | 'departamentos' | 'contas_tipo_item';
 type DepartamentoSubTab = 'veiculos_novos' | 'venda_direta' | 'veiculos_usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'diretoria' | 'consolidado';
 
 // ─── Seletor de Ano e Semestre ───────────────────────────────────────────────
@@ -583,6 +584,16 @@ export function IEODashboard({ onChangeBrand }: Props) {
               >
                 Regra por Departamento
               </button>
+              <button
+                onClick={() => setImportarSubTab('contas_tipo_item')}
+                className={`px-4 py-2 text-xs font-semibold rounded transition-colors ${
+                  importarSubTab === 'contas_tipo_item'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                Contas c/ Tipo Item
+              </button>
             </div>
 
             {/* Dados do Semestre */}
@@ -760,6 +771,13 @@ export function IEODashboard({ onChangeBrand }: Props) {
             {importarSubTab === 'departamentos' && (
               <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
                 <RegrasDepartamentosTab />
+              </div>
+            )}
+
+            {/* Contas com Tipo Item */}
+            {importarSubTab === 'contas_tipo_item' && (
+              <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
+                <ContasTipoItemTab />
               </div>
             )}
           </div>

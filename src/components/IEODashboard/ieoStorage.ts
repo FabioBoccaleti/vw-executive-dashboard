@@ -255,3 +255,16 @@ export async function loadCenarios(): Promise<IEOCenario[]> {
 export async function saveCenarios(cenarios: IEOCenario[]): Promise<void> {
   await kvSet(CENARIOS_KEY, cenarios);
 }
+
+// ─── Contas que usam Regra de Tipo Item (P/S/V) ──────────────────────────────
+
+const CONTAS_TIPO_ITEM_KEY = `${KEY_PREFIX}:contas_tipo_item`;
+
+// Retorna null se nunca foi configurado (permite fallback para comportamento legado)
+export async function loadContasTipoItem(): Promise<string[] | null> {
+  return kvGet<string[]>(CONTAS_TIPO_ITEM_KEY);
+}
+
+export async function saveContasTipoItem(contas: string[]): Promise<void> {
+  await kvSet(CONTAS_TIPO_ITEM_KEY, contas);
+}

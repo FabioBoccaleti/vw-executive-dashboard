@@ -4,6 +4,7 @@ import {
   getAllImportedSemestresData,
   loadRegrasDeptos,
   saveRegrasDeptos,
+  loadContasTipoItem,
   type RegraDepto,
   type DeptoClassificacao,
   DEPTO_CLASSIFICACAO_LABELS,
@@ -24,36 +25,39 @@ export function RegrasDepartamentosTab() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'classified'>('all');
 
   useEffect(() => {
-    Promise.all([getAllImportedSemestresData(), loadRegrasDeptos()])
-      .then(([allData, savedRegras]) => {
+    Promise.all([getAllImportedSemestresData(), loadRegrasDeptos(), loadContasTipoItem()])
+      .then(([allData, savedRegras, contasTipoItemRaw]) => {
+        // null = nunca configurado → usa fallback legado (prefixo 3 ou 4)
+        const contasTipoItemNums: Set<string> | null = contasTipoItemRaw !== null
+          ? new Set(contasTipoItemRaw.map(c => c.match(/^(\d+)/)?.[1] ?? '').filter(Boolean))
+          : null;
+
         const deptosMap = new Map<string, { fullName: string; temContaCom3ou4: boolean }>();
         
         for (const data of allData) {
           let contaPrincipalAtual: string | null = null;
           
           for (const row of data.rows) {
-            // Detectar linha de conta principal (ex: "3120101001 - PEÇAS BALCÃO VW")
-            // É uma linha que começa com número puro e tem " - " depois
             if (row.isMain) {
               const match = row.conta.match(/^(\d+)\s+-/);
               if (match) {
-                contaPrincipalAtual = match[1]; // Guardar número da conta principal
+                contaPrincipalAtual = match[1];
               }
               continue;
             }
             
-            // Detectar linha de departamento (CCusto)
-            // Formato: "103 - PEÇAS (CCusto)"
             const ccustoMatch = row.conta.match(/^(\d{3,})\s*-\s*[^(]+\(CCusto\)/i);
             if (!ccustoMatch) continue;
             
             const ccustoNum = ccustoMatch[1];
             const prefix = `${ccustoNum} -`;
             
-            // Verificar se a conta principal começa com 3 ou 4
-            const contaComecaCom3ou4 = contaPrincipalAtual ? 
-              (contaPrincipalAtual.startsWith('3') || contaPrincipalAtual.startsWith('4')) : 
-              false;
+            // Usar lista configurável; se não configurado, fallback para prefixo 3/4
+            const contaComecaCom3ou4 = contaPrincipalAtual
+              ? contasTipoItemNums !== null
+                ? contasTipoItemNums.has(contaPrincipalAtual)
+                : (contaPrincipalAtual.startsWith('3') || contaPrincipalAtual.startsWith('4'))
+              : false;
             
             if (!deptosMap.has(prefix)) {
               deptosMap.set(prefix, {
@@ -61,7 +65,6 @@ export function RegrasDepartamentosTab() {
                 temContaCom3ou4: contaComecaCom3ou4,
               });
             } else {
-              // Atualizar flag se encontrar conta com 3 ou 4
               const existing = deptosMap.get(prefix)!;
               if (contaComecaCom3ou4 && !existing.temContaCom3ou4) {
                 existing.temContaCom3ou4 = true;

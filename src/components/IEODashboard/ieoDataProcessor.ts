@@ -9,6 +9,7 @@ import {
   loadClassificacaoRevendas,
   loadClassificacoesConta,
   loadRegrasDeptos,
+  loadContasTipoItem,
 } from './ieoStorage';
 
 // ─── Estrutura hierárquica do arquivo importado ──────────────────────────────
@@ -143,11 +144,17 @@ export async function processDepartamentoData(
   semestre: number, // 0 = ano todo, 1 = S1, 2 = S2
 ): Promise<DepartamentoData> {
   // Carregar dados necessários
-  const [revendasMap, contasMap, regrasMap] = await Promise.all([
+  const [revendasMap, contasMap, regrasMap, contasTipoItemRaw] = await Promise.all([
     loadClassificacaoRevendas(),
     loadClassificacoesConta(),
     loadRegrasDeptos(),
+    loadContasTipoItem(),
   ]);
+
+  // null = nunca configurado → usa fallback legado (prefixo 3 ou 4)
+  const contasTipoItemNums: Set<string> | null = contasTipoItemRaw !== null
+    ? new Set(contasTipoItemRaw.map(c => c.match(/^(\d+)/)?.[1] ?? '').filter(Boolean))
+    : null;
 
   console.log(`[IEO DEBUG] ========== Processando ${marca} / ${depto} / ${year} / S${semestre} ==========`);
   console.log(`[IEO DEBUG] Revendas classificadas:`, Object.keys(revendasMap).length, revendasMap);
@@ -196,13 +203,15 @@ export async function processDepartamentoData(
       const hierarchy = extractHierarchy(semestreData.rows, i);
       if (!hierarchy) continue;
 
-      // Determinar prefixo da conta para decidir a lógica de processamento
+      // Determinar se esta conta usa a regra de Tipo Item
       const contaPrincipalNum = (hierarchy.contaPrincipal || hierarchy.conta).match(/^\d+/)?.[0];
-      const isContas3ou4 = contaPrincipalNum && (contaPrincipalNum.startsWith('3') || contaPrincipalNum.startsWith('4'));
+      const usaTipoItem = contasTipoItemNums !== null
+        ? (contaPrincipalNum != null && contasTipoItemNums.has(contaPrincipalNum))
+        : (contaPrincipalNum != null && (contaPrincipalNum.startsWith('3') || contaPrincipalNum.startsWith('4')));
 
-      // Contas 3/4: processar apenas linhas de TipoItem (o CCusto é subtotal, evita duplicação)
-      // Contas 5 e outras: processar apenas linhas de CCusto (não possuem TipoItem como folha)
-      if (isContas3ou4) {
+      // Contas com TipoItem: processar apenas linhas de TipoItem (o CCusto é subtotal, evita duplicação)
+      // Demais contas: processar apenas linhas de CCusto
+      if (usaTipoItem) {
         if (!hierarchy.tipoItem) continue;
       } else {
         if (!hierarchy.ccusto || hierarchy.tipoItem) continue;
@@ -243,19 +252,17 @@ export async function processDepartamentoData(
 
       let deptoClassificado: DeptoClassificacao | undefined;
 
-      console.log(`[IEO DEBUG] Conta: ${hierarchy.contaPrincipal || hierarchy.conta}, Num: ${contaPrincipalNum}, isContas3ou4: ${isContas3ou4}, TipoItem: ${hierarchy.tipoItem}`);
+      console.log(`[IEO DEBUG] Conta: ${hierarchy.contaPrincipal || hierarchy.conta}, Num: ${contaPrincipalNum}, usaTipoItem: ${usaTipoItem}, TipoItem: ${hierarchy.tipoItem}`);
 
-      if (isContas3ou4 && hierarchy.tipoItem && regra.byTipoItem) {
+      if (usaTipoItem && hierarchy.tipoItem && regra.byTipoItem) {
         deptoClassificado = regra.byTipoItem[hierarchy.tipoItem];
         console.log(`[IEO DEBUG] Usando byTipoItem[${hierarchy.tipoItem}] = ${deptoClassificado}`);
         
-        // Se não tem regra específica para este tipo de item, não adicionar em nenhum departamento
         if (!deptoClassificado) {
           console.log(`[IEO DEBUG] ❌ Sem regra específica para TipoItem ${hierarchy.tipoItem}, pulando...`);
           continue;
         }
       } else if (!deptoClassificado) {
-        // Apenas usar default se NÃO for contas 3 ou 4
         deptoClassificado = regra.default;
         console.log(`[IEO DEBUG] Usando default = ${deptoClassificado}`);
       }
