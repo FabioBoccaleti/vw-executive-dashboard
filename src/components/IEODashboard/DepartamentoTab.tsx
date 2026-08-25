@@ -203,7 +203,7 @@ export function DepartamentoTab({ marca, departamento, year, semestre }: Props) 
 
                 {/* Lista de Contas */}
                 <div className="space-y-1">
-                  {grupo.contas.map((conta, idx) => (
+                  {grupo.contas.filter(c => c.valor !== 0).map((conta, idx) => (
                     <div
                       key={idx}
                       className="flex items-center justify-between py-1.5 px-3 hover:bg-slate-50 rounded transition-colors"
