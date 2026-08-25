@@ -215,10 +215,12 @@ export async function saveAllDadosOperacionais(
 // ─── Cenários de Análise de Eficiência ───────────────────────────────────────
 
 export type NumeradorTipo =
-  | { tipo: 'resultado' }         // soma de todos os grupos
-  | { tipo: 'resultado_sem_fin' } // soma sem despesas_financeiras
+  | { tipo: 'resultado' }
+  | { tipo: 'resultado_sem_fin' }
   | { tipo: 'grupo'; grupo: TipoContaClassificacao }
-  | { tipo: 'conta'; conta: string }; // conta contábil específica
+  | { tipo: 'multi_grupo'; grupos: TipoContaClassificacao[] }
+  | { tipo: 'conta'; conta: string }
+  | { tipo: 'multi_conta'; contas: string[] };
 
 export type DenominadorTipo =
   | { tipo: 'funcionarios' }
@@ -226,7 +228,9 @@ export type DenominadorTipo =
   | { tipo: 'resultado' }
   | { tipo: 'resultado_sem_fin' }
   | { tipo: 'grupo'; grupo: TipoContaClassificacao }
-  | { tipo: 'conta'; conta: string }; // conta contábil específica
+  | { tipo: 'multi_grupo'; grupos: TipoContaClassificacao[] }
+  | { tipo: 'conta'; conta: string }
+  | { tipo: 'multi_conta'; contas: string[] };
 
 export interface IEOIndicadorConfig {
   id: string;

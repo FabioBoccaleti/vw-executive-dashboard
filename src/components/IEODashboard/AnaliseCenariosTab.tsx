@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit3, X, TrendingUp, TrendingDown, BarChart2, Save, AlertCircle, Settings, Zap } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Edit3, X, TrendingUp, TrendingDown, BarChart2, Save, AlertCircle, Settings, Zap, ChevronDown, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   type Marca,
@@ -99,58 +99,15 @@ function genId(): string {
 
 // ─── Opções de Numerador / Denominador ───────────────────────────────────────
 
-const NUMERADOR_OPTS: Array<{ key: string; label: string }> = [
-  { key: 'resultado',         label: 'Resultado Operacional (todos os grupos)' },
-  { key: 'resultado_sem_fin', label: 'Resultado s/ Despesas Financeiras' },
-  ...TIPOS_CONTA_ORDENADOS.map(g => ({ key: `grupo:${g}`, label: TIPO_CONTA_LABELS[g] })),
-];
-
-const DENOMINADOR_OPTS: Array<{ key: string; label: string }> = [
-  { key: 'funcionarios',      label: 'Nº de Funcionários' },
-  { key: 'volume_vendas',     label: 'Volume de Vendas / OS (unidades)' },
-  { key: 'resultado',         label: 'Resultado Operacional' },
-  { key: 'resultado_sem_fin', label: 'Resultado s/ Despesas Financeiras' },
-  ...TIPOS_CONTA_ORDENADOS.map(g => ({ key: `grupo:${g}`, label: TIPO_CONTA_LABELS[g] })),
-];
-
-function numeradorToKey(n: NumeradorTipo): string {
-  if (n.tipo === 'resultado') return 'resultado';
-  if (n.tipo === 'resultado_sem_fin') return 'resultado_sem_fin';
-  if (n.tipo === 'conta') return `conta:${n.conta}`;
-  return `grupo:${n.grupo}`;
-}
-
-function denominadorToKey(d: DenominadorTipo): string {
-  if (d.tipo === 'funcionarios') return 'funcionarios';
-  if (d.tipo === 'volume_vendas') return 'volume_vendas';
-  if (d.tipo === 'resultado') return 'resultado';
-  if (d.tipo === 'resultado_sem_fin') return 'resultado_sem_fin';
-  if (d.tipo === 'conta') return `conta:${d.conta}`;
-  return `grupo:${d.grupo}`;
-}
-
-function keyToNumerador(key: string): NumeradorTipo {
-  if (key === 'resultado') return { tipo: 'resultado' };
-  if (key === 'resultado_sem_fin') return { tipo: 'resultado_sem_fin' };
-  if (key.startsWith('conta:')) return { tipo: 'conta', conta: key.slice(6) };
-  return { tipo: 'grupo', grupo: key.replace('grupo:', '') as TipoContaClassificacao };
-}
-
-function keyToDenominador(key: string): DenominadorTipo {
-  if (key === 'funcionarios') return { tipo: 'funcionarios' };
-  if (key === 'volume_vendas') return { tipo: 'volume_vendas' };
-  if (key === 'resultado') return { tipo: 'resultado' };
-  if (key === 'resultado_sem_fin') return { tipo: 'resultado_sem_fin' };
-  if (key.startsWith('conta:')) return { tipo: 'conta', conta: key.slice(6) };
-  return { tipo: 'grupo', grupo: key.replace('grupo:', '') as TipoContaClassificacao };
-}
-
 function extractValue(
   data: DepartamentoData,
   tipo: NumeradorTipo | DenominadorTipo,
   dadosOp: DadosOperacionais,
 ): number | null {
   if (tipo.tipo === 'grupo') return data.grupos[tipo.grupo]?.subtotal ?? 0;
+  if (tipo.tipo === 'multi_grupo') {
+    return tipo.grupos.reduce((sum, g) => sum + (data.grupos[g]?.subtotal ?? 0), 0);
+  }
   if (tipo.tipo === 'resultado') return data.total;
   if (tipo.tipo === 'resultado_sem_fin') {
     return data.total - (data.grupos.despesas_financeiras?.subtotal ?? 0);
@@ -158,7 +115,6 @@ function extractValue(
   if (tipo.tipo === 'funcionarios') return dadosOp.funcionarios ?? null;
   if (tipo.tipo === 'volume_vendas') return dadosOp.volumeVendas ?? null;
   if (tipo.tipo === 'conta') {
-    // Soma o valor da conta em todos os grupos (pode aparecer em apenas um)
     let total = 0;
     for (const grupo of Object.values(data.grupos)) {
       const found = grupo.contas.find(c => c.conta === tipo.conta);
@@ -166,7 +122,201 @@ function extractValue(
     }
     return total;
   }
+  if (tipo.tipo === 'multi_conta') {
+    let total = 0;
+    for (const contaId of tipo.contas) {
+      for (const grupo of Object.values(data.grupos)) {
+        const found = grupo.contas.find(c => c.conta === contaId);
+        if (found) total += found.valor;
+      }
+    }
+    return total;
+  }
   return null;
+}
+
+// ─── MultiIndicadorDropdown ──────────────────────────────────────────────────
+
+interface MultiIndicadorDropdownProps {
+  value: NumeradorTipo | DenominadorTipo;
+  onChange: (v: NumeradorTipo | DenominadorTipo) => void;
+  includeDadosOp?: boolean;
+  contasDisponiveis: string[];
+}
+
+function MultiIndicadorDropdown({
+  value, onChange, includeDadosOp = false, contasDisponiveis,
+}: MultiIndicadorDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const isGrupoMode = value.tipo === 'grupo' || value.tipo === 'multi_grupo';
+  const isContaMode = value.tipo === 'conta' || value.tipo === 'multi_conta';
+
+  const activeGrupos = new Set<TipoContaClassificacao>(
+    value.tipo === 'grupo' ? [value.grupo]
+    : value.tipo === 'multi_grupo' ? value.grupos
+    : [],
+  );
+  const activeContas = new Set<string>(
+    value.tipo === 'conta' ? [value.conta]
+    : value.tipo === 'multi_conta' ? value.contas
+    : [],
+  );
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  function getSummary(): string {
+    switch (value.tipo) {
+      case 'resultado':         return 'Resultado Operacional (todos os grupos)';
+      case 'resultado_sem_fin': return 'Resultado s/ Despesas Financeiras';
+      case 'funcionarios':      return 'Nº de Funcionários';
+      case 'volume_vendas':     return 'Volume de Vendas / OS (unidades)';
+      case 'grupo':             return TIPO_CONTA_LABELS[value.grupo];
+      case 'multi_grupo': {
+        const gs = value.grupos;
+        return gs.length === 1 ? TIPO_CONTA_LABELS[gs[0]] : `${gs.length} grupos selecionados`;
+      }
+      case 'conta':       return value.conta;
+      case 'multi_conta': {
+        const cs = value.contas;
+        return cs.length === 1 ? cs[0] : `${cs.length} contas selecionadas`;
+      }
+      default: return '— Selecione —';
+    }
+  }
+
+  function selectSingle(v: NumeradorTipo | DenominadorTipo) {
+    onChange(v);
+    setOpen(false);
+  }
+
+  function toggleGrupo(grupo: TipoContaClassificacao) {
+    const next = new Set<TipoContaClassificacao>(isGrupoMode ? activeGrupos : []);
+    if (next.has(grupo)) next.delete(grupo); else next.add(grupo);
+    if (next.size === 0) return;
+    const arr = TIPOS_CONTA_ORDENADOS.filter(g => next.has(g));
+    onChange(arr.length === 1 ? { tipo: 'grupo', grupo: arr[0] } : { tipo: 'multi_grupo', grupos: arr });
+  }
+
+  function toggleConta(conta: string) {
+    const next = new Set<string>(isContaMode ? activeContas : []);
+    if (next.has(conta)) next.delete(conta); else next.add(conta);
+    if (next.size === 0) return;
+    const arr = contasDisponiveis.filter(c => next.has(c));
+    onChange(arr.length === 1 ? { tipo: 'conta', conta: arr[0] } : { tipo: 'multi_conta', contas: arr });
+  }
+
+  const RadioDot = ({ active }: { active: boolean }) => (
+    <div className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 flex items-center justify-center ${
+      active ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'
+    }`}>
+      {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+    </div>
+  );
+
+  const CheckBox = ({ active }: { active: boolean }) => (
+    <div className={`w-3.5 h-3.5 rounded border-2 shrink-0 flex items-center justify-center ${
+      active ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'
+    }`}>
+      {active && <Check className="w-2.5 h-2.5 text-white" />}
+    </div>
+  );
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400 text-left flex items-center justify-between gap-2"
+      >
+        <span className="truncate text-slate-700">{getSummary()}</span>
+        <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl max-h-72 overflow-y-auto">
+          <div className="px-3 pt-2 pb-0.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Resultados</span>
+          </div>
+          {([
+            { v: { tipo: 'resultado' as const },        label: 'Resultado Operacional (todos os grupos)' },
+            { v: { tipo: 'resultado_sem_fin' as const }, label: 'Resultado s/ Despesas Financeiras' },
+          ] as const).map(opt => (
+            <button key={opt.v.tipo} type="button" onClick={() => selectSingle(opt.v)}
+              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 flex items-center gap-2 ${
+                value.tipo === opt.v.tipo ? 'text-emerald-600 font-semibold' : 'text-slate-700'
+              }`}
+            >
+              <RadioDot active={value.tipo === opt.v.tipo} />
+              {opt.label}
+            </button>
+          ))}
+
+          {includeDadosOp && (<>
+            <div className="px-3 pt-2 pb-0.5 border-t border-slate-100 mt-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Dados Operacionais</span>
+            </div>
+            {([
+              { v: { tipo: 'funcionarios' as const }, label: 'Nº de Funcionários' },
+              { v: { tipo: 'volume_vendas' as const }, label: 'Volume de Vendas / OS (unidades)' },
+            ] as const).map(opt => (
+              <button key={opt.v.tipo} type="button" onClick={() => selectSingle(opt.v)}
+                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 flex items-center gap-2 ${
+                  value.tipo === opt.v.tipo ? 'text-emerald-600 font-semibold' : 'text-slate-700'
+                }`}
+              >
+                <RadioDot active={value.tipo === opt.v.tipo} />
+                {opt.label}
+              </button>
+            ))}
+          </>)}
+
+          <div className="px-3 pt-2 pb-0.5 border-t border-slate-100 mt-1">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Grupos de Contas</span>
+          </div>
+          {TIPOS_CONTA_ORDENADOS.map(g => {
+            const checked = isGrupoMode && activeGrupos.has(g);
+            return (
+              <button key={g} type="button" onClick={() => toggleGrupo(g)}
+                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 flex items-center gap-2 ${
+                  checked ? 'text-emerald-600 font-semibold' : 'text-slate-700'
+                }`}
+              >
+                <CheckBox active={checked} />
+                {TIPO_CONTA_LABELS[g]}
+              </button>
+            );
+          })}
+
+          {contasDisponiveis.length > 0 && (<>
+            <div className="px-3 pt-2 pb-0.5 border-t border-slate-100 mt-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contas Específicas</span>
+            </div>
+            {contasDisponiveis.map(c => {
+              const checked = isContaMode && activeContas.has(c);
+              return (
+                <button key={c} type="button" onClick={() => toggleConta(c)}
+                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 flex items-center gap-2 ${
+                    checked ? 'text-emerald-600 font-semibold' : 'text-slate-700'
+                  }`}
+                >
+                  <CheckBox active={checked} />
+                  {c}
+                </button>
+              );
+            })}
+          </>)}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── CenarioSection ───────────────────────────────────────────────────────────
@@ -796,46 +946,6 @@ function CenarioEditorDialog({ initial, defaultDepto, onSave, onClose }: EditorP
     });
   }, []);
 
-  // Select reutilizável com optgroups: Resultados | Dados Operacionais (opcional) | Grupos | Contas
-  function IndicadorSelect({
-    value, onChange, includeDadosOp = false,
-  }: {
-    value: string;
-    onChange: (v: string) => void;
-    includeDadosOp?: boolean;
-  }) {
-    return (
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
-      >
-        <optgroup label="Resultados">
-          <option value="resultado">Resultado Operacional (todos os grupos)</option>
-          <option value="resultado_sem_fin">Resultado s/ Despesas Financeiras</option>
-        </optgroup>
-        {includeDadosOp && (
-          <optgroup label="Dados Operacionais">
-            <option value="funcionarios">Nº de Funcionários</option>
-            <option value="volume_vendas">Volume de Vendas / OS (unidades)</option>
-          </optgroup>
-        )}
-        <optgroup label="Grupos de Contas">
-          {TIPOS_CONTA_ORDENADOS.map(g => (
-            <option key={g} value={`grupo:${g}`}>{TIPO_CONTA_LABELS[g]}</option>
-          ))}
-        </optgroup>
-        {contasDisponiveis.length > 0 && (
-          <optgroup label="Contas Específicas">
-            {contasDisponiveis.map(c => (
-              <option key={c} value={`conta:${c}`}>{c}</option>
-            ))}
-          </optgroup>
-        )}
-      </select>
-    );
-  }
-
   function addIndicador() {
     setIndicadores(prev => [
       ...prev,
@@ -945,17 +1055,19 @@ function CenarioEditorDialog({ initial, defaultDepto, onSave, onClose }: EditorP
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 mb-1">Numerador</label>
-                      <IndicadorSelect
-                        value={numeradorToKey(ind.numerador)}
-                        onChange={v => updateIndicador(ind.id, { numerador: keyToNumerador(v) })}
+                      <MultiIndicadorDropdown
+                        value={ind.numerador}
+                        onChange={v => updateIndicador(ind.id, { numerador: v as NumeradorTipo })}
+                        contasDisponiveis={contasDisponiveis}
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 mb-1">Denominador (divisor)</label>
-                      <IndicadorSelect
-                        value={denominadorToKey(ind.denominador)}
-                        onChange={v => updateIndicador(ind.id, { denominador: keyToDenominador(v) })}
+                      <MultiIndicadorDropdown
+                        value={ind.denominador}
+                        onChange={v => updateIndicador(ind.id, { denominador: v as DenominadorTipo })}
                         includeDadosOp
+                        contasDisponiveis={contasDisponiveis}
                       />
                     </div>
                   </div>
