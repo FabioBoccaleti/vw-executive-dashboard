@@ -249,6 +249,8 @@ export async function processDepartamentoData(
         // Exige ao menos CCusto para ter contexto de classificação
         if (!hierarchy.ccusto) continue;
       } else {
+        // Linhas (Revenda) são subtotais — pular para evitar que encontrem CCusto de outra revenda anterior
+        if (/\(Revenda\)/i.test(hierarchy.conta)) continue;
         if (!hierarchy.ccusto || hierarchy.tipoItem) continue;
       }
 
