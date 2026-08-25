@@ -19,7 +19,7 @@ interface ContaHierarchy {
   contaPrincipal?: string; // Conta principal (para buscar classificação)
   revenda?: string;
   ccusto?: string;
-  tipoItem?: 'P' | 'S' | 'V';
+  tipoItem?: 'P' | 'S' | 'V' | 'L';
   valor: number; // Crédito - Débito
 }
 
@@ -62,11 +62,11 @@ function extractHierarchy(
   // Primeiro, verificar se a linha atual já é um dos tipos de hierarquia
   const currentConta = row.conta;
   
-  // Se a linha atual é um Tipo (ex: "V - Veículos (Tipo)")
+  // Se a linha atual é um Tipo (ex: "V - Veículos (Tipo)", "L - Lubrificantes (Tipo)")
   if (/\(Tipo\)/i.test(currentConta)) {
-    const match = currentConta.match(/^([PSV])\s*-/i);
+    const match = currentConta.match(/^([PSVL])\s*-/i);
     if (match) {
-      result.tipoItem = match[1].toUpperCase() as 'P' | 'S' | 'V';
+      result.tipoItem = match[1].toUpperCase() as 'P' | 'S' | 'V' | 'L';
     }
   }
   
@@ -99,9 +99,9 @@ function extractHierarchy(
     // Tipo Item (Exemplo: "V - Veículos (Tipo)")
     // Não buscar tipoItem se a linha atual for intermediária (CCusto ou Revenda)
     if (!result.tipoItem && !isLinhaIntermediaria && /\(Tipo\)/i.test(conta)) {
-      const match = conta.match(/^([PSV])\s*-/i);
+      const match = conta.match(/^([PSVL])\s*-/i);
       if (match) {
-        result.tipoItem = match[1].toUpperCase() as 'P' | 'S' | 'V';
+        result.tipoItem = match[1].toUpperCase() as 'P' | 'S' | 'V' | 'L';
       }
       continue;
     }
@@ -254,7 +254,8 @@ export async function processDepartamentoData(
 
       console.log(`[IEO DEBUG] Conta: ${hierarchy.contaPrincipal || hierarchy.conta}, Num: ${contaPrincipalNum}, usaTipoItem: ${usaTipoItem}, TipoItem: ${hierarchy.tipoItem}`);
 
-      if (usaTipoItem && hierarchy.tipoItem && regra.byTipoItem) {
+      // Tipo L sempre usa CCusto (default); P/S/V usam byTipoItem
+      if (usaTipoItem && hierarchy.tipoItem && hierarchy.tipoItem !== 'L' && regra.byTipoItem) {
         deptoClassificado = regra.byTipoItem[hierarchy.tipoItem];
         console.log(`[IEO DEBUG] Usando byTipoItem[${hierarchy.tipoItem}] = ${deptoClassificado}`);
         
