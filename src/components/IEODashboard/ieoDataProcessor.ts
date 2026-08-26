@@ -137,7 +137,7 @@ function extractHierarchy(
 
 // ─── Função principal de processamento ──────────────────────────────────────
 
-export async function processDepartamentoData(
+async function _processDepartamentoDataRaw(
   marca: Marca,
   depto: DeptoClassificacao,
   year: number,
@@ -395,6 +395,63 @@ export async function processDepartamentoData(
   }
 
   return { grupos, total };
+}
+
+function _emptyDepartamentoData(): DepartamentoData {
+  const grupos: Record<TipoContaClassificacao, GrupoData> = {
+    receita_vendas: { contas: [], subtotal: 0 },
+    receitas_operacionais: { contas: [], subtotal: 0 },
+    receitas_financeiras: { contas: [], subtotal: 0 },
+    receitas_nao_operacionais: { contas: [], subtotal: 0 },
+    custos_operacionais: { contas: [], subtotal: 0 },
+    despesas_pessoal: { contas: [], subtotal: 0 },
+    despesas_servicos_terceiros: { contas: [], subtotal: 0 },
+    despesas_ocupacao: { contas: [], subtotal: 0 },
+    despesas_funcionamento: { contas: [], subtotal: 0 },
+    despesas_vendas: { contas: [], subtotal: 0 },
+    amortizacoes_depreciacoes: { contas: [], subtotal: 0 },
+    despesas_financeiras: { contas: [], subtotal: 0 },
+    outras_despesas_operacionais: { contas: [], subtotal: 0 },
+  };
+  return { grupos, total: 0 };
+}
+
+// Audi: soma Venda Direta em Veículos Novos — mesma conta soma, conta única é adicionada
+function _mergeDepartamentoData(a: DepartamentoData, b: DepartamentoData): DepartamentoData {
+  const tipos = Object.keys(a.grupos) as TipoContaClassificacao[];
+  const grupos = {} as Record<TipoContaClassificacao, GrupoData>;
+  for (const tipo of tipos) {
+    const contaMap = new Map<string, ContaDetail>();
+    for (const c of a.grupos[tipo].contas) contaMap.set(c.conta, { ...c });
+    for (const c of b.grupos[tipo].contas) {
+      const existing = contaMap.get(c.conta);
+      if (existing) {
+        contaMap.set(c.conta, { conta: existing.conta, valor: existing.valor + c.valor });
+      } else {
+        contaMap.set(c.conta, { ...c });
+      }
+    }
+    const contas = Array.from(contaMap.values());
+    grupos[tipo] = { contas, subtotal: contas.reduce((s, c) => s + c.valor, 0) };
+  }
+  return { grupos, total: Object.values(grupos).reduce((s, g) => s + g.subtotal, 0) };
+}
+
+export async function processDepartamentoData(
+  marca: Marca,
+  depto: DeptoClassificacao,
+  year: number,
+  semestre: number,
+): Promise<DepartamentoData> {
+  if (marca === 'audi' && depto === 'venda_direta') return _emptyDepartamentoData();
+  if (marca === 'audi' && depto === 'veiculos_novos') {
+    const [novos, vd] = await Promise.all([
+      _processDepartamentoDataRaw('audi', 'veiculos_novos', year, semestre),
+      _processDepartamentoDataRaw('audi', 'venda_direta', year, semestre),
+    ]);
+    return _mergeDepartamentoData(novos, vd);
+  }
+  return _processDepartamentoDataRaw(marca, depto, year, semestre);
 }
 
 // ─── Processar consolidado (soma de todos os departamentos) ─────────────────

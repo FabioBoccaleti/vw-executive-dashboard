@@ -104,13 +104,18 @@ export function DepartamentoTab({ marca, departamento, year, semestre }: Props) 
   );
 
   if (gruposComValores.length === 0) {
+    const isAudiVDMerged = marca === 'audi' && departamento === 'venda_direta';
     return (
       <div className="flex-1 flex flex-col gap-4 min-h-0">
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-2">
-            <p className="text-slate-500 font-medium">Nenhum dado encontrado</p>
+            <p className="text-slate-500 font-medium">
+              {isAudiVDMerged ? 'Dados incluídos em Veículos Novos' : 'Nenhum dado encontrado'}
+            </p>
             <p className="text-slate-400 text-sm">
-              Não há valores para este departamento no período selecionado.
+              {isAudiVDMerged
+                ? 'Na Audi, os dados de Venda Direta são somados e exibidos junto ao departamento Veículos Novos.'
+                : 'Não há valores para este departamento no período selecionado.'}
             </p>
           </div>
         </div>
