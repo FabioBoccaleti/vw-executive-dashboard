@@ -197,9 +197,10 @@ const DADOS_OP_KEY = `${KEY_PREFIX}:dados_operacionais`;
 export function dadosOpKey(
   year: number,
   semestre: number,
+  marca: Marca,
   departamento: DeptoClassificacao | 'consolidado',
 ): string {
-  return `${year}:S${semestre}:${departamento}`;
+  return `${year}:S${semestre}:${marca}:${departamento}`;
 }
 
 export async function loadAllDadosOperacionais(): Promise<Record<string, DadosOperacionais>> {

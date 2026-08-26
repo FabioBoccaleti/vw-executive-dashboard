@@ -324,6 +324,7 @@ function MultiIndicadorDropdown({
 
 interface CenarioSectionProps {
   cenario: IEOCenario;
+  marca: Marca;
   periodos: Periodo[];
   deptoDataMap: Record<string, DepartamentoData | null>;
   allDadosOp: Record<string, DadosOperacionais>;
@@ -333,7 +334,7 @@ interface CenarioSectionProps {
 }
 
 function CenarioSection({
-  cenario, periodos, deptoDataMap, allDadosOp, semFin, onEdit, onDelete,
+  cenario, marca, periodos, deptoDataMap, allDadosOp, semFin, onEdit, onDelete,
 }: CenarioSectionProps) {
   const hasMultiple = periodos.length > 1;
 
@@ -413,7 +414,7 @@ function CenarioSection({
                   const key = `${p.year}:S${p.semestre}`;
                   const data = deptoDataMap[key];
                   if (!data) return null;
-                  const dadosOp = allDadosOp[dadosOpKey(p.year, p.semestre, cenario.departamento)] ?? {};
+                  const dadosOp = allDadosOp[dadosOpKey(p.year, p.semestre, marca, cenario.departamento)] ?? {};
                   // Quando semFin ativo, 'resultado' é tratado como 'resultado_sem_fin'
                   const numTipo = semFin && ind.numerador.tipo === 'resultado' ? { tipo: 'resultado_sem_fin' as const } : ind.numerador;
                   const denTipo = semFin && ind.denominador.tipo === 'resultado' ? { tipo: 'resultado_sem_fin' as const } : ind.denominador;
@@ -683,6 +684,7 @@ function MarcaAnalise({
             <CenarioSection
               key={c.id}
               cenario={c}
+              marca={marca}
               periodos={periodos}
               deptoDataMap={deptoDataMap}
               allDadosOp={allDadosOp}
@@ -738,11 +740,12 @@ function ConfiguracoesCenarios({ cenarios, onEdit, onDelete, onNew }: ConfigProp
   }, []);
 
   async function handleDadosOpChange(
+    marca: Marca,
     dept: DeptoClassificacao | 'consolidado',
     field: keyof DadosOperacionais,
     rawValue: string,
   ) {
-    const key = dadosOpKey(dadosOpYear, dadosOpSemestre, dept);
+    const key = dadosOpKey(dadosOpYear, dadosOpSemestre, marca, dept);
     const parsed = rawValue === '' ? undefined : parseInt(rawValue, 10) || undefined;
     const next: Record<string, DadosOperacionais> = {
       ...allDadosOp,
@@ -845,35 +848,59 @@ function ConfiguracoesCenarios({ cenarios, onEdit, onDelete, onNew }: ConfigProp
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider" rowSpan={2}>Departamento</th>
+                  <th className="text-center py-2 px-3 text-xs font-bold text-blue-600 uppercase tracking-wider border-l border-slate-200" colSpan={2}>VW</th>
+                  <th className="text-center py-2 px-3 text-xs font-bold text-red-600 uppercase tracking-wider border-l border-slate-200" colSpan={2}>Audi</th>
+                </tr>
                 <tr className="border-b border-slate-200">
-                  <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Departamento</th>
-                  <th className="text-center py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Nº Funcionários</th>
+                  <th className="text-center py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-l border-slate-200">Nº Funcionários</th>
+                  <th className="text-center py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Volume Vendas / OS</th>
+                  <th className="text-center py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-l border-slate-200">Nº Funcionários</th>
                   <th className="text-center py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Volume Vendas / OS</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {DEPTOS_OPTS.map(({ id, label }) => {
-                  const key = dadosOpKey(dadosOpYear, dadosOpSemestre, id);
-                  const val = allDadosOp[key] ?? {};
+                  const vwVal = allDadosOp[dadosOpKey(dadosOpYear, dadosOpSemestre, 'vw', id)] ?? {};
+                  const audiVal = allDadosOp[dadosOpKey(dadosOpYear, dadosOpSemestre, 'audi', id)] ?? {};
                   return (
                     <tr key={id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2 px-3 text-slate-700 font-medium text-sm">{label}</td>
-                      <td className="py-2 px-3">
+                      <td className="py-2 px-3 border-l border-slate-100">
                         <input
                           type="number" min="0" step="1"
-                          value={val.funcionarios ?? ''}
-                          onChange={e => handleDadosOpChange(id, 'funcionarios', e.target.value)}
+                          value={vwVal.funcionarios ?? ''}
+                          onChange={e => handleDadosOpChange('vw', id, 'funcionarios', e.target.value)}
                           placeholder="—"
-                          className="w-full text-right px-2 py-1 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                          className="w-full text-right px-2 py-1 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
                         />
                       </td>
                       <td className="py-2 px-3">
                         <input
                           type="number" min="0" step="1"
-                          value={val.volumeVendas ?? ''}
-                          onChange={e => handleDadosOpChange(id, 'volumeVendas', e.target.value)}
+                          value={vwVal.volumeVendas ?? ''}
+                          onChange={e => handleDadosOpChange('vw', id, 'volumeVendas', e.target.value)}
                           placeholder="—"
-                          className="w-full text-right px-2 py-1 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                          className="w-full text-right px-2 py-1 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                        />
+                      </td>
+                      <td className="py-2 px-3 border-l border-slate-100">
+                        <input
+                          type="number" min="0" step="1"
+                          value={audiVal.funcionarios ?? ''}
+                          onChange={e => handleDadosOpChange('audi', id, 'funcionarios', e.target.value)}
+                          placeholder="—"
+                          className="w-full text-right px-2 py-1 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-400"
+                        />
+                      </td>
+                      <td className="py-2 px-3">
+                        <input
+                          type="number" min="0" step="1"
+                          value={audiVal.volumeVendas ?? ''}
+                          onChange={e => handleDadosOpChange('audi', id, 'volumeVendas', e.target.value)}
+                          placeholder="—"
+                          className="w-full text-right px-2 py-1 border border-slate-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-red-400"
                         />
                       </td>
                     </tr>
