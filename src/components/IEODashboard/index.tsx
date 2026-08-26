@@ -25,7 +25,8 @@ import { AnaliseCenariosTab } from './AnaliseCenariosTab';
 const SEMESTRES = ['1º Semestre', '2º Semestre'];
 
 const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 2 + i);
+const IMPORT_START_YEAR = 2022;
+const YEARS = Array.from({ length: CURRENT_YEAR - IMPORT_START_YEAR + 3 }, (_, i) => IMPORT_START_YEAR + i);
 
 function parseNum(s: string): number {
   const cleaned = (s ?? '0').trim().replace(',', '.');
