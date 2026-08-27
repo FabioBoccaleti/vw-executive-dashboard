@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Edit3, X, TrendingUp, TrendingDown, BarChart2, Save, AlertCircle, Settings, Zap, ChevronDown, Check } from 'lucide-react';
+import { Plus, Trash2, Edit3, X, TrendingUp, TrendingDown, BarChart2, Save, AlertCircle, Settings, Zap, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   type Marca,
@@ -331,10 +331,12 @@ interface CenarioSectionProps {
   semFin: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }
 
 function CenarioSection({
-  cenario, marca, periodos, deptoDataMap, allDadosOp, semFin, onEdit, onDelete,
+  cenario, marca, periodos, deptoDataMap, allDadosOp, semFin, onEdit, onDelete, onMoveUp, onMoveDown,
 }: CenarioSectionProps) {
   const hasMultiple = periodos.length > 1;
 
@@ -361,6 +363,22 @@ function CenarioSection({
       <div className="flex items-center justify-between px-4 py-3 bg-slate-50/80 border-b border-slate-100">
         <span className="font-bold text-slate-700 text-sm">{cenario.nome}</span>
         <div className="flex gap-0.5">
+          <button
+            onClick={onMoveUp}
+            disabled={!onMoveUp}
+            className="p-1.5 text-slate-400 hover:text-slate-600 rounded transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+            title="Mover para cima"
+          >
+            <ChevronUp className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onMoveDown}
+            disabled={!onMoveDown}
+            className="p-1.5 text-slate-400 hover:text-slate-600 rounded transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+            title="Mover para baixo"
+          >
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={onEdit}
             className="p-1.5 text-slate-400 hover:text-slate-600 rounded transition-colors"
@@ -552,12 +570,13 @@ interface MarcaAnaliseProps {
   onSemFinChange: (v: boolean) => void;
   onEdit: (c: IEOCenario) => void;
   onDelete: (id: string) => void;
+  onMove: (id: string, dir: 'up' | 'down') => void;
   onNew: (depto: DeptoFiltro) => void;
 }
 
 function MarcaAnalise({
   marca, cenarios, allDadosOp, periodos, depto, semFin,
-  onPeriodosChange, onDeptoChange, onSemFinChange, onEdit, onDelete, onNew,
+  onPeriodosChange, onDeptoChange, onSemFinChange, onEdit, onDelete, onMove, onNew,
 }: MarcaAnaliseProps) {
   const [deptoDataMap, setDeptoDataMap] = useState<Record<string, DepartamentoData | null>>({});
   const [loading, setLoading] = useState(false);
@@ -680,7 +699,7 @@ function MarcaAnalise({
       {/* Cenários do departamento — todos expandidos */}
       {cenariosDoDepto.length > 0 ? (
         <div className="flex flex-col gap-3">
-          {cenariosDoDepto.map(c => (
+          {cenariosDoDepto.map((c, idx) => (
             <CenarioSection
               key={c.id}
               cenario={c}
@@ -691,6 +710,8 @@ function MarcaAnalise({
               semFin={semFin}
               onEdit={() => onEdit(c)}
               onDelete={() => onDelete(c.id)}
+              onMoveUp={idx > 0 ? () => onMove(c.id, 'up') : undefined}
+              onMoveDown={idx < cenariosDoDepto.length - 1 ? () => onMove(c.id, 'down') : undefined}
             />
           ))}
         </div>
@@ -1194,6 +1215,23 @@ export function AnaliseCenariosTab() {
     toast.success('Cenário excluído.');
   }
 
+  async function handleMove(id: string, dir: 'up' | 'down') {
+    const cenario = cenarios.find(c => c.id === id);
+    if (!cenario) return;
+    // Reordena apenas dentro do mesmo departamento
+    const sameDepto = cenarios.filter(c => c.departamento === cenario.departamento);
+    const deptoIdx = sameDepto.findIndex(c => c.id === id);
+    const targetDeptoIdx = dir === 'up' ? deptoIdx - 1 : deptoIdx + 1;
+    if (targetDeptoIdx < 0 || targetDeptoIdx >= sameDepto.length) return;
+    const targetId = sameDepto[targetDeptoIdx].id;
+    const next = [...cenarios];
+    const idxA = next.findIndex(c => c.id === id);
+    const idxB = next.findIndex(c => c.id === targetId);
+    [next[idxA], next[idxB]] = [next[idxB], next[idxA]];
+    setCenarios(next);
+    await saveCenarios(next);
+  }
+
   const tabCls = (active: boolean) =>
     `flex items-center gap-1.5 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
       active
@@ -1230,6 +1268,7 @@ export function AnaliseCenariosTab() {
             onSemFinChange={setSemFin}
             onEdit={c => setEditing({ cenario: c })}
             onDelete={handleDelete}
+            onMove={handleMove}
             onNew={d => setEditing({ defaultDepto: d })}
           />
         )}
