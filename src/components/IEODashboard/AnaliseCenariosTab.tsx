@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Edit3, X, TrendingUp, TrendingDown, BarChart2, Save, AlertCircle, Settings, Zap, ChevronDown, ChevronUp, Check, Copy } from 'lucide-react';
+import { Plus, Trash2, Edit3, X, TrendingUp, TrendingDown, BarChart2, Save, AlertCircle, Settings, Zap, ChevronDown, ChevronUp, Check, Copy, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   type Marca,
@@ -415,6 +415,7 @@ interface CenarioSectionProps {
   deptoDataMap: Record<string, DepartamentoData | null>;
   allDadosOp: Record<string, DadosOperacionais>;
   semFin: boolean;
+  showDespFin: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -423,7 +424,7 @@ interface CenarioSectionProps {
 }
 
 function CenarioSection({
-  cenario, marca, periodos, deptoDataMap, allDadosOp, semFin, onEdit, onDelete, onDuplicate, onMoveUp, onMoveDown,
+  cenario, marca, periodos, deptoDataMap, allDadosOp, semFin, showDespFin, onEdit, onDelete, onDuplicate, onMoveUp, onMoveDown,
 }: CenarioSectionProps) {
   const hasMultiple = periodos.length > 1;
 
@@ -578,8 +579,8 @@ function CenarioSection({
                   </tr>
                 );
               })}
-              {/* Linha de impacto das Despesas Financeiras — sempre visível quando há dados */}
-              {hasAnyFin && (
+              {/* Linha de impacto das Despesas Financeiras — condicionada a showDespFin */}
+              {showDespFin && hasAnyFin && (
                 <>
                   <tr className="border-t-2 border-amber-200 bg-amber-50/50">
                     <td
@@ -659,6 +660,7 @@ interface MarcaAnaliseProps {
   periodos: Periodo[];
   depto: DeptoFiltro;
   semFin: boolean;
+  showDespFin: boolean;
   onPeriodosChange: (p: Periodo[]) => void;
   onDeptoChange: (d: DeptoFiltro) => void;
   onSemFinChange: (v: boolean) => void;
@@ -670,7 +672,7 @@ interface MarcaAnaliseProps {
 }
 
 function MarcaAnalise({
-  marca, cenarios, allDadosOp, periodos, depto, semFin,
+  marca, cenarios, allDadosOp, periodos, depto, semFin, showDespFin,
   onPeriodosChange, onDeptoChange, onSemFinChange, onEdit, onDelete, onMove, onDuplicate, onNew,
 }: MarcaAnaliseProps) {
   const [deptoDataMap, setDeptoDataMap] = useState<Record<string, DepartamentoData | null>>({});
@@ -777,18 +779,20 @@ function MarcaAnalise({
           <span className="text-xs text-slate-400 italic ml-2">Calculando...</span>
         )}
         {/* Toggle global: inclui ou exclui despesas financeiras do resultado */}
-        <button
-          onClick={() => onSemFinChange(!semFin)}
-          className={`flex items-center gap-1.5 ml-auto px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-            semFin
-              ? 'bg-amber-500 text-white shadow-sm'
-              : 'text-slate-500 bg-slate-100 hover:bg-slate-200'
-          }`}
-          title={semFin ? 'Resultado sem despesas financeiras (clique para incluir)' : 'Resultado com despesas financeiras (clique para excluir)'}
-        >
-          <Zap className="w-3.5 h-3.5" />
-          {semFin ? 's/ Desp. Financeiras' : 'c/ Desp. Financeiras'}
-        </button>
+        {showDespFin && (
+          <button
+            onClick={() => onSemFinChange(!semFin)}
+            className={`flex items-center gap-1.5 ml-auto px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+              semFin
+                ? 'bg-amber-500 text-white shadow-sm'
+                : 'text-slate-500 bg-slate-100 hover:bg-slate-200'
+            }`}
+            title={semFin ? 'Resultado sem despesas financeiras (clique para incluir)' : 'Resultado com despesas financeiras (clique para excluir)'}
+          >
+            <Zap className="w-3.5 h-3.5" />
+            {semFin ? 's/ Desp. Financeiras' : 'c/ Desp. Financeiras'}
+          </button>
+        )}
       </div>
 
       {/* Cenários do departamento — todos expandidos */}
@@ -803,6 +807,7 @@ function MarcaAnalise({
               deptoDataMap={deptoDataMap}
               allDadosOp={allDadosOp}
               semFin={semFin}
+              showDespFin={showDespFin}
               onEdit={() => onEdit(c)}
               onDelete={() => onDelete(c.id)}
               onDuplicate={() => onDuplicate(c)}
@@ -840,12 +845,14 @@ function MarcaAnalise({
 
 interface ConfigProps {
   cenarios: IEOCenario[];
+  showDespFin: boolean;
+  onShowDespFinChange: (v: boolean) => void;
   onEdit: (c: IEOCenario) => void;
   onDelete: (id: string) => void;
   onNew: () => void;
 }
 
-function ConfiguracoesCenarios({ cenarios, onEdit, onDelete, onNew }: ConfigProps) {
+function ConfiguracoesCenarios({ cenarios, showDespFin, onShowDespFinChange, onEdit, onDelete, onNew }: ConfigProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [dadosOpYear, setDadosOpYear] = useState(CURRENT_YEAR);
   const [dadosOpSemestre, setDadosOpSemestre] = useState<1 | 2>(1);
@@ -879,6 +886,34 @@ function ConfiguracoesCenarios({ cenarios, onEdit, onDelete, onNew }: ConfigProp
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Preferências de exibição */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/70">
+          <span className="text-sm font-bold text-slate-700">Preferências de Exibição</span>
+        </div>
+        <div className="px-5 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Despesas Financeiras</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Exibe o botão "c/ Desp. Financeiras" e a seção de valores nos cenários.
+              </p>
+            </div>
+            <button
+              onClick={() => onShowDespFinChange(!showDespFin)}
+              className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                showDespFin
+                  ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              {showDespFin ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              {showDespFin ? 'Visível' : 'Oculto'}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Lista de cenários */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50/70">
@@ -1281,11 +1316,19 @@ export function AnaliseCenariosTab() {
   const [periodos, setPeriodos] = useState<Periodo[]>(DEFAULT_PERIODOS);
   const [depto, setDepto] = useState<DeptoFiltro>('consolidado');
   const [semFin, setSemFin] = useState(false);
+  const [showDespFin, setShowDespFin] = useState<boolean>(
+    () => localStorage.getItem('ieo:desp_fin_visivel') !== 'false',
+  );
   const [editing, setEditing] = useState<{
     cenario?: IEOCenario;
     defaultDepto?: DeptoFiltro;
   } | null>(null);
   const [duplicating, setDuplicating] = useState<IEOCenario | null>(null);
+
+  function handleShowDespFinChange(v: boolean) {
+    setShowDespFin(v);
+    localStorage.setItem('ieo:desp_fin_visivel', String(v));
+  }
 
   useEffect(() => {
     Promise.all([loadCenarios(), loadAllDadosOperacionais()]).then(([c, op]) => {
@@ -1375,6 +1418,7 @@ export function AnaliseCenariosTab() {
             periodos={periodos}
             depto={depto}
             semFin={semFin}
+            showDespFin={showDespFin}
             onPeriodosChange={setPeriodos}
             onDeptoChange={setDepto}
             onSemFinChange={setSemFin}
@@ -1389,6 +1433,8 @@ export function AnaliseCenariosTab() {
         {mainTab === 'configuracoes' && (
           <ConfiguracoesCenarios
             cenarios={cenarios}
+            showDespFin={showDespFin}
+            onShowDespFinChange={handleShowDespFinChange}
             onEdit={c => setEditing({ cenario: c })}
             onDelete={handleDelete}
             onNew={() => setEditing({})}
