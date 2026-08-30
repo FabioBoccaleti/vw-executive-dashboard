@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Edit3, X, TrendingUp, TrendingDown, BarChart2, Save, AlertCircle, Settings, Zap, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { Plus, Trash2, Edit3, X, TrendingUp, TrendingDown, BarChart2, Save, AlertCircle, Settings, Zap, ChevronDown, ChevronUp, Check, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   type Marca,
@@ -319,6 +319,92 @@ function MultiIndicadorDropdown({
   );
 }
 
+// ─── DuplicarCenarioDialog ────────────────────────────────────────────────────
+
+interface DuplicarCenarioDialogProps {
+  cenario: IEOCenario;
+  onConfirm: (deptos: Array<DeptoClassificacao | 'consolidado'>) => void;
+  onClose: () => void;
+}
+
+function DuplicarCenarioDialog({ cenario, onConfirm, onClose }: DuplicarCenarioDialogProps) {
+  const [selected, setSelected] = useState<Set<DeptoClassificacao | 'consolidado'>>(new Set());
+
+  const availableDeptos = DEPTOS_OPTS.filter(d => d.id !== cenario.departamento);
+
+  function toggle(id: DeptoClassificacao | 'consolidado') {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const selectedArr = DEPTOS_OPTS
+    .filter(d => selected.has(d.id))
+    .map(d => d.id);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-800">Duplicar Cenário</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <p className="text-sm text-slate-500">
+          Selecione os departamentos para onde <strong className="text-slate-700">"{cenario.nome}"</strong> será duplicado.
+          Cada cópia usa os dados do departamento de destino (VW e Audi automaticamente).
+        </p>
+
+        <div className="space-y-1">
+          {availableDeptos.map(d => (
+            <label
+              key={d.id}
+              className="flex items-center gap-3 cursor-pointer px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              <div
+                className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors ${
+                  selected.has(d.id) ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'
+                }`}
+                onClick={() => toggle(d.id)}
+              >
+                {selected.has(d.id) && <Check className="w-2.5 h-2.5 text-white" />}
+              </div>
+              <span className="text-sm text-slate-700" onClick={() => toggle(d.id)}>{d.label}</span>
+            </label>
+          ))}
+        </div>
+
+        {selected.size > 0 && (
+          <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 text-xs text-emerald-700">
+            Serão criados <strong>{selected.size}</strong> cenário{selected.size > 1 ? 's' : ''} com o sufixo do departamento.
+            Cada um aparece em VW e Audi com seus próprios dados.
+          </div>
+        )}
+
+        <div className="flex justify-end gap-3 pt-1">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => selectedArr.length > 0 && onConfirm(selectedArr)}
+            disabled={selected.size === 0}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Copy className="w-4 h-4" /> Duplicar ({selected.size})
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── CenarioSection ───────────────────────────────────────────────────────────
 // Seção expandida de um cenário — valores calculados a partir do deptoDataMap já carregado
 
@@ -331,12 +417,13 @@ interface CenarioSectionProps {
   semFin: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onDuplicate: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
 }
 
 function CenarioSection({
-  cenario, marca, periodos, deptoDataMap, allDadosOp, semFin, onEdit, onDelete, onMoveUp, onMoveDown,
+  cenario, marca, periodos, deptoDataMap, allDadosOp, semFin, onEdit, onDelete, onDuplicate, onMoveUp, onMoveDown,
 }: CenarioSectionProps) {
   const hasMultiple = periodos.length > 1;
 
@@ -378,6 +465,13 @@ function CenarioSection({
             title="Mover para baixo"
           >
             <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onDuplicate}
+            className="p-1.5 text-slate-400 hover:text-emerald-600 rounded transition-colors"
+            title="Duplicar para outros departamentos"
+          >
+            <Copy className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onEdit}
@@ -571,12 +665,13 @@ interface MarcaAnaliseProps {
   onEdit: (c: IEOCenario) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, dir: 'up' | 'down') => void;
+  onDuplicate: (c: IEOCenario) => void;
   onNew: (depto: DeptoFiltro) => void;
 }
 
 function MarcaAnalise({
   marca, cenarios, allDadosOp, periodos, depto, semFin,
-  onPeriodosChange, onDeptoChange, onSemFinChange, onEdit, onDelete, onMove, onNew,
+  onPeriodosChange, onDeptoChange, onSemFinChange, onEdit, onDelete, onMove, onDuplicate, onNew,
 }: MarcaAnaliseProps) {
   const [deptoDataMap, setDeptoDataMap] = useState<Record<string, DepartamentoData | null>>({});
   const [loading, setLoading] = useState(false);
@@ -710,6 +805,7 @@ function MarcaAnalise({
               semFin={semFin}
               onEdit={() => onEdit(c)}
               onDelete={() => onDelete(c.id)}
+              onDuplicate={() => onDuplicate(c)}
               onMoveUp={idx > 0 ? () => onMove(c.id, 'up') : undefined}
               onMoveDown={idx < cenariosDoDepto.length - 1 ? () => onMove(c.id, 'down') : undefined}
             />
@@ -1189,6 +1285,7 @@ export function AnaliseCenariosTab() {
     cenario?: IEOCenario;
     defaultDepto?: DeptoFiltro;
   } | null>(null);
+  const [duplicating, setDuplicating] = useState<IEOCenario | null>(null);
 
   useEffect(() => {
     Promise.all([loadCenarios(), loadAllDadosOperacionais()]).then(([c, op]) => {
@@ -1232,6 +1329,21 @@ export function AnaliseCenariosTab() {
     await saveCenarios(next);
   }
 
+  async function handleDuplicate(cenario: IEOCenario, deptos: Array<DeptoClassificacao | 'consolidado'>) {
+    const novosCenarios: IEOCenario[] = deptos.map(depto => ({
+      ...cenario,
+      id: genId(),
+      departamento: depto,
+      nome: `${cenario.nome} — ${depto === 'consolidado' ? 'Consolidado' : DEPTO_CLASSIFICACAO_LABELS[depto as DeptoClassificacao]}`,
+      criadoEm: new Date().toISOString(),
+    }));
+    const next = [...cenarios, ...novosCenarios];
+    setCenarios(next);
+    await saveCenarios(next);
+    setDuplicating(null);
+    toast.success(`Cenário duplicado para ${deptos.length} departamento${deptos.length > 1 ? 's' : ''}.`);
+  }
+
   const tabCls = (active: boolean) =>
     `flex items-center gap-1.5 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
       active
@@ -1269,6 +1381,7 @@ export function AnaliseCenariosTab() {
             onEdit={c => setEditing({ cenario: c })}
             onDelete={handleDelete}
             onMove={handleMove}
+            onDuplicate={c => setDuplicating(c)}
             onNew={d => setEditing({ defaultDepto: d })}
           />
         )}
@@ -1289,6 +1402,14 @@ export function AnaliseCenariosTab() {
           defaultDepto={editing.defaultDepto}
           onSave={handleSave}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {duplicating !== null && (
+        <DuplicarCenarioDialog
+          cenario={duplicating}
+          onConfirm={deptos => handleDuplicate(duplicating, deptos)}
+          onClose={() => setDuplicating(null)}
         />
       )}
     </div>
