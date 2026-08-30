@@ -341,7 +341,7 @@ function YearSemestreSelector({ year, semestre, onYearChange, onSemestreChange }
 
 export function IEODashboard({ onChangeBrand }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('importar');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('analise');
   const [importarSubTab, setImportarSubTab] = useState<ImportarSubTab>('dados');
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
   const [selectedSemestre, setSelectedSemestre] = useState(1); // 1 ou 2
