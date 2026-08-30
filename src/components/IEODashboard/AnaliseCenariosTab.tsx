@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Edit3, X, TrendingUp, TrendingDown, BarChart2, Save, AlertCircle, Settings, Zap, ChevronDown, ChevronUp, Check, Copy, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, Edit3, X, TrendingUp, TrendingDown, BarChart2, Save, AlertCircle, Settings, Zap, ChevronDown, ChevronUp, Check, Copy, Eye, EyeOff, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   type Marca,
@@ -319,6 +319,89 @@ function MultiIndicadorDropdown({
   );
 }
 
+// ─── SenhaDialog ──────────────────────────────────────────────────────────────
+
+const SENHA_IEO = '1985';
+
+interface SenhaDialogProps {
+  title: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}
+
+function SenhaDialog({ title, onConfirm, onClose }: SenhaDialogProps) {
+  const [senha, setSenha] = useState('');
+  const [erro, setErro] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (senha === SENHA_IEO) {
+      onConfirm();
+    } else {
+      setErro(true);
+      setSenha('');
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center px-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-slate-100">
+              <Lock className="w-4 h-4 text-slate-500" />
+            </div>
+            <h2 className="text-base font-bold text-slate-800">{title}</h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <p className="text-sm text-slate-500">Digite a senha para continuar.</p>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            ref={inputRef}
+            type="password"
+            value={senha}
+            onChange={e => { setSenha(e.target.value); setErro(false); }}
+            placeholder="Senha"
+            autoComplete="off"
+            className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
+              erro ? 'border-red-400 bg-red-50' : 'border-slate-200'
+            }`}
+          />
+          {erro && (
+            <p className="text-xs text-red-500 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" /> Senha incorreta. Tente novamente.
+            </p>
+          )}
+          <div className="flex justify-end gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg"
+            >
+              <Lock className="w-3.5 h-3.5" /> Confirmar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── DuplicarCenarioDialog ────────────────────────────────────────────────────
 
 interface DuplicarCenarioDialogProps {
@@ -427,6 +510,8 @@ function CenarioSection({
   cenario, marca, periodos, deptoDataMap, allDadosOp, semFin, showDespFin, onEdit, onDelete, onDuplicate, onMoveUp, onMoveDown,
 }: CenarioSectionProps) {
   const hasMultiple = periodos.length > 1;
+  const [pendingAction, setPendingAction] = useState<'edit' | 'delete' | 'duplicate' | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Pré-calcula dados das despesas financeiras para a linha de impacto
   const impactRows = periodos.map(p => {
@@ -468,21 +553,21 @@ function CenarioSection({
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={onDuplicate}
+            onClick={() => setPendingAction('duplicate')}
             className="p-1.5 text-slate-400 hover:text-emerald-600 rounded transition-colors"
             title="Duplicar para outros departamentos"
           >
             <Copy className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={onEdit}
+            onClick={() => setPendingAction('edit')}
             className="p-1.5 text-slate-400 hover:text-slate-600 rounded transition-colors"
             title="Editar"
           >
             <Edit3 className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={onDelete}
+            onClick={() => setPendingAction('delete')}
             className="p-1.5 text-slate-400 hover:text-red-500 rounded transition-colors"
             title="Excluir"
           >
@@ -644,6 +729,56 @@ function CenarioSection({
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Dialogs de senha e confirmação de exclusão */}
+      {pendingAction !== null && (
+        <SenhaDialog
+          title={
+            pendingAction === 'edit' ? 'Editar Cenário' :
+            pendingAction === 'duplicate' ? 'Duplicar Cenário' :
+            'Excluir Cenário'
+          }
+          onConfirm={() => {
+            const action = pendingAction;
+            setPendingAction(null);
+            if (action === 'edit') onEdit();
+            else if (action === 'duplicate') onDuplicate();
+            else if (action === 'delete') setShowDeleteConfirm(true);
+          }}
+          onClose={() => setPendingAction(null)}
+        />
+      )}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-full bg-red-50 shrink-0">
+                <AlertCircle className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800">Excluir cenário?</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  "{cenario.nome}" será permanentemente excluído.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { setShowDeleteConfirm(false); onDelete(); }}
+                className="px-4 py-2 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -854,6 +989,7 @@ interface ConfigProps {
 
 function ConfiguracoesCenarios({ cenarios, showDespFin, onShowDespFinChange, onEdit, onDelete, onNew }: ConfigProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [pendingItem, setPendingItem] = useState<{ action: 'edit' | 'delete'; cenario: IEOCenario } | null>(null);
   const [dadosOpYear, setDadosOpYear] = useState(CURRENT_YEAR);
   const [dadosOpSemestre, setDadosOpSemestre] = useState<1 | 2>(1);
   const [allDadosOp, setAllDadosOp] = useState<Record<string, DadosOperacionais>>({});
@@ -948,13 +1084,13 @@ function ConfiguracoesCenarios({ cenarios, showDespFin, onShowDespFinChange, onE
                 </div>
                 <div className="flex gap-0.5">
                   <button
-                    onClick={() => onEdit(c)}
+                    onClick={() => setPendingItem({ action: 'edit', cenario: c })}
                     className="p-1.5 text-slate-400 hover:text-slate-600 rounded transition-colors"
                   >
                     <Edit3 className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => setConfirmDeleteId(c.id)}
+                    onClick={() => setPendingItem({ action: 'delete', cenario: c })}
                     className="p-1.5 text-slate-400 hover:text-red-500 rounded transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1063,6 +1199,20 @@ function ConfiguracoesCenarios({ cenarios, showDespFin, onShowDespFinChange, onE
           </div>
         </div>
       </div>
+
+      {/* Senha obrigatória para editar ou excluir */}
+      {pendingItem !== null && (
+        <SenhaDialog
+          title={pendingItem.action === 'edit' ? 'Editar Cenário' : 'Excluir Cenário'}
+          onConfirm={() => {
+            const item = pendingItem;
+            setPendingItem(null);
+            if (item.action === 'edit') onEdit(item.cenario);
+            else setConfirmDeleteId(item.cenario.id);
+          }}
+          onClose={() => setPendingItem(null)}
+        />
+      )}
 
       {/* Confirmação de exclusão */}
       {confirmDeleteId && (
