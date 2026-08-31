@@ -21,6 +21,7 @@ import { RegrasDepartamentosTab } from './RegrasDepartamentosTab';
 import { ContasTipoItemTab } from './ContasTipoItemTab';
 import { DepartamentoTab } from './DepartamentoTab';
 import { AnaliseCenariosTab } from './AnaliseCenariosTab';
+import { ComparativoTab } from './ComparativoTab';
 
 const SEMESTRES = ['1º Semestre', '2º Semestre'];
 
@@ -272,7 +273,7 @@ interface Props {
   onChangeBrand: () => void;
 }
 
-type ActiveTab = 'importar' | 'vw' | 'audi' | 'analise';
+type ActiveTab = 'importar' | 'vw' | 'audi' | 'analise' | 'comparativo';
 type ImportarSubTab = 'dados' | 'classificacao' | 'revendas' | 'departamentos' | 'contas_tipo_item';
 type DepartamentoSubTab = 'veiculos_novos' | 'venda_direta' | 'veiculos_usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'diretoria' | 'consolidado';
 
@@ -537,6 +538,16 @@ export function IEODashboard({ onChangeBrand }: Props) {
             }`}
           >
             Análise
+          </button>
+          <button
+            onClick={() => setActiveTab('comparativo')}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'comparativo'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Comparativo
           </button>
         </div>
 
@@ -836,6 +847,9 @@ export function IEODashboard({ onChangeBrand }: Props) {
 
         {/* Tab Análise */}
         {activeTab === 'analise' && <AnaliseCenariosTab />}
+
+        {/* Tab Comparativo */}
+        {activeTab === 'comparativo' && <ComparativoTab />}
 
         {/* Tab Audi */}
         {activeTab === 'audi' && (
