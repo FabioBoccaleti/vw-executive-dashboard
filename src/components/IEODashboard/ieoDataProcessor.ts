@@ -491,8 +491,16 @@ export async function processConsolidadoData(
   for (const deptoData of deptoDataList) {
     for (const [tipo, grupoData] of Object.entries(deptoData.grupos)) {
       const tipoKey = tipo as TipoContaClassificacao;
-      grupos[tipoKey].contas.push(...grupoData.contas);
       grupos[tipoKey].subtotal += grupoData.subtotal;
+
+      for (const conta of grupoData.contas) {
+        const contaExistente = grupos[tipoKey].contas.find(item => item.conta === conta.conta);
+        if (contaExistente) {
+          contaExistente.valor += conta.valor;
+        } else {
+          grupos[tipoKey].contas.push({ ...conta, ccusto: undefined });
+        }
+      }
     }
   }
 
