@@ -1,0 +1,929 @@
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { Upload, Trash2, FileText, AlertCircle, Printer, CheckCircle2, Tag } from 'lucide-react';
+import { toast } from 'sonner';
+import { kvKeys } from '@/lib/kvClient';
+import {
+  getBaseGerencialMes,
+  setBaseGerencialMes,
+  deleteBaseGerencialMes,
+  getAllImportedMesesData,
+  type BaseGerencialRow,
+  type BaseGerencialMesData,
+  type BaseGerencialTotalRow,
+  type TipoContaClassificacao,
+  TIPO_CONTA_LABELS,
+  TIPOS_CONTA_ORDENADOS,
+  loadClassificacoesConta,
+  saveClassificacoesConta,
+} from './baseGerencialStorage';
+import { ClassificacaoRevendasTab } from './ClassificacaoRevendasTab';
+import { RegrasDepartamentosTab } from './RegrasDepartamentosTab';
+import { ContasTipoItemTab } from './ContasTipoItemTab';
+import { DepartamentoTab } from './DepartamentoTab';
+import { AnaliseCenariosTab } from './AnaliseCenariosTab';
+import { ComparativoTab } from './ComparativoTab';
+
+const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+const CURRENT_YEAR = new Date().getFullYear();
+const IMPORT_START_YEAR = 2022;
+const YEARS = Array.from({ length: CURRENT_YEAR - IMPORT_START_YEAR + 3 }, (_, i) => IMPORT_START_YEAR + i);
+
+function parseNum(s: string): number {
+  const cleaned = (s ?? '0').trim().replace(',', '.');
+  return parseFloat(cleaned) || 0;
+}
+
+function isAllZero(row: BaseGerencialRow): boolean {
+  return (
+    row.saldoAnterior === 0 &&
+    row.valDebito === 0 &&
+    row.valCredito === 0 &&
+    row.saldoPeriodo === 0 &&
+    row.saldoAtual === 0
+  );
+}
+
+function parseTxt(text: string, fileName: string): BaseGerencialMesData {
+  // strip BOM if present
+  const clean = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  const lines = clean.split('\n');
+  const rows: BaseGerencialRow[] = [];
+  let totalRow: BaseGerencialTotalRow | null = null;
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const parts = line.split(';');
+    const nivel = parts[0].trim();
+
+    if (nivel === 'T') {
+      totalRow = {
+        saldoAnterior: parseNum(parts[2]),
+        valDebito: parseNum(parts[3]),
+        valCredito: parseNum(parts[4]),
+        saldoPeriodo: parseNum(parts[5]),
+        saldoAtual: parseNum(parts[6]),
+      };
+      continue;
+    }
+
+    if (nivel !== 'A') continue;
+    if (parts.length < 7) continue;
+
+    const contaRaw = parts[1];
+    const isMain = contaRaw === contaRaw.trimStart();
+
+    rows.push({
+      conta: contaRaw.trim(),
+      isMain,
+      saldoAnterior: parseNum(parts[2]),
+      valDebito: parseNum(parts[3]),
+      valCredito: parseNum(parts[4]),
+      saldoPeriodo: parseNum(parts[5]),
+      saldoAtual: parseNum(parts[6]),
+    });
+  }
+
+  return { rows, totalRow, importedAt: new Date().toISOString(), fileName };
+}
+
+function fmtNum(n: number): string {
+  if (n === 0) return '—';
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function NumCell({ value }: { value: number }) {
+  const text = fmtNum(value);
+  return (
+    <td className={`px-4 py-1.5 text-right font-mono text-xs tabular-nums ${value < 0 ? 'text-red-600' : value === 0 ? 'text-slate-300' : 'text-slate-700'}`}>
+      {text}
+    </td>
+  );
+}
+
+function ClassificacaoTipoContaTab() {
+  const [loading, setLoading] = useState(true);
+  const [accounts, setAccounts] = useState<string[]>([]);
+  const [classificacoes, setClassificacoes] = useState<Record<string, TipoContaClassificacao>>({});
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'pending' | 'classified'>('all');
+
+  useEffect(() => {
+    Promise.all([getAllImportedMesesData(), loadClassificacoesConta()])
+      .then(([allData, classif]) => {
+        // Coleta contas principais com pelo menos um valor não-zero em qualquer mês
+        const seen = new Map<string, boolean>();
+        for (const data of allData) {
+          for (const row of data.rows) {
+            if (!row.isMain) continue;
+            if (!isAllZero(row)) seen.set(row.conta, true);
+            else if (!seen.has(row.conta)) seen.set(row.conta, false);
+          }
+        }
+        const accs = [...seen.entries()]
+          .filter(([, hasValue]) => hasValue)
+          .map(([conta]) => conta)
+          .sort();
+        setAccounts(accs);
+        setClassificacoes(classif);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleClassify(conta: string, tipo: TipoContaClassificacao | '') {
+    const next = { ...classificacoes };
+    if (tipo === '') {
+      delete next[conta];
+    } else {
+      next[conta] = tipo as TipoContaClassificacao;
+    }
+    setClassificacoes(next);
+    setSaving(true);
+    try {
+      await saveClassificacoesConta(next);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const pending   = accounts.filter(a => !classificacoes[a]);
+  const classified = accounts.filter(a =>  classificacoes[a]);
+
+  const displayed = filter === 'pending'    ? pending
+                  : filter === 'classified' ? classified
+                  : [...pending, ...classified]; // pendentes primeiro
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-16">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
+      </div>
+    );
+  }
+
+  if (accounts.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-16">
+        <div className="text-center space-y-2">
+          <Tag className="w-10 h-10 text-slate-300 mx-auto" />
+          <p className="text-slate-500 font-medium">Nenhum dado importado ainda</p>
+          <p className="text-slate-400 text-sm">Importe ao menos um mês para classificar as contas.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Resumo + filtro */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          {pending.length > 0 ? (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-xs font-semibold text-amber-700">
+              <AlertCircle className="w-3.5 h-3.5" />
+              {pending.length} conta{pending.length !== 1 ? 's' : ''} sem classificação
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg text-xs font-semibold text-green-700">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Todas as contas classificadas
+            </div>
+          )}
+          <span className="text-xs text-slate-400">{classified.length}/{accounts.length} classificadas</span>
+          {saving && <span className="text-xs text-slate-400 italic">Salvando...</span>}
+        </div>
+        <div className="flex items-center gap-1">
+          {(['all', 'pending', 'classified'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
+                filter === f
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-slate-500 hover:bg-slate-100'
+              }`}
+            >
+              {f === 'all' ? 'Todas' : f === 'pending' ? 'Pendentes' : 'Classificadas'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tabela */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-slate-100 border-b-2 border-slate-200">
+              <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Conta / Descrição</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-slate-600 w-72">Classificação de Conta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayed.map((conta, i) => {
+              const isPending = !classificacoes[conta];
+              return (
+                <tr
+                  key={conta}
+                  className={`border-b last:border-0 ${
+                    isPending
+                      ? 'bg-amber-50 border-amber-100'
+                      : i % 2 === 0 ? 'bg-white border-slate-100' : 'bg-slate-50/50 border-slate-100'
+                  }`}
+                >
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      {isPending && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-bold shrink-0">
+                          <AlertCircle className="w-2.5 h-2.5" />
+                          Classificar
+                        </span>
+                      )}
+                      <span className={`font-${isPending ? 'semibold' : 'medium'} ${isPending ? 'text-slate-800' : 'text-slate-600'}`}>
+                        {conta}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">
+                    <select
+                      value={classificacoes[conta] ?? ''}
+                      onChange={e => handleClassify(conta, e.target.value as TipoContaClassificacao | '')}
+                      className={`w-full text-xs border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-400 ${
+                        isPending
+                          ? 'border-amber-300 bg-amber-50 text-amber-800'
+                          : 'border-slate-200 bg-white text-slate-700'
+                      }`}
+                    >
+                      <option value="">— Selecione —</option>
+                      {TIPOS_CONTA_ORDENADOS.map(tipo => (
+                        <option key={tipo} value={tipo}>{TIPO_CONTA_LABELS[tipo]}</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+interface Props {
+  onChangeBrand: () => void;
+}
+
+type ActiveTab = 'importar' | 'vw' | 'audi' | 'analise' | 'comparativo';
+type ImportarSubTab = 'dados' | 'classificacao' | 'revendas' | 'departamentos' | 'contas_tipo_item';
+type DepartamentoSubTab = 'veiculos_novos' | 'venda_direta' | 'veiculos_usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'diretoria' | 'consolidado';
+
+// ─── Seletor de Ano e Mês ─────────────────────────────────────────────────────
+
+interface YearMesSelectorProps {
+  year: number;
+  mes: number; // 0 = Ano todo, 1-12 = mês específico
+  onYearChange: (y: number) => void;
+  onMesChange: (m: number) => void;
+}
+
+function YearMesSelector({ year, mes, onYearChange, onMesChange }: YearMesSelectorProps) {
+  return (
+    <div className="flex items-center gap-3 flex-wrap py-1">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ANO</span>
+        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 shadow-sm">
+          <button
+            onClick={() => onYearChange(year - 1)}
+            className="text-slate-400 hover:text-slate-700 font-bold px-0.5 transition-colors"
+          >
+            ‹
+          </button>
+          <span className="text-sm font-bold text-slate-700 min-w-[38px] text-center select-none">
+            {year}
+          </span>
+          <button
+            onClick={() => onYearChange(year + 1)}
+            className="text-slate-400 hover:text-slate-700 font-bold px-0.5 transition-colors"
+          >
+            ›
+          </button>
+        </div>
+      </div>
+      <div className="w-px h-5 bg-slate-200 shrink-0" />
+      <div className="flex items-center gap-1 flex-wrap">
+        <button
+          onClick={() => onMesChange(0)}
+          className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+            mes === 0 ? 'bg-slate-700 text-white' : 'text-slate-500 hover:bg-slate-100'
+          }`}
+        >
+          Ano todo
+        </button>
+        {MESES.map((label, idx) => (
+          <button
+            key={idx}
+            onClick={() => onMesChange(idx + 1)}
+            className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+              mes === idx + 1 ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            {label.slice(0, 3)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function BaseGerencialDashboard({ onChangeBrand }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('analise');
+  const [importarSubTab, setImportarSubTab] = useState<ImportarSubTab>('dados');
+  const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
+  const [selectedMes, setSelectedMes] = useState(new Date().getMonth() + 1); // 1-12
+  const [mesData, setMesData] = useState<BaseGerencialMesData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  
+  // States para abas VW e Audi
+  const [vwSubTab, setVwSubTab] = useState<DepartamentoSubTab>('veiculos_novos');
+  const [audiSubTab, setAudiSubTab] = useState<DepartamentoSubTab>('veiculos_novos');
+  const [vwYear, setVwYear] = useState(CURRENT_YEAR);
+  const [vwMes, setVwMes] = useState(0); // 0 = ano todo, 1-12 = mês
+  const [audiYear, setAudiYear] = useState(CURRENT_YEAR);
+  const [audiMes, setAudiMes] = useState(0);
+
+  async function handlePrint() {
+    setPrinting(true);
+    try {
+      toast.info('Funcionalidade de impressão será implementada em breve.');
+    } finally {
+      setPrinting(false);
+    }
+  }
+
+  // Detecta último mês com dado importado
+  useEffect(() => {
+    kvKeys('basege:*').then(keys => {
+      const mesKeys = keys.filter(k => /^basege:\d{4}:M(0[1-9]|1[0-2])$/.test(k));
+      if (mesKeys.length === 0) return;
+      const parsed = mesKeys.map(k => {
+        const [, y, m] = k.split(':'); // basege:2026:M01 → ['basege','2026','M01']
+        return { year: Number(y), mes: Number(m.replace('M', '')) };
+      });
+      const last = parsed.reduce((acc, cur) =>
+        cur.year > acc.year || (cur.year === acc.year && cur.mes > acc.mes) ? cur : acc
+      );
+      setSelectedYear(last.year);
+      setSelectedMes(last.mes);
+    });
+  }, []);
+
+  const loadMes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getBaseGerencialMes(selectedYear, selectedMes);
+      setMesData(data);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedYear, selectedMes]);
+
+  useEffect(() => {
+    loadMes();
+  }, [loadMes]);
+
+  function handleImportClick() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setImporting(true);
+    try {
+      console.log('[BASEGE IMPORT] Iniciando importação...', { file: file.name, size: file.size, type: file.type, year: selectedYear, mes: selectedMes });
+      const buffer = await file.arrayBuffer();
+      console.log('[BASEGE IMPORT] Arquivo lido, tamanho:', buffer.byteLength, 'bytes');
+      
+      let text: string;
+      try {
+        text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+        console.log('[BASEGE IMPORT] Decodificado como UTF-8');
+      } catch {
+        text = new TextDecoder('windows-1252').decode(buffer);
+        console.log('[BASEGE IMPORT] Decodificado como Windows-1252');
+      }
+      console.log('[BASEGE IMPORT] Texto decodificado, primeiras 500 chars:', text.substring(0, 500));
+      console.log('[BASEGE IMPORT] Parseando...');
+      
+      const data = parseTxt(text, file.name);
+      console.log('[BASEGE IMPORT] Parse concluído:', { 
+        rows: data.rows.length, 
+        totalRow: !!data.totalRow,
+        firstRows: data.rows.slice(0, 3).map(r => ({ conta: r.conta, isMain: r.isMain }))
+      });
+      
+      console.log('[BASEGE IMPORT] Salvando no KV store com key:', `basege:${selectedYear}:M${String(selectedMes).padStart(2, '0')}`);
+      await setBaseGerencialMes(selectedYear, selectedMes, data);
+      console.log('[BASEGE IMPORT] Salvo com sucesso! Atualizando estado local...');
+      
+      setMesData(data);
+      const nonZero = data.rows.filter(r => !isAllZero(r)).length;
+      console.log('[BASEGE IMPORT] Importação concluída:', { nonZero });
+      toast.success(`Dados importados: ${nonZero} registros com valores.`);
+    } catch (err) {
+      console.error('[BASEGE IMPORT] Erro completo:', err);
+      console.error('[BASEGE IMPORT] Stack trace:', err instanceof Error ? err.stack : 'N/A');
+      toast.error(`Erro ao importar arquivo: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function handleDelete() {
+    setConfirmDelete(false);
+    setLoading(true);
+    try {
+      await deleteBaseGerencialMes(selectedYear, selectedMes);
+      setMesData(null);
+      toast.success('Dados removidos com sucesso.');
+    } catch {
+      toast.error('Erro ao remover dados.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const displayRows = mesData?.rows.filter(r => !isAllZero(r)) ?? [];
+
+  return (
+    <div className="min-h-screen bg-slate-100 flex flex-col">
+      {/* Header */}
+      <header
+        className="px-6 py-3 flex items-center justify-between shadow-md shrink-0"
+        style={{ backgroundColor: '#10b981' }}
+      >
+        <div>
+          <h1 className="text-sm font-bold text-white leading-tight">Base Gerencial</h1>
+          <p className="text-xs text-slate-100 mt-0.5">Demonstrativo de Resultados</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handlePrint}
+            disabled={printing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-white transition-colors disabled:opacity-50 hover:bg-emerald-700"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            {printing ? 'Gerando...' : 'Imprimir PDF'}
+          </button>
+          <button
+            onClick={onChangeBrand}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-slate-200 hover:text-white hover:bg-emerald-700 transition-colors"
+          >
+            ← Voltar
+          </button>
+        </div>
+      </header>
+
+      {/* Body */}
+      <div className="flex-1 p-6 flex flex-col gap-4 min-h-0">
+        {/* Tab bar */}
+        <div className="flex items-center gap-0 border-b border-slate-200">
+          <button
+            onClick={() => setActiveTab('importar')}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'importar'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Importar Dados
+          </button>
+          <button
+            onClick={() => setActiveTab('vw')}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'vw'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            VW
+          </button>
+          <button
+            onClick={() => setActiveTab('audi')}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'audi'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Audi
+          </button>
+          <button
+            onClick={() => setActiveTab('analise')}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'analise'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Análise
+          </button>
+          <button
+            onClick={() => setActiveTab('comparativo')}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'comparativo'
+                ? 'border-emerald-600 text-emerald-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Comparativo
+          </button>
+        </div>
+
+        {/* Content */}
+        {activeTab === 'importar' && (
+          <div className="flex-1 flex flex-col gap-4 min-h-0">
+            {/* Sub-tabs */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setImportarSubTab('dados')}
+                className={`px-4 py-2 text-xs font-semibold rounded transition-colors ${
+                  importarSubTab === 'dados'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                Dados do Mês
+              </button>
+              <button
+                onClick={() => setImportarSubTab('classificacao')}
+                className={`px-4 py-2 text-xs font-semibold rounded transition-colors ${
+                  importarSubTab === 'classificacao'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                Classificação de Tipo de Conta
+              </button>
+              <button
+                onClick={() => setImportarSubTab('revendas')}
+                className={`px-4 py-2 text-xs font-semibold rounded transition-colors ${
+                  importarSubTab === 'revendas'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                Classificação de Revendas
+              </button>
+              <button
+                onClick={() => setImportarSubTab('departamentos')}
+                className={`px-4 py-2 text-xs font-semibold rounded transition-colors ${
+                  importarSubTab === 'departamentos'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                Regra por Departamento
+              </button>
+              <button
+                onClick={() => setImportarSubTab('contas_tipo_item')}
+                className={`px-4 py-2 text-xs font-semibold rounded transition-colors ${
+                  importarSubTab === 'contas_tipo_item'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                Contas c/ Tipo Item
+              </button>
+            </div>
+
+            {/* Dados do Mês */}
+            {importarSubTab === 'dados' && (
+              <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+
+                {/* Seletor Ano + Mês */}
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">ANO</span>
+                    <select
+                      value={selectedYear}
+                      onChange={e => setSelectedYear(Number(e.target.value))}
+                      className="px-3 py-1.5 text-sm border border-slate-200 rounded bg-white text-slate-700 font-semibold"
+                    >
+                      {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+
+                    <div className="w-px h-5 bg-slate-200" />
+
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">MÊS</span>
+                    <select
+                      value={selectedMes}
+                      onChange={e => setSelectedMes(Number(e.target.value))}
+                      className="px-3 py-1.5 text-sm border border-slate-200 rounded bg-white text-slate-700 font-semibold"
+                    >
+                      {MESES.map((label, idx) => (
+                        <option key={idx} value={idx + 1}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleImportClick}
+                      disabled={importing}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      {importing ? 'Importando...' : 'Importar TXT'}
+                    </button>
+                    {mesData && (
+                      <button
+                        onClick={() => setConfirmDelete(true)}
+                        disabled={loading}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-red-600 border border-red-300 bg-white hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Remover dados
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Aviso sobre filtros do arquivo */}
+                <div className="flex items-start gap-2.5 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+                  <svg className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>
+                    O arquivo gerado deve considerar Revendas: <strong>1.1 - 1.6 · 1.4 - 1.9</strong>
+                    &nbsp;&nbsp;|&nbsp;&nbsp;
+                    Divisões: <strong>Centro de Custo - Revenda' - Tipo Item</strong>
+                  </span>
+                </div>
+
+                {/* Content area */}
+                {loading ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+                  </div>
+                ) : !mesData ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center space-y-2">
+                      <FileText className="w-10 h-10 text-slate-300 mx-auto" />
+                      <p className="text-slate-500 font-medium">Nenhum dado importado para este mês</p>
+                      <p className="text-slate-400 text-sm">Clique em "Importar TXT" para começar.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-auto">
+                    <div className="space-y-2 mb-3">
+                      <p className="text-xs text-slate-600">
+                        <span className="font-semibold">Arquivo:</span> {mesData.fileName}
+                      </p>
+                      <p className="text-xs text-slate-600">
+                        <span className="font-semibold">Importado em:</span>{' '}
+                        {new Date(mesData.importedAt).toLocaleString('pt-BR')}
+                      </p>
+                      <p className="text-xs text-slate-600">
+                        <span className="font-semibold">Registros:</span> {displayRows.length} (exibindo apenas com valores)
+                      </p>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-slate-100 border-b-2 border-slate-200">
+                            <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Conta / Descrição</th>
+                            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 w-32">Saldo Anterior</th>
+                            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 w-32">Val. Débito</th>
+                            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 w-32">Val. Crédito</th>
+                            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 w-32">Saldo Período</th>
+                            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 w-32">Saldo Atual</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {displayRows.map((row, i) => (
+                            <tr
+                              key={i}
+                              className={`border-b last:border-0 ${
+                                i % 2 === 0 ? 'bg-white border-slate-100' : 'bg-slate-50/50 border-slate-100'
+                              }`}
+                            >
+                              <td className="px-4 py-1.5">
+                                <span className={`${row.isMain ? 'font-semibold text-slate-700' : 'font-normal text-slate-600 pl-4'}`}>
+                                  {row.conta}
+                                </span>
+                              </td>
+                              <NumCell value={row.saldoAnterior} />
+                              <NumCell value={row.valDebito} />
+                              <NumCell value={row.valCredito} />
+                              <NumCell value={row.saldoPeriodo} />
+                              <NumCell value={row.saldoAtual} />
+                            </tr>
+                          ))}
+                        </tbody>
+                        {mesData.totalRow && (
+                          <tfoot>
+                            <tr className="bg-emerald-50 border-t-2 border-emerald-200">
+                              <td className="px-4 py-2 font-bold text-emerald-800">TOTAL</td>
+                              <NumCell value={mesData.totalRow.saldoAnterior} />
+                              <NumCell value={mesData.totalRow.valDebito} />
+                              <NumCell value={mesData.totalRow.valCredito} />
+                              <NumCell value={mesData.totalRow.saldoPeriodo} />
+                              <NumCell value={mesData.totalRow.saldoAtual} />
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Classificação de Tipo de Conta */}
+            {importarSubTab === 'classificacao' && (
+              <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
+                <ClassificacaoTipoContaTab />
+              </div>
+            )}
+
+            {/* Classificação de Revendas */}
+            {importarSubTab === 'revendas' && (
+              <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
+                <ClassificacaoRevendasTab />
+              </div>
+            )}
+
+            {/* Regra por Departamento */}
+            {importarSubTab === 'departamentos' && (
+              <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
+                <RegrasDepartamentosTab />
+              </div>
+            )}
+
+            {/* Contas com Tipo Item */}
+            {importarSubTab === 'contas_tipo_item' && (
+              <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
+                <ContasTipoItemTab />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab VW */}
+        {activeTab === 'vw' && (
+          <div className="flex-1 flex flex-col gap-4 min-h-0">
+            {/* Sub-tabs VW */}
+            <div className="flex items-center gap-0 border-b border-slate-200 overflow-x-auto">
+              {([
+                { id: 'veiculos_novos', label: 'Veículos Novos' },
+                { id: 'venda_direta', label: 'Venda Direta' },
+                { id: 'veiculos_usados', label: 'Veículos Usados' },
+                { id: 'pecas', label: 'Peças' },
+                { id: 'oficina', label: 'Oficina' },
+                { id: 'funilaria', label: 'Funilaria' },
+                { id: 'administracao', label: 'Administração' },
+                { id: 'diretoria', label: 'Diretoria' },
+                { id: 'consolidado', label: 'Consolidado (Total)' },
+              ] as { id: DepartamentoSubTab; label: string }[]).map(sub => (
+                <button
+                  key={sub.id}
+                  onClick={() => setVwSubTab(sub.id)}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                    vwSubTab === sub.id
+                      ? 'text-slate-700 border-emerald-600'
+                      : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Seletor de Ano e Mês */}
+            <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
+              <YearMesSelector
+                year={vwYear}
+                mes={vwMes}
+                onYearChange={setVwYear}
+                onMesChange={setVwMes}
+              />
+            </div>
+
+            {/* Conteúdo das sub-abas VW */}
+            <DepartamentoTab
+              marca="vw"
+              departamento={vwSubTab}
+              year={vwYear}
+              mes={vwMes}
+            />
+          </div>
+        )}
+
+        {/* Tab Análise */}
+        {activeTab === 'analise' && <AnaliseCenariosTab />}
+
+        {/* Tab Comparativo */}
+        {activeTab === 'comparativo' && <ComparativoTab />}
+
+        {/* Tab Audi */}
+        {activeTab === 'audi' && (
+          <div className="flex-1 flex flex-col gap-4 min-h-0">
+            {/* Sub-tabs Audi */}
+            <div className="flex items-center gap-0 border-b border-slate-200 overflow-x-auto">
+              {([
+                { id: 'veiculos_novos', label: 'Veículos Novos' },
+                { id: 'venda_direta', label: 'Venda Direta' },
+                { id: 'veiculos_usados', label: 'Veículos Usados' },
+                { id: 'pecas', label: 'Peças' },
+                { id: 'oficina', label: 'Oficina' },
+                { id: 'funilaria', label: 'Funilaria' },
+                { id: 'administracao', label: 'Administração' },
+                { id: 'diretoria', label: 'Diretoria' },
+                { id: 'consolidado', label: 'Consolidado (Total)' },
+              ] as { id: DepartamentoSubTab; label: string }[]).map(sub => (
+                <button
+                  key={sub.id}
+                  onClick={() => setAudiSubTab(sub.id)}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                    audiSubTab === sub.id
+                      ? 'text-slate-700 border-emerald-600'
+                      : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Seletor de Ano e Mês */}
+            <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
+              <YearMesSelector
+                year={audiYear}
+                mes={audiMes}
+                onYearChange={setAudiYear}
+                onMesChange={setAudiMes}
+              />
+            </div>
+
+            {/* Conteúdo das sub-abas Audi */}
+            <DepartamentoTab
+              marca="audi"
+              departamento={audiSubTab}
+              year={audiYear}
+              mes={audiMes}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Confirm Delete Dialog */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-full bg-red-100">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-slate-800">Confirmar remoção</h3>
+                <p className="text-sm text-slate-600 mt-1">
+                  Tem certeza que deseja remover os dados de <strong>{MESES[selectedMes - 1]}</strong> de <strong>{selectedYear}</strong>?
+                  Esta ação não pode ser desfeita.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 justify-end">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded transition-colors"
+              >
+                Sim, remover
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

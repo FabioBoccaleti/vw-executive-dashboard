@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'base_gerencial' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora';
 
 // Interface de configuraÃ§Ã£o visual da marca
 export interface BrandConfig {
@@ -285,6 +285,31 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-primary-light': '#d1fae5',
       '--brand-secondary': '#34d399',
       '--brand-accent': '#6ee7b7',
+    }
+  },
+  base_gerencial: {
+    id: 'base_gerencial',
+    name: 'Base Gerencial',
+    shortName: 'Base Gerencial',
+    colors: {
+      primary: '#334155',
+      primaryHover: '#1e293b',
+      primaryLight: '#f1f5f9',
+      secondary: '#64748b',
+      accent: '#94a3b8',
+      headerBg: 'bg-[#334155]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#334155] hover:bg-[#1e293b]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-slate-100 dark:bg-slate-900/30',
+      badgeText: 'text-slate-800 dark:text-slate-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#334155',
+      '--brand-primary-hover': '#1e293b',
+      '--brand-primary-light': '#f1f5f9',
+      '--brand-secondary': '#64748b',
+      '--brand-accent': '#94a3b8',
     }
   },
   audi_outros: {

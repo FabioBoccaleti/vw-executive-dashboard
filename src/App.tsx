@@ -33,6 +33,7 @@ import { DespesasAdministracaoDashboard } from '@/components/DespesasAdministrac
 import { DespesasDeptoAudiDashboard } from '@/components/DespesasDeptoAudiDashboard'
 import { DespesasDeptoVwDashboard } from '@/components/DespesasDeptoVwDashboard'
 import { IEODashboard } from '@/components/IEODashboard'
+import { BaseGerencialDashboard } from '@/components/BaseGerencialDashboard'
 
 function AppContent() {
   const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
@@ -320,6 +321,8 @@ function AppContent() {
         <DespesasDeptoVwDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'ieo' ? (
         <IEODashboard onChangeBrand={handleChangeBrand} />
+      ) : brand === 'base_gerencial' ? (
+        <BaseGerencialDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'resumo_dre' ? (
         <ResumoDREDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'analise_projecoes' ? (
