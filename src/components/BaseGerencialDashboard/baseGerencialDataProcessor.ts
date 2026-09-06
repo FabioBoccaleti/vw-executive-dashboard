@@ -177,6 +177,7 @@ async function _processDepartamentoDataRaw(
     receita_vendas: { contas: [], subtotal: 0 },
     receitas_operacionais: { contas: [], subtotal: 0 },
     receitas_financeiras: { contas: [], subtotal: 0 },
+    outras_receitas_financeiras: { contas: [], subtotal: 0 },
     receitas_nao_operacionais: { contas: [], subtotal: 0 },
     custos_operacionais: { contas: [], subtotal: 0 },
     despesas_pessoal: { contas: [], subtotal: 0 },
@@ -187,6 +188,11 @@ async function _processDepartamentoDataRaw(
     amortizacoes_depreciacoes: { contas: [], subtotal: 0 },
     despesas_financeiras: { contas: [], subtotal: 0 },
     outras_despesas_operacionais: { contas: [], subtotal: 0 },
+    despesas_financeiras_nao_operacional: { contas: [], subtotal: 0 },
+    despesas_nao_operacionais: { contas: [], subtotal: 0 },
+    outras_rendas_nao_operacionais: { contas: [], subtotal: 0 },
+    provisoes_irpj_cs: { contas: [], subtotal: 0 },
+    participacoes: { contas: [], subtotal: 0 },
   };
 
   // Maps para computação de gap (itens sem Tipo no arquivo-fonte)
@@ -402,6 +408,7 @@ function _emptyDepartamentoData(): DepartamentoData {
     receita_vendas: { contas: [], subtotal: 0 },
     receitas_operacionais: { contas: [], subtotal: 0 },
     receitas_financeiras: { contas: [], subtotal: 0 },
+    outras_receitas_financeiras: { contas: [], subtotal: 0 },
     receitas_nao_operacionais: { contas: [], subtotal: 0 },
     custos_operacionais: { contas: [], subtotal: 0 },
     despesas_pessoal: { contas: [], subtotal: 0 },
@@ -412,6 +419,11 @@ function _emptyDepartamentoData(): DepartamentoData {
     amortizacoes_depreciacoes: { contas: [], subtotal: 0 },
     despesas_financeiras: { contas: [], subtotal: 0 },
     outras_despesas_operacionais: { contas: [], subtotal: 0 },
+    despesas_financeiras_nao_operacional: { contas: [], subtotal: 0 },
+    despesas_nao_operacionais: { contas: [], subtotal: 0 },
+    outras_rendas_nao_operacionais: { contas: [], subtotal: 0 },
+    provisoes_irpj_cs: { contas: [], subtotal: 0 },
+    participacoes: { contas: [], subtotal: 0 },
   };
   return { grupos, total: 0 };
 }

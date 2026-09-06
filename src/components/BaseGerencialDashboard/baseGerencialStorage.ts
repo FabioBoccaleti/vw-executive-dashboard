@@ -132,6 +132,7 @@ export type TipoContaClassificacao =
   | 'receita_vendas'
   | 'receitas_operacionais'
   | 'receitas_financeiras'
+  | 'outras_receitas_financeiras'
   | 'receitas_nao_operacionais'
   | 'custos_operacionais'
   | 'despesas_pessoal'
@@ -141,12 +142,18 @@ export type TipoContaClassificacao =
   | 'despesas_vendas'
   | 'amortizacoes_depreciacoes'
   | 'despesas_financeiras'
-  | 'outras_despesas_operacionais';
+  | 'outras_despesas_operacionais'
+  | 'despesas_financeiras_nao_operacional'
+  | 'despesas_nao_operacionais'
+  | 'outras_rendas_nao_operacionais'
+  | 'provisoes_irpj_cs'
+  | 'participacoes';
 
 export const TIPO_CONTA_LABELS: Record<TipoContaClassificacao, string> = {
   receita_vendas:                'Receita de Vendas',
   receitas_operacionais:         'Receitas Operacionais',
   receitas_financeiras:          'Receitas Financeiras',
+  outras_receitas_financeiras:   'Outras Receitas Financeiras',
   receitas_nao_operacionais:     'Receitas não Operacionais',
   custos_operacionais:           'Custos Operacionais',
   despesas_pessoal:              'Despesas c/ Pessoal',
@@ -157,12 +164,18 @@ export const TIPO_CONTA_LABELS: Record<TipoContaClassificacao, string> = {
   amortizacoes_depreciacoes:     'Amortizações de Depreciações',
   despesas_financeiras:          'Despesas Financeiras',
   outras_despesas_operacionais:  'Outras Despesas Operacionais',
+  despesas_financeiras_nao_operacional: 'Despesas Financeiras Não Operacional',
+  despesas_nao_operacionais:     'Despesas Não Operacionais',
+  outras_rendas_nao_operacionais: 'Outras Rendas Não Operacionais',
+  provisoes_irpj_cs:             'Provisões IRPJ e C.S.',
+  participacoes:                 'Participações',
 };
 
 export const TIPOS_CONTA_ORDENADOS: TipoContaClassificacao[] = [
   'receita_vendas',
   'receitas_operacionais',
   'receitas_financeiras',
+  'outras_receitas_financeiras',
   'receitas_nao_operacionais',
   'custos_operacionais',
   'despesas_pessoal',
@@ -173,6 +186,11 @@ export const TIPOS_CONTA_ORDENADOS: TipoContaClassificacao[] = [
   'amortizacoes_depreciacoes',
   'despesas_financeiras',
   'outras_despesas_operacionais',
+  'despesas_financeiras_nao_operacional',
+  'despesas_nao_operacionais',
+  'outras_rendas_nao_operacionais',
+  'provisoes_irpj_cs',
+  'participacoes',
 ];
 
 const CLASSIFICACOES_CONTA_KEY = `${KEY_PREFIX}:classificacoes_conta`;
