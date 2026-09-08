@@ -24,6 +24,7 @@ import {
   mergeAssistenciaMedicaNova,
   mergeValeTransporte,
   mergePremiosGratificacoes,
+  seedMergedAccountTargets,
   type DespesasAdmMesData,
   type TipoClassificacao,
   TIPO_LABELS,
@@ -207,6 +208,12 @@ export function ConsolidadoAdmTab({ year, month }: Props) {
           const data = allMonths[i];
           if (!data) continue;
           const mMap = extractByDeptoRuleAll(data, regras);
+          maps[i] = mMap;
+        }
+        seedMergedAccountTargets(maps);
+        for (let i = 0; i < 12; i++) {
+          if (!allMonths[i]) continue;
+          const mMap = maps[i];
           mergeAssistenciaMedica(mMap);
           mergeSalariosOrdenados(mMap);
           mergeComissoesEmpregados(mMap);
@@ -223,7 +230,6 @@ export function ConsolidadoAdmTab({ year, month }: Props) {
           mergeAssistenciaMedicaNova(mMap);
           mergeValeTransporte(mMap);
           mergePremiosGratificacoes(mMap);
-          maps[i] = mMap;
           withData.push(i + 1);
           for (const [conta, val] of mMap) valMap.set(conta, (valMap.get(conta) ?? 0) + val);
         }

@@ -26,6 +26,30 @@ export const TIPOS_ORDENADOS: TipoClassificacao[] = [
   'vendas', 'amort_deprec', 'financeiras', 'outras_operacionais',
 ];
 
+const MERGED_ACCOUNT_PAIRS: Array<{ source: string; target: string }> = [
+  { source: '5510102013', target: '5520103001' },
+  { source: '4150101001', target: '5510101003' },
+  { source: '5520101001', target: '5510101003' },
+  { source: '4150101002', target: '5510101001' },
+  { source: '4150101004', target: '5520101002' },
+  { source: '4150101005', target: '5510101004' },
+  { source: '4150101008', target: '5520101008' },
+  { source: '5510102008', target: '5520101008' },
+  { source: '4150102001', target: '5510102001' },
+  { source: '4150102002', target: '5520102002' },
+  { source: '4150102004', target: '5520102004' },
+  { source: '5510102004', target: '5520102004' },
+  { source: '4150102003', target: '5510102003' },
+  { source: '4150102010', target: '5510102010' },
+  { source: '4150102012', target: '5510102011' },
+  { source: '4150102013', target: '5520102013' },
+  { source: '4150103001', target: '5520103001' },
+  { source: '4150103010', target: '5520103010' },
+  { source: '5510102015', target: '5520103010' },
+  { source: '5510101002', target: '5520101004' },
+  { source: '4150101003', target: '5520101004' },
+];
+
 export interface DespesaAdmRow {
   conta: string;
   isMain: boolean;
@@ -480,6 +504,32 @@ export function mergePremiosGratificacoes(valorMap: Map<string, number>): void {
   // Remove as contas que foram somadas
   if (conta4150) valorMap.delete(conta4150);
   if (conta5510) valorMap.delete(conta5510);
+}
+
+export function seedMergedAccountTargets(
+  monthMaps: Map<string, number>[],
+): void {
+  const targetKeys = new Map<string, string>();
+
+  for (const map of monthMaps) {
+    for (const key of map.keys()) {
+      for (const pair of MERGED_ACCOUNT_PAIRS) {
+        if (key.startsWith(pair.target) && !targetKeys.has(pair.target)) {
+          targetKeys.set(pair.target, key);
+        }
+      }
+    }
+  }
+
+  for (const map of monthMaps) {
+    for (const pair of MERGED_ACCOUNT_PAIRS) {
+      const targetKey = targetKeys.get(pair.target);
+      if (!targetKey || map.has(targetKey)) continue;
+      if ([...map.keys()].some(key => key.startsWith(pair.source))) {
+        map.set(targetKey, 0);
+      }
+    }
+  }
 }
 
 export async function getAllImportedMonthsData(): Promise<DespesasAdmMesData[]> {
