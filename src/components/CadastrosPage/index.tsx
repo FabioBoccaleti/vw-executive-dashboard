@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Car, Shield, Users, Percent, Store, Wrench, ShoppingBag, UserCheck, Receipt, CalendarCog } from 'lucide-react';
+import { ArrowLeft, Car, Shield, Users, Percent, Store, Wrench, ShoppingBag, UserCheck, Receipt, CalendarCog, WalletCards } from 'lucide-react';
 import { VeiculosSection } from './sections/VeiculosSection';
 import { BlinadorasSection } from './sections/BlinadorasSection';
 import { VendedoresSection } from './sections/VendedoresSection';
@@ -22,8 +22,9 @@ import { EsteticaProdutosSection } from './sections/EsteticaProdutosSection';
 import { EsteticaVendedoresAcessoriosSection } from './sections/EsteticaVendedoresAcessoriosSection';
 import { EsteticaAliquotasSection } from './sections/EsteticaAliquotasSection';
 import { EsteticaDsrSection } from './sections/EsteticaDsrSection';
+import { EsteticaSalariosFixosSection } from './sections/EsteticaSalariosFixosSection';
 
-type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos' | 'aliquotas' | 'dsr';
+type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos' | 'aliquotas' | 'dsr' | 'salariosFixos';
 
 interface MenuItem {
   id: SectionId;
@@ -61,6 +62,7 @@ const MENU_ESTETICA: MenuItem[] = [
   { id: 'aliquotas',             label: 'Alíquotas de Imposto',       description: 'Tipos de imposto, alíquotas e encargos', icon: <Receipt className="w-5 h-5" /> },
   { id: 'dsr',                   label: 'DSR',                        description: 'Percentual de DSR por Ano e Mês',   icon: <CalendarCog className="w-5 h-5" /> },
   { id: 'regras',                label: 'Regras de Remuneração',     description: 'Percentuais e bases de cálculo', icon: <Percent className="w-5 h-5" /> },
+  { id: 'salariosFixos',         label: 'Salários Fixo',              description: 'Custos fixos dos colaboradores', icon: <WalletCards className="w-5 h-5" /> },
 ];
 
 interface CadastrosPageProps {
@@ -168,6 +170,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
             {isEstetica   && activeSection === 'aliquotas'             && <EsteticaAliquotasSection />}
             {isEstetica   && activeSection === 'dsr'                   && <EsteticaDsrSection />}
             {isEstetica   && activeSection === 'regras'               && <EsteticaRegrasSection />}
+            {isEstetica   && activeSection === 'salariosFixos'         && <EsteticaSalariosFixosSection />}
           </div>
         </main>
       </div>

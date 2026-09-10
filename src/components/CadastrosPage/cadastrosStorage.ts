@@ -311,6 +311,27 @@ export async function saveEsteticaDsr(items: DsrConfig[]): Promise<boolean> {
   return kvSet(KEY_ESTETICA_DSR, items);
 }
 
+// ── Estética: Salários Fixos ──────────────────────────────────────────────────
+const KEY_ESTETICA_SALARIOS_FIXOS = 'estetica_cadastro_salarios_fixos';
+
+export interface SalarioFixoEstetica {
+  id: string;
+  nome: string;
+  cargo: string;
+  salarioFixo: string;
+  encargosProvisoes: string;
+  planoSaude: string;
+  valeTransporte: string;
+}
+
+export async function loadEsteticaSalariosFixos(): Promise<SalarioFixoEstetica[]> {
+  return (await kvGet<SalarioFixoEstetica[]>(KEY_ESTETICA_SALARIOS_FIXOS)) ?? [];
+}
+
+export async function saveEsteticaSalariosFixos(items: SalarioFixoEstetica[]): Promise<boolean> {
+  return kvSet(KEY_ESTETICA_SALARIOS_FIXOS, items);
+}
+
 // ── Estética: Veículos ────────────────────────────────────────────────────────
 const KEY_ESTETICA_VEICULOS = 'estetica_cadastro_veiculos';
 
