@@ -37,6 +37,7 @@ export interface RateioResultadoLinha {
 
 export type RateioResultadosBrandYearData = Record<number, RateioResultadoLinha[]>;
 export type RateioEndividamentoBrandYearData = Record<number, string[]>;
+export type RateioEndividamentoDeducoesYearData = Record<number, number>;
 export type RateioTaxaJurosYearData = Record<number, number>;
 export type RateioDepartamentoName = 'novos' | 'vendaDireta' | 'usados' | 'pecas' | 'oficina' | 'funilaria';
 
@@ -95,6 +96,10 @@ function getRateioEndividamentoKey(brand: AnaliseBrand, year: number): string {
   return `analise_despesas_rateio_endividamento_${brand}_${year}`;
 }
 
+function getRateioEndividamentoDeducoesKey(brand: AnaliseBrand, year: number): string {
+  return `analise_despesas_rateio_endividamento_deducoes_${brand}_${year}`;
+}
+
 function getRateioTaxaJurosKey(year: number): string {
   return `analise_despesas_rateio_taxa_juros_${year}`;
 }
@@ -139,6 +144,14 @@ function getDefaultRateioEndividamentoData(): RateioEndividamentoBrandYearData {
   const out: RateioEndividamentoBrandYearData = {};
   for (let month = 1; month <= 12; month++) {
     out[month] = [];
+  }
+  return out;
+}
+
+function getDefaultRateioEndividamentoDeducoesData(): RateioEndividamentoDeducoesYearData {
+  const out: RateioEndividamentoDeducoesYearData = {};
+  for (let month = 1; month <= 12; month++) {
+    out[month] = 0;
   }
   return out;
 }
@@ -414,6 +427,45 @@ export async function saveRateioEndividamento(
     await kvSet(getRateioEndividamentoKey(brand, year), payload);
   } catch (err) {
     console.error('Erro ao salvar endividamento de rateio:', err);
+  }
+}
+
+/** Carrega deduções de endividamento (ajustes manuais) por marca/ano. */
+export async function loadRateioEndividamentoDeducoes(
+  brand: AnaliseBrand,
+  year: number,
+): Promise<RateioEndividamentoDeducoesYearData> {
+  try {
+    const saved = await kvGet<Record<string, number>>(getRateioEndividamentoDeducoesKey(brand, year));
+    const base = getDefaultRateioEndividamentoDeducoesData();
+    if (!saved) return base;
+
+    for (let month = 1; month <= 12; month++) {
+      const val = Number(saved[String(month)]);
+      base[month] = Number.isFinite(val) ? val : 0;
+    }
+
+    return base;
+  } catch (err) {
+    console.error('Erro ao carregar deduções de endividamento:', err);
+    return getDefaultRateioEndividamentoDeducoesData();
+  }
+}
+
+/** Salva deduções de endividamento (ajustes manuais) por marca/ano. */
+export async function saveRateioEndividamentoDeducoes(
+  brand: AnaliseBrand,
+  year: number,
+  data: RateioEndividamentoDeducoesYearData,
+): Promise<void> {
+  try {
+    const payload: Record<string, number> = {};
+    for (let month = 1; month <= 12; month++) {
+      payload[String(month)] = Number.isFinite(data[month]) ? data[month] : 0;
+    }
+    await kvSet(getRateioEndividamentoDeducoesKey(brand, year), payload);
+  } catch (err) {
+    console.error('Erro ao salvar deduções de endividamento:', err);
   }
 }
 
