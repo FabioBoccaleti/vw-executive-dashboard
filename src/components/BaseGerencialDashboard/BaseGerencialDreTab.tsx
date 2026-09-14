@@ -2,10 +2,19 @@ import { useEffect, useState } from 'react';
 import {
   dadosOpKey,
   loadAllDadosOperacionais,
+  loadRegrasDre,
   saveAllDadosOperacionais,
   type DeptoClassificacao,
+  type BaseGerencialDreLine,
+  type BaseGerencialDreRules,
+  type TipoContaClassificacao,
   type Marca,
 } from './baseGerencialStorage';
+import {
+  processConsolidadoData,
+  processDepartamentoData,
+  type DepartamentoData,
+} from './baseGerencialDataProcessor';
 
 const MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
@@ -45,6 +54,25 @@ const BASE_LINE_IDS: DreLineId[] = [
   'despesasNaoOperacionais', 'outrasRendasNaoOperacionais', 'provisoesIrpjCs', 'participacoes',
 ];
 
+const DRE_RULE_LINE_BY_ID: Partial<Record<DreLineId, BaseGerencialDreLine>> = {
+  receitaOperacionalLiquida: 'receita_operacional_liquida',
+  custoOperacionalReceita: 'custo_operacional_receita',
+  outrasReceitasOperacionais: 'outras_receitas_operacionais',
+  outrasDespesasOperacionais: 'outras_despesas_operacionais',
+  despesasPessoal: 'despesas_pessoal',
+  despesasServTerceiros: 'despesas_servicos_terceiros',
+  despesasOcupacao: 'despesas_ocupacao',
+  despesasFuncionamento: 'despesas_funcionamento',
+  despesasVendas: 'despesas_vendas',
+  amortizacoesDepreciacoes: 'amortizacoes_depreciacoes',
+  outrasReceitasFinanceiras: 'outras_receitas_financeiras',
+  despesasFinanceirasNaoOperacional: 'despesas_financeiras_nao_operacional',
+  despesasNaoOperacionais: 'despesas_nao_operacionais',
+  outrasRendasNaoOperacionais: 'outras_rendas_nao_operacionais',
+  provisoesIrpjCs: 'provisoes_irpj_cs',
+  participacoes: 'participacoes',
+};
+
 function createEmptyMonthlyValues(): MonthlyValues {
   return Object.fromEntries(DRE_ROWS.map(row => [row.id, Array(12).fill(0)])) as MonthlyValues;
 }
@@ -81,6 +109,19 @@ function calculateDreValues(baseValues: MonthlyValues): MonthlyValues {
   }
 
   return values;
+}
+
+function sumRuleGroups(
+  data: DepartamentoData,
+  rules: BaseGerencialDreRules,
+  lineId: DreLineId,
+): number {
+  const ruleLine = DRE_RULE_LINE_BY_ID[lineId];
+  if (!ruleLine) return 0;
+  return (rules[ruleLine] ?? []).reduce(
+    (sum, group: TipoContaClassificacao) => sum + (data.grupos[group]?.subtotal ?? 0),
+    0,
+  );
 }
 
 const DEPARTMENTS = [
@@ -132,33 +173,57 @@ export function BaseGerencialDreTab({
 }: Props) {
   const [activeDepartment, setActiveDepartment] = useState<(typeof DEPARTMENTS)[number]>('Veículos Novos');
   const [allDadosOperacionais, setAllDadosOperacionais] = useState<Record<string, { volumeVendas?: number }>>({});
+  const [dreRules, setDreRules] = useState<BaseGerencialDreRules>({});
+  const [departmentValues, setDepartmentValues] = useState<MonthlyValues>(createEmptyMonthlyValues);
+  const [loadingDre, setLoadingDre] = useState(true);
   const isAudiVendaDireta = marca === 'audi' && activeDepartment === 'Venda Direta';
   const storageDepartment = DEPARTMENT_TO_STORAGE[activeDepartment];
 
   useEffect(() => {
     let active = true;
-    loadAllDadosOperacionais().then(data => {
-      if (active) setAllDadosOperacionais(data);
-    });
+    setLoadingDre(true);
+    Promise.all([loadAllDadosOperacionais(), loadRegrasDre()])
+      .then(([operationalData, rules]) => {
+        if (active) {
+          setAllDadosOperacionais(operationalData);
+          setDreRules(rules);
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingDre(false);
+      });
     return () => { active = false; };
   }, [marca, year]);
+
+  useEffect(() => {
+    let active = true;
+    const loadDepartmentValues = async () => {
+      if (isAudiVendaDireta) return;
+      const monthlyData = await Promise.all(
+        MONTHS.map((_, index) => storageDepartment === null
+          ? processConsolidadoData(marca, year, index + 1)
+          : processDepartamentoData(marca, storageDepartment, year, index + 1))
+      );
+      const nextValues = createEmptyMonthlyValues();
+      nextValues.volumeVendas = MONTHS.map((_, month) => {
+        const departments = storageDepartment ? [storageDepartment] : CONSOLIDATED_DEPARTMENTS;
+        return departments.reduce((sum, department) => sum + getVolume(department, month), 0);
+      });
+      for (const line of BASE_LINE_IDS) {
+        if (line === 'volumeVendas') continue;
+        nextValues[line] = monthlyData.map(data => sumRuleGroups(data, dreRules, line));
+      }
+      if (active) setDepartmentValues(nextValues);
+    };
+    loadDepartmentValues().catch(error => console.error('Erro ao carregar dados da DRE:', error));
+    return () => { active = false; };
+  }, [marca, year, storageDepartment, isAudiVendaDireta, dreRules, allDadosOperacionais]);
 
   function getVolume(department: DeptoClassificacao, month: number): number {
     return Number(allDadosOperacionais[dadosOpKey(year, month + 1, marca, department)]?.volumeVendas ?? 0);
   }
 
-  function getMonthlyBaseValues(): MonthlyValues {
-    const baseValues = createEmptyMonthlyValues();
-    const departments = storageDepartment
-      ? [storageDepartment]
-      : CONSOLIDATED_DEPARTMENTS;
-    baseValues.volumeVendas = MONTHS.map((_, month) =>
-      departments.reduce((sum, department) => sum + getVolume(department, month), 0)
-    );
-    return baseValues;
-  }
-
-  const values = calculateDreValues(getMonthlyBaseValues());
+  const values = calculateDreValues(departmentValues);
 
   async function handleVolumeChange(month: number, rawValue: string) {
     if (!storageDepartment) return;
@@ -211,6 +276,10 @@ export function BaseGerencialDreTab({
               Na Audi, os dados de Venda Direta são somados e exibidos junto ao departamento Veículos Novos.
             </p>
           </div>
+        </div>
+      ) : loadingDre ? (
+        <div className="flex-1 flex items-center justify-center bg-white rounded-xl border border-slate-200 shadow-sm">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-auto bg-white rounded-xl border border-slate-200 shadow-sm p-4">
