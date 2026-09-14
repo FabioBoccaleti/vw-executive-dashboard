@@ -203,6 +203,38 @@ export async function saveClassificacoesConta(data: Record<string, TipoContaClas
   await kvSet(CLASSIFICACOES_CONTA_KEY, data);
 }
 
+// ─── Regras de alimentação da DRE ───────────────────────────────────────────
+
+export type BaseGerencialDreLine =
+  | 'receita_operacional_liquida'
+  | 'custo_operacional_receita'
+  | 'outras_receitas_operacionais'
+  | 'outras_despesas_operacionais'
+  | 'despesas_pessoal'
+  | 'despesas_servicos_terceiros'
+  | 'despesas_ocupacao'
+  | 'despesas_funcionamento'
+  | 'despesas_vendas'
+  | 'amortizacoes_depreciacoes'
+  | 'outras_receitas_financeiras'
+  | 'despesas_financeiras_nao_operacional'
+  | 'despesas_nao_operacionais'
+  | 'outras_rendas_nao_operacionais'
+  | 'provisoes_irpj_cs'
+  | 'participacoes';
+
+export type BaseGerencialDreRules = Partial<Record<BaseGerencialDreLine, TipoContaClassificacao[]>>;
+
+const REGRAS_DRE_KEY = `${KEY_PREFIX}:regras_dre`;
+
+export async function loadRegrasDre(): Promise<BaseGerencialDreRules> {
+  return (await kvGet<BaseGerencialDreRules>(REGRAS_DRE_KEY)) ?? {};
+}
+
+export async function saveRegrasDre(data: BaseGerencialDreRules): Promise<void> {
+  await kvSet(REGRAS_DRE_KEY, data);
+}
+
 // ─── Dados Operacionais por Período e Departamento ───────────────────────────
 
 export interface DadosOperacionais {

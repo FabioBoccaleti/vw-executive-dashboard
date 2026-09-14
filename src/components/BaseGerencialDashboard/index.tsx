@@ -23,6 +23,7 @@ import { DepartamentoTab } from './DepartamentoTab';
 import { AnaliseCenariosTab } from './AnaliseCenariosTab';
 import { ComparativoTab } from './ComparativoTab';
 import { BaseGerencialDreTab } from './BaseGerencialDreTab';
+import { RegrasDreTab } from './RegrasDreTab';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -275,7 +276,7 @@ interface Props {
 }
 
 type ActiveTab = 'importar' | 'vw' | 'audi' | 'analise' | 'comparativo';
-type ImportarSubTab = 'dados' | 'classificacao' | 'revendas' | 'departamentos' | 'contas_tipo_item';
+type ImportarSubTab = 'dados' | 'classificacao' | 'revendas' | 'departamentos' | 'contas_tipo_item' | 'regras_dre';
 type DepartamentoSubTab = 'veiculos_novos' | 'venda_direta' | 'veiculos_usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'diretoria' | 'consolidado' | 'dre';
 
 // ─── Seletor de Ano e Mês ─────────────────────────────────────────────────────
@@ -602,6 +603,16 @@ export function BaseGerencialDashboard({ onChangeBrand }: Props) {
               >
                 Contas c/ Tipo Item
               </button>
+              <button
+                onClick={() => setImportarSubTab('regras_dre')}
+                className={`px-4 py-2 text-xs font-semibold rounded transition-colors ${
+                  importarSubTab === 'regras_dre'
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                Regras da DRE
+              </button>
             </div>
 
             {/* Dados do Mês */}
@@ -780,6 +791,12 @@ export function BaseGerencialDashboard({ onChangeBrand }: Props) {
             {importarSubTab === 'contas_tipo_item' && (
               <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
                 <ContasTipoItemTab />
+              </div>
+            )}
+
+            {importarSubTab === 'regras_dre' && (
+              <div className="flex-1 flex flex-col gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-0 overflow-auto">
+                <RegrasDreTab />
               </div>
             )}
           </div>
