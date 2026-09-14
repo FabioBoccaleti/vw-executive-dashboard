@@ -1,32 +1,87 @@
-import { useState } from 'react';
-import type { Marca } from './baseGerencialStorage';
+import { useEffect, useState } from 'react';
+import {
+  dadosOpKey,
+  loadAllDadosOperacionais,
+  saveAllDadosOperacionais,
+  type DeptoClassificacao,
+  type Marca,
+} from './baseGerencialStorage';
 
 const MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
 const DRE_ROWS = [
-  { label: 'VOLUME DE VENDAS', kind: 'normal' },
-  { label: 'RECEITA OPERACIONAL LÍQUIDA', kind: 'bold' },
-  { label: 'CUSTO OPERACIONAL DA RECEITA', kind: 'negative' },
-  { label: 'LUCRO (PREJUÍZO) OPERACIONAL BRUTO', kind: 'subtotal' },
-  { label: 'OUTRAS RECEITAS OPERACIONAIS', kind: 'normal' },
-  { label: 'OUTRAS DESPESAS OPERACIONAIS', kind: 'negative' },
-  { label: 'MARGEM DE CONTRIBUIÇÃO', kind: 'subtotal' },
-  { label: 'DESPESAS C/ PESSOAL', kind: 'negative' },
-  { label: 'DESPESAS C/ SERV. DE TERCEIROS', kind: 'negative' },
-  { label: 'DESPESAS C/ OCUPAÇÃO', kind: 'negative' },
-  { label: 'DESPESAS C/ FUNCIONAMENTO', kind: 'negative' },
-  { label: 'DESPESAS C/ VENDAS', kind: 'negative' },
-  { label: 'LUCRO (PREJUÍZO) OPERACIONAL LÍQUIDO', kind: 'subtotal' },
-  { label: 'AMORTIZAÇÕES E DEPRECIAÇÕES', kind: 'negative' },
-  { label: 'OUTRAS RECEITAS FINANCEIRAS', kind: 'normal' },
-  { label: 'DESPESAS FINANCEIRAS NÃO OPERACIONAL', kind: 'negative' },
-  { label: 'DESPESAS NÃO OPERACIONAIS', kind: 'negative' },
-  { label: 'OUTRAS RENDAS NÃO OPERACIONAIS', kind: 'normal' },
-  { label: 'LUCRO (PREJUÍZO) ANTES IMPOSTOS', kind: 'subtotal' },
-  { label: 'PROVISÕES IRPJ E C.S.', kind: 'negative' },
-  { label: 'PARTICIPAÇÕES', kind: 'negative' },
-  { label: 'LUCRO LÍQUIDO DO EXERCÍCIO', kind: 'total' },
+  { id: 'volumeVendas', label: 'VOLUME DE VENDAS', kind: 'normal' },
+  { id: 'receitaOperacionalLiquida', label: 'RECEITA OPERACIONAL LÍQUIDA', kind: 'bold' },
+  { id: 'custoOperacionalReceita', label: 'CUSTO OPERACIONAL DA RECEITA', kind: 'negative' },
+  { id: 'lucroOperacionalBruto', label: 'LUCRO (PREJUÍZO) OPERACIONAL BRUTO', kind: 'subtotal' },
+  { id: 'outrasReceitasOperacionais', label: 'OUTRAS RECEITAS OPERACIONAIS', kind: 'normal' },
+  { id: 'outrasDespesasOperacionais', label: 'OUTRAS DESPESAS OPERACIONAIS', kind: 'negative' },
+  { id: 'margemContribuicao', label: 'MARGEM DE CONTRIBUIÇÃO', kind: 'subtotal' },
+  { id: 'despesasPessoal', label: 'DESPESAS C/ PESSOAL', kind: 'negative' },
+  { id: 'despesasServTerceiros', label: 'DESPESAS C/ SERV. DE TERCEIROS', kind: 'negative' },
+  { id: 'despesasOcupacao', label: 'DESPESAS C/ OCUPAÇÃO', kind: 'negative' },
+  { id: 'despesasFuncionamento', label: 'DESPESAS C/ FUNCIONAMENTO', kind: 'negative' },
+  { id: 'despesasVendas', label: 'DESPESAS C/ VENDAS', kind: 'negative' },
+  { id: 'lucroOperacionalLiquido', label: 'LUCRO (PREJUÍZO) OPERACIONAL LÍQUIDO', kind: 'subtotal' },
+  { id: 'amortizacoesDepreciacoes', label: 'AMORTIZAÇÕES E DEPRECIAÇÕES', kind: 'negative' },
+  { id: 'outrasReceitasFinanceiras', label: 'OUTRAS RECEITAS FINANCEIRAS', kind: 'normal' },
+  { id: 'despesasFinanceirasNaoOperacional', label: 'DESPESAS FINANCEIRAS NÃO OPERACIONAL', kind: 'negative' },
+  { id: 'despesasNaoOperacionais', label: 'DESPESAS NÃO OPERACIONAIS', kind: 'negative' },
+  { id: 'outrasRendasNaoOperacionais', label: 'OUTRAS RENDAS NÃO OPERACIONAIS', kind: 'normal' },
+  { id: 'lucroAntesImpostos', label: 'LUCRO (PREJUÍZO) ANTES IMPOSTOS', kind: 'subtotal' },
+  { id: 'provisoesIrpjCs', label: 'PROVISÕES IRPJ E C.S.', kind: 'negative' },
+  { id: 'participacoes', label: 'PARTICIPAÇÕES', kind: 'negative' },
+  { id: 'lucroLiquidoExercicio', label: 'LUCRO LÍQUIDO DO EXERCÍCIO', kind: 'total' },
 ] as const;
+
+type DreLineId = typeof DRE_ROWS[number]['id'];
+type MonthlyValues = Record<DreLineId, number[]>;
+
+const BASE_LINE_IDS: DreLineId[] = [
+  'volumeVendas', 'receitaOperacionalLiquida', 'custoOperacionalReceita',
+  'outrasReceitasOperacionais', 'outrasDespesasOperacionais', 'despesasPessoal',
+  'despesasServTerceiros', 'despesasOcupacao', 'despesasFuncionamento', 'despesasVendas',
+  'amortizacoesDepreciacoes', 'outrasReceitasFinanceiras', 'despesasFinanceirasNaoOperacional',
+  'despesasNaoOperacionais', 'outrasRendasNaoOperacionais', 'provisoesIrpjCs', 'participacoes',
+];
+
+function createEmptyMonthlyValues(): MonthlyValues {
+  return Object.fromEntries(DRE_ROWS.map(row => [row.id, Array(12).fill(0)])) as MonthlyValues;
+}
+
+function calculateDreValues(baseValues: MonthlyValues): MonthlyValues {
+  const values = createEmptyMonthlyValues();
+  for (const id of BASE_LINE_IDS) values[id] = [...baseValues[id]];
+
+  for (let month = 0; month < 12; month += 1) {
+    values.lucroOperacionalBruto[month] =
+      values.receitaOperacionalLiquida[month] + values.custoOperacionalReceita[month];
+    values.margemContribuicao[month] =
+      values.lucroOperacionalBruto[month] +
+      values.outrasReceitasOperacionais[month] +
+      values.outrasDespesasOperacionais[month];
+    values.lucroOperacionalLiquido[month] =
+      values.margemContribuicao[month] +
+      values.despesasPessoal[month] +
+      values.despesasServTerceiros[month] +
+      values.despesasOcupacao[month] +
+      values.despesasFuncionamento[month] +
+      values.despesasVendas[month];
+    values.lucroAntesImpostos[month] =
+      values.lucroOperacionalLiquido[month] +
+      values.amortizacoesDepreciacoes[month] +
+      values.outrasReceitasFinanceiras[month] +
+      values.despesasFinanceirasNaoOperacional[month] +
+      values.despesasNaoOperacionais[month] +
+      values.outrasRendasNaoOperacionais[month];
+    values.lucroLiquidoExercicio[month] =
+      values.lucroAntesImpostos[month] +
+      values.provisoesIrpjCs[month] +
+      values.participacoes[month];
+  }
+
+  return values;
+}
 
 const DEPARTMENTS = [
   'Veículos Novos',
@@ -40,6 +95,23 @@ const DEPARTMENTS = [
   'Consolidado (Total)',
 ] as const;
 
+const DEPARTMENT_TO_STORAGE: Record<(typeof DEPARTMENTS)[number], DeptoClassificacao | null> = {
+  'Veículos Novos': 'veiculos_novos',
+  'Venda Direta': 'venda_direta',
+  'Veículos Usados': 'veiculos_usados',
+  'Peças': 'pecas',
+  'Oficina': 'oficina',
+  'Funilaria': 'funilaria',
+  'Administração': 'administracao',
+  'Diretoria': 'diretoria',
+  'Consolidado (Total)': null,
+};
+
+const CONSOLIDATED_DEPARTMENTS: DeptoClassificacao[] = [
+  'veiculos_novos', 'venda_direta', 'veiculos_usados', 'pecas',
+  'oficina', 'funilaria', 'administracao', 'diretoria',
+];
+
 interface Props {
   marca: Marca;
   year: number;
@@ -47,14 +119,9 @@ interface Props {
   onYearChange: (year: number) => void;
 }
 
-function valueText(label: string): string {
-  return label === 'VOLUME DE VENDAS' ? '0' : 'R$ 0';
-}
-
-function totalText(label: string): string {
-  const monthlyValues = MONTHS.map(() => 0);
-  const total = monthlyValues.reduce((sum, value) => sum + value, 0);
-  return label === 'VOLUME DE VENDAS' ? String(total) : `R$ ${total}`;
+function formatValue(label: string, value: number): string {
+  if (label === 'VOLUME DE VENDAS') return String(value);
+  return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
 export function BaseGerencialDreTab({
@@ -64,7 +131,46 @@ export function BaseGerencialDreTab({
   onYearChange,
 }: Props) {
   const [activeDepartment, setActiveDepartment] = useState<(typeof DEPARTMENTS)[number]>('Veículos Novos');
+  const [allDadosOperacionais, setAllDadosOperacionais] = useState<Record<string, { volumeVendas?: number }>>({});
   const isAudiVendaDireta = marca === 'audi' && activeDepartment === 'Venda Direta';
+  const storageDepartment = DEPARTMENT_TO_STORAGE[activeDepartment];
+
+  useEffect(() => {
+    let active = true;
+    loadAllDadosOperacionais().then(data => {
+      if (active) setAllDadosOperacionais(data);
+    });
+    return () => { active = false; };
+  }, [marca, year]);
+
+  function getVolume(department: DeptoClassificacao, month: number): number {
+    return Number(allDadosOperacionais[dadosOpKey(year, month + 1, marca, department)]?.volumeVendas ?? 0);
+  }
+
+  function getMonthlyBaseValues(): MonthlyValues {
+    const baseValues = createEmptyMonthlyValues();
+    const departments = storageDepartment
+      ? [storageDepartment]
+      : CONSOLIDATED_DEPARTMENTS;
+    baseValues.volumeVendas = MONTHS.map((_, month) =>
+      departments.reduce((sum, department) => sum + getVolume(department, month), 0)
+    );
+    return baseValues;
+  }
+
+  const values = calculateDreValues(getMonthlyBaseValues());
+
+  async function handleVolumeChange(month: number, rawValue: string) {
+    if (!storageDepartment) return;
+    const value = rawValue === '' ? 0 : Math.max(0, Math.trunc(Number(rawValue)) || 0);
+    const key = dadosOpKey(year, month + 1, marca, storageDepartment);
+    const next = {
+      ...allDadosOperacionais,
+      [key]: { ...allDadosOperacionais[key], volumeVendas: value },
+    };
+    setAllDadosOperacionais(next);
+    await saveAllDadosOperacionais(next);
+  }
 
   return (
     <div className="flex-1 flex flex-col gap-4 min-h-0">
@@ -128,17 +234,31 @@ export function BaseGerencialDreTab({
                 const isTotal = row.kind === 'total';
                 const isSubtotal = row.kind === 'subtotal';
                 const isNegative = row.kind === 'negative';
+                const monthlyValues = values[row.id];
+                const total = monthlyValues.reduce((sum, value) => sum + value, 0);
                 return (
                   <tr
                     key={row.label}
                     className={`${isTotal ? 'bg-purple-100 text-purple-900 font-bold' : isSubtotal ? 'bg-slate-100 font-semibold' : index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} border-b border-slate-200`}
                   >
                     <td className="px-2 py-1.5 font-medium">{row.label}</td>
-                    <td className={`w-32 min-w-32 px-3 py-1.5 text-right tabular-nums ${isNegative ? 'text-red-600' : ''}`}>{totalText(row.label)}</td>
+                    <td className={`w-32 min-w-32 px-3 py-1.5 text-right tabular-nums ${isNegative ? 'text-red-600' : ''}`}>{formatValue(row.label, total)}</td>
                     <td className="px-2 py-1.5 text-right tabular-nums">-</td>
                     {MONTHS.map(month => (
                       <td key={`${row.label}-${month}`} className={`border-l border-slate-200 px-2 py-1.5 text-right tabular-nums ${isNegative ? 'text-red-600' : ''}`}>
-                        {valueText(row.label)}
+                        {row.id === 'volumeVendas' && storageDepartment ? (
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            inputMode="numeric"
+                            value={getVolume(storageDepartment, MONTHS.indexOf(month)) || ''}
+                            onChange={event => handleVolumeChange(MONTHS.indexOf(month), event.target.value)}
+                            className="w-full min-w-14 bg-transparent text-right tabular-nums outline-none focus:bg-emerald-50 focus:ring-1 focus:ring-emerald-400 rounded px-1"
+                          />
+                        ) : (
+                          formatValue(row.label, monthlyValues[MONTHS.indexOf(month)])
+                        )}
                       </td>
                     ))}
                   </tr>
