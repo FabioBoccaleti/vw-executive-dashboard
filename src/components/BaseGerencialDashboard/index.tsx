@@ -22,6 +22,7 @@ import { ContasTipoItemTab } from './ContasTipoItemTab';
 import { DepartamentoTab } from './DepartamentoTab';
 import { AnaliseCenariosTab } from './AnaliseCenariosTab';
 import { ComparativoTab } from './ComparativoTab';
+import { BaseGerencialDreTab } from './BaseGerencialDreTab';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -275,7 +276,7 @@ interface Props {
 
 type ActiveTab = 'importar' | 'vw' | 'audi' | 'analise' | 'comparativo';
 type ImportarSubTab = 'dados' | 'classificacao' | 'revendas' | 'departamentos' | 'contas_tipo_item';
-type DepartamentoSubTab = 'veiculos_novos' | 'venda_direta' | 'veiculos_usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'diretoria' | 'consolidado';
+type DepartamentoSubTab = 'veiculos_novos' | 'venda_direta' | 'veiculos_usados' | 'pecas' | 'oficina' | 'funilaria' | 'administracao' | 'diretoria' | 'consolidado' | 'dre';
 
 // ─── Seletor de Ano e Mês ─────────────────────────────────────────────────────
 
@@ -799,6 +800,7 @@ export function BaseGerencialDashboard({ onChangeBrand }: Props) {
                 { id: 'administracao', label: 'Administração' },
                 { id: 'diretoria', label: 'Diretoria' },
                 { id: 'consolidado', label: 'Consolidado (Total)' },
+                { id: 'dre', label: 'DRE' },
               ] as { id: DepartamentoSubTab; label: string }[]).map(sub => (
                 <button
                   key={sub.id}
@@ -814,23 +816,31 @@ export function BaseGerencialDashboard({ onChangeBrand }: Props) {
               ))}
             </div>
 
-            {/* Seletor de Ano e Mês */}
-            <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
-              <YearMesSelector
+            {vwSubTab === 'dre' ? (
+              <BaseGerencialDreTab
+                marca="vw"
                 year={vwYear}
-                mes={vwMes}
+                years={YEARS}
                 onYearChange={setVwYear}
-                onMesChange={setVwMes}
               />
-            </div>
-
-            {/* Conteúdo das sub-abas VW */}
-            <DepartamentoTab
-              marca="vw"
-              departamento={vwSubTab}
-              year={vwYear}
-              mes={vwMes}
-            />
+            ) : (
+              <>
+                <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
+                  <YearMesSelector
+                    year={vwYear}
+                    mes={vwMes}
+                    onYearChange={setVwYear}
+                    onMesChange={setVwMes}
+                  />
+                </div>
+                <DepartamentoTab
+                  marca="vw"
+                  departamento={vwSubTab}
+                  year={vwYear}
+                  mes={vwMes}
+                />
+              </>
+            )}
           </div>
         )}
 
@@ -855,6 +865,7 @@ export function BaseGerencialDashboard({ onChangeBrand }: Props) {
                 { id: 'administracao', label: 'Administração' },
                 { id: 'diretoria', label: 'Diretoria' },
                 { id: 'consolidado', label: 'Consolidado (Total)' },
+                { id: 'dre', label: 'DRE' },
               ] as { id: DepartamentoSubTab; label: string }[]).map(sub => (
                 <button
                   key={sub.id}
@@ -870,23 +881,31 @@ export function BaseGerencialDashboard({ onChangeBrand }: Props) {
               ))}
             </div>
 
-            {/* Seletor de Ano e Mês */}
-            <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
-              <YearMesSelector
+            {audiSubTab === 'dre' ? (
+              <BaseGerencialDreTab
+                marca="audi"
                 year={audiYear}
-                mes={audiMes}
+                years={YEARS}
                 onYearChange={setAudiYear}
-                onMesChange={setAudiMes}
               />
-            </div>
-
-            {/* Conteúdo das sub-abas Audi */}
-            <DepartamentoTab
-              marca="audi"
-              departamento={audiSubTab}
-              year={audiYear}
-              mes={audiMes}
-            />
+            ) : (
+              <>
+                <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
+                  <YearMesSelector
+                    year={audiYear}
+                    mes={audiMes}
+                    onYearChange={setAudiYear}
+                    onMesChange={setAudiMes}
+                  />
+                </div>
+                <DepartamentoTab
+                  marca="audi"
+                  departamento={audiSubTab}
+                  year={audiYear}
+                  mes={audiMes}
+                />
+              </>
+            )}
           </div>
         )}
       </div>

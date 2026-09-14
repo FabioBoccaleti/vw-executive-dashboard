@@ -476,7 +476,7 @@ export async function processConsolidadoData(
   const departamentos: DeptoClassificacao[] = [
     'veiculos_novos', 'venda_direta', 'veiculos_usados', 'pecas',
     'oficina', 'funilaria', 'administracao', 'diretoria',
-  ];
+  ].filter(depto => !(marca === 'audi' && depto === 'venda_direta'));
 
   // Processar cada departamento
   const deptoDataList = await Promise.all(
@@ -484,21 +484,7 @@ export async function processConsolidadoData(
   );
 
   // Consolidar resultados
-  const grupos: Record<TipoContaClassificacao, GrupoData> = {
-    receita_vendas: { contas: [], subtotal: 0 },
-    receitas_operacionais: { contas: [], subtotal: 0 },
-    receitas_financeiras: { contas: [], subtotal: 0 },
-    receitas_nao_operacionais: { contas: [], subtotal: 0 },
-    custos_operacionais: { contas: [], subtotal: 0 },
-    despesas_pessoal: { contas: [], subtotal: 0 },
-    despesas_servicos_terceiros: { contas: [], subtotal: 0 },
-    despesas_ocupacao: { contas: [], subtotal: 0 },
-    despesas_funcionamento: { contas: [], subtotal: 0 },
-    despesas_vendas: { contas: [], subtotal: 0 },
-    amortizacoes_depreciacoes: { contas: [], subtotal: 0 },
-    despesas_financeiras: { contas: [], subtotal: 0 },
-    outras_despesas_operacionais: { contas: [], subtotal: 0 },
-  };
+  const grupos = _emptyDepartamentoData().grupos;
 
   for (const deptoData of deptoDataList) {
     for (const [tipo, grupoData] of Object.entries(deptoData.grupos)) {
