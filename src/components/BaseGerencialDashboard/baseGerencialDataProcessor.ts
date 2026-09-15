@@ -6,8 +6,11 @@ import {
   type TipoContaClassificacao,
   type RegraDepto,
   getBaseGerencialMes,
+  dadosOpKey,
+  loadAllDadosOperacionais,
   loadClassificacaoRevendas,
   loadClassificacoesConta,
+  loadRegrasDre,
   loadRegrasDeptos,
   loadContasTipoItem,
 } from './baseGerencialStorage';
@@ -40,6 +43,52 @@ export interface ContaDetail {
   ccusto?: string; // Centro de custo (opcional - só aparece quando não é consolidado)
   valor: number;
 }
+
+export interface BaseGerencialDreMonth {
+  month: number;
+  values: Record<string, number>;
+}
+
+export interface BaseGerencialDreSnapshot {
+  months: BaseGerencialDreMonth[];
+}
+
+const DASHBOARD_DRE_LINES = [
+  ['VOLUME DE VENDAS', 'volumeVendas'],
+  ['RECEITA OPERACIONAL LIQUIDA', 'receitaOperacionalLiquida'],
+  ['CUSTO OPERACIONAL DA RECEITA', 'custoOperacionalReceita'],
+  ['LUCRO (PREJUIZO) OPERACIONAL BRUTO', 'lucroOperacionalBruto'],
+  ['OUTRAS RECEITAS OPERACIONAIS', 'outrasReceitasOperacionais'],
+  ['OUTRAS DESPESAS OPERACIONAIS', 'outrasDespesasOperacionais'],
+  ['MARGEM DE CONTRIBUIÇÃO', 'margemContribuicao'],
+  ['DESPESAS C/ PESSOAL', 'despesasPessoal'],
+  ['DESPESAS C/ SERV. DE TERCEIROS', 'despesasServTerceiros'],
+  ['DESPESAS C/ OCUPAÇÃO', 'despesasOcupacao'],
+  ['DESPESAS C/ FUNCIONAMENTO', 'despesasFuncionamento'],
+  ['DESPESAS C/ VENDAS', 'despesasVendas'],
+  ['LUCRO (PREJUIZO) OPERACIONAL LIQUIDO', 'lucroOperacionalLiquido'],
+  ['AMORTIZAÇÕES E DEPRECIAÇÕES', 'amortizacoesDepreciacoes'],
+  ['OUTRAS RECEITAS FINANCEIRAS', 'outrasReceitasFinanceiras'],
+  ['DESPESAS FINANCEIRAS NÃO OPERACIONAL', 'despesasFinanceirasNaoOperacional'],
+  ['DESPESAS NÃO OPERACIONAIS', 'despesasNaoOperacionais'],
+  ['OUTRAS RENDAS NÃO OPERACIONAIS', 'outrasRendasNaoOperacionais'],
+  ['LUCRO (PREJUIZO) ANTES IMPOSTOS', 'lucroAntesImpostos'],
+  ['PROVISÕES IRPJ E C.S.', 'provisoesIrpjCs'],
+  ['PARTICIPAÇÕES', 'participacoes'],
+  ['LUCRO LIQUIDO DO EXERCICIO', 'lucroLiquidoExercicio'],
+] as const;
+
+const DASHBOARD_DEPARTMENT_TO_STORAGE: Record<string, DeptoClassificacao | null> = {
+  novos: 'veiculos_novos',
+  vendaDireta: 'venda_direta',
+  usados: 'veiculos_usados',
+  pecas: 'pecas',
+  oficina: 'oficina',
+  funilaria: 'funilaria',
+  administracao: 'administracao',
+  diretoria: 'diretoria',
+  consolidado: null,
+};
 
 // ─── Funções de extração da hierarquia ──────────────────────────────────────
 
@@ -505,4 +554,83 @@ export async function processConsolidadoData(
   const total = Object.values(grupos).reduce((sum, grupo) => sum + grupo.subtotal, 0);
 
   return { grupos, total };
+}
+
+function sumDreGroups(data: DepartamentoData, groups: string[] | undefined): number {
+  return (groups ?? []).reduce(
+    (sum, group) => sum + (data.grupos[group as TipoContaClassificacao]?.subtotal ?? 0),
+    0,
+  );
+}
+
+function buildDreMonthValues(
+  data: DepartamentoData,
+  rules: Awaited<ReturnType<typeof loadRegrasDre>>,
+  volumeVendas: number,
+): Record<string, number> {
+  const values: Record<string, number> = {
+    volumeVendas,
+    receitaOperacionalLiquida: sumDreGroups(data, rules.receita_operacional_liquida),
+    custoOperacionalReceita: sumDreGroups(data, rules.custo_operacional_receita),
+    outrasReceitasOperacionais: sumDreGroups(data, rules.outras_receitas_operacionais),
+    outrasDespesasOperacionais: sumDreGroups(data, rules.outras_despesas_operacionais),
+    despesasPessoal: sumDreGroups(data, rules.despesas_pessoal),
+    despesasServTerceiros: sumDreGroups(data, rules.despesas_servicos_terceiros),
+    despesasOcupacao: sumDreGroups(data, rules.despesas_ocupacao),
+    despesasFuncionamento: sumDreGroups(data, rules.despesas_funcionamento),
+    despesasVendas: sumDreGroups(data, rules.despesas_vendas),
+    amortizacoesDepreciacoes: sumDreGroups(data, rules.amortizacoes_depreciacoes),
+    outrasReceitasFinanceiras: sumDreGroups(data, rules.outras_receitas_financeiras),
+    despesasFinanceirasNaoOperacional: sumDreGroups(data, rules.despesas_financeiras_nao_operacional),
+    despesasNaoOperacionais: sumDreGroups(data, rules.despesas_nao_operacionais),
+    outrasRendasNaoOperacionais: sumDreGroups(data, rules.outras_rendas_nao_operacionais),
+    provisoesIrpjCs: sumDreGroups(data, rules.provisoes_irpj_cs),
+    participacoes: sumDreGroups(data, rules.participacoes),
+  };
+
+  values.lucroOperacionalBruto = values.receitaOperacionalLiquida + values.custoOperacionalReceita;
+  values.margemContribuicao = values.lucroOperacionalBruto + values.outrasReceitasOperacionais + values.outrasDespesasOperacionais;
+  values.lucroOperacionalLiquido = values.margemContribuicao + values.despesasPessoal + values.despesasServTerceiros + values.despesasOcupacao + values.despesasFuncionamento + values.despesasVendas;
+  values.lucroAntesImpostos = values.lucroOperacionalLiquido + values.amortizacoesDepreciacoes + values.outrasReceitasFinanceiras + values.despesasFinanceirasNaoOperacional + values.despesasNaoOperacionais + values.outrasRendasNaoOperacionais;
+  values.lucroLiquidoExercicio = values.lucroAntesImpostos + values.provisoesIrpjCs + values.participacoes;
+
+  return values;
+}
+
+export async function loadBaseGerencialDreSnapshot(
+  marca: Marca,
+  year: number,
+  dashboardDepartment: string,
+): Promise<BaseGerencialDreSnapshot> {
+  const storageDepartment = DASHBOARD_DEPARTMENT_TO_STORAGE[dashboardDepartment];
+  if (storageDepartment === undefined) return { months: [] };
+
+  const [rules, operationalData, importedMonths] = await Promise.all([
+    loadRegrasDre(),
+    loadAllDadosOperacionais(),
+    Promise.all(Array.from({ length: 12 }, (_, index) => getBaseGerencialMes(year, index + 1))),
+  ]);
+
+  const months = await Promise.all(importedMonths.map(async (monthData, index) => {
+    if (!monthData) return null;
+    const month = index + 1;
+    const data = storageDepartment === null
+      ? await processConsolidadoData(marca, year, month)
+      : await processDepartamentoData(marca, storageDepartment, year, month);
+    const departments = storageDepartment ? [storageDepartment] : [
+      'veiculos_novos', 'venda_direta', 'veiculos_usados', 'pecas',
+      'oficina', 'funilaria', 'administracao', 'diretoria',
+    ] as DeptoClassificacao[];
+    const volumeVendas = departments.reduce(
+      (sum, department) => sum + Number(operationalData[dadosOpKey(year, month, marca, department)]?.volumeVendas ?? 0),
+      0,
+    );
+    return { month, values: buildDreMonthValues(data, rules, volumeVendas) };
+  }));
+
+  return { months: months.filter((month): month is BaseGerencialDreMonth => month !== null) };
+}
+
+export function getDashboardDreLineIds(): readonly (readonly [string, string])[] {
+  return DASHBOARD_DRE_LINES;
 }

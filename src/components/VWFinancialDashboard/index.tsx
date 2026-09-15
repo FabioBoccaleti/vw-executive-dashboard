@@ -48,6 +48,10 @@ import {
 } from "@/lib/hybridStorage"
 import { DEPARTMENT_LABELS, DEPARTMENTS } from "@/lib/types"
 import { getBrandConfig, BRAND_CONFIGS } from "@/lib/brands"
+import {
+  getDashboardDreLineIds,
+  loadBaseGerencialDreSnapshot,
+} from "@/components/BaseGerencialDashboard/baseGerencialDataProcessor"
 
 // Props interface para VWFinancialDashboard
 interface VWFinancialDashboardProps {
@@ -210,6 +214,52 @@ const countMonthsWithData = (values: number[]): number => {
   return values.filter(v => v !== 0).length
 }
 
+function normalizeDreLabel(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[()]/g, '')
+    .replace(/PREJUIZO/g, 'PREJUIZO')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
+}
+
+function mergeBaseGerencialDreData(
+  savedData: any[] | null,
+  snapshot: Awaited<ReturnType<typeof loadBaseGerencialDreSnapshot>>,
+): any[] | null {
+  if (snapshot.months.length === 0) return null;
+
+  const sourceByLabel = new Map(
+    getDashboardDreLineIds().map(([label, id]) => [normalizeDreLabel(label), id]),
+  );
+  const data = savedData?.length
+    ? savedData.map(line => ({ ...line, meses: [...(line.meses ?? Array(12).fill(0))] }))
+    : initialDreData.map(line => ({ ...line, total: 0, percentTotal: line.percentTotal === null ? null : 0, meses: Array(12).fill(0) }));
+
+  for (const month of snapshot.months) {
+    for (const line of data) {
+      const id = sourceByLabel.get(normalizeDreLabel(line.descricao ?? ''));
+      if (id && month.values[id] !== undefined) {
+        line.meses[month.month - 1] = Math.round(month.values[id]);
+      }
+    }
+  }
+
+  const receita = data.find(line => sourceByLabel.get(normalizeDreLabel(line.descricao ?? '')) === 'receitaOperacionalLiquida');
+  const receitaTotal = receita?.meses?.reduce((sum: number, value: number) => sum + value, 0) ?? 0;
+  for (const line of data) {
+    line.total = line.meses.reduce((sum: number, value: number) => sum + Math.round(value), 0);
+    const id = sourceByLabel.get(normalizeDreLabel(line.descricao ?? ''));
+    line.percentTotal = id === 'volumeVendas' || receitaTotal === 0
+      ? (id === 'volumeVendas' ? null : 0)
+      : Number(((line.total / receitaTotal) * 100).toFixed(2));
+  }
+
+  return data;
+}
+
 export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashboardProps) {
   // Configuração da marca atual
   const brandConfig = getBrandConfig(brand);
@@ -330,17 +380,28 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     console.log(`🔄 Carregando dados para: ${brand.toUpperCase()} - ${fiscalYear} - ${DEPARTMENT_LABELS[department]}`);
     
     // Função para tentar carregar dados com retry
-    const loadDataWithRetry = (retryCount = 0) => {
+    const loadDataWithRetry = async (retryCount = 0) => {
       const newMetricsData = loadMetricsData(fiscalYear, department, brand);
       const newSharedMetricsData = loadSharedMetricsData(fiscalYear, brand);
       const newDreData = loadDREData(fiscalYear, department, brand);
+      let dashboardDreData = newDreData;
+
+      if (brand === 'vw' || brand === 'audi') {
+        const baseSnapshot = await loadBaseGerencialDreSnapshot(brand, fiscalYear, department);
+        const mergedDreData = mergeBaseGerencialDreData(newDreData, baseSnapshot);
+        if (mergedDreData) {
+          dashboardDreData = mergedDreData;
+          saveDREData(fiscalYear, mergedDreData, department, department === 'consolidado', brand);
+          console.log(`🔗 DRE da Base Gerencial integrada: ${brand} - ${fiscalYear} - ${department}`);
+        }
+      }
       
       console.log('📊 Métricas carregadas:', newMetricsData);
       console.log('🔗 Métricas compartilhadas carregadas:', newSharedMetricsData);
       console.log('🔍 Comparação de dados:');
       console.log('  - Métricas normais (específicas dept):', newMetricsData?.bonus?.veiculosUsados || 'não carregado');
       console.log('  - Métricas compartilhadas (todos depts):', newSharedMetricsData?.bonus?.veiculosUsados || 'não carregado');
-      console.log('📈 DRE carregado:', newDreData);
+      console.log('📈 DRE carregado:', dashboardDreData);
       console.log('📍 Origem dos dados: cache Redis');
       
       // Logs de verificação de carregamento (dados vêm do cache Redis)
@@ -350,9 +411,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
       console.log(`  - DRE ${fiscalYear}/${department}: ${newDreData ? '✅ carregado' : '❌ não encontrado'}`);
       
       // Se DRE não foi carregado do cache e deveria tentar novamente
-      if (!newDreData && retryCount < 3) {
+      if (!dashboardDreData && retryCount < 3) {
         console.log(`🔄 Retry ${retryCount + 1}/3 - tentando recarregar dados do cache`);
-        setTimeout(() => loadDataWithRetry(retryCount + 1), 100);
+        setTimeout(() => { void loadDataWithRetry(retryCount + 1); }, 100);
         return;
       }
       
@@ -367,9 +428,9 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
       setSharedMetricsData(newSharedMetricsData);
       
       // Atualizar DRE
-      if (newDreData && newDreData.length > 0) {
+      if (dashboardDreData && dashboardDreData.length > 0) {
         console.log('✅ Usando dados do cache Redis para DRE');
-        setDreData(newDreData);
+        setDreData(dashboardDreData);
       } else {
         console.log('⚠️ Sem dados no cache Redis, usando dados padrão/zerados');
         // Se não houver dados salvos e for marca VW, usar dados iniciais apenas para 2025/usados
