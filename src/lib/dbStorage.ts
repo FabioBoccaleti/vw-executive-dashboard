@@ -10,6 +10,7 @@
 import { kvGet, kvSet, kvBulkGet, kvKeys } from './kvClient';
 import { type Brand, getSavedBrand } from './brands';
 import { type MetricsData, type DREData, type Department, createEmptyMetricsData } from './dataStorage';
+import { getDashboardDreLineIds, loadBaseGerencialDreSnapshot } from '@/components/BaseGerencialDashboard/baseGerencialDataProcessor';
 
 // Cache local para evitar múltiplas requisições ao banco
 const dataCache: Map<string, { data: any; timestamp: number }> = new Map();
@@ -146,6 +147,27 @@ export async function loadDREDataAsync(
   if (data) {
     console.log(`✅ [DB] DRE carregada: ${key}`);
     return data;
+  }
+
+  const baseGerencialData = (currentBrand === 'vw' || currentBrand === 'audi')
+    ? await loadBaseGerencialDreSnapshot(currentBrand, fiscalYear, department)
+    : { months: [] };
+  if (baseGerencialData.months.length > 0) {
+    const lineIds = getDashboardDreLineIds();
+    const fallbackData: DREData = lineIds.map(([descricao, id]) => {
+      const meses = Array.from({ length: 12 }, (_, index) =>
+        baseGerencialData.months.find(month => month.month === index + 1)?.values[id] ?? 0,
+      );
+      return {
+        id,
+        label: descricao,
+        values: meses,
+        meses,
+        total: meses.reduce((sum, value) => sum + value, 0),
+      } as DREData[number];
+    });
+    console.log(`✅ [DB] DRE carregada da Base Gerencial: ${key}`);
+    return fallbackData;
   }
   
   console.log(`⚠️ [DB] DRE não encontrada: ${key}`);
