@@ -48,7 +48,7 @@ const DRE_ADJUSTMENTS_KEY = `${KEY_PREFIX}:dre-adjustments`;
 const DRE_CACHE_PATTERN = `${KEY_PREFIX}:dre-cache:*`;
 
 export interface BaseGerencialDreCache {
-  version: 2;
+  version: 3;
   values: Record<string, number[]>;
   generatedAt: string;
 }
@@ -71,7 +71,7 @@ export async function setBaseGerencialDreCache(
   values: Record<string, number[]>,
 ): Promise<void> {
   await kvSet(dreCacheKey(marca, year, departamento), {
-    version: 2,
+    version: 3,
     values,
     generatedAt: new Date().toISOString(),
   } satisfies BaseGerencialDreCache);

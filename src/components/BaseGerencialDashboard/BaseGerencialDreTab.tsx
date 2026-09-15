@@ -229,7 +229,7 @@ export function BaseGerencialDreTab({
       }
       const cacheDepartment = storageDepartment ?? 'consolidado';
       const cached = await getBaseGerencialDreCache(marca, year, cacheDepartment);
-      if (cached?.version === 2 && active) {
+      if (cached?.version === 3 && active) {
         setDepartmentValues(cached.values as MonthlyValues);
         setLoadingDre(false);
         return;
@@ -246,10 +246,19 @@ export function BaseGerencialDreTab({
               : ['veiculos_novos', 'venda_direta', 'veiculos_usados', 'pecas', 'oficina', 'funilaria', 'diretoria'];
             return Promise.all(departments.map(department =>
               processDepartamentoData(marca, department, year, index + 1)
-            )).then(departmentData => departmentData.reduce(
-              (sum, data) => sum + sumRuleGroups(data, dreRules, 'receitaOperacionalLiquida'),
-              0,
-            ));
+            )).then(departmentData => {
+              const baseRevenue = departmentData.reduce(
+                (sum, data) => sum + sumRuleGroups(data, dreRules, 'receitaOperacionalLiquida'),
+                0,
+              );
+              const adjustmentRevenue = departments.reduce(
+                (sum, department) => sum + getActiveBaseGerencialDreAdjustments(
+                  dreAdjustments, marca, department, year, index + 1
+                ).reduce((total, adjustment) => total + adjustment.amount, 0),
+                0,
+              );
+              return baseRevenue + adjustmentRevenue;
+            });
           }))
         : null;
       const nextValues = createEmptyMonthlyValues();
