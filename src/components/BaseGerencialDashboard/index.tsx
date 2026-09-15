@@ -339,7 +339,7 @@ function YearMesSelector({ year, mes, onYearChange, onMesChange }: YearMesSelect
 
 export function BaseGerencialDashboard({ onChangeBrand }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('analise');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('importar');
   const [importarSubTab, setImportarSubTab] = useState<ImportarSubTab>('dados');
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
   const [selectedMes, setSelectedMes] = useState(new Date().getMonth() + 1); // 1-12

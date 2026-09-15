@@ -3,6 +3,8 @@ import {
   dadosOpKey,
   loadAllDadosOperacionais,
   loadRegrasDre,
+  getBaseGerencialDreCache,
+  setBaseGerencialDreCache,
   saveAllDadosOperacionais,
   type DeptoClassificacao,
   type BaseGerencialDreLine,
@@ -176,29 +178,45 @@ export function BaseGerencialDreTab({
   const [dreRules, setDreRules] = useState<BaseGerencialDreRules>({});
   const [departmentValues, setDepartmentValues] = useState<MonthlyValues>(createEmptyMonthlyValues);
   const [loadingDre, setLoadingDre] = useState(true);
+  const [dreError, setDreError] = useState<string | null>(null);
+  const [dependenciesReady, setDependenciesReady] = useState(false);
   const isAudiVendaDireta = marca === 'audi' && activeDepartment === 'Venda Direta';
   const storageDepartment = DEPARTMENT_TO_STORAGE[activeDepartment];
 
   useEffect(() => {
     let active = true;
+    setDreError(null);
+    setDependenciesReady(false);
     setLoadingDre(true);
     Promise.all([loadAllDadosOperacionais(), loadRegrasDre()])
       .then(([operationalData, rules]) => {
         if (active) {
           setAllDadosOperacionais(operationalData);
           setDreRules(rules);
+          setDependenciesReady(true);
         }
-      })
-      .finally(() => {
-        if (active) setLoadingDre(false);
       });
-    return () => { active = false; };
+      return () => { active = false; };
   }, [marca, year]);
 
   useEffect(() => {
     let active = true;
+    if (!dependenciesReady) return () => { active = false; };
+    setLoadingDre(true);
+    setDreError(null);
     const loadDepartmentValues = async () => {
-      if (isAudiVendaDireta) return;
+      if (isAudiVendaDireta) {
+        if (active) setDepartmentValues(createEmptyMonthlyValues());
+        setLoadingDre(false);
+        return;
+      }
+      const cacheDepartment = storageDepartment ?? 'consolidado';
+      const cached = await getBaseGerencialDreCache(marca, year, cacheDepartment);
+      if (cached?.version === 1 && active) {
+        setDepartmentValues(cached.values as MonthlyValues);
+        setLoadingDre(false);
+        return;
+      }
       const monthlyData = await Promise.all(
         MONTHS.map((_, index) => storageDepartment === null
           ? processConsolidadoData(marca, year, index + 1)
@@ -213,11 +231,21 @@ export function BaseGerencialDreTab({
         if (line === 'volumeVendas') continue;
         nextValues[line] = monthlyData.map(data => sumRuleGroups(data, dreRules, line));
       }
-      if (active) setDepartmentValues(nextValues);
+      if (active) {
+        setDepartmentValues(nextValues);
+        await setBaseGerencialDreCache(marca, year, cacheDepartment, nextValues);
+        setLoadingDre(false);
+      }
     };
-    loadDepartmentValues().catch(error => console.error('Erro ao carregar dados da DRE:', error));
+    loadDepartmentValues().catch(error => {
+      console.error('Erro ao carregar dados da DRE:', error);
+      if (active) {
+        setDreError(error instanceof Error ? error.message : 'Não foi possível carregar os dados da DRE.');
+        setLoadingDre(false);
+      }
+    });
     return () => { active = false; };
-  }, [marca, year, storageDepartment, isAudiVendaDireta, dreRules, allDadosOperacionais]);
+  }, [marca, year, storageDepartment, isAudiVendaDireta, dreRules, allDadosOperacionais, dependenciesReady]);
 
   function getVolume(department: DeptoClassificacao, month: number): number {
     return Number(allDadosOperacionais[dadosOpKey(year, month + 1, marca, department)]?.volumeVendas ?? 0);
@@ -280,6 +308,13 @@ export function BaseGerencialDreTab({
       ) : loadingDre ? (
         <div className="flex-1 flex items-center justify-center bg-white rounded-xl border border-slate-200 shadow-sm">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
+        </div>
+      ) : dreError ? (
+        <div className="flex-1 flex items-center justify-center bg-white rounded-xl border border-red-200 shadow-sm">
+          <div className="text-center space-y-2 px-6">
+            <p className="text-red-600 font-semibold">Erro ao carregar os dados da DRE</p>
+            <p className="text-slate-500 text-sm">{dreError}</p>
+          </div>
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-auto bg-white rounded-xl border border-slate-200 shadow-sm p-4">

@@ -1,4 +1,4 @@
-import { kvGet, kvSet, kvKeys } from '@/lib/kvClient';
+import { kvClearPattern, kvGet, kvSet, kvKeys } from '@/lib/kvClient';
 
 export interface BaseGerencialRow {
   conta: string;
@@ -26,6 +26,41 @@ export interface BaseGerencialMesData {
 }
 
 const KEY_PREFIX = 'basege';
+const DRE_CACHE_PATTERN = `${KEY_PREFIX}:dre-cache:*`;
+
+export interface BaseGerencialDreCache {
+  version: 1;
+  values: Record<string, number[]>;
+  generatedAt: string;
+}
+
+const dreCacheKey = (marca: Marca, year: number, departamento: string) =>
+  `${KEY_PREFIX}:dre-cache:${marca}:${year}:${departamento}`;
+
+export async function getBaseGerencialDreCache(
+  marca: Marca,
+  year: number,
+  departamento: string,
+): Promise<BaseGerencialDreCache | null> {
+  return kvGet<BaseGerencialDreCache>(dreCacheKey(marca, year, departamento));
+}
+
+export async function setBaseGerencialDreCache(
+  marca: Marca,
+  year: number,
+  departamento: string,
+  values: Record<string, number[]>,
+): Promise<void> {
+  await kvSet(dreCacheKey(marca, year, departamento), {
+    version: 1,
+    values,
+    generatedAt: new Date().toISOString(),
+  } satisfies BaseGerencialDreCache);
+}
+
+export async function invalidateBaseGerencialDreCache(): Promise<void> {
+  await kvClearPattern(DRE_CACHE_PATTERN);
+}
 
 function makeKey(year: number, mes: number): string {
   return `${KEY_PREFIX}:${year}:M${String(mes).padStart(2, '0')}`;
@@ -44,10 +79,12 @@ export async function setBaseGerencialMes(
   data: BaseGerencialMesData,
 ): Promise<void> {
   await kvSet(makeKey(year, mes), data);
+  await invalidateBaseGerencialDreCache();
 }
 
 export async function deleteBaseGerencialMes(year: number, mes: number): Promise<void> {
   await kvSet(makeKey(year, mes), null);
+  await invalidateBaseGerencialDreCache();
 }
 
 export async function getAllImportedMesesData(): Promise<BaseGerencialMesData[]> {
@@ -74,6 +111,7 @@ export async function loadClassificacaoRevendas(): Promise<Record<string, Marca>
 
 export async function saveClassificacaoRevendas(data: Record<string, Marca>): Promise<void> {
   await kvSet(REVENDAS_KEY, data);
+  await invalidateBaseGerencialDreCache();
 }
 
 // ─── Regras de Departamentos ─────────────────────────────────────────────────
@@ -124,6 +162,7 @@ export async function loadRegrasDeptos(): Promise<Record<string, RegraDepto>> {
 
 export async function saveRegrasDeptos(data: Record<string, RegraDepto>): Promise<void> {
   await kvSet(REGRAS_KEY, data);
+  await invalidateBaseGerencialDreCache();
 }
 
 // ─── Classificação de Tipo de Conta ──────────────────────────────────────────
@@ -201,6 +240,7 @@ export async function loadClassificacoesConta(): Promise<Record<string, TipoCont
 
 export async function saveClassificacoesConta(data: Record<string, TipoContaClassificacao>): Promise<void> {
   await kvSet(CLASSIFICACOES_CONTA_KEY, data);
+  await invalidateBaseGerencialDreCache();
 }
 
 // ─── Regras de alimentação da DRE ───────────────────────────────────────────
@@ -233,6 +273,7 @@ export async function loadRegrasDre(): Promise<BaseGerencialDreRules> {
 
 export async function saveRegrasDre(data: BaseGerencialDreRules): Promise<void> {
   await kvSet(REGRAS_DRE_KEY, data);
+  await invalidateBaseGerencialDreCache();
 }
 
 // ─── Dados Operacionais por Período e Departamento ───────────────────────────
@@ -261,6 +302,7 @@ export async function saveAllDadosOperacionais(
   data: Record<string, DadosOperacionais>,
 ): Promise<void> {
   await kvSet(DADOS_OP_KEY, data);
+  await invalidateBaseGerencialDreCache();
 }
 
 // ─── Cenários de Análise de Eficiência ───────────────────────────────────────
@@ -322,4 +364,5 @@ export async function loadContasTipoItem(): Promise<string[] | null> {
 
 export async function saveContasTipoItem(contas: string[]): Promise<void> {
   await kvSet(CONTAS_TIPO_ITEM_KEY, contas);
+  await invalidateBaseGerencialDreCache();
 }
