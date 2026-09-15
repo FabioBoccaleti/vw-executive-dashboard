@@ -13,6 +13,9 @@ import {
   loadRegrasDre,
   loadRegrasDeptos,
   loadContasTipoItem,
+  getActiveBaseGerencialDreAdjustments,
+  loadBaseGerencialDreAdjustments,
+  type BaseGerencialDreAdjustment,
 } from './baseGerencialStorage';
 
 // ─── Estrutura hierárquica do arquivo importado ──────────────────────────────
@@ -567,6 +570,8 @@ function buildDreMonthValues(
   data: DepartamentoData,
   rules: Awaited<ReturnType<typeof loadRegrasDre>>,
   volumeVendas: number,
+  revenueInformativeOnly = false,
+  adjustments: BaseGerencialDreAdjustment[] = [],
 ): Record<string, number> {
   const values: Record<string, number> = {
     volumeVendas,
@@ -588,7 +593,21 @@ function buildDreMonthValues(
     participacoes: sumDreGroups(data, rules.participacoes),
   };
 
-  values.lucroOperacionalBruto = values.receitaOperacionalLiquida + values.custoOperacionalReceita;
+  values.lucroOperacionalBruto = revenueInformativeOnly
+    ? 0
+    : values.receitaOperacionalLiquida + values.custoOperacionalReceita;
+  values.margemContribuicao = values.lucroOperacionalBruto + values.outrasReceitasOperacionais + values.outrasDespesasOperacionais;
+  values.lucroOperacionalLiquido = values.margemContribuicao + values.despesasPessoal + values.despesasServTerceiros + values.despesasOcupacao + values.despesasFuncionamento + values.despesasVendas;
+  values.lucroAntesImpostos = values.lucroOperacionalLiquido + values.amortizacoesDepreciacoes + values.outrasReceitasFinanceiras + values.despesasFinanceirasNaoOperacional + values.despesasNaoOperacionais + values.outrasRendasNaoOperacionais;
+  values.lucroLiquidoExercicio = values.lucroAntesImpostos + values.provisoesIrpjCs + values.participacoes;
+
+  for (const adjustment of adjustments) {
+    values.receitaOperacionalLiquida += adjustment.amount;
+    values.outrasReceitasOperacionais -= adjustment.amount;
+  }
+  values.lucroOperacionalBruto = revenueInformativeOnly
+    ? 0
+    : values.receitaOperacionalLiquida + values.custoOperacionalReceita;
   values.margemContribuicao = values.lucroOperacionalBruto + values.outrasReceitasOperacionais + values.outrasDespesasOperacionais;
   values.lucroOperacionalLiquido = values.margemContribuicao + values.despesasPessoal + values.despesasServTerceiros + values.despesasOcupacao + values.despesasFuncionamento + values.despesasVendas;
   values.lucroAntesImpostos = values.lucroOperacionalLiquido + values.amortizacoesDepreciacoes + values.outrasReceitasFinanceiras + values.despesasFinanceirasNaoOperacional + values.despesasNaoOperacionais + values.outrasRendasNaoOperacionais;
@@ -605,10 +624,11 @@ export async function loadBaseGerencialDreSnapshot(
   const storageDepartment = DASHBOARD_DEPARTMENT_TO_STORAGE[dashboardDepartment];
   if (storageDepartment === undefined) return { months: [] };
 
-  const [rules, operationalData, importedMonths] = await Promise.all([
+  const [rules, operationalData, importedMonths, adjustments] = await Promise.all([
     loadRegrasDre(),
     loadAllDadosOperacionais(),
     Promise.all(Array.from({ length: 12 }, (_, index) => getBaseGerencialMes(year, index + 1))),
+    loadBaseGerencialDreAdjustments(),
   ]);
 
   const months = await Promise.all(importedMonths.map(async (monthData, index) => {
@@ -625,7 +645,40 @@ export async function loadBaseGerencialDreSnapshot(
       (sum, department) => sum + Number(operationalData[dadosOpKey(year, month, marca, department)]?.volumeVendas ?? 0),
       0,
     );
-    return { month, values: buildDreMonthValues(data, rules, volumeVendas) };
+    const values = buildDreMonthValues(
+      data,
+      rules,
+      volumeVendas,
+      storageDepartment === 'administracao',
+      getActiveBaseGerencialDreAdjustments(adjustments, marca, storageDepartment ?? 'veiculos_novos', year, month),
+    );
+    if (storageDepartment === 'administracao') {
+      const revenueDepartments: DeptoClassificacao[] = marca === 'audi'
+        ? ['veiculos_novos', 'veiculos_usados', 'pecas', 'oficina', 'funilaria', 'diretoria']
+        : ['veiculos_novos', 'venda_direta', 'veiculos_usados', 'pecas', 'oficina', 'funilaria', 'diretoria'];
+      const revenueData = await Promise.all(
+        revenueDepartments.map(department => processDepartamentoData(marca, department, year, month)),
+      );
+      values.receitaOperacionalLiquida = revenueData.reduce(
+        (sum, departmentData) => sum + sumDreGroups(departmentData, rules.receita_operacional_liquida),
+        0,
+      );
+      const adminAdjustments = getActiveBaseGerencialDreAdjustments(
+        adjustments,
+        marca,
+        storageDepartment,
+        year,
+        month,
+      );
+      const adjustmentAmount = adminAdjustments.reduce((sum, adjustment) => sum + adjustment.amount, 0);
+      values.receitaOperacionalLiquida += adjustmentAmount;
+      values.outrasReceitasOperacionais -= adjustmentAmount;
+      values.margemContribuicao = values.outrasReceitasOperacionais + values.outrasDespesasOperacionais;
+      values.lucroOperacionalLiquido = values.margemContribuicao + values.despesasPessoal + values.despesasServTerceiros + values.despesasOcupacao + values.despesasFuncionamento + values.despesasVendas;
+      values.lucroAntesImpostos = values.lucroOperacionalLiquido + values.amortizacoesDepreciacoes + values.outrasReceitasFinanceiras + values.despesasFinanceirasNaoOperacional + values.despesasNaoOperacionais + values.outrasRendasNaoOperacionais;
+      values.lucroLiquidoExercicio = values.lucroAntesImpostos + values.provisoesIrpjCs + values.participacoes;
+    }
+    return { month, values };
   }));
 
   return { months: months.filter((month): month is BaseGerencialDreMonth => month !== null) };

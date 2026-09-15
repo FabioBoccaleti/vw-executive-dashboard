@@ -25,11 +25,30 @@ export interface BaseGerencialMesData {
   fileName: string;
 }
 
+export type BaseGerencialDreAdjustmentStatus = 'active' | 'replaced' | 'deleted';
+
+export interface BaseGerencialDreAdjustment {
+  id: string;
+  marca: Marca;
+  departamento: DeptoClassificacao;
+  year: number;
+  month: number;
+  amount: number;
+  reason: string;
+  status: BaseGerencialDreAdjustmentStatus;
+  createdAt: string;
+  createdBy: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  replacesId?: string;
+}
+
 const KEY_PREFIX = 'basege';
+const DRE_ADJUSTMENTS_KEY = `${KEY_PREFIX}:dre-adjustments`;
 const DRE_CACHE_PATTERN = `${KEY_PREFIX}:dre-cache:*`;
 
 export interface BaseGerencialDreCache {
-  version: 1;
+  version: 2;
   values: Record<string, number[]>;
   generatedAt: string;
 }
@@ -52,7 +71,7 @@ export async function setBaseGerencialDreCache(
   values: Record<string, number[]>,
 ): Promise<void> {
   await kvSet(dreCacheKey(marca, year, departamento), {
-    version: 1,
+    version: 2,
     values,
     generatedAt: new Date().toISOString(),
   } satisfies BaseGerencialDreCache);
@@ -60,6 +79,33 @@ export async function setBaseGerencialDreCache(
 
 export async function invalidateBaseGerencialDreCache(): Promise<void> {
   await kvClearPattern(DRE_CACHE_PATTERN);
+}
+
+export async function loadBaseGerencialDreAdjustments(): Promise<BaseGerencialDreAdjustment[]> {
+  return (await kvGet<BaseGerencialDreAdjustment[]>(DRE_ADJUSTMENTS_KEY)) ?? [];
+}
+
+export async function saveBaseGerencialDreAdjustments(
+  adjustments: BaseGerencialDreAdjustment[],
+): Promise<void> {
+  await kvSet(DRE_ADJUSTMENTS_KEY, adjustments);
+  await invalidateBaseGerencialDreCache();
+}
+
+export function getActiveBaseGerencialDreAdjustments(
+  adjustments: BaseGerencialDreAdjustment[],
+  marca: Marca,
+  departamento: DeptoClassificacao,
+  year: number,
+  month: number,
+): BaseGerencialDreAdjustment[] {
+  return adjustments.filter(adjustment =>
+    adjustment.marca === marca &&
+    adjustment.departamento === departamento &&
+    adjustment.year === year &&
+    adjustment.month === month &&
+    adjustment.status === 'active'
+  );
 }
 
 function makeKey(year: number, mes: number): string {
