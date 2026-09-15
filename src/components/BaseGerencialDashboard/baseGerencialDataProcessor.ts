@@ -645,12 +645,20 @@ export async function loadBaseGerencialDreSnapshot(
       (sum, department) => sum + Number(operationalData[dadosOpKey(year, month, marca, department)]?.volumeVendas ?? 0),
       0,
     );
+    const adjustmentDepartments = storageDepartment === null
+      ? (marca === 'audi'
+          ? ['veiculos_novos', 'veiculos_usados', 'pecas', 'oficina', 'funilaria', 'administracao', 'diretoria']
+          : ['veiculos_novos', 'venda_direta', 'veiculos_usados', 'pecas', 'oficina', 'funilaria', 'administracao', 'diretoria'])
+      : [storageDepartment];
+    const monthAdjustments = adjustmentDepartments.flatMap(department =>
+      getActiveBaseGerencialDreAdjustments(adjustments, marca, department, year, month)
+    );
     const values = buildDreMonthValues(
       data,
       rules,
       volumeVendas,
       storageDepartment === 'administracao',
-      getActiveBaseGerencialDreAdjustments(adjustments, marca, storageDepartment ?? 'veiculos_novos', year, month),
+      monthAdjustments,
     );
     if (storageDepartment === 'administracao') {
       const revenueDepartments: DeptoClassificacao[] = marca === 'audi'
@@ -663,14 +671,9 @@ export async function loadBaseGerencialDreSnapshot(
         (sum, departmentData) => sum + sumDreGroups(departmentData, rules.receita_operacional_liquida),
         0,
       );
-      const adminAdjustments = getActiveBaseGerencialDreAdjustments(
-        adjustments,
-        marca,
-        storageDepartment,
-        year,
-        month,
-      );
-      const adjustmentAmount = adminAdjustments.reduce((sum, adjustment) => sum + adjustment.amount, 0);
+      const adjustmentAmount = revenueDepartments
+        .flatMap(department => getActiveBaseGerencialDreAdjustments(adjustments, marca, department, year, month))
+        .reduce((sum, adjustment) => sum + adjustment.amount, 0);
       values.receitaOperacionalLiquida += adjustmentAmount;
       values.outrasReceitasOperacionais -= adjustmentAmount;
       values.margemContribuicao = values.outrasReceitasOperacionais + values.outrasDespesasOperacionais;

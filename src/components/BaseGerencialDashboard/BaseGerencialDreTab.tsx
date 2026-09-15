@@ -265,12 +265,13 @@ export function BaseGerencialDreTab({
         nextValues.receitaOperacionalLiquida = adminRevenueByMonth;
       }
       for (let month = 0; month < 12; month += 1) {
-        const activeAdjustments = getActiveBaseGerencialDreAdjustments(
-          dreAdjustments,
-          marca,
-          storageDepartment ?? 'veiculos_novos',
-          year,
-          month + 1,
+        const adjustmentDepartments = storageDepartment === null
+          ? (marca === 'audi'
+              ? ['veiculos_novos', 'veiculos_usados', 'pecas', 'oficina', 'funilaria', 'administracao', 'diretoria']
+              : CONSOLIDATED_DEPARTMENTS)
+          : [storageDepartment];
+        const activeAdjustments = adjustmentDepartments.flatMap(department =>
+          getActiveBaseGerencialDreAdjustments(dreAdjustments, marca, department, year, month + 1)
         );
         const amount = activeAdjustments.reduce((sum, adjustment) => sum + adjustment.amount, 0);
         nextValues.receitaOperacionalLiquida[month] += amount;
