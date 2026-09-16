@@ -268,7 +268,11 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
         }
         setData(summed);
         setLoading(false);
-      });
+      }).catch(error => {
+        console.error('Erro ao carregar DRE VW anual:', error);
+        setData(createEmptyDreVwRow(year, 0));
+        setAllMonthRows(Array.from({ length: 12 }, (_, i) => createEmptyDreVwRow(year, i + 1)));
+      }).finally(() => setLoading(false));
       return;
     }
 
@@ -325,8 +329,11 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
 
       setData(buildRow(year, month, currentAjustes ?? null));
       setPrevData(periods.map((p, i) => buildRow(p.year, p.month, prevAjustesArr[i] ?? null)));
-      setLoading(false);
-    });
+    }).catch(error => {
+      console.error('Erro ao carregar DRE VW:', error);
+      setData(createEmptyDreVwRow(year, month));
+      setPrevData([]);
+    }).finally(() => setLoading(false));
   }, [year, month]);
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -786,7 +793,7 @@ function AjustesTable({ ajustes, onChange, onLabelChange, onAdd, onDelete, data,
 
   const deptList = DEPTS.map(d => data[d.key]);
   const totalLiquido = sumDepts(deptList, 'lucroLiquidoExercicio');
-  const totalLiqNum = parseVal(totalLiquido);
+  const totalLiqNum = deptList.reduce((sum, dept) => sum + parseVal(dept.lucroLiquidoExercicio), 0);
   const rowTotals = ajustes.map(row => ({ id: row.id, total: DEPTS.reduce((s, d) => s + parseVal(row.values[d.key]), 0) }));
   const totalAjustes = rowTotals.reduce((s, r) => s + r.total, 0);
   const totalAjustado = totalLiqNum + totalAjustes;
@@ -1286,7 +1293,7 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
 function PrintAjustesTable({ data, year, month }: { data: DreVwRow; year: number; month: number }) {
   const deptList = DEPTS.map(d => data[d.key]);
   const totalLiquido = sumDepts(deptList, 'lucroLiquidoExercicio');
-  const totalLiqNum = parseVal(totalLiquido);
+  const totalLiqNum = deptList.reduce((sum, dept) => sum + parseVal(dept.lucroLiquidoExercicio), 0);
   const rowTotals = data.ajustes.map(row => DEPTS.reduce((s, d) => s + parseVal(row.values[d.key]), 0));
   const totalAjustes = rowTotals.reduce((s, v) => s + v, 0);
   const totalAjustado = totalLiqNum + totalAjustes;

@@ -14,6 +14,7 @@ import {
   Legend,
 } from 'recharts';
 import { loadDREDataAsync } from '@/lib/dbStorage';
+import { loadCanonicalDreData } from './canonicalDreSource';
 import type { Department } from '@/lib/dataStorage';
 
 const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -185,9 +186,15 @@ export function DespesasDepartamentoEvolucaoTab({ year, month }: Props) {
     const audiDeptKeys = Object.keys(AUDI_DEPT_TO_DEPT);
 
     Promise.all([
-      Promise.all(vwDeptKeys.map(k => loadDREDataAsync(yr, VW_DEPT_TO_DEPT[k], 'vw').then(d => ({ key: k, d })))),
+      Promise.all(vwDeptKeys.map(async k => ({
+        key: k,
+        d: await loadCanonicalDreData('vw', year, VW_DEPT_TO_DEPT[k], await loadDREDataAsync(yr, VW_DEPT_TO_DEPT[k], 'vw')),
+      }))),
       Promise.all(vwDeptKeys.map(k => loadDREDataAsync(prevYr, VW_DEPT_TO_DEPT[k], 'vw').then(d => ({ key: k, d })))),
-      Promise.all(audiDeptKeys.map(k => loadDREDataAsync(yr, AUDI_DEPT_TO_DEPT[k], 'audi').then(d => ({ key: k, d })))),
+      Promise.all(audiDeptKeys.map(async k => ({
+        key: k,
+        d: await loadCanonicalDreData('audi', year, AUDI_DEPT_TO_DEPT[k], await loadDREDataAsync(yr, AUDI_DEPT_TO_DEPT[k], 'audi')),
+      }))),
       Promise.all(audiDeptKeys.map(k => loadDREDataAsync(prevYr, AUDI_DEPT_TO_DEPT[k], 'audi').then(d => ({ key: k, d })))),
     ]).then(([vwCurrAsync, vwPrevAsync, audiCurrAsync, audiPrevAsync]) => {
       const vwMap: Record<string, { curr: DreLines; prev: DreLines }> = {};

@@ -862,7 +862,7 @@ function AjustesTable({
 
   const deptList = DEPTS.map(d => data[d.key]);
   const totalLiquido = sumDepts(deptList, 'lucroLiquidoExercicio');
-  const totalLiqNum = parseVal(totalLiquido);
+  const totalLiqNum = deptList.reduce((sum, dept) => sum + parseVal(dept.lucroLiquidoExercicio), 0);
 
   // Total de cada linha de ajuste
   const rowTotals = ajustes.map(row => ({
@@ -1388,7 +1388,7 @@ function PrintDeptTable({
 function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: number; month: number }) {
   const deptList = DEPTS.map(d => data[d.key]);
   const totalLiquido = sumDepts(deptList, 'lucroLiquidoExercicio');
-  const totalLiqNum = parseVal(totalLiquido);
+  const totalLiqNum = deptList.reduce((sum, dept) => sum + parseVal(dept.lucroLiquidoExercicio), 0);
   const rowTotals = data.ajustes.map(row => DEPTS.reduce((s, d) => s + parseVal(row.values[d.key]), 0));
   const totalAjustes = rowTotals.reduce((s, v) => s + v, 0);
   const totalAjustado = totalLiqNum + totalAjustes;
