@@ -235,7 +235,8 @@ interface EvolucaoMensalTableProps {
 }
 
 function EvolucaoMensalTable({ title, subtitle, color, colorDrk, monthRows }: EvolucaoMensalTableProps) {
-  const NCOLS = 14; // descrição + 12 meses + total
+  const visibleMonths = MONTHS_SHORT.slice(0, monthRows.length);
+  const NCOLS = visibleMonths.length + 2; // descrição + meses visíveis + total
 
   const annualTotal = Object.fromEntries(
     DEPT_FIELDS.map(f => [f, monthRows.reduce((s, mr) => s + (mr.totals[f] ?? 0), 0)])
@@ -252,7 +253,7 @@ function EvolucaoMensalTable({ title, subtitle, color, colorDrk, monthRows }: Ev
           <thead>
             <tr className="bg-slate-200" style={{ borderBottom: `2px solid ${color}` }}>
               <th className="text-left px-4 py-3 font-bold text-slate-800 text-sm w-52 min-w-[13rem]">Descrição</th>
-              {MONTHS_SHORT.map((m, i) => (
+              {visibleMonths.map((m, i) => (
                 <th key={i} className="text-center px-2 py-3 font-bold text-sm text-slate-800 min-w-[5.5rem]">{m}</th>
               ))}
               <th className="text-center px-3 py-3 font-bold text-sm text-slate-800 min-w-[7rem] bg-slate-300">Total Acum.</th>
