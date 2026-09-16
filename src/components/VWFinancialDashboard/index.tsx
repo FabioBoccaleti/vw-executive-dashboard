@@ -40,6 +40,7 @@ import {
   type FatosRelevantesData,
   type ProjectionData
 } from "@/lib/dataStorage"
+import { subscribeBaseGerencialUpdated } from "@/components/BaseGerencialDashboard/baseGerencialEvents"
 import { 
   importAllDataToCloudAndLocal,
   preloadFromCloud,
@@ -302,6 +303,11 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
   
   // Flag para controlar quando uma importação está acontecendo
   const [isImporting, setIsImporting] = useState(false)
+  const [baseGerencialRevision, setBaseGerencialRevision] = useState(0)
+
+  useEffect(() => subscribeBaseGerencialUpdated(() => {
+    setBaseGerencialRevision(revision => revision + 1)
+  }), [])
   
   // Estado para dados de métricas de negócios (para permitir importação/exportação)
   const [metricsData, setMetricsData] = useState<MetricsData>(() => loadMetricsData(fiscalYear, department, brand))
@@ -453,7 +459,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     
     saveSelectedFiscalYear(fiscalYear);
     saveSelectedDepartment(department);
-  }, [fiscalYear, department, brand, isImporting]);
+  }, [fiscalYear, department, brand, isImporting, baseGerencialRevision]);
   
   // Effect para carregar Fatos Relevantes quando mudar departamento, ano ou marca
   useEffect(() => {

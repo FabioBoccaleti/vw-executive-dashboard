@@ -24,6 +24,7 @@ import { AnaliseCenariosTab } from './AnaliseCenariosTab';
 import { ComparativoTab } from './ComparativoTab';
 import { BaseGerencialDreTab } from './BaseGerencialDreTab';
 import { RegrasDreTab } from './RegrasDreTab';
+import { syncBaseGerencialAfterImport } from './baseGerencialSync';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -432,6 +433,7 @@ export function BaseGerencialDashboard({ onChangeBrand }: Props) {
       console.log('[BASEGE IMPORT] Salvando no KV store com key:', `basege:${selectedYear}:M${String(selectedMes).padStart(2, '0')}`);
       await setBaseGerencialMes(selectedYear, selectedMes, data);
       console.log('[BASEGE IMPORT] Salvo com sucesso! Atualizando estado local...');
+      await syncBaseGerencialAfterImport(selectedYear);
       
       setMesData(data);
       const nonZero = data.rows.filter(r => !isAllZero(r)).length;

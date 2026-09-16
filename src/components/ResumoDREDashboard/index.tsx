@@ -21,6 +21,7 @@ import { VolumeVendasEvolucaoTab } from './VolumeVendasEvolucaoTab';
 import { ComparativoMarcasTab } from './ComparativoMarcasTab';
 import { ResumoMarcasTab } from './ResumoMarcasTab';
 import { DiagnostivoTab } from './DiagnostivoTab';
+import { subscribeBaseGerencialUpdated } from '@/components/BaseGerencialDashboard/baseGerencialEvents';
 
 interface ResumoDREDashboardProps {
   onChangeBrand: () => void;
@@ -63,6 +64,11 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
   const [year,       setYear]       = useState(CURRENT_YEAR);
   const [month,      setMonth]      = useState(CURRENT_MONTH);
   const [diasUteis,  setDiasUteis]  = useState(22);
+  const [baseGerencialRevision, setBaseGerencialRevision] = useState(0);
+
+  useEffect(() => subscribeBaseGerencialUpdated(() => {
+    setBaseGerencialRevision(revision => revision + 1);
+  }), []);
 
   // Ao montar, detecta automaticamente o último mês/ano com dados alimentados no VW DRE
   useEffect(() => {
@@ -108,7 +114,7 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
     }
 
     detectLastPeriod();
-  }, []);
+  }, [baseGerencialRevision]);
 
   const activeTabConfig = TABS.find(t => t.id === activeTab)!;
   const YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2];
@@ -183,7 +189,7 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
       </div>
 
       {/* ── Conteúdo da aba ─────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+      <div key={`${activeTab}-${baseGerencialRevision}`} className="flex-1 flex flex-col overflow-hidden min-h-0">
         {activeTab === 'comparativo-marcas' ? (
           <ComparativoMarcasTab year={year} month={month} />
         ) : activeTab === 'resumo-marcas' ? (
