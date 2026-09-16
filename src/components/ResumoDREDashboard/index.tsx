@@ -228,7 +228,7 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
         ) : activeTab === 'consolidado-graficos' ? (
           <ConsolidadoGraficosTab year={year} month={month} />
         ) : activeTab === 'mensal' ? (
-          <MensalDreTab year={year} />
+          <MensalDreTab year={year} month={month} />
         ) : activeTab === 'saidas-caixa' ? (
           <SaidasCaixaTab year={year} month={month} />
         ) : activeTab === 'analise-evolucao' ? (

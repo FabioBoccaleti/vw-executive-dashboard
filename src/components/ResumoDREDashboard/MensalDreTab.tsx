@@ -318,9 +318,10 @@ function EvolucaoMensalTable({ title, subtitle, color, colorDrk, monthRows }: Ev
 
 interface MensalDreTabProps {
   year: number;
+  month: number;
 }
 
-export function MensalDreTab({ year }: MensalDreTabProps) {
+export function MensalDreTab({ year, month }: MensalDreTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<'vw' | 'audi' | 'consolidado'>('vw');
   const [loadingVw, setLoadingVw]       = useState(true);
   const [loadingAudi, setLoadingAudi]   = useState(true);
@@ -443,6 +444,11 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
     ) as Record<keyof DreVwDept, number>,
   }));
 
+  const visibleMonthCount = month === 0 ? 12 : Math.max(1, Math.min(month, 12));
+  const visibleVwMonthData = vwMonthData.slice(0, visibleMonthCount);
+  const visibleAudiMonthData = audiMonthData.slice(0, visibleMonthCount);
+  const visibleConsolidadoMonthData = consolidadoMonthData.slice(0, visibleMonthCount);
+
   const loading = activeSubTab === 'consolidado'
     ? loadingVw || loadingAudi
     : activeSubTab === 'vw' ? loadingVw : loadingAudi;
@@ -511,7 +517,7 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
             subtitle={`Ano ${year} — Evolução Mensal (todos os departamentos)`}
             color={VW_COLOR}
             colorDrk={VW_COLOR_DRK}
-            monthRows={vwMonthData}
+            monthRows={visibleVwMonthData}
           />
         ) : activeSubTab === 'audi' ? (
           <EvolucaoMensalTable
@@ -519,7 +525,7 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
             subtitle={`Ano ${year} — Evolução Mensal (todos os departamentos)`}
             color={AUDI_COLOR}
             colorDrk={AUDI_COLOR_DRK}
-            monthRows={audiMonthData}
+            monthRows={visibleAudiMonthData}
           />
         ) : (
           <EvolucaoMensalTable
@@ -527,7 +533,7 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
             subtitle={`Ano ${year} — Evolução Mensal (todos os departamentos)`}
             color={CON_COLOR}
             colorDrk={CON_COLOR_DRK}
-            monthRows={consolidadoMonthData}
+            monthRows={visibleConsolidadoMonthData}
           />
         )}
       </div>
@@ -537,9 +543,9 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
         createPortal(
           <PrintableMensalReport
             year={year}
-            vwMonthData={vwMonthData}
-            audiMonthData={audiMonthData}
-            consolidadoMonthData={consolidadoMonthData}
+            vwMonthData={visibleVwMonthData}
+            audiMonthData={visibleAudiMonthData}
+            consolidadoMonthData={visibleConsolidadoMonthData}
           />,
           document.getElementById('print-root')!
         )
