@@ -262,6 +262,26 @@ function mergeBaseGerencialDreData(
   return data;
 }
 
+function combineBaseGerencialSnapshots(
+  vwSnapshot: Awaited<ReturnType<typeof loadBaseGerencialDreSnapshot>>,
+  audiSnapshot: Awaited<ReturnType<typeof loadBaseGerencialDreSnapshot>>,
+): Awaited<ReturnType<typeof loadBaseGerencialDreSnapshot>> {
+  const months = Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1;
+    const vwMonth = vwSnapshot.months.find(item => item.month === month);
+    const audiMonth = audiSnapshot.months.find(item => item.month === month);
+    if (!vwMonth && !audiMonth) return null;
+    const lineIds = getDashboardDreLineIds().map(([, id]) => id);
+    const values = Object.fromEntries(lineIds.map(id => [
+      id,
+      Number(vwMonth?.values[id] ?? 0) + Number(audiMonth?.values[id] ?? 0),
+    ]));
+    return { month, values };
+  }).filter((month): month is { month: number; values: Record<string, number> } => month !== null);
+
+  return { months };
+}
+
 export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashboardProps) {
   // Configuração da marca atual
   const brandConfig = getBrandConfig(brand);
@@ -396,8 +416,13 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
       const newDreData = directDreData ?? loadDREData(fiscalYear, department, brand);
       let dashboardDreData = newDreData;
 
-      if (brand === 'vw' || brand === 'audi') {
-        const baseSnapshot = await loadBaseGerencialDreSnapshot(brand, fiscalYear, department);
+      if (brand === 'vw' || brand === 'audi' || brand === 'consolidado') {
+        const baseSnapshot = brand === 'consolidado'
+          ? combineBaseGerencialSnapshots(
+              await loadBaseGerencialDreSnapshot('vw', fiscalYear, department),
+              await loadBaseGerencialDreSnapshot('audi', fiscalYear, department),
+            )
+          : await loadBaseGerencialDreSnapshot(brand, fiscalYear, department);
         const mergedDreData = mergeBaseGerencialDreData(newDreData, baseSnapshot);
         if (mergedDreData) {
           dashboardDreData = mergedDreData;
