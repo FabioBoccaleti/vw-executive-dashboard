@@ -10,6 +10,7 @@ import {
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import type { Department } from '@/lib/dataStorage';
 import { formatDreAmount } from './dreDisplayFormat';
+import { loadCanonicalVwRow } from './canonicalDreSource';
 
 // ─── Cores VW ─────────────────────────────────────────────────────────────────
 const VW_COLOR     = '#001e50';
@@ -273,9 +274,7 @@ async function loadPeriodData(
 
   // Dados mensais do KV
   const monthRows: DreVwRow[] = await Promise.all(
-    months.map(m =>
-      loadDreVw(sel.year, m).then(r => r ?? createEmptyDreVwRow(sel.year, m))
-    )
+    months.map(async m => loadCanonicalVwRow(sel.year, m, await loadDreVw(sel.year, m)))
   );
 
   // Mescla: KV tem prioridade; DRE async é fallback

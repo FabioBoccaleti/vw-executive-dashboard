@@ -17,6 +17,7 @@ import {
 } from './dreAudiStorage';
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import { formatDreAmount } from './dreDisplayFormat';
+import { loadCanonicalAudiRow, loadCanonicalVwRow } from './canonicalDreSource';
 import type { Department } from '@/lib/dataStorage';
 
 // ─── Cores ────────────────────────────────────────────────────────────────────
@@ -336,7 +337,7 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
     const yr = year as 2024 | 2025 | 2026 | 2027;
 
     Promise.all([
-      Promise.all(Array.from({ length: 12 }, (_, i) => loadDreVw(year, i + 1))),
+      Promise.all(Array.from({ length: 12 }, async (_, i) => loadCanonicalVwRow(year, i + 1, await loadDreVw(year, i + 1)))),
       Promise.all(
         (Object.entries(VW_DEPT_TO_DEPARTMENT) as [VwDeptKey, Department][])
           .map(([dk, dept]) =>
@@ -387,7 +388,7 @@ export function MensalDreTab({ year }: MensalDreTabProps) {
     const yr = year as 2024 | 2025 | 2026 | 2027;
 
     Promise.all([
-      Promise.all(Array.from({ length: 12 }, (_, i) => loadDreAudi(year, i + 1))),
+      Promise.all(Array.from({ length: 12 }, async (_, i) => loadCanonicalAudiRow(year, i + 1, await loadDreAudi(year, i + 1)))),
       Promise.all(
         (Object.entries(AUDI_DEPT_TO_DEPARTMENT) as [AudiDeptKey, Department][])
           .map(([dk, dept]) =>

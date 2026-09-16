@@ -17,6 +17,7 @@ import {
   type DreAudiDept,
 } from './dreAudiStorage';
 import { formatDreAmount } from './dreDisplayFormat';
+import { loadCanonicalAudiRow, loadCanonicalVwRow } from './canonicalDreSource';
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import type { Department } from '@/lib/dataStorage';
 
@@ -287,8 +288,8 @@ export function ConsolidadoDreTab({ year, month }: ConsolidadoDreTabProps) {
       const yr = year as 2024 | 2025 | 2026 | 2027;
       const syncable = DEPTS.filter(d => DEPT_TO_DEPT_KEY[d.key]);
       Promise.all([
-        Promise.all(Array.from({ length: 12 }, (_, i) => loadDreVw(year, i + 1))),
-        Promise.all(Array.from({ length: 12 }, (_, i) => loadDreAudi(year, i + 1))),
+        Promise.all(Array.from({ length: 12 }, async (_, i) => loadCanonicalVwRow(year, i + 1, await loadDreVw(year, i + 1)))),
+        Promise.all(Array.from({ length: 12 }, async (_, i) => loadCanonicalAudiRow(year, i + 1, await loadDreAudi(year, i + 1)))),
         Promise.all(syncable.flatMap(d => [
           loadDREDataAsync(yr, DEPT_TO_DEPT_KEY[d.key]!, 'vw').then(dre => ({ brand: 'vw' as const, deptKey: d.key as DeptKey, dre })),
           loadDREDataAsync(yr, DEPT_TO_DEPT_KEY[d.key]!, 'audi').then(dre => ({ brand: 'audi' as const, deptKey: d.key as DeptKey, dre })),
@@ -368,8 +369,8 @@ export function ConsolidadoDreTab({ year, month }: ConsolidadoDreTabProps) {
     );
 
     // Carrega KV de VW e Audi para período atual e períodos anteriores
-    const vwPromises   = allPeriods.map(p => loadDreVw(p.year, p.month));
-    const audiPromises = allPeriods.map(p => loadDreAudi(p.year, p.month));
+    const vwPromises   = allPeriods.map(async p => loadCanonicalVwRow(p.year, p.month, await loadDreVw(p.year, p.month)));
+    const audiPromises = allPeriods.map(async p => loadCanonicalAudiRow(p.year, p.month, await loadDreAudi(p.year, p.month)));
 
     Promise.all([
       Promise.all(vwPromises),

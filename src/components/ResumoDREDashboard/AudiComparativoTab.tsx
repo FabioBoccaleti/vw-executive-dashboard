@@ -10,6 +10,7 @@ import {
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import type { Department } from '@/lib/dataStorage';
 import { formatDreAmount } from './dreDisplayFormat';
+import { loadCanonicalAudiRow } from './canonicalDreSource';
 
 // ─── Cores Audi ───────────────────────────────────────────────────────────────
 const AUDI_COLOR     = '#bb0a30';
@@ -268,9 +269,7 @@ async function loadPeriodData(
 
   // Dados mensais do KV
   const monthRows: DreAudiRow[] = await Promise.all(
-    months.map(m =>
-      loadDreAudi(sel.year, m).then(r => r ?? createEmptyDreAudiRow(sel.year, m))
-    )
+    months.map(async m => loadCanonicalAudiRow(sel.year, m, await loadDreAudi(sel.year, m)))
   );
 
   // Mescla: KV tem prioridade; DRE async é fallback
