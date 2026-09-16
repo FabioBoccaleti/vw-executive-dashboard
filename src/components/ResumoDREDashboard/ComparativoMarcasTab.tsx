@@ -14,6 +14,7 @@ import {
 } from './dreAudiStorage';
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import type { Department } from '@/lib/dataStorage';
+import { formatDreAmount } from './dreDisplayFormat';
 
 // ─── Cores ────────────────────────────────────────────────────────────────────
 const VW_COLOR      = '#001e50';
@@ -264,7 +265,7 @@ function ComparativoTabela({ vwData, audiData, periodLabel, rootId, showPrintBut
               const fmtVal = (v: number) =>
                 isQuant
                   ? (v > 0 ? v.toString() : '—')
-                  : (v !== 0 ? v.toLocaleString('pt-BR') : '—');
+                  : (v !== 0 ? formatDreAmount(v) : '—');
 
               const rowStyle = line.isTotal ? {} : undefined;
               const rowClass = line.isTotal

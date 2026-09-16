@@ -9,6 +9,7 @@ import {
 } from './dreAudiStorage';
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import type { Department } from '@/lib/dataStorage';
+import { formatDreAmount } from './dreDisplayFormat';
 
 // ─── Cores Audi ───────────────────────────────────────────────────────────────
 const AUDI_COLOR     = '#bb0a30';
@@ -718,7 +719,7 @@ function AudiComparativoTable({
                       display = v > 0 ? v.toString() : '—';
                     } else {
                       const v = parseVal(dept[line.field]);
-                      display = v !== 0 ? v.toLocaleString('pt-BR') : '—';
+                      display = v !== 0 ? formatDreAmount(v) : '—';
                     }
 
                     /* Variação vs período anterior */

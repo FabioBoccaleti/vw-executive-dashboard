@@ -607,7 +607,7 @@ function ResumoTable({ data, deptList, year, month }: {
                       ? '0,00'
                       : isQuant
                       ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
-                      : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
+                      : (parseVal(val) !== 0 ? formatDreAmount(parseVal(val)) : '—');
                     return <td key={d.key} className="px-3 py-1.5 text-center">{display}</td>;
                   })}
                   <td
@@ -621,7 +621,7 @@ function ResumoTable({ data, deptList, year, month }: {
                             if (d.key === 'adm' && line.field === 'receitaOperacionalLiquida') return s;
                             return s + parseVal(data[d.key][line.field]);
                           }, 0);
-                          return t !== 0 ? t.toLocaleString('pt-BR') : '—';
+                          return t !== 0 ? formatDreAmount(t) : '—';
                         })()
                     }
                   </td>
@@ -722,7 +722,7 @@ function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, mon
                 totalStr = '0,00';
               } else {
                 const t = yearDepts.reduce((s, d) => s + parseVal(d[line.field]), 0);
-                totalStr = t !== 0 ? t.toLocaleString('pt-BR') : '—';
+                totalStr = t !== 0 ? formatDreAmount(t) : '—';
               }
 
               return (
@@ -731,7 +731,7 @@ function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, mon
                   {prevDepts.map((pd, pi) => {
                     const v = pd[line.field];
                     const num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
-                    const display = isAdmROL ? '0,00' : isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
+                    const display = isAdmROL ? '0,00' : isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? formatDreAmount(num) : '—');
                     return <td key={pi} className="px-3 py-1.5 text-center">{display}</td>;
                   })}
                   <td className="px-2 py-1 text-center">
@@ -858,7 +858,7 @@ function AjustesTable({ ajustes, onChange, onLabelChange, onAdd, onDelete, data,
                     </td>
                   ))}
                   <td className="px-3 py-1.5 text-center bg-slate-50 text-slate-700 font-semibold">
-                    {rowTotal !== 0 ? rowTotal.toLocaleString('pt-BR') : '—'}
+                    {rowTotal !== 0 ? formatDreAmount(rowTotal) : '—'}
                   </td>
                 </tr>
               );
@@ -871,10 +871,10 @@ function AjustesTable({ ajustes, onChange, onLabelChange, onAdd, onDelete, data,
               {DEPTS.map(d => {
                 const liq = parseVal(data[d.key].lucroLiquidoExercicio);
                 const adj = ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0);
-                return <td key={d.key} className="px-3 py-2 text-center">{(liq + adj) !== 0 ? (liq + adj).toLocaleString('pt-BR') : '—'}</td>;
+                return <td key={d.key} className="px-3 py-2 text-center">{(liq + adj) !== 0 ? formatDreAmount(liq + adj) : '—'}</td>;
               })}
               <td className="px-3 py-2 text-center text-white" style={{ backgroundColor: VW_COLOR_DRK }}>
-                {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}
+                {totalAjustado !== 0 ? formatDreAmount(totalAjustado) : '—'}
               </td>
             </tr>
           </tbody>
@@ -971,10 +971,10 @@ function VwEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreVwRow[
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
                   {monthlyTotals.map((mt, mi) => {
                     const val = mt[line.field] ?? 0;
-                    return <td key={mi} className="px-2 py-1.5 text-center">{isQuant ? (Math.round(val) > 0 ? Math.round(val).toString() : '—') : (val !== 0 ? val.toLocaleString('pt-BR') : '—')}</td>;
+                    return <td key={mi} className="px-2 py-1.5 text-center">{isQuant ? (Math.round(val) > 0 ? Math.round(val).toString() : '—') : (val !== 0 ? formatDreAmount(val) : '—')}</td>;
                   })}
                   <td className={`px-3 py-1.5 text-center font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: VW_COLOR_DRK } : undefined}>
-                    {(() => { const v = annualTotal[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—'); })()}
+                    {(() => { const v = annualTotal[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? formatDreAmount(v) : '—'); })()}
                   </td>
                 </tr>
               );
@@ -1033,11 +1033,11 @@ function VwDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
                   {allMonthRows.map((row, mi) => {
                     const v = isAdmROL ? 0 : isQuant ? (parseInt(String(row[deptKey][line.field])) || 0) : parseVal(row[deptKey][line.field]);
-                    return <td key={mi} className="px-2 py-1.5 text-center">{isAdmROL ? '0,00' : isQuant ? (v > 0 ? v.toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—')}</td>;
+                    return <td key={mi} className="px-2 py-1.5 text-center">{isAdmROL ? '0,00' : isQuant ? (v > 0 ? v.toString() : '—') : (v !== 0 ? formatDreAmount(v) : '—')}</td>;
                   })}
                   <td className="px-2 py-1.5 text-center text-[0.68rem] border-l border-slate-200">{varMM || '—'}</td>
                   <td className={`px-3 py-1.5 text-center font-semibold ${line.isTotal ? 'text-white' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: VW_COLOR_DRK } : undefined}>
-                    {(() => { const v = isAdmROL ? 0 : annualTotals[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—'); })()}
+                    {(() => { const v = isAdmROL ? 0 : annualTotals[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? formatDreAmount(v) : '—'); })()}
                   </td>
                 </tr>
               );
@@ -1165,7 +1165,7 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreVwRow; dep
                     ? '0,00'
                     : isQuant
                       ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
-                      : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
+                      : (parseVal(val) !== 0 ? formatDreAmount(parseVal(val)) : '—');
                   return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{display}</td>;
                 })}
                 <td className={line.isTotal ? 'vw-cell-total' : ''}
@@ -1180,7 +1180,7 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreVwRow; dep
                         const s = line.field === 'receitaOperacionalLiquida'
                           ? DEPTS.reduce((acc, dept) => dept.key === 'adm' ? acc : acc + parseVal(data[dept.key][line.field]), 0)
                           : parseVal(sumDepts(deptList, line.field));
-                        return s !== 0 ? s.toLocaleString('pt-BR') : '—';
+                        return s !== 0 ? formatDreAmount(s) : '—';
                       })()
                   }
                 </td>
@@ -1254,7 +1254,7 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
             const totalStr = isQuant
               ? (() => { const t = allDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0); return t > 0 ? t.toString() : '—'; })()
               : isAdmROL ? '0,00'
-              : (() => { const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0); return t !== 0 ? t.toLocaleString('pt-BR') : '—'; })();
+              : (() => { const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0); return t !== 0 ? formatDreAmount(t) : '—'; })();
 
             const totalCellStyle: React.CSSProperties = line.isTotal
               ? { textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${VW_COLOR_DRK} 0%, ${VW_COLOR_DRK} 100%)`, backgroundColor: VW_COLOR_DRK, color: 'white' }
@@ -1265,11 +1265,11 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
                 <td style={{ padding: `2px ${line.indent ? '14px' : '6px'}`, fontWeight: line.isTotal || line.isSubtotal ? 700 : 400 }}>{line.label}</td>
                 {prevDepts.map((pd, pi) => {
                   const v = pd[line.field], num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
-                  const display = isAdmROL ? '0,00' : isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
+                  const display = isAdmROL ? '0,00' : isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? formatDreAmount(num) : '—');
                   return <td key={pi} style={{ textAlign: 'center', padding: '2px 4px', color: line.isTotal ? 'white' : '#111', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{display}</td>;
                 })}
                 <td style={{ textAlign: 'center', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>
-                  {isAdmROL ? '0,00' : isQuant ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—') : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')}
+                  {isAdmROL ? '0,00' : isQuant ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—') : (parseVal(dept[line.field]) !== 0 ? formatDreAmount(parseVal(dept[line.field])) : '—')}
                 </td>
                 <td style={{ textAlign: 'center', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', color: line.isTotal ? 'white' : '#111', fontSize: '6.5pt' }}>{varMM || '—'}</td>
                 <td className={line.isTotal ? 'vw-cell-total' : ''} style={totalCellStyle}>{totalStr}</td>
@@ -1318,9 +1318,9 @@ function PrintAjustesTable({ data, year, month }: { data: DreVwRow; year: number
               <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#111' }}>
                 <td style={{ padding: '2px 14px' }}>{row.label || '—'}</td>
                 {DEPTS.map(d => (
-                  <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px' }}>{parseVal(row.values[d.key]) !== 0 ? parseVal(row.values[d.key]).toLocaleString('pt-BR') : '—'}</td>
+                  <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px' }}>{parseVal(row.values[d.key]) !== 0 ? formatDreAmount(parseVal(row.values[d.key])) : '—'}</td>
                 ))}
-                <td style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111' }}>{rTotal !== 0 ? rTotal.toLocaleString('pt-BR') : '—'}</td>
+                <td style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111' }}>{rTotal !== 0 ? formatDreAmount(rTotal) : '—'}</td>
               </tr>
             );
           })}
@@ -1329,10 +1329,10 @@ function PrintAjustesTable({ data, year, month }: { data: DreVwRow; year: number
             {DEPTS.map(d => {
               const liq = parseVal(data[d.key].lucroLiquidoExercicio);
               const adj = data.ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0);
-              return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: 700 }}>{(liq + adj) !== 0 ? (liq + adj).toLocaleString('pt-BR') : '—'}</td>;
+              return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: 700 }}>{(liq + adj) !== 0 ? formatDreAmount(liq + adj) : '—'}</td>;
             })}
             <td className="vw-cell-total" style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${VW_COLOR_DRK} 0%, ${VW_COLOR_DRK} 100%)`, backgroundColor: VW_COLOR_DRK }}>
-              {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}
+              {totalAjustado !== 0 ? formatDreAmount(totalAjustado) : '—'}
             </td>
           </tr>
         </tbody>

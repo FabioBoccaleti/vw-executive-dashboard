@@ -9,6 +9,7 @@ import {
 } from './dreVwStorage';
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import type { Department } from '@/lib/dataStorage';
+import { formatDreAmount } from './dreDisplayFormat';
 
 // ─── Cores VW ─────────────────────────────────────────────────────────────────
 const VW_COLOR     = '#001e50';
@@ -725,7 +726,7 @@ function ComparativoTable({
                       display = v > 0 ? v.toString() : '—';
                     } else {
                       const v = parseVal(dept[line.field]);
-                      display = v !== 0 ? v.toLocaleString('pt-BR') : '—';
+                      display = v !== 0 ? formatDreAmount(v) : '—';
                     }
 
                     /* Variação vs período anterior */

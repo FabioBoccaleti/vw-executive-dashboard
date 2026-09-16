@@ -760,7 +760,7 @@ function DeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year, mon
                 totalStr = t > 0 ? t.toString() : '—';
               } else {
                 const t = yearDepts.reduce((s, d) => s + parseVal(d[line.field]), 0);
-                totalStr = t !== 0 ? t.toLocaleString('pt-BR') : '—';
+                totalStr = t !== 0 ? formatDreAmount(t) : '—';
               }
 
               return (
@@ -769,13 +769,13 @@ function DeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year, mon
                   {prevDepts.map((pd, pi) => {
                     const v = pd[line.field];
                     const num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
-                    const display = isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
+                    const display = isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? formatDreAmount(num) : '—');
                     return <td key={pi} className="px-3 py-1.5 text-center">{display}</td>;
                   })}
                   <td className="px-3 py-1.5 text-center">
                     {isQuant
                       ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—')
-                      : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')
+                      : (parseVal(dept[line.field]) !== 0 ? formatDreAmount(parseVal(dept[line.field])) : '—')
                     }
                   </td>
                   <td className="px-2 py-1.5 text-center text-[0.68rem] border-l border-slate-200">{varMM || '—'}</td>
@@ -843,7 +843,7 @@ function AjustesTable({ data, year, month }: { data: DreVwRow; year: number; mon
                   <td className="px-4 py-1.5 pl-7">{row.label || '—'}</td>
                   {DEPTS.map(d => (
                     <td key={d.key} className="px-3 py-1.5 text-center">
-                      {parseVal(row.values[d.key]) !== 0 ? parseVal(row.values[d.key]).toLocaleString('pt-BR') : '—'}
+                      {parseVal(row.values[d.key]) !== 0 ? formatDreAmount(parseVal(row.values[d.key])) : '—'}
                     </td>
                   ))}
                   <td className="px-3 py-1.5 text-center bg-slate-50 text-slate-700 font-semibold">
@@ -858,7 +858,7 @@ function AjustesTable({ data, year, month }: { data: DreVwRow; year: number; mon
               {DEPTS.map(d => {
                 const liq = parseVal(data[d.key].lucroLiquidoExercicio);
                 const adj = data.ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0);
-                return <td key={d.key} className="px-3 py-2 text-center">{(liq + adj) !== 0 ? (liq + adj).toLocaleString('pt-BR') : '—'}</td>;
+                return <td key={d.key} className="px-3 py-2 text-center">{(liq + adj) !== 0 ? formatDreAmount(liq + adj) : '—'}</td>;
               })}
               <td className="px-3 py-2 text-center text-white" style={{ backgroundColor: CON_COLOR_DRK }}>
                 {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}

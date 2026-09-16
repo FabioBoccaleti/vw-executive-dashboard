@@ -620,7 +620,7 @@ function ResumoTable({
                       ? '0,00'
                       : isQuant
                       ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
-                      : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
+                      : (parseVal(val) !== 0 ? formatDreAmount(parseVal(val)) : '—');
                     return (
                       <td key={d.key} className="px-3 py-1.5 text-center">
                         {display}
@@ -639,7 +639,7 @@ function ResumoTable({
                             if (d.key === 'adm' && line.field === 'receitaOperacionalLiquida') return s;
                             return s + parseVal(data[d.key][line.field]);
                           }, 0);
-                          return t !== 0 ? t.toLocaleString('pt-BR') : '—';
+                            return t !== 0 ? formatDreAmount(t) : '—';
                         })()
                     }
                   </td>
@@ -762,7 +762,7 @@ function DeptTable({
                 totalStr = '0,00';
               } else {
                 const t = yearDepts.reduce((s, d) => s + parseVal(d[line.field]), 0);
-                totalStr = t !== 0 ? t.toLocaleString('pt-BR') : '—';
+                totalStr = t !== 0 ? formatDreAmount(t) : '—';
               }
 
               return (
@@ -775,7 +775,7 @@ function DeptTable({
                       ? '0,00'
                       : isQuant
                       ? (num > 0 ? num.toString() : '—')
-                      : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
+                      : (num !== 0 ? formatDreAmount(num) : '—');
                     return (
                       <td key={pi} className={`px-3 py-1.5 text-center ${line.isTotal ? 'text-black' : 'text-black'}`}>
                         {display}
@@ -957,7 +957,7 @@ function AjustesTable({
                   ))}
                   {/* Total da linha */}
                   <td className="px-3 py-1.5 text-center bg-slate-50 text-slate-700 font-semibold">
-                    {rowTotal !== 0 ? rowTotal.toLocaleString('pt-BR') : '—'}
+                    {rowTotal !== 0 ? formatDreAmount(rowTotal) : '—'}
                   </td>
                 </tr>
               );
@@ -973,12 +973,12 @@ function AjustesTable({
                 const total = liq + adj;
                 return (
                   <td key={d.key} className="px-3 py-2 text-center">
-                    {total !== 0 ? total.toLocaleString('pt-BR') : '—'}
+                    {total !== 0 ? formatDreAmount(total) : '—'}
                   </td>
                 );
               })}
               <td className="px-3 py-2 text-center" style={{backgroundColor:'#9a0827'}}>
-                {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}
+                {totalAjustado !== 0 ? formatDreAmount(totalAjustado) : '—'}
               </td>
             </tr>
           </tbody>
@@ -1043,11 +1043,11 @@ function AudiEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreAudi
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
                   {monthlyTotals.map((mt, mi) => {
                     const val = mt[line.field] ?? 0;
-                    const display = isQuant ? (Math.round(val) > 0 ? Math.round(val).toString() : '—') : (val !== 0 ? val.toLocaleString('pt-BR') : '—');
+                    const display = isQuant ? (Math.round(val) > 0 ? Math.round(val).toString() : '—') : (val !== 0 ? formatDreAmount(val) : '—');
                     return <td key={mi} className="px-2 py-1.5 text-center">{display}</td>;
                   })}
                   <td className={`px-3 py-1.5 text-center font-semibold ${line.isTotal ? '' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: '#9a0827' } : undefined}>
-                    {(() => { const v = annualTotal[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—'); })()}
+                    {(() => { const v = annualTotal[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? formatDreAmount(v) : '—'); })()}
                   </td>
                 </tr>
               );
@@ -1106,11 +1106,11 @@ function AudiDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
                   <td className={`px-4 py-1.5 ${line.indent ? 'pl-7' : ''}`}>{line.label}</td>
                   {allMonthRows.map((row, mi) => {
                     const v = isAdmROL ? 0 : isQuant ? (parseInt(String(row[deptKey][line.field])) || 0) : parseVal(row[deptKey][line.field]);
-                    return <td key={mi} className="px-2 py-1.5 text-center">{isAdmROL ? '0,00' : isQuant ? (v > 0 ? v.toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—')}</td>;
+                    return <td key={mi} className="px-2 py-1.5 text-center">{isAdmROL ? '0,00' : isQuant ? (v > 0 ? v.toString() : '—') : (v !== 0 ? formatDreAmount(v) : '—')}</td>;
                   })}
                   <td className="px-2 py-1.5 text-center text-[0.68rem] border-l border-slate-200">{varMM || '—'}</td>
                   <td className={`px-3 py-1.5 text-center font-semibold ${line.isTotal ? '' : 'bg-slate-50 text-black'}`} style={line.isTotal ? { backgroundColor: '#9a0827' } : undefined}>
-                    {(() => { const v = isAdmROL ? 0 : annualTotals[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? v.toLocaleString('pt-BR') : '—'); })()}
+                    {(() => { const v = isAdmROL ? 0 : annualTotals[line.field] ?? 0; return isQuant ? (Math.round(v) > 0 ? Math.round(v).toString() : '—') : (v !== 0 ? formatDreAmount(v) : '—'); })()}
                   </td>
                 </tr>
               );
@@ -1248,7 +1248,7 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
                   const s = line.field === 'receitaOperacionalLiquida'
                     ? DEPTS.reduce((acc, dept) => dept.key === 'adm' ? acc : acc + parseVal(data[dept.key][line.field]), 0)
                     : parseVal(sumDepts(deptList, line.field));
-                  return s !== 0 ? s.toLocaleString('pt-BR') : '—';
+                  return s !== 0 ? formatDreAmount(s) : '—';
                 })();
             const rowStyle: React.CSSProperties = line.isTotal
               ? { backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'black', borderBottom: '1px solid #f1f5f9' }
@@ -1266,7 +1266,7 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
                     ? '0,00'
                     : isQuant
                       ? ((parseInt(String(val)) || 0) > 0 ? String(parseInt(String(val))) : '—')
-                      : (parseVal(val) !== 0 ? parseVal(val).toLocaleString('pt-BR') : '—');
+                      : (parseVal(val) !== 0 ? formatDreAmount(parseVal(val)) : '—');
                   return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{display}</td>;
                 })}
                 <td className={line.isTotal ? 'dre-cell-total' : ''} style={totalCellStyle}>{totalVal}</td>
@@ -1347,7 +1347,7 @@ function PrintDeptTable({
               ? (() => { const t = allDepts.reduce((s, d) => s + (parseInt(String(d.quant)) || 0), 0); return t > 0 ? t.toString() : '—'; })()
               : isAdmROL
               ? '0,00'
-              : (() => { const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0); return t !== 0 ? t.toLocaleString('pt-BR') : '—'; })();
+              : (() => { const t = allDepts.reduce((s, d) => s + parseVal(d[line.field]), 0); return t !== 0 ? formatDreAmount(t) : '—'; })();
 
             const deptRowStyle: React.CSSProperties = line.isTotal
               ? { backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'black', borderBottom: '1px solid #f1f5f9' }
@@ -1362,7 +1362,7 @@ function PrintDeptTable({
                   const v = pd[line.field]; const num = isQuant ? (parseInt(String(v)) || 0) : parseVal(v);
                   const display = isAdmROL
                     ? '0,00'
-                    : isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? num.toLocaleString('pt-BR') : '—');
+                    : isQuant ? (num > 0 ? num.toString() : '—') : (num !== 0 ? formatDreAmount(num) : '—');
                   return <td key={pi} style={{ textAlign: 'center', padding: '2px 4px', color: '#111111', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>{display}</td>;
                 })}
                 <td style={{ textAlign: 'center', padding: '2px 4px', fontWeight: (line.isTotal || line.field === 'lucroPrejOperacionalBruto') ? 700 : 400 }}>
@@ -1370,7 +1370,7 @@ function PrintDeptTable({
                     ? '0,00'
                     : isQuant
                     ? ((parseInt(String(dept[line.field])) || 0) > 0 ? String(parseInt(String(dept[line.field]))) : '—')
-                    : (parseVal(dept[line.field]) !== 0 ? parseVal(dept[line.field]).toLocaleString('pt-BR') : '—')}
+                    : (parseVal(dept[line.field]) !== 0 ? formatDreAmount(parseVal(dept[line.field])) : '—')}
                 </td>
                 <td style={{ textAlign: 'center', padding: '2px 4px', borderLeft: '1px solid #e2e8f0', color: '#111111', fontSize: '6.5pt' }}>{varMM || '—'}</td>
                 <td className={line.isTotal ? 'dre-cell-total' : ''} style={deptTotalCellStyle}>{totalStr}</td>
@@ -1423,11 +1423,11 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
                 <td style={{ padding: '2px 14px' }}>{row.label || '—'}</td>
                 {DEPTS.map(d => (
                   <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px' }}>
-                    {parseVal(row.values[d.key]) !== 0 ? parseVal(row.values[d.key]).toLocaleString('pt-BR') : '—'}
+                    {parseVal(row.values[d.key]) !== 0 ? formatDreAmount(parseVal(row.values[d.key])) : '—'}
                   </td>
                 ))}
                 <td style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundColor: '#f8fafc', color: '#111111' }}>
-                  {rTotal !== 0 ? rTotal.toLocaleString('pt-BR') : '—'}
+                  {rTotal !== 0 ? formatDreAmount(rTotal) : '—'}
                 </td>
               </tr>
             );
@@ -1439,10 +1439,10 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
               const liq = parseVal(data[d.key].lucroLiquidoExercicio);
               const adj = data.ajustes.reduce((s, r) => s + parseVal(r.values[d.key]), 0);
               const total = liq + adj;
-              return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: 700 }}>{total !== 0 ? total.toLocaleString('pt-BR') : '—'}</td>;
+              return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: 700 }}>{total !== 0 ? formatDreAmount(total) : '—'}</td>;
             })}
             <td className="dre-cell-total" style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827' }}>
-              {totalAjustado !== 0 ? totalAjustado.toLocaleString('pt-BR') : '—'}
+              {totalAjustado !== 0 ? formatDreAmount(totalAjustado) : '—'}
             </td>
           </tr>
         </tbody>

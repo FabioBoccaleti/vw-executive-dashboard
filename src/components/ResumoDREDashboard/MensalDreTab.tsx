@@ -747,7 +747,7 @@ function PrintMensalTable({ title, subtitle, year, color, colorDrk, monthRows }:
                 }>
                   {isQuant
                     ? (Math.round(annualVal) > 0 ? Math.round(annualVal).toString() : '—')
-                    : (annualVal !== 0 ? annualVal.toLocaleString('pt-BR') : '—')
+                    : (annualVal !== 0 ? formatDreAmount(annualVal) : '—')
                   }
                 </td>
               </tr>
