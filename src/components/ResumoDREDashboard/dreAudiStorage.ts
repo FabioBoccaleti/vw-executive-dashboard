@@ -205,10 +205,32 @@ async function loadAllDreAudiFromLegacy(year: number): Promise<(DreAudiRow | nul
 
 // ─── Load / Save ──────────────────────────────────────────────────────────────
 
+function normalizeStoredValue(value: string): string {
+  if (!/^[-+]?\d+\.\d+$/.test(value.trim())) return value;
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue)
+    ? numericValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : value;
+}
+
+function normalizeDreAudiRow(row: DreAudiRow): DreAudiRow {
+  const departments = ['novos', 'usados', 'pecas', 'oficina', 'funilaria', 'adm'] as const;
+  const normalized = { ...row };
+  for (const department of departments) {
+    normalized[department] = Object.fromEntries(
+      Object.entries(row[department]).map(([field, value]) => [field, normalizeStoredValue(value)])
+    ) as DreAudiDept;
+  }
+  return normalized;
+}
+
 export async function loadDreAudi(year: number, month: number): Promise<DreAudiRow | null> {
   try {
     const data = await kvGet<DreAudiRow>(key(year, month));
-    return data ?? null;
+    if (!data) return null;
+    const normalized = normalizeDreAudiRow(data);
+    if (JSON.stringify(normalized) !== JSON.stringify(data)) void kvSet(key(year, month), normalized);
+    return normalized;
   } catch {
     return null;
   }
@@ -221,7 +243,13 @@ export async function loadAllDreAudi(year: number): Promise<(DreAudiRow | null)[
   try {
     const keys = Array.from({ length: 12 }, (_, i) => key(year, i + 1));
     const results = await kvBulkGet(keys);
-    const rows = keys.map(k => (results[k] as DreAudiRow) ?? null);
+    const rows = keys.map(k => {
+      const row = (results[k] as DreAudiRow) ?? null;
+      if (!row) return null;
+      const normalized = normalizeDreAudiRow(row);
+      if (JSON.stringify(normalized) !== JSON.stringify(row)) void kvSet(k, normalized);
+      return normalized;
+    });
     if (rows.some(r => r !== null)) return rows;
     return loadAllDreAudiFromLegacy(year);
   } catch {

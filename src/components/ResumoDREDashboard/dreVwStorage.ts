@@ -209,10 +209,32 @@ async function loadAllDreVwFromLegacy(year: number): Promise<(DreVwRow | null)[]
 
 // ─── Load / Save ──────────────────────────────────────────────────────────────
 
+function normalizeStoredValue(value: string): string {
+  if (!/^[-+]?\d+\.\d+$/.test(value.trim())) return value;
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue)
+    ? numericValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : value;
+}
+
+function normalizeDreVwRow(row: DreVwRow): DreVwRow {
+  const departments = ['novos', 'usados', 'direta', 'pecas', 'oficina', 'funilaria', 'adm'] as const;
+  const normalized = { ...row };
+  for (const department of departments) {
+    normalized[department] = Object.fromEntries(
+      Object.entries(row[department]).map(([field, value]) => [field, normalizeStoredValue(value)])
+    ) as DreVwDept;
+  }
+  return normalized;
+}
+
 export async function loadDreVw(year: number, month: number): Promise<DreVwRow | null> {
   try {
     const data = await kvGet<DreVwRow>(key(year, month));
-    return data ?? null;
+    if (!data) return null;
+    const normalized = normalizeDreVwRow(data);
+    if (JSON.stringify(normalized) !== JSON.stringify(data)) void kvSet(key(year, month), normalized);
+    return normalized;
   } catch {
     return null;
   }
@@ -225,7 +247,13 @@ export async function loadAllDreVw(year: number): Promise<(DreVwRow | null)[]> {
   try {
     const keys = Array.from({ length: 12 }, (_, i) => key(year, i + 1));
     const results = await kvBulkGet(keys);
-    const rows = keys.map(k => (results[k] as DreVwRow) ?? null);
+    const rows = keys.map(k => {
+      const row = (results[k] as DreVwRow) ?? null;
+      if (!row) return null;
+      const normalized = normalizeDreVwRow(row);
+      if (JSON.stringify(normalized) !== JSON.stringify(row)) void kvSet(k, normalized);
+      return normalized;
+    });
     if (rows.some(r => r !== null)) return rows;
     return loadAllDreVwFromLegacy(year);
   } catch {
