@@ -149,6 +149,14 @@ export async function loadDREDataAsync(
     return data;
   }
 
+  const directData = (currentBrand === 'vw' || currentBrand === 'audi')
+    ? await getCachedData<DREData>(`${currentBrand}_dre_manual_${fiscalYear}_${department}`)
+    : null;
+  if (directData) {
+    console.log(`✅ [DB] DRE carregada da importação direta: ${key}`);
+    return directData;
+  }
+
   const baseGerencialData = (currentBrand === 'vw' || currentBrand === 'audi')
     ? await loadBaseGerencialDreSnapshot(currentBrand, fiscalYear, department)
     : { months: [] };
@@ -251,6 +259,24 @@ export async function saveDREDataAsync(
   }
   
   return success;
+}
+
+/** Mantém a última importação direta do Dashboard Executivo separada da Base Gerencial. */
+export async function saveDirectDREDataAsync(
+  fiscalYear: 2024 | 2025 | 2026 | 2027,
+  data: DREData,
+  department: Department,
+  brand: Brand,
+): Promise<boolean> {
+  return setCachedData(`${brand}_dre_manual_${fiscalYear}_${department}`, data);
+}
+
+export async function loadDirectDREDataAsync(
+  fiscalYear: 2024 | 2025 | 2026 | 2027,
+  department: Department,
+  brand: Brand,
+): Promise<DREData | null> {
+  return getCachedData<DREData>(`${brand}_dre_manual_${fiscalYear}_${department}`);
 }
 
 /**

@@ -40,6 +40,7 @@ import {
   type FatosRelevantesData,
   type ProjectionData
 } from "@/lib/dataStorage"
+import { loadDirectDREDataAsync, saveDirectDREDataAsync } from "@/lib/dbStorage"
 import { subscribeBaseGerencialUpdated } from "@/components/BaseGerencialDashboard/baseGerencialEvents"
 import { 
   importAllDataToCloudAndLocal,
@@ -389,7 +390,10 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
     const loadDataWithRetry = async (retryCount = 0) => {
       const newMetricsData = loadMetricsData(fiscalYear, department, brand);
       const newSharedMetricsData = loadSharedMetricsData(fiscalYear, brand);
-      const newDreData = loadDREData(fiscalYear, department, brand);
+      const directDreData = (brand === 'vw' || brand === 'audi')
+        ? await loadDirectDREDataAsync(fiscalYear, department, brand)
+        : null;
+      const newDreData = directDreData ?? loadDREData(fiscalYear, department, brand);
       let dashboardDreData = newDreData;
 
       if (brand === 'vw' || brand === 'audi') {
@@ -397,7 +401,6 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
         const mergedDreData = mergeBaseGerencialDreData(newDreData, baseSnapshot);
         if (mergedDreData) {
           dashboardDreData = mergedDreData;
-          saveDREData(fiscalYear, mergedDreData, department, department === 'consolidado', brand);
           console.log(`🔗 DRE da Base Gerencial integrada: ${brand} - ${fiscalYear} - ${department}`);
         }
       }
@@ -1222,6 +1225,7 @@ export function VWFinancialDashboard({ brand, onChangeBrand }: VWFinancialDashbo
       const saved = saveDREData(fiscalYear, importedData, department, isConsolidado, brand);
       
       if (saved) {
+        await saveDirectDREDataAsync(fiscalYear, importedData, department, brand);
         console.log(`✅ DRE salvo no Redis: ${brand}_dre_${fiscalYear}_${department}`);
         
         // Aguardar um momento para garantir persistência e depois atualizar interface

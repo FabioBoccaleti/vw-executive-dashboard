@@ -1,5 +1,5 @@
-import type { Department, DREData } from '@/lib/dataStorage';
-import { clearCache, loadDREDataAsync, saveDREDataAsync } from '@/lib/dbStorage';
+import type { Department } from '@/lib/dataStorage';
+import { clearCache } from '@/lib/dbStorage';
 import { getBaseGerencialMes, setBaseGerencialDreCache, type DeptoClassificacao, type Marca } from './baseGerencialStorage';
 import { getDashboardDreLineIds, loadBaseGerencialDreSnapshot, type BaseGerencialDreSnapshot } from './baseGerencialDataProcessor';
 import { createEmptyDreAudiRow, loadDreAudi, saveDreAudi, type DreAudiDept } from '../ResumoDREDashboard/dreAudiStorage';
@@ -28,25 +28,6 @@ const AUDI_SUMMARY_DEPARTMENTS = [
   ['oficina', 'oficina'], ['funilaria', 'funilaria'], ['administracao', 'adm'],
 ] as const;
 
-function snapshotToDreData(snapshot: BaseGerencialDreSnapshot, existing: DREData | null): DREData {
-  const importedMonths = new Set(snapshot.months.map(month => month.month - 1));
-  return getDashboardDreLineIds().map(([label, id]) => {
-    const previous = existing?.find(line => line.id === id);
-    const values = Array.from({ length: 12 }, (_, month) => {
-      if (!importedMonths.has(month)) return previous?.values?.[month] ?? previous?.meses?.[month] ?? 0;
-      return snapshot.months.find(item => item.month === month + 1)?.values[id] ?? 0;
-    });
-    return {
-      ...(previous ?? {}),
-      id,
-      label: previous?.label ?? label,
-      values,
-      meses: values,
-      total: values.reduce((sum, value) => sum + value, 0),
-    } as DREData[number];
-  });
-}
-
 function buildCacheValues(snapshot: BaseGerencialDreSnapshot): Record<string, number[]> {
   return Object.fromEntries(getDashboardDreLineIds().map(([, id]) => [
     id,
@@ -54,9 +35,13 @@ function buildCacheValues(snapshot: BaseGerencialDreSnapshot): Record<string, nu
   ]));
 }
 
+function formatSummaryValue(value: number): string {
+  return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function deptFromSnapshot(snapshot: BaseGerencialDreSnapshot, month: number): Record<string, string> {
   const values = snapshot.months.find(item => item.month === month)?.values ?? {};
-  return Object.fromEntries(getDashboardDreLineIds().map(([, id]) => [id, String(values[id] ?? 0)]));
+  return Object.fromEntries(getDashboardDreLineIds().map(([, id]) => [id, formatSummaryValue(Number(values[id] ?? 0))]));
 }
 
 function applySummaryDept<T extends DreVwDept | DreAudiDept>(target: T, values: Record<string, string>): T {
@@ -123,10 +108,6 @@ export async function syncBaseGerencialAfterImport(year: number): Promise<void> 
       snapshots.set(dashboard, snapshot);
       if (storage !== 'venda_direta' || marca !== 'audi') {
         await setBaseGerencialDreCache(marca, year, storage ?? 'consolidado', buildCacheValues(snapshot));
-      }
-      if (dashboard !== 'consolidado') {
-        const existing = await loadDREDataAsync(year as 2024 | 2025 | 2026 | 2027, dashboard, marca);
-        await saveDREDataAsync(year as 2024 | 2025 | 2026 | 2027, snapshotToDreData(snapshot, existing), dashboard, marca);
       }
     }));
     await syncSummaryRows(marca, year, snapshots, importedMonths);
