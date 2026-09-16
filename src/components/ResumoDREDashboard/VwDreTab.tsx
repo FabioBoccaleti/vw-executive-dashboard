@@ -59,7 +59,8 @@ function getYtdPeriods(year: number, month: number): { year: number; month: numb
 }
 
 function parseVal(v: string | number): number {
-  return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  return v.includes(',') ? Number(v.replace(/\./g, '').replace(',', '.')) || 0 : Number(v) || 0;
 }
 
 function pctStr(val: number, rol: number): string {

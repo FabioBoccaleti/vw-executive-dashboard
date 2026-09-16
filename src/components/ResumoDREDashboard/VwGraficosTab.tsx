@@ -84,7 +84,8 @@ const DESCRICAO_TO_FIELD: Record<string, keyof DreVwDept> = {
 
 function parseVal(v: string | number | undefined): number {
   if (v === undefined || v === null || v === '') return 0;
-  return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  return v.includes(',') ? Number(v.replace(/\./g, '').replace(',', '.')) || 0 : Number(v) || 0;
 }
 
 function fmtK(v: number): string {

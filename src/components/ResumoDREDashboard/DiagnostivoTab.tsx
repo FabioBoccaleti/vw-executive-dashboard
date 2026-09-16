@@ -141,7 +141,8 @@ const LEVEL_COLOR: Record<RadarLevel, { bg: string; dot: string; txt: string }> 
 
 function parseVal(v: string | number | null | undefined): number {
   if (v == null || v === '') return 0;
-  return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  return v.includes(',') ? Number(v.replace(/\./g, '').replace(',', '.')) || 0 : Number(v) || 0;
 }
 
 function fmt(v: number): string {

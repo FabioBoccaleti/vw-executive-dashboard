@@ -121,7 +121,8 @@ const VW_DESCRICAO_TO_FIELD: Record<string, string> = {
 
 function parseVal(v: string | number | undefined | null): number {
   if (v == null || v === '') return 0;
-  return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  return v.includes(',') ? Number(v.replace(/\./g, '').replace(',', '.')) || 0 : Number(v) || 0;
 }
 
 function pctStr(val: number, rol: number): string {
