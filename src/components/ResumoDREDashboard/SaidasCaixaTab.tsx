@@ -28,7 +28,7 @@ function fmtBRL(v: number, compact = false): string {
     if (abs >= 1_000_000) return `R$ ${(abs / 1_000_000).toFixed(2).replace('.', ',')}M`;
     if (abs >= 1_000)     return `R$ ${(abs / 1_000).toFixed(1).replace('.', ',')}K`;
   }
-  return 'R$ ' + abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return 'R$ ' + Math.round(abs).toLocaleString('pt-BR');
 }
 
 function fmtPct(v: number): string {

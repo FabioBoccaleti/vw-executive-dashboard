@@ -16,6 +16,7 @@ import {
   type DreAudiDept,
 } from './dreAudiStorage';
 import { loadDREDataAsync } from '@/lib/dbStorage';
+import { formatDreAmount } from './dreDisplayFormat';
 import type { Department } from '@/lib/dataStorage';
 
 // ─── Cores ────────────────────────────────────────────────────────────────────
@@ -283,7 +284,7 @@ function EvolucaoMensalTable({ title, subtitle, color, colorDrk, monthRows }: Ev
                     const val = mr.totals[line.field] ?? 0;
                     const display = isQuant
                       ? (Math.round(val) > 0 ? Math.round(val).toString() : '—')
-                      : (val !== 0 ? val.toLocaleString('pt-BR') : '—');
+                      : (val !== 0 ? formatDreAmount(val) : '—');
                     return (
                       <td key={mi} className="px-2 py-1.5 text-center">{display}</td>
                     );
@@ -297,7 +298,7 @@ function EvolucaoMensalTable({ title, subtitle, color, colorDrk, monthRows }: Ev
                       const v = annualTotal[line.field] ?? 0;
                       return isQuant
                         ? (Math.round(v) > 0 ? Math.round(v).toString() : '—')
-                        : (v !== 0 ? v.toLocaleString('pt-BR') : '—');
+                        : (v !== 0 ? formatDreAmount(v) : '—');
                     })()}
                   </td>
                 </tr>
@@ -731,7 +732,7 @@ function PrintMensalTable({ title, subtitle, year, color, colorDrk, monthRows }:
                   const val = mr.totals[line.field] ?? 0;
                   const display = isQuant
                     ? (Math.round(val) > 0 ? Math.round(val).toString() : '—')
-                    : (val !== 0 ? val.toLocaleString('pt-BR') : '—');
+                    : (val !== 0 ? formatDreAmount(val) : '—');
                   return (
                     <td key={mi} style={{ textAlign: 'center', padding: compactFewMonths ? '2px 6px' : '2px 3px' }}>{display}</td>
                   );

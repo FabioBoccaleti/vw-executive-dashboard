@@ -15,6 +15,7 @@ import {
 } from './dreVwStorage';
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import type { Department } from '@/lib/dataStorage';
+import { formatDreAmount } from './dreDisplayFormat';
 
 // ─── Cor principal VW ─────────────────────────────────────────────────────────
 const VW_COLOR     = '#001e50'; // azul VW
@@ -30,7 +31,7 @@ const MONTHS = [
 function fmtNum(v: string): string {
   const n = parseFloat(v.replace(/\./g, '').replace(',', '.'));
   if (isNaN(n)) return v;
-  return n.toLocaleString('pt-BR');
+  return formatDreAmount(n);
 }
 
 function sumDepts(depts: DreVwDept[], field: keyof DreVwDept): string {
@@ -39,7 +40,7 @@ function sumDepts(depts: DreVwDept[], field: keyof DreVwDept): string {
     return acc + (isNaN(v) ? 0 : v);
   }, 0);
   if (total === 0) return '';
-  return total.toLocaleString('pt-BR');
+  return formatDreAmount(total);
 }
 
 function getPrevPeriods(year: number, month: number, count: number): { year: number; month: number }[] {

@@ -36,7 +36,7 @@ function buildCacheValues(snapshot: BaseGerencialDreSnapshot): Record<string, nu
 }
 
 function formatSummaryValue(value: number): string {
-  return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return Math.round(value).toLocaleString('pt-BR');
 }
 
 function deptFromSnapshot(snapshot: BaseGerencialDreSnapshot, month: number): Record<string, string> {

@@ -213,7 +213,7 @@ function normalizeStoredValue(value: string): string {
   if (!/^[-+]?\d+\.\d+$/.test(value.trim())) return value;
   const numericValue = Number(value);
   return Number.isFinite(numericValue)
-    ? numericValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    ? Math.round(numericValue).toLocaleString('pt-BR')
     : value;
 }
 

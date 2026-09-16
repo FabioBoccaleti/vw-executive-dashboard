@@ -703,7 +703,7 @@ export function DespesasDepartamentoEvolucaoTab({ year, month }: Props) {
                             : `${group.varR >= 0 ? '+' : ''}${fmtBRL(group.varR)} (0,0%)`}
                         </div>
                         <div className="text-[10px] font-medium text-slate-400 mt-0.5">
-                          vs {prevYear}: {group.prev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          vs {prevYear}: {Math.round(group.prev).toLocaleString('pt-BR')}
                         </div>
                       </div>
                     </td>

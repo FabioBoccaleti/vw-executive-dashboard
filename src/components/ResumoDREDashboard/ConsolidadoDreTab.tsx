@@ -16,6 +16,7 @@ import {
   type DreAudiRow,
   type DreAudiDept,
 } from './dreAudiStorage';
+import { formatDreAmount } from './dreDisplayFormat';
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import type { Department } from '@/lib/dataStorage';
 
@@ -33,7 +34,7 @@ const MONTHS = [
 function fmtNum(v: string): string {
   const n = parseFloat(v.replace(/\./g, '').replace(',', '.'));
   if (isNaN(n)) return v;
-  return n.toLocaleString('pt-BR');
+  return formatDreAmount(n);
 }
 
 function sumDeptsArr(depts: DreVwDept[], field: keyof DreVwDept): string {
@@ -42,7 +43,7 @@ function sumDeptsArr(depts: DreVwDept[], field: keyof DreVwDept): string {
     return acc + (isNaN(v) ? 0 : v);
   }, 0);
   if (total === 0) return '';
-  return total.toLocaleString('pt-BR');
+  return formatDreAmount(total);
 }
 
 function getPrevPeriods(year: number, month: number, count: number): { year: number; month: number }[] {
