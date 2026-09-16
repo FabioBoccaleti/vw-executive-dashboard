@@ -643,6 +643,8 @@ export function DespesasDeptoAudiDashboard({ onChangeBrand }: Props) {
             O arquivo gerado deve considerar Revendas: <strong>1.6 · 1.4 - 1.9</strong>
             &nbsp;&nbsp;|&nbsp;&nbsp;
             Divisões: <strong>Centro de Custo e Revenda</strong>
+            &nbsp;&nbsp;|&nbsp;&nbsp;
+            Contas: <strong>numeração iniciada de 4 até 6</strong>
           </span>
         </div>
 

@@ -684,7 +684,9 @@ export function BaseGerencialDashboard({ onChangeBrand }: Props) {
                   <span>
                     O arquivo gerado deve considerar Revendas: <strong>1.1 - 1.6 · 1.4 - 1.9</strong>
                     &nbsp;&nbsp;|&nbsp;&nbsp;
-                    Divisões: <strong>Centro de Custo - Revenda' - Tipo Item</strong>
+                    Divisões: <strong>Centro de Custo - Revenda - Tipo Item</strong>
+                    &nbsp;&nbsp;|&nbsp;&nbsp;
+                    Contas: <strong>numeração iniciada de 3 até 6</strong>
                   </span>
                 </div>
 

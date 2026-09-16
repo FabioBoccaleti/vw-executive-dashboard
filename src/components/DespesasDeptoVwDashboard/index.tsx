@@ -643,6 +643,8 @@ export function DespesasDeptoVwDashboard({ onChangeBrand }: Props) {
             O arquivo gerado deve considerar Revendas: <strong>1.1</strong>
             &nbsp;&nbsp;|&nbsp;&nbsp;
             Divisões: <strong>Centro de Custo e Revenda</strong>
+            &nbsp;&nbsp;|&nbsp;&nbsp;
+            Contas: <strong>numeração iniciada de 4 até 6</strong>
           </span>
         </div>
 
