@@ -76,7 +76,24 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
       const yearsToCheck = [CURRENT_YEAR, CURRENT_YEAR - 1] as const;
 
       for (const yr of yearsToCheck) {
-        // Estratégia 1: verifica os dados do Dashboard Executivo (vw_dre_YYYY_novos)
+        // Estratégia 1: prioriza o último mês importado na Base Gerencial.
+        try {
+          const keys = await kvKeys('basege:*');
+          const months = keys
+            .filter(key => key.startsWith(`basege:${yr}:M`))
+            .map(key => {
+              const match = key.match(/:M(\d{2})$/);
+              return match ? Number(match[1]) : 0;
+            })
+            .filter(monthValue => monthValue >= 1 && monthValue <= 12);
+          if (months.length > 0) {
+            setYear(yr);
+            setMonth(Math.max(...months));
+            return;
+          }
+        } catch {}
+
+        // Estratégia 2: verifica os dados do Dashboard Executivo (vw_dre_YYYY_novos)
         try {
           const dreData = await loadDREDataAsync(yr as 2024 | 2025 | 2026 | 2027, 'novos', 'vw');
           if (dreData && dreData.length > 0) {
@@ -96,7 +113,7 @@ export function ResumoDREDashboard({ onChangeBrand }: ResumoDREDashboardProps) {
           }
         } catch {}
 
-        // Estratégia 2: verifica chaves salvas manualmente (resumo_dre:vw:YYYY-MM)
+        // Estratégia 3: verifica chaves salvas manualmente (resumo_dre:vw:YYYY-MM)
         try {
           const keys = await kvKeys('resumo_dre:vw:*');
           const yearStr = String(yr);
