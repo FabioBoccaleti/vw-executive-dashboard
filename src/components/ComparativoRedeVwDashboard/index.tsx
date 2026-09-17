@@ -71,6 +71,11 @@ function difference(value: number | null, reference: number | null) {
   return value === null || reference === null ? null : value - reference;
 }
 
+function adjustedAverage(average: number | null, sorana: number | null, total: number, totalWithoutSorana: number) {
+  if (average === null || sorana === null || total <= 0 || totalWithoutSorana <= 0) return null;
+  return (average * total - sorana) / totalWithoutSorana;
+}
+
 function parseWorkbook(buffer: ArrayBuffer, fileName: string, year: number, month: number): ComparativoRedeVwMonthData {
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
   const available = new Map(workbook.SheetNames.map(name => [normalizeName(name), name]));
@@ -97,7 +102,7 @@ export function ComparativoRedeVwDashboard({ onChangeBrand }: Props) {
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [data, setData] = useState<ComparativoRedeVwMonthData | null>(null);
-  const [activeTab, setActiveTab] = useState<'importar' | 'dados' | 'concessionarias' | 'comparativo'>('importar');
+  const [activeTab, setActiveTab] = useState<'importar' | 'dados' | 'concessionarias' | 'comparativo' | 'ajustado'>('importar');
   const [comparativoSheetIndex, setComparativoSheetIndex] = useState(1);
   const [concessionarias, setConcessionarias] = useState<ComparativoRedeVwConcessionarias>(EMPTY_CONCESSIONARIAS);
   const [hasSavedConcessionarias, setHasSavedConcessionarias] = useState(false);
@@ -216,6 +221,9 @@ export function ComparativoRedeVwDashboard({ onChangeBrand }: Props) {
           <button onClick={() => setActiveTab('comparativo')} className={`px-5 py-3 text-sm font-semibold border-b-2 ${activeTab === 'comparativo' ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500'}`}>
             Comparativo de Dados
           </button>
+          <button onClick={() => setActiveTab('ajustado')} className={`px-5 py-3 text-sm font-semibold border-b-2 ${activeTab === 'ajustado' ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500'}`}>
+            Comparativo Ajustado
+          </button>
         </div>
 
         <section className="bg-white rounded-b-lg shadow-sm p-4 md:p-6">
@@ -247,6 +255,8 @@ export function ComparativoRedeVwDashboard({ onChangeBrand }: Props) {
             </div>
           ) : activeTab === 'comparativo' ? (
             <ComparativoDados data={data} sheetIndex={comparativoSheetIndex} onSheetChange={setComparativoSheetIndex} />
+          ) : activeTab === 'ajustado' ? (
+            <ComparativoAjustado data={data} concessionarias={concessionarias} sheetIndex={comparativoSheetIndex} onSheetChange={setComparativoSheetIndex} />
           ) : activeTab === 'importar' ? (
             <div className="space-y-5">
               <div className="border border-dashed border-teal-300 bg-teal-50 rounded-lg p-8 text-center">
@@ -352,6 +362,99 @@ function ComparativoDados({ data, sheetIndex, onSheetChange }: ComparativoDadosP
                   <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{percentage ? formatNumber(regiaoValue) : '—'}</td>
                   <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatNumber(difference(comparableSorana, comparableSatelite))}</td>
                   <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatNumber(difference(comparableSorana, comparableRegiao))}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+interface ComparativoAjustadoProps {
+  data: ComparativoRedeVwMonthData | null;
+  concessionarias: ComparativoRedeVwConcessionarias;
+  sheetIndex: number;
+  onSheetChange: (index: number) => void;
+}
+
+function ComparativoAjustado({ data, concessionarias, sheetIndex, onSheetChange }: ComparativoAjustadoProps) {
+  const selectedSheet = data?.sheets[sheetIndex];
+  const rows = selectedSheet?.rows ?? [];
+  const vendasLiquidasRow = rows.find(row => isVendasLiquidas(String(row[0] ?? '')));
+  const vendasLiquidas = {
+    sorana: numericCell(vendasLiquidasRow?.[2]),
+    satelite: numericCell(vendasLiquidasRow?.[3]),
+    regiao: numericCell(vendasLiquidasRow?.[5]),
+  };
+  const adjustedVendasLiquidas = {
+    satelite: adjustedAverage(vendasLiquidas.satelite, vendasLiquidas.sorana, concessionarias.sateliteTotal, concessionarias.sateliteSemSorana),
+    regiao: adjustedAverage(vendasLiquidas.regiao, vendasLiquidas.sorana, concessionarias.regiaoTotal, concessionarias.regiaoSemSorana),
+  };
+  const comparisonRows = rows.filter(row => {
+    const label = String(row[0] ?? '').trim();
+    const unit = String(row[1] ?? '').trim();
+    return Boolean(label && unit && (numericCell(row[2]) !== null || numericCell(row[3]) !== null || numericCell(row[5]) !== null));
+  });
+  const validCounts = concessionarias.sateliteTotal > 1 && concessionarias.sateliteSemSorana > 0 && concessionarias.regiaoTotal > 1 && concessionarias.regiaoSemSorana > 0;
+
+  if (!data) {
+    return <div className="py-16 text-center text-slate-500"><AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-400" />Nenhum dado importado para o comparativo ajustado.</div>;
+  }
+
+  if (!selectedSheet || !vendasLiquidasRow) {
+    return <div className="py-16 text-center text-slate-500"><AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-400" />A aba selecionada ou a linha Vendas Líquidas não foi encontrada.</div>;
+  }
+
+  if (!validCounts) {
+    return <div className="py-16 text-center text-slate-500"><AlertCircle className="w-8 h-8 mx-auto mb-2 text-amber-500" /><p>Informe números de concessionárias válidos antes de calcular.</p><p className="text-xs mt-1">Os totais devem ser maiores que 1 e os totais sem Sorana devem ser maiores que zero.</p></div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-bold text-slate-800">Comparativo Ajustado</h2>
+        <p className="text-sm text-slate-500 mt-1">Região e Satélite recalculados sem a participação da Sorana. O cálculo é feito linha por linha sobre valores absolutos.</p>
+      </div>
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200">{data.sheets.map((sheet, index) => <button key={sheet.name} onClick={() => onSheetChange(index)} className={`whitespace-nowrap px-3 py-2 text-xs font-semibold border-b-2 ${sheetIndex === index ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500'}`}>{sheet.name}</button>)}</div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <BaseCard label="Sorana - Vendas Líquidas" value={vendasLiquidas.sorana} />
+        <BaseCard label="Região sem Sorana - Vendas Líquidas" value={adjustedVendasLiquidas.regiao} />
+        <BaseCard label="Satélite sem Sorana - Vendas Líquidas" value={adjustedVendasLiquidas.satelite} />
+      </div>
+      <div className="rounded border border-teal-100 bg-teal-50 px-3 py-2 text-xs text-teal-800">
+        Fórmula: (média original × total de concessionárias - valor Sorana) ÷ total sem Sorana.
+      </div>
+      <div className="overflow-auto max-h-[calc(100vh-360px)] border border-slate-200">
+        <table className="min-w-[1080px] text-xs border-collapse">
+          <thead className="sticky top-0 bg-teal-700 text-white">
+            <tr>{['Indicador', 'Unidade', 'Sorana', 'Região sem Sorana', 'Região % s/ VL', 'Satélite sem Sorana', 'Satélite % s/ VL'].map(header => <th key={header} className="px-3 py-2 text-left whitespace-nowrap">{header}</th>)}</tr>
+          </thead>
+          <tbody>
+            {comparisonRows.map((row, index) => {
+              const label = String(row[0]);
+              const unit = String(row[1]);
+              const percentage = isPercentageUnit(unit);
+              const sorana = numericCell(row[2]);
+              const satelite = numericCell(row[3]);
+              const regiao = numericCell(row[5]);
+              const soranaValue = percentage && vendasLiquidas.sorana !== null && sorana !== null ? sorana / 100 * vendasLiquidas.sorana : sorana;
+              const sateliteValue = percentage && vendasLiquidas.satelite !== null && satelite !== null ? satelite / 100 * vendasLiquidas.satelite : satelite;
+              const regiaoValue = percentage && vendasLiquidas.regiao !== null && regiao !== null ? regiao / 100 * vendasLiquidas.regiao : regiao;
+              const adjustedRegiao = adjustedAverage(regiaoValue, soranaValue, concessionarias.regiaoTotal, concessionarias.regiaoSemSorana);
+              const adjustedSatelite = adjustedAverage(sateliteValue, soranaValue, concessionarias.sateliteTotal, concessionarias.sateliteSemSorana);
+              const adjustedRegiaoPercent = percentage && adjustedVendasLiquidas.regiao ? (adjustedRegiao ?? 0) / adjustedVendasLiquidas.regiao * 100 : null;
+              const adjustedSatelitePercent = percentage && adjustedVendasLiquidas.satelite ? (adjustedSatelite ?? 0) / adjustedVendasLiquidas.satelite * 100 : null;
+              return (
+                <tr key={`${label}-${index}`} className="odd:bg-white even:bg-slate-50">
+                  <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap font-medium">{label}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{unit}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatNumber(soranaValue)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatNumber(adjustedRegiao)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatNumber(adjustedRegiaoPercent, true)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatNumber(adjustedSatelite)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatNumber(adjustedSatelitePercent, true)}</td>
                 </tr>
               );
             })}
