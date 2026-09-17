@@ -13,8 +13,18 @@ export interface ComparativoRedeVwMonthData {
   sheets: ComparativoRedeVwSheet[];
 }
 
+export interface ComparativoRedeVwConcessionarias {
+  regiaoTotal: number;
+  regiaoSemSorana: number;
+  sateliteTotal: number;
+  sateliteSemSorana: number;
+}
+
 const keyFor = (year: number, month: number) =>
   `comparativo-rede-vw:${year}:M${String(month).padStart(2, '0')}`;
+
+const concessionariasKeyFor = (year: number, month: number) =>
+  `comparativo-rede-vw-concessionarias:${year}:M${String(month).padStart(2, '0')}`;
 
 export async function getComparativoRedeVwMonth(year: number, month: number) {
   return kvGet<ComparativoRedeVwMonthData>(keyFor(year, month));
@@ -26,4 +36,20 @@ export async function setComparativoRedeVwMonth(data: ComparativoRedeVwMonthData
 
 export async function deleteComparativoRedeVwMonth(year: number, month: number) {
   return kvDelete(keyFor(year, month));
+}
+
+export async function getComparativoRedeVwConcessionarias(year: number, month: number) {
+  return kvGet<ComparativoRedeVwConcessionarias>(concessionariasKeyFor(year, month));
+}
+
+export async function setComparativoRedeVwConcessionarias(
+  year: number,
+  month: number,
+  data: ComparativoRedeVwConcessionarias,
+) {
+  return kvSet(concessionariasKeyFor(year, month), data);
+}
+
+export async function deleteComparativoRedeVwConcessionarias(year: number, month: number) {
+  return kvDelete(concessionariasKeyFor(year, month));
 }
