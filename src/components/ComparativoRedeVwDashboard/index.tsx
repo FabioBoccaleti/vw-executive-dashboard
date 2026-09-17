@@ -313,8 +313,8 @@ function ComparativoDados({ data, sheetIndex, onSheetChange }: ComparativoDadosP
     return <div className="py-16 text-center text-slate-500"><AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-400" />Nenhum dado importado para comparação.</div>;
   }
 
-  if (!selectedSheet || !vendasLiquidasRow) {
-    return <div className="py-16 text-center text-slate-500"><AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-400" />A aba selecionada ou a linha Vendas Líquidas não foi encontrada.</div>;
+  if (!selectedSheet) {
+    return <div className="py-16 text-center text-slate-500"><AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-400" />A aba selecionada não foi encontrada.</div>;
   }
 
   return (
@@ -322,6 +322,7 @@ function ComparativoDados({ data, sheetIndex, onSheetChange }: ComparativoDadosP
       <div>
         <h2 className="text-lg font-bold text-slate-800">Comparativo de Dados</h2>
         <p className="text-sm text-slate-500 mt-1">Os valores originais permanecem preservados; linhas `% s/ VL` também mostram o valor absoluto calculado sobre Vendas Líquidas.</p>
+        {!vendasLiquidasRow && <p className="mt-2 text-xs text-amber-700">Esta seção não possui uma linha de Vendas Líquidas; os valores originais continuam disponíveis e os cálculos dependentes dessa base ficam indisponíveis.</p>}
       </div>
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200">{data.sheets.map((sheet, index) => <button key={sheet.name} onClick={() => onSheetChange(index)} className={`whitespace-nowrap px-3 py-2 text-xs font-semibold border-b-2 ${sheetIndex === index ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500'}`}>{sheet.name}</button>)}</div>
       <div className="grid gap-3 md:grid-cols-3">
@@ -382,6 +383,7 @@ interface ComparativoAjustadoProps {
 function ComparativoAjustado({ data, concessionarias, sheetIndex, onSheetChange }: ComparativoAjustadoProps) {
   const selectedSheet = data?.sheets[sheetIndex];
   const rows = selectedSheet?.rows ?? [];
+  const usesVendasLiquidasBase = sheetIndex !== 0;
   const vendasLiquidasRow = rows.find(row => isVendasLiquidas(String(row[0] ?? '')));
   const vendasLiquidas = {
     sorana: numericCell(vendasLiquidasRow?.[2]),
@@ -403,8 +405,8 @@ function ComparativoAjustado({ data, concessionarias, sheetIndex, onSheetChange 
     return <div className="py-16 text-center text-slate-500"><AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-400" />Nenhum dado importado para o comparativo ajustado.</div>;
   }
 
-  if (!selectedSheet || !vendasLiquidasRow) {
-    return <div className="py-16 text-center text-slate-500"><AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-400" />A aba selecionada ou a linha Vendas Líquidas não foi encontrada.</div>;
+  if (!selectedSheet) {
+    return <div className="py-16 text-center text-slate-500"><AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-400" />A aba selecionada não foi encontrada.</div>;
   }
 
   if (!validCounts) {
@@ -416,12 +418,15 @@ function ComparativoAjustado({ data, concessionarias, sheetIndex, onSheetChange 
       <div>
         <h2 className="text-lg font-bold text-slate-800">Comparativo Ajustado</h2>
         <p className="text-sm text-slate-500 mt-1">Região e Satélite recalculados sem a participação da Sorana. O cálculo é feito linha por linha sobre valores absolutos.</p>
+        <p className="text-xs text-teal-700 mt-1">{usesVendasLiquidasBase ? 'Esta seção converte percentuais usando Vendas Líquidas antes do ajuste.' : 'Esta seção usa diretamente os valores originais, sem base de Vendas Líquidas.'}</p>
       </div>
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200">{data.sheets.map((sheet, index) => <button key={sheet.name} onClick={() => onSheetChange(index)} className={`whitespace-nowrap px-3 py-2 text-xs font-semibold border-b-2 ${sheetIndex === index ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500'}`}>{sheet.name}</button>)}</div>
       <div className="grid gap-3 md:grid-cols-3">
-        <BaseCard label="Sorana - Vendas Líquidas" value={vendasLiquidas.sorana} />
-        <BaseCard label="Região sem Sorana - Vendas Líquidas" value={adjustedVendasLiquidas.regiao} />
-        <BaseCard label="Satélite sem Sorana - Vendas Líquidas" value={adjustedVendasLiquidas.satelite} />
+        {usesVendasLiquidasBase ? <>
+          <BaseCard label="Sorana - Vendas Líquidas" value={vendasLiquidas.sorana} />
+          <BaseCard label="Região sem Sorana - Vendas Líquidas" value={adjustedVendasLiquidas.regiao} />
+          <BaseCard label="Satélite sem Sorana - Vendas Líquidas" value={adjustedVendasLiquidas.satelite} />
+        </> : <div className="md:col-span-3 rounded border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">Indicadores Econômico-Financeiros: ajuste direto da média, sem cálculo sobre Vendas Líquidas.</div>}
       </div>
       <div className="rounded border border-teal-100 bg-teal-50 px-3 py-2 text-xs text-teal-800">
         Fórmula: (média original × total de concessionárias - valor Sorana) ÷ total sem Sorana.
@@ -439,13 +444,13 @@ function ComparativoAjustado({ data, concessionarias, sheetIndex, onSheetChange 
               const sorana = numericCell(row[2]);
               const satelite = numericCell(row[3]);
               const regiao = numericCell(row[5]);
-              const soranaValue = percentage && vendasLiquidas.sorana !== null && sorana !== null ? sorana / 100 * vendasLiquidas.sorana : sorana;
-              const sateliteValue = percentage && vendasLiquidas.satelite !== null && satelite !== null ? satelite / 100 * vendasLiquidas.satelite : satelite;
-              const regiaoValue = percentage && vendasLiquidas.regiao !== null && regiao !== null ? regiao / 100 * vendasLiquidas.regiao : regiao;
+              const soranaValue = usesVendasLiquidasBase && percentage && vendasLiquidas.sorana !== null && sorana !== null ? sorana / 100 * vendasLiquidas.sorana : sorana;
+              const sateliteValue = usesVendasLiquidasBase && percentage && vendasLiquidas.satelite !== null && satelite !== null ? satelite / 100 * vendasLiquidas.satelite : satelite;
+              const regiaoValue = usesVendasLiquidasBase && percentage && vendasLiquidas.regiao !== null && regiao !== null ? regiao / 100 * vendasLiquidas.regiao : regiao;
               const adjustedRegiao = adjustedAverage(regiaoValue, soranaValue, concessionarias.regiaoTotal, concessionarias.regiaoSemSorana);
               const adjustedSatelite = adjustedAverage(sateliteValue, soranaValue, concessionarias.sateliteTotal, concessionarias.sateliteSemSorana);
-              const adjustedRegiaoPercent = percentage && adjustedVendasLiquidas.regiao ? (adjustedRegiao ?? 0) / adjustedVendasLiquidas.regiao * 100 : null;
-              const adjustedSatelitePercent = percentage && adjustedVendasLiquidas.satelite ? (adjustedSatelite ?? 0) / adjustedVendasLiquidas.satelite * 100 : null;
+              const adjustedRegiaoPercent = usesVendasLiquidasBase && percentage && adjustedVendasLiquidas.regiao ? (adjustedRegiao ?? 0) / adjustedVendasLiquidas.regiao * 100 : null;
+              const adjustedSatelitePercent = usesVendasLiquidasBase && percentage && adjustedVendasLiquidas.satelite ? (adjustedSatelite ?? 0) / adjustedVendasLiquidas.satelite * 100 : null;
               return (
                 <tr key={`${label}-${index}`} className="odd:bg-white even:bg-slate-50">
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap font-medium">{label}</td>
