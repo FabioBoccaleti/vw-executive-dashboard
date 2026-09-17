@@ -34,6 +34,7 @@ import { DespesasDeptoAudiDashboard } from '@/components/DespesasDeptoAudiDashbo
 import { DespesasDeptoVwDashboard } from '@/components/DespesasDeptoVwDashboard'
 import { IEODashboard } from '@/components/IEODashboard'
 import { BaseGerencialDashboard } from '@/components/BaseGerencialDashboard'
+import { ComparativoRedeVwDashboard } from '@/components/ComparativoRedeVwDashboard'
 
 function AppContent() {
   const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
@@ -79,7 +80,7 @@ function AppContent() {
     }
   }, [])
   
-  const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'vw_outros', 'audi_outros']
+  const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'vw_outros', 'audi_outros', 'comparativo_rede_vw']
 
   const handleBrandSelect = async (selectedBrand: Brand) => {
     saveBrand(selectedBrand)
@@ -323,6 +324,8 @@ function AppContent() {
         <IEODashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'base_gerencial' ? (
         <BaseGerencialDashboard onChangeBrand={handleChangeBrand} />
+      ) : brand === 'comparativo_rede_vw' ? (
+        <ComparativoRedeVwDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'resumo_dre' ? (
         <ResumoDREDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'analise_projecoes' ? (
