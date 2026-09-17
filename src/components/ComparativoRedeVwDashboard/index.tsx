@@ -67,6 +67,11 @@ function formatNumber(value: number | null, isPercent = false) {
   return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value)}${isPercent ? '%' : ''}`;
 }
 
+function formatDemonstrativoValue(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return '—';
+  return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(Math.round(value));
+}
+
 function difference(value: number | null, reference: number | null) {
   return value === null || reference === null ? null : value - reference;
 }
@@ -102,7 +107,7 @@ export function ComparativoRedeVwDashboard({ onChangeBrand }: Props) {
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [data, setData] = useState<ComparativoRedeVwMonthData | null>(null);
-  const [activeTab, setActiveTab] = useState<'importar' | 'dados' | 'concessionarias' | 'comparativo' | 'ajustado'>('importar');
+  const [activeTab, setActiveTab] = useState<'importar' | 'dados' | 'concessionarias' | 'comparativo' | 'ajustado' | 'demonstrativo'>('importar');
   const [comparativoSheetIndex, setComparativoSheetIndex] = useState(1);
   const [concessionarias, setConcessionarias] = useState<ComparativoRedeVwConcessionarias>(EMPTY_CONCESSIONARIAS);
   const [hasSavedConcessionarias, setHasSavedConcessionarias] = useState(false);
@@ -224,6 +229,9 @@ export function ComparativoRedeVwDashboard({ onChangeBrand }: Props) {
           <button onClick={() => setActiveTab('ajustado')} className={`px-5 py-3 text-sm font-semibold border-b-2 ${activeTab === 'ajustado' ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500'}`}>
             Comparativo Ajustado
           </button>
+          <button onClick={() => setActiveTab('demonstrativo')} className={`px-5 py-3 text-sm font-semibold border-b-2 ${activeTab === 'demonstrativo' ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500'}`}>
+            Demonstrativo
+          </button>
         </div>
 
         <section className="bg-white rounded-b-lg shadow-sm p-4 md:p-6">
@@ -257,6 +265,8 @@ export function ComparativoRedeVwDashboard({ onChangeBrand }: Props) {
             <ComparativoDados data={data} sheetIndex={comparativoSheetIndex} onSheetChange={setComparativoSheetIndex} />
           ) : activeTab === 'ajustado' ? (
             <ComparativoAjustado data={data} concessionarias={concessionarias} sheetIndex={comparativoSheetIndex} onSheetChange={setComparativoSheetIndex} />
+          ) : activeTab === 'demonstrativo' ? (
+            <DemonstrativoTab year={year} month={month} concessionarias={concessionarias} />
           ) : activeTab === 'importar' ? (
             <div className="space-y-5">
               <div className="border border-dashed border-teal-300 bg-teal-50 rounded-lg p-8 text-center">
@@ -468,6 +478,178 @@ function ComparativoAjustado({ data, concessionarias, sheetIndex, onSheetChange 
       </div>
     </div>
   );
+}
+
+type DemonstrativoPeriodicity = 'mensal' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
+
+interface DemonstrativoTabProps {
+  year: number;
+  month: number;
+  concessionarias: ComparativoRedeVwConcessionarias;
+}
+
+interface DemonstrativoRow {
+  label: string;
+  unit: string;
+  sorana: number | null;
+  regiao: number | null;
+  satelite: number | null;
+  soranaPercent: number | null;
+  regiaoPercent: number | null;
+  satelitePercent: number | null;
+}
+
+const DEMONSTRATIVO_SECTIONS = EXPECTED_SHEETS.slice(1).map((name, index) => ({ name, sheetIndex: index + 1 }));
+
+function periodMonths(year: number, month: number, periodicity: DemonstrativoPeriodicity, periodNumber: number) {
+  if (periodicity === 'mensal') return [{ year, month: periodNumber }];
+  const size = periodicity === 'bimestral' ? 2 : periodicity === 'trimestral' ? 3 : periodicity === 'semestral' ? 6 : 12;
+  const start = (periodNumber - 1) * size + 1;
+  return Array.from({ length: size }, (_, index) => ({ year, month: start + index }));
+}
+
+function periodOptions(periodicity: DemonstrativoPeriodicity) {
+  if (periodicity === 'mensal') return MONTHS.map((name, index) => ({ value: index + 1, label: name }));
+  const size = periodicity === 'bimestral' ? 2 : periodicity === 'trimestral' ? 3 : periodicity === 'semestral' ? 6 : 12;
+  const count = 12 / size;
+  return Array.from({ length: count }, (_, index) => ({ value: index + 1, label: `${index + 1}º período` }));
+}
+
+function isLastMonthValue(label: string) {
+  const normalized = normalizeName(label);
+  return normalized.includes('funcionario') || normalized.includes('vendedor') || normalized.includes('estoque') || normalized.includes('diasdeestoque');
+}
+
+function isExpense(label: string) {
+  return normalizeName(label).includes('despesa') || normalizeName(label).includes('juros');
+}
+
+function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProps) {
+  const [periodicity, setPeriodicity] = useState<DemonstrativoPeriodicity>('mensal');
+  const [periodNumber, setPeriodNumber] = useState(month);
+  const [sectionIndex, setSectionIndex] = useState(1);
+  const [rows, setRows] = useState<DemonstrativoRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const options = periodOptions(periodicity);
+
+  useEffect(() => {
+    if (periodicity === 'mensal') setPeriodNumber(month);
+    else setPeriodNumber(1);
+  }, [month, periodicity]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      const periods = periodMonths(year, month, periodicity, periodNumber);
+      const loaded = await Promise.all(periods.map(async period => ({
+        data: await getComparativoRedeVwMonth(period.year, period.month),
+        concessionarias: await getComparativoRedeVwConcessionarias(period.year, period.month),
+      })));
+      if (cancelled) return;
+      const monthlyRows = loaded.flatMap(({ data: monthData, concessionarias: monthlyCounts }) => {
+        const sheet = monthData?.sheets[sectionIndex];
+        const values = sheet?.rows ?? [];
+        const salesRow = values.find(row => isVendasLiquidas(String(row[0] ?? '')));
+        const sales = {
+          sorana: numericCell(salesRow?.[2]),
+          satelite: numericCell(salesRow?.[3]),
+          regiao: numericCell(salesRow?.[5]),
+        };
+        return values.filter(row => String(row[0] ?? '').trim() && String(row[1] ?? '').trim()).map(row => {
+          const label = String(row[0]);
+          const unit = String(row[1]);
+          const percentage = isPercentageUnit(unit);
+          const soranaOriginal = numericCell(row[2]);
+          const sateliteOriginal = numericCell(row[3]);
+          const regiaoOriginal = numericCell(row[5]);
+          const soranaValue = percentage && sales.sorana !== null && soranaOriginal !== null ? soranaOriginal / 100 * sales.sorana : soranaOriginal;
+          const sateliteValue = percentage && sales.satelite !== null && sateliteOriginal !== null ? sateliteOriginal / 100 * sales.satelite : sateliteOriginal;
+          const regiaoValue = percentage && sales.regiao !== null && regiaoOriginal !== null ? regiaoOriginal / 100 * sales.regiao : regiaoOriginal;
+          return {
+            label,
+            unit,
+            sorana: soranaValue,
+            satelite: adjustedAverage(sateliteValue, soranaValue, monthlyCounts?.sateliteTotal ?? concessionarias.sateliteTotal, monthlyCounts?.sateliteSemSorana ?? concessionarias.sateliteSemSorana),
+            regiao: adjustedAverage(regiaoValue, soranaValue, monthlyCounts?.regiaoTotal ?? concessionarias.regiaoTotal, monthlyCounts?.regiaoSemSorana ?? concessionarias.regiaoSemSorana),
+            soranaPercent: percentage ? soranaOriginal : null,
+            satelitePercent: percentage ? sateliteOriginal : null,
+            regiaoPercent: percentage ? regiaoOriginal : null,
+          } as DemonstrativoRow;
+        });
+      });
+      const grouped = new Map<string, DemonstrativoRow[]>();
+      monthlyRows.forEach(row => {
+        const key = `${row.label}\u0000${row.unit}`;
+        const group = grouped.get(key) ?? [];
+        group.push(row);
+        grouped.set(key, group);
+      });
+      const periodCount = periods.length;
+      const consolidated = Array.from(grouped.values()).map(group => {
+        const first = group[0];
+        const lastValue = (field: 'sorana' | 'regiao' | 'satelite') => group[group.length - 1][field];
+        const aggregate = (field: 'sorana' | 'regiao' | 'satelite') => group.reduce<number | null>((total, row) => total === null || row[field] === null ? total : total + (row[field] as number), 0);
+        const useLast = first.unit.toUpperCase().includes('QT') && isLastMonthValue(first.label);
+        const sorana = useLast ? lastValue('sorana') : aggregate('sorana');
+        const regiao = useLast ? lastValue('regiao') : aggregate('regiao');
+        const satelite = useLast ? lastValue('satelite') : aggregate('satelite');
+        return { ...first, sorana, regiao, satelite, soranaPercent: null, regiaoPercent: null, satelitePercent: null, periodCount };
+      });
+      const sales = consolidated.find(row => isVendasLiquidas(row.label));
+      setRows(consolidated.map(row => ({
+        ...row,
+        soranaPercent: row.unit.includes('%') && sales?.sorana ? (row.sorana ?? 0) / sales.sorana * 100 : null,
+        regiaoPercent: row.unit.includes('%') && sales?.regiao ? (row.regiao ?? 0) / sales.regiao * 100 : null,
+        satelitePercent: row.unit.includes('%') && sales?.satelite ? (row.satelite ?? 0) / sales.satelite * 100 : null,
+      })));
+      setLoading(false);
+    }
+    void load();
+    return () => { cancelled = true; };
+  }, [year, month, periodicity, periodNumber, sectionIndex, concessionarias]);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-bold text-slate-800">Demonstrativo</h2>
+        <p className="text-sm text-slate-500 mt-1">Resultados com base no Comparativo Ajustado: Região e Satélite sem a Sorana.</p>
+      </div>
+      <div className="flex flex-wrap gap-3 items-end">
+        <label className="text-xs font-semibold text-slate-600">Periodicidade<select value={periodicity} onChange={event => setPeriodicity(event.target.value as DemonstrativoPeriodicity)} className="block mt-1 border border-slate-300 rounded px-3 py-2 text-sm"><option value="mensal">Mensal</option><option value="bimestral">Bimestral</option><option value="trimestral">Trimestral</option><option value="semestral">Semestral</option><option value="anual">Anual</option></select></label>
+        <label className="text-xs font-semibold text-slate-600">Período<select value={periodNumber} onChange={event => setPeriodNumber(Number(event.target.value))} className="block mt-1 border border-slate-300 rounded px-3 py-2 text-sm">{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+      </div>
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200">{DEMONSTRATIVO_SECTIONS.map(section => <button key={section.sheetIndex} onClick={() => setSectionIndex(section.sheetIndex)} className={`whitespace-nowrap px-3 py-2 text-xs font-semibold border-b-2 ${sectionIndex === section.sheetIndex ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>{section.name}</button>)}</div>
+      {loading ? <div className="py-12 text-center text-slate-500">Calculando demonstrativo...</div> : rows.length === 0 ? <div className="py-12 text-center text-slate-500">Não há dados ajustados para o período selecionado.</div> : <>
+        <div className="grid gap-3 md:grid-cols-3">{['Lucro Bruto', 'Margem de Contribuição', 'Lucro Operacional VW'].map(indicator => { const row = rows.find(item => normalizeName(item.label).includes(normalizeName(indicator))); return <div key={indicator} className="rounded-lg border border-teal-100 bg-teal-50 px-4 py-3"><p className="text-xs text-slate-500">{indicator}</p><p className="mt-1 text-sm font-bold text-teal-800">Sorana: {formatDemonstrativoValue(row?.sorana ?? null)}</p><p className="text-xs text-slate-600">Satélite: {formatDemonstrativoValue(row?.satelite ?? null)} | Região: {formatDemonstrativoValue(row?.regiao ?? null)}</p></div>; })}</div>
+        <div className="overflow-x-auto border border-slate-200"><table className="min-w-[1180px] w-full text-xs border-collapse"><thead className="sticky top-0 bg-teal-700 text-white"><tr>{['Indicador', 'Unidade', 'Sorana', 'Sorana %', 'Satélite sem Sorana', 'Satélite %', 'Dif. x Satélite', 'Região sem Sorana', 'Região %', 'Dif. x Região'].map(header => <th key={header} className="px-3 py-2 text-left whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{rows.map((row, index) => <DemonstrativoTableRow key={`${row.label}-${index}`} row={row} />)}</tbody></table></div>
+      </>}
+    </div>
+  );
+}
+
+function DemonstrativoTableRow({ row }: { row: DemonstrativoRow }) {
+  const differenceRegion = difference(row.sorana, row.regiao);
+  const differenceSatelite = difference(row.sorana, row.satelite);
+  const favorable = (value: number | null) => value === null ? '' : (isExpense(row.label) ? value <= 0 : value >= 0) ? 'text-emerald-700 bg-emerald-50' : 'text-red-700 bg-red-50';
+  const normalizedLabel = normalizeName(row.label);
+  const isFinancial = normalizedLabel.includes('rendasfinanceiras');
+  const isFinancialExpense = normalizedLabel.includes('despesasfinanceiras');
+  const isClosingResult = normalizedLabel.includes('lai') || normalizedLabel.includes('lucroantesdoimpostoderenda');
+  const isPrimaryResult = normalizedLabel.includes('lucrobruto') || normalizedLabel.includes('lucrooperacionalvw') || normalizedLabel.includes('lucrooperacionalii') || normalizedLabel.includes('lucrooperacionaliii');
+  const isIntermediateMargin = normalizedLabel.includes('margemdecontribuicao') || normalizedLabel.includes('lucroatividadevw');
+  const rowClass = isClosingResult
+    ? 'bg-emerald-100 font-bold border-t-2 border-emerald-600'
+    : isPrimaryResult
+      ? 'bg-emerald-50 font-semibold border-t border-emerald-200'
+      : isIntermediateMargin
+        ? 'bg-sky-50 font-semibold border-t border-sky-200'
+        : isFinancialExpense
+          ? 'bg-rose-50 font-semibold border-t border-rose-200'
+          : isFinancial
+            ? 'bg-amber-50 font-semibold border-t border-amber-200'
+            : 'odd:bg-white even:bg-slate-50';
+  return <tr className={rowClass}><td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap font-medium">{row.label}</td><td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{row.unit}</td><td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatDemonstrativoValue(row.sorana)}</td><td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatNumber(row.soranaPercent, true)}</td><td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatDemonstrativoValue(row.satelite)}</td><td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatNumber(row.satelitePercent, true)}</td><td className={`border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap ${favorable(differenceSatelite)}`}>{formatDemonstrativoValue(differenceSatelite)}</td><td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatDemonstrativoValue(row.regiao)}</td><td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatNumber(row.regiaoPercent, true)}</td><td className={`border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap ${favorable(differenceRegion)}`}>{formatDemonstrativoValue(differenceRegion)}</td></tr>;
 }
 
 function BaseCard({ label, value }: { label: string; value: number | null }) {
