@@ -765,6 +765,14 @@ function GestaoTab({ grades, veiculos }: { grades: GradeTrimestre[]; veiculos: V
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="bg-slate-100 font-semibold text-slate-700">
+                  <td className="px-3 py-2" colSpan={2}>Total</td>
+                  <td className="px-3 py-2 text-right">{obrigacoes.reduce((sum, item) => sum + item.quantidade, 0)}</td>
+                  <td className="px-3 py-2 text-right">{obrigacoes.reduce((sum, item) => sum + item.elegiveis, 0)}</td>
+                  <td className={`px-3 py-2 text-right ${totalFaltam > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{totalFaltam}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}

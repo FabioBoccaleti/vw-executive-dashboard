@@ -78,6 +78,15 @@ export async function exportGestaoGradeExcel(params: {
   obrigacoes.forEach(item => {
     ws.addRow([item.modelo, CLASSIFICACAO_LABELS[item.classificacao], item.quantidade, item.elegiveis, item.faltam]);
   });
+  const totalRow = ws.addRow([
+    'Total',
+    '',
+    obrigacoes.reduce((sum, item) => sum + item.quantidade, 0),
+    obrigacoes.reduce((sum, item) => sum + item.elegiveis, 0),
+    obrigacoes.reduce((sum, item) => sum + item.faltam, 0),
+  ]);
+  totalRow.font = { bold: true };
+  totalRow.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }; });
   ws.addRow([]);
 
   const veiculoHeader = ['Modelo', 'Chassi', 'Classificação', 'Compra', 'Venc. grade', 'Situação', 'Venda'];
