@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Layers, Car, Sparkles, Banknote, Wrench, ClipboardList } from 'lucide-react';
+import { Shield, Layers, Car, Sparkles, Banknote, Wrench, ClipboardList, Grid3X3 } from 'lucide-react';
 import { useAuth } from '@/contexts/useAuth';
 import type { VendasSubModuleId } from '@/lib/authTypes';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
@@ -14,7 +14,7 @@ const FINANCIAMENTO_BV_SUBS: VendasSubModuleId[] = ['financiamento_bv.vendas', '
 const VPECAS_COND_SUBS: VendasSubModuleId[] = ['vpecas_cond.relatorios', 'vpecas_cond.resumo'];
 
 interface VendasSelectionPageProps {
-  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante') => void;
+  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade') => void;
   onChangeBrand: () => void;
 }
 
@@ -160,6 +160,21 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">
                 Serviços de Despachante
+              </h2>
+            </div>
+          </button>
+
+          {/* Card — Grade de Test Drive Audi e Rentabilidade */}
+          <button
+            onClick={() => onSelect('grade-test-drive-audi-rentabilidade')}
+            className="flex-1 bg-white rounded-2xl border-2 border-cyan-400 shadow-md hover:shadow-xl hover:border-cyan-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-cyan-50 group-hover:bg-cyan-100 transition-colors">
+              <Grid3X3 className="w-10 h-10 text-cyan-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Grade de Test Drive Audi<br />e Rentabilidade
               </h2>
             </div>
           </button>

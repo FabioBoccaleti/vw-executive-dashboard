@@ -35,6 +35,7 @@ import { DespesasDeptoVwDashboard } from '@/components/DespesasDeptoVwDashboard'
 import { IEODashboard } from '@/components/IEODashboard'
 import { BaseGerencialDashboard } from '@/components/BaseGerencialDashboard'
 import { ComparativoRedeVwDashboard } from '@/components/ComparativoRedeVwDashboard'
+import { GradeTestDriveAudiDashboard } from '@/components/VendasBonificacoesDashboard/GradeTestDriveAudi'
 
 function AppContent() {
   const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
@@ -46,7 +47,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<'app' | 'admin' | 'cadastros'>(() =>
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
-  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante'>('selection')
+  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade'>('selection')
   const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas'>('selection')
   const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica'>('blindagem')
   
@@ -300,6 +301,8 @@ function AppContent() {
               </div>
             </div>
           </div>
+        ) : vendasSubPage === 'grade-test-drive-audi-rentabilidade' ? (
+          <GradeTestDriveAudiDashboard onBack={() => setVendasSubPage('selection')} />
         ) : (
           <VendasBonificacoesDashboard
             onChangeBrand={() => setVendasSubPage('selection')}
