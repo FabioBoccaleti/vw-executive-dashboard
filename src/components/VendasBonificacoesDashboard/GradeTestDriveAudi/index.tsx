@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Trash2, Pencil, Car, ClipboardList, LayoutGrid, X, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Pencil, Car, ClipboardList, LayoutGrid, X, CheckCircle2, AlertTriangle, TrendingUp } from 'lucide-react';
 import {
   CLASSIFICACAO_LABELS,
   CONDICAO_PAGAMENTO_LABELS,
   MODELOS,
   PRAZO_COMERCIALIZACAO_PADRAO,
   PRAZO_ELEGIBILIDADE_PADRAO,
+  calcularRentabilidade,
+  diasEntreISO,
   firstDayOfQuarterISO,
   getGrades,
   getVeiculos,
   lastDayOfQuarterISO,
   liberadoVendaVeiculo,
+  quarterOfISO,
   saveGrades,
   saveVeiculos,
   situacaoVendaVeiculo,
@@ -64,7 +67,7 @@ function newId(): string {
 }
 
 export function GradeTestDriveAudiDashboard({ onBack }: Props) {
-  const [activeTab, setActiveTab] = useState<'grade' | 'veiculos' | 'gestao'>('gestao');
+  const [activeTab, setActiveTab] = useState<'grade' | 'veiculos' | 'gestao' | 'resultado'>('gestao');
   const [grades, setGrades] = useState<GradeTrimestre[]>([]);
   const [veiculos, setVeiculos] = useState<VeiculoGrade[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +121,9 @@ export function GradeTestDriveAudiDashboard({ onBack }: Props) {
           <TabButton active={activeTab === 'veiculos'} onClick={() => setActiveTab('veiculos')} icon={<Car className="w-4 h-4" />}>
             Veículos
           </TabButton>
+          <TabButton active={activeTab === 'resultado'} onClick={() => setActiveTab('resultado')} icon={<TrendingUp className="w-4 h-4" />}>
+            Resultado das Vendas
+          </TabButton>
         </div>
 
         <section className="bg-white rounded-b-lg shadow-sm p-4 md:p-6">
@@ -127,6 +133,8 @@ export function GradeTestDriveAudiDashboard({ onBack }: Props) {
             <GestaoTab grades={grades} veiculos={veiculos} />
           ) : activeTab === 'grade' ? (
             <GradeExigidaTab grades={grades} onSave={persistGrades} />
+          ) : activeTab === 'resultado' ? (
+            <ResultadoVendasTab veiculos={veiculos} />
           ) : (
             <VeiculosTab veiculos={veiculos} grades={grades} onSave={persistVeiculos} />
           )}
@@ -305,7 +313,6 @@ function VeiculosTab({ veiculos, grades, onSave }: { veiculos: VeiculoGrade[]; g
   const [form, setForm] = useState({ ...EMPTY_VEICULO_FORM });
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [vendaAlvo, setVendaAlvo] = useState<VeiculoGrade | null>(null);
-  const [dataVenda, setDataVenda] = useState('');
 
   const precisaVencimento = form.condicaoPagamento !== 'a_vista';
 
@@ -350,6 +357,13 @@ function VeiculosTab({ veiculos, grades, onSave }: { veiculos: VeiculoGrade[]; g
         dataVencimentoPagamento: precisaVencimento ? form.dataVencimentoPagamento : null,
         vendido: false,
         dataVenda: null,
+        valorVenda: null,
+        valorImpostos: null,
+        creditoICMS: null,
+        custoEmplacamento: null,
+        custoIPVA: null,
+        jurosEstoque: null,
+        cortesia: null,
         criadoEm: new Date().toISOString(),
       };
       await onSave([...veiculos, veiculo]);
@@ -379,20 +393,40 @@ function VeiculosTab({ veiculos, grades, onSave }: { veiculos: VeiculoGrade[]; g
 
   function abrirVenda(veiculo: VeiculoGrade) {
     setVendaAlvo(veiculo);
-    setDataVenda(veiculo.dataVenda ?? new Date().toISOString().slice(0, 10));
   }
 
-  async function confirmarVenda() {
+  async function confirmarVenda(dados: VendaFormValues) {
     if (!vendaAlvo) return;
-    if (!dataVenda) { toast.error('Informe a data da venda.'); return; }
-    const next = veiculos.map(v => v.id === vendaAlvo.id ? { ...v, vendido: true, dataVenda } : v);
+    const next = veiculos.map(v => v.id === vendaAlvo.id ? {
+      ...v,
+      vendido: true,
+      dataVenda: dados.dataVenda,
+      valorVenda: dados.valorVenda,
+      valorImpostos: dados.valorImpostos,
+      creditoICMS: dados.creditoICMS,
+      custoEmplacamento: dados.custoEmplacamento,
+      custoIPVA: dados.custoIPVA,
+      jurosEstoque: dados.jurosEstoque,
+      cortesia: dados.cortesia,
+    } : v);
     await onSave(next);
     setVendaAlvo(null);
-    toast.success('Veículo marcado como vendido.');
+    toast.success('Venda registrada.');
   }
 
   async function desfazerVenda(veiculo: VeiculoGrade) {
-    const next = veiculos.map(v => v.id === veiculo.id ? { ...v, vendido: false, dataVenda: null } : v);
+    const next = veiculos.map(v => v.id === veiculo.id ? {
+      ...v,
+      vendido: false,
+      dataVenda: null,
+      valorVenda: null,
+      valorImpostos: null,
+      creditoICMS: null,
+      custoEmplacamento: null,
+      custoIPVA: null,
+      jurosEstoque: null,
+      cortesia: null,
+    } : v);
     await onSave(next);
     toast.success('Venda desfeita.');
   }
@@ -485,8 +519,11 @@ function VeiculosTab({ veiculos, grades, onSave }: { veiculos: VeiculoGrade[]; g
                   <td className="px-3 py-2">
                     <div className="flex items-center justify-end gap-2">
                       {veiculo.vendido
-                        ? <button onClick={() => void desfazerVenda(veiculo)} className="text-[11px] text-slate-500 hover:text-slate-700 underline">Desfazer venda</button>
-                        : <button onClick={() => abrirVenda(veiculo)} className="text-[11px] text-cyan-600 hover:text-cyan-800 underline">Marcar vendido</button>}
+                        ? <>
+                            <button onClick={() => abrirVenda(veiculo)} className="text-[11px] text-cyan-600 hover:text-cyan-800 underline">Editar venda</button>
+                            <button onClick={() => void desfazerVenda(veiculo)} className="text-[11px] text-slate-500 hover:text-slate-700 underline">Desfazer</button>
+                          </>
+                        : <button onClick={() => abrirVenda(veiculo)} className="text-[11px] text-cyan-600 hover:text-cyan-800 underline">Registrar venda</button>}
                       <button onClick={() => editar(veiculo)} className="text-slate-500 hover:text-slate-700"><Pencil className="w-4 h-4" /></button>
                       <button onClick={() => void excluir(veiculo.id)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
                     </div>
@@ -499,23 +536,132 @@ function VeiculosTab({ veiculos, grades, onSave }: { veiculos: VeiculoGrade[]; g
       )}
 
       {vendaAlvo && (
-        <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-800">Marcar como vendido</h3>
-              <button onClick={() => setVendaAlvo(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
-            </div>
-            <p className="text-sm text-slate-600">{vendaAlvo.modelo} — {vendaAlvo.chassi}</p>
-            <label className="text-xs font-semibold text-slate-600 block">Data da venda
-              <input type="date" value={dataVenda} onChange={event => setDataVenda(event.target.value)} className="block mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+        <RegistrarVendaModal veiculo={vendaAlvo} onClose={() => setVendaAlvo(null)} onConfirm={confirmarVenda} />
+      )}
+    </div>
+  );
+}
+
+// ─── Modal: Registrar / editar venda ────────────────────────────────────────
+
+interface VendaFormValues {
+  dataVenda: string;
+  valorVenda: number;
+  valorImpostos: number;
+  creditoICMS: number;
+  custoEmplacamento: number;
+  custoIPVA: number;
+  jurosEstoque: number;
+  cortesia: number;
+}
+
+const CAMPOS_VENDA: Array<{ key: keyof Omit<VendaFormValues, 'dataVenda'>; label: string }> = [
+  { key: 'valorVenda', label: 'Valor da Venda' },
+  { key: 'valorImpostos', label: 'Valor dos Impostos' },
+  { key: 'custoEmplacamento', label: 'Custo de Emplacamento' },
+  { key: 'custoIPVA', label: 'Custo de IPVA' },
+  { key: 'jurosEstoque', label: 'Juros de Estoque' },
+  { key: 'cortesia', label: 'Cortesias' },
+  { key: 'creditoICMS', label: 'Crédito de ICMS' },
+];
+
+function RegistrarVendaModal({ veiculo, onClose, onConfirm }: { veiculo: VeiculoGrade; onClose: () => void; onConfirm: (dados: VendaFormValues) => Promise<void> }) {
+  const [dataVenda, setDataVenda] = useState(veiculo.dataVenda ?? new Date().toISOString().slice(0, 10));
+  const [valores, setValores] = useState<Record<keyof Omit<VendaFormValues, 'dataVenda'>, string>>({
+    valorVenda: veiculo.valorVenda != null ? String(veiculo.valorVenda) : '',
+    valorImpostos: veiculo.valorImpostos != null ? String(veiculo.valorImpostos) : '',
+    custoEmplacamento: veiculo.custoEmplacamento != null ? String(veiculo.custoEmplacamento) : '',
+    custoIPVA: veiculo.custoIPVA != null ? String(veiculo.custoIPVA) : '',
+    jurosEstoque: veiculo.jurosEstoque != null ? String(veiculo.jurosEstoque) : '',
+    cortesia: veiculo.cortesia != null ? String(veiculo.cortesia) : '',
+    creditoICMS: veiculo.creditoICMS != null ? String(veiculo.creditoICMS) : '',
+  });
+
+  const num = (v: string) => Number(v);
+  const previa = useMemo(() => calcularRentabilidade({
+    ...veiculo,
+    valorVenda: num(valores.valorVenda) || 0,
+    valorImpostos: num(valores.valorImpostos) || 0,
+    creditoICMS: num(valores.creditoICMS) || 0,
+    custoEmplacamento: num(valores.custoEmplacamento) || 0,
+    custoIPVA: num(valores.custoIPVA) || 0,
+    jurosEstoque: num(valores.jurosEstoque) || 0,
+    cortesia: num(valores.cortesia) || 0,
+  }), [veiculo, valores]);
+
+  async function confirmar() {
+    if (!dataVenda) { toast.error('Informe a data da venda.'); return; }
+    for (const campo of CAMPOS_VENDA) {
+      const raw = valores[campo.key];
+      if (raw.trim() === '' || !Number.isFinite(Number(raw))) {
+        toast.error(`Informe o campo "${campo.label}" (use 0,00 se não houver).`);
+        return;
+      }
+    }
+    await onConfirm({
+      dataVenda,
+      valorVenda: num(valores.valorVenda),
+      valorImpostos: num(valores.valorImpostos),
+      creditoICMS: num(valores.creditoICMS),
+      custoEmplacamento: num(valores.custoEmplacamento),
+      custoIPVA: num(valores.custoIPVA),
+      jurosEstoque: num(valores.jurosEstoque),
+      cortesia: num(valores.cortesia),
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full shadow-xl space-y-4 max-h-[90vh] overflow-auto">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-slate-800">{veiculo.vendido ? 'Editar venda' : 'Registrar venda'}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+        </div>
+        <p className="text-sm text-slate-600">{veiculo.modelo} — <span className="font-mono">{veiculo.chassi}</span> · Compra {formatDate(veiculo.dataCompra)} · Custo {formatCurrency(veiculo.valorCompra)}</p>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="text-xs font-semibold text-slate-600">Data da venda
+            <input type="date" value={dataVenda} onChange={event => setDataVenda(event.target.value)} className="block mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm" />
+          </label>
+          {CAMPOS_VENDA.map(campo => (
+            <label key={campo.key} className="text-xs font-semibold text-slate-600">{campo.label}
+              <input type="number" step="0.01" value={valores[campo.key]} onChange={event => setValores(v => ({ ...v, [campo.key]: event.target.value }))} className="block mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm" />
             </label>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setVendaAlvo(null)} className="text-sm text-slate-600 px-3 py-2">Cancelar</button>
-              <button onClick={() => void confirmarVenda()} className="bg-cyan-600 text-white rounded px-4 py-2 text-sm font-semibold hover:bg-cyan-700">Confirmar</button>
-            </div>
+          ))}
+        </div>
+
+        <div className="border border-slate-200 rounded-lg bg-slate-50 p-4">
+          <h4 className="text-xs font-bold text-slate-700 mb-2">Prévia da rentabilidade</h4>
+          <div className="space-y-1 text-sm">
+            <LinhaWaterfall label="Valor da Venda" valor={previa.valorVenda} />
+            <LinhaWaterfall label="(-) Impostos" valor={-previa.impostos} />
+            <LinhaWaterfall label="(=) Receita Líquida" valor={previa.receitaLiquida} destaque />
+            <LinhaWaterfall label="(-) Custo de Compra" valor={-previa.custoCompra} />
+            <LinhaWaterfall label="(=) Lucro Bruto" valor={previa.lucroBruto} destaque />
+            <LinhaWaterfall label="(-) Custo de Emplacamento" valor={-previa.custoEmplacamento} />
+            <LinhaWaterfall label="(-) Custo de IPVA" valor={-previa.custoIPVA} />
+            <LinhaWaterfall label="(-) Juros de Estoque" valor={-previa.jurosEstoque} />
+            <LinhaWaterfall label="(-) Cortesia" valor={-previa.cortesia} />
+            <LinhaWaterfall label="(+) Crédito de ICMS" valor={previa.creditoICMS} />
+            <LinhaWaterfall label="(=) Lucro Líquido (Rentabilidade)" valor={previa.lucroLiquido} destaque total />
+            <div className="flex justify-between pt-1 text-xs text-slate-500"><span>Margem</span><span>{previa.margem.toFixed(1)}%</span></div>
           </div>
         </div>
-      )}
+
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="text-sm text-slate-600 px-3 py-2">Cancelar</button>
+          <button onClick={() => void confirmar()} className="bg-cyan-600 text-white rounded px-4 py-2 text-sm font-semibold hover:bg-cyan-700">{veiculo.vendido ? 'Salvar venda' : 'Registrar venda'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LinhaWaterfall({ label, valor, destaque = false, total = false }: { label: string; valor: number; destaque?: boolean; total?: boolean }) {
+  return (
+    <div className={`flex justify-between ${destaque ? 'font-semibold' : ''} ${total ? 'border-t border-slate-300 pt-1 mt-1 text-cyan-700' : 'text-slate-700'}`}>
+      <span>{label}</span>
+      <span className={valor < 0 ? 'text-red-600' : ''}>{formatCurrency(valor)}</span>
     </div>
   );
 }
@@ -675,6 +821,185 @@ function VeiculosSituacaoLista({ titulo, cor, veiculos, grades, hoje, mostrarSit
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Aba: Resultado das Vendas ──────────────────────────────────────────────
+
+function ResultadoVendasTab({ veiculos }: { veiculos: VeiculoGrade[] }) {
+  const [subView, setSubView] = useState<'trimestre' | 'anual'>('trimestre');
+  const [ano, setAno] = useState(currentYear());
+  const [trimestre, setTrimestre] = useState(currentQuarter());
+
+  const vendidos = useMemo(
+    () => veiculos.filter(v => v.vendido && v.dataVenda),
+    [veiculos],
+  );
+
+  const porTrimestre = useMemo(() => {
+    return vendidos
+      .filter(v => {
+        const periodo = quarterOfISO(v.dataCompra);
+        return periodo.ano === ano && periodo.trimestre === trimestre;
+      })
+      .sort((a, b) => (b.dataVenda ?? '').localeCompare(a.dataVenda ?? ''));
+  }, [vendidos, ano, trimestre]);
+
+  const anuais = useMemo(() => {
+    return vendidos
+      .filter(v => (v.dataVenda ?? '').slice(0, 4) === String(ano))
+      .sort((a, b) => (b.dataVenda ?? '').localeCompare(a.dataVenda ?? ''));
+  }, [vendidos, ano]);
+
+  const kpisAnuais = useMemo(() => {
+    let totalVenda = 0;
+    let totalLucro = 0;
+    anuais.forEach(v => {
+      const r = calcularRentabilidade(v);
+      totalVenda += r.valorVenda;
+      totalLucro += r.lucroLiquido;
+    });
+    const margem = totalVenda > 0 ? (totalLucro / totalVenda) * 100 : 0;
+    return { totalVenda, totalLucro, margem, quantidade: anuais.length };
+  }, [anuais]);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex border border-slate-200 rounded-lg overflow-hidden w-fit">
+        <button onClick={() => setSubView('trimestre')} className={`px-4 py-2 text-sm font-semibold ${subView === 'trimestre' ? 'bg-cyan-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>Por Trimestre da Grade</button>
+        <button onClick={() => setSubView('anual')} className={`px-4 py-2 text-sm font-semibold ${subView === 'anual' ? 'bg-cyan-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>Anual</button>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="text-xs font-semibold text-slate-600">Ano
+          <input type="number" value={ano} onChange={event => setAno(Number(event.target.value))} className="block mt-1 w-28 border border-slate-300 rounded px-3 py-2 text-sm" />
+        </label>
+        {subView === 'trimestre' && (
+          <label className="text-xs font-semibold text-slate-600">Trimestre de aquisição
+            <select value={trimestre} onChange={event => setTrimestre(Number(event.target.value))} className="block mt-1 border border-slate-300 rounded px-3 py-2 text-sm">
+              {TRIMESTRES.map(t => <option key={t} value={t}>{t}º trimestre</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+
+      {subView === 'anual' && anuais.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <KpiCard label="Veículos vendidos" valor={String(kpisAnuais.quantidade)} />
+          <KpiCard label="Lucro líquido total" valor={formatCurrency(kpisAnuais.totalLucro)} destaque={kpisAnuais.totalLucro >= 0} />
+          <KpiCard label="Margem média" valor={`${kpisAnuais.margem.toFixed(1)}%`} />
+        </div>
+      )}
+
+      {subView === 'trimestre' ? (
+        porTrimestre.length === 0
+          ? <p className="text-sm text-slate-400">Nenhuma venda de veículo adquirido no {trimestre}º trimestre de {ano}.</p>
+          : <ResultadoTable veiculos={porTrimestre} mostrarDiasEstoque />
+      ) : (
+        anuais.length === 0
+          ? <p className="text-sm text-slate-400">Nenhum veículo vendido em {ano}.</p>
+          : <ResultadoTable veiculos={anuais} mostrarDiasEstoque />
+      )}
+    </div>
+  );
+}
+
+function KpiCard({ label, valor, destaque }: { label: string; valor: string; destaque?: boolean }) {
+  return (
+    <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className={`text-lg font-bold mt-1 ${destaque === undefined ? 'text-slate-800' : destaque ? 'text-emerald-600' : 'text-red-600'}`}>{valor}</p>
+    </div>
+  );
+}
+
+function ResultadoTable({ veiculos, mostrarDiasEstoque = false }: { veiculos: VeiculoGrade[]; mostrarDiasEstoque?: boolean }) {
+  const linhas = veiculos.map(v => ({ veiculo: v, r: calcularRentabilidade(v) }));
+  const totais = linhas.reduce(
+    (acc, { r }) => {
+      acc.valorVenda += r.valorVenda;
+      acc.impostos += r.impostos;
+      acc.receitaLiquida += r.receitaLiquida;
+      acc.custoCompra += r.custoCompra;
+      acc.lucroBruto += r.lucroBruto;
+      acc.custoEmplacamento += r.custoEmplacamento;
+      acc.custoIPVA += r.custoIPVA;
+      acc.jurosEstoque += r.jurosEstoque;
+      acc.cortesia += r.cortesia;
+      acc.creditoICMS += r.creditoICMS;
+      acc.lucroLiquido += r.lucroLiquido;
+      return acc;
+    },
+    { valorVenda: 0, impostos: 0, receitaLiquida: 0, custoCompra: 0, lucroBruto: 0, custoEmplacamento: 0, custoIPVA: 0, jurosEstoque: 0, cortesia: 0, creditoICMS: 0, lucroLiquido: 0 },
+  );
+  const margemTotal = totais.valorVenda > 0 ? (totais.lucroLiquido / totais.valorVenda) * 100 : 0;
+
+  return (
+    <div className="overflow-auto border border-slate-200 rounded-lg">
+      <table className="min-w-[1400px] w-full text-[11px]">
+        <thead className="bg-slate-100 text-slate-600">
+          <tr>
+            <th className="px-2 py-2 text-left">Modelo</th>
+            <th className="px-2 py-2 text-left">Chassi</th>
+            <th className="px-2 py-2 text-left">Compra</th>
+            <th className="px-2 py-2 text-left">Venda</th>
+            {mostrarDiasEstoque && <th className="px-2 py-2 text-right">Dias estoque</th>}
+            <th className="px-2 py-2 text-right">Venda R$</th>
+            <th className="px-2 py-2 text-right">Impostos</th>
+            <th className="px-2 py-2 text-right">Receita Líq.</th>
+            <th className="px-2 py-2 text-right">Custo Compra</th>
+            <th className="px-2 py-2 text-right">Lucro Bruto</th>
+            <th className="px-2 py-2 text-right">Emplac.</th>
+            <th className="px-2 py-2 text-right">IPVA</th>
+            <th className="px-2 py-2 text-right">Juros</th>
+            <th className="px-2 py-2 text-right">Cortesia</th>
+            <th className="px-2 py-2 text-right">Créd. ICMS</th>
+            <th className="px-2 py-2 text-right">Lucro Líq.</th>
+            <th className="px-2 py-2 text-right">Margem</th>
+          </tr>
+        </thead>
+        <tbody>
+          {linhas.map(({ veiculo, r }) => (
+            <tr key={veiculo.id} className="odd:bg-white even:bg-slate-50">
+              <td className="px-2 py-1.5 font-medium">{veiculo.modelo}</td>
+              <td className="px-2 py-1.5 font-mono">{veiculo.chassi}</td>
+              <td className="px-2 py-1.5">{formatDate(veiculo.dataCompra)}</td>
+              <td className="px-2 py-1.5">{formatDate(veiculo.dataVenda)}</td>
+              {mostrarDiasEstoque && <td className="px-2 py-1.5 text-right">{veiculo.dataVenda ? diasEntreISO(veiculo.dataCompra, veiculo.dataVenda) : '—'}</td>}
+              <td className="px-2 py-1.5 text-right">{formatCurrency(r.valorVenda)}</td>
+              <td className="px-2 py-1.5 text-right">{formatCurrency(r.impostos)}</td>
+              <td className="px-2 py-1.5 text-right">{formatCurrency(r.receitaLiquida)}</td>
+              <td className="px-2 py-1.5 text-right">{formatCurrency(r.custoCompra)}</td>
+              <td className="px-2 py-1.5 text-right">{formatCurrency(r.lucroBruto)}</td>
+              <td className="px-2 py-1.5 text-right">{formatCurrency(r.custoEmplacamento)}</td>
+              <td className="px-2 py-1.5 text-right">{formatCurrency(r.custoIPVA)}</td>
+              <td className="px-2 py-1.5 text-right">{formatCurrency(r.jurosEstoque)}</td>
+              <td className="px-2 py-1.5 text-right">{formatCurrency(r.cortesia)}</td>
+              <td className="px-2 py-1.5 text-right">{formatCurrency(r.creditoICMS)}</td>
+              <td className={`px-2 py-1.5 text-right font-semibold ${r.lucroLiquido >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatCurrency(r.lucroLiquido)}</td>
+              <td className="px-2 py-1.5 text-right">{r.margem.toFixed(1)}%</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="bg-slate-100 font-semibold text-slate-700">
+            <td className="px-2 py-2" colSpan={mostrarDiasEstoque ? 5 : 4}>Total ({linhas.length})</td>
+            <td className="px-2 py-2 text-right">{formatCurrency(totais.valorVenda)}</td>
+            <td className="px-2 py-2 text-right">{formatCurrency(totais.impostos)}</td>
+            <td className="px-2 py-2 text-right">{formatCurrency(totais.receitaLiquida)}</td>
+            <td className="px-2 py-2 text-right">{formatCurrency(totais.custoCompra)}</td>
+            <td className="px-2 py-2 text-right">{formatCurrency(totais.lucroBruto)}</td>
+            <td className="px-2 py-2 text-right">{formatCurrency(totais.custoEmplacamento)}</td>
+            <td className="px-2 py-2 text-right">{formatCurrency(totais.custoIPVA)}</td>
+            <td className="px-2 py-2 text-right">{formatCurrency(totais.jurosEstoque)}</td>
+            <td className="px-2 py-2 text-right">{formatCurrency(totais.cortesia)}</td>
+            <td className="px-2 py-2 text-right">{formatCurrency(totais.creditoICMS)}</td>
+            <td className={`px-2 py-2 text-right ${totais.lucroLiquido >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{formatCurrency(totais.lucroLiquido)}</td>
+            <td className="px-2 py-2 text-right">{margemTotal.toFixed(1)}%</td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 }

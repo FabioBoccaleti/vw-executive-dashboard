@@ -58,7 +58,30 @@ export interface VeiculoGrade {
   dataVencimentoPagamento: string | null; // yyyy-mm-dd, apenas quando não for à vista
   vendido: boolean;
   dataVenda: string | null; // yyyy-mm-dd
+  // Dados financeiros da venda (preenchidos ao registrar a venda)
+  valorVenda: number | null;
+  valorImpostos: number | null;
+  creditoICMS: number | null;
+  custoEmplacamento: number | null;
+  custoIPVA: number | null;
+  jurosEstoque: number | null;
+  cortesia: number | null;
   criadoEm: string;
+}
+
+export interface Rentabilidade {
+  valorVenda: number;
+  impostos: number;
+  receitaLiquida: number;
+  custoCompra: number;
+  lucroBruto: number;
+  custoEmplacamento: number;
+  custoIPVA: number;
+  jurosEstoque: number;
+  cortesia: number;
+  creditoICMS: number;
+  lucroLiquido: number;
+  margem: number; // %
 }
 
 // ─── Chaves de armazenamento ────────────────────────────────────────────────
@@ -119,6 +142,45 @@ export function situacaoVendaVeiculo(
   referenciaISO: string,
 ): 'disponivel' | 'bloqueado' {
   return referenciaISO >= liberadoVendaVeiculo(veiculo, grades) ? 'disponivel' : 'bloqueado';
+}
+
+/** Diferença em dias entre duas datas ISO (fim - início). */
+export function diasEntreISO(inicioISO: string, fimISO: string): number {
+  const [y1, m1, d1] = inicioISO.split('-').map(Number);
+  const [y2, m2, d2] = fimISO.split('-').map(Number);
+  const inicio = new Date(y1, m1 - 1, d1);
+  const fim = new Date(y2, m2 - 1, d2);
+  return Math.round((fim.getTime() - inicio.getTime()) / 86_400_000);
+}
+
+/** Calcula a rentabilidade da venda a partir dos dados financeiros do veículo. */
+export function calcularRentabilidade(veiculo: VeiculoGrade): Rentabilidade {
+  const valorVenda = veiculo.valorVenda ?? 0;
+  const impostos = veiculo.valorImpostos ?? 0;
+  const receitaLiquida = valorVenda - impostos;
+  const custoCompra = veiculo.valorCompra;
+  const lucroBruto = receitaLiquida - custoCompra;
+  const custoEmplacamento = veiculo.custoEmplacamento ?? 0;
+  const custoIPVA = veiculo.custoIPVA ?? 0;
+  const jurosEstoque = veiculo.jurosEstoque ?? 0;
+  const cortesia = veiculo.cortesia ?? 0;
+  const creditoICMS = veiculo.creditoICMS ?? 0;
+  const lucroLiquido = lucroBruto - custoEmplacamento - custoIPVA - jurosEstoque - cortesia + creditoICMS;
+  const margem = valorVenda > 0 ? (lucroLiquido / valorVenda) * 100 : 0;
+  return {
+    valorVenda,
+    impostos,
+    receitaLiquida,
+    custoCompra,
+    lucroBruto,
+    custoEmplacamento,
+    custoIPVA,
+    jurosEstoque,
+    cortesia,
+    creditoICMS,
+    lucroLiquido,
+    margem,
+  };
 }
 
 export function quarterOfISO(iso: string): { ano: number; trimestre: number } {
