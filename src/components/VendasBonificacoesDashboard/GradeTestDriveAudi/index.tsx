@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Trash2, Pencil, Car, ClipboardList, LayoutGrid, X, CheckCircle2, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Plus, Trash2, Pencil, Car, ClipboardList, LayoutGrid, X, CheckCircle2, AlertTriangle, TrendingUp, Download } from 'lucide-react';
 import {
   CLASSIFICACAO_LABELS,
   CONDICAO_PAGAMENTO_LABELS,
@@ -27,6 +27,7 @@ import {
   type Modelo,
   type VeiculoGrade,
 } from './gradeTestDriveStorage';
+import { exportGestaoGradeExcel, exportResultadoVendasExcel } from './gradeTestDriveExport';
 
 interface Props {
   onBack: () => void;
@@ -721,6 +722,12 @@ function GestaoTab({ grades, veiculos }: { grades: GradeTrimestre[]; veiculos: V
             {TRIMESTRES.map(t => <option key={t} value={t}>{t}º trimestre</option>)}
           </select>
         </label>
+        <button
+          onClick={() => void exportGestaoGradeExcel({ ano, trimestre, obrigacoes, elegiveis: classificados.elegiveis, emEstoqueNaoElegiveis: classificados.emEstoqueNaoElegiveis, vendidos: classificados.vendidos, grades, hoje })}
+          className="ml-auto flex items-center gap-2 border border-emerald-300 text-emerald-700 rounded px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
+        >
+          <Download className="w-4 h-4" />Exportar Excel
+        </button>
       </div>
 
       {/* Obrigação de compra */}
@@ -882,6 +889,20 @@ function ResultadoVendasTab({ veiculos }: { veiculos: VeiculoGrade[] }) {
             </select>
           </label>
         )}
+        <button
+          onClick={() => {
+            if (subView === 'trimestre') {
+              if (porTrimestre.length === 0) { toast.error('Não há vendas para exportar.'); return; }
+              void exportResultadoVendasExcel({ titulo: `Resultado das Vendas — ${trimestre}º trimestre de ${ano} (aquisição)`, filename: `resultado-vendas-${ano}-T${trimestre}.xlsx`, veiculos: porTrimestre });
+            } else {
+              if (anuais.length === 0) { toast.error('Não há vendas para exportar.'); return; }
+              void exportResultadoVendasExcel({ titulo: `Resultado das Vendas — Ano ${ano}`, filename: `resultado-vendas-anual-${ano}.xlsx`, veiculos: anuais });
+            }
+          }}
+          className="ml-auto flex items-center gap-2 border border-emerald-300 text-emerald-700 rounded px-3 py-2 text-sm font-semibold hover:bg-emerald-50"
+        >
+          <Download className="w-4 h-4" />Exportar Excel
+        </button>
       </div>
 
       {subView === 'anual' && anuais.length > 0 && (
