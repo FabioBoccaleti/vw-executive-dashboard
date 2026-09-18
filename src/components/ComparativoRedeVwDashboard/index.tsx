@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import {
   deleteComparativoRedeVwMonth,
   deleteComparativoRedeVwConcessionarias,
+  getLatestComparativoRedeVwMonth,
   getComparativoRedeVwMonth,
   getComparativoRedeVwConcessionarias,
   setComparativoRedeVwMonth,
@@ -117,6 +118,7 @@ export function ComparativoRedeVwDashboard({ onChangeBrand }: Props) {
   const [confirmReplace, setConfirmReplace] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   const selectedSheet = data?.sheets[activeSheet];
   const periodLabel = `${MONTHS[month - 1]} de ${year}`;
@@ -144,7 +146,30 @@ export function ComparativoRedeVwDashboard({ onChangeBrand }: Props) {
     }
   }
 
-  useEffect(() => { void loadMonth(); }, [year, month]);
+  useEffect(() => {
+    let cancelled = false;
+    async function initialize() {
+      setLoading(true);
+      try {
+        const latest = await getLatestComparativoRedeVwMonth();
+        if (cancelled) return;
+        if (latest) {
+          setYear(latest.year);
+          setMonth(latest.month);
+        }
+        setActiveTab('demonstrativo');
+        setInitialized(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void initialize();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (initialized) void loadMonth();
+  }, [initialized, year, month]);
 
   async function importFile(file: File) {
     setLoading(true);

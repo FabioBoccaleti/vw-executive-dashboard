@@ -1,4 +1,4 @@
-import { kvDelete, kvGet, kvSet } from '@/lib/kvClient';
+import { kvBulkGet, kvDelete, kvGet, kvKeys, kvSet } from '@/lib/kvClient';
 
 export interface ComparativoRedeVwSheet {
   name: string;
@@ -25,6 +25,24 @@ const keyFor = (year: number, month: number) =>
 
 const concessionariasKeyFor = (year: number, month: number) =>
   `comparativo-rede-vw-concessionarias:${year}:M${String(month).padStart(2, '0')}`;
+
+export async function getLatestComparativoRedeVwMonth() {
+  const keys = await kvKeys('comparativo-rede-vw:*');
+  const periods = keys
+    .map(key => {
+      const match = key.match(/^comparativo-rede-vw:(\d{4}):M(\d{2})$/);
+      return match ? { key, year: Number(match[1]), month: Number(match[2]) } : null;
+    })
+    .filter((period): period is { key: string; year: number; month: number } => period !== null)
+    .sort((left, right) => right.year - left.year || right.month - left.month);
+
+  const dataByKey = await kvBulkGet<ComparativoRedeVwMonthData>(periods.map(period => period.key));
+  for (const period of periods) {
+    const data = dataByKey[period.key];
+    if (data) return data;
+  }
+  return null;
+}
 
 export async function getComparativoRedeVwMonth(year: number, month: number) {
   return kvGet<ComparativoRedeVwMonthData>(keyFor(year, month));
