@@ -107,6 +107,20 @@ export function lastDayOfQuarterISO(ano: number, trimestre: number): string {
   return toISO(new Date(ano, endMonth, 0)); // dia 0 do mês seguinte = último dia do mês final
 }
 
+export function firstDayOfQuarterISO(ano: number, trimestre: number): string {
+  const startMonth = (trimestre - 1) * 3 + 1; // 1, 4, 7, 10
+  return `${ano}-${String(startMonth).padStart(2, '0')}-01`;
+}
+
+/** Disponível para venda quando a data de referência já passou do prazo de comercialização. */
+export function situacaoVendaVeiculo(
+  veiculo: VeiculoGrade,
+  grades: GradeTrimestre[],
+  referenciaISO: string,
+): 'disponivel' | 'bloqueado' {
+  return referenciaISO >= liberadoVendaVeiculo(veiculo, grades) ? 'disponivel' : 'bloqueado';
+}
+
 export function quarterOfISO(iso: string): { ano: number; trimestre: number } {
   const [year, month] = iso.split('-').map(Number);
   return { ano: year, trimestre: Math.floor((month - 1) / 3) + 1 };

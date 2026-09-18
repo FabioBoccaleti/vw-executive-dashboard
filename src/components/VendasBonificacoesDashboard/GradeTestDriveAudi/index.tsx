@@ -7,11 +7,14 @@ import {
   MODELOS,
   PRAZO_COMERCIALIZACAO_PADRAO,
   PRAZO_ELEGIBILIDADE_PADRAO,
+  firstDayOfQuarterISO,
   getGrades,
   getVeiculos,
+  lastDayOfQuarterISO,
   liberadoVendaVeiculo,
   saveGrades,
   saveVeiculos,
+  situacaoVendaVeiculo,
   veiculoGaranteGrade,
   vencimentoGradeVeiculo,
   type Classificacao,
@@ -528,24 +531,27 @@ function GestaoTab({ grades, veiculos }: { grades: GradeTrimestre[]; veiculos: V
     [grades, ano, trimestre],
   );
 
-  const ultimoDia = useMemo(() => {
-    const endMonth = trimestre * 3;
-    const date = new Date(ano, endMonth, 0);
-    return `${ano}-${String(endMonth).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  }, [ano, trimestre]);
+  const ultimoDia = useMemo(() => lastDayOfQuarterISO(ano, trimestre), [ano, trimestre]);
+  const primeiroDia = useMemo(() => firstDayOfQuarterISO(ano, trimestre), [ano, trimestre]);
+  const hoje = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const classificados = useMemo(() => {
     const elegiveis: VeiculoGrade[] = [];
     const emEstoqueNaoElegiveis: VeiculoGrade[] = [];
     const vendidos: VeiculoGrade[] = [];
     veiculos.forEach(veiculo => {
-      if (veiculo.vendido) { vendidos.push(veiculo); return; }
-      if (veiculo.dataCompra > ultimoDia) return; // comprado após o trimestre analisado
+      if (veiculo.dataCompra > ultimoDia) return; // ainda não comprado neste trimestre
+      if (veiculo.vendido) {
+        if (!veiculo.dataVenda) { vendidos.push(veiculo); return; }
+        if (veiculo.dataVenda < primeiroDia) return; // vendido em trimestre anterior — não aparece
+        if (veiculo.dataVenda <= ultimoDia) { vendidos.push(veiculo); return; } // vendido neste trimestre
+        // vendido em trimestre futuro — ainda em estoque neste trimestre
+      }
       if (veiculoGaranteGrade(veiculo, grades, ano, trimestre)) elegiveis.push(veiculo);
       else emEstoqueNaoElegiveis.push(veiculo);
     });
     return { elegiveis, emEstoqueNaoElegiveis, vendidos };
-  }, [veiculos, grades, ano, trimestre, ultimoDia]);
+  }, [veiculos, grades, ano, trimestre, primeiroDia, ultimoDia]);
 
   const obrigacoes = useMemo(() => {
     const exigencias = grade?.exigencias ?? [];
@@ -612,14 +618,14 @@ function GestaoTab({ grades, veiculos }: { grades: GradeTrimestre[]; veiculos: V
       </div>
 
       {/* Listas de veículos */}
-      <VeiculosSituacaoLista titulo="Elegíveis (garantem a grade)" cor="emerald" veiculos={classificados.elegiveis} grades={grades} />
-      <VeiculosSituacaoLista titulo="Em estoque, não elegíveis no trimestre" cor="amber" veiculos={classificados.emEstoqueNaoElegiveis} grades={grades} />
-      <VeiculosSituacaoLista titulo="Vendidos" cor="slate" veiculos={classificados.vendidos} grades={grades} />
+      <VeiculosSituacaoLista titulo="Elegíveis (garantem a grade)" cor="emerald" veiculos={classificados.elegiveis} grades={grades} hoje={hoje} mostrarSituacao />
+      <VeiculosSituacaoLista titulo="Em estoque, não elegíveis no trimestre" cor="amber" veiculos={classificados.emEstoqueNaoElegiveis} grades={grades} hoje={hoje} mostrarSituacao />
+      <VeiculosSituacaoLista titulo="Vendidos" cor="slate" veiculos={classificados.vendidos} grades={grades} hoje={hoje} />
     </div>
   );
 }
 
-function VeiculosSituacaoLista({ titulo, cor, veiculos, grades }: { titulo: string; cor: 'emerald' | 'amber' | 'slate'; veiculos: VeiculoGrade[]; grades: GradeTrimestre[] }) {
+function VeiculosSituacaoLista({ titulo, cor, veiculos, grades, hoje, mostrarSituacao = false }: { titulo: string; cor: 'emerald' | 'amber' | 'slate'; veiculos: VeiculoGrade[]; grades: GradeTrimestre[]; hoje: string; mostrarSituacao?: boolean }) {
   const dot = cor === 'emerald' ? 'bg-emerald-500' : cor === 'amber' ? 'bg-amber-500' : 'bg-slate-400';
   return (
     <div className="space-y-2">
@@ -640,20 +646,31 @@ function VeiculosSituacaoLista({ titulo, cor, veiculos, grades }: { titulo: stri
                 <th className="px-3 py-2 text-left">Classificação</th>
                 <th className="px-3 py-2 text-left">Compra</th>
                 <th className="px-3 py-2 text-left">Venc. grade</th>
+                {mostrarSituacao && <th className="px-3 py-2 text-left">Situação</th>}
                 <th className="px-3 py-2 text-left">Venda</th>
               </tr>
             </thead>
             <tbody>
-              {veiculos.map(veiculo => (
-                <tr key={veiculo.id} className="odd:bg-white even:bg-slate-50">
-                  <td className="px-3 py-2 font-medium">{veiculo.modelo}</td>
-                  <td className="px-3 py-2 font-mono">{veiculo.chassi}</td>
-                  <td className="px-3 py-2">{CLASSIFICACAO_LABELS[veiculo.classificacao]}</td>
-                  <td className="px-3 py-2">{formatDate(veiculo.dataCompra)}</td>
-                  <td className="px-3 py-2">{formatDate(vencimentoGradeVeiculo(veiculo, grades))}</td>
-                  <td className="px-3 py-2">{formatDate(veiculo.dataVenda)}</td>
-                </tr>
-              ))}
+              {veiculos.map(veiculo => {
+                const situacao = situacaoVendaVeiculo(veiculo, grades, hoje);
+                return (
+                  <tr key={veiculo.id} className="odd:bg-white even:bg-slate-50">
+                    <td className="px-3 py-2 font-medium">{veiculo.modelo}</td>
+                    <td className="px-3 py-2 font-mono">{veiculo.chassi}</td>
+                    <td className="px-3 py-2">{CLASSIFICACAO_LABELS[veiculo.classificacao]}</td>
+                    <td className="px-3 py-2">{formatDate(veiculo.dataCompra)}</td>
+                    <td className="px-3 py-2">{formatDate(vencimentoGradeVeiculo(veiculo, grades))}</td>
+                    {mostrarSituacao && (
+                      <td className="px-3 py-2">
+                        {situacao === 'disponivel'
+                          ? <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[11px] font-semibold">Disponível para Venda</span>
+                          : <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[11px] font-semibold">Bloqueado para venda</span>}
+                      </td>
+                    )}
+                    <td className="px-3 py-2">{formatDate(veiculo.dataVenda)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
