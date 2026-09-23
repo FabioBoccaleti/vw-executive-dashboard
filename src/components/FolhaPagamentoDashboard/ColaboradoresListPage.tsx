@@ -10,16 +10,28 @@ import {
   addDescricaoExtra,
   removeDescricaoExtra,
   DESCRICAO_PADRAO,
+  BASE_CALCULO_LABELS,
+  CATEGORIA_LABELS,
   type Colaborador,
   type ItemRemuneracaoRV,
   type KpiColaborador,
   type RvBrand,
   type TipoRemuneracao,
+  type ItemCategoria,
+  type ModoVariavel,
+  type BaseCalculoVariavel,
+  type FaixaResultado,
 } from './remVariaveisStorage';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────
 
 const BRAND_LABEL: Record<RvBrand, string> = { vw: 'VW', audi: 'Audi' };
+
+const BASE_CALCULO_OPTIONS = Object.entries(BASE_CALCULO_LABELS) as [BaseCalculoVariavel, string][];
+
+function newFaixa(): FaixaResultado {
+  return { id: crypto.randomUUID(), de: 0, ate: undefined, percentual: 0 };
+}
 
 function newItem(): ItemRemuneracaoRV {
   return { id: crypto.randomUUID(), descricao: '', tipo: 'fixa', valorBase: 0 };
@@ -46,6 +58,7 @@ function ColaboradorDialog({
     cargo: initial?.cargo ?? '',
     departamento: initial?.departamento ?? '',
     brand: (initial?.brand ?? 'vw') as RvBrand,
+    salarioFixo: initial?.salarioFixo,
   });
   const [itens, setItens] = useState<ItemRemuneracaoRV[]>(
     initial?.itens?.length ? initial.itens.map(i => ({ ...i })) : [newItem()]
@@ -89,6 +102,13 @@ function ColaboradorDialog({
     if (itens.length === 0) { toast.error('Adicione ao menos um item de remuneração.'); return; }
     for (const it of itens) {
       if (!it.descricao.trim()) { toast.error('Preencha a descrição de todos os itens.'); return; }
+      if (it.tipo === 'variavel' && (it.modoVariavel ?? 'percentual') === 'faixa') {
+        const faixas = (it.faixas ?? []).filter(f => f.percentual > 0 || f.de > 0 || f.ate != null);
+        if (faixas.length === 0) {
+          toast.error(`Defina ao menos uma faixa de resultado em "${it.descricao}".`);
+          return;
+        }
+      }
     }
     onConfirm({
       id: initial?.id ?? crypto.randomUUID(),
@@ -96,14 +116,24 @@ function ColaboradorDialog({
       cargo: form.cargo || undefined,
       departamento: form.departamento || undefined,
       brand: form.brand,
+      salarioFixo: form.salarioFixo,
       ativo: initial?.ativo ?? true,
-      itens: itens.map(item => ({
-        id: item.id,
-        descricao: item.descricao,
-        tipo: item.tipo,
-        valorBase: item.tipo === 'fixa' ? (item.valorBase ?? 0) : undefined,
-        percentual: item.tipo === 'variavel' ? item.percentual : undefined,
-      })),
+      itens: itens.map(item => {
+        if (item.tipo === 'fixa') {
+          return { id: item.id, descricao: item.descricao, tipo: 'fixa' as const, valorBase: item.valorBase ?? 0 };
+        }
+        const modo = item.modoVariavel ?? 'percentual';
+        return {
+          id: item.id,
+          descricao: item.descricao,
+          tipo: 'variavel' as const,
+          categoria: item.categoria ?? 'premio',
+          modoVariavel: modo,
+          percentual: modo === 'percentual' ? item.percentual : undefined,
+          faixas: modo === 'faixa' ? (item.faixas ?? []) : undefined,
+          baseCalculo: item.baseCalculo,
+        };
+      }),
       kpis,
       ordem: initial?.ordem,
     });
@@ -168,6 +198,23 @@ function ColaboradorDialog({
                 <option value="vw">VW</option>
                 <option value="audi">Audi</option>
               </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Salário Fixo (RH)</label>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-slate-400">R$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.salarioFixo ?? ''}
+                  onChange={e => setForm(prev => ({ ...prev, salarioFixo: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
+                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  placeholder="0,00"
+                />
+              </div>
+              <span className="text-[10px] text-slate-400 italic">Valor informativo, já cadastrado no RH.</span>
             </div>
           </div>
 
@@ -251,6 +298,8 @@ function ColaboradorDialog({
                         tipo: e.target.value as TipoRemuneracao,
                         valorBase: e.target.value === 'variavel' ? undefined : (item.valorBase ?? 0),
                         percentual: e.target.value === 'variavel' ? (item.percentual ?? undefined) : undefined,
+                        categoria: e.target.value === 'variavel' ? (item.categoria ?? 'premio') : undefined,
+                        modoVariavel: e.target.value === 'variavel' ? (item.modoVariavel ?? 'percentual') : undefined,
                       })}
                       className="border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
                     >
@@ -284,24 +333,141 @@ function ColaboradorDialog({
                     )}
                   </div>
 
-                  {/* Linha extra para variável */}
+                  {/* Configuração do item variável */}
                   {item.tipo === 'variavel' && (
-                    <div className="flex items-center gap-2 pl-7">
-                      <span className="text-xs text-slate-500 whitespace-nowrap">% sobre a base:</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={item.percentual ?? ''}
-                        onChange={e => updateItem(item.id, { percentual: parseFloat(e.target.value) || undefined })}
-                        className="w-20 border border-amber-300 rounded px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400"
-                        placeholder="0,00"
-                      />
-                      <span className="text-xs text-slate-400">%</span>
-                      <span className="text-[10px] text-slate-400 italic">
-                        A base é informada mês a mês no demonstrativo.
-                      </span>
+                    <div className="flex flex-col gap-2 pl-7">
+                      {/* Categoria + Modo */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-slate-500 whitespace-nowrap">Tipo:</span>
+                        <select
+                          value={item.categoria ?? 'premio'}
+                          onChange={e => updateItem(item.id, { categoria: e.target.value as ItemCategoria })}
+                          className="border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                        >
+                          {(Object.keys(CATEGORIA_LABELS) as ItemCategoria[]).map(cat => (
+                            <option key={cat} value={cat}>{CATEGORIA_LABELS[cat]}</option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-slate-500 whitespace-nowrap">Cálculo:</span>
+                        <select
+                          value={item.modoVariavel ?? 'percentual'}
+                          onChange={e => updateItem(item.id, {
+                            modoVariavel: e.target.value as ModoVariavel,
+                            faixas: e.target.value === 'faixa' ? (item.faixas?.length ? item.faixas : [newFaixa()]) : item.faixas,
+                          })}
+                          className="border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                        >
+                          <option value="percentual">% fixo</option>
+                          <option value="faixa">% por faixa de resultado</option>
+                        </select>
+                      </div>
+
+                      {/* Base de cálculo (departamento / DRE) */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-slate-500 whitespace-nowrap">Sobre o resultado:</span>
+                        <select
+                          value={item.baseCalculo ?? ''}
+                          onChange={e => updateItem(item.id, { baseCalculo: (e.target.value || undefined) as BaseCalculoVariavel | undefined })}
+                          className="flex-1 min-w-[220px] border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                        >
+                          <option value="">Base informada manualmente no mês</option>
+                          {BASE_CALCULO_OPTIONS.map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                        </select>
+                        {item.baseCalculo && (
+                          <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 whitespace-nowrap">
+                            Puxado do DRE (igual PJ)
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Modo % fixo */}
+                      {(item.modoVariavel ?? 'percentual') === 'percentual' ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-slate-500 whitespace-nowrap">% sobre a base:</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={item.percentual ?? ''}
+                            onChange={e => updateItem(item.id, { percentual: parseFloat(e.target.value) || undefined })}
+                            className="w-20 border border-amber-300 rounded px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            placeholder="0,00"
+                          />
+                          <span className="text-xs text-slate-400">%</span>
+                        </div>
+                      ) : (
+                        /* Modo faixas */
+                        <div className="flex flex-col gap-1.5 bg-white border border-amber-200 rounded-lg px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-amber-700">Faixas de resultado</span>
+                            <button
+                              type="button"
+                              onClick={() => updateItem(item.id, { faixas: [...(item.faixas ?? []), newFaixa()] })}
+                              className="text-[11px] text-teal-600 hover:text-teal-700 font-semibold"
+                            >
+                              + Adicionar faixa
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-1.5 items-center text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                            <span>De (R$)</span>
+                            <span>Até (R$)</span>
+                            <span className="text-right pr-1">% Prêmio</span>
+                            <span />
+                          </div>
+                          {(item.faixas ?? []).map((faixa, fIdx) => (
+                            <div key={faixa.id} className="grid grid-cols-[1fr_1fr_auto_auto] gap-1.5 items-center">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={faixa.de}
+                                onChange={e => updateItem(item.id, {
+                                  faixas: (item.faixas ?? []).map((f, i) => i === fIdx ? { ...f, de: parseFloat(e.target.value) || 0 } : f),
+                                })}
+                                className="border border-slate-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                placeholder="0,00"
+                              />
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={faixa.ate ?? ''}
+                                onChange={e => updateItem(item.id, {
+                                  faixas: (item.faixas ?? []).map((f, i) => i === fIdx ? { ...f, ate: e.target.value === '' ? undefined : parseFloat(e.target.value) } : f),
+                                })}
+                                className="border border-slate-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                placeholder="Acima do limite"
+                              />
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  max="100"
+                                  value={faixa.percentual || ''}
+                                  onChange={e => updateItem(item.id, {
+                                    faixas: (item.faixas ?? []).map((f, i) => i === fIdx ? { ...f, percentual: parseFloat(e.target.value) || 0 } : f),
+                                  })}
+                                  className="w-16 border border-amber-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                  placeholder="0,00"
+                                />
+                                <span className="text-[10px] text-slate-400">%</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => updateItem(item.id, { faixas: (item.faixas ?? []).filter((_, i) => i !== fIdx) })}
+                                className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                          <p className="text-[10px] text-slate-400">
+                            Deixe "Até" em branco na última faixa para "acima do limite". Resultado ≤ 0 não gera remuneração. O % encontrado incide sobre o valor total do resultado.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -475,6 +641,9 @@ function ColaboradorCard({
             {colaborador.departamento && (
               <p className="text-xs text-slate-400 truncate">{colaborador.departamento}</p>
             )}
+            {colaborador.salarioFixo != null && (
+              <p className="text-xs text-slate-400 truncate">Fixo (RH): R${colaborador.salarioFixo.toLocaleString('pt-BR')}</p>
+            )}
           </div>
 
           {/* Ações admin */}
@@ -522,7 +691,9 @@ function ColaboradorCard({
               {item.tipo === 'fixa' && item.valorBase
                 ? ` · R$${item.valorBase.toLocaleString('pt-BR')}`
                 : item.tipo === 'variavel'
-                  ? ` · ${item.percentual != null ? item.percentual + '%' : 'var.'}`
+                  ? ` · ${(item.modoVariavel ?? 'percentual') === 'faixa'
+                      ? 'faixas'
+                      : (item.percentual != null ? item.percentual + '%' : 'var.')}${item.baseCalculo ? ' / ' + BASE_CALCULO_LABELS[item.baseCalculo].replace('LUCRO LÍQUIDO DO EXERCÍCIO - ', '') : ''}`
                   : ''}
             </span>
           ))}

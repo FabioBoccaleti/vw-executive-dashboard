@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Printer, Check, Save, Loader2, X, FileText, PenLine, ShieldCheck, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
+import { kvGet } from '@/lib/kvClient';
+import { loadDREDataAsync } from '@/lib/dbStorage';
 import { useAuth } from '@/contexts/useAuth';
 import { apiLogin } from '@/lib/authClient';
 import {
@@ -9,12 +11,14 @@ import {
   buildLancamentoVazio,
   buildColaboradorSnapshot,
   buildLancamentoPreview,
+  percentualBaseVariavel,
   totalLancamento,
   type Colaborador,
   type ColaboradorSnapshot,
   type LancamentoRV,
   type LancamentoItemRV,
   type AssinaturaDigital,
+  type BaseCalculoVariavel,
 } from './remVariaveisStorage';
 
 const MONTHS = [
@@ -23,6 +27,50 @@ const MONTHS = [
 ];
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - 3 + i);
+
+// ─── Mapeamentos DRE (base automática por departamento) ──────────────────────
+
+/** baseCalculo → chave de departamento no DRE */
+const BASE_TO_DEPT: Record<BaseCalculoVariavel, string> = {
+  lucro_novos:     'novos',
+  lucro_usados:    'usados',
+  lucro_vd_direta: 'direta',
+  lucro_pecas:     'pecas',
+  lucro_oficina:   'oficina',
+  lucro_funilaria: 'funilaria',
+};
+
+/** chave de departamento DRE → Department do Dashboard Executivo */
+const DEPT_TO_EXEC_DEPT: Record<string, string> = {
+  novos:     'novos',
+  usados:    'usados',
+  direta:    'vendaDireta',
+  pecas:     'pecas',
+  oficina:   'oficina',
+  funilaria: 'funilaria',
+};
+
+/** Extrai lucroLiquidoExercicio de um DRELine[] do Dashboard Executivo para um mês (0-based) */
+function extractLucroLiquido(dreLines: any[] | null, monthIndex: number): number {
+  if (!dreLines) return 0;
+  for (const line of dreLines) {
+    const label = String(line.label || line.descricao || '')
+      .toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z ]/g, '').trim();
+    if (label === 'LUCRO LIQUIDO DO EXERCICIO') {
+      const vals: number[] = line.meses || line.values || [];
+      return vals[monthIndex] ?? 0;
+    }
+  }
+  return 0;
+}
+
+function parseValDre(v: string | number | undefined | null): number {
+  if (v == null || v === '') return 0;
+  if (typeof v === 'number') return v;
+  return parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
+}
 
 function fmtBRL(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -167,7 +215,14 @@ function DemonstrativoTable({
                       className="w-full border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
                     />
                   ) : (
-                    <span className="text-sm text-slate-800">{item.descricao}</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm text-slate-800">{item.descricao}</span>
+                      {item.tipo === 'variavel' && item.categoria && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                          {item.categoria === 'premio' ? 'Prêmio' : 'Comissão'}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </td>
 
@@ -209,7 +264,7 @@ function DemonstrativoTable({
                 <td className="px-4 py-3">
                   {item.tipo === 'variavel' ? (
                     editing ? (
-                      <div className="flex justify-end">
+                      <div className="flex flex-col items-end gap-0.5">
                         <input
                           type="number"
                           min="0"
@@ -219,11 +274,23 @@ function DemonstrativoTable({
                           className="w-36 border border-slate-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-400"
                           placeholder="0,00"
                         />
+                        {item.baseCalculoLabel && (
+                          <span className="text-[9px] text-slate-400 text-right leading-tight">
+                            {item.baseCalculoLabel.replace('LUCRO LÍQUIDO DO EXERCÍCIO - ', '')} · DRE
+                          </span>
+                        )}
                       </div>
                     ) : (
-                      <p className="text-right text-sm text-slate-600 tabular-nums">
-                        {item.valorBaseCalculo ? fmtBRL(item.valorBaseCalculo) : '—'}
-                      </p>
+                      <div className="flex flex-col items-end gap-0.5">
+                        <p className="text-right text-sm text-slate-600 tabular-nums">
+                          {item.valorBaseCalculo ? fmtBRL(item.valorBaseCalculo) : '—'}
+                        </p>
+                        {item.baseCalculoLabel && (
+                          <span className="text-[9px] text-slate-400 text-right leading-tight">
+                            {item.baseCalculoLabel.replace('LUCRO LÍQUIDO DO EXERCÍCIO - ', '')}
+                          </span>
+                        )}
+                      </div>
                     )
                   ) : (
                     <p className="text-right text-sm text-slate-300">—</p>
@@ -265,12 +332,35 @@ function DemonstrativoTable({
         </tbody>
         <tfoot>
           <tr style={{ backgroundColor: brandDark }}>
-            <td colSpan={3} className="px-6 py-3 text-sm font-bold text-white">Total</td>
+            <td colSpan={3} className="px-6 py-3 text-sm font-bold text-white">Total Variável</td>
             <td className="px-6 py-3 text-right text-base font-bold text-white tabular-nums">{fmtBRL(total)}</td>
             {editing && isAdmin && <td />}
           </tr>
         </tfoot>
       </table>
+
+      {/* Resumo consolidado — Salário Fixo (RH) + Variável */}
+      <div className="px-6 py-4 border-t border-slate-100 bg-slate-50">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex flex-col gap-1.5 text-sm">
+            <div className="flex items-center gap-3">
+              <span className="text-slate-500">Salário Fixo</span>
+              <span className="font-semibold text-slate-700 tabular-nums">{fmtBRL(colaborador.salarioFixo ?? 0)}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-slate-500">Remuneração Variável</span>
+              <span className="font-semibold text-slate-700 tabular-nums">{fmtBRL(total)}</span>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-0.5 rounded-lg px-4 py-2 border border-teal-200 bg-teal-50">
+            <span className="text-[11px] font-semibold text-teal-600 uppercase tracking-wider">Total a Receber no Mês</span>
+            <span className="text-xl font-bold text-teal-700 tabular-nums">{fmtBRL((colaborador.salarioFixo ?? 0) + total)}</span>
+          </div>
+        </div>
+        <p className="text-[10px] text-slate-400 mt-2">
+          O salário fixo já está cadastrado no RH; valor informativo para conferência do total a ser recebido pelo colaborador.
+        </p>
+      </div>
 
       {/* Adicionar item (edição) */}
       {editing && isAdmin && (
@@ -400,20 +490,68 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
     ? lanc.snapshotColaborador
     : colaborador;
 
-  // Carrega lançamento do mês selecionado
+  // Carrega lançamento do mês selecionado + base do DRE (mês anterior, igual PJ)
   useEffect(() => {
     setLoading(true);
     setEditing(false);
     setDirty(false);
 
+    const drePrev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
+    const dreKey = `resumo_dre:${colaborador.brand}:${drePrev.year}-${String(drePrev.month).padStart(2, '0')}`;
+
     async function load() {
-      const existing = await loadLancamento(colaborador.id, year, month);
+      const [existing, kvDreRow] = await Promise.all([
+        loadLancamento(colaborador.id, year, month),
+        kvGet<any>(dreKey),
+      ]);
+
       if (existing && existing.status === 'pago') {
         setLanc(existing);
-      } else {
-        const base = existing ?? buildLancamentoVazio(colaborador, year, month);
-        setLanc(buildLancamentoPreview(colaborador, base));
+        setLoading(false);
+        return;
       }
+
+      // Monta a linha de DRE por departamento (prioriza o Dashboard Executivo)
+      let dreRow = kvDreRow;
+      const monthIndex = drePrev.month - 1;
+      const deptEntries = Object.entries(DEPT_TO_EXEC_DEPT);
+      const dreResults = await Promise.all(
+        deptEntries.map(([dk, dept]) =>
+          loadDREDataAsync(drePrev.year as any, dept as any, colaborador.brand).then(d => ({ dk, d }))
+        )
+      );
+      const synthetic: Record<string, { lucroLiquidoExercicio: number }> = {};
+      for (const { dk, d } of dreResults) {
+        synthetic[dk] = { lucroLiquidoExercicio: extractLucroLiquido(d, monthIndex) };
+      }
+      if (Object.values(synthetic).some(v => v.lucroLiquidoExercicio !== 0)) {
+        dreRow = synthetic;
+      }
+
+      const raw = existing ?? buildLancamentoVazio(colaborador, year, month);
+      let base = buildLancamentoPreview(colaborador, raw);
+
+      // Preenche a base dos itens variáveis com baseCalculo a partir do DRE e recalcula o valor
+      if (dreRow) {
+        base = {
+          ...base,
+          itens: base.itens.map(item => {
+            if (item.tipo !== 'variavel') return item;
+            const colabItem = colaborador.itens.find(ci => ci.id === item.itemId);
+            if (!colabItem?.baseCalculo) return item;
+            const dk = BASE_TO_DEPT[colabItem.baseCalculo];
+            const valorBase = Math.max(0, parseValDre(dreRow[dk]?.lucroLiquidoExercicio));
+            const kpiBonus = (colaborador.kpis ?? [])
+              .filter(k => k.itemRemuneracaoId === colabItem.id && (base.kpisAtingidos ?? []).includes(k.id))
+              .reduce((s, k) => s + k.percentualBonus, 0);
+            const pctTotal = percentualBaseVariavel(colabItem, valorBase) + kpiBonus;
+            const valor = valorBase > 0 ? Math.max(0, Math.round((valorBase * pctTotal / 100) * 100) / 100) : 0;
+            return { ...item, valorBaseCalculo: valorBase, percentualUsado: pctTotal, valor };
+          }),
+        };
+      }
+
+      setLanc(base);
       setLoading(false);
     }
     load();
@@ -430,12 +568,14 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
 
   function recalcVariavel(it: LancamentoItemRV, kpisAtingidos: string[]): LancamentoItemRV {
     if (it.tipo !== 'variavel') return it;
-    const pctBase = colaborador.itens.find(ci => ci.id === it.itemId)?.percentual ?? 0;
+    const colabItem = colaborador.itens.find(ci => ci.id === it.itemId);
     const kpiBonus = (colaborador.kpis ?? [])
       .filter(k => k.itemRemuneracaoId === it.itemId && kpisAtingidos.includes(k.id))
       .reduce((s, k) => s + k.percentualBonus, 0);
+    const valorBase = it.valorBaseCalculo ?? 0;
+    const pctBase = colabItem ? percentualBaseVariavel(colabItem, valorBase) : 0;
     const pctTotal = pctBase + kpiBonus;
-    const valor = Math.max(0, Math.round(((it.valorBaseCalculo ?? 0) * pctTotal / 100) * 100) / 100);
+    const valor = valorBase > 0 ? Math.max(0, Math.round(((valorBase * pctTotal) / 100) * 100) / 100) : 0;
     return { ...it, percentualUsado: pctTotal, valor };
   }
 

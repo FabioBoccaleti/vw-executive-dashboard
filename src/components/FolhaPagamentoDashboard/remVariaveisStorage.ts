@@ -6,15 +6,84 @@ export type RvBrand = 'vw' | 'audi';
 export type TipoRemuneracao = 'fixa' | 'variavel';
 export type StatusPagamento = 'pendente' | 'pago';
 
+/** Classificação do item variável (apenas rótulo, não altera o cálculo) */
+export type ItemCategoria = 'premio' | 'comissao';
+export const CATEGORIA_LABELS: Record<ItemCategoria, string> = {
+  premio: 'Prêmio',
+  comissao: 'Comissão',
+};
+
+/** Modo de cálculo do item variável */
+export type ModoVariavel = 'percentual' | 'faixa';
+
+/** Base de cálculo (resultado por departamento, puxado do DRE) */
+export type BaseCalculoVariavel =
+  | 'lucro_novos'
+  | 'lucro_usados'
+  | 'lucro_vd_direta'
+  | 'lucro_pecas'
+  | 'lucro_oficina'
+  | 'lucro_funilaria';
+
+export const BASE_CALCULO_LABELS: Record<BaseCalculoVariavel, string> = {
+  lucro_novos:     'LUCRO LÍQUIDO DO EXERCÍCIO - Novos',
+  lucro_usados:    'LUCRO LÍQUIDO DO EXERCÍCIO - Usados',
+  lucro_vd_direta: 'LUCRO LÍQUIDO DO EXERCÍCIO - VD Direta',
+  lucro_pecas:     'LUCRO LÍQUIDO DO EXERCÍCIO - Peças',
+  lucro_oficina:   'LUCRO LÍQUIDO DO EXERCÍCIO - Oficina',
+  lucro_funilaria: 'LUCRO LÍQUIDO DO EXERCÍCIO - Funilaria',
+};
+
+/** Faixa de resultado → percentual (a % incide sobre o valor total da base) */
+export interface FaixaResultado {
+  id: string;
+  /** Limite inferior (inclusive) */
+  de: number;
+  /** Limite superior (inclusive). undefined = "acima do limite" */
+  ate?: number;
+  /** Percentual aplicado quando a base cai nesta faixa */
+  percentual: number;
+}
+
 /** Item de remuneração vinculado ao cadastro do colaborador */
 export interface ItemRemuneracaoRV {
   id: string;
   descricao: string;
   tipo: TipoRemuneracao;
+  /** Classificação (rótulo) do item variável: Prêmio ou Comissão */
+  categoria?: ItemCategoria;
   /** Valor base — apenas para tipo 'fixa' */
   valorBase?: number;
-  /** Percentual aplicado sobre a base informada no mês — apenas 'variavel' */
+  /** Modo de cálculo do item variável (default 'percentual') */
+  modoVariavel?: ModoVariavel;
+  /** Percentual fixo aplicado sobre a base — apenas modo 'percentual' */
   percentual?: number;
+  /** Tabela de faixas de resultado → % — apenas modo 'faixa' */
+  faixas?: FaixaResultado[];
+  /** Base de cálculo (departamento). Se definida, a base é puxada do DRE; senão, manual */
+  baseCalculo?: BaseCalculoVariavel;
+}
+
+/**
+ * Retorna o percentual da faixa em que o valor da base se enquadra.
+ * Base menor ou igual a zero => 0%. Sem faixas => 0%.
+ */
+export function percentualPorFaixa(faixas: FaixaResultado[] | undefined, valorBase: number): number {
+  if (!faixas || faixas.length === 0) return 0;
+  if (valorBase <= 0) return 0;
+  const ordenadas = [...faixas].sort((a, b) => a.de - b.de);
+  for (const f of ordenadas) {
+    const ate = f.ate ?? Infinity;
+    if (valorBase >= f.de && valorBase <= ate) return f.percentual;
+  }
+  return 0;
+}
+
+/** Percentual base de um item variável conforme o modo (fixo ou faixa) */
+export function percentualBaseVariavel(item: ItemRemuneracaoRV, valorBase: number): number {
+  return (item.modoVariavel ?? 'percentual') === 'faixa'
+    ? percentualPorFaixa(item.faixas, valorBase)
+    : (item.percentual ?? 0);
 }
 
 /** KPI vinculado a um item variável do colaborador */
@@ -40,6 +109,8 @@ export interface Colaborador {
   cargo?: string;
   departamento?: string;
   brand: RvBrand;
+  /** Salário fixo mensal de referência (cadastrado no RH). Congelado no snapshot ao pagar. */
+  salarioFixo?: number;
   ativo: boolean;
   itens: ItemRemuneracaoRV[];
   kpis?: KpiColaborador[];
@@ -56,10 +127,14 @@ export interface LancamentoItemRV {
   tipo: TipoRemuneracao;
   valor: number;
   observacao?: string;
+  /** Para itens variáveis: classificação (Prêmio/Comissão) */
+  categoria?: ItemCategoria;
   /** Para itens variáveis: valor da base de cálculo informado no lançamento */
   valorBaseCalculo?: number;
   /** Para itens variáveis: snapshot do percentual (base + KPIs) no lançamento */
   percentualUsado?: number;
+  /** Para itens variáveis: rótulo da base de cálculo */
+  baseCalculoLabel?: string;
 }
 
 export interface AssinaturaDigital {
@@ -249,7 +324,11 @@ export function buildLancamentoVazio(
       descricao: item.descricao,
       tipo: item.tipo,
       valor: item.tipo === 'fixa' ? (item.valorBase ?? 0) : 0,
-      ...(item.tipo === 'variavel' && { percentualUsado: item.percentual }),
+      ...(item.tipo === 'variavel' && {
+        categoria: item.categoria,
+        percentualUsado: (item.modoVariavel ?? 'percentual') === 'faixa' ? 0 : item.percentual,
+        baseCalculoLabel: item.baseCalculo ? BASE_CALCULO_LABELS[item.baseCalculo] : undefined,
+      }),
     })),
   };
 }
@@ -275,7 +354,7 @@ export function buildLancamentoPreview(colaborador: Colaborador, lanc: Lancament
         valor: colabItem.valorBase ?? 0,
       };
     }
-    const pctBase = colabItem.percentual ?? 0;
+    const pctBase = percentualBaseVariavel(colabItem, itemAtual?.valorBaseCalculo ?? 0);
     const kpiBonus = (colaborador.kpis ?? [])
       .filter(k => k.itemRemuneracaoId === colabItem.id && (lanc.kpisAtingidos ?? []).includes(k.id))
       .reduce((s, k) => s + k.percentualBonus, 0);
@@ -285,9 +364,11 @@ export function buildLancamentoPreview(colaborador: Colaborador, lanc: Lancament
       itemId: colabItem.id,
       descricao: colabItem.descricao,
       tipo: 'variavel',
-      valor: Math.max(0, Math.round((valorBase * pctTotal / 100) * 100) / 100),
+      categoria: colabItem.categoria,
+      valor: valorBase > 0 ? Math.max(0, Math.round((valorBase * pctTotal / 100) * 100) / 100) : 0,
       valorBaseCalculo: valorBase,
       percentualUsado: pctTotal,
+      baseCalculoLabel: colabItem.baseCalculo ? BASE_CALCULO_LABELS[colabItem.baseCalculo] : undefined,
     };
   });
 
