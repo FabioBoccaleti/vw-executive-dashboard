@@ -1,8 +1,8 @@
-import { Wallet, UserCheck, Calculator } from 'lucide-react';
+import { Wallet, UserCheck, Calculator, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/useAuth';
 
 interface FolhaSelectionPageProps {
-  onSelect: (option: 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas') => void;
+  onSelect: (option: 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis') => void;
   onChangeBrand: () => void;
 }
 
@@ -34,7 +34,7 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
           {/* Card — Salários Fixo */}
           <button
             onClick={() => onSelect('salarios_fixo')}
-            className="flex-1 max-w-xs mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+            className="w-44 mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
           >
             <div className="p-4 rounded-full bg-teal-50 group-hover:bg-teal-100 transition-colors">
               <Wallet className="w-10 h-10 text-teal-500" />
@@ -50,7 +50,7 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
           {canPJ && (
           <button
             onClick={() => onSelect('remuneracoes_pj')}
-            className="flex-1 max-w-xs mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+            className="w-44 mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
           >
             <div className="p-4 rounded-full bg-teal-50 group-hover:bg-teal-100 transition-colors">
               <UserCheck className="w-10 h-10 text-teal-500" />
@@ -67,7 +67,7 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
           {canComissoesVW && (
           <button
             onClick={() => onSelect('calculo_comissoes_vw')}
-            className="flex-1 max-w-xs mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+            className="w-44 mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
           >
             <div className="p-4 rounded-full bg-teal-50 group-hover:bg-teal-100 transition-colors">
               <Calculator className="w-10 h-10 text-teal-500" />
@@ -84,7 +84,7 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
           {canComissoesVW && (
           <button
             onClick={() => onSelect('calculo_comissoes_vw_pos_vendas')}
-            className="flex-1 max-w-xs mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+            className="w-44 mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
           >
             <div className="p-4 rounded-full bg-teal-50 group-hover:bg-teal-100 transition-colors">
               <Calculator className="w-10 h-10 text-teal-500" />
@@ -96,6 +96,21 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
             </div>
           </button>
           )}
+
+          {/* Card — Remunerações Variáveis */}
+          <button
+            onClick={() => onSelect('remuneracoes_variaveis')}
+            className="w-44 mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-teal-50 group-hover:bg-teal-100 transition-colors">
+              <TrendingUp className="w-10 h-10 text-teal-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Remunerações Variáveis
+              </h2>
+            </div>
+          </button>
 
         </div>
       </div>

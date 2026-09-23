@@ -15,6 +15,7 @@ import { SalariosFixosDashboard } from '@/components/FolhaPagamentoDashboard/Sal
 import { RemuneracoesPJDashboard } from '@/components/FolhaPagamentoDashboard/RemuneracoesPJDashboard'
 import { CalculoComissoesVWPage } from '@/components/FolhaPagamentoDashboard/CalculoComissoesVWPage'
 import { CalculoComissoesVWPosVendasPage } from '@/components/FolhaPagamentoDashboard/CalculoComissoesVWPosVendasPage'
+import { RemuneracoesVariaveisDashboard } from '@/components/FolhaPagamentoDashboard/RemuneracoesVariaveisDashboard'
 import { CadastrosPage } from '@/components/CadastrosPage'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
@@ -48,7 +49,7 @@ function AppContent() {
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
   const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade'>('selection')
-  const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas'>('selection')
+  const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis'>('selection')
   const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica'>('blindagem')
   
   // Inicializa o banco de dados em produção
@@ -246,6 +247,8 @@ function AppContent() {
           <CalculoComissoesVWPage onBack={() => setFolhaSubPage('selection')} />
         ) : folhaSubPage === 'calculo_comissoes_vw_pos_vendas' ? (
           <CalculoComissoesVWPosVendasPage onBack={() => setFolhaSubPage('selection')} />
+        ) : folhaSubPage === 'remuneracoes_variaveis' ? (
+          <RemuneracoesVariaveisDashboard onBack={() => setFolhaSubPage('selection')} />
         ) : null
       ) : brand === 'vendas_bonificacoes' ? (
         vendasSubPage === 'selection' ? (
