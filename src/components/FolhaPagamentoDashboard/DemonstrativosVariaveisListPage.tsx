@@ -6,8 +6,11 @@ import {
   buildLancamentoVazio,
   buildLancamentoPreview,
   totalLancamento,
+  CAMPO_ASSINATURA_LABELS,
+  CAMPO_ASSINATURA_LABELS_CURTO,
   type Colaborador,
   type LancamentoRV,
+  type CampoAssinaturaRV,
 } from './remVariaveisStorage';
 
 const MONTHS = [
@@ -35,8 +38,6 @@ function ColaboradorRow({
   const lancPreview = lanc ? buildLancamentoPreview(colaborador, lanc) : null;
   const total = lancPreview ? totalLancamento(lancPreview) : null;
   const pago = lanc?.status === 'pago';
-  const finAssinou = !!lanc?.assinaturas?.financeiro;
-  const rhAssinou  = !!lanc?.assinaturas?.rh;
   const brandColor = colaborador.brand === 'vw' ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-red-700 bg-red-50 border-red-200';
 
   return (
@@ -59,9 +60,10 @@ function ColaboradorRow({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <AssinaturaIcon label="Fin" assinado={finAssinou} />
-        <AssinaturaIcon label="RH"  assinado={rhAssinou} />
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        {(Object.keys(CAMPO_ASSINATURA_LABELS_CURTO) as CampoAssinaturaRV[]).map(campo => (
+          <AssinaturaIcon key={campo} label={CAMPO_ASSINATURA_LABELS_CURTO[campo]} assinado={!!lanc?.assinaturas?.[campo]} />
+        ))}
       </div>
 
       <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${
@@ -192,9 +194,9 @@ export function DemonstrativosVariaveisListPage({ onOpenColaborador }: Demonstra
         </tr>
       `).join('');
 
-      const assinaturas = (['financeiro', 'rh'] as const).map(campo => {
+      const assinaturas = (Object.keys(CAMPO_ASSINATURA_LABELS) as CampoAssinaturaRV[]).map(campo => {
         const ass = l.assinaturas?.[campo];
-        const label = campo === 'financeiro' ? 'Financeiro' : 'Recursos Humanos';
+        const label = CAMPO_ASSINATURA_LABELS[campo];
         return ass ? `
           <div style="border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;background:#f0fdf4;">
             <div style="font-size:11px;color:#15803d;font-weight:700;margin-bottom:2px;">${label}</div>

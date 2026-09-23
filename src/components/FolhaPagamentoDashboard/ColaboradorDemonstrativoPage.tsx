@@ -13,12 +13,14 @@ import {
   buildLancamentoPreview,
   percentualBaseVariavel,
   totalLancamento,
+  CAMPO_ASSINATURA_LABELS,
   type Colaborador,
   type ColaboradorSnapshot,
   type LancamentoRV,
   type LancamentoItemRV,
   type AssinaturaDigital,
   type BaseCalculoVariavel,
+  type CampoAssinaturaRV,
 } from './remVariaveisStorage';
 
 const MONTHS = [
@@ -144,7 +146,7 @@ function DemonstrativoTable({
   onAddItem: () => void;
   onRemoveItem: (idx: number) => void;
   onKpiAlcancadoChange: (kpiId: string, valor: number | undefined) => void;
-  onAssinar: (campo: 'financeiro' | 'rh') => void;
+  onAssinar: (campo: CampoAssinaturaRV) => void;
 }) {
   const total = totalLancamento(lanc);
   const brandColor = colaborador.brand === 'vw' ? '#001e50' : '#bb0a30';
@@ -419,9 +421,9 @@ function DemonstrativoTable({
       <div className="border-t border-slate-100 px-6 py-4">
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Assinaturas</p>
         <div className="grid grid-cols-2 gap-3">
-          {(['financeiro', 'rh'] as const).map(campo => {
+          {(Object.keys(CAMPO_ASSINATURA_LABELS) as CampoAssinaturaRV[]).map(campo => {
             const ass = lanc.assinaturas?.[campo];
-            const label = campo === 'financeiro' ? 'Financeiro' : 'Recursos Humanos';
+            const label = CAMPO_ASSINATURA_LABELS[campo];
             if (ass) {
               return (
                 <div key={campo} className="border border-emerald-200 rounded-lg px-3 py-2.5 bg-emerald-50">
@@ -477,7 +479,7 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
 
   const { session } = useAuth();
   const [assinaDialog, setAssinaDialog] = useState<{
-    campo: 'financeiro' | 'rh';
+    campo: CampoAssinaturaRV;
     nome: string;
     senha: string;
     loading: boolean;
@@ -485,7 +487,13 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
   } | null>(null);
   const [reabrirDialog, setReopenDialog] = useState<{ senha: string; erro: string | null } | null>(null);
 
-  const isLocked = !!(lanc?.assinaturas?.financeiro || lanc?.assinaturas?.rh || lanc?.status === 'pago');
+  const isLocked = !!(
+    lanc?.assinaturas?.financeiro ||
+    lanc?.assinaturas?.gerenciaComercial ||
+    lanc?.assinaturas?.diretoriaComercial ||
+    lanc?.assinaturas?.diretoria ||
+    lanc?.status === 'pago'
+  );
   const effectiveColaborador = lanc?.status === 'pago' && lanc?.snapshotColaborador
     ? lanc.snapshotColaborador
     : colaborador;
@@ -660,7 +668,7 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
     toast.success('Marcado como pago.');
   }
 
-  function handleAbrirAssinatura(campo: 'financeiro' | 'rh') {
+  function handleAbrirAssinatura(campo: CampoAssinaturaRV) {
     if (!session) return;
     setAssinaDialog({ campo, nome: session.name ?? '', senha: '', loading: false, erro: null });
   }
@@ -685,7 +693,7 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
     setLanc(novoLanc);
     await saveLancamento(novoLanc);
     setAssinaDialog(null);
-    toast.success(`Assinatura de ${assinaDialog.campo === 'financeiro' ? 'Financeiro' : 'RH'} registrada!`);
+    toast.success(`Assinatura de ${CAMPO_ASSINATURA_LABELS[assinaDialog.campo]} registrada!`);
   }
 
   async function handleConfirmarReabrir() {
@@ -916,7 +924,7 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
               <div className="flex items-center gap-2">
                 <PenLine className="w-4 h-4 text-teal-600" />
                 <h3 className="text-sm font-bold text-slate-800">
-                  Assinar — {assinaDialog.campo === 'financeiro' ? 'Financeiro' : 'Recursos Humanos'}
+                  Assinar — {CAMPO_ASSINATURA_LABELS[assinaDialog.campo]}
                 </h3>
               </div>
               <button onClick={() => setAssinaDialog(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100">

@@ -143,6 +143,27 @@ export interface AssinaturaDigital {
   dataHora: string;
 }
 
+/** Campos de assinatura (mesmo padrão do Cálculo de Comissões VW) */
+export type CampoAssinaturaRV =
+  | 'financeiro'
+  | 'gerenciaComercial'
+  | 'diretoriaComercial'
+  | 'diretoria';
+
+export const CAMPO_ASSINATURA_LABELS: Record<CampoAssinaturaRV, string> = {
+  financeiro:         'Financeiro',
+  gerenciaComercial:  'Gerência Comercial',
+  diretoriaComercial: 'Diretoria Comercial',
+  diretoria:          'Diretoria',
+};
+
+export const CAMPO_ASSINATURA_LABELS_CURTO: Record<CampoAssinaturaRV, string> = {
+  financeiro:         'Fin',
+  gerenciaComercial:  'G.Com',
+  diretoriaComercial: 'D.Com',
+  diretoria:          'Dir',
+};
+
 /** Lançamento mensal de um colaborador */
 export interface LancamentoRV {
   colaboradorId: string;
@@ -159,10 +180,7 @@ export interface LancamentoRV {
   /** Valores alcançados por KPI neste mês: kpiId → valor */
   kpisAlcancado?: Record<string, number>;
   /** Assinaturas eletrônicas */
-  assinaturas?: {
-    financeiro?: AssinaturaDigital;
-    rh?: AssinaturaDigital;
-  };
+  assinaturas?: Partial<Record<CampoAssinaturaRV, AssinaturaDigital>>;
 }
 
 // ─── Chaves KV ────────────────────────────────────────────────────────────────
