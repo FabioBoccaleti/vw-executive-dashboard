@@ -144,6 +144,23 @@ function buildPrestadorSnapshot(prestador: PrestadorPJ): PrestadorSnapshotPJ {
   };
 }
 
+// Recalcula o valor do item Prêmio Adicional a partir dos itens marcados e da dedução.
+function recomputePremioItens(
+  itens: LancamentoItem[],
+  itensPremioIds: string[],
+  percentualPremio: number,
+  deducaoBasePremio: number,
+): LancamentoItem[] {
+  const somaItens = itens
+    .filter(it => itensPremioIds.includes(it.itemId))
+    .reduce((s, it) => s + (it.valor || 0), 0);
+  const baseValor = Math.max(0, somaItens - deducaoBasePremio);
+  const valorPremio = Math.round((baseValor * percentualPremio) / 100 * 100) / 100;
+  return itens.map(it =>
+    it.itemId === 'premio_adicional' ? { ...it, valor: valorPremio } : it,
+  );
+}
+
 function prevMonth(y: number, m: number) {
   return m === 1 ? { year: y - 1, month: 12 } : { year: y, month: m - 1 };
 }
@@ -912,6 +929,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
             if (item.tipo !== 'variavel') return item;
             const prestItem = prestador.itens.find(pi => pi.id === item.itemId);
             let valorBase = 0;
+            let baseResolvida = false;
             const rateioBases: Record<string, number> = {};
             const addBase = (dreKey: string, raw: number, allowNegative = false) => {
               const departamento = DRE_TO_RATEIO_DEPT[dreKey];
@@ -930,9 +948,11 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
                 if (dk) addBase(dk, raw);
                 return sum + Math.max(0, raw);
               }, 0);
+              baseResolvida = true;
             } else {
               const baseCalculo = inferBaseCalculoFromItem(prestItem, item);
               if (baseCalculo) {
+                baseResolvida = true;
                 if (baseCalculo === 'lucro_novos_usados') {
                   const novos = parseValDre(dreRow['novos']?.lucroLiquidoExercicio);
                   const usados = parseValDre(dreRow['usados']?.lucroLiquidoExercicio);
@@ -956,6 +976,11 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
               }
             }
 
+            // Sem base derivável do DRE: preserva o valor digitado manualmente.
+            if (!baseResolvida) {
+              valorBase = item.valorBaseCalculo ?? 0;
+            }
+
             const pctBase = prestItem?.percentual ?? 0;
             const kpiBonus = (prestador.kpis ?? [])
               .filter(k => k.itemRemuneracaoId === item.itemId && (base.kpisAtingidos ?? []).includes(k.id))
@@ -967,7 +992,7 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
               valorBaseCalculo: valorBase,
               valor,
               percentualUsado: pctTotal,
-              rateioBases,
+              rateioBases: baseResolvida ? rateioBases : item.rateioBases,
             };
           });
         }
@@ -1035,7 +1060,10 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
         }
         return updated;
       });
-      return { ...prev, itens };
+      const itensFinais = prestador.temPremio
+        ? recomputePremioItens(itens, prev.itensPremioIds ?? [], prestador.percentualPremio ?? 0, prestador.deducaoBasePremio ?? 0)
+        : itens;
+      return { ...prev, itens: itensFinais };
     });
     setDirty(true);
   }
@@ -1231,8 +1259,12 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
       setReopenDialog(prev => prev ? { ...prev, erro: 'Senha incorreta.' } : prev);
       return;
     }
+    const itensReabertos = prestador.temPremio
+      ? recomputePremioItens(lanc.itens, lanc.itensPremioIds ?? [], prestador.percentualPremio ?? 0, prestador.deducaoBasePremio ?? 0)
+      : lanc.itens;
     const updated: LancamentoPJ = {
       ...lanc,
+      itens: itensReabertos,
       assinaturas: {},
       status: 'pendente',
       dataPagamento: undefined,
