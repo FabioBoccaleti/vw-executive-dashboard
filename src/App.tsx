@@ -49,7 +49,7 @@ function AppContent() {
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
   const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade'>('selection')
-  const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis'>('selection')
+  const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis' | 'premios'>('selection')
   const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica'>('blindagem')
   
   // Inicializa o banco de dados em produção
@@ -249,6 +249,24 @@ function AppContent() {
           <CalculoComissoesVWPosVendasPage onBack={() => setFolhaSubPage('selection')} />
         ) : folhaSubPage === 'remuneracoes_variaveis' ? (
           <RemuneracoesVariaveisDashboard onBack={() => setFolhaSubPage('selection')} />
+        ) : folhaSubPage === 'premios' ? (
+          <div className="min-h-screen bg-slate-100 flex flex-col">
+            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+              <div>
+                <h1 className="text-lg font-bold text-slate-800">Prêmios</h1>
+                <p className="text-xs text-slate-500 mt-0.5">Folha de Pagamento</p>
+              </div>
+              <button
+                onClick={() => setFolhaSubPage('selection')}
+                className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
+              >
+                ← Voltar
+              </button>
+            </header>
+            <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+              Em desenvolvimento
+            </div>
+          </div>
         ) : null
       ) : brand === 'vendas_bonificacoes' ? (
         vendasSubPage === 'selection' ? (

@@ -1,8 +1,8 @@
-import { Wallet, UserCheck, Calculator, TrendingUp } from 'lucide-react';
+import { Wallet, UserCheck, Calculator, TrendingUp, Trophy } from 'lucide-react';
 import { useAuth } from '@/contexts/useAuth';
 
 interface FolhaSelectionPageProps {
-  onSelect: (option: 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis') => void;
+  onSelect: (option: 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis' | 'premios') => void;
   onChangeBrand: () => void;
 }
 
@@ -108,6 +108,21 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">
                 Remunerações Variáveis
+              </h2>
+            </div>
+          </button>
+
+          {/* Card — Prêmios */}
+          <button
+            onClick={() => onSelect('premios')}
+            className="w-44 mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-teal-50 group-hover:bg-teal-100 transition-colors">
+              <Trophy className="w-10 h-10 text-teal-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Prêmios
               </h2>
             </div>
           </button>
