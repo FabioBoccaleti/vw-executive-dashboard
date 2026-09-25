@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { ChevronRight, ChevronLeft, Printer, PenLine, ShieldCheck, DollarSign, LockOpen, ClipboardList, FileText, BarChart2, Search, Check } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
+import { ChevronRight, ChevronLeft, ChevronDown, Printer, PenLine, ShieldCheck, DollarSign, LockOpen, ClipboardList, FileText, BarChart2, Search, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/useAuth';
 import { apiLogin } from '@/lib/authClient';
@@ -607,8 +607,10 @@ export function AcoesVendasView() {
           <ResumoTab
             premiadosNovos={premiadosNovos}
             premiadosUsados={premiadosUsados}
+            lancamentosPk={lancamentos[pk] ?? {}}
             nomeAcao={nomeAcao}
             competencia={competencia}
+            printHtml={printHtml}
           />
         )}
       </div>
@@ -1222,21 +1224,34 @@ function SecaoTabela({ label, itens, periodoLabel }: { label: string; itens: Pre
 
 // ─── Aba: Resumo ──────────────────────────────────────────────────────────────
 function ResumoTab({
-  premiadosNovos, premiadosUsados, nomeAcao, competencia,
+  premiadosNovos, premiadosUsados, lancamentosPk, nomeAcao, competencia, printHtml,
 }: {
   premiadosNovos: PremiadoItem[];
   premiadosUsados: PremiadoItem[];
+  lancamentosPk: Record<string, AcaoLancamento>;
   nomeAcao: string;
   competencia: string;
+  printHtml: (html: string) => void;
 }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  function toggleExpand(v: string) {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(v)) next.delete(v); else next.add(v);
+      return next;
+    });
+  }
+
+  // Agrupa por vendedor: qtd/valor + itens (para o detalhe expandido)
   const linhas = useMemo(() => {
-    const map = new Map<string, { qtdN: number; valN: number; qtdU: number; valU: number }>();
+    const map = new Map<string, { qtdN: number; valN: number; qtdU: number; valU: number; novos: PremiadoItem[]; usados: PremiadoItem[] }>();
     const ensure = (v: string) => {
-      if (!map.has(v)) map.set(v, { qtdN: 0, valN: 0, qtdU: 0, valU: 0 });
+      if (!map.has(v)) map.set(v, { qtdN: 0, valN: 0, qtdU: 0, valU: 0, novos: [], usados: [] });
       return map.get(v)!;
     };
-    premiadosNovos.forEach(i => { const e = ensure(i.row.vendedor?.trim() || '(sem nome)'); e.qtdN++; e.valN += i.premio; });
-    premiadosUsados.forEach(i => { const e = ensure(i.row.vendedor?.trim() || '(sem nome)'); e.qtdU++; e.valU += i.premio; });
+    premiadosNovos.forEach(i => { const e = ensure(i.row.vendedor?.trim() || '(sem nome)'); e.qtdN++; e.valN += i.premio; e.novos.push(i); });
+    premiadosUsados.forEach(i => { const e = ensure(i.row.vendedor?.trim() || '(sem nome)'); e.qtdU++; e.valU += i.premio; e.usados.push(i); });
     return [...map.entries()]
       .map(([vendedor, d]) => ({ vendedor, ...d, total: d.valN + d.valU }))
       .sort((a, b) => a.vendedor.localeCompare(b.vendedor));
@@ -1247,53 +1262,198 @@ function ResumoTab({
     return acc;
   }, { qtdN: 0, valN: 0, qtdU: 0, valU: 0, total: 0 });
 
+  const thCls  = 'px-4 py-2.5 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wide bg-slate-50';
+  const tdCls  = 'px-4 py-2.5 text-sm border-b border-slate-100';
+  const numCls = `${tdCls} text-right tabular-nums font-mono`;
+
+  function handlePrint() {
+    const rowsHtml = linhas.map(l => {
+      const lanc = lancamentosPk[l.vendedor];
+      const pago = lanc?.pago ?? false;
+      const assinados = CAMPOS_ASSINATURA.filter(c => lanc?.assinaturas?.[c]).map(c => CAMPO_LABELS_CURTO[c]);
+      const statusTxt = `${pago ? 'Pago' : 'Pendente'}${assinados.length ? ' · ' + assinados.join(', ') : ''}`;
+      return `<tr>
+        <td>${escapeHtml(fixVendedorName(l.vendedor))}</td>
+        <td style="text-align:center">${l.qtdN}</td>
+        <td style="text-align:right">R$ ${fmtBRL(l.valN)}</td>
+        <td style="text-align:center">${l.qtdU}</td>
+        <td style="text-align:right">R$ ${fmtBRL(l.valU)}</td>
+        <td style="text-align:right;font-weight:700">R$ ${fmtBRL(l.total)}</td>
+        <td>${statusTxt}</td>
+      </tr>`;
+    }).join('');
+    const html = `<div style="font-family:Inter,system-ui,sans-serif;padding:8px;">
+      <h2 style="font-size:14px;margin:0 0 2px;">Resumo da ação${nomeAcao ? ' — ' + escapeHtml(nomeAcao) : ''}</h2>
+      <p style="font-size:10px;color:#64748b;margin:0 0 10px;">Competência: ${competencia}</p>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead><tr style="background:#f1f5f9;">
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #cbd5e1;">Vendedor</th>
+          <th style="padding:6px;border-bottom:1px solid #cbd5e1;">Qtd Novos</th>
+          <th style="text-align:right;padding:6px;border-bottom:1px solid #cbd5e1;">Valor Novos</th>
+          <th style="padding:6px;border-bottom:1px solid #cbd5e1;">Qtd Usados</th>
+          <th style="text-align:right;padding:6px;border-bottom:1px solid #cbd5e1;">Valor Usados</th>
+          <th style="text-align:right;padding:6px;border-bottom:1px solid #cbd5e1;">Total Prêmio</th>
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #cbd5e1;">Status</th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+        <tfoot><tr style="background:#1e293b;color:white;font-weight:700;">
+          <td style="padding:6px;">Total geral</td>
+          <td style="text-align:center;padding:6px;">${totais.qtdN}</td>
+          <td style="text-align:right;padding:6px;">R$ ${fmtBRL(totais.valN)}</td>
+          <td style="text-align:center;padding:6px;">${totais.qtdU}</td>
+          <td style="text-align:right;padding:6px;">R$ ${fmtBRL(totais.valU)}</td>
+          <td style="text-align:right;padding:6px;">R$ ${fmtBRL(totais.total)}</td>
+          <td style="padding:6px;"></td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+    printHtml(html);
+  }
+
   return (
-    <div className="max-w-5xl mx-auto p-6 flex flex-col gap-4">
-      <div>
-        <h3 className="text-sm font-bold text-slate-800">Resumo da ação — {competencia}</h3>
-        {nomeAcao && <p className="text-xs text-violet-600 font-medium">{nomeAcao}</p>}
+    <div className="flex-1 flex flex-col">
+      {/* Toolbar */}
+      <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+        <span className="text-xs text-slate-400">
+          Competência: <strong className="text-slate-700">{competencia}</strong>
+          {nomeAcao && <span className="ml-2 text-violet-600 font-medium">{nomeAcao}</span>}
+        </span>
+        <button
+          onClick={handlePrint}
+          disabled={linhas.length === 0}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-200 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+        >
+          <Printer className="w-3.5 h-3.5" />
+          Imprimir PDF
+        </button>
       </div>
 
-      {linhas.length === 0 ? (
-        <div className="text-center text-slate-400 text-sm py-16">Nenhum prêmio lançado neste período.</div>
-      ) : (
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
-                <th className="text-left px-3 py-2.5 font-semibold">Vendedor</th>
-                <th className="text-right px-3 py-2.5 font-semibold">Qtd Novos</th>
-                <th className="text-right px-3 py-2.5 font-semibold">Valor Novos</th>
-                <th className="text-right px-3 py-2.5 font-semibold">Qtd Usados</th>
-                <th className="text-right px-3 py-2.5 font-semibold">Valor Usados</th>
-                <th className="text-right px-3 py-2.5 font-semibold text-violet-700">Total Prêmio</th>
-              </tr>
-            </thead>
-            <tbody>
-              {linhas.map(l => (
-                <tr key={l.vendedor} className="border-b border-slate-100 hover:bg-slate-50/60">
-                  <td className="px-3 py-2 text-slate-700 font-medium">{fixVendedorName(l.vendedor)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-600">{l.qtdN}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-600">R$ {fmtBRL(l.valN)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-600">{l.qtdU}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-slate-600">R$ {fmtBRL(l.valU)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-bold text-violet-700">R$ {fmtBRL(l.total)}</td>
+      <div className="flex-1 overflow-auto p-6">
+        {linhas.length === 0 ? (
+          <div className="text-center text-slate-400 text-sm py-16">Nenhum prêmio lançado neste período.</div>
+        ) : (
+          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+            <div className="px-5 py-3 border-b border-slate-100">
+              <h2 className="text-sm font-semibold text-slate-700">Resumo de Prêmios por Vendedor</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Competência: {competencia}</p>
+            </div>
+
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className={`${thCls} w-8`} />
+                  <th className={thCls}>Vendedor</th>
+                  <th className={`${thCls} text-right`}>Qtd Novos</th>
+                  <th className={`${thCls} text-right`}>Valor Novos</th>
+                  <th className={`${thCls} text-right`}>Qtd Usados</th>
+                  <th className={`${thCls} text-right`}>Valor Usados</th>
+                  <th className={`${thCls} text-right`}>Total Prêmio</th>
+                  <th className={thCls}>Status</th>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-slate-800 text-white font-bold text-xs">
-                <td className="px-3 py-2.5 text-left">Total geral</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{totais.qtdN}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">R$ {fmtBRL(totais.valN)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">{totais.qtdU}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">R$ {fmtBRL(totais.valU)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums">R$ {fmtBRL(totais.total)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {linhas.map(l => {
+                  const isExp = expanded.has(l.vendedor);
+                  const lanc = lancamentosPk[l.vendedor];
+                  const pago = lanc?.pago ?? false;
+                  return (
+                    <Fragment key={l.vendedor}>
+                      <tr className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => toggleExpand(l.vendedor)}>
+                        <td className={tdCls}>
+                          {isExp ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                        </td>
+                        <td className={`${tdCls} font-medium text-slate-800`}>{fixVendedorName(l.vendedor)}</td>
+                        <td className={numCls}>{l.qtdN || <span className="text-slate-300">—</span>}</td>
+                        <td className={numCls}>{l.qtdN ? `R$ ${fmtBRL(l.valN)}` : <span className="text-slate-300">—</span>}</td>
+                        <td className={numCls}>{l.qtdU || <span className="text-slate-300">—</span>}</td>
+                        <td className={numCls}>{l.qtdU ? `R$ ${fmtBRL(l.valU)}` : <span className="text-slate-300">—</span>}</td>
+                        <td className={`${numCls} font-semibold text-violet-700`}>R$ {fmtBRL(l.total)}</td>
+                        <td className={tdCls}>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${pago ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {pago ? 'Pago' : 'Pendente'}
+                            </span>
+                            {CAMPOS_ASSINATURA.map(campo => {
+                              const ass = lanc?.assinaturas?.[campo];
+                              return (
+                                <span
+                                  key={campo}
+                                  title={ass ? `${ass.name ?? ass.username} — ${new Date(ass.dataHora).toLocaleString('pt-BR')}` : 'Não assinado'}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded font-semibold border ${ass ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-300 text-slate-400'}`}
+                                >
+                                  {CAMPO_LABELS_CURTO[campo]}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {isExp && (
+                        <tr>
+                          <td colSpan={8} className="bg-slate-50/70 border-b border-slate-100 px-10 py-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                              {l.novos.length > 0 && <DetalhePremios label="Novos" itens={l.novos} />}
+                              {l.usados.length > 0 && <DetalhePremios label="Usados" itens={l.usados} />}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-800 text-white font-bold text-xs">
+                  <td className="px-4 py-2.5" />
+                  <td className="px-4 py-2.5 text-left">Total geral</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{totais.qtdN}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">R$ {fmtBRL(totais.valN)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{totais.qtdU}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">R$ {fmtBRL(totais.valU)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">R$ {fmtBRL(totais.total)}</td>
+                  <td className="px-4 py-2.5" />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Detalhe expandido de prêmios (Novos ou Usados) ───────────────────────────
+function DetalhePremios({ label, itens }: { label: string; itens: PremiadoItem[] }) {
+  const total = itens.reduce((s, i) => s + i.premio, 0);
+  const sorted = [...itens].sort((a, b) => (parseDataVenda(a.row.dataVenda)?.getTime() ?? 0) - (parseDataVenda(b.row.dataVenda)?.getTime() ?? 0));
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2">{label}</p>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-[10px] text-slate-400">
+            <th className="text-left pb-1.5 font-semibold">Chassi</th>
+            <th className="text-left pb-1.5 font-semibold">Modelo</th>
+            <th className="text-right pb-1.5 font-semibold">Prêmio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((it, i) => (
+            <tr key={i} className="border-t border-slate-100">
+              <td className="py-1 pr-3 font-mono text-slate-500">{it.row.chassi || '—'}</td>
+              <td className="py-1 pr-3 text-slate-500">{it.row.modelo || '—'}</td>
+              <td className="py-1 text-right tabular-nums font-medium text-violet-700">{fmtBRL(it.premio)}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t-2 border-slate-200">
+            <td className="pt-1.5 font-semibold text-slate-600" colSpan={2}>Total {label}</td>
+            <td className="pt-1.5 text-right tabular-nums font-bold text-slate-800">{fmtBRL(total)}</td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
   );
 }
