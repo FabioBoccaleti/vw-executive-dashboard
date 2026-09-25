@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { ClipboardList, TrendingUp, Calculator, Lock, BarChart2 } from 'lucide-react';
+import { ClipboardList, TrendingUp, Calculator, Lock, BarChart2, Gift } from 'lucide-react';
 import { ComissoesVendasView } from './ComissoesVendasView';
 import { ComissoesCadastroView } from './ComissoesCadastroView';
 import { ComissoesCalculoView } from './ComissoesCalculoView';
 import { ComissoesResumoView } from './ComissoesResumoView';
+import { AcoesVendasView } from './AcoesVendasView';
 import { useAuth } from '@/contexts/useAuth';
 
-type MainView = 'cadastro' | 'vendas' | 'calculo' | 'resumo';
+type MainView = 'cadastro' | 'vendas' | 'calculo' | 'resumo' | 'acoes';
 type VendasSubTab = 'novos' | 'usados';
 type CalculoSubTab = 'novos' | 'usados';
 
@@ -28,6 +29,7 @@ export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) 
   const canCalculoNovos   = admin || canAccessFolhaSub('folha.comissoes_vw.calculo.novos');
   const canCalculoUsados  = admin || canAccessFolhaSub('folha.comissoes_vw.calculo.usados');
   const canResumo         = admin || canAccessFolhaSub('folha.comissoes_vw.resumo');
+  const canAcoes          = admin || canAccessFolhaSub('folha.comissoes_vw.calculo');
 
   const firstAllowedView: MainView = canResumo ? 'resumo' : canCalculo ? 'calculo' : canVendas ? 'vendas' : 'cadastro';
   const [mainView, setMainView] = useState<MainView>(firstAllowedView);
@@ -99,6 +101,17 @@ export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) 
             >
               <BarChart2 className="w-3.5 h-3.5" />
               Resumo
+            </button>
+            )}
+            {canAcoes && (
+            <button
+              onClick={() => setMainView('acoes')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                mainView === 'acoes' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Gift className="w-3.5 h-3.5" />
+              Ações de Vendas
             </button>
             )}
           </div>
@@ -177,6 +190,9 @@ export function CalculoComissoesVWPage({ onBack }: CalculoComissoesVWPageProps) 
 
       {/* Resumo de Comissões */}
       {mainView === 'resumo' && canResumo && <ComissoesResumoView />}
+
+      {/* Ações de Vendas */}
+      {mainView === 'acoes' && canAcoes && <AcoesVendasView />}
     </div>
   );
 }
