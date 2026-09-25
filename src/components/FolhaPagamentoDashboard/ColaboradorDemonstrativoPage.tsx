@@ -240,9 +240,10 @@ function DemonstrativoTable({
                     </span>
                     {item.tipo === 'variavel' && pct != null && (() => {
                       const pctBase = colaborador.itens.find(ci => ci.id === item.itemId)?.percentual;
-                      const kpiBonus = (colaborador.kpis ?? [])
-                        .filter(k => k.itemRemuneracaoId === item.itemId && (lanc.kpisAtingidos ?? []).includes(k.id))
-                        .reduce((s, k) => s + k.percentualBonus, 0);
+                      const kpisAtingidos = (colaborador.kpis ?? [])
+                        .filter(k => k.itemRemuneracaoId === item.itemId && (lanc.kpisAtingidos ?? []).includes(k.id));
+                      const kpiBonus = kpisAtingidos.reduce((s, k) => s + k.percentualBonus, 0);
+                      const kpiValorBonus = kpisAtingidos.reduce((s, k) => s + (k.valorBonus ?? 0), 0);
                       return (
                         <div className="flex flex-col items-center gap-0.5">
                           <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
@@ -251,6 +252,11 @@ function DemonstrativoTable({
                           {kpiBonus > 0 && pctBase != null && (
                             <span className="text-[9px] text-teal-600 font-semibold">
                               {pctBase}% + {kpiBonus}% KPI
+                            </span>
+                          )}
+                          {kpiValorBonus > 0 && (
+                            <span className="text-[9px] text-teal-600 font-semibold">
+                              + {fmtBRL(kpiValorBonus)} KPI
                             </span>
                           )}
                         </div>
@@ -377,43 +383,95 @@ function DemonstrativoTable({
         </div>
       )}
 
-      {/* KPIs — controle de atingimento (edição) */}
-      {editing && isAdmin && kpis.length > 0 && (
-        <div className="px-6 py-4 border-t border-slate-100 flex flex-col gap-2 no-print">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">KPIs do mês</p>
-          {kpis.map(kpi => {
-            const alcancado = lanc.kpisAlcancado?.[kpi.id];
-            const atingido = (lanc.kpisAtingidos ?? []).includes(kpi.id);
-            return (
-              <div key={kpi.id} className={`flex items-center gap-3 flex-wrap rounded-lg px-3 py-2 border ${
-                atingido ? 'bg-teal-50 border-teal-200' : 'bg-slate-50 border-slate-200'
-              }`}>
-                <span className="text-sm text-slate-700 flex-1 min-w-0 truncate">{kpi.descricao || 'KPI'}</span>
-                {kpi.objetivo != null && (
-                  <span className="text-xs text-slate-400">
-                    Meta: {kpi.condicao ?? '>='} {kpi.objetivo}{kpi.unidade ? ` ${kpi.unidade}` : ''}
-                  </span>
-                )}
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-slate-500">Alcançado:</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={alcancado ?? ''}
-                    onChange={e => onKpiAlcancadoChange(kpi.id, e.target.value === '' ? undefined : parseFloat(e.target.value))}
-                    className="w-24 border border-slate-300 rounded px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-400"
-                    placeholder="0"
-                  />
-                  {kpi.unidade && <span className="text-xs text-slate-400">{kpi.unidade}</span>}
-                </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  atingido ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-500'
+      {/* KPIs — sempre visível no demonstrativo (inclui impressão) */}
+      {kpis.length > 0 && (
+        <div className="px-6 py-4 border-t border-slate-100">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">KPIs</p>
+          <div className="flex flex-col gap-2">
+            {kpis.map(kpi => {
+              const alcancado = lanc.kpisAlcancado?.[kpi.id];
+              const atingido = (lanc.kpisAtingidos ?? []).includes(kpi.id);
+              const itemAfetado = colaborador.itens.find(it => it.id === kpi.itemRemuneracaoId);
+              const temObjetivo = kpi.objetivo != null;
+              const bonusLabel = [
+                kpi.percentualBonus ? `+${kpi.percentualBonus}%` : null,
+                kpi.valorBonus ? `+${fmtBRL(kpi.valorBonus)}` : null,
+              ].filter(Boolean).join(' ') || '—';
+              return (
+                <div key={kpi.id} className={`rounded-lg border transition-colors ${
+                  atingido ? 'bg-teal-50 border-teal-200' : 'bg-slate-50 border-slate-200'
                 }`}>
-                  {atingido ? `+${kpi.percentualBonus}%` : 'não atingido'}
-                </span>
-              </div>
-            );
-          })}
+                  <div className="flex items-center gap-3 px-4 py-2.5">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      atingido ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-400'
+                    }`}>
+                      <Check className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${atingido ? 'text-teal-800' : 'text-slate-600'}`}>
+                        {kpi.descricao || 'KPI'}
+                      </p>
+                      {itemAfetado && (
+                        <p className="text-xs text-slate-400 mt-0.5">{itemAfetado.descricao}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                        atingido
+                          ? 'bg-teal-100 text-teal-700 border-teal-300'
+                          : 'bg-slate-100 text-slate-500 border-slate-300'
+                      }`}>
+                        {bonusLabel}
+                      </span>
+                      <span className={`text-xs font-semibold ${atingido ? 'text-teal-600' : 'text-slate-400'}`}>
+                        {atingido ? 'Atingido' : 'Não atingido'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {(temObjetivo || (editing && isAdmin)) && (
+                    <div className="flex items-center gap-4 px-4 pb-3 pt-0">
+                      {temObjetivo && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold">Meta:</span>
+                          <span className="text-xs font-bold text-slate-500">
+                            {kpi.condicao === '<=' ? '≤' : '≥'}
+                          </span>
+                          <span className="text-xs font-bold text-slate-600">
+                            {kpi.objetivo?.toLocaleString('pt-BR')}{kpi.unidade ? ` ${kpi.unidade}` : ''}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-400 uppercase font-semibold">Alcançado:</span>
+                        {editing && isAdmin ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={alcancado ?? ''}
+                              onChange={e => onKpiAlcancadoChange(kpi.id, e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                              className="w-24 border border-slate-300 rounded px-2 py-1 text-xs text-right focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                              placeholder="0"
+                            />
+                            {kpi.unidade && <span className="text-[10px] text-slate-400">{kpi.unidade}</span>}
+                          </div>
+                        ) : (
+                          <span className={`text-xs font-bold ${
+                            alcancado != null ? (atingido ? 'text-teal-700' : 'text-red-500') : 'text-slate-400 italic'
+                          }`}>
+                            {alcancado != null
+                              ? `${alcancado.toLocaleString('pt-BR')}${kpi.unidade ? ` ${kpi.unidade}` : ''}`
+                              : '—'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -549,11 +607,12 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
             if (!colabItem?.baseCalculo) return item;
             const dk = BASE_TO_DEPT[colabItem.baseCalculo];
             const valorBase = Math.max(0, parseValDre(dreRow[dk]?.lucroLiquidoExercicio));
-            const kpiBonus = (colaborador.kpis ?? [])
-              .filter(k => k.itemRemuneracaoId === colabItem.id && (base.kpisAtingidos ?? []).includes(k.id))
-              .reduce((s, k) => s + k.percentualBonus, 0);
+            const kpisAtingidos = (colaborador.kpis ?? [])
+              .filter(k => k.itemRemuneracaoId === colabItem.id && (base.kpisAtingidos ?? []).includes(k.id));
+            const kpiBonus = kpisAtingidos.reduce((s, k) => s + k.percentualBonus, 0);
+            const kpiValorBonus = kpisAtingidos.reduce((s, k) => s + (k.valorBonus ?? 0), 0);
             const pctTotal = percentualBaseVariavel(colabItem, valorBase) + kpiBonus;
-            const valor = valorBase > 0 ? Math.max(0, Math.round((valorBase * pctTotal / 100) * 100) / 100) : 0;
+            const valor = Math.max(0, Math.round(((valorBase > 0 ? valorBase * pctTotal / 100 : 0) + kpiValorBonus) * 100) / 100);
             return { ...item, valorBaseCalculo: valorBase, percentualUsado: pctTotal, valor };
           }),
         };
@@ -577,13 +636,14 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
   function recalcVariavel(it: LancamentoItemRV, kpisAtingidos: string[]): LancamentoItemRV {
     if (it.tipo !== 'variavel') return it;
     const colabItem = colaborador.itens.find(ci => ci.id === it.itemId);
-    const kpiBonus = (colaborador.kpis ?? [])
-      .filter(k => k.itemRemuneracaoId === it.itemId && kpisAtingidos.includes(k.id))
-      .reduce((s, k) => s + k.percentualBonus, 0);
+    const kpisDoItem = (colaborador.kpis ?? [])
+      .filter(k => k.itemRemuneracaoId === it.itemId && kpisAtingidos.includes(k.id));
+    const kpiBonus = kpisDoItem.reduce((s, k) => s + k.percentualBonus, 0);
+    const kpiValorBonus = kpisDoItem.reduce((s, k) => s + (k.valorBonus ?? 0), 0);
     const valorBase = it.valorBaseCalculo ?? 0;
     const pctBase = colabItem ? percentualBaseVariavel(colabItem, valorBase) : 0;
     const pctTotal = pctBase + kpiBonus;
-    const valor = valorBase > 0 ? Math.max(0, Math.round(((valorBase * pctTotal) / 100) * 100) / 100) : 0;
+    const valor = Math.max(0, Math.round(((valorBase > 0 ? (valorBase * pctTotal) / 100 : 0) + kpiValorBonus) * 100) / 100);
     return { ...it, percentualUsado: pctTotal, valor };
   }
 

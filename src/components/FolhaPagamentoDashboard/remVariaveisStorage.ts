@@ -94,6 +94,8 @@ export interface KpiColaborador {
   itemRemuneracaoId: string;
   /** Percentual de bônus adicionado ao % base do item quando atingido */
   percentualBonus: number;
+  /** Bônus em valor fixo (R$) somado ao valor do item quando atingido */
+  valorBonus?: number;
   /** Meta numérica a atingir */
   objetivo?: number;
   /** Unidade da meta (ex: "%", "unid.", "R$") — apenas exibição */
@@ -373,9 +375,10 @@ export function buildLancamentoPreview(colaborador: Colaborador, lanc: Lancament
       };
     }
     const pctBase = percentualBaseVariavel(colabItem, itemAtual?.valorBaseCalculo ?? 0);
-    const kpiBonus = (colaborador.kpis ?? [])
-      .filter(k => k.itemRemuneracaoId === colabItem.id && (lanc.kpisAtingidos ?? []).includes(k.id))
-      .reduce((s, k) => s + k.percentualBonus, 0);
+    const kpisAtingidos = (colaborador.kpis ?? [])
+      .filter(k => k.itemRemuneracaoId === colabItem.id && (lanc.kpisAtingidos ?? []).includes(k.id));
+    const kpiBonus = kpisAtingidos.reduce((s, k) => s + k.percentualBonus, 0);
+    const kpiValorBonus = kpisAtingidos.reduce((s, k) => s + (k.valorBonus ?? 0), 0);
     const pctTotal = pctBase + kpiBonus;
     const valorBase = itemAtual?.valorBaseCalculo ?? 0;
     return {
@@ -383,7 +386,7 @@ export function buildLancamentoPreview(colaborador: Colaborador, lanc: Lancament
       descricao: colabItem.descricao,
       tipo: 'variavel',
       categoria: colabItem.categoria,
-      valor: valorBase > 0 ? Math.max(0, Math.round((valorBase * pctTotal / 100) * 100) / 100) : 0,
+      valor: Math.max(0, Math.round(((valorBase > 0 ? valorBase * pctTotal / 100 : 0) + kpiValorBonus) * 100) / 100),
       valorBaseCalculo: valorBase,
       percentualUsado: pctTotal,
       baseCalculoLabel: colabItem.baseCalculo ? BASE_CALCULO_LABELS[colabItem.baseCalculo] : undefined,

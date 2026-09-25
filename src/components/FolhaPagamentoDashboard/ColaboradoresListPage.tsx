@@ -489,7 +489,7 @@ function ColaboradorDialog({
               </button>
             </div>
             {kpis.length === 0 && (
-              <p className="text-xs text-slate-400 italic">Nenhum KPI cadastrado. KPIs permitem aumentar o % de itens variáveis ao serem atingidos.</p>
+              <p className="text-xs text-slate-400 italic">Nenhum KPI cadastrado. KPIs permitem aumentar o % e/ou somar um bônus fixo (R$) a itens variáveis ao serem atingidos.</p>
             )}
             {kpis.map((kpi, idx) => {
               const itensVariaveis = itens.filter(it => it.tipo === 'variavel' && it.descricao);
@@ -535,6 +535,16 @@ function ColaboradorDialog({
                       placeholder="0,00"
                     />
                     <span className="text-xs text-slate-400">%</span>
+                    <span className="text-xs text-slate-400">+ R$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={kpi.valorBonus || ''}
+                      onChange={e => setKpis(prev => prev.map(k => k.id === kpi.id ? { ...k, valorBonus: parseFloat(e.target.value) || undefined } : k))}
+                      className="w-24 border border-teal-300 rounded px-2.5 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                      placeholder="0,00"
+                    />
                   </div>
                   <div className="flex items-center gap-2 pl-7">
                     <span className="text-xs text-slate-500 whitespace-nowrap">Objetivo:</span>
