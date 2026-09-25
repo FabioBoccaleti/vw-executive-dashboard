@@ -230,7 +230,13 @@ function ColaboradorDialog({
               </label>
               <select
                 value={form.brand}
-                onChange={e => setField('brand', e.target.value)}
+                onChange={e => {
+                  const brand = e.target.value as RvBrand;
+                  setField('brand', brand);
+                  if (brand !== 'vw') {
+                    setItens(prev => prev.map(it => it.baseCalculo === 'incentivo_siq' ? { ...it, baseCalculo: undefined } : it));
+                  }
+                }}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
               >
                 <option value="vw">VW</option>
@@ -470,13 +476,15 @@ function ColaboradorDialog({
                           className="flex-1 min-w-[220px] border border-amber-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
                         >
                           <option value="">Base informada manualmente no mês</option>
-                          {BASE_CALCULO_OPTIONS.map(([key, label]) => (
-                            <option key={key} value={key}>{label}</option>
-                          ))}
+                          {BASE_CALCULO_OPTIONS
+                            .filter(([key]) => key !== 'incentivo_siq' || form.brand === 'vw')
+                            .map(([key, label]) => (
+                              <option key={key} value={key}>{label}</option>
+                            ))}
                         </select>
                         {item.baseCalculo && (
                           <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 whitespace-nowrap">
-                            Puxado do DRE (igual PJ)
+                            {item.baseCalculo === 'incentivo_siq' ? 'Puxado da Provisão PIV (SIQ)' : 'Puxado do DRE (igual PJ)'}
                           </span>
                         )}
                       </div>

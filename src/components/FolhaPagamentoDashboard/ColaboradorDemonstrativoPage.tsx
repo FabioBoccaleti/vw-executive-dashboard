@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, Printer, Check, Save, Loader2, X, FileText, 
 import { toast } from 'sonner';
 import { kvGet } from '@/lib/kvClient';
 import { loadDREDataAsync } from '@/lib/dbStorage';
+import { loadSnapshotStore } from '../VendasBonificacoesDashboard/provisaoPivSnapshotStorage';
+import { periodoKey } from '../VendasBonificacoesDashboard/provisaoPivStorage';
 import { useAuth } from '@/contexts/useAuth';
 import { apiLogin } from '@/lib/authClient';
 import {
@@ -40,6 +42,7 @@ const BASE_TO_DEPT: Record<BaseCalculoVariavel, string> = {
   lucro_pecas:     'pecas',
   lucro_oficina:   'oficina',
   lucro_funilaria: 'funilaria',
+  incentivo_siq:   '', // base vem da Provisão PIV (SIQ), não do DRE
 };
 
 /** chave de departamento DRE → Department do Dashboard Executivo */
@@ -566,9 +569,10 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
     const dreKey = `resumo_dre:${colaborador.brand}:${drePrev.year}-${String(drePrev.month).padStart(2, '0')}`;
 
     async function load() {
-      const [existing, kvDreRow] = await Promise.all([
+      const [existing, kvDreRow, snapshotStore] = await Promise.all([
         loadLancamento(colaborador.id, year, month),
         kvGet<any>(dreKey),
+        colaborador.brand === 'vw' ? loadSnapshotStore() : Promise.resolve({}),
       ]);
 
       if (existing && existing.status === 'pago') {
@@ -576,6 +580,11 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
         setLoading(false);
         return;
       }
+
+      // Base do Incentivo SIQ: total travado (snapshot) da Provisão PIV do mês anterior (só VW)
+      const siqBase = colaborador.brand === 'vw'
+        ? Math.max(0, (snapshotStore as any)[periodoKey(drePrev.year, drePrev.month)]?.totalSiq ?? 0)
+        : 0;
 
       // Monta a linha de DRE por departamento (prioriza o Dashboard Executivo)
       let dreRow = kvDreRow;
@@ -597,16 +606,23 @@ export function ColaboradorDemonstrativoPage({ colaborador, isAdmin, onBack, ini
       const raw = existing ?? buildLancamentoVazio(colaborador, year, month);
       let base = buildLancamentoPreview(colaborador, raw);
 
-      // Preenche a base dos itens variáveis com baseCalculo a partir do DRE e recalcula o valor
-      if (dreRow) {
+      // Preenche a base dos itens variáveis (DRE por departamento ou SIQ) e recalcula o valor
+      if (dreRow || siqBase > 0) {
         base = {
           ...base,
           itens: base.itens.map(item => {
             if (item.tipo !== 'variavel') return item;
             const colabItem = colaborador.itens.find(ci => ci.id === item.itemId);
             if (!colabItem?.baseCalculo) return item;
-            const dk = BASE_TO_DEPT[colabItem.baseCalculo];
-            const valorBase = Math.max(0, parseValDre(dreRow[dk]?.lucroLiquidoExercicio));
+            let valorBase: number;
+            if (colabItem.baseCalculo === 'incentivo_siq') {
+              valorBase = siqBase;
+            } else if (dreRow) {
+              const dk = BASE_TO_DEPT[colabItem.baseCalculo];
+              valorBase = Math.max(0, parseValDre(dreRow[dk]?.lucroLiquidoExercicio));
+            } else {
+              return item;
+            }
             const kpisAtingidos = (colaborador.kpis ?? [])
               .filter(k => k.itemRemuneracaoId === colabItem.id && (base.kpisAtingidos ?? []).includes(k.id));
             const kpiBonus = kpisAtingidos.reduce((s, k) => s + k.percentualBonus, 0);

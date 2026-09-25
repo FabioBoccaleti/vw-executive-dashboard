@@ -23,7 +23,8 @@ export type BaseCalculoVariavel =
   | 'lucro_vd_direta'
   | 'lucro_pecas'
   | 'lucro_oficina'
-  | 'lucro_funilaria';
+  | 'lucro_funilaria'
+  | 'incentivo_siq';
 
 export const BASE_CALCULO_LABELS: Record<BaseCalculoVariavel, string> = {
   lucro_novos:     'LUCRO LÍQUIDO DO EXERCÍCIO - Novos',
@@ -32,6 +33,7 @@ export const BASE_CALCULO_LABELS: Record<BaseCalculoVariavel, string> = {
   lucro_pecas:     'LUCRO LÍQUIDO DO EXERCÍCIO - Peças',
   lucro_oficina:   'LUCRO LÍQUIDO DO EXERCÍCIO - Oficina',
   lucro_funilaria: 'LUCRO LÍQUIDO DO EXERCÍCIO - Funilaria',
+  incentivo_siq:   'Incentivo SIQ',
 };
 
 /** Faixa de resultado → percentual (a % incide sobre o valor total da base) */
