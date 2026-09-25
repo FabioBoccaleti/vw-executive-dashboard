@@ -11,6 +11,7 @@ import { ImportarPDFPage } from '@/components/VendasBonificacoesDashboard/Import
 import { FinanciamentoBancoVolksDashboard } from '@/components/VendasBonificacoesDashboard/FinanciamentoBancoVolksDashboard'
 import { VPecasCondicaoPagamentoDashboard } from '@/components/VendasBonificacoesDashboard/VPecasCondicaoPagamentoDashboard'
 import { FolhaSelectionPage } from '@/components/FolhaPagamentoDashboard/FolhaSelectionPage'
+import { PremiosDashboard } from '@/components/FolhaPagamentoDashboard/PremiosDashboard'
 import { SalariosFixosDashboard } from '@/components/FolhaPagamentoDashboard/SalariosFixosDashboard'
 import { RemuneracoesPJDashboard } from '@/components/FolhaPagamentoDashboard/RemuneracoesPJDashboard'
 import { CalculoComissoesVWPage } from '@/components/FolhaPagamentoDashboard/CalculoComissoesVWPage'
@@ -250,23 +251,7 @@ function AppContent() {
         ) : folhaSubPage === 'remuneracoes_variaveis' ? (
           <RemuneracoesVariaveisDashboard onBack={() => setFolhaSubPage('selection')} />
         ) : folhaSubPage === 'premios' ? (
-          <div className="min-h-screen bg-slate-100 flex flex-col">
-            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
-              <div>
-                <h1 className="text-lg font-bold text-slate-800">Prêmios</h1>
-                <p className="text-xs text-slate-500 mt-0.5">Folha de Pagamento</p>
-              </div>
-              <button
-                onClick={() => setFolhaSubPage('selection')}
-                className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
-              >
-                ← Voltar
-              </button>
-            </header>
-            <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
-              Em desenvolvimento
-            </div>
-          </div>
+          <PremiosDashboard onBack={() => setFolhaSubPage('selection')} />
         ) : null
       ) : brand === 'vendas_bonificacoes' ? (
         vendasSubPage === 'selection' ? (
