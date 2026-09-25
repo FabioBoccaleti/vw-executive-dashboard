@@ -163,7 +163,7 @@ function DemonstrativoTable({
             <p className="text-xs font-semibold opacity-75 uppercase tracking-wider mb-0.5">
               Demonstrativo de Remuneração Variável
             </p>
-            <h2 className="text-lg font-bold no-print">{colaborador.nome}</h2>
+            <h2 className="text-lg font-bold">{colaborador.nome}</h2>
             {colaborador.departamento && (
               <p className="text-sm opacity-80">{colaborador.departamento}</p>
             )}
