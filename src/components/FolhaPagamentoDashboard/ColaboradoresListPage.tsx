@@ -6,10 +6,10 @@ import {
   addColaborador,
   updateColaborador,
   deleteColaborador,
-  loadDescricaoExtras,
-  addDescricaoExtra,
-  removeDescricaoExtra,
-  DESCRICAO_PADRAO,
+  loadDescricaoOpcoes,
+  addDescricaoOpcao,
+  renameDescricaoOpcao,
+  removeDescricaoOpcao,
   BASE_CALCULO_LABELS,
   CATEGORIA_LABELS,
   type Colaborador,
@@ -45,12 +45,18 @@ function ColaboradorDialog({
   onCancel,
   descricaoOpcoes,
   onAddDescricao,
+  onRenameDescricao,
+  onRemoveDescricao,
+  descricaoEmUso,
 }: {
   initial?: Colaborador;
   onConfirm: (c: Colaborador) => void;
   onCancel: () => void;
   descricaoOpcoes: string[];
   onAddDescricao: (d: string) => void;
+  onRenameDescricao: (oldName: string, newName: string) => void;
+  onRemoveDescricao: (d: string) => void;
+  descricaoEmUso: (d: string) => boolean;
 }) {
   const isEdit = !!initial;
   const [form, setForm] = useState({
@@ -66,6 +72,8 @@ function ColaboradorDialog({
   const [kpis, setKpis] = useState<KpiColaborador[]>(initial?.kpis ?? []);
   const [novaDescricao, setNovaDescricao] = useState('');
   const [showNovaDescricao, setShowNovaDescricao] = useState(false);
+  const [editandoOpcao, setEditandoOpcao] = useState<string | null>(null);
+  const [opcaoDraft, setOpcaoDraft] = useState('');
 
   function setField(field: string, value: string) {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -94,6 +102,36 @@ function ColaboradorDialog({
     setNovaDescricao('');
     setShowNovaDescricao(false);
     toast.success(`"${val}" adicionado à lista.`);
+  }
+
+  function iniciarEdicaoOpcao(op: string) {
+    setEditandoOpcao(op);
+    setOpcaoDraft(op);
+  }
+
+  function handleConfirmarEdicaoOpcao(original: string) {
+    const val = opcaoDraft.trim();
+    if (!val) { toast.error('Informe a descrição.'); return; }
+    if (val === original) { setEditandoOpcao(null); return; }
+    if (descricaoOpcoes.includes(val)) {
+      toast.error('Essa descrição já existe na lista.');
+      return;
+    }
+    onRenameDescricao(original, val);
+    // Reflete a correção nos itens em edição que usavam o texto antigo
+    setItens(prev => prev.map(it => it.descricao === original ? { ...it, descricao: val } : it));
+    setEditandoOpcao(null);
+    setOpcaoDraft('');
+    toast.success('Descrição corrigida.');
+  }
+
+  function handleRemoverOpcao(op: string) {
+    if (descricaoEmUso(op) || itens.some(it => it.descricao === op)) {
+      toast.error('Essa opção está em uso e não pode ser excluída.');
+      return;
+    }
+    onRemoveDescricao(op);
+    toast.success(`"${op}" removido da lista.`);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -245,32 +283,93 @@ function ColaboradorDialog({
               </div>
             </div>
 
-            {/* Painel inline para cadastrar nova opção de descrição */}
+            {/* Painel inline para gerenciar opções de descrição */}
             {showNovaDescricao && (
-              <div className="mb-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                <input
-                  value={novaDescricao}
-                  onChange={e => setNovaDescricao(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleConfirmNovaDescricao(); } }}
-                  className="flex-1 border border-blue-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                  placeholder="Nome da nova opção..."
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={handleConfirmNovaDescricao}
-                  className="flex items-center gap-1 text-xs bg-blue-600 text-white rounded px-3 py-1.5 font-semibold hover:bg-blue-700"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  Salvar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowNovaDescricao(false); setNovaDescricao(''); }}
-                  className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+              <div className="mb-2 flex flex-col gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={novaDescricao}
+                    onChange={e => setNovaDescricao(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleConfirmNovaDescricao(); } }}
+                    className="flex-1 border border-blue-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                    placeholder="Nome da nova opção..."
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={handleConfirmNovaDescricao}
+                    className="flex items-center gap-1 text-xs bg-blue-600 text-white rounded px-3 py-1.5 font-semibold hover:bg-blue-700"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    Adicionar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowNovaDescricao(false); setNovaDescricao(''); setEditandoOpcao(null); }}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {descricaoOpcoes.length > 0 && (
+                  <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pt-1 border-t border-blue-200">
+                    {descricaoOpcoes.map(op => (
+                      <div key={op} className="flex items-center gap-2 bg-white border border-blue-100 rounded px-2 py-1">
+                        {editandoOpcao === op ? (
+                          <>
+                            <input
+                              value={opcaoDraft}
+                              onChange={e => setOpcaoDraft(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') { e.preventDefault(); handleConfirmarEdicaoOpcao(op); }
+                                if (e.key === 'Escape') { e.preventDefault(); setEditandoOpcao(null); }
+                              }}
+                              className="flex-1 border border-teal-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmarEdicaoOpcao(op)}
+                              className="text-teal-600 hover:text-teal-800 p-1 rounded hover:bg-teal-50"
+                              title="Salvar"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setEditandoOpcao(null); setOpcaoDraft(''); }}
+                              className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100"
+                              title="Cancelar"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="flex-1 text-sm text-slate-600 truncate">{op}</span>
+                            <button
+                              type="button"
+                              onClick={() => iniciarEdicaoOpcao(op)}
+                              className="text-slate-300 hover:text-teal-600 p-1 rounded hover:bg-teal-50"
+                              title="Editar"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoverOpcao(op)}
+                              className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -736,21 +835,49 @@ export function ColaboradoresListPage({ isAdmin, onOpenColaborador }: Colaborado
   const [editTarget, setEditTarget]   = useState<Colaborador | undefined>();
   const [filterBrand, setFilterBrand] = useState<'todos' | 'vw' | 'audi'>('todos');
   const [showInativos, setShowInativos] = useState(false);
-  const [descricaoExtras, setDescricaoExtras] = useState<string[]>([]);
+  const [descricaoOpcoes, setDescricaoOpcoes] = useState<string[]>([]);
 
   useEffect(() => {
     loadColaboradores().then(list => {
       setColaboradores(list);
       setLoading(false);
     });
-    loadDescricaoExtras().then(setDescricaoExtras);
+    loadDescricaoOpcoes().then(setDescricaoOpcoes);
   }, []);
 
-  const todasDescricoes = [...DESCRICAO_PADRAO, ...descricaoExtras];
+  const todasDescricoes = descricaoOpcoes;
 
   async function handleAddDescricao(d: string) {
-    await addDescricaoExtra(d);
-    setDescricaoExtras(prev => [...prev, d]);
+    await addDescricaoOpcao(d);
+    setDescricaoOpcoes(prev => prev.includes(d) ? prev : [...prev, d]);
+  }
+
+  async function handleRenameDescricao(oldName: string, newName: string) {
+    await renameDescricaoOpcao(oldName, newName);
+    setDescricaoOpcoes(prev => prev.map(d => d === oldName ? newName : d));
+    // Propaga a correção para o cadastro dos colaboradores que usam o texto antigo.
+    // Lançamentos pagos permanecem congelados (guardam snapshot próprio).
+    const afetados = colaboradores.filter(c => c.itens.some(it => it.descricao === oldName));
+    for (const c of afetados) {
+      const updated = { ...c, itens: c.itens.map(it => it.descricao === oldName ? { ...it, descricao: newName } : it) };
+      await updateColaborador(updated);
+    }
+    if (afetados.length) {
+      setColaboradores(prev => prev.map(c =>
+        c.itens.some(it => it.descricao === oldName)
+          ? { ...c, itens: c.itens.map(it => it.descricao === oldName ? { ...it, descricao: newName } : it) }
+          : c
+      ));
+    }
+  }
+
+  async function handleRemoveDescricao(d: string) {
+    await removeDescricaoOpcao(d);
+    setDescricaoOpcoes(prev => prev.filter(x => x !== d));
+  }
+
+  function descricaoEmUso(d: string): boolean {
+    return colaboradores.some(c => c.itens.some(it => it.descricao === d));
   }
 
   async function handleAdd(c: Colaborador) {
@@ -892,6 +1019,9 @@ export function ColaboradoresListPage({ isAdmin, onOpenColaborador }: Colaborado
           onCancel={() => { setShowDialog(false); setEditTarget(undefined); }}
           descricaoOpcoes={todasDescricoes}
           onAddDescricao={handleAddDescricao}
+          onRenameDescricao={handleRenameDescricao}
+          onRemoveDescricao={handleRemoveDescricao}
+          descricaoEmUso={descricaoEmUso}
         />
       )}
     </div>

@@ -189,6 +189,7 @@ export interface LancamentoRV {
 
 const COLABORADORES_KEY = 'rem_var_colaboradores';
 const DESCRICAO_EXTRAS_KEY = 'rem_var_descricao_extras';
+const DESCRICAO_OPCOES_KEY = 'rem_var_descricao_opcoes';
 
 function lancamentoKey(colaboradorId: string, year: number, month: number): string {
   const mm = String(month).padStart(2, '0');
@@ -204,6 +205,52 @@ export const DESCRICAO_PADRAO: readonly string[] = [
   'Comissão',
   'Gratificação',
 ];
+
+/**
+ * Lista completa (editável) de opções de descrição. Na primeira leitura, faz a
+ * migração a partir das opções padrão + extras legadas e persiste o resultado.
+ */
+export async function loadDescricaoOpcoes(): Promise<string[]> {
+  try {
+    const stored = await kvGet<string[]>(DESCRICAO_OPCOES_KEY);
+    if (stored && stored.length) return stored;
+    const legacyExtras = (await kvGet<string[]>(DESCRICAO_EXTRAS_KEY)) ?? [];
+    const seed = [...DESCRICAO_PADRAO, ...legacyExtras.filter(e => !DESCRICAO_PADRAO.includes(e))];
+    await kvSet(DESCRICAO_OPCOES_KEY, seed);
+    return seed;
+  } catch {
+    return [...DESCRICAO_PADRAO];
+  }
+}
+
+export async function addDescricaoOpcao(descricao: string): Promise<boolean> {
+  try {
+    const list = await loadDescricaoOpcoes();
+    if (list.includes(descricao)) return true;
+    return kvSet(DESCRICAO_OPCOES_KEY, [...list, descricao]);
+  } catch {
+    return false;
+  }
+}
+
+export async function renameDescricaoOpcao(oldName: string, newName: string): Promise<boolean> {
+  try {
+    const list = await loadDescricaoOpcoes();
+    const next = list.map(d => (d === oldName ? newName : d));
+    return kvSet(DESCRICAO_OPCOES_KEY, next);
+  } catch {
+    return false;
+  }
+}
+
+export async function removeDescricaoOpcao(descricao: string): Promise<boolean> {
+  try {
+    const list = await loadDescricaoOpcoes();
+    return kvSet(DESCRICAO_OPCOES_KEY, list.filter(d => d !== descricao));
+  } catch {
+    return false;
+  }
+}
 
 export async function loadDescricaoExtras(): Promise<string[]> {
   try {
