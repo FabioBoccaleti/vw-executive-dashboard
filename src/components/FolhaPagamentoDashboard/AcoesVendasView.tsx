@@ -462,6 +462,10 @@ export function AcoesVendasView() {
       </div>
       ${sectionHtml('Novos', novos)}
       ${sectionHtml('Usados', usados)}
+      ${novos.length > 0 && usados.length > 0 ? `<div style="margin-top:10px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 12px;display:flex;justify-content:flex-end;align-items:center;gap:10px;">
+        <span style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#6d28d9;">Total do prêmio (Novos + Usados)</span>
+        <span style="font-size:12px;font-weight:700;color:#6d28d9;">R$ ${fmtBRL(totalPremio)}</span>
+      </div>` : ''}
       <div style="margin-top:12px;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;">
         <p style="font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin:0 0 8px;">ASSINATURAS</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${camposHtml}</div>
@@ -1051,6 +1055,12 @@ function VendedorDemonstrativo({
         <div className="p-4 flex flex-col gap-6">
           {novos.length > 0 && <SecaoTabela label="Novos" itens={novos} periodoLabel={periodoNovosLabel} />}
           {usados.length > 0 && <SecaoTabela label="Usados" itens={usados} periodoLabel={periodoUsadosLabel} />}
+          {novos.length > 0 && usados.length > 0 && (
+            <div className="flex items-center justify-end gap-3 bg-violet-50 border border-violet-200 rounded-lg px-4 py-3">
+              <span className="text-xs font-semibold text-violet-700 uppercase tracking-wider">Total do prêmio (Novos + Usados)</span>
+              <span className="text-lg font-bold text-violet-700 tabular-nums">R$ {fmtBRL(totalPremio)}</span>
+            </div>
+          )}
           {source.length === 0 && (
             <p className="text-center text-slate-400 text-sm py-6">Nenhum chassi premiado para este vendedor.</p>
           )}
