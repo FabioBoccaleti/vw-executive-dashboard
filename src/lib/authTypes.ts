@@ -75,7 +75,12 @@ export type FolhaSubModuleId =
   | 'folha.comissoes_vw.calculo'
   | 'folha.comissoes_vw.calculo.novos'
   | 'folha.comissoes_vw.calculo.usados'
-  | 'folha.comissoes_vw.resumo';
+  | 'folha.comissoes_vw.resumo'
+  | 'folha.remuneracoes_variaveis'
+  | 'folha.premios'
+  | 'folha.premios.plantao_sabado'
+  | 'folha.premios.pesquisa_cem'
+  | 'folha.premios.diversos';
 
 export const FOLHA_SUB_MODULE_LABELS: Record<FolhaSubModuleId, string> = {
   'folha.analise': 'Análise',
@@ -95,6 +100,11 @@ export const FOLHA_SUB_MODULE_LABELS: Record<FolhaSubModuleId, string> = {
   'folha.comissoes_vw.calculo.novos':  'Novos',
   'folha.comissoes_vw.calculo.usados': 'Usados',
   'folha.comissoes_vw.resumo':         'Resumo',
+  'folha.remuneracoes_variaveis':      'Remunerações Variáveis',
+  'folha.premios':                     'Prêmios',
+  'folha.premios.plantao_sabado':      'Plantão aos Sábados',
+  'folha.premios.pesquisa_cem':        'Pesquisa CEM',
+  'folha.premios.diversos':            'Diversos',
 };
 
 // Subpermissões do módulo central_vendas_vw

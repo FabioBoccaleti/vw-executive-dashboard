@@ -374,7 +374,7 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Visões</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {(['folha.analise', 'folha.relacao', 'folha.pj', 'folha.comissoes_vw'] as FolhaSubModuleId[]).map(s => (
+              {(['folha.analise', 'folha.relacao', 'folha.pj', 'folha.comissoes_vw', 'folha.remuneracoes_variaveis', 'folha.premios'] as FolhaSubModuleId[]).map(s => (
                 <button
                   key={s} type="button"
                   onClick={() => toggleFolhaSub(s)}
@@ -485,6 +485,30 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Sub-abas: Prêmios */}
+          {form.folhaSubModules.includes('folha.premios') && (
+            <div className="ml-3 space-y-2 border-l-2 border-teal-300 pl-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Prêmios — Abas</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {(['folha.premios.plantao_sabado', 'folha.premios.pesquisa_cem', 'folha.premios.diversos'] as FolhaSubModuleId[]).map(s => (
+                  <button
+                    key={s} type="button"
+                    onClick={() => toggleFolhaSub(s)}
+                    className={cn(
+                      'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                      form.folhaSubModules.includes(s)
+                        ? 'border-teal-500 bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 font-medium'
+                        : 'border-border bg-background text-muted-foreground hover:border-input',
+                    )}
+                  >
+                    {form.folhaSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                    {FOLHA_SUB_MODULE_LABELS[s]}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
