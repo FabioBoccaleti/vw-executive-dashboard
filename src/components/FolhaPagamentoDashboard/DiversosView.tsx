@@ -385,8 +385,21 @@ function PremioTab({
   onEdit: (c: DiversosColaborador) => void;
   onDelete: (id: string) => void;
 }) {
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [pwd, setPwd] = useState<{ kind: 'delete' | 'premiacao' | 'edit'; colab: DiversosColaborador; senha: string; erro: string | null } | null>(null);
+  const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
   const ativos = colaboradores.filter(c => c.ativo);
+
+  // Reseta o desbloqueio ao trocar de competência
+  useEffect(() => { setUnlocked(new Set()); }, [competencia]);
+
+  function handlePwdConfirm() {
+    if (!pwd) return;
+    if (pwd.senha !== '1985') { setPwd({ ...pwd, erro: 'Senha incorreta.' }); return; }
+    if (pwd.kind === 'delete') onDelete(pwd.colab.id);
+    else if (pwd.kind === 'edit') onEdit(pwd.colab);
+    else setUnlocked(prev => new Set(prev).add(pwd.colab.id));
+    setPwd(null);
+  }
 
   return (
     <div className="max-w-5xl mx-auto p-6 flex flex-col gap-4">
@@ -424,25 +437,27 @@ function PremioTab({
                       <p className="text-[10px] text-slate-400 uppercase">Prêmio</p>
                       <p className="text-sm font-bold text-teal-700">R$ {fmtBRL(p.valor)}</p>
                     </div>
-                    <button onClick={() => onEdit(c)} disabled={pago} className="text-slate-300 hover:text-slate-600 p-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed" title="Editar"><Pencil className="w-3.5 h-3.5" /></button>
-                    {confirmDelete === c.id ? (
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => { onDelete(c.id); setConfirmDelete(null); }} className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"><Check className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => setConfirmDelete(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100"><X className="w-3.5 h-3.5" /></button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setConfirmDelete(c.id)} disabled={pago} className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed" title="Excluir"><Trash2 className="w-3.5 h-3.5" /></button>
-                    )}
+                    <button onClick={() => setPwd({ kind: 'edit', colab: c, senha: '', erro: null })} disabled={pago} className="text-slate-300 hover:text-slate-600 p-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed" title="Editar nome/função"><Pencil className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => setPwd({ kind: 'delete', colab: c, senha: '', erro: null })} disabled={pago} className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed" title="Excluir"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 </div>
 
                 {/* Premiação: motivo / departamento / valor */}
                 <div className="flex items-end gap-2 flex-wrap pt-2 border-t border-slate-100">
+                  {!pago && !unlocked.has(c.id) && (
+                    <button
+                      onClick={() => setPwd({ kind: 'premiacao', colab: c, senha: '', erro: null })}
+                      className="flex items-center gap-1 text-[11px] border border-amber-300 text-amber-700 rounded px-2 py-1.5 hover:bg-amber-50 font-semibold"
+                      title="Editar valores (requer senha)"
+                    >
+                      <LockOpen className="w-3 h-3" /> Editar valores
+                    </button>
+                  )}
                   <div className="flex flex-col gap-1 flex-1 min-w-[220px]">
                     <label className="text-[10px] text-slate-400 uppercase font-semibold">Motivo da premiação</label>
                     <input
                       value={p.motivo}
-                      disabled={pago}
+                      disabled={pago || !unlocked.has(c.id)}
                       onChange={e => onUpdate(c.id, { motivo: e.target.value })}
                       placeholder="ex: Destaque do mês"
                       className="border border-slate-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 disabled:bg-slate-50"
@@ -452,7 +467,7 @@ function PremioTab({
                     <label className="text-[10px] text-slate-400 uppercase font-semibold">Departamento</label>
                     <select
                       value={p.departamento}
-                      disabled={pago}
+                      disabled={pago || !unlocked.has(c.id)}
                       onChange={e => onUpdate(c.id, { departamento: e.target.value as DiversosDepto })}
                       className="border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 disabled:bg-slate-50"
                     >
@@ -467,7 +482,7 @@ function PremioTab({
                         type="number"
                         min="0"
                         step="0.01"
-                        disabled={pago}
+                        disabled={pago || !unlocked.has(c.id)}
                         value={p.valor || ''}
                         onChange={e => onUpdate(c.id, { valor: Math.max(0, parseFloat(e.target.value) || 0) })}
                         placeholder="0,00"
@@ -480,6 +495,19 @@ function PremioTab({
             );
           })}
         </div>
+      )}
+
+      {pwd && (
+        <SenhaDialog
+          titulo={pwd.kind === 'delete' ? 'Excluir colaborador' : pwd.kind === 'edit' ? 'Editar colaborador' : 'Editar valores da premiação'}
+          descricao={pwd.kind === 'delete' ? `Digite a senha para excluir ${pwd.colab.nome}.` : pwd.kind === 'edit' ? `Digite a senha para editar ${pwd.colab.nome}.` : `Digite a senha para editar a premiação de ${pwd.colab.nome}.`}
+          senha={pwd.senha}
+          erro={pwd.erro}
+          onChange={s => setPwd(p => p ? { ...p, senha: s, erro: null } : p)}
+          onCancel={() => setPwd(null)}
+          onConfirm={handlePwdConfirm}
+          confirmLabel={pwd.kind === 'delete' ? 'Excluir' : 'Continuar'}
+        />
       )}
     </div>
   );
