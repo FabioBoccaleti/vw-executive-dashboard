@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, ClipboardList } from 'lucide-react';
 import { PlantaoSabadoView } from './PlantaoSabadoView';
+import { PesquisaCemView } from './PesquisaCemView';
 
 interface PremiosDashboardProps {
   onBack: () => void;
 }
 
-type PremioTab = 'plantao_sabado';
+type PremioTab = 'plantao_sabado' | 'pesquisa_cem';
 
 export function PremiosDashboard({ onBack }: PremiosDashboardProps) {
   const [tab, setTab] = useState<PremioTab>('plantao_sabado');
@@ -30,6 +31,15 @@ export function PremiosDashboard({ onBack }: PremiosDashboardProps) {
               <CalendarClock className="w-3.5 h-3.5" />
               Plantão de Sábado
             </button>
+            <button
+              onClick={() => setTab('pesquisa_cem')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                tab === 'pesquisa_cem' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              Pesquisa CEM
+            </button>
           </div>
           <button
             onClick={onBack}
@@ -41,6 +51,8 @@ export function PremiosDashboard({ onBack }: PremiosDashboardProps) {
       </header>
 
       {tab === 'plantao_sabado' && <PlantaoSabadoView />}
+      {tab === 'pesquisa_cem' && <PesquisaCemView />}
     </div>
   );
 }
+
