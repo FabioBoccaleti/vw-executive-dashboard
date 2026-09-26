@@ -30,7 +30,7 @@ export function PremiosDashboard({ onBack }: PremiosDashboardProps) {
               }`}
             >
               <CalendarClock className="w-3.5 h-3.5" />
-              Plantão de Sábado
+              Plantão aos Sábados
             </button>
             <button
               onClick={() => setTab('pesquisa_cem')}
