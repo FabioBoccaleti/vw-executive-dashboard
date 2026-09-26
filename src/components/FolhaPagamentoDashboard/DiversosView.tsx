@@ -401,7 +401,7 @@ function PremioTab({
           <h3 className="text-sm font-bold text-slate-800">Colaboradores</h3>
           <p className="text-xs text-slate-400">Informe motivo, departamento e valor da premiação em {competencia}.</p>
         </div>
-        <button onClick={onNew} className="flex items-center gap-1.5 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-lg px-3 py-2 font-semibold">
+        <button onClick={onNew} disabled={pago} className="flex items-center gap-1.5 text-xs bg-teal-600 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-3 py-2 font-semibold">
           <Plus className="w-3.5 h-3.5" /> Cadastrar colaborador
         </button>
       </div>
@@ -424,14 +424,14 @@ function PremioTab({
                       <p className="text-[10px] text-slate-400 uppercase">Prêmio</p>
                       <p className="text-sm font-bold text-teal-700">R$ {fmtBRL(p.valor)}</p>
                     </div>
-                    <button onClick={() => onEdit(c)} className="text-slate-300 hover:text-slate-600 p-1 rounded hover:bg-slate-100" title="Editar"><Pencil className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => onEdit(c)} disabled={pago} className="text-slate-300 hover:text-slate-600 p-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed" title="Editar"><Pencil className="w-3.5 h-3.5" /></button>
                     {confirmDelete === c.id ? (
                       <div className="flex items-center gap-1">
                         <button onClick={() => { onDelete(c.id); setConfirmDelete(null); }} className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"><Check className="w-3.5 h-3.5" /></button>
                         <button onClick={() => setConfirmDelete(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded hover:bg-slate-100"><X className="w-3.5 h-3.5" /></button>
                       </div>
                     ) : (
-                      <button onClick={() => setConfirmDelete(c.id)} className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50" title="Excluir"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => setConfirmDelete(c.id)} disabled={pago} className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed" title="Excluir"><Trash2 className="w-3.5 h-3.5" /></button>
                     )}
                   </div>
                 </div>
