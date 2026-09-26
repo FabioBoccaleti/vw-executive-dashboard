@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { CalendarClock, ClipboardList, LayoutGrid } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { CalendarClock, ClipboardList, LayoutGrid, Printer } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/useAuth';
 import { PlantaoSabadoView } from './PlantaoSabadoView';
 import { PesquisaCemView } from './PesquisaCemView';
 import { DiversosView } from './DiversosView';
+import { printAllPremios } from './premiosPrint';
 
 interface PremiosDashboardProps {
   onBack: () => void;
@@ -25,6 +27,24 @@ export function PremiosDashboard({ onBack }: PremiosDashboardProps) {
   ].filter(t => t.can);
 
   const [tab, setTab] = useState<PremioTab>(() => tabs[0]?.id ?? 'plantao_sabado');
+
+  // Competência da aba aberta (reportada pelas views) — usada no "Imprimir todos"
+  const now = new Date();
+  const [competencia, setCompetencia] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
+  const handleCompetencia = useCallback((year: number, month: number) => {
+    setCompetencia(prev => (prev.year === year && prev.month === month) ? prev : { year, month });
+  }, []);
+  const [printingAll, setPrintingAll] = useState(false);
+
+  async function handlePrintAll() {
+    setPrintingAll(true);
+    try {
+      const n = await printAllPremios(competencia.year, competencia.month);
+      if (n === 0) toast.error('Nenhum demonstrativo com lançamentos neste mês.');
+    } finally {
+      setPrintingAll(false);
+    }
+  }
 
   return (
     <div className="h-screen bg-slate-100 flex flex-col overflow-hidden">
@@ -51,6 +71,17 @@ export function PremiosDashboard({ onBack }: PremiosDashboardProps) {
               ))}
             </div>
           )}
+          {tabs.length > 0 && (
+            <button
+              onClick={handlePrintAll}
+              disabled={printingAll}
+              className="flex items-center gap-1.5 text-xs bg-slate-700 hover:bg-slate-800 disabled:opacity-40 text-white rounded px-3 py-1.5 font-semibold"
+              title="Imprimir todos os demonstrativos do mês selecionado"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              Imprimir todos
+            </button>
+          )}
           <button
             onClick={onBack}
             className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
@@ -66,9 +97,9 @@ export function PremiosDashboard({ onBack }: PremiosDashboardProps) {
         </div>
       ) : (
         <>
-          {tab === 'plantao_sabado' && canPlantao && <PlantaoSabadoView />}
-          {tab === 'pesquisa_cem' && canPesquisa && <PesquisaCemView />}
-          {tab === 'diversos' && canDiversos && <DiversosView />}
+          {tab === 'plantao_sabado' && canPlantao && <PlantaoSabadoView onCompetencia={handleCompetencia} />}
+          {tab === 'pesquisa_cem' && canPesquisa && <PesquisaCemView onCompetencia={handleCompetencia} />}
+          {tab === 'diversos' && canDiversos && <DiversosView onCompetencia={handleCompetencia} />}
         </>
       )}
     </div>

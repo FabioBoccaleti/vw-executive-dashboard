@@ -46,7 +46,7 @@ interface LinhaDemo {
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
-export function PesquisaCemView() {
+export function PesquisaCemView({ onCompetencia }: { onCompetencia?: (year: number, month: number) => void }) {
   const { session } = useAuth();
 
   const [filterYear, setFilterYear]   = useState(new Date().getFullYear());
@@ -83,6 +83,8 @@ export function PesquisaCemView() {
   useEffect(() => {
     setTituloDraft(tituloEfetivo(titulos, filterYear, filterMonth));
   }, [pk, titulos, filterYear, filterMonth]);
+
+  useEffect(() => { onCompetencia?.(filterYear, filterMonth); }, [filterYear, filterMonth, onCompetencia]);
 
   const respForPk = respostas[pk] ?? {};
 

@@ -48,7 +48,7 @@ interface LinhaDemo {
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
-export function PlantaoSabadoView() {
+export function PlantaoSabadoView({ onCompetencia }: { onCompetencia?: (year: number, month: number) => void }) {
   const { session } = useAuth();
 
   const [filterYear, setFilterYear]   = useState(new Date().getFullYear());
@@ -88,6 +88,8 @@ export function PlantaoSabadoView() {
   useEffect(() => {
     setTituloDraft(tituloEfetivo(titulos, filterYear, filterMonth));
   }, [pk, titulos, filterYear, filterMonth]);
+
+  useEffect(() => { onCompetencia?.(filterYear, filterMonth); }, [filterYear, filterMonth, onCompetencia]);
 
   // Dias disponíveis: sábados do mês + do mês anterior + dias avulsos
   const prev = filterMonth === 1 ? { y: filterYear - 1, m: 12 } : { y: filterYear, m: filterMonth - 1 };
