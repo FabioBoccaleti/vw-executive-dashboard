@@ -7,6 +7,7 @@ import { loadVendasRows, saveVendasRows, createEmptyRow, type VendasRow } from '
 import { loadCatalogo, type CatalogoVeiculos } from './catalogoStorage';
 import { loadRevendas, loadBlinadadoras, loadRegras, loadVendedores, type Revenda, type Blindadora, type RegraRemuneracao, type Vendedor } from '@/components/CadastrosPage/cadastrosStorage';
 import { VendasAnalise } from './VendasAnalise';
+import { DeclaracaoView } from './DeclaracaoView';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
@@ -739,7 +740,7 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
   const [inlineNFValue, setInlineNFValue] = useState('');
   const [inlineAcertoId, setInlineAcertoId] = useState<string | null>(null);
   const [inlineAcertoValue, setInlineAcertoValue] = useState('');
-  const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>('analise');
+  const [activeTab, setActiveTab] = useState<'tabela' | 'analise' | 'declaracao'>('analise');
   const { canAccessVendasSub, isAdmin } = useAuth();
   const canTabela = isAdmin() || canAccessVendasSub('blindagem.tabela');
   const canAnalise = isAdmin() || canAccessVendasSub('blindagem.analise');
@@ -1310,6 +1311,19 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                 Análise
               </button>
               )}
+              {canTabela && (
+              <button
+                onClick={() => setActiveTab('declaracao')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  activeTab === 'declaracao'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Declaração
+              </button>
+              )}
             </div>
             <Button
               variant="ghost"
@@ -1347,6 +1361,13 @@ export function VendasBonificacoesDashboard({ onChangeBrand, onOpenCadastros }: 
                 await persist(next);
               }}
             />
+          </div>
+        )}
+
+        {/* ── ABA DECLARAÇÃO ── */}
+        {activeTab === 'declaracao' && canTabela && (
+          <div className="flex-1 flex flex-col min-h-0" style={{ maxHeight: 'calc(100vh - 72px)' }}>
+            <DeclaracaoView rows={rows} />
           </div>
         )}
 
