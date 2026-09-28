@@ -26,7 +26,7 @@ const AVAILABLE_YEARS = Array.from({ length: 5 }, (_, i) => new Date().getFullYe
 
 const CAMPO_LABELS: Record<CampoAssinaturaComissao, string> = {
   financeiro:         'Financeiro',
-  gerenciaComercial:  'Gerência Comercial',
+  gerenciaComercial:  'Supervisora Customer Success',
   diretoriaComercial: 'Diretoria Comercial',
   diretoria:          'Diretoria',
 };

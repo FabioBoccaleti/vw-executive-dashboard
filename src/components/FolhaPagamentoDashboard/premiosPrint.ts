@@ -25,6 +25,10 @@ const CAMPO_LABELS: Record<CampoAssinaturaComissao, string> = {
   diretoriaComercial: 'Diretoria Comercial',
   diretoria:          'Diretoria',
 };
+const CAMPO_LABELS_CS: Record<CampoAssinaturaComissao, string> = {
+  ...CAMPO_LABELS,
+  gerenciaComercial: 'Supervisora Customer Success',
+};
 const CAMPOS_ASSINATURA = Object.keys(CAMPO_LABELS) as CampoAssinaturaComissao[];
 
 const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -45,19 +49,19 @@ function headerHtml(titulo: string, competencia: string, pago: boolean, totalGer
   </div>`;
 }
 
-function assinaturasHtml(assinaturas: AssinaturasMap | undefined): string {
+function assinaturasHtml(assinaturas: AssinaturasMap | undefined, labels: Record<CampoAssinaturaComissao, string> = CAMPO_LABELS): string {
   const camposHtml = CAMPOS_ASSINATURA.map(key => {
     const ass = assinaturas?.[key];
     if (ass) {
       const dt = new Date(ass.dataHora).toLocaleString('pt-BR');
-      return `<div><p style="font-size:7px;font-weight:600;color:#475569;margin:0 0 4px;">${CAMPO_LABELS[key]}</p>
+      return `<div><p style="font-size:7px;font-weight:600;color:#475569;margin:0 0 4px;">${labels[key]}</p>
         <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:6px 8px;">
           <p style="font-size:7.5px;color:#15803d;font-weight:600;margin:0;">${escapeHtml(ass.name || ass.username)}</p>
           <p style="font-size:7px;color:#16a34a;margin:2px 0 0;">${dt}</p>
           <p style="font-size:6.5px;font-weight:700;color:#15803d;margin:3px 0 0;">&#10003; ASSINATURA ELETRÔNICA</p>
         </div></div>`;
     }
-    return `<div><p style="font-size:7px;font-weight:600;color:#475569;margin:0 0 4px;">${CAMPO_LABELS[key]}</p>
+    return `<div><p style="font-size:7px;font-weight:600;color:#475569;margin:0 0 4px;">${labels[key]}</p>
       <div style="border:1.5px dashed #cbd5e1;border-radius:6px;padding:8px;text-align:center;"><p style="font-size:7px;color:#94a3b8;margin:0;">—</p></div></div>`;
   }).join('');
   return `<div style="margin-top:12px;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;">
@@ -102,7 +106,7 @@ function buildBlocoUnidades(titulo: string, competencia: string, pago: boolean, 
       <tbody>${rowsHtml}</tbody>
       <tfoot><tr><td style="${tfB}" colspan="2">Total</td><td style="${tfB}text-align:center;">${totalUnid}</td>${depTf}${totalTf}</tr></tfoot>
     </table>
-    ${assinaturasHtml(assinaturas)}`;
+    ${assinaturasHtml(assinaturas, CAMPO_LABELS_CS)}`;
 }
 
 async function buildPlantaoBlock(year: number, month: number): Promise<string> {
