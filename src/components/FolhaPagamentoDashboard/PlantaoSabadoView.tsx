@@ -104,6 +104,20 @@ export function PlantaoSabadoView({ onCompetencia }: { onCompetencia?: (year: nu
 
   const selForPk = selecao[pk] ?? {};
 
+  // Sábados já pagos (recebidos) em OUTRAS competências, por colaborador.
+  // Usado para impedir que o mesmo sábado seja pago em dois períodos.
+  const diasPagosOutrasComp = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    for (const [key, lanc] of Object.entries(lancamentos)) {
+      if (key === pk || !lanc?.pago || !lanc.snapshotLinhas) continue;
+      for (const linha of lanc.snapshotLinhas) {
+        map[linha.colaboradorId] ??= new Set();
+        for (const d of linha.dias) map[linha.colaboradorId].add(d);
+      }
+    }
+    return map;
+  }, [lancamentos, pk]);
+
   // Linhas do demonstrativo (colaboradores com dias selecionados)
   const linhasLive: LinhaDemo[] = useMemo(() => {
     return colaboradores
@@ -168,6 +182,7 @@ export function PlantaoSabadoView({ onCompetencia }: { onCompetencia?: (year: nu
   // ── Seleção de dias ─────────────────────────────────────────────────────────
   function toggleDia(colabId: string, dia: string) {
     if (pago) return;
+    if (diasPagosOutrasComp[colabId]?.has(dia)) return;
     const atual = selForPk[colabId] ?? [];
     const next = atual.includes(dia) ? atual.filter(d => d !== dia) : [...atual, dia].sort();
     persistSelecao({ ...selecao, [pk]: { ...selForPk, [colabId]: next } });
@@ -352,6 +367,7 @@ export function PlantaoSabadoView({ onCompetencia }: { onCompetencia?: (year: nu
             colaboradores={colaboradores}
             selForPk={selForPk}
             diasDisponiveis={diasDisponiveis}
+            diasPagosPorColab={diasPagosOutrasComp}
             pago={pago}
             competencia={competencia}
             novoDia={novoDia}
@@ -424,12 +440,13 @@ export function PlantaoSabadoView({ onCompetencia }: { onCompetencia?: (year: nu
 
 // ─── Aba Prêmio (cadastro + seleção de dias) ──────────────────────────────────
 function PremioTab({
-  colaboradores, selForPk, diasDisponiveis, pago, competencia,
+  colaboradores, selForPk, diasDisponiveis, diasPagosPorColab, pago, competencia,
   novoDia, setNovoDia, onAddDia, onToggleDia, onNew, onEdit, onDelete,
 }: {
   colaboradores: PlantaoColaborador[];
   selForPk: Record<string, string[]>;
   diasDisponiveis: string[];
+  diasPagosPorColab: Record<string, Set<string>>;
   pago: boolean;
   competencia: string;
   novoDia: string;
@@ -512,13 +529,16 @@ function PremioTab({
                   ) : diasDisponiveis.map(dia => {
                     const sel = dias.includes(dia);
                     const feriado = !isSabado(dia);
+                    const recebido = diasPagosPorColab[c.id]?.has(dia) ?? false;
                     return (
                       <button
                         key={dia}
                         onClick={() => onToggleDia(c.id, dia)}
-                        disabled={pago}
+                        disabled={pago || recebido}
                         className={`text-[11px] px-2 py-1 rounded-full border font-medium transition-colors disabled:cursor-not-allowed ${
-                          sel ? 'bg-teal-600 border-teal-600 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-teal-300'
+                          recebido ? 'bg-slate-100 border-slate-200 text-slate-300'
+                            : sel ? 'bg-teal-600 border-teal-600 text-white'
+                            : 'bg-white border-slate-200 text-slate-500 hover:border-teal-300'
                         }`}
                         title={feriado ? 'Dia avulso / feriado' : 'Sábado'}
                       >
