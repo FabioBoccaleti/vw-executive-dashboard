@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { useAuth } from '@/contexts/useAuth';
 import { Button } from '@/components/ui/button';
-import { LogOut, Key, BookOpen, TableProperties, BarChart2, Search, FilePlus, X, Trash2, Pencil, Lock, LockOpen, Coins, Download, FileText, Truck } from 'lucide-react';
+import { LogOut, Key, BookOpen, TableProperties, BarChart2, Search, FilePlus, X, Trash2, Pencil, Lock, LockOpen, Coins, Download, FileText, Truck, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -80,6 +80,26 @@ const emptyDraft = (): RegisterDraft => ({
 
 // Produto que permite alterar o % de comissão da venda no registro (desconto)
 const PRODUTO_COMISSAO_EDITAVEL = 'Sign and Drive Empresas';
+
+// ─── Zona de inserção de linha (hover entre as linhas) ─────────────────────
+function InsertZoneRow({ colSpan, onInsert }: { colSpan: number; onInsert: () => void }) {
+  return (
+    <tr className="group/ins" style={{ height: '10px' }}>
+      <td colSpan={colSpan} className="p-0 relative" style={{ height: '10px' }}>
+        <div className="absolute inset-x-0 inset-y-0 flex items-center justify-center z-30 opacity-0 group-hover/ins:opacity-100 pointer-events-none group-hover/ins:pointer-events-auto transition-all duration-150">
+          <div className="absolute inset-x-0 top-1/2 h-px bg-blue-400" />
+          <button
+            onClick={onInsert}
+            className="relative z-10 flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-blue-600 text-white rounded-full shadow-md hover:bg-blue-700 active:scale-95 transition-all"
+          >
+            <Plus className="w-3 h-3" />
+            Inserir linha aqui
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 // ─── Export Tabela to Excel (mesmo layout da Blindagem) ───────────────────────
 async function exportTabelaExcel(exportRows: AssinaturaRow[]): Promise<void> {
@@ -228,6 +248,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
 
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [draft, setDraft] = useState<RegisterDraft>(emptyDraft());
+  const [insertIndex, setInsertIndex] = useState<number | null>(null);
 
   // Edição inline
   type EditDraft = {
@@ -328,9 +349,13 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       anulada: false,
       comissaoEditada: false,
     };
-    await persist([newRow, ...rows]);
+    const idx = insertIndex ?? 0;
+    const updated = [...rows];
+    updated.splice(idx, 0, newRow);
+    await persist(updated);
     setShowRegisterModal(false);
     setDraft(emptyDraft());
+    setInsertIndex(null);
     toast.success('Venda registrada');
   };
 
@@ -487,6 +512,10 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     comissoes: rows.filter(r => !(r.nfComissao ?? '').trim() && !r.anulada).length,
     pendente: rows.filter(r => !(r.dataEntrega ?? '').trim() && !r.anulada).length,
   }), [rows]);
+
+  const hasActiveFilters = Object.values(filters).some(v => v.trim() !== '');
+  const canInsert = viewMode === 'todas' && !hasActiveFilters;
+  const openInsert = (i: number) => { setInsertIndex(i); setDraft(emptyDraft()); setShowRegisterModal(true); };
 
 
   const fmtCell = (col: ColDef, value: string): string => {
@@ -718,6 +747,9 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                     </td>
                   </tr>
                 )}
+                {filteredRows.length > 0 && canInsert && (
+                  <InsertZoneRow colSpan={COLUMNS.length + 2} onInsert={() => openInsert(0)} />
+                )}
                 {filteredRows.map((row, idx) => {
                   const editing = editingId === row.id;
                   const editingComissao = editComissaoId === row.id;
@@ -728,7 +760,8 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                   const rowBg = editing ? '#eff6ff' : editingComissao ? '#ecfdf5' : isComissaoPrompt ? '#ecfdf5' : isLocking ? '#fffbeb' : isDelete ? '#fef2f2' : row.anulada ? '#f1f5f9' : isEven ? '#ffffff' : '#f8fafc';
                   const nf = editing ? editDraft.nfComissao : (row.nfComissao ?? '');
                   return (
-                    <tr key={row.id} style={{ background: rowBg }} className="transition-colors">
+                    <Fragment key={row.id}>
+                    <tr style={{ background: rowBg }} className="transition-colors">
                       <td className="sticky left-0 z-20 text-center border-r border-slate-200 px-1 py-1" style={{ background: rowBg }}>
                         <span className="text-xs text-slate-400 font-mono">{idx + 1}</span>
                       </td>
@@ -817,6 +850,10 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                         )}
                       </td>
                     </tr>
+                    {canInsert && (
+                      <InsertZoneRow colSpan={COLUMNS.length + 2} onInsert={() => openInsert(idx + 1)} />
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -827,7 +864,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
           <div className="flex-shrink-0 flex items-center gap-2 flex-wrap">
             <Button
               size="sm"
-              onClick={() => { setDraft(emptyDraft()); setShowRegisterModal(true); }}
+              onClick={() => { setInsertIndex(null); setDraft(emptyDraft()); setShowRegisterModal(true); }}
               className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
             >
               <FilePlus className="w-4 h-4" />
@@ -885,7 +922,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                   <p className="text-sm text-slate-500 mt-0.5">Preencha os dados da venda. A data de registro será definida automaticamente.</p>
                 </div>
               </div>
-              <button onClick={() => { setShowRegisterModal(false); setDraft(emptyDraft()); }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+              <button onClick={() => { setShowRegisterModal(false); setDraft(emptyDraft()); setInsertIndex(null); }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -976,7 +1013,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
 
             {/* Footer buttons */}
             <div className="flex gap-3 justify-end pt-1 border-t border-slate-100">
-              <Button variant="outline" size="sm" onClick={() => { setShowRegisterModal(false); setDraft(emptyDraft()); }} className="border-slate-300 text-slate-600">Cancelar</Button>
+              <Button variant="outline" size="sm" onClick={() => { setShowRegisterModal(false); setDraft(emptyDraft()); setInsertIndex(null); }} className="border-slate-300 text-slate-600">Cancelar</Button>
               <Button size="sm" onClick={registerVenda} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5">
                 <FilePlus className="w-4 h-4" />
                 Registrar Venda
