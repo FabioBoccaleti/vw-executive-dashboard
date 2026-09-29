@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/useAuth';
 import { Button } from '@/components/ui/button';
-import { LogOut, Key, BookOpen, TableProperties, BarChart2, Search } from 'lucide-react';
+import { LogOut, Key, BookOpen, TableProperties, BarChart2, Search, FilePlus, X, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { loadAssinaturaRows, saveAssinaturaRows, type AssinaturaRow } from './assinaturaStorage';
+import { loadSignDriveCatalogo, type CatalogoVeiculos } from './catalogoStorage';
+import { loadSignDriveVendedores, loadSignDriveTiposVenda, type Vendedor, type TipoVendaSignDrive } from '@/components/CadastrosPage/cadastrosStorage';
 
 interface AssinaturaSignDriveDashboardProps {
   onChangeBrand: () => void;
@@ -34,6 +38,40 @@ const COLUMNS: ColDef[] = [
   { key: 'situacaoComissao',        label: 'Situação da Comissão',         type: 'text',     width: 160 },
 ];
 
+// ─── Helpers ───────────────────────────────────────────────────
+function parseBR(s: string): number {
+  if (!s) return 0;
+  let clean = s.trim().replace(/R\$\s*/g, '');
+  if (clean.includes(',')) clean = clean.replace(/\./g, '').replace(',', '.');
+  return parseFloat(clean) || 0;
+}
+
+function fmtCurrency(raw: string): string {
+  if (raw === '' || raw == null) return '—';
+  const n = parseFloat(raw);
+  return isNaN(n) ? '—' : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function fmtPct(raw: string): string {
+  if (raw === '' || raw == null) return '—';
+  const n = parseFloat(raw);
+  return isNaN(n) ? '—' : `${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+function todayISO(): string { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function todayBR(): string { const d = new Date(); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; }
+function isoToBR(iso: string): string { if (!iso) return ''; const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; }
+
+type RegisterDraft = {
+  dataVenda: string; cliente: string; produto: string; veiculo: string;
+  chassi: string; placa: string; vendedor: string; valorContrato: string;
+};
+const emptyDraft = (): RegisterDraft => ({
+  dataVenda: todayISO(), cliente: '', produto: '', veiculo: '',
+  chassi: '', placa: '', vendedor: '', valorContrato: '',
+});
+
 export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }: AssinaturaSignDriveDashboardProps) {
   const { canAccessVendasSub, isAdmin } = useAuth();
   const canTabela  = isAdmin() || canAccessVendasSub('assinatura_signdrive.tabela');
@@ -43,6 +81,106 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>(canTabela ? 'tabela' : 'analise');
   const [filters, setFilters] = useState<Record<string, string>>({});
   const setFilter = (key: string, value: string) => setFilters(prev => ({ ...prev, [key]: value }));
+
+  const [rows, setRows] = useState<AssinaturaRow[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  // Cadastros (dropdowns)
+  const [catalogo, setCatalogo] = useState<CatalogoVeiculos>({ marcas: [], modelos: [] });
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  const [tiposVenda, setTiposVenda] = useState<TipoVendaSignDrive[]>([]);
+
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [draft, setDraft] = useState<RegisterDraft>(emptyDraft());
+
+  useEffect(() => {
+    loadAssinaturaRows().then(setRows);
+    loadSignDriveCatalogo().then(setCatalogo);
+    loadSignDriveVendedores().then(setVendedores);
+    loadSignDriveTiposVenda().then(setTiposVenda);
+  }, []);
+
+  const veiculoOptions = useMemo(() => {
+    const marcaNome = (id: string) => catalogo.marcas.find(m => m.id === id)?.nome ?? '';
+    return catalogo.modelos.map(m => `${marcaNome(m.marcaId)} ${m.modelo}`.trim());
+  }, [catalogo]);
+
+  // Comissões calculadas a partir do % do produto (Tipo da Venda) sobre o Valor do Contrato
+  const preview = useMemo(() => {
+    const prod = tiposVenda.find(t => t.descricao === draft.produto);
+    const valor = parseBR(draft.valorContrato);
+    const pctVenda = prod ? parseBR(prod.pctComissaoVenda) : 0;
+    const pctEntrega = prod ? parseBR(prod.pctComissaoEntrega) : 0;
+    const comissaoVenda = valor * pctVenda / 100;
+    const comissaoEntrega = valor * pctEntrega / 100;
+    const total = comissaoVenda + comissaoEntrega;
+    const rentBruta = valor > 0 ? total / valor * 100 : 0;
+    return { comissaoVenda, comissaoEntrega, total, rentBruta };
+  }, [draft.produto, draft.valorContrato, tiposVenda]);
+
+  const persist = async (updated: AssinaturaRow[]) => {
+    setSaving(true);
+    try {
+      const ok = await saveAssinaturaRows(updated);
+      if (!ok) toast.error('Erro ao salvar.');
+      else setRows(updated);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const registerVenda = async () => {
+    if (!draft.cliente.trim() || !draft.produto || !draft.vendedor || !draft.valorContrato.trim()) {
+      toast.error('Preencha Cliente, Produto, Vendedor e Valor do Contrato.');
+      return;
+    }
+    const valor = parseBR(draft.valorContrato);
+    const newRow: AssinaturaRow = {
+      id: crypto.randomUUID(),
+      dataRegistro: todayBR(),
+      dataVenda: isoToBR(draft.dataVenda) || todayBR(),
+      cliente: draft.cliente.trim(),
+      tipoVenda: draft.produto,
+      veiculo: draft.veiculo,
+      chassi: draft.chassi.trim(),
+      placa: draft.placa.trim(),
+      vendedor: draft.vendedor,
+      valorContrato: String(valor),
+      pctComissaoSorana: '',
+      comissaoEntrega: String(preview.comissaoEntrega),
+      comissaoVenda: String(preview.comissaoVenda),
+      totalComissoesBruta: String(preview.total),
+      pctRentabilidadeBruta: String(preview.rentBruta),
+      pctImpostosComissao: '',
+      totalComissaoLiquida: '',
+      pctRentabilidadeLiquida: '',
+      nfComissao: '',
+      situacaoComissao: '',
+    };
+    await persist([newRow, ...rows]);
+    setShowRegisterModal(false);
+    setDraft(emptyDraft());
+    toast.success('Venda registrada');
+  };
+
+  const deleteRow = async (id: string) => {
+    await persist(rows.filter(r => r.id !== id));
+    toast.success('Registro removido');
+  };
+
+  const filteredRows = useMemo(() => {
+    const active = Object.entries(filters).filter(([, v]) => v.trim() !== '');
+    if (active.length === 0) return rows;
+    return rows.filter(row =>
+      active.every(([key, v]) => String((row as unknown as Record<string, string>)[key] ?? '').toLowerCase().includes(v.toLowerCase())),
+    );
+  }, [rows, filters]);
+
+  const fmtCell = (col: ColDef, value: string): string => {
+    if (col.type === 'currency') return fmtCurrency(value);
+    if (col.type === 'percent') return fmtPct(value);
+    return value || '—';
+  };
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -61,7 +199,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
               <h1 className="text-base font-bold leading-tight tracking-tight">
                 Vendas de Carro por Assinatura (Sign&amp;Drive)
               </h1>
-              <p className="text-rose-200 text-xs mt-0.5">0 registros</p>
+              <p className="text-rose-200 text-xs mt-0.5">{rows.length} {rows.length === 1 ? 'registro' : 'registros'}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -168,19 +306,155 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
 
               {/* ── TBODY ── */}
               <tbody>
-                <tr>
-                  <td colSpan={COLUMNS.length + 2} className="text-center text-sm text-slate-400 py-10">
-                    Nenhum registro cadastrado
-                  </td>
-                </tr>
+                {filteredRows.length === 0 && (
+                  <tr>
+                    <td colSpan={COLUMNS.length + 2} className="text-center text-sm text-slate-400 py-10">
+                      Nenhum registro cadastrado
+                    </td>
+                  </tr>
+                )}
+                {filteredRows.map((row, idx) => {
+                  const isEven = idx % 2 === 0;
+                  const rowBg = isEven ? '#ffffff' : '#f8fafc';
+                  return (
+                    <tr key={row.id} style={{ background: rowBg }} className="transition-colors">
+                      <td className="sticky left-0 z-20 text-center border-r border-slate-200 px-1 py-1" style={{ background: rowBg }}>
+                        <span className="text-xs text-slate-400 font-mono">{idx + 1}</span>
+                      </td>
+                      {COLUMNS.map((col, ci) => {
+                        const val = (row as unknown as Record<string, string>)[col.key] ?? '';
+                        const isRight = col.type === 'currency' || col.type === 'percent';
+                        return (
+                          <td key={`c-${col.key}-${ci}`} className={`px-3 py-2 text-xs text-slate-700 border-r border-slate-100 whitespace-nowrap ${isRight ? 'text-right' : ''}`}>
+                            {fmtCell(col, val)}
+                          </td>
+                        );
+                      })}
+                      <td className="sticky right-0 z-20 text-center border-l border-slate-200 px-1 py-1" style={{ background: rowBg }}>
+                        <button onClick={() => deleteRow(row.id)} disabled={saving} className="text-red-400 hover:text-red-600 p-1 rounded" title="Remover">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+          </div>
+
+          {/* ── Footer ── */}
+          <div className="flex-shrink-0 flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => { setDraft(emptyDraft()); setShowRegisterModal(true); }}
+              className="bg-rose-600 hover:bg-rose-700 text-white gap-1.5"
+            >
+              <FilePlus className="w-4 h-4" />
+              Registrar Venda
+            </Button>
           </div>
         </div>
       )}
 
       {activeTab === 'analise' && canAnalise && (
         <div className="flex-1 overflow-auto p-6" />
+      )}
+
+      {/* ── Modal Registrar Venda ── */}
+      {showRegisterModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 flex flex-col gap-5 max-h-[90vh] overflow-auto">
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 bg-rose-100 rounded-xl flex-shrink-0">
+                  <FilePlus className="w-5 h-5 text-rose-700" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">Registrar Venda</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">Preencha os dados da venda. A data de registro será definida automaticamente.</p>
+                </div>
+              </div>
+              <button onClick={() => { setShowRegisterModal(false); setDraft(emptyDraft()); }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Fields grid */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Data da Venda <span className="text-red-500">*</span></label>
+                <input type="date" value={draft.dataVenda} onChange={e => setDraft(p => ({ ...p, dataVenda: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Cliente <span className="text-red-500">*</span></label>
+                <input type="text" value={draft.cliente} onChange={e => setDraft(p => ({ ...p, cliente: e.target.value }))} placeholder="Nome do cliente" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Produto <span className="text-red-500">*</span></label>
+                <select value={draft.produto} onChange={e => setDraft(p => ({ ...p, produto: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 bg-white">
+                  <option value="">Selecione...</option>
+                  {tiposVenda.map(t => <option key={t.id} value={t.descricao}>{t.descricao}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Veículo</label>
+                <select value={draft.veiculo} onChange={e => setDraft(p => ({ ...p, veiculo: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 bg-white">
+                  <option value="">Selecione...</option>
+                  {veiculoOptions.map((v, i) => <option key={`${v}-${i}`} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Chassi</label>
+                <input type="text" value={draft.chassi} onChange={e => setDraft(p => ({ ...p, chassi: e.target.value }))} placeholder="Ex: 9BWZZZ377VT004251" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Placa</label>
+                <input type="text" value={draft.placa} onChange={e => setDraft(p => ({ ...p, placa: e.target.value }))} placeholder="Ex: ABC1D23" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Vendedor <span className="text-red-500">*</span></label>
+                <select value={draft.vendedor} onChange={e => setDraft(p => ({ ...p, vendedor: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 bg-white">
+                  <option value="">Selecione...</option>
+                  {vendedores.map(v => <option key={v.id} value={v.nome}>{v.nome}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Valor do Contrato <span className="text-red-500">*</span></label>
+                <input type="text" value={draft.valorContrato} onChange={e => setDraft(p => ({ ...p, valorContrato: e.target.value }))} placeholder="Ex: 1.500,00" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+              </div>
+            </div>
+
+            {/* Comissões calculadas (somente leitura) */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 bg-slate-50 rounded-xl p-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500">Valor da Comissão de Entrega</label>
+                <div className="text-sm font-semibold text-slate-700">{fmtCurrency(String(preview.comissaoEntrega))}</div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500">Valor da Comissão de Venda</label>
+                <div className="text-sm font-semibold text-slate-700">{fmtCurrency(String(preview.comissaoVenda))}</div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500">Total das Comissões Bruta</label>
+                <div className="text-sm font-semibold text-slate-700">{fmtCurrency(String(preview.total))}</div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500">% Rentabilidade Bruta</label>
+                <div className="text-sm font-semibold text-slate-700">{fmtPct(String(preview.rentBruta))}</div>
+              </div>
+            </div>
+
+            {/* Footer buttons */}
+            <div className="flex gap-3 justify-end pt-1 border-t border-slate-100">
+              <Button variant="outline" size="sm" onClick={() => { setShowRegisterModal(false); setDraft(emptyDraft()); }} className="border-slate-300 text-slate-600">Cancelar</Button>
+              <Button size="sm" onClick={registerVenda} disabled={saving} className="bg-rose-600 hover:bg-rose-700 text-white gap-1.5">
+                <FilePlus className="w-4 h-4" />
+                Registrar Venda
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
