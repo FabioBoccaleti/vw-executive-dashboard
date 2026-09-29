@@ -66,11 +66,16 @@ function isoToBR(iso: string): string { if (!iso) return ''; const [y, m, d] = i
 type RegisterDraft = {
   dataVenda: string; cliente: string; produto: string; veiculo: string;
   chassi: string; placa: string; vendedor: string; valorContrato: string;
+  pctComissaoVendaOverride: string;
 };
 const emptyDraft = (): RegisterDraft => ({
   dataVenda: todayISO(), cliente: '', produto: '', veiculo: '',
   chassi: '', placa: '', vendedor: '', valorContrato: '',
+  pctComissaoVendaOverride: '',
 });
+
+// Produto que permite alterar o % de comissão da venda no registro (desconto)
+const PRODUTO_COMISSAO_EDITAVEL = 'Sign and Drive Empresas';
 
 export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }: AssinaturaSignDriveDashboardProps) {
   const { canAccessVendasSub, isAdmin } = useAuth();
@@ -109,7 +114,9 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   const preview = useMemo(() => {
     const prod = tiposVenda.find(t => t.descricao === draft.produto);
     const valor = parseBR(draft.valorContrato);
-    const pctVenda = prod ? parseBR(prod.pctComissaoVenda) : 0;
+    const isEditavel = draft.produto === PRODUTO_COMISSAO_EDITAVEL;
+    const pctVendaCad = prod ? parseBR(prod.pctComissaoVenda) : 0;
+    const pctVenda = isEditavel && draft.pctComissaoVendaOverride.trim() !== '' ? parseBR(draft.pctComissaoVendaOverride) : pctVendaCad;
     const pctEntrega = prod ? parseBR(prod.pctComissaoEntrega) : 0;
     const pctImpostos = prod ? parseBR(prod.pctImpostos) : 0;
     const comissaoVenda = valor * pctVenda / 100;
@@ -120,7 +127,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     const totalLiquida = total - impostos;
     const rentLiquida = valor > 0 ? totalLiquida / valor * 100 : 0;
     return { comissaoVenda, comissaoEntrega, total, rentBruta, impostos, totalLiquida, rentLiquida };
-  }, [draft.produto, draft.valorContrato, tiposVenda]);
+  }, [draft.produto, draft.valorContrato, draft.pctComissaoVendaOverride, tiposVenda]);
 
   const persist = async (updated: AssinaturaRow[]) => {
     setSaving(true);
@@ -398,7 +405,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Produto <span className="text-red-500">*</span></label>
-                <select value={draft.produto} onChange={e => setDraft(p => ({ ...p, produto: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 bg-white">
+                <select value={draft.produto} onChange={e => { const prod = tiposVenda.find(t => t.descricao === e.target.value); setDraft(p => ({ ...p, produto: e.target.value, pctComissaoVendaOverride: e.target.value === PRODUTO_COMISSAO_EDITAVEL ? (prod?.pctComissaoVenda ?? '') : '' })); }} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 bg-white">
                   <option value="">Selecione...</option>
                   {tiposVenda.map(t => <option key={t.id} value={t.descricao}>{t.descricao}</option>)}
                 </select>
@@ -429,6 +436,13 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                 <label className="text-xs font-semibold text-slate-600">Valor do Contrato <span className="text-red-500">*</span></label>
                 <input type="text" value={draft.valorContrato} onChange={e => setDraft(p => ({ ...p, valorContrato: e.target.value }))} placeholder="Ex: 1.500,00" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
               </div>
+              {draft.produto === PRODUTO_COMISSAO_EDITAVEL && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">% Comissão da Venda <span className="text-red-500">*</span></label>
+                <input type="text" value={draft.pctComissaoVendaOverride} onChange={e => setDraft(p => ({ ...p, pctComissaoVendaOverride: e.target.value }))} placeholder="Ex: 2" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+                <span className="text-[11px] text-slate-400">Ajuste conforme o desconto concedido.</span>
+              </div>
+              )}
             </div>
 
             {/* Comissões calculadas (somente leitura) */}
