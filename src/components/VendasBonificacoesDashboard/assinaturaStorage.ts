@@ -13,12 +13,11 @@ export interface AssinaturaRow {
   placa: string;
   vendedor: string;
   valorContrato: string;
-  pctComissaoSorana: string;
   comissaoEntrega: string;
   comissaoVenda: string;
   totalComissoesBruta: string;
   pctRentabilidadeBruta: string;
-  pctImpostosComissao: string;
+  impostosComissao: string;
   totalComissaoLiquida: string;
   pctRentabilidadeLiquida: string;
   nfComissao: string;

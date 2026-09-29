@@ -26,13 +26,12 @@ const COLUMNS: ColDef[] = [
   { key: 'placa',                   label: 'Placa',                        type: 'text',     width: 120 },
   { key: 'vendedor',                label: 'Vendedor',                     type: 'text',     width: 160 },
   { key: 'valorContrato',           label: 'Valor do Contrato',            type: 'currency', width: 150 },
-  { key: 'pctComissaoSorana',       label: '% Comissão Sorana',            type: 'percent',  width: 140 },
   { key: 'comissaoEntrega',         label: 'Valor da Comissão de Entrega', type: 'currency', width: 180 },
   { key: 'comissaoVenda',           label: 'Valor da Comissão de Venda',   type: 'currency', width: 180 },
   { key: 'totalComissoesBruta',     label: 'Total das Comissões Bruta',    type: 'currency', width: 175 },
   { key: 'pctRentabilidadeBruta',   label: '% Rentabilidade Bruta',        type: 'percent',  width: 150 },
-  { key: 'pctImpostosComissao',     label: '% Impostos s/ Comissão',       type: 'percent',  width: 150 },
-  { key: 'totalComissaoLiquida',    label: '% Total das Comissão Líquida', type: 'percent',  width: 175 },
+  { key: 'impostosComissao',        label: 'Impostos s/ Comissão',         type: 'currency', width: 150 },
+  { key: 'totalComissaoLiquida',    label: 'Total das Comissão Líquida',  type: 'currency', width: 175 },
   { key: 'pctRentabilidadeLiquida', label: '% Rentabilidade Líquida',      type: 'percent',  width: 150 },
   { key: 'nfComissao',              label: 'Nº NF de Comissão',            type: 'text',     width: 150 },
   { key: 'situacaoComissao',        label: 'Situação da Comissão',         type: 'text',     width: 160 },
@@ -111,11 +110,15 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     const valor = parseBR(draft.valorContrato);
     const pctVenda = prod ? parseBR(prod.pctComissaoVenda) : 0;
     const pctEntrega = prod ? parseBR(prod.pctComissaoEntrega) : 0;
+    const pctImpostos = prod ? parseBR(prod.pctImpostos) : 0;
     const comissaoVenda = valor * pctVenda / 100;
     const comissaoEntrega = valor * pctEntrega / 100;
     const total = comissaoVenda + comissaoEntrega;
     const rentBruta = valor > 0 ? total / valor * 100 : 0;
-    return { comissaoVenda, comissaoEntrega, total, rentBruta };
+    const impostos = total * pctImpostos / 100;
+    const totalLiquida = total - impostos;
+    const rentLiquida = valor > 0 ? totalLiquida / valor * 100 : 0;
+    return { comissaoVenda, comissaoEntrega, total, rentBruta, impostos, totalLiquida, rentLiquida };
   }, [draft.produto, draft.valorContrato, tiposVenda]);
 
   const persist = async (updated: AssinaturaRow[]) => {
@@ -146,14 +149,13 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       placa: draft.placa.trim(),
       vendedor: draft.vendedor,
       valorContrato: String(valor),
-      pctComissaoSorana: '',
       comissaoEntrega: String(preview.comissaoEntrega),
       comissaoVenda: String(preview.comissaoVenda),
       totalComissoesBruta: String(preview.total),
       pctRentabilidadeBruta: String(preview.rentBruta),
-      pctImpostosComissao: '',
-      totalComissaoLiquida: '',
-      pctRentabilidadeLiquida: '',
+      impostosComissao: String(preview.impostos),
+      totalComissaoLiquida: String(preview.totalLiquida),
+      pctRentabilidadeLiquida: String(preview.rentLiquida),
       nfComissao: '',
       situacaoComissao: '',
     };
@@ -442,6 +444,18 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-500">% Rentabilidade Bruta</label>
                 <div className="text-sm font-semibold text-slate-700">{fmtPct(String(preview.rentBruta))}</div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500">Impostos s/ Comissão</label>
+                <div className="text-sm font-semibold text-slate-700">{fmtCurrency(String(preview.impostos))}</div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500">Total das Comissão Líquida</label>
+                <div className="text-sm font-semibold text-slate-700">{fmtCurrency(String(preview.totalLiquida))}</div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500">% Rentabilidade Líquida</label>
+                <div className="text-sm font-semibold text-slate-700">{fmtPct(String(preview.rentLiquida))}</div>
               </div>
             </div>
 
