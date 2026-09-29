@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/useAuth';
 import { Button } from '@/components/ui/button';
-import { LogOut, Key, BookOpen, TableProperties, BarChart2, Search, FilePlus, X, Trash2, Pencil, Lock, LockOpen, Coins } from 'lucide-react';
+import { LogOut, Key, BookOpen, TableProperties, BarChart2, Search, FilePlus, X, Trash2, Pencil, Lock, LockOpen, Coins, Download, FileText, Truck } from 'lucide-react';
 import { toast } from 'sonner';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import { loadAssinaturaRows, saveAssinaturaRows, type AssinaturaRow } from './assinaturaStorage';
 import { loadSignDriveCatalogo, type CatalogoVeiculos } from './catalogoStorage';
 import { loadSignDriveVendedores, loadSignDriveTiposVenda, type Vendedor, type TipoVendaSignDrive } from '@/components/CadastrosPage/cadastrosStorage';
@@ -79,6 +81,132 @@ const emptyDraft = (): RegisterDraft => ({
 // Produto que permite alterar o % de comissão da venda no registro (desconto)
 const PRODUTO_COMISSAO_EDITAVEL = 'Sign and Drive Empresas';
 
+// ─── Export Tabela to Excel (mesmo layout da Blindagem) ───────────────────────
+async function exportTabelaExcel(exportRows: AssinaturaRow[]): Promise<void> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Sorana Executive Dashboard';
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet('Sign&Drive', {
+    views: [{ state: 'frozen', xSplit: 0, ySplit: 2 }],
+    properties: { tabColor: { argb: 'FF2563EB' } },
+  });
+
+  ws.columns = COLUMNS.map(col => ({ width: Math.max(10, Math.round(col.width / 6.5)) }));
+
+  // ── Row 1: título mesclado ──
+  const today = new Date().toLocaleDateString('pt-BR');
+  const titleRow = ws.addRow([`Vendas de Carro por Assinatura (Sign&Drive) — ${today}`]);
+  ws.mergeCells(1, 1, 1, COLUMNS.length);
+  titleRow.height = 30;
+  titleRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 13 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF1E3A8A' } }, bottom: { style: 'thin', color: { argb: 'FF1E3A8A' } },
+      left: { style: 'thin', color: { argb: 'FF1E3A8A' } }, right: { style: 'thin', color: { argb: 'FF1E3A8A' } },
+    };
+  });
+
+  // ── Row 2: cabeçalho ──
+  const headerRow = ws.addRow(COLUMNS.map(c => c.label));
+  headerRow.height = 38;
+  headerRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 9.5 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = {
+      top:    { style: 'thin',   color: { argb: 'FF3B82F6' } },
+      bottom: { style: 'medium', color: { argb: 'FF93C5FD' } },
+      left:   { style: 'thin',   color: { argb: 'FF3B82F6' } },
+      right:  { style: 'thin',   color: { argb: 'FF3B82F6' } },
+    };
+  });
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: COLUMNS.length } };
+
+  // ── Linhas de dados ──
+  const BTHIN = { style: 'thin' as const, color: { argb: 'FFE2E8F0' } };
+  const BRL_FMT = '"R$"\\ #,##0.00';
+  const PCT_FMT = '0.00"%"';
+
+  const cellValue = (row: AssinaturaRow, col: ColDef): string | number | Date | null => {
+    if (col.key === 'situacaoComissao') return row.anulada ? 'Anulada' : (row.nfComissao ?? '').trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
+    const raw = (row as unknown as Record<string, string>)[col.key] ?? '';
+    if (col.type === 'currency') return raw === '' ? null : (parseFloat(raw) || 0);
+    if (col.type === 'percent')  return raw === '' ? null : (parseFloat(raw) || 0);
+    if (col.type === 'date') {
+      if (!raw) return null;
+      const [d, m, y] = raw.split('/');
+      return (d && m && y) ? new Date(+y, +m - 1, +d) : raw;
+    }
+    return raw || '';
+  };
+
+  exportRows.forEach((row, ri) => {
+    const bg = ri % 2 === 0 ? 'FFFFFFFF' : 'FFF8FAFC';
+    const dr = ws.addRow(COLUMNS.map(col => cellValue(row, col)));
+    dr.height = 17;
+    dr.eachCell({ includeEmpty: true }, (cell, ci) => {
+      const col = COLUMNS[ci - 1];
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.border = { top: BTHIN, bottom: BTHIN, left: BTHIN, right: BTHIN };
+      if (!col) return;
+      if (col.type === 'currency') {
+        cell.numFmt = BRL_FMT;
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.font = { size: 9.5, name: 'Courier New' };
+      } else if (col.type === 'percent') {
+        cell.numFmt = PCT_FMT;
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.font = { size: 9.5, name: 'Courier New' };
+      } else if (col.type === 'date') {
+        if (cell.value instanceof Date) cell.numFmt = 'DD/MM/YYYY';
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.font = { size: 9.5 };
+      } else {
+        cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: false };
+        cell.font = { size: 9.5 };
+      }
+    });
+  });
+
+  // ── Linha de total ──
+  const totals = COLUMNS.map((col, i) => {
+    if (i === 0) return 'TOTAL';
+    if (col.type === 'currency') return exportRows.reduce((s, r) => s + (parseFloat((r as unknown as Record<string, string>)[col.key]) || 0), 0);
+    return null;
+  });
+  const totalRow = ws.addRow(totals);
+  totalRow.height = 22;
+  totalRow.eachCell({ includeEmpty: true }, (cell, ci) => {
+    const col = COLUMNS[ci - 1];
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+    cell.border = {
+      top:    { style: 'medium', color: { argb: 'FF93C5FD' } },
+      bottom: { style: 'medium', color: { argb: 'FF3B82F6' } },
+      left:   { style: 'thin',   color: { argb: 'FF3B82F6' } },
+      right:  { style: 'thin',   color: { argb: 'FF3B82F6' } },
+    };
+    if (!col) return;
+    if (col.type === 'currency') {
+      cell.numFmt = BRL_FMT;
+      cell.alignment = { horizontal: 'right', vertical: 'middle' };
+      cell.font = { bold: true, size: 10, color: { argb: 'FFBFDBFE' }, name: 'Courier New' };
+    } else {
+      cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+    }
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  const dateStr = new Date().toISOString().split('T')[0];
+  saveAs(
+    new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    `vendas-sign-drive-${dateStr}.xlsx`,
+  );
+}
+
 export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }: AssinaturaSignDriveDashboardProps) {
   const { canAccessVendasSub, isAdmin } = useAuth();
   const canTabela  = isAdmin() || canAccessVendasSub('assinatura_signdrive.tabela');
@@ -86,6 +214,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   const canCadastro = isAdmin() || canAccessVendasSub('assinatura_signdrive.cadastro');
 
   const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>(canTabela ? 'tabela' : 'analise');
+  const [viewMode, setViewMode] = useState<'todas' | 'comissoes' | 'pendente'>('todas');
   const [filters, setFilters] = useState<Record<string, string>>({});
   const setFilter = (key: string, value: string) => setFilters(prev => ({ ...prev, [key]: value }));
 
@@ -339,13 +468,26 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     toast.success('Registro atualizado');
   };
 
+  const viewRows = useMemo(() => {
+    if (viewMode === 'comissoes') return rows.filter(r => !(r.nfComissao ?? '').trim() && !r.anulada);
+    if (viewMode === 'pendente') return rows.filter(r => !(r.dataEntrega ?? '').trim() && !r.anulada);
+    return rows;
+  }, [rows, viewMode]);
+
   const filteredRows = useMemo(() => {
     const active = Object.entries(filters).filter(([, v]) => v.trim() !== '');
-    if (active.length === 0) return rows;
-    return rows.filter(row =>
+    if (active.length === 0) return viewRows;
+    return viewRows.filter(row =>
       active.every(([key, v]) => String((row as unknown as Record<string, string>)[key] ?? '').toLowerCase().includes(v.toLowerCase())),
     );
-  }, [rows, filters]);
+  }, [viewRows, filters]);
+
+  const counts = useMemo(() => ({
+    todas: rows.length,
+    comissoes: rows.filter(r => !(r.nfComissao ?? '').trim() && !r.anulada).length,
+    pendente: rows.filter(r => !(r.dataEntrega ?? '').trim() && !r.anulada).length,
+  }), [rows]);
+
 
   const fmtCell = (col: ColDef, value: string): string => {
     if (col.type === 'currency') return fmtCurrency(value);
@@ -572,16 +714,18 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                 {filteredRows.length === 0 && (
                   <tr>
                     <td colSpan={COLUMNS.length + 2} className="text-center text-sm text-slate-400 py-10">
-                      Nenhum registro cadastrado
+                      {viewMode === 'comissoes' ? 'Nenhuma venda com comissão a receber' : viewMode === 'pendente' ? 'Nenhuma venda pendente de entrega' : 'Nenhum registro cadastrado'}
                     </td>
                   </tr>
                 )}
                 {filteredRows.map((row, idx) => {
                   const editing = editingId === row.id;
+                  const editingComissao = editComissaoId === row.id;
+                  const isComissaoPrompt = comissaoPromptId === row.id;
                   const isDelete = deleteId === row.id;
                   const isLocking = lockPromptId === row.id;
                   const isEven = idx % 2 === 0;
-                  const rowBg = editing ? '#eff6ff' : isLocking ? '#fffbeb' : isDelete ? '#fef2f2' : row.anulada ? '#f1f5f9' : isEven ? '#ffffff' : '#f8fafc';
+                  const rowBg = editing ? '#eff6ff' : editingComissao ? '#ecfdf5' : isComissaoPrompt ? '#ecfdf5' : isLocking ? '#fffbeb' : isDelete ? '#fef2f2' : row.anulada ? '#f1f5f9' : isEven ? '#ffffff' : '#f8fafc';
                   const nf = editing ? editDraft.nfComissao : (row.nfComissao ?? '');
                   return (
                     <tr key={row.id} style={{ background: rowBg }} className="transition-colors">
@@ -603,6 +747,29 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                           <div className="flex items-center justify-center gap-1 flex-wrap">
                             <button onClick={saveEditRow} disabled={saving} className="px-2.5 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 font-semibold transition-colors">Salvar</button>
                             <button onClick={() => setEditingId(null)} className="px-2.5 py-1 bg-slate-200 text-slate-600 text-xs rounded-md hover:bg-slate-300 font-semibold transition-colors">Cancelar</button>
+                          </div>
+                        ) : editingComissao ? (
+                          <div className="flex items-center justify-center gap-1 flex-wrap">
+                            <button onClick={saveEditComissao} disabled={saving} className="px-2.5 py-1 bg-emerald-600 text-white text-xs rounded-md hover:bg-emerald-700 font-semibold transition-colors">Salvar</button>
+                            <button onClick={() => setEditComissaoId(null)} className="px-2.5 py-1 bg-slate-200 text-slate-600 text-xs rounded-md hover:bg-slate-300 font-semibold transition-colors">Cancelar</button>
+                          </div>
+                        ) : isComissaoPrompt ? (
+                          <div className="flex flex-col items-center gap-1.5 py-0.5">
+                            <p className="text-xs text-emerald-700 font-semibold text-center leading-tight"><Coins className="w-3 h-3 inline-block mb-0.5" /> Senha</p>
+                            <input
+                              type="password"
+                              autoComplete="new-password"
+                              value={comissaoPassword}
+                              onChange={e => setComissaoPassword(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') confirmComissao(row); if (e.key === 'Escape') { setComissaoPromptId(null); setComissaoPassword(''); } }}
+                              placeholder="Senha"
+                              autoFocus
+                              className="w-full border border-emerald-300 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                            />
+                            <div className="flex gap-1">
+                              <button onClick={() => confirmComissao(row)} className="px-2 py-0.5 bg-emerald-600 text-white text-xs rounded-md hover:bg-emerald-700 font-semibold transition-colors">OK</button>
+                              <button onClick={() => { setComissaoPromptId(null); setComissaoPassword(''); }} className="px-2 py-0.5 bg-slate-200 text-slate-600 text-xs rounded-md hover:bg-slate-300 font-semibold transition-colors">Cancelar</button>
+                            </div>
                           </div>
                         ) : isLocking ? (
                           <div className="flex flex-col items-center gap-1.5 py-0.5">
@@ -642,6 +809,9 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                                 <button onClick={() => requestEdit(row)} title="Editar" className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
                               )
                             )}
+                            {!row.anulada && (
+                              <button onClick={() => requestEditComissao(row)} title="Editar comissões (requer senha)" className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors"><Coins className="w-3.5 h-3.5" /></button>
+                            )}
                             <button onClick={() => { setEditingId(null); setDeleteId(row.id); }} title="Excluir linha" className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                           </div>
                         )}
@@ -654,7 +824,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
           </div>
 
           {/* ── Footer ── */}
-          <div className="flex-shrink-0 flex items-center gap-2">
+          <div className="flex-shrink-0 flex items-center gap-2 flex-wrap">
             <Button
               size="sm"
               onClick={() => { setDraft(emptyDraft()); setShowRegisterModal(true); }}
@@ -663,6 +833,35 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
               <FilePlus className="w-4 h-4" />
               Registrar Venda
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportTabelaExcel(filteredRows)}
+              className="text-emerald-700 border-emerald-300 hover:bg-emerald-50 gap-1.5 font-medium"
+            >
+              <Download className="w-4 h-4" />
+              Exportar Excel
+            </Button>
+            <div className="inline-flex bg-slate-200 rounded-lg p-0.5 gap-0.5">
+              {([
+                { v: 'todas' as const, label: 'Todas', icon: null, count: counts.todas },
+                { v: 'comissoes' as const, label: 'Comissões a Receber', icon: <FileText className="w-3.5 h-3.5" />, count: counts.comissoes },
+                { v: 'pendente' as const, label: 'Pendente de Entrega', icon: <Truck className="w-3.5 h-3.5" />, count: counts.pendente },
+              ]).map(opt => {
+                const active = viewMode === opt.v;
+                return (
+                  <button
+                    key={opt.v}
+                    onClick={() => setViewMode(opt.v)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-300'}`}
+                  >
+                    {opt.icon}
+                    {opt.label}
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold tabular-nums ${active ? 'bg-white/25 text-white' : 'bg-slate-300 text-slate-600'}`}>{opt.count}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
