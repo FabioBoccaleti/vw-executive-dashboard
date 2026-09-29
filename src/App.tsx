@@ -49,7 +49,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<'app' | 'admin' | 'cadastros'>(() =>
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
-  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade'>('selection')
+  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade'>('selection')
   const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis' | 'premios'>('selection')
   const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica'>('blindagem')
   
@@ -263,6 +263,32 @@ function AppContent() {
           <ImportarPDFPage
             onBack={() => setVendasSubPage('selection')}
           />
+        ) : vendasSubPage === 'assinatura-sign-drive' ? (
+          <div className="min-h-screen bg-slate-100 flex flex-col">
+            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+              <div>
+                <h1 className="text-lg font-bold text-slate-800">Vendas de Carro por Assinatura (Sign&amp;Drive)</h1>
+                <p className="text-xs text-slate-500 mt-0.5">Demonstrativo de Vendas e Bonificações</p>
+              </div>
+              <button
+                onClick={() => setVendasSubPage('selection')}
+                className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
+              >
+                ← Voltar
+              </button>
+            </header>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center space-y-3">
+                <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center mx-auto">
+                  <svg className="w-8 h-8 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
+                  </svg>
+                </div>
+                <p className="text-lg font-semibold text-slate-700">Em desenvolvimento</p>
+                <p className="text-sm text-slate-400">Este módulo estará disponível em breve.</p>
+              </div>
+            </div>
+          </div>
         ) : vendasSubPage === 'peliculas' ? (
           <PeliculasDashboard
             onBack={() => setVendasSubPage('selection')}
