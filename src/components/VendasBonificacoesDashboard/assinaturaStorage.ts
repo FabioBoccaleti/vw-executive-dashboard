@@ -20,9 +20,12 @@ export interface AssinaturaRow {
   impostosComissao: string;
   totalComissaoLiquida: string;
   pctRentabilidadeLiquida: string;
+  dataEntrega: string;
   nfComissao: string;
   situacaoComissao: string;
   situacaoComissaoVendedor: string;
+  anulada?: boolean;
+  comissaoEditada?: boolean;
 }
 
 export async function loadAssinaturaRows(): Promise<AssinaturaRow[]> {

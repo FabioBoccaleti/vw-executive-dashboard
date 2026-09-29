@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/useAuth';
 import { Button } from '@/components/ui/button';
-import { LogOut, Key, BookOpen, TableProperties, BarChart2, Search, FilePlus, X, Trash2, Pencil, Check } from 'lucide-react';
+import { LogOut, Key, BookOpen, TableProperties, BarChart2, Search, FilePlus, X, Trash2, Pencil, Lock, LockOpen, Coins } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadAssinaturaRows, saveAssinaturaRows, type AssinaturaRow } from './assinaturaStorage';
 import { loadSignDriveCatalogo, type CatalogoVeiculos } from './catalogoStorage';
@@ -33,6 +33,7 @@ const COLUMNS: ColDef[] = [
   { key: 'impostosComissao',        label: 'Impostos s/ Comissão',         type: 'currency', width: 150 },
   { key: 'totalComissaoLiquida',    label: 'Total das Comissão Líquida',  type: 'currency', width: 175 },
   { key: 'pctRentabilidadeLiquida', label: '% Rentabilidade Líquida',      type: 'percent',  width: 150 },
+  { key: 'dataEntrega',             label: 'Data de Entrega',              type: 'date',     width: 140 },
   { key: 'nfComissao',              label: 'Nº NF de Comissão',            type: 'text',     width: 150 },
   { key: 'situacaoComissao',        label: 'Situação da Comissão',         type: 'text',     width: 160 },
   { key: 'situacaoComissaoVendedor', label: 'Sit. Comissão vendedor',      type: 'text',     width: 170 },
@@ -103,12 +104,27 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   type EditDraft = {
     dataVenda: string; cliente: string; produto: string; veiculo: string;
     chassi: string; placa: string; vendedor: string; valorContrato: string;
-    comissaoVenda: string; nfComissao: string;
+    dataEntrega: string; nfComissao: string;
   };
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft>({
-    dataVenda: '', cliente: '', produto: '', veiculo: '', chassi: '', placa: '', vendedor: '', valorContrato: '', comissaoVenda: '', nfComissao: '',
+    dataVenda: '', cliente: '', produto: '', veiculo: '', chassi: '', placa: '', vendedor: '', valorContrato: '', dataEntrega: '', nfComissao: '',
   });
+
+  // Edição das comissões (com senha)
+  const [editComissaoId, setEditComissaoId] = useState<string | null>(null);
+  const [editComissao, setEditComissao] = useState<{ comissaoEntrega: string; comissaoVenda: string }>({ comissaoEntrega: '', comissaoVenda: '' });
+  const [comissaoPromptId, setComissaoPromptId] = useState<string | null>(null);
+  const [comissaoPassword, setComissaoPassword] = useState('');
+
+  // Exclusão / anulação / cadeado de edição
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deletePasswordPromptId, setDeletePasswordPromptId] = useState<string | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [lockPromptId, setLockPromptId] = useState<string | null>(null);
+  const [lockPassword, setLockPassword] = useState('');
+
+  const isRowLocked = (row: AssinaturaRow) => !!((row.dataEntrega ?? '').trim() || (row.nfComissao ?? '').trim() || (row.situacaoComissaoVendedor ?? '').trim());
 
   useEffect(() => {
     loadAssinaturaRows().then(setRows);
@@ -176,9 +192,12 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       impostosComissao: String(preview.impostos),
       totalComissaoLiquida: String(preview.totalLiquida),
       pctRentabilidadeLiquida: String(preview.rentLiquida),
+      dataEntrega: '',
       nfComissao: '',
       situacaoComissao: '',
       situacaoComissaoVendedor: '',
+      anulada: false,
+      comissaoEditada: false,
     };
     await persist([newRow, ...rows]);
     setShowRegisterModal(false);
@@ -188,18 +207,64 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
 
   const deleteRow = async (id: string) => {
     await persist(rows.filter(r => r.id !== id));
+    setDeleteId(null);
+    setDeletePasswordPromptId(null);
+    setDeletePassword('');
     toast.success('Registro removido');
   };
 
-  // Cálculos da linha em edição (para Empresas, a comissão de venda é editada direto)
+  const anularRow = async (id: string) => {
+    await persist(rows.map(r => r.id === id ? { ...r, anulada: true } : r));
+    setDeleteId(null);
+    toast.success('Registro anulado');
+  };
+
+  // Abre a edição — pede senha se algum dos campos de controle estiver preenchido
+  const requestEdit = (row: AssinaturaRow) => {
+    if (isRowLocked(row)) { setLockPromptId(row.id); setLockPassword(''); }
+    else startEdit(row);
+  };
+
+  const confirmLock = (row: AssinaturaRow) => {
+    if (lockPassword === '1985') { startEdit(row); setLockPromptId(null); setLockPassword(''); }
+    else { toast.error('Senha incorreta'); setLockPassword(''); }
+  };
+
+  // ─ Edição das comissões (requer senha) ─
+  const requestEditComissao = (row: AssinaturaRow) => { setComissaoPromptId(row.id); setComissaoPassword(''); };
+  const confirmComissao = (row: AssinaturaRow) => {
+    if (comissaoPassword === '1985') {
+      setEditComissaoId(row.id);
+      setEditComissao({ comissaoEntrega: row.comissaoEntrega, comissaoVenda: row.comissaoVenda });
+      setComissaoPromptId(null); setComissaoPassword('');
+    } else { toast.error('Senha incorreta'); setComissaoPassword(''); }
+  };
+  const saveEditComissao = async () => {
+    if (!editComissaoId) return;
+    const updated = rows.map(r => r.id === editComissaoId ? {
+      ...r,
+      comissaoEntrega: String(comissaoPreview.comissaoEntrega),
+      comissaoVenda: String(comissaoPreview.comissaoVenda),
+      totalComissoesBruta: String(comissaoPreview.total),
+      pctRentabilidadeBruta: String(comissaoPreview.rentBruta),
+      impostosComissao: String(comissaoPreview.impostos),
+      totalComissaoLiquida: String(comissaoPreview.totalLiquida),
+      pctRentabilidadeLiquida: String(comissaoPreview.rentLiquida),
+      comissaoEditada: true,
+    } : r);
+    await persist(updated);
+    setEditComissaoId(null);
+    toast.success('Comissões atualizadas');
+  };
+
+  // Cálculos da linha em edição normal (comissões sempre pelo % do cadastro)
   const editPreview = useMemo(() => {
     const prod = tiposVenda.find(t => t.descricao === editDraft.produto);
     const valor = parseBR(editDraft.valorContrato);
-    const isEmpresas = editDraft.produto === PRODUTO_COMISSAO_EDITAVEL;
     const pctVenda = prod ? parseBR(prod.pctComissaoVenda) : 0;
     const pctEntrega = prod ? parseBR(prod.pctComissaoEntrega) : 0;
     const pctImpostos = prod ? parseBR(prod.pctImpostos) : 0;
-    const comissaoVenda = isEmpresas ? parseBR(editDraft.comissaoVenda) : valor * pctVenda / 100;
+    const comissaoVenda = valor * pctVenda / 100;
     const comissaoEntrega = valor * pctEntrega / 100;
     const total = comissaoVenda + comissaoEntrega;
     const rentBruta = valor > 0 ? total / valor * 100 : 0;
@@ -208,6 +273,22 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     const rentLiquida = valor > 0 ? totalLiquida / valor * 100 : 0;
     return { comissaoVenda, comissaoEntrega, total, rentBruta, impostos, totalLiquida, rentLiquida };
   }, [editDraft, tiposVenda]);
+
+  // Cálculos ao editar manualmente as comissões
+  const comissaoPreview = useMemo(() => {
+    const row = rows.find(r => r.id === editComissaoId);
+    const valor = row ? parseBR(row.valorContrato) : 0;
+    const prod = row ? tiposVenda.find(t => t.descricao === row.tipoVenda) : undefined;
+    const pctImpostos = prod ? parseBR(prod.pctImpostos) : 0;
+    const comissaoEntrega = parseBR(editComissao.comissaoEntrega);
+    const comissaoVenda = parseBR(editComissao.comissaoVenda);
+    const total = comissaoEntrega + comissaoVenda;
+    const rentBruta = valor > 0 ? total / valor * 100 : 0;
+    const impostos = total * pctImpostos / 100;
+    const totalLiquida = total - impostos;
+    const rentLiquida = valor > 0 ? totalLiquida / valor * 100 : 0;
+    return { comissaoEntrega, comissaoVenda, total, rentBruta, impostos, totalLiquida, rentLiquida };
+  }, [editComissao, editComissaoId, rows, tiposVenda]);
 
   const startEdit = (row: AssinaturaRow) => {
     setEditingId(row.id);
@@ -220,7 +301,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       placa: row.placa,
       vendedor: row.vendedor,
       valorContrato: row.valorContrato,
-      comissaoVenda: row.comissaoVenda,
+      dataEntrega: brToISO(row.dataEntrega ?? ''),
       nfComissao: row.nfComissao ?? '',
     });
   };
@@ -249,7 +330,9 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       impostosComissao: String(editPreview.impostos),
       totalComissaoLiquida: String(editPreview.totalLiquida),
       pctRentabilidadeLiquida: String(editPreview.rentLiquida),
+      dataEntrega: isoToBR(editDraft.dataEntrega),
       nfComissao: editDraft.nfComissao.trim(),
+      comissaoEditada: false,
     } : r);
     await persist(updated);
     setEditingId(null);
@@ -271,14 +354,47 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   };
 
   const editInputClass = 'w-full min-w-0 bg-white border border-blue-300 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400';
+  const comissaoInputClass = 'w-full min-w-0 bg-white border border-emerald-400 rounded px-1.5 py-1 text-xs text-right focus:outline-none focus:ring-2 focus:ring-emerald-400';
+
+  const situacaoText = (row: AssinaturaRow, nf: string) => row.anulada ? 'Anulada' : nf.trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
 
   const renderCellContent = (col: ColDef, row: AssinaturaRow) => {
     const editing = editingId === row.id;
+    const editingComissao = editComissaoId === row.id;
     const val = (row as unknown as Record<string, string>)[col.key] ?? '';
+
+    // ── Modo edição das comissões ──
+    if (editingComissao) {
+      switch (col.key) {
+        case 'comissaoEntrega':
+          return <input type="text" value={editComissao.comissaoEntrega} onChange={e => setEditComissao(p => ({ ...p, comissaoEntrega: e.target.value }))} className={comissaoInputClass} />;
+        case 'comissaoVenda':
+          return <input type="text" value={editComissao.comissaoVenda} onChange={e => setEditComissao(p => ({ ...p, comissaoVenda: e.target.value }))} className={comissaoInputClass} />;
+        case 'totalComissoesBruta':     return fmtCurrency(String(comissaoPreview.total));
+        case 'pctRentabilidadeBruta':   return fmtPct(String(comissaoPreview.rentBruta));
+        case 'impostosComissao':        return fmtCurrency(String(comissaoPreview.impostos));
+        case 'totalComissaoLiquida':    return fmtCurrency(String(comissaoPreview.totalLiquida));
+        case 'pctRentabilidadeLiquida': return fmtPct(String(comissaoPreview.rentLiquida));
+        case 'situacaoComissao':        return situacaoText(row, row.nfComissao ?? '');
+        default:                        return fmtCell(col, val);
+      }
+    }
+
+    // ── Modo exibição ──
     if (!editing) {
-      if (col.key === 'situacaoComissao') return (row.nfComissao ?? '').trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
+      if (col.key === 'situacaoComissao') return situacaoText(row, row.nfComissao ?? '');
+      if ((col.key === 'comissaoEntrega' || col.key === 'comissaoVenda') && row.comissaoEditada) {
+        return (
+          <span className="inline-flex items-center gap-1">
+            {fmtCurrency(val)}
+            <span title="Comissão editada manualmente" className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+          </span>
+        );
+      }
       return fmtCell(col, val);
     }
+
+    // ── Modo edição normal (comissões são somente leitura, recalculadas pelo cadastro) ──
     switch (col.key) {
       case 'dataVenda':
         return <input type="date" value={editDraft.dataVenda} onChange={e => setEditDraft(p => ({ ...p, dataVenda: e.target.value }))} className={editInputClass} />;
@@ -311,16 +427,15 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
         );
       case 'valorContrato':
         return <input type="text" value={editDraft.valorContrato} onChange={e => setEditDraft(p => ({ ...p, valorContrato: e.target.value }))} className={`${editInputClass} text-right`} />;
-      case 'comissaoVenda':
-        if (editDraft.produto === PRODUTO_COMISSAO_EDITAVEL)
-          return <input type="text" value={editDraft.comissaoVenda} onChange={e => setEditDraft(p => ({ ...p, comissaoVenda: e.target.value }))} className={`${editInputClass} text-right`} />;
-        return fmtCurrency(String(editPreview.comissaoVenda));
       case 'comissaoEntrega':      return fmtCurrency(String(editPreview.comissaoEntrega));
+      case 'comissaoVenda':        return fmtCurrency(String(editPreview.comissaoVenda));
       case 'totalComissoesBruta':  return fmtCurrency(String(editPreview.total));
       case 'pctRentabilidadeBruta': return fmtPct(String(editPreview.rentBruta));
       case 'impostosComissao':     return fmtCurrency(String(editPreview.impostos));
       case 'totalComissaoLiquida': return fmtCurrency(String(editPreview.totalLiquida));
       case 'pctRentabilidadeLiquida': return fmtPct(String(editPreview.rentLiquida));
+      case 'dataEntrega':
+        return <input type="date" value={editDraft.dataEntrega} onChange={e => setEditDraft(p => ({ ...p, dataEntrega: e.target.value }))} className={editInputClass} />;
       case 'nfComissao':
         return <input type="text" value={editDraft.nfComissao} onChange={e => setEditDraft(p => ({ ...p, nfComissao: e.target.value }))} className={editInputClass} />;
       case 'situacaoComissao':
@@ -417,7 +532,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                 {COLUMNS.map(c => (
                   <col key={c.key} style={{ width: c.width, minWidth: c.width }} />
                 ))}
-                <col style={{ width: 110, minWidth: 110 }} /> {/* Ações */}
+                <col style={{ width: 150, minWidth: 150 }} /> {/* Ações */}
               </colgroup>
 
               {/* ── THEAD ── */}
@@ -463,8 +578,10 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                 )}
                 {filteredRows.map((row, idx) => {
                   const editing = editingId === row.id;
+                  const isDelete = deleteId === row.id;
+                  const isLocking = lockPromptId === row.id;
                   const isEven = idx % 2 === 0;
-                  const rowBg = editing ? '#eff6ff' : isEven ? '#ffffff' : '#f8fafc';
+                  const rowBg = editing ? '#eff6ff' : isLocking ? '#fffbeb' : isDelete ? '#fef2f2' : row.anulada ? '#f1f5f9' : isEven ? '#ffffff' : '#f8fafc';
                   const nf = editing ? editDraft.nfComissao : (row.nfComissao ?? '');
                   return (
                     <tr key={row.id} style={{ background: rowBg }} className="transition-colors">
@@ -474,22 +591,58 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                       {COLUMNS.map((col, ci) => {
                         const isRight = col.type === 'currency' || col.type === 'percent';
                         const isSituacao = col.key === 'situacaoComissao';
+                        const situacaoColor = row.anulada ? 'text-slate-500' : nf.trim() ? 'text-emerald-600' : 'text-amber-600';
                         return (
-                          <td key={`c-${col.key}-${ci}`} className={`px-3 py-1.5 text-xs border-r border-slate-100 whitespace-nowrap ${isRight && !editing ? 'text-right' : ''} ${isSituacao ? 'font-semibold ' + (nf.trim() ? 'text-emerald-600' : 'text-amber-600') : 'text-slate-700'}`}>
+                          <td key={`c-${col.key}-${ci}`} className={`px-3 py-1.5 text-xs border-r border-slate-100 whitespace-nowrap ${isRight && !editing ? 'text-right' : ''} ${isSituacao ? 'font-semibold ' + situacaoColor : row.anulada && !editing ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
                             {renderCellContent(col, row)}
                           </td>
                         );
                       })}
                       <td className="sticky right-0 z-20 text-center border-l border-slate-200 px-1 py-1" style={{ background: rowBg }}>
                         {editing ? (
-                          <div className="flex items-center justify-center gap-1">
-                            <button onClick={saveEditRow} disabled={saving} className="text-green-600 hover:text-green-700 p-1 rounded" title="Salvar"><Check className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => setEditingId(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded" title="Cancelar"><X className="w-3.5 h-3.5" /></button>
+                          <div className="flex items-center justify-center gap-1 flex-wrap">
+                            <button onClick={saveEditRow} disabled={saving} className="px-2.5 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 font-semibold transition-colors">Salvar</button>
+                            <button onClick={() => setEditingId(null)} className="px-2.5 py-1 bg-slate-200 text-slate-600 text-xs rounded-md hover:bg-slate-300 font-semibold transition-colors">Cancelar</button>
+                          </div>
+                        ) : isLocking ? (
+                          <div className="flex flex-col items-center gap-1.5 py-0.5">
+                            <p className="text-xs text-amber-700 font-semibold text-center leading-tight"><LockOpen className="w-3 h-3 inline-block mb-0.5" /> Senha</p>
+                            <input
+                              type="password"
+                              autoComplete="new-password"
+                              value={lockPassword}
+                              onChange={e => setLockPassword(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') confirmLock(row); if (e.key === 'Escape') { setLockPromptId(null); setLockPassword(''); } }}
+                              placeholder="Senha"
+                              autoFocus
+                              className="w-full border border-amber-300 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            />
+                            <div className="flex gap-1">
+                              <button onClick={() => confirmLock(row)} className="px-2 py-0.5 bg-amber-600 text-white text-xs rounded-md hover:bg-amber-700 font-semibold transition-colors">OK</button>
+                              <button onClick={() => { setLockPromptId(null); setLockPassword(''); }} className="px-2 py-0.5 bg-slate-200 text-slate-600 text-xs rounded-md hover:bg-slate-300 font-semibold transition-colors">Cancelar</button>
+                            </div>
+                          </div>
+                        ) : isDelete ? (
+                          <div className="flex flex-col items-center gap-1.5 py-0.5">
+                            <p className="text-xs text-red-600 font-semibold text-center leading-tight">Remover este<br />registro?</p>
+                            <div className="flex gap-1 flex-wrap justify-center">
+                              <button onClick={() => { setDeletePasswordPromptId(row.id); setDeletePassword(''); setDeleteId(null); }} className="px-2.5 py-1 bg-red-600 text-white text-xs rounded-md hover:bg-red-700 font-semibold transition-colors">Excluir</button>
+                              {!isRowLocked(row) && !row.anulada && (
+                                <button onClick={() => anularRow(row.id)} className="px-2.5 py-1 bg-orange-500 text-white text-xs rounded-md hover:bg-orange-600 font-semibold transition-colors">Anular</button>
+                              )}
+                              <button onClick={() => setDeleteId(null)} className="px-2.5 py-1 bg-slate-200 text-slate-600 text-xs rounded-md hover:bg-slate-300 font-semibold transition-colors">Cancelar</button>
+                            </div>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-center gap-1">
-                            <button onClick={() => startEdit(row)} className="text-blue-500 hover:text-blue-700 p-1 rounded" title="Editar"><Pencil className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => deleteRow(row.id)} disabled={saving} className="text-red-400 hover:text-red-600 p-1 rounded" title="Remover"><Trash2 className="w-3.5 h-3.5" /></button>
+                          <div className="flex items-center justify-center gap-0.5">
+                            {!row.anulada && (
+                              isRowLocked(row) ? (
+                                <button onClick={() => { setLockPromptId(row.id); setLockPassword(''); }} title="Editar (requer senha)" className="p-1.5 rounded-md text-amber-600 hover:bg-amber-50 transition-colors"><Lock className="w-3.5 h-3.5" /></button>
+                              ) : (
+                                <button onClick={() => requestEdit(row)} title="Editar" className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                              )
+                            )}
+                            <button onClick={() => { setEditingId(null); setDeleteId(row.id); }} title="Excluir linha" className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                           </div>
                         )}
                       </td>
@@ -629,6 +782,46 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                 <FilePlus className="w-4 h-4" />
                 Registrar Venda
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal senha exclusão ── */}
+      {deletePasswordPromptId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-5">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-red-100 rounded-xl flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">Excluir registro</h3>
+                <p className="text-sm text-slate-500 mt-1">Digite a senha para excluir permanentemente este registro.</p>
+              </div>
+            </div>
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={deletePassword}
+              onChange={e => setDeletePassword(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  if (deletePassword === '1985') deleteRow(deletePasswordPromptId!);
+                  else { toast.error('Senha incorreta'); setDeletePassword(''); }
+                }
+                if (e.key === 'Escape') { setDeletePasswordPromptId(null); setDeletePassword(''); }
+              }}
+              placeholder="Senha"
+              autoFocus
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+            />
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" size="sm" onClick={() => { setDeletePasswordPromptId(null); setDeletePassword(''); }} className="border-slate-300 text-slate-600">Cancelar</Button>
+              <Button size="sm" onClick={() => {
+                if (deletePassword === '1985') deleteRow(deletePasswordPromptId!);
+                else { toast.error('Senha incorreta'); setDeletePassword(''); }
+              }} className="bg-red-600 hover:bg-red-700 text-white">Excluir</Button>
             </div>
           </div>
         </div>
