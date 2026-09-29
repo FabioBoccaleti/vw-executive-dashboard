@@ -110,14 +110,14 @@ export function SignDriveVeiculosSection() {
             onKeyDown={e => { if (e.key === 'Enter') addMarca(); }}
             className="flex-1"
           />
-          <Button onClick={addMarca} disabled={saving || !novaMarca.trim()} size="sm" style={{ background: '#881337' }} className="text-white hover:opacity-90">
+          <Button onClick={addMarca} disabled={saving || !novaMarca.trim()} size="sm" style={{ background: '#1e3a8a' }} className="text-white hover:opacity-90">
             <Plus className="w-4 h-4 mr-1" /> Adicionar
           </Button>
         </div>
         <div className="border rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ background: '#881337' }}>
+              <tr style={{ background: '#1e3a8a' }}>
                 <th className="text-white text-left px-4 py-3 text-xs font-semibold">Marca</th>
                 <th className="text-white text-center px-4 py-3 text-xs font-semibold w-24">Ações</th>
               </tr>
@@ -172,14 +172,14 @@ export function SignDriveVeiculosSection() {
           </select>
           <Input placeholder="Nome do modelo..." value={novoModeloNome} onChange={e => setNovoModeloNome(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') addModelo(); }} className="flex-1" />
-          <Button onClick={addModelo} disabled={saving || !novoModeloNome.trim() || !novoModeloMarcaId} size="sm" style={{ background: '#881337' }} className="text-white hover:opacity-90">
+          <Button onClick={addModelo} disabled={saving || !novoModeloNome.trim() || !novoModeloMarcaId} size="sm" style={{ background: '#1e3a8a' }} className="text-white hover:opacity-90">
             <Plus className="w-4 h-4 mr-1" /> Adicionar
           </Button>
         </div>
         <div className="border rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ background: '#881337' }}>
+              <tr style={{ background: '#1e3a8a' }}>
                 <th className="text-white text-left px-4 py-3 text-xs font-semibold">Marca</th>
                 <th className="text-white text-left px-4 py-3 text-xs font-semibold">Modelo</th>
                 <th className="text-white text-center px-4 py-3 text-xs font-semibold w-24">Ações</th>

@@ -93,7 +93,7 @@ export function SignDriveVendedoresSection() {
         >
           {CARGOS_VENDEDOR.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <Button onClick={add} disabled={saving || !novoNome.trim()} size="sm" style={{ background: '#881337' }} className="text-white hover:opacity-90">
+        <Button onClick={add} disabled={saving || !novoNome.trim()} size="sm" style={{ background: '#1e3a8a' }} className="text-white hover:opacity-90">
           <Plus className="w-4 h-4 mr-1" /> Adicionar
         </Button>
       </div>
@@ -101,7 +101,7 @@ export function SignDriveVendedoresSection() {
       <div className="border rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ background: '#881337' }}>
+            <tr style={{ background: '#1e3a8a' }}>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold w-32">Código</th>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold">Nome</th>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold">Cargo</th>

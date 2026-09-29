@@ -121,10 +121,10 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
           {canAssinatura && (
           <button
             onClick={() => onSelect('assinatura-sign-drive')}
-            className="w-56 bg-white rounded-2xl border-2 border-rose-400 shadow-md hover:shadow-xl hover:border-rose-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+            className="w-56 bg-white rounded-2xl border-2 border-blue-400 shadow-md hover:shadow-xl hover:border-blue-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
           >
-            <div className="p-4 rounded-full bg-rose-50 group-hover:bg-rose-100 transition-colors">
-              <Key className="w-10 h-10 text-rose-500" />
+            <div className="p-4 rounded-full bg-blue-50 group-hover:bg-blue-100 transition-colors">
+              <Key className="w-10 h-10 text-blue-500" />
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/useAuth';
 import { Button } from '@/components/ui/button';
-import { LogOut, Key, BookOpen, TableProperties, BarChart2, Search, FilePlus, X, Trash2 } from 'lucide-react';
+import { LogOut, Key, BookOpen, TableProperties, BarChart2, Search, FilePlus, X, Trash2, Pencil, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadAssinaturaRows, saveAssinaturaRows, type AssinaturaRow } from './assinaturaStorage';
 import { loadSignDriveCatalogo, type CatalogoVeiculos } from './catalogoStorage';
@@ -62,6 +62,7 @@ const pad = (n: number) => String(n).padStart(2, '0');
 function todayISO(): string { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function todayBR(): string { const d = new Date(); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; }
 function isoToBR(iso: string): string { if (!iso) return ''; const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; }
+function brToISO(br: string): string { if (!br) return ''; const [d, m, y] = br.split('/'); return d && m && y ? `${y}-${m}-${d}` : ''; }
 
 type RegisterDraft = {
   dataVenda: string; cliente: string; produto: string; veiculo: string;
@@ -97,6 +98,17 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
 
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [draft, setDraft] = useState<RegisterDraft>(emptyDraft());
+
+  // Edição inline
+  type EditDraft = {
+    dataVenda: string; cliente: string; produto: string; veiculo: string;
+    chassi: string; placa: string; vendedor: string; valorContrato: string;
+    comissaoVenda: string; nfComissao: string;
+  };
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<EditDraft>({
+    dataVenda: '', cliente: '', produto: '', veiculo: '', chassi: '', placa: '', vendedor: '', valorContrato: '', comissaoVenda: '', nfComissao: '',
+  });
 
   useEffect(() => {
     loadAssinaturaRows().then(setRows);
@@ -141,8 +153,8 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   };
 
   const registerVenda = async () => {
-    if (!draft.cliente.trim() || !draft.produto || !draft.vendedor || !draft.valorContrato.trim()) {
-      toast.error('Preencha Cliente, Produto, Vendedor e Valor do Contrato.');
+    if (!draft.cliente.trim() || !draft.produto || !draft.veiculo || !draft.chassi.trim() || !draft.vendedor || !draft.valorContrato.trim()) {
+      toast.error('Preencha Cliente, Produto, Veículo, Chassi, Vendedor e Valor do Contrato.');
       return;
     }
     const valor = parseBR(draft.valorContrato);
@@ -179,6 +191,71 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     toast.success('Registro removido');
   };
 
+  // Cálculos da linha em edição (para Empresas, a comissão de venda é editada direto)
+  const editPreview = useMemo(() => {
+    const prod = tiposVenda.find(t => t.descricao === editDraft.produto);
+    const valor = parseBR(editDraft.valorContrato);
+    const isEmpresas = editDraft.produto === PRODUTO_COMISSAO_EDITAVEL;
+    const pctVenda = prod ? parseBR(prod.pctComissaoVenda) : 0;
+    const pctEntrega = prod ? parseBR(prod.pctComissaoEntrega) : 0;
+    const pctImpostos = prod ? parseBR(prod.pctImpostos) : 0;
+    const comissaoVenda = isEmpresas ? parseBR(editDraft.comissaoVenda) : valor * pctVenda / 100;
+    const comissaoEntrega = valor * pctEntrega / 100;
+    const total = comissaoVenda + comissaoEntrega;
+    const rentBruta = valor > 0 ? total / valor * 100 : 0;
+    const impostos = total * pctImpostos / 100;
+    const totalLiquida = total - impostos;
+    const rentLiquida = valor > 0 ? totalLiquida / valor * 100 : 0;
+    return { comissaoVenda, comissaoEntrega, total, rentBruta, impostos, totalLiquida, rentLiquida };
+  }, [editDraft, tiposVenda]);
+
+  const startEdit = (row: AssinaturaRow) => {
+    setEditingId(row.id);
+    setEditDraft({
+      dataVenda: brToISO(row.dataVenda),
+      cliente: row.cliente,
+      produto: row.tipoVenda,
+      veiculo: row.veiculo,
+      chassi: row.chassi,
+      placa: row.placa,
+      vendedor: row.vendedor,
+      valorContrato: row.valorContrato,
+      comissaoVenda: row.comissaoVenda,
+      nfComissao: row.nfComissao ?? '',
+    });
+  };
+
+  const saveEditRow = async () => {
+    if (!editingId) return;
+    if (!editDraft.cliente.trim() || !editDraft.produto || !editDraft.veiculo || !editDraft.chassi.trim() || !editDraft.vendedor || !editDraft.valorContrato.trim()) {
+      toast.error('Preencha Cliente, Produto, Veículo, Chassi, Vendedor e Valor do Contrato.');
+      return;
+    }
+    const valor = parseBR(editDraft.valorContrato);
+    const updated = rows.map(r => r.id === editingId ? {
+      ...r,
+      dataVenda: isoToBR(editDraft.dataVenda) || r.dataVenda,
+      cliente: editDraft.cliente.trim(),
+      tipoVenda: editDraft.produto,
+      veiculo: editDraft.veiculo,
+      chassi: editDraft.chassi.trim(),
+      placa: editDraft.placa.trim(),
+      vendedor: editDraft.vendedor,
+      valorContrato: String(valor),
+      comissaoEntrega: String(editPreview.comissaoEntrega),
+      comissaoVenda: String(editPreview.comissaoVenda),
+      totalComissoesBruta: String(editPreview.total),
+      pctRentabilidadeBruta: String(editPreview.rentBruta),
+      impostosComissao: String(editPreview.impostos),
+      totalComissaoLiquida: String(editPreview.totalLiquida),
+      pctRentabilidadeLiquida: String(editPreview.rentLiquida),
+      nfComissao: editDraft.nfComissao.trim(),
+    } : r);
+    await persist(updated);
+    setEditingId(null);
+    toast.success('Registro atualizado');
+  };
+
   const filteredRows = useMemo(() => {
     const active = Object.entries(filters).filter(([, v]) => v.trim() !== '');
     if (active.length === 0) return rows;
@@ -193,13 +270,73 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     return value || '—';
   };
 
+  const editInputClass = 'w-full min-w-0 bg-white border border-blue-300 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400';
+
+  const renderCellContent = (col: ColDef, row: AssinaturaRow) => {
+    const editing = editingId === row.id;
+    const val = (row as unknown as Record<string, string>)[col.key] ?? '';
+    if (!editing) {
+      if (col.key === 'situacaoComissao') return (row.nfComissao ?? '').trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
+      return fmtCell(col, val);
+    }
+    switch (col.key) {
+      case 'dataVenda':
+        return <input type="date" value={editDraft.dataVenda} onChange={e => setEditDraft(p => ({ ...p, dataVenda: e.target.value }))} className={editInputClass} />;
+      case 'cliente':
+        return <input type="text" value={editDraft.cliente} onChange={e => setEditDraft(p => ({ ...p, cliente: e.target.value }))} className={editInputClass} />;
+      case 'tipoVenda':
+        return (
+          <select value={editDraft.produto} onChange={e => setEditDraft(p => ({ ...p, produto: e.target.value }))} className={editInputClass}>
+            <option value="">Selecione...</option>
+            {tiposVenda.map(t => <option key={t.id} value={t.descricao}>{t.descricao}</option>)}
+          </select>
+        );
+      case 'veiculo':
+        return (
+          <select value={editDraft.veiculo} onChange={e => setEditDraft(p => ({ ...p, veiculo: e.target.value }))} className={editInputClass}>
+            <option value="">Selecione...</option>
+            {veiculoOptions.map((v, i) => <option key={`${v}-${i}`} value={v}>{v}</option>)}
+          </select>
+        );
+      case 'chassi':
+        return <input type="text" value={editDraft.chassi} onChange={e => setEditDraft(p => ({ ...p, chassi: e.target.value }))} className={editInputClass} />;
+      case 'placa':
+        return <input type="text" value={editDraft.placa} onChange={e => setEditDraft(p => ({ ...p, placa: e.target.value }))} className={editInputClass} />;
+      case 'vendedor':
+        return (
+          <select value={editDraft.vendedor} onChange={e => setEditDraft(p => ({ ...p, vendedor: e.target.value }))} className={editInputClass}>
+            <option value="">Selecione...</option>
+            {vendedores.map(v => <option key={v.id} value={v.nome}>{v.nome}</option>)}
+          </select>
+        );
+      case 'valorContrato':
+        return <input type="text" value={editDraft.valorContrato} onChange={e => setEditDraft(p => ({ ...p, valorContrato: e.target.value }))} className={`${editInputClass} text-right`} />;
+      case 'comissaoVenda':
+        if (editDraft.produto === PRODUTO_COMISSAO_EDITAVEL)
+          return <input type="text" value={editDraft.comissaoVenda} onChange={e => setEditDraft(p => ({ ...p, comissaoVenda: e.target.value }))} className={`${editInputClass} text-right`} />;
+        return fmtCurrency(String(editPreview.comissaoVenda));
+      case 'comissaoEntrega':      return fmtCurrency(String(editPreview.comissaoEntrega));
+      case 'totalComissoesBruta':  return fmtCurrency(String(editPreview.total));
+      case 'pctRentabilidadeBruta': return fmtPct(String(editPreview.rentBruta));
+      case 'impostosComissao':     return fmtCurrency(String(editPreview.impostos));
+      case 'totalComissaoLiquida': return fmtCurrency(String(editPreview.totalLiquida));
+      case 'pctRentabilidadeLiquida': return fmtPct(String(editPreview.rentLiquida));
+      case 'nfComissao':
+        return <input type="text" value={editDraft.nfComissao} onChange={e => setEditDraft(p => ({ ...p, nfComissao: e.target.value }))} className={editInputClass} />;
+      case 'situacaoComissao':
+        return editDraft.nfComissao.trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
+      default:
+        return fmtCell(col, val);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
 
       {/* ── Header ── */}
       <header
         className="text-white shadow-lg flex-shrink-0"
-        style={{ background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)' }}
+        style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)' }}
       >
         <div className="px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -210,7 +347,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
               <h1 className="text-base font-bold leading-tight tracking-tight">
                 Vendas de Carro por Assinatura (Sign&amp;Drive)
               </h1>
-              <p className="text-rose-200 text-xs mt-0.5">{rows.length} {rows.length === 1 ? 'registro' : 'registros'}</p>
+              <p className="text-blue-200 text-xs mt-0.5">{rows.length} {rows.length === 1 ? 'registro' : 'registros'}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -221,7 +358,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                 onClick={() => setActiveTab('tabela')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
                   activeTab === 'tabela'
-                    ? 'bg-rose-500 text-white shadow-sm'
+                    ? 'bg-blue-500 text-white shadow-sm'
                     : 'text-white/70 hover:text-white hover:bg-white/10'
                 }`}
               >
@@ -234,7 +371,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                 onClick={() => setActiveTab('analise')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
                   activeTab === 'analise'
-                    ? 'bg-rose-500 text-white shadow-sm'
+                    ? 'bg-blue-500 text-white shadow-sm'
                     : 'text-white/70 hover:text-white hover:bg-white/10'
                 }`}
               >
@@ -286,13 +423,13 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
               {/* ── THEAD ── */}
               <thead>
                 <tr>
-                  <th className="sticky left-0 top-0 z-40 text-white text-center text-xs font-semibold px-2 py-3 border-r border-rose-800" style={{ background: '#881337' }}>#</th>
+                  <th className="sticky left-0 top-0 z-40 text-white text-center text-xs font-semibold px-2 py-3 border-r border-blue-900" style={{ background: '#1e3a8a' }}>#</th>
                   {COLUMNS.map((col, ci) => (
-                    <th key={`h-${col.key}-${ci}`} className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-rose-600 align-top leading-snug text-center" style={{ background: '#be123c' }}>
+                    <th key={`h-${col.key}-${ci}`} className="sticky top-0 z-30 text-white text-xs font-semibold px-3 py-3 border-r border-blue-500 align-top leading-snug text-center" style={{ background: '#2563eb' }}>
                       {col.label}
                     </th>
                   ))}
-                  <th className="sticky right-0 top-0 z-40 text-white text-center text-xs font-semibold px-2 py-3 border-l border-rose-800 whitespace-nowrap" style={{ background: '#881337' }}>Ações</th>
+                  <th className="sticky right-0 top-0 z-40 text-white text-center text-xs font-semibold px-2 py-3 border-l border-blue-900 whitespace-nowrap" style={{ background: '#1e3a8a' }}>Ações</th>
                 </tr>
 
                 {/* Filter row */}
@@ -306,7 +443,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                           type="text"
                           value={filters[col.key] ?? ''}
                           onChange={e => setFilter(col.key, e.target.value)}
-                          className={`w-full min-w-0 bg-white border rounded pl-5 pr-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-rose-400 ${(filters[col.key]?.length ?? 0) > 0 ? 'border-rose-400 ring-1 ring-rose-300' : 'border-slate-200'}`}
+                          className={`w-full min-w-0 bg-white border rounded pl-5 pr-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 ${(filters[col.key]?.length ?? 0) > 0 ? 'border-blue-400 ring-1 ring-blue-300' : 'border-slate-200'}`}
                         />
                       </div>
                     </th>
@@ -325,28 +462,36 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                   </tr>
                 )}
                 {filteredRows.map((row, idx) => {
+                  const editing = editingId === row.id;
                   const isEven = idx % 2 === 0;
-                  const rowBg = isEven ? '#ffffff' : '#f8fafc';
+                  const rowBg = editing ? '#eff6ff' : isEven ? '#ffffff' : '#f8fafc';
+                  const nf = editing ? editDraft.nfComissao : (row.nfComissao ?? '');
                   return (
                     <tr key={row.id} style={{ background: rowBg }} className="transition-colors">
                       <td className="sticky left-0 z-20 text-center border-r border-slate-200 px-1 py-1" style={{ background: rowBg }}>
                         <span className="text-xs text-slate-400 font-mono">{idx + 1}</span>
                       </td>
                       {COLUMNS.map((col, ci) => {
-                        const val = (row as unknown as Record<string, string>)[col.key] ?? '';
                         const isRight = col.type === 'currency' || col.type === 'percent';
                         const isSituacao = col.key === 'situacaoComissao';
-                        const situacaoText = (row.nfComissao ?? '').trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
                         return (
-                          <td key={`c-${col.key}-${ci}`} className={`px-3 py-2 text-xs border-r border-slate-100 whitespace-nowrap ${isRight ? 'text-right' : ''} ${isSituacao ? 'font-semibold ' + ((row.nfComissao ?? '').trim() ? 'text-emerald-600' : 'text-amber-600') : 'text-slate-700'}`}>
-                            {isSituacao ? situacaoText : fmtCell(col, val)}
+                          <td key={`c-${col.key}-${ci}`} className={`px-3 py-1.5 text-xs border-r border-slate-100 whitespace-nowrap ${isRight && !editing ? 'text-right' : ''} ${isSituacao ? 'font-semibold ' + (nf.trim() ? 'text-emerald-600' : 'text-amber-600') : 'text-slate-700'}`}>
+                            {renderCellContent(col, row)}
                           </td>
                         );
                       })}
                       <td className="sticky right-0 z-20 text-center border-l border-slate-200 px-1 py-1" style={{ background: rowBg }}>
-                        <button onClick={() => deleteRow(row.id)} disabled={saving} className="text-red-400 hover:text-red-600 p-1 rounded" title="Remover">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {editing ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={saveEditRow} disabled={saving} className="text-green-600 hover:text-green-700 p-1 rounded" title="Salvar"><Check className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => setEditingId(null)} className="text-slate-400 hover:text-slate-600 p-1 rounded" title="Cancelar"><X className="w-3.5 h-3.5" /></button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={() => startEdit(row)} className="text-blue-500 hover:text-blue-700 p-1 rounded" title="Editar"><Pencil className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => deleteRow(row.id)} disabled={saving} className="text-red-400 hover:text-red-600 p-1 rounded" title="Remover"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -360,7 +505,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
             <Button
               size="sm"
               onClick={() => { setDraft(emptyDraft()); setShowRegisterModal(true); }}
-              className="bg-rose-600 hover:bg-rose-700 text-white gap-1.5"
+              className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
             >
               <FilePlus className="w-4 h-4" />
               Registrar Venda
@@ -380,8 +525,8 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
             {/* Header */}
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-3">
-                <div className="p-2.5 bg-rose-100 rounded-xl flex-shrink-0">
-                  <FilePlus className="w-5 h-5 text-rose-700" />
+                <div className="p-2.5 bg-blue-100 rounded-xl flex-shrink-0">
+                  <FilePlus className="w-5 h-5 text-blue-700" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-800">Registrar Venda</h3>
@@ -397,49 +542,49 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Data da Venda <span className="text-red-500">*</span></label>
-                <input type="date" value={draft.dataVenda} onChange={e => setDraft(p => ({ ...p, dataVenda: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+                <input type="date" value={draft.dataVenda} onChange={e => setDraft(p => ({ ...p, dataVenda: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Cliente <span className="text-red-500">*</span></label>
-                <input type="text" value={draft.cliente} onChange={e => setDraft(p => ({ ...p, cliente: e.target.value }))} placeholder="Nome do cliente" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+                <input type="text" value={draft.cliente} onChange={e => setDraft(p => ({ ...p, cliente: e.target.value }))} placeholder="Nome do cliente" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Produto <span className="text-red-500">*</span></label>
-                <select value={draft.produto} onChange={e => { const prod = tiposVenda.find(t => t.descricao === e.target.value); setDraft(p => ({ ...p, produto: e.target.value, pctComissaoVendaOverride: e.target.value === PRODUTO_COMISSAO_EDITAVEL ? (prod?.pctComissaoVenda ?? '') : '' })); }} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 bg-white">
+                <select value={draft.produto} onChange={e => { const prod = tiposVenda.find(t => t.descricao === e.target.value); setDraft(p => ({ ...p, produto: e.target.value, pctComissaoVendaOverride: e.target.value === PRODUTO_COMISSAO_EDITAVEL ? (prod?.pctComissaoVenda ?? '') : '' })); }} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
                   <option value="">Selecione...</option>
                   {tiposVenda.map(t => <option key={t.id} value={t.descricao}>{t.descricao}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-slate-600">Veículo</label>
-                <select value={draft.veiculo} onChange={e => setDraft(p => ({ ...p, veiculo: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 bg-white">
+                <label className="text-xs font-semibold text-slate-600">Veículo <span className="text-red-500">*</span></label>
+                <select value={draft.veiculo} onChange={e => setDraft(p => ({ ...p, veiculo: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
                   <option value="">Selecione...</option>
                   {veiculoOptions.map((v, i) => <option key={`${v}-${i}`} value={v}>{v}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-slate-600">Chassi</label>
-                <input type="text" value={draft.chassi} onChange={e => setDraft(p => ({ ...p, chassi: e.target.value }))} placeholder="Ex: 9BWZZZ377VT004251" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+                <label className="text-xs font-semibold text-slate-600">Chassi <span className="text-red-500">*</span></label>
+                <input type="text" value={draft.chassi} onChange={e => setDraft(p => ({ ...p, chassi: e.target.value }))} placeholder="Ex: 9BWZZZ377VT004251" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Placa</label>
-                <input type="text" value={draft.placa} onChange={e => setDraft(p => ({ ...p, placa: e.target.value }))} placeholder="Ex: ABC1D23" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+                <input type="text" value={draft.placa} onChange={e => setDraft(p => ({ ...p, placa: e.target.value }))} placeholder="Ex: ABC1D23" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Vendedor <span className="text-red-500">*</span></label>
-                <select value={draft.vendedor} onChange={e => setDraft(p => ({ ...p, vendedor: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 bg-white">
+                <select value={draft.vendedor} onChange={e => setDraft(p => ({ ...p, vendedor: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
                   <option value="">Selecione...</option>
                   {vendedores.map(v => <option key={v.id} value={v.nome}>{v.nome}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Valor do Contrato <span className="text-red-500">*</span></label>
-                <input type="text" value={draft.valorContrato} onChange={e => setDraft(p => ({ ...p, valorContrato: e.target.value }))} placeholder="Ex: 1.500,00" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+                <input type="text" value={draft.valorContrato} onChange={e => setDraft(p => ({ ...p, valorContrato: e.target.value }))} placeholder="Ex: 1.500,00" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </div>
               {draft.produto === PRODUTO_COMISSAO_EDITAVEL && (
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">% Comissão da Venda <span className="text-red-500">*</span></label>
-                <input type="text" value={draft.pctComissaoVendaOverride} onChange={e => setDraft(p => ({ ...p, pctComissaoVendaOverride: e.target.value }))} placeholder="Ex: 2" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400" />
+                <input type="text" value={draft.pctComissaoVendaOverride} onChange={e => setDraft(p => ({ ...p, pctComissaoVendaOverride: e.target.value }))} placeholder="Ex: 2" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
                 <span className="text-[11px] text-slate-400">Ajuste conforme o desconto concedido.</span>
               </div>
               )}
@@ -480,7 +625,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
             {/* Footer buttons */}
             <div className="flex gap-3 justify-end pt-1 border-t border-slate-100">
               <Button variant="outline" size="sm" onClick={() => { setShowRegisterModal(false); setDraft(emptyDraft()); }} className="border-slate-300 text-slate-600">Cancelar</Button>
-              <Button size="sm" onClick={registerVenda} disabled={saving} className="bg-rose-600 hover:bg-rose-700 text-white gap-1.5">
+              <Button size="sm" onClick={registerVenda} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5">
                 <FilePlus className="w-4 h-4" />
                 Registrar Venda
               </Button>

@@ -99,7 +99,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
           : isEstetica
           ? { background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)' }
           : isAssinatura
-          ? { background: 'linear-gradient(135deg, #881337 0%, #be123c 100%)' }
+          ? { background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)' }
           : { background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)' }}
       >
         <div className="px-6 py-4 flex items-center gap-4">
@@ -135,7 +135,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
                     ? 'text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'
                 }`}
-                style={activeSection === item.id ? { background: isAssinatura ? '#881337' : isPeliculas ? '#312e81' : '#1f2937' } : {}}
+                style={activeSection === item.id ? { background: isAssinatura ? '#1e3a8a' : isPeliculas ? '#312e81' : '#1f2937' } : {}}
               >
                 <span className={`mt-0.5 flex-shrink-0 ${activeSection === item.id ? 'text-white' : 'text-slate-400'}`}>
                   {item.icon}

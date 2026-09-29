@@ -103,7 +103,7 @@ export function SignDriveTipoVendaSection() {
           onKeyDown={e => { if (e.key === 'Enter') add(); }}
           className="w-32"
         />
-        <Button onClick={add} disabled={saving || !novaDescricao.trim()} size="sm" style={{ background: '#881337' }} className="text-white hover:opacity-90">
+        <Button onClick={add} disabled={saving || !novaDescricao.trim()} size="sm" style={{ background: '#1e3a8a' }} className="text-white hover:opacity-90">
           <Plus className="w-4 h-4 mr-1" /> Adicionar
         </Button>
       </div>
@@ -111,7 +111,7 @@ export function SignDriveTipoVendaSection() {
       <div className="border rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ background: '#881337' }}>
+            <tr style={{ background: '#1e3a8a' }}>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold">Tipo da Venda</th>
               <th className="text-white text-center px-4 py-3 text-xs font-semibold w-36">% Comissão da Venda</th>
               <th className="text-white text-center px-4 py-3 text-xs font-semibold w-36">% Comissão Entrega</th>
