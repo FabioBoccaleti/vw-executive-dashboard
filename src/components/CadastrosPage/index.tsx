@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Car, Shield, Users, Percent, Store, Wrench, ShoppingBag, UserCheck, Receipt, CalendarCog, WalletCards } from 'lucide-react';
+import { ArrowLeft, Car, Shield, Users, Percent, Store, Wrench, ShoppingBag, UserCheck, Receipt, CalendarCog, WalletCards, Tag } from 'lucide-react';
 import { VeiculosSection } from './sections/VeiculosSection';
 import { BlinadorasSection } from './sections/BlinadorasSection';
 import { VendedoresSection } from './sections/VendedoresSection';
@@ -23,8 +23,11 @@ import { EsteticaVendedoresAcessoriosSection } from './sections/EsteticaVendedor
 import { EsteticaAliquotasSection } from './sections/EsteticaAliquotasSection';
 import { EsteticaDsrSection } from './sections/EsteticaDsrSection';
 import { EsteticaSalariosFixosSection } from './sections/EsteticaSalariosFixosSection';
+import { SignDriveVeiculosSection } from './sections/SignDriveVeiculosSection';
+import { SignDriveVendedoresSection } from './sections/SignDriveVendedoresSection';
+import { SignDriveTipoVendaSection } from './sections/SignDriveTipoVendaSection';
 
-type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos' | 'aliquotas' | 'dsr' | 'salariosFixos';
+type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos' | 'aliquotas' | 'dsr' | 'salariosFixos' | 'tipoVenda';
 
 interface MenuItem {
   id: SectionId;
@@ -65,18 +68,26 @@ const MENU_ESTETICA: MenuItem[] = [
   { id: 'salariosFixos',         label: 'Salários Fixo',              description: 'Custos fixos dos colaboradores', icon: <WalletCards className="w-5 h-5" /> },
 ];
 
+const MENU_SIGNDRIVE: MenuItem[] = [
+  { id: 'veiculos',   label: 'Veículos',              description: 'Marcas e modelos',                icon: <Car className="w-5 h-5" /> },
+  { id: 'vendedores', label: 'Vendedores',            description: 'Equipe de vendas e cargos',       icon: <Users className="w-5 h-5" /> },
+  { id: 'tipoVenda',  label: 'Tipo da Venda / Produto', description: 'Tipos, % comissão e % impostos',   icon: <Tag className="w-5 h-5" /> },
+  { id: 'regras',     label: 'Regras de Remuneração', description: 'Percentuais e bases de cálculo',  icon: <Percent className="w-5 h-5" /> },
+];
+
 interface CadastrosPageProps {
   onBack: () => void;
-  variant?: 'blindagem' | 'peliculas' | 'estetica';
+  variant?: 'blindagem' | 'peliculas' | 'estetica' | 'assinatura-signdrive';
 }
 
 export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPageProps) {
   const [activeSection, setActiveSection] = useState<SectionId>('veiculos');
   const isPeliculas = variant === 'peliculas';
   const isEstetica  = variant === 'estetica';
-  const MENU_ITEMS = isEstetica ? MENU_ESTETICA : isPeliculas ? MENU_PELICULAS : MENU_BLINDAGEM;
+  const isAssinatura = variant === 'assinatura-signdrive';
+  const MENU_ITEMS = isAssinatura ? MENU_SIGNDRIVE : isEstetica ? MENU_ESTETICA : isPeliculas ? MENU_PELICULAS : MENU_BLINDAGEM;
 
-  const current = MENU_ITEMS.find(m => m.id === activeSection)!;
+  const current = MENU_ITEMS.find(m => m.id === activeSection);
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
@@ -87,6 +98,8 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
           ? { background: 'linear-gradient(135deg, #312e81 0%, #4338ca 100%)' }
           : isEstetica
           ? { background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)' }
+          : isAssinatura
+          ? { background: 'linear-gradient(135deg, #881337 0%, #be123c 100%)' }
           : { background: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)' }}
       >
         <div className="px-6 py-4 flex items-center gap-4">
@@ -102,6 +115,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
             <h1 className="text-base font-bold tracking-tight">Cadastros</h1>
             {isPeliculas && <p className="text-xs text-white/60 mt-0.5">Películas na Audi</p>}
             {isEstetica  && <p className="text-xs text-white/60 mt-0.5">Estética Audi</p>}
+            {isAssinatura && <p className="text-xs text-white/60 mt-0.5">Vendas de Carro por Assinatura (Sign&amp;Drive)</p>}
           </div>
         </div>
       </header>
@@ -121,7 +135,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
                     ? 'text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'
                 }`}
-                style={activeSection === item.id ? { background: isPeliculas ? '#312e81' : '#1f2937' } : {}}
+                style={activeSection === item.id ? { background: isAssinatura ? '#881337' : isPeliculas ? '#312e81' : '#1f2937' } : {}}
               >
                 <span className={`mt-0.5 flex-shrink-0 ${activeSection === item.id ? 'text-white' : 'text-slate-400'}`}>
                   {item.icon}
@@ -142,17 +156,17 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
           <div className="max-w-4xl mx-auto">
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-slate-400">{current.icon}</span>
-                <h2 className="text-lg font-bold text-slate-800">{current.label}</h2>
+                <span className="text-slate-400">{current?.icon}</span>
+                <h2 className="text-lg font-bold text-slate-800">{current?.label}</h2>
               </div>
-              <p className="text-sm text-slate-500">{current.description}</p>
+              <p className="text-sm text-slate-500">{current?.description}</p>
             </div>
 
-            {!isPeliculas && !isEstetica && activeSection === 'veiculos'    && <VeiculosSection />}
-            {!isPeliculas && !isEstetica && activeSection === 'blindadoras' && <BlinadorasSection />}
-            {!isPeliculas && !isEstetica && activeSection === 'revendas'    && <RevendasSection />}
-            {!isPeliculas && !isEstetica && activeSection === 'vendedores'  && <VendedoresSection />}
-            {!isPeliculas && !isEstetica && activeSection === 'regras'      && <RegrasSection />}
+            {!isPeliculas && !isEstetica && !isAssinatura && activeSection === 'veiculos'    && <VeiculosSection />}
+            {!isPeliculas && !isEstetica && !isAssinatura && activeSection === 'blindadoras' && <BlinadorasSection />}
+            {!isPeliculas && !isEstetica && !isAssinatura && activeSection === 'revendas'    && <RevendasSection />}
+            {!isPeliculas && !isEstetica && !isAssinatura && activeSection === 'vendedores'  && <VendedoresSection />}
+            {!isPeliculas && !isEstetica && !isAssinatura && activeSection === 'regras'      && <RegrasSection />}
             {isPeliculas  && activeSection === 'veiculos'             && <PeliculasVeiculosSection />}
             {isPeliculas  && activeSection === 'prestadores'          && <PrestadoresSection />}
             {isPeliculas  && activeSection === 'produtos'             && <PeliculasProdutosSection />}
@@ -171,6 +185,15 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
             {isEstetica   && activeSection === 'dsr'                   && <EsteticaDsrSection />}
             {isEstetica   && activeSection === 'regras'               && <EsteticaRegrasSection />}
             {isEstetica   && activeSection === 'salariosFixos'         && <EsteticaSalariosFixosSection />}
+            {isAssinatura && activeSection === 'veiculos'             && <SignDriveVeiculosSection />}
+            {isAssinatura && activeSection === 'vendedores'           && <SignDriveVendedoresSection />}
+            {isAssinatura && activeSection === 'tipoVenda'            && <SignDriveTipoVendaSection />}
+            {isAssinatura && activeSection === 'regras'               && (
+              <div className="text-center space-y-3 py-16">
+                <p className="text-lg font-semibold text-slate-700">Em desenvolvimento</p>
+                <p className="text-sm text-slate-400">As regras de remuneração estarão disponíveis em breve.</p>
+              </div>
+            )}
           </div>
         </main>
       </div>

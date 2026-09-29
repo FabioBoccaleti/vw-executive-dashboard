@@ -347,3 +347,31 @@ export async function loadEsteticaVeiculos(): Promise<Veiculo[]> {
 export async function saveEsteticaVeiculos(items: Veiculo[]): Promise<boolean> {
   return kvSet(KEY_ESTETICA_VEICULOS, items);
 }
+
+// ── Sign&Drive: Vendedores (dados próprios) ───────────────────────────────────
+const KEY_SIGNDRIVE_VENDEDORES = 'signdrive_cadastro_vendedores';
+
+export async function loadSignDriveVendedores(): Promise<Vendedor[]> {
+  return (await kvGet<Vendedor[]>(KEY_SIGNDRIVE_VENDEDORES)) ?? [];
+}
+export async function saveSignDriveVendedores(items: Vendedor[]): Promise<boolean> {
+  return kvSet(KEY_SIGNDRIVE_VENDEDORES, items);
+}
+
+// ── Sign&Drive: Tipos de Venda ────────────────────────────────────────────────
+const KEY_SIGNDRIVE_TIPOS_VENDA = 'signdrive_cadastro_tipos_venda';
+
+export interface TipoVendaSignDrive {
+  id: string;
+  descricao: string;
+  pctComissaoVenda: string;
+  pctComissaoEntrega: string;
+  pctImpostos: string;
+}
+
+export async function loadSignDriveTiposVenda(): Promise<TipoVendaSignDrive[]> {
+  return (await kvGet<TipoVendaSignDrive[]>(KEY_SIGNDRIVE_TIPOS_VENDA)) ?? [];
+}
+export async function saveSignDriveTiposVenda(items: TipoVendaSignDrive[]): Promise<boolean> {
+  return kvSet(KEY_SIGNDRIVE_TIPOS_VENDA, items);
+}

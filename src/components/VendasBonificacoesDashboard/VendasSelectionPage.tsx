@@ -10,6 +10,7 @@ const BLINDAGEM_SUBS: VendasSubModuleId[] = [
 ];
 const PELICULAS_SUBS: VendasSubModuleId[] = ['peliculas.tabela', 'peliculas.analise'];
 const ESTETICA_SUBS: VendasSubModuleId[] = ['estetica.tabela', 'estetica.analise'];
+const ASSINATURA_SUBS: VendasSubModuleId[] = ['assinatura_signdrive.tabela', 'assinatura_signdrive.analise', 'assinatura_signdrive.cadastro'];
 const FINANCIAMENTO_BV_SUBS: VendasSubModuleId[] = ['financiamento_bv.vendas', 'financiamento_bv.acelera', 'financiamento_bv.cadastro'];
 const VPECAS_COND_SUBS: VendasSubModuleId[] = ['vpecas_cond.relatorios', 'vpecas_cond.resumo'];
 
@@ -23,6 +24,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
   const canBlindagem = isAdmin() || BLINDAGEM_SUBS.some(s => canAccessVendasSub(s));
   const canPeliculas = isAdmin() || PELICULAS_SUBS.some(s => canAccessVendasSub(s));
   const canEstetica  = isAdmin() || ESTETICA_SUBS.some(s => canAccessVendasSub(s));
+  const canAssinatura = isAdmin() || ASSINATURA_SUBS.some(s => canAccessVendasSub(s));
   const canFinanciamentoBV = isAdmin() || FINANCIAMENTO_BV_SUBS.some(s => canAccessVendasSub(s));
   const canVPecasCond     = isAdmin() || VPECAS_COND_SUBS.some(s => canAccessVendasSub(s));
 
@@ -116,6 +118,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
           </button>
 
           {/* Card — Vendas de Carro por Assinatura (Sign&Drive) */}
+          {canAssinatura && (
           <button
             onClick={() => onSelect('assinatura-sign-drive')}
             className="w-56 bg-white rounded-2xl border-2 border-rose-400 shadow-md hover:shadow-xl hover:border-rose-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
@@ -129,6 +132,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
               </h2>
             </div>
           </button>
+          )}
 
           {/* Card — Financiamento Banco Volks */}
           {canFinanciamentoBV && (

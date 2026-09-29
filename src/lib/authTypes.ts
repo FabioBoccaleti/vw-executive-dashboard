@@ -54,6 +54,9 @@ export type VendasSubModuleId =
   | 'financiamento_bv.vendas'
   | 'financiamento_bv.acelera'
   | 'financiamento_bv.cadastro'
+  | 'assinatura_signdrive.tabela'
+  | 'assinatura_signdrive.analise'
+  | 'assinatura_signdrive.cadastro'
   | 'vpecas_cond.relatorios'
   | 'vpecas_cond.resumo';
 
@@ -140,6 +143,9 @@ export const VENDAS_SUB_MODULE_LABELS: Record<VendasSubModuleId, string> = {
   'financiamento_bv.vendas': 'Vendas',
   'financiamento_bv.acelera': 'Acelera',
   'financiamento_bv.cadastro': 'Cadastro',
+  'assinatura_signdrive.tabela': 'Tabela',
+  'assinatura_signdrive.analise': 'Análise',
+  'assinatura_signdrive.cadastro': 'Cadastro',
   'vpecas_cond.relatorios': 'Relatórios',
   'vpecas_cond.resumo': 'Resumo',
 };
