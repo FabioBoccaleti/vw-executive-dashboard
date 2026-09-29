@@ -22,6 +22,7 @@ export interface AssinaturaRow {
   pctRentabilidadeLiquida: string;
   nfComissao: string;
   situacaoComissao: string;
+  situacaoComissaoVendedor: string;
 }
 
 export async function loadAssinaturaRows(): Promise<AssinaturaRow[]> {

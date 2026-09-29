@@ -35,6 +35,7 @@ const COLUMNS: ColDef[] = [
   { key: 'pctRentabilidadeLiquida', label: '% Rentabilidade Líquida',      type: 'percent',  width: 150 },
   { key: 'nfComissao',              label: 'Nº NF de Comissão',            type: 'text',     width: 150 },
   { key: 'situacaoComissao',        label: 'Situação da Comissão',         type: 'text',     width: 160 },
+  { key: 'situacaoComissaoVendedor', label: 'Sit. Comissão vendedor',      type: 'text',     width: 170 },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────
@@ -158,6 +159,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       pctRentabilidadeLiquida: String(preview.rentLiquida),
       nfComissao: '',
       situacaoComissao: '',
+      situacaoComissaoVendedor: '',
     };
     await persist([newRow, ...rows]);
     setShowRegisterModal(false);
@@ -326,9 +328,11 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                       {COLUMNS.map((col, ci) => {
                         const val = (row as unknown as Record<string, string>)[col.key] ?? '';
                         const isRight = col.type === 'currency' || col.type === 'percent';
+                        const isSituacao = col.key === 'situacaoComissao';
+                        const situacaoText = (row.nfComissao ?? '').trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
                         return (
-                          <td key={`c-${col.key}-${ci}`} className={`px-3 py-2 text-xs text-slate-700 border-r border-slate-100 whitespace-nowrap ${isRight ? 'text-right' : ''}`}>
-                            {fmtCell(col, val)}
+                          <td key={`c-${col.key}-${ci}`} className={`px-3 py-2 text-xs border-r border-slate-100 whitespace-nowrap ${isRight ? 'text-right' : ''} ${isSituacao ? 'font-semibold ' + ((row.nfComissao ?? '').trim() ? 'text-emerald-600' : 'text-amber-600') : 'text-slate-700'}`}>
+                            {isSituacao ? situacaoText : fmtCell(col, val)}
                           </td>
                         );
                       })}
