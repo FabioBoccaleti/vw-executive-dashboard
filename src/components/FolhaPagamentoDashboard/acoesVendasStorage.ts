@@ -72,3 +72,21 @@ export async function loadAcaoConfig(): Promise<AcaoConfigMap> {
 export async function saveAcaoConfig(map: AcaoConfigMap): Promise<void> {
   await kvSet(CONFIG_KEY, map);
 }
+
+// ─── Chassis incluídos manualmente (de outro período) ─────────────────────────
+// Estrutura: { "2026-9": { novos: [rowKey...], usados: [rowKey...] } }
+export type AcaoExtrasMap = Record<string, Record<AcaoTab, string[]>>;
+
+const EXTRAS_KEY = 'acoes_vendas_extras';
+
+export async function loadAcaoExtras(): Promise<AcaoExtrasMap> {
+  try {
+    return (await kvGet<AcaoExtrasMap>(EXTRAS_KEY)) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveAcaoExtras(map: AcaoExtrasMap): Promise<void> {
+  await kvSet(EXTRAS_KEY, map);
+}

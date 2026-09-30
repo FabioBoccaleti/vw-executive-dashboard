@@ -20,11 +20,14 @@ import {
   saveAcaoLancamentos,
   loadAcaoConfig,
   saveAcaoConfig,
+  loadAcaoExtras,
+  saveAcaoExtras,
   type AcaoTab,
   type PremioMap,
   type AcaoLancamentosMap,
   type AcaoLancamento,
   type AcaoConfigMap,
+  type AcaoExtrasMap,
   type AcaoItemSnapshot,
 } from './acoesVendasStorage';
 
@@ -132,6 +135,7 @@ export function AcoesVendasView() {
   const [premiosUsados, setPremiosUsados] = useState<PremioMap>({});
   const [lancamentos, setLancamentos] = useState<AcaoLancamentosMap>({});
   const [configMap, setConfigMap] = useState<AcaoConfigMap>({});
+  const [extras, setExtras] = useState<AcaoExtrasMap>({});
   const [loading, setLoading] = useState(true);
 
   const [selectedVendedor, setSelectedVendedor] = useState<string | null>(null);
@@ -154,7 +158,8 @@ export function AcoesVendasView() {
       loadPremios('usados'),
       loadAcaoLancamentos(),
       loadAcaoConfig(),
-    ]).then(([rn, ru, pn, pu, prn, pru, lancs, cfg]) => {
+      loadAcaoExtras(),
+    ]).then(([rn, ru, pn, pu, prn, pru, lancs, cfg, ext]) => {
       setRowsNovos(rn);
       setRowsUsados(ru);
       setPeriodoNovos(pn);
@@ -163,6 +168,7 @@ export function AcoesVendasView() {
       setPremiosUsados(pru);
       setLancamentos(lancs);
       setConfigMap(cfg);
+      setExtras(ext);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -180,16 +186,33 @@ export function AcoesVendasView() {
   const periodRowsNovos = useMemo(() => filterByPeriodo(rowsNovos, savedPeriodo('novos')), [rowsNovos, savedPeriodo]);
   const periodRowsUsados = useMemo(() => filterByPeriodo(rowsUsados, savedPeriodo('usados')), [rowsUsados, savedPeriodo]);
 
+  // Chassis incluídos manualmente (de outro período) por aba — linhas vindas do dataset completo
+  const extraRowsNovos = useMemo(
+    () => buildExtraRows(rowsNovos, extras[pk]?.novos ?? [], periodRowsNovos),
+    [rowsNovos, extras, pk, periodRowsNovos],
+  );
+  const extraRowsUsados = useMemo(
+    () => buildExtraRows(rowsUsados, extras[pk]?.usados ?? [], periodRowsUsados),
+    [rowsUsados, extras, pk, periodRowsUsados],
+  );
+
+  // Lista exibida = período + extras (extras ao final)
+  const displayRowsNovos = useMemo(() => [...periodRowsNovos, ...extraRowsNovos], [periodRowsNovos, extraRowsNovos]);
+  const displayRowsUsados = useMemo(() => [...periodRowsUsados, ...extraRowsUsados], [periodRowsUsados, extraRowsUsados]);
+
+  const extraKeysNovos = useMemo(() => new Set((extras[pk]?.novos ?? [])), [extras, pk]);
+  const extraKeysUsados = useMemo(() => new Set((extras[pk]?.usados ?? [])), [extras, pk]);
+
   const premForTab = (tab: AcaoTab) => (tab === 'novos' ? premiosNovos : premiosUsados)[pk] ?? {};
 
-  // Itens premiados por aba (rowKey selecionado)
+  // Itens premiados por aba (rowKey selecionado) — considera período + extras
   const premiadosNovos = useMemo(
-    () => buildPremiados('novos', periodRowsNovos, premiosNovos[pk] ?? {}),
-    [periodRowsNovos, premiosNovos, pk],
+    () => buildPremiados('novos', displayRowsNovos, premiosNovos[pk] ?? {}),
+    [displayRowsNovos, premiosNovos, pk],
   );
   const premiadosUsados = useMemo(
-    () => buildPremiados('usados', periodRowsUsados, premiosUsados[pk] ?? {}),
-    [periodRowsUsados, premiosUsados, pk],
+    () => buildPremiados('usados', displayRowsUsados, premiosUsados[pk] ?? {}),
+    [displayRowsUsados, premiosUsados, pk],
   );
 
   // Agrupa premiados por vendedor (nome exibição)
@@ -224,6 +247,91 @@ export function AcoesVendasView() {
 
   function persistPremios(tab: AcaoTab) {
     savePremios(tab, tab === 'novos' ? premiosNovos : premiosUsados);
+  }
+
+  // ── Chassis incluídos manualmente (de outro período) ───────────────────────
+  const persistExtras = async (next: AcaoExtrasMap) => {
+    setExtras(next);
+    await saveAcaoExtras(next);
+  };
+
+  // Competencia (pk) onde este chassi já foi marcado como pago, se houver
+  function findPaidCompetencia(rowKey: string): string | null {
+    for (const [otherPk, vendMap] of Object.entries(lancamentos)) {
+      for (const l of Object.values(vendMap)) {
+        if (l.pago && l.snapshotItens?.some(s => stableRowKey(s.row, -1) === rowKey)) return otherPk;
+      }
+    }
+    return null;
+  }
+
+  function pkLabel(key: string): string {
+    const [y, m] = key.split('-');
+    return `${MONTH_NAMES[Number(m) - 1] ?? m} de ${y}`;
+  }
+
+  function handleIncluirChassi(chassiInput: string) {
+    const q = normalizeKeyPart(chassiInput);
+    if (!q) return;
+
+    let found: { tab: AcaoTab; row: VendasResultadoRow } | null = null;
+    const nRow = rowsNovos.find(r => normalizeKeyPart(r.chassi) === q);
+    if (nRow) found = { tab: 'novos', row: nRow };
+    else {
+      const uRow = rowsUsados.find(r => normalizeKeyPart(r.chassi) === q);
+      if (uRow) found = { tab: 'usados', row: uRow };
+    }
+    if (!found) { toast.error('Chassi não encontrado em Novos ou Usados.'); return; }
+
+    const { tab, row } = found;
+    const rowKey = stableRowKey(row, -1);
+
+    const periodRows = tab === 'novos' ? periodRowsNovos : periodRowsUsados;
+    const jaNoPeriodo = periodRows.some((r, i) => stableRowKey(r, i) === rowKey);
+    const jaExtra = (extras[pk]?.[tab] ?? []).includes(rowKey);
+    if (jaNoPeriodo || jaExtra) {
+      setRelacaoTab(tab);
+      toast.info('Este chassi já está na lista deste período.');
+      return;
+    }
+
+    const paidPk = findPaidCompetencia(rowKey);
+    if (paidPk && paidPk !== pk) {
+      toast.warning(`Atenção: este chassi já consta como PAGO em ${pkLabel(paidPk)}.`);
+    }
+
+    const next: AcaoExtrasMap = {
+      ...extras,
+      [pk]: {
+        novos: [...(extras[pk]?.novos ?? [])],
+        usados: [...(extras[pk]?.usados ?? [])],
+      },
+    };
+    next[pk][tab] = [...next[pk][tab], rowKey];
+    persistExtras(next);
+
+    setPremioValue(tab, rowKey, 0, true);
+    setRelacaoTab(tab);
+    toast.success(`Chassi incluído em ${tab === 'novos' ? 'Novos' : 'Usados'}. Informe o prêmio.`);
+  }
+
+  function handleRemoverExtra(tab: AcaoTab, rowKey: string) {
+    const cur = extras[pk]?.[tab] ?? [];
+    const nextArr = cur.filter(k => k !== rowKey);
+    persistExtras({
+      ...extras,
+      [pk]: {
+        novos: tab === 'novos' ? nextArr : [...(extras[pk]?.novos ?? [])],
+        usados: tab === 'usados' ? nextArr : [...(extras[pk]?.usados ?? [])],
+      },
+    });
+    const prem = tab === 'novos' ? premiosNovos : premiosUsados;
+    if (rowKey in (prem[pk] ?? {})) {
+      const forPk = { ...(prem[pk] ?? {}) };
+      delete forPk[rowKey];
+      setPremios(tab, { ...prem, [pk]: forPk });
+    }
+    toast.success('Chassi removido.');
   }
 
   // ── Nome da ação ───────────────────────────────────────────────────────────
@@ -561,14 +669,17 @@ export function AcoesVendasView() {
           <RelacaoTab
             relacaoTab={relacaoTab}
             setRelacaoTab={setRelacaoTab}
-            periodRows={relacaoTab === 'novos' ? periodRowsNovos : periodRowsUsados}
+            periodRows={relacaoTab === 'novos' ? displayRowsNovos : displayRowsUsados}
             premForPk={premForTab(relacaoTab)}
+            extraKeys={relacaoTab === 'novos' ? extraKeysNovos : extraKeysUsados}
             hasPeriodo={!!savedPeriodo(relacaoTab)?.de && !!savedPeriodo(relacaoTab)?.ate}
             periodoLabel={periodoLabelFor(relacaoTab)}
             pagosVendedores={pagosVendedores}
             onToggle={rk => toggleSelect(relacaoTab, rk)}
             onPremioChange={(rk, v) => setPremioValue(relacaoTab, rk, v)}
             onPremioCommit={() => persistPremios(relacaoTab)}
+            onIncluirChassi={handleIncluirChassi}
+            onRemoverExtra={rk => handleRemoverExtra(relacaoTab, rk)}
           />
         )}
 
@@ -641,24 +752,55 @@ function buildPremiados(tab: AcaoTab, periodRows: VendasResultadoRow[], premForP
   return out;
 }
 
+// Resolve as linhas extras (incluídas manualmente) a partir do dataset completo,
+// ignorando as que já estão no período e chaves duplicadas.
+function buildExtraRows(allRows: VendasResultadoRow[], extraKeys: string[], periodRows: VendasResultadoRow[]): VendasResultadoRow[] {
+  if (extraKeys.length === 0) return [];
+  const periodKeys = new Set(periodRows.map((r, i) => stableRowKey(r, i)));
+  const byKey = new Map<string, VendasResultadoRow>();
+  allRows.forEach((r, i) => {
+    const k = stableRowKey(r, i);
+    if (!byKey.has(k)) byKey.set(k, r);
+  });
+  const out: VendasResultadoRow[] = [];
+  const seen = new Set<string>();
+  for (const key of extraKeys) {
+    if (periodKeys.has(key) || seen.has(key)) continue;
+    const row = byKey.get(key);
+    if (row) { out.push(row); seen.add(key); }
+  }
+  return out;
+}
+
 // ─── Aba: Relação dos chassis ─────────────────────────────────────────────────
 function RelacaoTab({
-  relacaoTab, setRelacaoTab, periodRows, premForPk, hasPeriodo, periodoLabel, pagosVendedores,
-  onToggle, onPremioChange, onPremioCommit,
+  relacaoTab, setRelacaoTab, periodRows, premForPk, extraKeys, hasPeriodo, periodoLabel, pagosVendedores,
+  onToggle, onPremioChange, onPremioCommit, onIncluirChassi, onRemoverExtra,
 }: {
   relacaoTab: AcaoTab;
   setRelacaoTab: (t: AcaoTab) => void;
   periodRows: VendasResultadoRow[];
   premForPk: Record<string, number>;
+  extraKeys: Set<string>;
   hasPeriodo: boolean;
   periodoLabel: string;
   pagosVendedores: Set<string>;
   onToggle: (rowKey: string) => void;
   onPremioChange: (rowKey: string, value: number) => void;
   onPremioCommit: () => void;
+  onIncluirChassi: (chassi: string) => void;
+  onRemoverExtra: (rowKey: string) => void;
 }) {
   const [busca, setBusca] = useState('');
   const [bulkValue, setBulkValue] = useState('');
+  const [incluirInput, setIncluirInput] = useState('');
+
+  function doIncluir() {
+    const c = incluirInput.trim();
+    if (!c) return;
+    onIncluirChassi(c);
+    setIncluirInput('');
+  }
 
   const rowsWithKey = useMemo(
     () => periodRows.map((row, idx) => ({ row, key: stableRowKey(row, idx) })),
@@ -752,6 +894,26 @@ function RelacaoTab({
             </div>
           </div>
 
+          {/* Incluir chassi de outro período */}
+          <div className="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-lg px-4 py-3">
+            <span className="text-xs font-semibold text-slate-600">Incluir chassi de outro período:</span>
+            <input
+              value={incluirInput}
+              onChange={e => setIncluirInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') doIncluir(); }}
+              placeholder="Digite o chassi completo"
+              className="flex-1 min-w-[16rem] border border-slate-200 rounded px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-violet-400"
+            />
+            <button
+              onClick={doIncluir}
+              disabled={!incluirInput.trim()}
+              className="text-xs bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white rounded px-3 py-1.5 font-semibold"
+            >
+              Incluir
+            </button>
+            <span className="text-[11px] text-slate-400">Busca em Novos e Usados. A venda mantém a data original.</span>
+          </div>
+
           {/* Tabela */}
           <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full">
@@ -771,8 +933,9 @@ function RelacaoTab({
                 ) : filtered.map(({ row, key }) => {
                   const selected = key in premForPk;
                   const travado = isPago(row);
+                  const isExtra = extraKeys.has(key);
                   return (
-                    <tr key={key} className={`border-b border-slate-100 ${travado ? 'bg-emerald-50/40' : selected ? 'bg-violet-50/40' : 'hover:bg-slate-50/60'}`}>
+                    <tr key={key} className={`border-b border-slate-100 ${travado ? 'bg-emerald-50/40' : isExtra ? 'bg-amber-50/40' : selected ? 'bg-violet-50/40' : 'hover:bg-slate-50/60'}`}>
                       <td className="px-3 py-2 text-center">
                         <input
                           type="checkbox"
@@ -782,7 +945,10 @@ function RelacaoTab({
                           className="w-4 h-4 accent-violet-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                         />
                       </td>
-                      <td className="px-3 py-2 font-mono text-xs text-slate-700">{row.chassi || '—'}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-slate-700">
+                        {row.chassi || '—'}
+                        {isExtra && <span className="ml-1.5 text-[9px] font-bold text-amber-700 bg-amber-100 rounded px-1 py-0.5 align-middle">OUTRO PERÍODO</span>}
+                      </td>
                       <td className="px-3 py-2 text-xs text-slate-600">{row.modelo || '—'}</td>
                       <td className="px-3 py-2 font-mono text-xs text-slate-500">{row.dataVenda || '—'}</td>
                       <td className="px-3 py-2 text-xs text-slate-600">
@@ -790,17 +956,28 @@ function RelacaoTab({
                         {travado && <span className="ml-1.5 text-[9px] font-bold text-emerald-600 bg-emerald-100 rounded px-1 py-0.5">PAGO</span>}
                       </td>
                       <td className="px-3 py-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          disabled={!selected || travado}
-                          value={selected ? (premForPk[key] || '') : ''}
-                          onChange={e => onPremioChange(key, parseFloat(e.target.value) || 0)}
-                          onBlur={onPremioCommit}
-                          placeholder="0,00"
-                          className="w-32 border border-slate-200 rounded px-2 py-1 text-sm text-right disabled:bg-slate-50 disabled:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-400"
-                        />
+                        <div className="flex items-center justify-end gap-1.5">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            disabled={!selected || travado}
+                            value={selected ? (premForPk[key] || '') : ''}
+                            onChange={e => onPremioChange(key, parseFloat(e.target.value) || 0)}
+                            onBlur={onPremioCommit}
+                            placeholder="0,00"
+                            className="w-32 border border-slate-200 rounded px-2 py-1 text-sm text-right disabled:bg-slate-50 disabled:text-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                          />
+                          {isExtra && !travado && (
+                            <button
+                              onClick={() => onRemoverExtra(key)}
+                              title="Remover chassi incluído"
+                              className="text-slate-400 hover:text-red-600 text-base leading-none px-1"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
