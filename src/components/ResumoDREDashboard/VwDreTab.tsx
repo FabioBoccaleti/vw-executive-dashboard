@@ -16,6 +16,7 @@ import {
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import type { Department } from '@/lib/dataStorage';
 import { formatDreAmount } from './dreDisplayFormat';
+import { loadCanonicalVwRow } from './canonicalDreSource';
 
 // ─── Cor principal VW ─────────────────────────────────────────────────────────
 const VW_COLOR     = '#001e50'; // azul VW
@@ -232,7 +233,7 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
       const yr = year as 2024 | 2025 | 2026 | 2027;
       const syncable = DEPTS.filter(d => DEPT_KEY_TO_DEPT[d.key]);
       Promise.all([
-        Promise.all(Array.from({ length: 12 }, (_, i) => loadDreVw(year, i + 1))),
+        Promise.all(Array.from({ length: 12 }, async (_, i) => loadCanonicalVwRow(year, i + 1, await loadDreVw(year, i + 1)))),
         Promise.all(syncable.map(d =>
           loadDREDataAsync(yr, DEPT_KEY_TO_DEPT[d.key]!, 'vw')
             .then(dre => ({ deptKey: d.key as DeptKey, dre }))
@@ -292,8 +293,8 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
     );
 
     const ajustesPromises = [
-      loadDreVw(year, month),
-      ...periods.map(p => loadDreVw(p.year, p.month)),
+      loadDreVw(year, month).then(kv => loadCanonicalVwRow(year, month, kv)),
+      ...periods.map(p => loadDreVw(p.year, p.month).then(kv => loadCanonicalVwRow(p.year, p.month, kv))),
     ];
 
     Promise.all([
