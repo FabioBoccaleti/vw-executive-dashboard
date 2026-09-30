@@ -13,6 +13,7 @@ import {
   type DreVwDept,
 } from './dreVwStorage';
 import { loadDREDataAsync } from '@/lib/dbStorage';
+import { loadCanonicalVwRow } from './canonicalDreSource';
 import type { Department } from '@/lib/dataStorage';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -327,7 +328,7 @@ export function VwGraficosTab({ year, month }: Props) {
     setLoading(true);
     const yr = year as 2024 | 2025 | 2026 | 2027;
     Promise.all([
-      Promise.all(Array.from({ length: 12 }, (_, i) => loadDreVw(year, i + 1))),
+      Promise.all(Array.from({ length: 12 }, async (_, i) => loadCanonicalVwRow(year, i + 1, await loadDreVw(year, i + 1)))),
       Promise.all(DEPTS.map(d =>
         loadDREDataAsync(yr, DEPT_KEY_TO_DEPT[d.key], 'vw')
           .then(dre => ({ deptKey: d.key as DeptKey, dre }))

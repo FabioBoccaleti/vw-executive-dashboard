@@ -8,6 +8,7 @@ import {
 import { loadDreVw, type DreVwRow } from './dreVwStorage';
 import { loadDreAudi, type DreAudiRow } from './dreAudiStorage';
 import { loadDREDataAsync } from '@/lib/dbStorage';
+import { loadCanonicalVwRow, loadCanonicalAudiRow } from './canonicalDreSource';
 import type { Department } from '@/lib/dataStorage';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -139,10 +140,10 @@ export function ReceitaVendasEvolucaoTab({ year, month }: Props) {
 
     Promise.all([
       // KV por mês
-      Promise.all(months12.map(m => loadDreVw(year, m))),
-      Promise.all(months12.map(m => loadDreVw(prevYear, m))),
-      Promise.all(months12.map(m => loadDreAudi(year, m))),
-      Promise.all(months12.map(m => loadDreAudi(prevYear, m))),
+      Promise.all(months12.map(async m => loadCanonicalVwRow(year, m, await loadDreVw(year, m)))),
+      Promise.all(months12.map(async m => loadCanonicalVwRow(prevYear, m, await loadDreVw(prevYear, m)))),
+      Promise.all(months12.map(async m => loadCanonicalAudiRow(year, m, await loadDreAudi(year, m)))),
+      Promise.all(months12.map(async m => loadCanonicalAudiRow(prevYear, m, await loadDreAudi(prevYear, m)))),
       // DRE async por dept (ano atual)
       Promise.all(vwDeptKeys.map(k =>
         loadDREDataAsync(yr, VW_DEPT_TO_DEPT[k], 'vw').then(d => ({ key: k, d }))

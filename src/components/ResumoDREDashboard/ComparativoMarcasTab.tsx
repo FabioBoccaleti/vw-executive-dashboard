@@ -15,6 +15,7 @@ import {
 import { loadDREDataAsync } from '@/lib/dbStorage';
 import type { Department } from '@/lib/dataStorage';
 import { formatDreAmount } from './dreDisplayFormat';
+import { loadCanonicalVwRow, loadCanonicalAudiRow } from './canonicalDreSource';
 
 // ─── Cores ────────────────────────────────────────────────────────────────────
 const VW_COLOR      = '#001e50';
@@ -361,8 +362,8 @@ function ResultadoTab({ year, month, periodo }: { year: number; month: number; p
       ] as const;
 
       const [vwMonths, audiMonths, vwExec, audiExec] = await Promise.all([
-        Promise.all(monthsToLoad.map(m => loadDreVw(year, m))),
-        Promise.all(monthsToLoad.map(m => loadDreAudi(year, m))),
+        Promise.all(monthsToLoad.map(async m => loadCanonicalVwRow(year, m, await loadDreVw(year, m)))),
+        Promise.all(monthsToLoad.map(async m => loadCanonicalAudiRow(year, m, await loadDreAudi(year, m)))),
         Promise.all(vwSyncable.map(k => loadDREDataAsync(yr, VW_DEPT_TO_EXEC[k]!, 'vw').then(d => ({ k, d })))),
         Promise.all(audiSyncable.map(k => loadDREDataAsync(yr, AUDI_DEPT_TO_EXEC[k]!, 'audi').then(d => ({ k, d })))),
       ]);
@@ -412,8 +413,8 @@ function ResultadoTab({ year, month, periodo }: { year: number; month: number; p
       const audiSyncable = AUDI_DEPTS.filter(k => AUDI_DEPT_TO_EXEC[k]);
 
       const [vwKv, audiKv, vwExec, audiExec] = await Promise.all([
-        loadDreVw(year, targetMonth),
-        loadDreAudi(year, targetMonth),
+        loadDreVw(year, targetMonth).then(kv => loadCanonicalVwRow(year, targetMonth, kv)),
+        loadDreAudi(year, targetMonth).then(kv => loadCanonicalAudiRow(year, targetMonth, kv)),
         Promise.all(vwSyncable.map(k => loadDREDataAsync(yr, VW_DEPT_TO_EXEC[k]!, 'vw').then(d => ({ k, d })))),
         Promise.all(audiSyncable.map(k => loadDREDataAsync(yr, AUDI_DEPT_TO_EXEC[k]!, 'audi').then(d => ({ k, d })))),
       ]);

@@ -20,6 +20,7 @@ import {
   type DreAudiDept,
 } from './dreAudiStorage';
 import { loadDREDataAsync } from '@/lib/dbStorage';
+import { loadCanonicalVwRow, loadCanonicalAudiRow } from './canonicalDreSource';
 import type { Department } from '@/lib/dataStorage';
 
 // ─── Cores ────────────────────────────────────────────────────────────────────
@@ -381,12 +382,12 @@ export function ConsolidadoGraficosTab({ year, month }: Props) {
     const yr = year as 2024 | 2025 | 2026 | 2027;
     Promise.all([
       // VW: KV + DRE fallback
-      Promise.all(Array.from({ length: 12 }, (_, i) => loadDreVw(year, i + 1))),
+      Promise.all(Array.from({ length: 12 }, async (_, i) => loadCanonicalVwRow(year, i + 1, await loadDreVw(year, i + 1)))),
       Promise.all(VW_DEPTS.map(d =>
         loadDREDataAsync(yr, VW_DEPT_TO_DEPARTMENT[d.key], 'vw').then(dre => ({ key: d.key, dre }))
       )),
       // Audi: KV + DRE fallback
-      Promise.all(Array.from({ length: 12 }, (_, i) => loadDreAudi(year, i + 1))),
+      Promise.all(Array.from({ length: 12 }, async (_, i) => loadCanonicalAudiRow(year, i + 1, await loadDreAudi(year, i + 1)))),
       Promise.all(AUDI_DEPTS.map(d =>
         loadDREDataAsync(yr, AUDI_DEPT_TO_DEPARTMENT[d.key], 'audi').then(dre => ({ key: d.key, dre }))
       )),
