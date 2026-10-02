@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Layers, Car, Sparkles, Banknote, Wrench, ClipboardList, Grid3X3, Key } from 'lucide-react';
+import { Shield, Layers, Car, Sparkles, Banknote, Wrench, ClipboardList, Grid3X3, Key, Hammer } from 'lucide-react';
 import { useAuth } from '@/contexts/useAuth';
 import type { VendasSubModuleId } from '@/lib/authTypes';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
@@ -15,7 +15,7 @@ const FINANCIAMENTO_BV_SUBS: VendasSubModuleId[] = ['financiamento_bv.vendas', '
 const VPECAS_COND_SUBS: VendasSubModuleId[] = ['vpecas_cond.relatorios', 'vpecas_cond.resumo'];
 
 interface VendasSelectionPageProps {
-  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade') => void;
+  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade' | 'passagem-oficina-funilaria-vw') => void;
   onChangeBrand: () => void;
 }
 
@@ -194,6 +194,21 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">
                 Grade de Test Drive Audi<br />e Rentabilidade
+              </h2>
+            </div>
+          </button>
+
+          {/* Card — Passagem Oficina e Funilaria VW */}
+          <button
+            onClick={() => onSelect('passagem-oficina-funilaria-vw')}
+            className="w-56 bg-white rounded-2xl border-2 border-rose-400 shadow-md hover:shadow-xl hover:border-rose-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-rose-50 group-hover:bg-rose-100 transition-colors">
+              <Hammer className="w-10 h-10 text-rose-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Passagem Oficina<br />e Funilaria VW
               </h2>
             </div>
           </button>
