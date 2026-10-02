@@ -63,3 +63,21 @@ export async function setRegrasAnoChassi(regras: RegraAnoChassi[]): Promise<bool
   return kvSet(REGRA_ANO_CHASSI_KEY, regras);
 }
 
+// ─── Categoria (de-para código → categoria) ──────────────────────────────────
+export interface CategoriaOS {
+  id: string;
+  codigo: string;  // número (código da CATEGORIA_OS)
+  categoria: string;
+}
+
+const CATEGORIA_KEY = 'passagem_oficina_funilaria_vw_categoria';
+
+export async function getCategorias(): Promise<CategoriaOS[]> {
+  return (await kvGet<CategoriaOS[]>(CATEGORIA_KEY)) ?? [];
+}
+
+export async function setCategorias(categorias: CategoriaOS[]): Promise<boolean> {
+  return kvSet(CATEGORIA_KEY, categorias);
+}
+
+
