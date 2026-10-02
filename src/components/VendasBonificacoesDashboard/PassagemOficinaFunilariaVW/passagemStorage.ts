@@ -6,6 +6,7 @@
 import { kvGet, kvSet } from '@/lib/kvClient';
 
 export interface PassagemRow {
+  nroOs: string;
   nomeDepartamento: string;
   dtaEmissao: string;
   dtaEncerramento: string;

@@ -19,6 +19,7 @@ type ColType = 'text' | 'currency';
 interface ColDef { key: keyof PassagemRow; label: string; type: ColType; }
 
 const COLUMNS: ColDef[] = [
+  { key: 'nroOs',             label: 'Nº OS',             type: 'text' },
   { key: 'nomeDepartamento',  label: 'Departamento',     type: 'text' },
   { key: 'dtaEmissao',        label: 'Dt. Emissão',      type: 'text' },
   { key: 'dtaEncerramento',   label: 'Dt. Encerramento', type: 'text' },
@@ -43,6 +44,7 @@ const COLUMNS: ColDef[] = [
 
 // Mapeia a coluna do TXT (header) para a chave da linha e se é numérica.
 const FIELD_MAP: Record<string, { key: keyof PassagemRow; numeric: boolean }> = {
+  NRO_OS:               { key: 'nroOs',              numeric: false },
   NOME_DEPARTAMENTO:    { key: 'nomeDepartamento',   numeric: false },
   DTA_EMISSAO:          { key: 'dtaEmissao',         numeric: false },
   DTA_ENCERRAMENTO:     { key: 'dtaEncerramento',    numeric: false },
@@ -75,7 +77,7 @@ function parseBRNumber(s: string): number {
 
 function emptyRow(): PassagemRow {
   return {
-    nomeDepartamento: '', dtaEmissao: '', dtaEncerramento: '', nomeVendedor: '',
+    nroOs: '', nomeDepartamento: '', dtaEmissao: '', dtaEncerramento: '', nomeVendedor: '',
     categoriaOs: '', chassi: '', valTotalOs: 0, valTotalPecas: 0, valTotalServicos: 0,
     totalDesconto: 0, valPecaExterno: 0, valServicoExterno: 0, valPecaInterno: 0,
     valServicoInterno: 0, valPecaGarantia: 0, valServicoGarantia: 0, valPecaRevisao: 0,
