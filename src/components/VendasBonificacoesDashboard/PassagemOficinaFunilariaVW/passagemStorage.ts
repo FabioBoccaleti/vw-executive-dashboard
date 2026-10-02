@@ -44,3 +44,21 @@ export async function getPassagemMes(year: number, month: number): Promise<Passa
 export async function setPassagemMes(year: number, month: number, data: PassagemMesData): Promise<boolean> {
   return kvSet(key(year, month), data);
 }
+
+// ─── Regra Ano / Chassi (de-para letra da posição 10 → ano) ──────────────────
+export interface RegraAnoChassi {
+  id: string;
+  letra: string;  // 1 caractere A-Z (posição 10 do chassi)
+  ano: number;
+}
+
+const REGRA_ANO_CHASSI_KEY = 'passagem_oficina_funilaria_vw_regra_ano_chassi';
+
+export async function getRegrasAnoChassi(): Promise<RegraAnoChassi[]> {
+  return (await kvGet<RegraAnoChassi[]>(REGRA_ANO_CHASSI_KEY)) ?? [];
+}
+
+export async function setRegrasAnoChassi(regras: RegraAnoChassi[]): Promise<boolean> {
+  return kvSet(REGRA_ANO_CHASSI_KEY, regras);
+}
+

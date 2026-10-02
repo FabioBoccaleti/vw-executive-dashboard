@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Hammer, TableProperties, Upload, BookOpen, Ruler } from 'lucide-react';
+import { TableProperties, Upload, BookOpen, Ruler } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter,
   AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import { getPassagemMes, setPassagemMes, type PassagemRow } from './passagemStorage';
+import { RegraAnoChassiSection } from './RegraAnoChassiSection';
 
 interface Props {
   onBack: () => void;
@@ -182,57 +183,40 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       {/* ── Header ── */}
-      <header
-        className="text-white shadow-lg flex-shrink-0"
-        style={{ background: 'linear-gradient(135deg, #9f1239 0%, #f43f5e 100%)' }}
-      >
-        <div className="px-6 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/15 rounded-lg">
-              <Hammer className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-base font-bold leading-tight tracking-tight">
-                Passagem Oficina e Funilaria VW
-              </h1>
-              <p className="text-rose-200 text-xs mt-0.5">Demonstrativo de Vendas e Bonificações</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Abas */}
-            <div className="flex items-center bg-white/10 rounded-lg p-0.5 gap-0.5">
-              <button
-                onClick={() => setActiveTab('passagens')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                  activeTab === 'passagens'
-                    ? 'bg-rose-500 text-white shadow-sm'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <TableProperties className="w-3.5 h-3.5" />
-                Passagens
-              </button>
-              <button
-                onClick={() => setActiveTab('cadastro')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                  activeTab === 'cadastro'
-                    ? 'bg-rose-500 text-white shadow-sm'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                Cadastro
-              </button>
-            </div>
-            <button
-              onClick={onBack}
-              className="text-white border border-white/30 hover:bg-white/15 rounded px-3 py-1.5 text-xs font-semibold transition-colors"
-            >
-              ← Voltar
-            </button>
-          </div>
+      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0">
+        <div>
+          <h1 className="text-lg font-bold text-slate-800">Passagem Oficina e Funilaria VW</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Demonstrativo de Vendas e Bonificações</p>
         </div>
+        <button
+          onClick={onBack}
+          className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
+        >
+          ← Voltar
+        </button>
       </header>
+
+      {/* ── Abas ── */}
+      <div className="flex border-b border-slate-200 bg-white px-4">
+        <button
+          onClick={() => setActiveTab('passagens')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+            activeTab === 'passagens' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <TableProperties className="w-4 h-4" />
+          Passagens
+        </button>
+        <button
+          onClick={() => setActiveTab('cadastro')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+            activeTab === 'cadastro' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          Cadastro
+        </button>
+      </div>
 
       {/* ── Content ── */}
       {activeTab === 'passagens' && (
@@ -245,7 +229,7 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
                 <select
                   value={selectedYear}
                   onChange={e => setSelectedYear(Number(e.target.value))}
-                  className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-400"
+                  className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
                 >
                   {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
@@ -260,7 +244,7 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
                       onClick={() => setSelectedMonth(month)}
                       className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
                         selectedMonth === month
-                          ? 'bg-rose-500 text-white'
+                          ? 'bg-blue-600 text-white'
                           : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                       }`}
                     >
@@ -284,7 +268,7 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-rose-500 hover:bg-rose-600 transition-colors shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   Importar TXT
@@ -299,8 +283,8 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
           ) : rows.length === 0 ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center mx-auto">
-                  <Upload className="w-8 h-8 text-rose-500" />
+                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto">
+                  <Upload className="w-8 h-8 text-blue-500" />
                 </div>
                 <p className="text-lg font-semibold text-slate-700">Nenhum dado importado</p>
                 <p className="text-sm text-slate-400">
@@ -315,11 +299,11 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
             >
               <table className="border-collapse text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
                 <thead className="sticky top-0 z-10">
-                  <tr className="bg-rose-50">
+                  <tr className="bg-blue-50">
                     {COLUMNS.map(col => (
                       <th
                         key={col.key}
-                        className={`px-3 py-2 font-semibold text-rose-900 border-b border-rose-200 whitespace-nowrap ${
+                        className={`px-3 py-2 font-semibold text-blue-900 border-b border-blue-200 whitespace-nowrap ${
                           col.type === 'currency' ? 'text-right' : 'text-left'
                         }`}
                       >
@@ -330,7 +314,7 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
                 </thead>
                 <tbody>
                   {rows.map((row, ri) => (
-                    <tr key={ri} className="hover:bg-rose-50/50 border-b border-slate-100">
+                    <tr key={ri} className="hover:bg-blue-50/50 border-b border-slate-100">
                       {COLUMNS.map(col => (
                         <td
                           key={col.key}
@@ -363,7 +347,7 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
                   key={item.id}
                   onClick={() => setCadastroSection(item.id)}
                   className={`w-full text-left flex items-start gap-3 px-3 py-3 rounded-lg transition-all ${
-                    cadastroSection === item.id ? 'text-white shadow-sm bg-rose-700' : 'text-slate-600 hover:bg-slate-50'
+                    cadastroSection === item.id ? 'text-white shadow-sm bg-blue-700' : 'text-slate-600 hover:bg-slate-50'
                   }`}
                 >
                   <span className={`mt-0.5 flex-shrink-0 ${cadastroSection === item.id ? 'text-white' : 'text-slate-400'}`}>
@@ -393,17 +377,7 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
                 </div>
               )}
 
-              {cadastroSection === 'regraAnoChassi' && (
-                <div className="flex items-center justify-center py-20">
-                  <div className="text-center space-y-3">
-                    <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center mx-auto">
-                      <Ruler className="w-8 h-8 text-rose-500" />
-                    </div>
-                    <p className="text-lg font-semibold text-slate-700">Em desenvolvimento</p>
-                    <p className="text-sm text-slate-400">Este módulo estará disponível em breve.</p>
-                  </div>
-                </div>
-              )}
+              {cadastroSection === 'regraAnoChassi' && <RegraAnoChassiSection />}
             </div>
           </main>
         </div>
@@ -421,7 +395,7 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
                   <strong>{MONTHS[selectedMonth - 1]}/{selectedYear}</strong>?
                 </div>
                 {rows.length > 0 && (
-                  <div className="text-rose-600 font-medium">
+                  <div className="text-amber-600 font-medium">
                     Atenção: já existem {rows.length} registro{rows.length !== 1 ? 's' : ''} neste mês. Eles serão substituídos.
                   </div>
                 )}
@@ -430,7 +404,7 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmImport} className="bg-rose-500 hover:bg-rose-600">
+            <AlertDialogAction onClick={confirmImport} className="bg-blue-600 hover:bg-blue-700">
               Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
