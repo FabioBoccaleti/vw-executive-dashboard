@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { TableProperties, Upload, BookOpen, Ruler } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from 'react';
+import { TableProperties, Upload, BookOpen, Ruler, BarChart2, ListChecks } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter,
@@ -125,7 +125,7 @@ const CADASTRO_MENU: CadastroMenuItem[] = [
 
 export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
   const now = new Date();
-  const [activeTab, setActiveTab] = useState<'passagens' | 'cadastro'>('passagens');
+  const [activeTab, setActiveTab] = useState<'passagens' | 'situacoes' | 'cadastro' | 'analise'>('passagens');
   const [cadastroSection, setCadastroSection] = useState<CadastroSectionId>('regraAnoChassi');
   const currentCadastro = CADASTRO_MENU.find(m => m.id === cadastroSection);
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
@@ -151,6 +151,20 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
   useEffect(() => {
     void loadMonth(selectedYear, selectedMonth);
   }, [selectedYear, selectedMonth, loadMonth]);
+
+  // Grupos de chassi repetido (>1 ocorrência) no mês, ignorando chassi vazio
+  const chassiGroups = useMemo(() => {
+    const map = new Map<string, PassagemRow[]>();
+    for (const r of rows) {
+      const c = r.chassi?.trim();
+      if (!c) continue;
+      if (!map.has(c)) map.set(c, []);
+      map.get(c)!.push(r);
+    }
+    return Array.from(map.entries())
+      .filter(([, rs]) => rs.length > 1)
+      .sort((a, b) => a[0].localeCompare(b[0]));
+  }, [rows]);
 
   function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -210,6 +224,15 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
           Passagens
         </button>
         <button
+          onClick={() => setActiveTab('situacoes')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+            activeTab === 'situacoes' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <ListChecks className="w-4 h-4" />
+          Situações
+        </button>
+        <button
           onClick={() => setActiveTab('cadastro')}
           className={`px-5 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
             activeTab === 'cadastro' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -217,6 +240,15 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
         >
           <BookOpen className="w-4 h-4" />
           Cadastro
+        </button>
+        <button
+          onClick={() => setActiveTab('analise')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+            activeTab === 'analise' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <BarChart2 className="w-4 h-4" />
+          Análise
         </button>
       </div>
 
@@ -338,6 +370,111 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
         </div>
       )}
 
+      {/* ── Situações ── */}
+      {activeTab === 'situacoes' && (
+        <div className="flex-1 flex flex-col p-4 gap-4 min-h-0">
+          {/* Seletor de ano e mês (mesmo estado das Passagens) */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ano</span>
+                <select
+                  value={selectedYear}
+                  onChange={e => setSelectedYear(Number(e.target.value))}
+                  className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide mr-1">Mês</span>
+                {MONTHS.map((m, mi) => {
+                  const month = mi + 1;
+                  return (
+                    <button
+                      key={month}
+                      onClick={() => setSelectedMonth(month)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+                        selectedMonth === month
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex-1 flex items-center justify-center text-sm text-slate-400">Carregando…</div>
+          ) : chassiGroups.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center space-y-3">
+                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto">
+                  <ListChecks className="w-8 h-8 text-blue-500" />
+                </div>
+                <p className="text-lg font-semibold text-slate-700">Nenhum chassi repetido</p>
+                <p className="text-sm text-slate-400">
+                  Não há chassis com mais de uma passagem em {MONTHS[selectedMonth - 1]}/{selectedYear}.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-auto flex-1"
+              style={{ maxHeight: 'calc(100vh - 220px)' }}
+            >
+              <table className="border-collapse text-sm" style={{ width: 'max-content', minWidth: '100%' }}>
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-blue-50">
+                    {COLUMNS.map(col => (
+                      <th
+                        key={col.key}
+                        className={`px-3 py-2 font-semibold text-blue-900 border-b border-blue-200 whitespace-nowrap ${
+                          col.type === 'currency' ? 'text-right' : 'text-left'
+                        }`}
+                      >
+                        {col.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {chassiGroups.map(([chassi, groupRows]) => (
+                    <Fragment key={chassi}>
+                      <tr className="bg-slate-100">
+                        <td colSpan={COLUMNS.length} className="px-3 py-1.5 text-xs font-bold text-slate-600 border-y border-slate-200">
+                          Chassi {chassi} — {groupRows.length} passagens
+                        </td>
+                      </tr>
+                      {groupRows.map((row, ri) => (
+                        <tr key={`${chassi}-${ri}`} className="hover:bg-blue-50/50 border-b border-slate-100">
+                          {COLUMNS.map(col => (
+                            <td
+                              key={col.key}
+                              className={`px-3 py-1.5 whitespace-nowrap text-slate-700 ${
+                                col.type === 'currency' ? 'text-right tabular-nums' : 'text-left'
+                              }`}
+                            >
+                              {col.type === 'currency'
+                                ? fmtCurrency(row[col.key] as number)
+                                : ((row[col.key] as string) || '—')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Cadastro ── */}
       {activeTab === 'cadastro' && (
         <div className="flex flex-1 overflow-hidden">
@@ -382,6 +519,19 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
               {cadastroSection === 'regraAnoChassi' && <RegraAnoChassiSection />}
             </div>
           </main>
+        </div>
+      )}
+
+      {/* ── Análise ── */}
+      {activeTab === 'analise' && (
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center space-y-3">
+            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto">
+              <BarChart2 className="w-8 h-8 text-blue-500" />
+            </div>
+            <p className="text-lg font-semibold text-slate-700">Em desenvolvimento</p>
+            <p className="text-sm text-slate-400">Este módulo estará disponível em breve.</p>
+          </div>
         </div>
       )}
 
