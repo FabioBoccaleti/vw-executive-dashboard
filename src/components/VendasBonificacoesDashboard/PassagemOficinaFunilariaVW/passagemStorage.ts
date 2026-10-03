@@ -265,6 +265,58 @@ export function analisarPorAno(
     .sort((a, b) => a.anoNum - b.anoNum);
 }
 
+/** Um chassi que caiu no grupo "Não identificado" (sem ano determinável). */
+export interface ChassiNaoIdentificado {
+  chassi: string;        // chassi (pode ser vazio)
+  codigoPos10: string;   // caractere da posição 10, ou '—' se chassi curto/vazio
+  qtdOs: number;         // nº de OS elegíveis desse chassi
+  departamentos: string[];
+}
+
+/**
+ * Lista os chassis distintos que caem em "Não identificado" (posição 10 sem
+ * regra, ou chassi curto/vazio), respeitando as mesmas regras por departamento
+ * (elegibilidade). Útil para descobrir quais códigos cadastrar na Regra Ano/Chassi.
+ */
+export function listarChassisNaoIdentificados(
+  rows: PassagemRow[],
+  grupos: RegraDepartamento[],
+  regrasAnoChassi: RegraAnoChassi[],
+): ChassiNaoIdentificado[] {
+  const anoByLetra = new Map<string, number>();
+  for (const r of regrasAnoChassi) anoByLetra.set(r.letra.toUpperCase(), r.ano);
+
+  const isNaoIdentificado = (chassi: string): boolean => {
+    if (chassi.length < 10) return true;
+    return !anoByLetra.has(chassi.charAt(9).toUpperCase());
+  };
+
+  const map = new Map<string, { qtdOs: number; deps: Set<string> }>();
+  for (const g of grupos) {
+    const regra = g.contagem ?? defaultRegraContagem();
+    const deps = new Set(g.departamentos);
+    for (const r of rows) {
+      const dep = (r.nomeDepartamento ?? '').trim();
+      if (!deps.has(dep) || !osElegivel(r, regra)) continue;
+      const chassi = (r.chassi ?? '').trim();
+      if (!isNaoIdentificado(chassi)) continue;
+      let e = map.get(chassi);
+      if (!e) { e = { qtdOs: 0, deps: new Set() }; map.set(chassi, e); }
+      e.qtdOs += 1;
+      if (dep) e.deps.add(dep);
+    }
+  }
+
+  return [...map.entries()]
+    .map(([chassi, e]) => ({
+      chassi,
+      codigoPos10: chassi.length >= 10 ? chassi.charAt(9).toUpperCase() : '—',
+      qtdOs: e.qtdOs,
+      departamentos: [...e.deps].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    }))
+    .sort((a, b) => b.qtdOs - a.qtdOs || a.chassi.localeCompare(b.chassi));
+}
+
 const REGRA_DEPARTAMENTOS_KEY = 'passagem_oficina_funilaria_vw_regra_departamentos';
 
 export async function getRegrasDepartamentos(): Promise<RegraDepartamento[]> {
