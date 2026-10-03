@@ -3,7 +3,7 @@
  * Chaveamento: passagem_oficina_funilaria_vw_{YYYY}_{MM}
  */
 
-import { kvGet, kvSet } from '@/lib/kvClient';
+import { kvGet, kvSet, kvKeys, kvBulkGet } from '@/lib/kvClient';
 
 export interface PassagemRow {
   nroOs: string;
@@ -78,6 +78,43 @@ export async function getCategorias(): Promise<CategoriaOS[]> {
 
 export async function setCategorias(categorias: CategoriaOS[]): Promise<boolean> {
   return kvSet(CATEGORIA_KEY, categorias);
+}
+
+// ─── Regra Departamentos (agrupamento de departamentos brutos) ───────────────
+export interface RegraDepartamento {
+  id: string;
+  nome: string;             // nome do grupo (ex. Oficina, Funilaria)
+  departamentos: string[];  // nomeDepartamento brutos que compõem o grupo
+}
+
+const REGRA_DEPARTAMENTOS_KEY = 'passagem_oficina_funilaria_vw_regra_departamentos';
+
+export async function getRegrasDepartamentos(): Promise<RegraDepartamento[]> {
+  return (await kvGet<RegraDepartamento[]>(REGRA_DEPARTAMENTOS_KEY)) ?? [];
+}
+
+export async function setRegrasDepartamentos(regras: RegraDepartamento[]): Promise<boolean> {
+  return kvSet(REGRA_DEPARTAMENTOS_KEY, regras);
+}
+
+/**
+ * Varre todos os meses/anos já importados e retorna a lista de
+ * departamentos (nomeDepartamento) distintos, ordenados alfabeticamente.
+ * O padrão `..._2*` casa apenas as chaves de dados mensais (ano começa com 2),
+ * ignorando as chaves de regras/categoria.
+ */
+export async function getDepartamentosDistintos(): Promise<string[]> {
+  const keys = await kvKeys(`passagem_oficina_funilaria_vw_2*`);
+  if (keys.length === 0) return [];
+  const data = await kvBulkGet<PassagemMesData>(keys);
+  const set = new Set<string>();
+  for (const value of Object.values(data)) {
+    for (const row of value?.rows ?? []) {
+      const dep = row.nomeDepartamento?.trim();
+      if (dep) set.add(dep);
+    }
+  }
+  return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }
 
 

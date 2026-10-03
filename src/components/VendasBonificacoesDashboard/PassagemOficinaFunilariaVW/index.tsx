@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from 'react';
-import { TableProperties, Upload, BookOpen, Ruler, BarChart2, ListChecks, Tag } from 'lucide-react';
+import { TableProperties, Upload, BookOpen, Ruler, BarChart2, ListChecks, Tag, FolderTree } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter,
@@ -8,6 +8,7 @@ import {
 import { getPassagemMes, setPassagemMes, type PassagemRow } from './passagemStorage';
 import { RegraAnoChassiSection } from './RegraAnoChassiSection';
 import { CategoriaSection } from './CategoriaSection';
+import { RegraDepartamentosSection } from './RegraDepartamentosSection';
 
 interface Props {
   onBack: () => void;
@@ -118,11 +119,12 @@ function fmtCurrency(n: number): string {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-type CadastroSectionId = 'regraAnoChassi' | 'categoria';
+type CadastroSectionId = 'regraAnoChassi' | 'categoria' | 'regraDepartamentos';
 interface CadastroMenuItem { id: CadastroSectionId; label: string; description: string; icon: React.ReactNode; }
 const CADASTRO_MENU: CadastroMenuItem[] = [
   { id: 'regraAnoChassi', label: 'Regra Ano / Chassi', description: 'Regras por ano e chassi', icon: <Ruler className="w-5 h-5" /> },
   { id: 'categoria', label: 'Categoria', description: 'Categorias de OS', icon: <Tag className="w-5 h-5" /> },
+  { id: 'regraDepartamentos', label: 'Regra Departamentos', description: 'Agrupamento de departamentos', icon: <FolderTree className="w-5 h-5" /> },
 ];
 
 export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
@@ -521,6 +523,8 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
               {cadastroSection === 'regraAnoChassi' && <RegraAnoChassiSection />}
 
               {cadastroSection === 'categoria' && <CategoriaSection />}
+
+              {cadastroSection === 'regraDepartamentos' && <RegraDepartamentosSection />}
             </div>
           </main>
         </div>
