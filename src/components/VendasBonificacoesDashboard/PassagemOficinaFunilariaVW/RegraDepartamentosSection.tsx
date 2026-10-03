@@ -5,11 +5,14 @@ import {
   getRegrasDepartamentos,
   setRegrasDepartamentos,
   getDepartamentosDistintos,
+  getCategoriasDistintas,
+  getCategorias,
   defaultRegraContagem,
   type RegraDepartamento,
   type RegraContagem,
   type FiltroValorOS,
   type ModoContagem,
+  type CategoriaOS,
 } from './passagemStorage';
 
 function newId(): string {
@@ -20,6 +23,8 @@ function newId(): string {
 export function RegraDepartamentosSection() {
   const [grupos, setGrupos] = useState<RegraDepartamento[]>([]);
   const [departamentos, setDepartamentos] = useState<string[]>([]);
+  const [categorias, setCategorias] = useState<string[]>([]);
+  const [categoriasCadastro, setCategoriasCadastro] = useState<CategoriaOS[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -29,9 +34,16 @@ export function RegraDepartamentosSection() {
   const [editNome, setEditNome] = useState('');
 
   useEffect(() => {
-    Promise.all([getRegrasDepartamentos(), getDepartamentosDistintos()]).then(([g, d]) => {
+    Promise.all([
+      getRegrasDepartamentos(),
+      getDepartamentosDistintos(),
+      getCategoriasDistintas(),
+      getCategorias(),
+    ]).then(([g, d, cats, catCad]) => {
       setGrupos(g);
       setDepartamentos(d);
+      setCategorias(cats);
+      setCategoriasCadastro(catCad);
       setLoading(false);
     });
   }, []);
@@ -48,6 +60,13 @@ export function RegraDepartamentosSection() {
     for (const g of grupos) map.set(g.id, g.nome);
     return map;
   }, [grupos]);
+
+  // Mapa: código de categoria → nome cadastrado (quando existir)
+  const nomeCategoriaByCodigo = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of categoriasCadastro) map.set(c.codigo, c.categoria);
+    return map;
+  }, [categoriasCadastro]);
 
   // Departamentos que ainda não existem em nenhum grupo (para exibir mesmo sem import)
   const naoAgrupados = useMemo(
@@ -70,9 +89,15 @@ export function RegraDepartamentosSection() {
   const refreshDepartamentos = async () => {
     setRefreshing(true);
     try {
-      const d = await getDepartamentosDistintos();
+      const [d, cats, catCad] = await Promise.all([
+        getDepartamentosDistintos(),
+        getCategoriasDistintas(),
+        getCategorias(),
+      ]);
       setDepartamentos(d);
-      toast.success(`${d.length} departamento(s) encontrado(s).`);
+      setCategorias(cats);
+      setCategoriasCadastro(catCad);
+      toast.success(`${d.length} departamento(s) e ${cats.length} categoria(s) encontrados.`);
     } finally {
       setRefreshing(false);
     }
@@ -131,6 +156,16 @@ export function RegraDepartamentosSection() {
         : g,
     );
     await persist(updated);
+  };
+
+  // Liga/desliga uma categoria na contagem do grupo (checked = conta = NÃO excluída)
+  const toggleCategoria = async (grupoId: string, codigo: string, conta: boolean) => {
+    const grupo = grupos.find(g => g.id === grupoId);
+    const atual = grupo?.contagem ?? defaultRegraContagem();
+    const excluidas = new Set(atual.categoriasExcluidas ?? []);
+    if (conta) excluidas.delete(codigo);
+    else excluidas.add(codigo);
+    await updateContagem(grupoId, { categoriasExcluidas: [...excluidas] });
   };
 
   if (loading) return <div className="text-slate-400 text-sm py-8 text-center">Carregando...</div>;
@@ -320,6 +355,51 @@ export function RegraDepartamentosSection() {
                         {modoOpcoes.find(o => o.value === regra.modoContagem)?.hint}
                       </p>
                     </div>
+                  </div>
+
+                  {/* Categorias que contam */}
+                  <div className="mt-4">
+                    <p className="text-[11px] font-semibold text-slate-500 mb-1.5">
+                      Categorias que contam como passagem
+                    </p>
+                    {categorias.length === 0 ? (
+                      <p className="text-[10px] text-slate-400">
+                        Nenhuma categoria detectada. Importe passagens e clique em "Atualizar lista".
+                      </p>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap gap-1.5">
+                          {categorias.map(cod => {
+                            const conta = !(regra.categoriasExcluidas ?? []).includes(cod);
+                            const nome = nomeCategoriaByCodigo.get(cod);
+                            return (
+                              <label
+                                key={cod}
+                                title={nome ? `${cod} — ${nome}` : `Categoria ${cod}`}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] cursor-pointer transition-colors ${
+                                  conta
+                                    ? 'border-blue-300 bg-blue-50 text-blue-800'
+                                    : 'border-slate-200 bg-white text-slate-400'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={conta}
+                                  disabled={saving}
+                                  onChange={e => toggleCategoria(grupo.id, cod, e.target.checked)}
+                                  className="accent-blue-600"
+                                />
+                                <span className="font-semibold">{cod}</span>
+                                {nome && <span className="font-normal opacity-80">· {nome}</span>}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Categorias desmarcadas são ignoradas na contagem deste departamento.
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   {/* Considerar categoria */}

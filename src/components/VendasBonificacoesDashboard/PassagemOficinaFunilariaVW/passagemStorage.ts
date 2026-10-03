@@ -92,7 +92,8 @@ export type ModoContagem = 'porDia' | 'porMes' | 'porOs';
 export interface RegraContagem {
   filtroValor: FiltroValorOS;        // quais OS entram na contagem (Total OS)
   modoContagem: ModoContagem;        // o que define "a mesma passagem"
-  considerarCategoria: boolean;      // categorias diferentes = passagens diferentes
+  categoriasExcluidas: string[];     // códigos de Categoria OS que NÃO contam (filtro)
+  considerarCategoria: boolean;      // categorias diferentes contam como passagens diferentes
 }
 
 export interface RegraDepartamento {
@@ -103,17 +104,23 @@ export interface RegraDepartamento {
 }
 
 export function defaultRegraContagem(): RegraContagem {
-  return { filtroValor: 'todas', modoContagem: 'porDia', considerarCategoria: false };
+  return { filtroValor: 'todas', modoContagem: 'porDia', categoriasExcluidas: [], considerarCategoria: false };
 }
 
 /**
  * Conta as passagens de um conjunto de linhas (já filtradas para o grupo)
  * aplicando a regra de contagem. Função pura — reutilizável pela aba Análise.
+ *
+ * Filtros de entrada (descartam OS antes de contar): valor Total OS e
+ * categorias excluídas. Em seguida o modo de contagem define o agrupamento;
+ * com "considerarCategoria" ligado, categorias diferentes separam a passagem.
  */
 export function contarPassagensGrupo(rows: PassagemRow[], regra: RegraContagem): number {
+  const excluidas = new Set(regra.categoriasExcluidas ?? []);
   const elegiveis = rows.filter(r => {
-    if (regra.filtroValor === 'zero') return (r.valTotalOs ?? 0) === 0;
-    if (regra.filtroValor === 'positivo') return (r.valTotalOs ?? 0) > 0;
+    if (regra.filtroValor === 'zero' && (r.valTotalOs ?? 0) !== 0) return false;
+    if (regra.filtroValor === 'positivo' && (r.valTotalOs ?? 0) <= 0) return false;
+    if (excluidas.has((r.categoriaOs ?? '').trim())) return false;
     return true;
   });
 
@@ -157,6 +164,28 @@ export async function getDepartamentosDistintos(): Promise<string[]> {
     }
   }
   return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
+/**
+ * Varre todos os meses/anos já importados e retorna os códigos de
+ * Categoria OS distintos, ordenados numericamente quando possível.
+ */
+export async function getCategoriasDistintas(): Promise<string[]> {
+  const keys = await kvKeys(`passagem_oficina_funilaria_vw_2*`);
+  if (keys.length === 0) return [];
+  const data = await kvBulkGet<PassagemMesData>(keys);
+  const set = new Set<string>();
+  for (const value of Object.values(data)) {
+    for (const row of value?.rows ?? []) {
+      const cat = row.categoriaOs?.trim();
+      if (cat) set.add(cat);
+    }
+  }
+  return [...set].sort((a, b) => {
+    const na = Number(a), nb = Number(b);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a.localeCompare(b, 'pt-BR');
+  });
 }
 
 
