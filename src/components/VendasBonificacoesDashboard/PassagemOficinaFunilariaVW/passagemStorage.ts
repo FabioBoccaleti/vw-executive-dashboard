@@ -108,6 +108,18 @@ export function defaultRegraContagem(): RegraContagem {
 }
 
 /**
+ * Diz se uma OS é elegível para a contagem/valores de um grupo, conforme os
+ * filtros de entrada da regra (valor Total OS e categorias excluídas).
+ * Obs.: não checa departamento — isso é feito por quem chama.
+ */
+export function osElegivel(row: PassagemRow, regra: RegraContagem): boolean {
+  if (regra.filtroValor === 'zero' && (row.valTotalOs ?? 0) !== 0) return false;
+  if (regra.filtroValor === 'positivo' && (row.valTotalOs ?? 0) <= 0) return false;
+  if ((regra.categoriasExcluidas ?? []).includes((row.categoriaOs ?? '').trim())) return false;
+  return true;
+}
+
+/**
  * Conta as passagens de um conjunto de linhas (já filtradas para o grupo)
  * aplicando a regra de contagem. Função pura — reutilizável pela aba Análise.
  *
@@ -116,13 +128,7 @@ export function defaultRegraContagem(): RegraContagem {
  * com "considerarCategoria" ligado, categorias diferentes separam a passagem.
  */
 export function contarPassagensGrupo(rows: PassagemRow[], regra: RegraContagem): number {
-  const excluidas = new Set(regra.categoriasExcluidas ?? []);
-  const elegiveis = rows.filter(r => {
-    if (regra.filtroValor === 'zero' && (r.valTotalOs ?? 0) !== 0) return false;
-    if (regra.filtroValor === 'positivo' && (r.valTotalOs ?? 0) <= 0) return false;
-    if (excluidas.has((r.categoriaOs ?? '').trim())) return false;
-    return true;
-  });
+  const elegiveis = rows.filter(r => osElegivel(r, regra));
 
   if (regra.modoContagem === 'porOs') return elegiveis.length;
 
@@ -136,6 +142,49 @@ export function contarPassagensGrupo(rows: PassagemRow[], regra: RegraContagem):
   return chaves.size;
 }
 
+/** Resultado agregado de um grupo de departamento para a aba Análise. */
+export interface GrupoAnalise {
+  id: string;
+  nome: string;
+  departamentos: string[];
+  passagens: number;      // quantidade de passagens (modo de contagem)
+  totalPecas: number;     // Total Peças líquido (bruto − Desconto Peça)
+  totalServicos: number;  // Total Serviços líquido (bruto − Desconto Serviço)
+  totalOs: number;        // totalPecas + totalServicos
+}
+
+/**
+ * Agrega as linhas por grupo de departamento, seguindo as regras cadastradas.
+ * Passagens usam o modo de contagem; os valores somam apenas OS elegíveis
+ * (filtro de valor + categorias) com desconto abatido. Departamentos que não
+ * pertencem a nenhum grupo são ignorados.
+ */
+export function analisarGrupos(rows: PassagemRow[], grupos: RegraDepartamento[]): GrupoAnalise[] {
+  return grupos.map(g => {
+    const regra = g.contagem ?? defaultRegraContagem();
+    const deps = new Set(g.departamentos);
+    const doGrupo = rows.filter(r => deps.has((r.nomeDepartamento ?? '').trim()));
+
+    let totalPecas = 0;
+    let totalServicos = 0;
+    for (const r of doGrupo) {
+      if (!osElegivel(r, regra)) continue;
+      totalPecas += (r.valTotalPecas ?? 0) - (r.descontoPeca ?? 0);
+      totalServicos += (r.valTotalServicos ?? 0) - (r.descontoServ ?? 0);
+    }
+
+    return {
+      id: g.id,
+      nome: g.nome,
+      departamentos: g.departamentos,
+      passagens: contarPassagensGrupo(doGrupo, regra),
+      totalPecas,
+      totalServicos,
+      totalOs: totalPecas + totalServicos,
+    };
+  });
+}
+
 const REGRA_DEPARTAMENTOS_KEY = 'passagem_oficina_funilaria_vw_regra_departamentos';
 
 export async function getRegrasDepartamentos(): Promise<RegraDepartamento[]> {
@@ -144,6 +193,22 @@ export async function getRegrasDepartamentos(): Promise<RegraDepartamento[]> {
 
 export async function setRegrasDepartamentos(regras: RegraDepartamento[]): Promise<boolean> {
   return kvSet(REGRA_DEPARTAMENTOS_KEY, regras);
+}
+
+/**
+ * Carrega as linhas de um período: um mês específico (1-12) ou o ano inteiro
+ * ('ano' agrega os 12 meses do ano).
+ */
+export async function getPassagensPeriodo(year: number, month: number | 'ano'): Promise<PassagemRow[]> {
+  if (month === 'ano') {
+    const keys = Array.from({ length: 12 }, (_, i) => key(year, i + 1));
+    const data = await kvBulkGet<PassagemMesData>(keys);
+    const rows: PassagemRow[] = [];
+    for (const v of Object.values(data)) if (v?.rows) rows.push(...v.rows);
+    return rows;
+  }
+  const d = await getPassagemMes(year, month);
+  return d?.rows ?? [];
 }
 
 /**

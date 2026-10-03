@@ -9,6 +9,7 @@ import { getPassagemMes, setPassagemMes, type PassagemRow } from './passagemStor
 import { RegraAnoChassiSection } from './RegraAnoChassiSection';
 import { CategoriaSection } from './CategoriaSection';
 import { RegraDepartamentosSection } from './RegraDepartamentosSection';
+import { AnaliseSection } from './AnaliseSection';
 
 interface Props {
   onBack: () => void;
@@ -531,17 +532,7 @@ export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
       )}
 
       {/* ── Análise ── */}
-      {activeTab === 'analise' && (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="text-center space-y-3">
-            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto">
-              <BarChart2 className="w-8 h-8 text-blue-500" />
-            </div>
-            <p className="text-lg font-semibold text-slate-700">Em desenvolvimento</p>
-            <p className="text-sm text-slate-400">Este módulo estará disponível em breve.</p>
-          </div>
-        </div>
-      )}
+      {activeTab === 'analise' && <AnaliseSection />}
 
       {/* Dialog de confirmação de mês/ano */}
       <AlertDialog open={pendingFile !== null} onOpenChange={(open) => { if (!open) setPendingFile(null); }}>
