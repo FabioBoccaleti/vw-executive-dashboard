@@ -29,6 +29,7 @@ const COLUMNS: ColDef[] = [
   { key: 'nomeVendedor',      label: 'Vendedor',         type: 'text' },
   { key: 'categoriaOs',       label: 'Categoria OS',     type: 'text' },
   { key: 'chassi',            label: 'Chassi',           type: 'text' },
+  { key: 'desModelo',         label: 'Modelo',           type: 'text' },
   { key: 'valTotalOs',        label: 'Total OS',         type: 'currency' },
   { key: 'valTotalPecas',     label: 'Total Peças',      type: 'currency' },
   { key: 'valTotalServicos',  label: 'Total Serviços',   type: 'currency' },
@@ -54,6 +55,7 @@ const FIELD_MAP: Record<string, { key: keyof PassagemRow; numeric: boolean }> = 
   NOME_VENDEDOR:        { key: 'nomeVendedor',       numeric: false },
   CATEGORIA_OS:         { key: 'categoriaOs',        numeric: false },
   CHASSI:               { key: 'chassi',             numeric: false },
+  DES_MODELO:           { key: 'desModelo',          numeric: false },
   VAL_TOTAL_OS:         { key: 'valTotalOs',         numeric: true  },
   VAL_TOTAL_PECAS:      { key: 'valTotalPecas',      numeric: true  },
   VAL_TOTAL_SERVICOS:   { key: 'valTotalServicos',   numeric: true  },
@@ -81,7 +83,7 @@ function parseBRNumber(s: string): number {
 function emptyRow(): PassagemRow {
   return {
     nroOs: '', nomeDepartamento: '', dtaEmissao: '', dtaEncerramento: '', nomeVendedor: '',
-    categoriaOs: '', chassi: '', valTotalOs: 0, valTotalPecas: 0, valTotalServicos: 0,
+    categoriaOs: '', chassi: '', desModelo: '', valTotalOs: 0, valTotalPecas: 0, valTotalServicos: 0,
     totalDesconto: 0, valPecaExterno: 0, valServicoExterno: 0, valPecaInterno: 0,
     valServicoInterno: 0, valPecaGarantia: 0, valServicoGarantia: 0, valPecaRevisao: 0,
     valServicoRevisao: 0, descontoPeca: 0, descontoServ: 0,

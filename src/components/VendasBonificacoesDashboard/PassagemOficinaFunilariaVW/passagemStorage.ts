@@ -13,6 +13,7 @@ export interface PassagemRow {
   nomeVendedor: string;
   categoriaOs: string;
   chassi: string;
+  desModelo: string;
   valTotalOs: number;
   valTotalPecas: number;
   valTotalServicos: number;
