@@ -318,6 +318,96 @@ export function listarChassisNaoIdentificados(
     .sort((a, b) => b.qtdOs - a.qtdOs || a.chassi.localeCompare(b.chassi));
 }
 
+/** Resultado agregado por modelo base do veículo. */
+export interface ModeloAnalise {
+  modelo: string;
+  passagens: number;
+  totalPecas: number;
+  totalServicos: number;
+  totalOs: number;
+}
+
+export const MODELO_NAO_INFORMADO = 'Não informado';
+
+/**
+ * Deriva o "modelo base" a partir da descrição completa (DES_MODELO),
+ * agrupando versões do mesmo carro. Ex.: "NOVO T-CROSS COMFORTLINE 200 TSI"
+ * e "NOVO T-CROSS EXTREME 250 TSI" → "T-CROSS".
+ *
+ * Regra: remove prefixos NOVO/NOVA e códigos de concessionária no início
+ * (ex. "5Z11C4 - ") e usa a primeira palavra (preservando hífen, ex. T-CROSS).
+ */
+export function normalizarModelo(desModelo: string): string {
+  const raw = (desModelo ?? '').trim();
+  if (!raw) return MODELO_NAO_INFORMADO;
+
+  const tokens = raw.toUpperCase().replace(/\s+/g, ' ').trim().split(' ');
+  const isCodigo = (t: string) => /\d/.test(t) && /[A-Z]/.test(t); // ex. 5Z11C4
+
+  while (tokens.length > 1) {
+    const t = tokens[0];
+    if (t === 'NOVO' || t === 'NOVA' || t === '-' || t === '' || isCodigo(t)) tokens.shift();
+    else break;
+  }
+
+  const base = (tokens[0] ?? '').replace(/^[^A-Z0-9]+/, '').replace(/[^A-Z0-9-]+$/, '');
+  return base || MODELO_NAO_INFORMADO;
+}
+
+/**
+ * Agrega passagens e valores por modelo base do veículo, seguindo as mesmas
+ * regras por departamento (elegibilidade + modo de contagem). Modelos vazios
+ * caem no grupo "Não informado".
+ */
+export function analisarPorModelo(rows: PassagemRow[], grupos: RegraDepartamento[]): ModeloAnalise[] {
+  const acc = new Map<string, { passagens: number; totalPecas: number; totalServicos: number }>();
+  const ensure = (label: string) => {
+    let v = acc.get(label);
+    if (!v) { v = { passagens: 0, totalPecas: 0, totalServicos: 0 }; acc.set(label, v); }
+    return v;
+  };
+
+  for (const g of grupos) {
+    const regra = g.contagem ?? defaultRegraContagem();
+    const deps = new Set(g.departamentos);
+    const elegiveis = rows.filter(r => deps.has((r.nomeDepartamento ?? '').trim()) && osElegivel(r, regra));
+
+    for (const r of elegiveis) {
+      const v = ensure(normalizarModelo(r.desModelo));
+      v.totalPecas += (r.valTotalPecas ?? 0) - (r.descontoPeca ?? 0);
+      v.totalServicos += (r.valTotalServicos ?? 0) - (r.descontoServ ?? 0);
+    }
+
+    if (regra.modoContagem === 'porOs') {
+      for (const r of elegiveis) ensure(normalizarModelo(r.desModelo)).passagens += 1;
+    } else {
+      const keyToLabel = new Map<string, string>();
+      for (const r of elegiveis) {
+        const partes = [r.chassi?.trim() ?? ''];
+        if (regra.modoContagem === 'porDia') partes.push(r.dtaEmissao?.trim() ?? '');
+        if (regra.considerarCategoria) partes.push(r.categoriaOs?.trim() ?? '');
+        const key = partes.join('|');
+        if (!keyToLabel.has(key)) keyToLabel.set(key, normalizarModelo(r.desModelo));
+      }
+      for (const label of keyToLabel.values()) ensure(label).passagens += 1;
+    }
+  }
+
+  return [...acc.entries()]
+    .map(([modelo, v]) => ({
+      modelo,
+      passagens: v.passagens,
+      totalPecas: v.totalPecas,
+      totalServicos: v.totalServicos,
+      totalOs: v.totalPecas + v.totalServicos,
+    }))
+    .sort((a, b) => {
+      if (a.modelo === MODELO_NAO_INFORMADO) return 1;
+      if (b.modelo === MODELO_NAO_INFORMADO) return -1;
+      return b.passagens - a.passagens || a.modelo.localeCompare(b.modelo, 'pt-BR');
+    });
+}
+
 const REGRA_DEPARTAMENTOS_KEY = 'passagem_oficina_funilaria_vw_regra_departamentos';
 
 export async function getRegrasDepartamentos(): Promise<RegraDepartamento[]> {

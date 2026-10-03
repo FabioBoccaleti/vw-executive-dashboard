@@ -10,13 +10,16 @@ import {
   getPassagensPeriodo,
   analisarGrupos,
   analisarPorAno,
+  analisarPorModelo,
   listarChassisNaoIdentificados,
   ANO_NAO_IDENTIFICADO,
+  MODELO_NAO_INFORMADO,
   type RegraDepartamento,
   type RegraAnoChassi,
   type PassagemRow,
   type GrupoAnalise,
   type AnoAnalise,
+  type ModeloAnalise,
 } from './passagemStorage';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -45,8 +48,10 @@ export function AnaliseSection() {
   const [vendedor, setVendedor] = useState<string>('todos');
   const [metricaBar, setMetricaBar] = useState<'quantidade' | 'valor'>('quantidade');
   const [metricaAno, setMetricaAno] = useState<'quantidade' | 'valor'>('quantidade');
+  const [metricaModelo, setMetricaModelo] = useState<'quantidade' | 'valor'>('quantidade');
   const [showNaoId, setShowNaoId] = useState(false);
   const [showAnoTable, setShowAnoTable] = useState(false);
+  const [showModeloTable, setShowModeloTable] = useState(false);
 
   const [grupos, setGrupos] = useState<RegraDepartamento[]>([]);
   const [regrasAnoChassi, setRegrasAnoChassi] = useState<RegraAnoChassi[]>([]);
@@ -132,6 +137,11 @@ export function AnaliseSection() {
   const chassisNaoId = useMemo(
     () => listarChassisNaoIdentificados(rowsFiltradas, gruposAtivos, regrasAnoChassi),
     [rowsFiltradas, gruposAtivos, regrasAnoChassi],
+  );
+
+  const modeloData: ModeloAnalise[] = useMemo(
+    () => analisarPorModelo(rowsFiltradas, gruposAtivos),
+    [rowsFiltradas, gruposAtivos],
   );
 
   const periodoLabel = periodo === 'ano' ? `Ano ${year}` : `${MONTHS[(periodo as number) - 1]}/${year}`;
@@ -484,6 +494,125 @@ export function AnaliseSection() {
                         <td className="px-5 py-3 text-right tabular-nums text-slate-800">{fmtCurrency(totais.totalPecas)}</td>
                         <td className="px-5 py-3 text-right tabular-nums text-slate-800">{fmtCurrency(totais.totalServicos)}</td>
                         <td className="px-5 py-3 text-right tabular-nums text-blue-700">{fmtCurrency(totais.totalOs)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* ── Passagens por modelo ── */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <CarFront className="w-4 h-4 text-slate-400" />
+                <h3 className="text-sm font-bold text-slate-700">Passagens por modelo</h3>
+              </div>
+              <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
+                <button
+                  onClick={() => setMetricaModelo('quantidade')}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                    metricaModelo === 'quantidade' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
+                  }`}
+                >
+                  Quantidade
+                </button>
+                <button
+                  onClick={() => setMetricaModelo('valor')}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                    metricaModelo === 'valor' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
+                  }`}
+                >
+                  Valor
+                </button>
+              </div>
+            </div>
+
+            {modeloData.length === 0 ? (
+              <div className="h-[220px] flex items-center justify-center text-sm text-slate-400">
+                Sem passagens no período.
+              </div>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={modeloData} margin={{ top: 5, right: 10, left: 0, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis
+                      dataKey="modelo"
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      interval={0}
+                      angle={-40}
+                      textAnchor="end"
+                      height={70}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: '#64748b' }}
+                      tickFormatter={v => (metricaModelo === 'valor' ? fmtCompact(v) : String(v))}
+                      width={metricaModelo === 'valor' ? 60 : 36}
+                    />
+                    <Tooltip
+                      formatter={(v: number) => (metricaModelo === 'valor' ? fmtCurrency(v) : v.toLocaleString('pt-BR'))}
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                    />
+                    <Bar
+                      dataKey={metricaModelo === 'quantidade' ? 'passagens' : 'totalOs'}
+                      name={metricaModelo === 'quantidade' ? 'Passagens' : 'Total OS'}
+                      radius={[6, 6, 0, 0]}
+                    >
+                      {modeloData.map((m, i) => (
+                        <Cell key={i} fill={m.modelo === MODELO_NAO_INFORMADO ? '#94a3b8' : '#16a34a'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+
+                <button
+                  onClick={() => setShowModeloTable(v => !v)}
+                  className="mt-4 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  {showModeloTable ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  {showModeloTable ? 'Ocultar detalhamento por modelo' : 'Ver detalhamento por modelo'}
+                </button>
+
+                {showModeloTable && (
+                <div className="overflow-x-auto mt-4">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50">
+                        <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500">Modelo</th>
+                        <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Passagens</th>
+                        <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Total Peças</th>
+                        <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Total Serviços</th>
+                        <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Total OS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {modeloData.map(m => {
+                        const isNaoInf = m.modelo === MODELO_NAO_INFORMADO;
+                        return (
+                          <tr key={m.modelo} className="border-t border-slate-100 hover:bg-slate-50/60">
+                            <td className="px-5 py-2.5 font-medium">
+                              {isNaoInf ? <span className="text-slate-400">{m.modelo}</span> : <span className="text-slate-700">{m.modelo}</span>}
+                            </td>
+                            <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-slate-700">
+                              {m.passagens.toLocaleString('pt-BR')}
+                            </td>
+                            <td className="px-5 py-2.5 text-right tabular-nums text-slate-600">{fmtCurrency(m.totalPecas)}</td>
+                            <td className="px-5 py-2.5 text-right tabular-nums text-slate-600">{fmtCurrency(m.totalServicos)}</td>
+                            <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-slate-800">{fmtCurrency(m.totalOs)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-slate-200 bg-slate-50 font-bold">
+                        <td className="px-5 py-3 text-slate-800">Total</td>
+                        <td className="px-5 py-3 text-right tabular-nums text-slate-800">{totais.passagens.toLocaleString('pt-BR')}</td>
+                        <td className="px-5 py-3 text-right tabular-nums text-slate-800">{fmtCurrency(totais.totalPecas)}</td>
+                        <td className="px-5 py-3 text-right tabular-nums text-slate-800">{fmtCurrency(totais.totalServicos)}</td>
+                        <td className="px-5 py-3 text-right tabular-nums text-green-700">{fmtCurrency(totais.totalOs)}</td>
                       </tr>
                     </tfoot>
                   </table>
