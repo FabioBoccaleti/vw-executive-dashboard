@@ -81,10 +81,52 @@ export async function setCategorias(categorias: CategoriaOS[]): Promise<boolean>
 }
 
 // ─── Regra Departamentos (agrupamento de departamentos brutos) ───────────────
+
+/** Filtro de elegibilidade pela coluna Total OS. */
+export type FiltroValorOS = 'todas' | 'zero' | 'positivo';
+
+/** Como contar passagens dentro de um grupo. */
+export type ModoContagem = 'porDia' | 'porMes' | 'porOs';
+
+/** Regra de contagem de passagens de um grupo de departamento. */
+export interface RegraContagem {
+  filtroValor: FiltroValorOS;        // quais OS entram na contagem (Total OS)
+  modoContagem: ModoContagem;        // o que define "a mesma passagem"
+  considerarCategoria: boolean;      // categorias diferentes = passagens diferentes
+}
+
 export interface RegraDepartamento {
   id: string;
   nome: string;             // nome do grupo (ex. Oficina, Funilaria)
   departamentos: string[];  // nomeDepartamento brutos que compõem o grupo
+  contagem?: RegraContagem; // regra de contagem (opcional p/ retrocompatibilidade)
+}
+
+export function defaultRegraContagem(): RegraContagem {
+  return { filtroValor: 'todas', modoContagem: 'porDia', considerarCategoria: false };
+}
+
+/**
+ * Conta as passagens de um conjunto de linhas (já filtradas para o grupo)
+ * aplicando a regra de contagem. Função pura — reutilizável pela aba Análise.
+ */
+export function contarPassagensGrupo(rows: PassagemRow[], regra: RegraContagem): number {
+  const elegiveis = rows.filter(r => {
+    if (regra.filtroValor === 'zero') return (r.valTotalOs ?? 0) === 0;
+    if (regra.filtroValor === 'positivo') return (r.valTotalOs ?? 0) > 0;
+    return true;
+  });
+
+  if (regra.modoContagem === 'porOs') return elegiveis.length;
+
+  const chaves = new Set<string>();
+  for (const r of elegiveis) {
+    const partes = [r.chassi?.trim() ?? ''];
+    if (regra.modoContagem === 'porDia') partes.push(r.dtaEmissao?.trim() ?? '');
+    if (regra.considerarCategoria) partes.push(r.categoriaOs?.trim() ?? '');
+    chaves.add(partes.join('|'));
+  }
+  return chaves.size;
 }
 
 const REGRA_DEPARTAMENTOS_KEY = 'passagem_oficina_funilaria_vw_regra_departamentos';

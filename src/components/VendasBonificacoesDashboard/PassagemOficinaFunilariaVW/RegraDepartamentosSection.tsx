@@ -1,11 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Pencil, Trash2, Check, X, Plus, RefreshCw } from 'lucide-react';
+import { Pencil, Trash2, Check, X, Plus, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getRegrasDepartamentos,
   setRegrasDepartamentos,
   getDepartamentosDistintos,
+  defaultRegraContagem,
   type RegraDepartamento,
+  type RegraContagem,
+  type FiltroValorOS,
+  type ModoContagem,
 } from './passagemStorage';
 
 function newId(): string {
@@ -80,7 +84,7 @@ export function RegraDepartamentosSection() {
     if (grupos.some(g => g.nome.toLowerCase() === nome.toLowerCase())) {
       toast.error(`O grupo "${nome}" já existe.`); return;
     }
-    const ok = await persist([...grupos, { id: newId(), nome, departamentos: [] }]);
+    const ok = await persist([...grupos, { id: newId(), nome, departamentos: [], contagem: defaultRegraContagem() }]);
     if (ok) { setNovoNome(''); toast.success('Grupo criado.'); }
   };
 
@@ -117,6 +121,15 @@ export function RegraDepartamentosSection() {
           : [...g.departamentos, dep],
       };
     });
+    await persist(updated);
+  };
+
+  const updateContagem = async (grupoId: string, patch: Partial<RegraContagem>) => {
+    const updated = grupos.map(g =>
+      g.id === grupoId
+        ? { ...g, contagem: { ...(g.contagem ?? defaultRegraContagem()), ...patch } }
+        : g,
+    );
     await persist(updated);
   };
 
@@ -240,6 +253,90 @@ export function RegraDepartamentosSection() {
                 </div>
               )}
             </div>
+
+            {/* Regra de contagem de passagens */}
+            {(() => {
+              const regra: RegraContagem = grupo.contagem ?? defaultRegraContagem();
+              const filtroOpcoes: { value: FiltroValorOS; label: string }[] = [
+                { value: 'todas', label: 'Todas' },
+                { value: 'zero', label: 'Somente = R$ 0,00' },
+                { value: 'positivo', label: 'Somente > R$ 0,00' },
+              ];
+              const modoOpcoes: { value: ModoContagem; label: string; hint: string }[] = [
+                { value: 'porDia', label: '1 por dia', hint: 'OS no mesmo dia = 1 passagem' },
+                { value: 'porMes', label: '1 no mês', hint: 'Todo o chassi no mês = 1 passagem' },
+                { value: 'porOs', label: '1 por OS', hint: 'Cada OS conta como passagem' },
+              ];
+              return (
+                <div className="border-t bg-slate-50/60 px-4 py-3">
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">Regra de contagem</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                    {/* Filtro de valor */}
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-500 mb-1.5">Filtro de valor (Total OS)</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {filtroOpcoes.map(opt => (
+                          <button
+                            key={opt.value}
+                            onClick={() => updateContagem(grupo.id, { filtroValor: opt.value })}
+                            disabled={saving}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors disabled:opacity-50 ${
+                              regra.filtroValor === opt.value
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Modo de contagem */}
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-500 mb-1.5">Modo de contagem</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {modoOpcoes.map(opt => (
+                          <button
+                            key={opt.value}
+                            onClick={() => updateContagem(grupo.id, { modoContagem: opt.value })}
+                            disabled={saving}
+                            title={opt.hint}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors disabled:opacity-50 ${
+                              regra.modoContagem === opt.value
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {modoOpcoes.find(o => o.value === regra.modoContagem)?.hint}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Considerar categoria */}
+                  <label className={`inline-flex items-center gap-2 mt-3 text-[11px] ${regra.modoContagem === 'porOs' ? 'opacity-50' : 'cursor-pointer'}`}>
+                    <input
+                      type="checkbox"
+                      checked={regra.considerarCategoria}
+                      disabled={saving || regra.modoContagem === 'porOs'}
+                      onChange={e => updateContagem(grupo.id, { considerarCategoria: e.target.checked })}
+                      className="accent-blue-600"
+                    />
+                    <span className="text-slate-600 font-medium">Considerar categoria</span>
+                    <span className="text-slate-400">— categorias diferentes contam como passagens diferentes</span>
+                  </label>
+                </div>
+              );
+            })()}
           </div>
         ))}
       </div>
