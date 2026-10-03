@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
   PieChart, Pie, Cell,
 } from 'recharts';
-import { TableProperties, Users, Wrench, DollarSign, Package, CarFront } from 'lucide-react';
+import { TableProperties, Users, Wrench, DollarSign, Package, CarFront, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   getRegrasDepartamentos,
   getRegrasAnoChassi,
@@ -46,6 +46,7 @@ export function AnaliseSection() {
   const [metricaBar, setMetricaBar] = useState<'quantidade' | 'valor'>('quantidade');
   const [metricaAno, setMetricaAno] = useState<'quantidade' | 'valor'>('quantidade');
   const [showNaoId, setShowNaoId] = useState(false);
+  const [showAnoTable, setShowAnoTable] = useState(false);
 
   const [grupos, setGrupos] = useState<RegraDepartamento[]>([]);
   const [regrasAnoChassi, setRegrasAnoChassi] = useState<RegraAnoChassi[]>([]);
@@ -429,6 +430,15 @@ export function AnaliseSection() {
                   </BarChart>
                 </ResponsiveContainer>
 
+                <button
+                  onClick={() => setShowAnoTable(v => !v)}
+                  className="mt-4 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  {showAnoTable ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  {showAnoTable ? 'Ocultar detalhamento por ano' : 'Ver detalhamento por ano'}
+                </button>
+
+                {showAnoTable && (
                 <div className="overflow-x-auto mt-4">
                   <table className="w-full text-sm">
                     <thead>
@@ -478,6 +488,7 @@ export function AnaliseSection() {
                     </tfoot>
                   </table>
                 </div>
+                )}
               </>
             )}
           </div>
