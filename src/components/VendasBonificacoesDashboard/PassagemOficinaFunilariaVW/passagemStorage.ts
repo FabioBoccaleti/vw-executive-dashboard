@@ -185,6 +185,86 @@ export function analisarGrupos(rows: PassagemRow[], grupos: RegraDepartamento[])
   });
 }
 
+/** Resultado agregado por ano do veículo (derivado da Regra Ano / Chassi). */
+export interface AnoAnalise {
+  ano: string;            // "2020" ou "Não identificado"
+  anoNum: number;         // para ordenação (Infinity = não identificado)
+  passagens: number;
+  totalPecas: number;
+  totalServicos: number;
+  totalOs: number;
+}
+
+export const ANO_NAO_IDENTIFICADO = 'Não identificado';
+
+/**
+ * Agrega passagens e valores por ano do veículo, usando a Regra Ano / Chassi
+ * (posição 10 do chassi → ano). Aplica as mesmas regras por departamento
+ * (elegibilidade + modo de contagem). Chassis sem ano determinável caem no
+ * grupo "Não identificado".
+ */
+export function analisarPorAno(
+  rows: PassagemRow[],
+  grupos: RegraDepartamento[],
+  regrasAnoChassi: RegraAnoChassi[],
+): AnoAnalise[] {
+  const anoByLetra = new Map<string, number>();
+  for (const r of regrasAnoChassi) anoByLetra.set(r.letra.toUpperCase(), r.ano);
+
+  const anoDoChassi = (chassi: string): string => {
+    const c = (chassi ?? '').trim();
+    if (c.length < 10) return ANO_NAO_IDENTIFICADO;
+    const ano = anoByLetra.get(c.charAt(9).toUpperCase());
+    return ano != null ? String(ano) : ANO_NAO_IDENTIFICADO;
+  };
+
+  const acc = new Map<string, { passagens: number; totalPecas: number; totalServicos: number }>();
+  const ensure = (label: string) => {
+    let v = acc.get(label);
+    if (!v) { v = { passagens: 0, totalPecas: 0, totalServicos: 0 }; acc.set(label, v); }
+    return v;
+  };
+
+  for (const g of grupos) {
+    const regra = g.contagem ?? defaultRegraContagem();
+    const deps = new Set(g.departamentos);
+    const elegiveis = rows.filter(r => deps.has((r.nomeDepartamento ?? '').trim()) && osElegivel(r, regra));
+
+    // Valores por ano (soma de todas as OS elegíveis)
+    for (const r of elegiveis) {
+      const v = ensure(anoDoChassi(r.chassi));
+      v.totalPecas += (r.valTotalPecas ?? 0) - (r.descontoPeca ?? 0);
+      v.totalServicos += (r.valTotalServicos ?? 0) - (r.descontoServ ?? 0);
+    }
+
+    // Passagens por ano (dedup conforme o modo de contagem)
+    if (regra.modoContagem === 'porOs') {
+      for (const r of elegiveis) ensure(anoDoChassi(r.chassi)).passagens += 1;
+    } else {
+      const keyToLabel = new Map<string, string>();
+      for (const r of elegiveis) {
+        const partes = [r.chassi?.trim() ?? ''];
+        if (regra.modoContagem === 'porDia') partes.push(r.dtaEmissao?.trim() ?? '');
+        if (regra.considerarCategoria) partes.push(r.categoriaOs?.trim() ?? '');
+        const key = partes.join('|');
+        if (!keyToLabel.has(key)) keyToLabel.set(key, anoDoChassi(r.chassi));
+      }
+      for (const label of keyToLabel.values()) ensure(label).passagens += 1;
+    }
+  }
+
+  return [...acc.entries()]
+    .map(([ano, v]) => ({
+      ano,
+      anoNum: ano === ANO_NAO_IDENTIFICADO ? Number.POSITIVE_INFINITY : Number(ano),
+      passagens: v.passagens,
+      totalPecas: v.totalPecas,
+      totalServicos: v.totalServicos,
+      totalOs: v.totalPecas + v.totalServicos,
+    }))
+    .sort((a, b) => a.anoNum - b.anoNum);
+}
+
 const REGRA_DEPARTAMENTOS_KEY = 'passagem_oficina_funilaria_vw_regra_departamentos';
 
 export async function getRegrasDepartamentos(): Promise<RegraDepartamento[]> {
