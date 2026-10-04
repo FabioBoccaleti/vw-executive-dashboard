@@ -410,6 +410,162 @@ export function analisarPorModelo(rows: PassagemRow[], grupos: RegraDepartamento
 
 const REGRA_DEPARTAMENTOS_KEY = 'passagem_oficina_funilaria_vw_regra_departamentos';
 
+/** Linha agregada de OS por categoria (visão "OS por Categoria"). */
+export interface OsPorCategoria {
+  categoria: string;   // código da Categoria OS
+  qtdOs: number;       // OS com valor > 0
+  qtdOsZero: number;   // OS com valor == 0
+  valor: number;       // Total OS líquido (só das OS com valor > 0)
+}
+
+/** Linha agregada de OS por departamento (grupo). */
+export interface OsPorDepartamento {
+  departamento: string; // nome do grupo
+  qtdOs: number;
+  qtdOsZero: number;
+  valor: number;
+}
+
+/** Faturamento agregado por dia/mês (Dt. Encerramento), com peças e serviços. */
+export interface FaturamentoPonto {
+  rotulo: string;   // 'dd/mm/yyyy' (dia) ou 'mm/yyyy' (mês)
+  ordem: number;    // chave de ordenação
+  pecas: number;    // Peças líquido
+  servicos: number; // Serviços líquido
+  total: number;    // pecas + servicos
+  qtdOs: number;
+}
+
+export interface OsCategoriaResumo {
+  totalOs: number;        // OS com valor > 0
+  totalOsZero: number;    // OS com valor == 0
+  faturamento: number;    // Total OS líquido
+  porCategoria: OsPorCategoria[];
+  porDepartamento: OsPorDepartamento[];
+}
+
+const SEM_CATEGORIA = '(sem categoria)';
+
+function parseDataBR(s: string): { d: number; m: number; y: number } | null {
+  const mm = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((s ?? '').trim());
+  if (!mm) return null;
+  return { d: +mm[1], m: +mm[2], y: +mm[3] };
+}
+
+/**
+ * Agrega OS (brutas, sem dedup de passagem) considerando apenas departamentos
+ * agrupados e TODAS as categorias. As OS com Total OS = 0 saem da contagem/
+ * faturamento principal, mas têm sua quantidade registrada à parte (qtdOsZero).
+ * Valores são líquidos (Peças+Serviços abatido o desconto). O faturamento é
+ * agregado por dia (Dt. Encerramento) ou por mês quando agruparPorMes=true.
+ */
+export function analisarOsPorCategoria(
+  rows: PassagemRow[],
+  grupos: RegraDepartamento[],
+  agruparPorMes: boolean,
+): OsCategoriaResumo {
+  const grupoByDepto = new Map<string, string>();
+  for (const g of grupos) for (const d of g.departamentos) grupoByDepto.set(d, g.nome);
+
+  type Acc = { qtdOs: number; qtdOsZero: number; valor: number };
+  const catAcc = new Map<string, Acc>();
+  const depAcc = new Map<string, Acc>();
+  let totalOs = 0, totalOsZero = 0, faturamento = 0;
+
+  const ensure = (map: Map<string, Acc>, key: string) => {
+    let v = map.get(key);
+    if (!v) { v = { qtdOs: 0, qtdOsZero: 0, valor: 0 }; map.set(key, v); }
+    return v;
+  };
+
+  for (const r of rows) {
+    const grupoNome = grupoByDepto.get((r.nomeDepartamento ?? '').trim());
+    if (!grupoNome) continue; // só departamentos agrupados
+
+    const valOs = r.valTotalOs ?? 0;
+    const valor = (r.valTotalPecas ?? 0) - (r.descontoPeca ?? 0)
+                + (r.valTotalServicos ?? 0) - (r.descontoServ ?? 0);
+    const cat = (r.categoriaOs ?? '').trim() || SEM_CATEGORIA;
+    const c = ensure(catAcc, cat);
+    const d = ensure(depAcc, grupoNome);
+
+    if (valOs === 0) {
+      c.qtdOsZero += 1; d.qtdOsZero += 1; totalOsZero += 1;
+      continue;
+    }
+
+    c.qtdOs += 1; c.valor += valor;
+    d.qtdOs += 1; d.valor += valor;
+    totalOs += 1; faturamento += valor;
+  }
+
+  const sortCodigo = (a: string, b: string) => {
+    if (a === SEM_CATEGORIA) return 1;
+    if (b === SEM_CATEGORIA) return -1;
+    const na = Number(a), nb = Number(b);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a.localeCompare(b, 'pt-BR');
+  };
+
+  return {
+    totalOs,
+    totalOsZero,
+    faturamento,
+    porCategoria: [...catAcc.entries()]
+      .map(([categoria, v]) => ({ categoria, qtdOs: v.qtdOs, qtdOsZero: v.qtdOsZero, valor: v.valor }))
+      .sort((a, b) => sortCodigo(a.categoria, b.categoria)),
+    porDepartamento: [...depAcc.entries()]
+      .map(([departamento, v]) => ({ departamento, qtdOs: v.qtdOs, qtdOsZero: v.qtdOsZero, valor: v.valor }))
+      .sort((a, b) => b.qtdOs - a.qtdOs || a.departamento.localeCompare(b.departamento, 'pt-BR')),
+  };
+}
+
+/**
+ * Pontos de faturamento por dia (ou mês) a partir da Dt. Encerramento, separando
+ * Peças e Serviços (líquidos). Considera apenas departamentos agrupados e OS com
+ * valor > 0. Permite filtrar por um grupo de departamento e/ou por uma categoria
+ * (passe 'todos' para não filtrar).
+ */
+export function faturamentoPontos(
+  rows: PassagemRow[],
+  grupos: RegraDepartamento[],
+  agruparPorMes: boolean,
+  departamento: string = 'todos',
+  categoria: string = 'todos',
+): FaturamentoPonto[] {
+  const grupoByDepto = new Map<string, string>();
+  for (const g of grupos) for (const d of g.departamentos) grupoByDepto.set(d, g.nome);
+
+  const acc = new Map<string, { ordem: number; pecas: number; servicos: number; qtdOs: number }>();
+
+  for (const r of rows) {
+    const grupoNome = grupoByDepto.get((r.nomeDepartamento ?? '').trim());
+    if (!grupoNome) continue;
+    if (departamento !== 'todos' && grupoNome !== departamento) continue;
+    const cat = (r.categoriaOs ?? '').trim() || SEM_CATEGORIA;
+    if (categoria !== 'todos' && cat !== categoria) continue;
+    if ((r.valTotalOs ?? 0) === 0) continue;
+
+    const pecas = (r.valTotalPecas ?? 0) - (r.descontoPeca ?? 0);
+    const servicos = (r.valTotalServicos ?? 0) - (r.descontoServ ?? 0);
+
+    const p = parseDataBR(r.dtaEncerramento);
+    let rotulo: string, ordem: number;
+    if (p) {
+      if (agruparPorMes) { rotulo = `${String(p.m).padStart(2, '0')}/${p.y}`; ordem = p.y * 100 + p.m; }
+      else { rotulo = `${String(p.d).padStart(2, '0')}/${String(p.m).padStart(2, '0')}/${p.y}`; ordem = p.y * 10000 + p.m * 100 + p.d; }
+    } else { rotulo = 'Sem data'; ordem = Number.POSITIVE_INFINITY; }
+
+    let pt = acc.get(rotulo);
+    if (!pt) { pt = { ordem, pecas: 0, servicos: 0, qtdOs: 0 }; acc.set(rotulo, pt); }
+    pt.pecas += pecas; pt.servicos += servicos; pt.qtdOs += 1;
+  }
+
+  return [...acc.entries()]
+    .map(([rotulo, v]) => ({ rotulo, ordem: v.ordem, pecas: v.pecas, servicos: v.servicos, total: v.pecas + v.servicos, qtdOs: v.qtdOs }))
+    .sort((a, b) => a.ordem - b.ordem);
+}
+
 export async function getRegrasDepartamentos(): Promise<RegraDepartamento[]> {
   return (await kvGet<RegraDepartamento[]>(REGRA_DEPARTAMENTOS_KEY)) ?? [];
 }

@@ -3,23 +3,28 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
   PieChart, Pie, Cell,
 } from 'recharts';
-import { TableProperties, Users, Wrench, DollarSign, Package, CarFront, ChevronDown, ChevronUp } from 'lucide-react';
+import { TableProperties, Users, Wrench, DollarSign, Package, CarFront, ChevronDown, ChevronUp, LayoutGrid, Tags, Ban } from 'lucide-react';
 import {
   getRegrasDepartamentos,
   getRegrasAnoChassi,
+  getCategorias,
   getPassagensPeriodo,
   analisarGrupos,
   analisarPorAno,
   analisarPorModelo,
+  analisarOsPorCategoria,
+  faturamentoPontos,
   listarChassisNaoIdentificados,
   ANO_NAO_IDENTIFICADO,
   MODELO_NAO_INFORMADO,
   type RegraDepartamento,
   type RegraAnoChassi,
+  type CategoriaOS,
   type PassagemRow,
   type GrupoAnalise,
   type AnoAnalise,
   type ModeloAnalise,
+  type OsCategoriaResumo,
 } from './passagemStorage';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -46,6 +51,7 @@ export function AnaliseSection() {
   const [year, setYear] = useState<number>(now.getFullYear());
   const [periodo, setPeriodo] = useState<Periodo>(now.getMonth() + 1);
   const [vendedor, setVendedor] = useState<string>('todos');
+  const [subAba, setSubAba] = useState<'geral' | 'osCategoria'>('geral');
   const [metricaBar, setMetricaBar] = useState<'quantidade' | 'valor'>('quantidade');
   const [metricaAno, setMetricaAno] = useState<'quantidade' | 'valor'>('quantidade');
   const [metricaModelo, setMetricaModelo] = useState<'quantidade' | 'valor'>('quantidade');
@@ -55,12 +61,14 @@ export function AnaliseSection() {
 
   const [grupos, setGrupos] = useState<RegraDepartamento[]>([]);
   const [regrasAnoChassi, setRegrasAnoChassi] = useState<RegraAnoChassi[]>([]);
+  const [categoriasCadastro, setCategoriasCadastro] = useState<CategoriaOS[]>([]);
   const [rows, setRows] = useState<PassagemRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     getRegrasDepartamentos().then(setGrupos);
     getRegrasAnoChassi().then(setRegrasAnoChassi);
+    getCategorias().then(setCategoriasCadastro);
   }, []);
 
   const loadRows = useCallback(async (y: number, p: Periodo) => {
@@ -144,6 +152,12 @@ export function AnaliseSection() {
     [rowsFiltradas, gruposAtivos],
   );
 
+  const nomeCategoriaByCodigo = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of categoriasCadastro) map.set(c.codigo, c.categoria);
+    return map;
+  }, [categoriasCadastro]);
+
   const periodoLabel = periodo === 'ano' ? `Ano ${year}` : `${MONTHS[(periodo as number) - 1]}/${year}`;
 
   return (
@@ -214,6 +228,28 @@ export function AnaliseSection() {
         </div>
       ) : (
         <>
+          {/* ── Sub-abas ── */}
+          <div className="flex gap-1 bg-white rounded-xl border border-slate-200 shadow-sm p-1 w-fit">
+            <button
+              onClick={() => setSubAba('geral')}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                subAba === 'geral' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" /> Visão Geral
+            </button>
+            <button
+              onClick={() => setSubAba('osCategoria')}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                subAba === 'osCategoria' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <Tags className="w-4 h-4" /> OS por Categoria
+            </button>
+          </div>
+
+          {subAba === 'geral' && (
+          <>
           {/* ── Cards-resumo ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <SummaryCard icon={<TableProperties className="w-5 h-5" />} color="blue"
@@ -621,6 +657,17 @@ export function AnaliseSection() {
               </>
             )}
           </div>
+          </>
+          )}
+
+          {subAba === 'osCategoria' && (
+            <OsCategoriaView
+              rows={rowsFiltradas}
+              grupos={gruposAtivos}
+              agruparPorMes={periodo === 'ano'}
+              nomeCategoriaByCodigo={nomeCategoriaByCodigo}
+            />
+          )}
         </>
       )}
 
@@ -665,6 +712,252 @@ export function AnaliseSection() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function OsCategoriaView({
+  rows, grupos, agruparPorMes, nomeCategoriaByCodigo,
+}: {
+  rows: PassagemRow[];
+  grupos: RegraDepartamento[];
+  agruparPorMes: boolean;
+  nomeCategoriaByCodigo: Map<string, string>;
+}) {
+  const [metricaCat, setMetricaCat] = useState<'quantidade' | 'valor'>('quantidade');
+  const [metricaDep, setMetricaDep] = useState<'quantidade' | 'valor'>('quantidade');
+  const [showCatTable, setShowCatTable] = useState(true);
+  const [showDepTable, setShowDepTable] = useState(true);
+  const [fatDepto, setFatDepto] = useState<string>('todos');
+  const [fatCategoria, setFatCategoria] = useState<string>('todos');
+
+  const resumo: OsCategoriaResumo = useMemo(
+    () => analisarOsPorCategoria(rows, grupos, agruparPorMes),
+    [rows, grupos, agruparPorMes],
+  );
+
+  const fatPontos = useMemo(
+    () => faturamentoPontos(rows, grupos, agruparPorMes, fatDepto, fatCategoria),
+    [rows, grupos, agruparPorMes, fatDepto, fatCategoria],
+  );
+
+  const catChart = useMemo(
+    () => resumo.porCategoria.map(c => ({
+      rotulo: nomeCategoriaByCodigo.get(c.categoria) ? `${c.categoria} · ${nomeCategoriaByCodigo.get(c.categoria)}` : c.categoria,
+      qtdOs: c.qtdOs,
+      valor: c.valor,
+    })),
+    [resumo.porCategoria, nomeCategoriaByCodigo],
+  );
+
+  const semDados = resumo.totalOs === 0 && resumo.totalOsZero === 0;
+
+  return (
+    <>
+      {/* Cards-resumo */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <SummaryCard icon={<Tags className="w-5 h-5" />} color="blue"
+          label="Total de OS (valor > 0)" value={resumo.totalOs.toLocaleString('pt-BR')} sub="ordens de serviço" />
+        <SummaryCard icon={<DollarSign className="w-5 h-5" />} color="emerald"
+          label="Faturamento (líquido)" value={fmtCurrency(resumo.faturamento)} sub="Peças + Serviços" />
+        <SummaryCard icon={<Ban className="w-5 h-5" />} color="amber"
+          label="OS com R$ 0,00" value={resumo.totalOsZero.toLocaleString('pt-BR')} sub="fora da contagem" />
+      </div>
+
+      {semDados ? (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-10 text-center text-sm text-slate-400">
+          Sem OS no período (verifique departamentos agrupados e importação).
+        </div>
+      ) : (
+        <>
+          {/* Faturamento diário / mensal */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h3 className="text-sm font-bold text-slate-700">
+                Faturamento {agruparPorMes ? 'mensal' : 'diário'} <span className="font-normal text-slate-400">(por Dt. Encerramento)</span>
+              </h3>
+              <div className="flex items-center gap-2">
+                <select
+                  value={fatDepto}
+                  onChange={e => setFatDepto(e.target.value)}
+                  className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  <option value="todos">Todos os departamentos</option>
+                  {grupos.map(g => <option key={g.id} value={g.nome}>{g.nome}</option>)}
+                </select>
+                <select
+                  value={fatCategoria}
+                  onChange={e => setFatCategoria(e.target.value)}
+                  className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  <option value="todos">Todas as categorias</option>
+                  {resumo.porCategoria.map(c => (
+                    <option key={c.categoria} value={c.categoria}>
+                      {nomeCategoriaByCodigo.get(c.categoria) ? `${c.categoria} · ${nomeCategoriaByCodigo.get(c.categoria)}` : c.categoria}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {fatPontos.length === 0 ? (
+              <div className="h-[260px] flex items-center justify-center text-sm text-slate-400">
+                Sem faturamento para o filtro selecionado.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={fatPontos} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis dataKey="rotulo" tick={{ fontSize: 10, fill: '#64748b' }} interval="preserveStartEnd" angle={-40} textAnchor="end" height={50} />
+                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={fmtCompact} width={60} />
+                  <Tooltip
+                    formatter={(v: number) => fmtCurrency(v)}
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="pecas" name="Peças" stackId="f" fill="#f59e0b" />
+                  <Bar dataKey="servicos" name="Serviços" stackId="f" fill="#7c3aed" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* OS por categoria */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-700">OS por categoria</h3>
+              <MetricToggle value={metricaCat} onChange={setMetricaCat} />
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={catChart} margin={{ top: 5, right: 10, left: 0, bottom: 50 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <XAxis dataKey="rotulo" tick={{ fontSize: 10, fill: '#64748b' }} interval={0} angle={-30} textAnchor="end" height={60} />
+                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={v => (metricaCat === 'valor' ? fmtCompact(v) : String(v))} width={metricaCat === 'valor' ? 60 : 36} />
+                <Tooltip formatter={(v: number) => (metricaCat === 'valor' ? fmtCurrency(v) : v.toLocaleString('pt-BR'))} contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                <Bar dataKey={metricaCat === 'quantidade' ? 'qtdOs' : 'valor'} name={metricaCat === 'quantidade' ? 'Qtd OS' : 'Valor'} fill="#2563eb" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+
+            <CollapseButton open={showCatTable} onToggle={() => setShowCatTable(v => !v)} label="detalhamento por categoria" />
+            {showCatTable && (
+              <div className="overflow-x-auto mt-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50">
+                      <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500">Categoria</th>
+                      <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Qtd OS</th>
+                      <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Valor (líq.)</th>
+                      <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">OS R$ 0,00</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resumo.porCategoria.map(c => (
+                      <tr key={c.categoria} className="border-t border-slate-100 hover:bg-slate-50/60">
+                        <td className="px-5 py-2.5 text-slate-700 font-medium">
+                          {c.categoria}
+                          {nomeCategoriaByCodigo.get(c.categoria) && <span className="text-slate-400 font-normal"> · {nomeCategoriaByCodigo.get(c.categoria)}</span>}
+                        </td>
+                        <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-slate-700">{c.qtdOs.toLocaleString('pt-BR')}</td>
+                        <td className="px-5 py-2.5 text-right tabular-nums text-slate-600">{fmtCurrency(c.valor)}</td>
+                        <td className="px-5 py-2.5 text-right tabular-nums text-amber-600">{c.qtdOsZero.toLocaleString('pt-BR')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-slate-200 bg-slate-50 font-bold">
+                      <td className="px-5 py-3 text-slate-800">Total</td>
+                      <td className="px-5 py-3 text-right tabular-nums text-slate-800">{resumo.totalOs.toLocaleString('pt-BR')}</td>
+                      <td className="px-5 py-3 text-right tabular-nums text-blue-700">{fmtCurrency(resumo.faturamento)}</td>
+                      <td className="px-5 py-3 text-right tabular-nums text-amber-600">{resumo.totalOsZero.toLocaleString('pt-BR')}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* OS por departamento */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-700">OS por departamento</h3>
+              <MetricToggle value={metricaDep} onChange={setMetricaDep} />
+            </div>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={resumo.porDepartamento} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <XAxis dataKey="departamento" tick={{ fontSize: 11, fill: '#64748b' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={v => (metricaDep === 'valor' ? fmtCompact(v) : String(v))} width={metricaDep === 'valor' ? 60 : 36} />
+                <Tooltip formatter={(v: number) => (metricaDep === 'valor' ? fmtCurrency(v) : v.toLocaleString('pt-BR'))} contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                <Bar dataKey={metricaDep === 'quantidade' ? 'qtdOs' : 'valor'} name={metricaDep === 'quantidade' ? 'Qtd OS' : 'Valor'} fill="#7c3aed" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+
+            <CollapseButton open={showDepTable} onToggle={() => setShowDepTable(v => !v)} label="detalhamento por departamento" />
+            {showDepTable && (
+              <div className="overflow-x-auto mt-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50">
+                      <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500">Departamento</th>
+                      <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Qtd OS</th>
+                      <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Valor (líq.)</th>
+                      <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">OS R$ 0,00</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resumo.porDepartamento.map(d => (
+                      <tr key={d.departamento} className="border-t border-slate-100 hover:bg-slate-50/60">
+                        <td className="px-5 py-2.5 text-slate-700 font-medium">{d.departamento}</td>
+                        <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-slate-700">{d.qtdOs.toLocaleString('pt-BR')}</td>
+                        <td className="px-5 py-2.5 text-right tabular-nums text-slate-600">{fmtCurrency(d.valor)}</td>
+                        <td className="px-5 py-2.5 text-right tabular-nums text-amber-600">{d.qtdOsZero.toLocaleString('pt-BR')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-slate-200 bg-slate-50 font-bold">
+                      <td className="px-5 py-3 text-slate-800">Total</td>
+                      <td className="px-5 py-3 text-right tabular-nums text-slate-800">{resumo.totalOs.toLocaleString('pt-BR')}</td>
+                      <td className="px-5 py-3 text-right tabular-nums text-violet-700">{fmtCurrency(resumo.faturamento)}</td>
+                      <td className="px-5 py-3 text-right tabular-nums text-amber-600">{resumo.totalOsZero.toLocaleString('pt-BR')}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function MetricToggle({ value, onChange }: { value: 'quantidade' | 'valor'; onChange: (v: 'quantidade' | 'valor') => void }) {
+  return (
+    <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
+      <button
+        onClick={() => onChange('quantidade')}
+        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${value === 'quantidade' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}
+      >
+        Quantidade
+      </button>
+      <button
+        onClick={() => onChange('valor')}
+        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${value === 'valor' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}
+      >
+        Valor
+      </button>
+    </div>
+  );
+}
+
+function CollapseButton({ open, onToggle, label }: { open: boolean; onToggle: () => void; label: string }) {
+  return (
+    <button
+      onClick={onToggle}
+      className="mt-4 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+    >
+      {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+      {open ? `Ocultar ${label}` : `Ver ${label}`}
+    </button>
   );
 }
 
