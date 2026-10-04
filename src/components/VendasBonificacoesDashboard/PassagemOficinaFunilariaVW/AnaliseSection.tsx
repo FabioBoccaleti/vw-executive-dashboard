@@ -51,6 +51,7 @@ export function AnaliseSection() {
   const [year, setYear] = useState<number>(now.getFullYear());
   const [periodo, setPeriodo] = useState<Periodo>(now.getMonth() + 1);
   const [vendedor, setVendedor] = useState<string>('todos');
+  const [departamentoSel, setDepartamentoSel] = useState<string>('todos');
   const [subAba, setSubAba] = useState<'geral' | 'osCategoria'>('geral');
   const [metricaBar, setMetricaBar] = useState<'quantidade' | 'valor'>('quantidade');
   const [metricaAno, setMetricaAno] = useState<'quantidade' | 'valor'>('quantidade');
@@ -104,8 +105,21 @@ export function AnaliseSection() {
     [rows, vendedor],
   );
 
-  // Só grupos que têm ao menos um departamento associado
-  const gruposAtivos = useMemo(() => grupos.filter(g => g.departamentos.length > 0), [grupos]);
+  // Grupos que têm ao menos um departamento associado (opções do filtro)
+  const gruposComDeptos = useMemo(() => grupos.filter(g => g.departamentos.length > 0), [grupos]);
+
+  // Mantém "todos" se o departamento selecionado sumir
+  useEffect(() => {
+    if (departamentoSel !== 'todos' && !gruposComDeptos.some(g => g.id === departamentoSel)) {
+      setDepartamentoSel('todos');
+    }
+  }, [gruposComDeptos, departamentoSel]);
+
+  // Grupos efetivamente analisados (aplica o filtro de departamento)
+  const gruposAtivos = useMemo(
+    () => (departamentoSel === 'todos' ? gruposComDeptos : gruposComDeptos.filter(g => g.id === departamentoSel)),
+    [gruposComDeptos, departamentoSel],
+  );
 
   const analise: GrupoAnalise[] = useMemo(
     () => analisarGrupos(rowsFiltradas, gruposAtivos),
@@ -202,7 +216,16 @@ export function AnaliseSection() {
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
-            <Users className="w-4 h-4 text-slate-400" />
+            <LayoutGrid className="w-4 h-4 text-slate-400" />
+            <select
+              value={departamentoSel}
+              onChange={e => setDepartamentoSel(e.target.value)}
+              className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white max-w-[220px] focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <option value="todos">Todos os departamentos</option>
+              {gruposComDeptos.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
+            </select>
+            <Users className="w-4 h-4 text-slate-400 ml-1" />
             <select
               value={vendedor}
               onChange={e => setVendedor(e.target.value)}
