@@ -3,29 +3,35 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
   PieChart, Pie, Cell,
 } from 'recharts';
-import { TableProperties, Users, Wrench, DollarSign, Package, CarFront, ChevronDown, ChevronUp, LayoutGrid, Tags, Ban } from 'lucide-react';
+import { TableProperties, Users, Wrench, DollarSign, Package, CarFront, ChevronDown, ChevronUp, LayoutGrid, Tags, Ban, Layers, FolderTree } from 'lucide-react';
 import {
   getRegrasDepartamentos,
   getRegrasAnoChassi,
   getCategorias,
+  getSegmentos,
+  getSegmentacaoConfig,
   getPassagensPeriodo,
   getMesMaisRecenteComDados,
   analisarGrupos,
   analisarPorAno,
   analisarPorModelo,
   analisarOsPorCategoria,
+  analisarPorSegmento,
   faturamentoPontos,
   listarChassisNaoIdentificados,
   ANO_NAO_IDENTIFICADO,
   MODELO_NAO_INFORMADO,
+  SEGMENTO_SEM_SEGMENTO,
   type RegraDepartamento,
   type RegraAnoChassi,
   type CategoriaOS,
+  type Segmento,
   type PassagemRow,
   type GrupoAnalise,
   type AnoAnalise,
   type ModeloAnalise,
   type OsCategoriaResumo,
+  type SegmentoAnalise,
 } from './passagemStorage';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -53,7 +59,7 @@ export function AnaliseSection() {
   const [periodo, setPeriodo] = useState<Periodo>(now.getMonth() + 1);
   const [vendedor, setVendedor] = useState<string>('todos');
   const [departamentoSel, setDepartamentoSel] = useState<string>('todos');
-  const [subAba, setSubAba] = useState<'geral' | 'osCategoria'>('geral');
+  const [subAba, setSubAba] = useState<'geral' | 'osCategoria' | 'segmentacao'>('geral');
   const [metricaBar, setMetricaBar] = useState<'quantidade' | 'valor'>('quantidade');
   const [metricaAno, setMetricaAno] = useState<'quantidade' | 'valor'>('quantidade');
   const [metricaModelo, setMetricaModelo] = useState<'quantidade' | 'valor'>('quantidade');
@@ -64,6 +70,8 @@ export function AnaliseSection() {
   const [grupos, setGrupos] = useState<RegraDepartamento[]>([]);
   const [regrasAnoChassi, setRegrasAnoChassi] = useState<RegraAnoChassi[]>([]);
   const [categoriasCadastro, setCategoriasCadastro] = useState<CategoriaOS[]>([]);
+  const [segmentos, setSegmentos] = useState<Segmento[]>([]);
+  const [segmentacaoDeptIds, setSegmentacaoDeptIds] = useState<string[]>([]);
   const [rows, setRows] = useState<PassagemRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -71,6 +79,8 @@ export function AnaliseSection() {
     getRegrasDepartamentos().then(setGrupos);
     getRegrasAnoChassi().then(setRegrasAnoChassi);
     getCategorias().then(setCategoriasCadastro);
+    getSegmentos().then(setSegmentos);
+    getSegmentacaoConfig().then(c => setSegmentacaoDeptIds(c.departamentoIds));
     // Abre no mês mais recente que tem arquivo importado (qualquer ano)
     getMesMaisRecenteComDados().then(r => {
       if (r) { setYear(r.year); setPeriodo(r.month); }
@@ -177,6 +187,23 @@ export function AnaliseSection() {
     return map;
   }, [categoriasCadastro]);
 
+  // Departamentos considerados na segmentação (config global; vazio = nenhum)
+  const gruposSegmentacao = useMemo(() => {
+    if (segmentacaoDeptIds.length === 0) return [];
+    const set = new Set(segmentacaoDeptIds);
+    return gruposComDeptos.filter(g => set.has(g.id));
+  }, [gruposComDeptos, segmentacaoDeptIds]);
+
+  const departamentosSegmentacao = useMemo(
+    () => gruposSegmentacao.map(g => g.nome),
+    [gruposSegmentacao],
+  );
+
+  const segmentoData: SegmentoAnalise[] = useMemo(
+    () => analisarPorSegmento(rowsFiltradas, gruposSegmentacao, segmentos, regrasAnoChassi),
+    [rowsFiltradas, gruposSegmentacao, segmentos, regrasAnoChassi],
+  );
+
   const periodoLabel = periodo === 'ano' ? `Ano ${year}` : `${MONTHS[(periodo as number) - 1]}/${year}`;
 
   return (
@@ -273,6 +300,14 @@ export function AnaliseSection() {
               }`}
             >
               <Tags className="w-4 h-4" /> OS por Categoria
+            </button>
+            <button
+              onClick={() => setSubAba('segmentacao')}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                subAba === 'segmentacao' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <Layers className="w-4 h-4" /> Segmentação
             </button>
           </div>
 
@@ -696,6 +731,10 @@ export function AnaliseSection() {
               nomeCategoriaByCodigo={nomeCategoriaByCodigo}
             />
           )}
+
+          {subAba === 'segmentacao' && (
+            <SegmentacaoView data={segmentoData} segmentos={segmentos} periodoLabel={periodoLabel} departamentos={departamentosSegmentacao} />
+          )}
         </>
       )}
 
@@ -954,6 +993,222 @@ function OsCategoriaView({
           </div>
         </>
       )}
+    </>
+  );
+}
+
+function SegmentacaoView({
+  data, segmentos, periodoLabel, departamentos,
+}: {
+  data: SegmentoAnalise[];
+  segmentos: Segmento[];
+  periodoLabel: string;
+  departamentos: string[];
+}) {
+  const [metricaBar, setMetricaBar] = useState<'quantidade' | 'valor'>('quantidade');
+
+  const totais = useMemo(() => data.reduce(
+    (acc, s) => ({
+      passagens: acc.passagens + s.passagens,
+      totalOs: acc.totalOs + s.totalOs,
+      totalPecas: acc.totalPecas + s.totalPecas,
+      totalServicos: acc.totalServicos + s.totalServicos,
+    }),
+    { passagens: 0, totalOs: 0, totalPecas: 0, totalServicos: 0 },
+  ), [data]);
+
+  const chartData = useMemo(() => data.map(s => ({
+    nome: s.nome,
+    passagens: s.passagens,
+    totalOs: s.totalOs,
+    totalPecas: s.totalPecas,
+    totalServicos: s.totalServicos,
+  })), [data]);
+
+  const donutData = useMemo(() => chartData.filter(d => d.totalOs > 0), [chartData]);
+
+  if (segmentos.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-16">
+        <div className="text-center space-y-2">
+          <p className="text-lg font-semibold text-slate-700">Nenhum segmento configurado</p>
+          <p className="text-sm text-slate-400">
+            Crie segmentos em <strong>Cadastro → Segmentação</strong> para ver a análise.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* ── Faixa: departamentos considerados ── */}
+      {departamentos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+          <FolderTree className="w-4 h-4 text-blue-500 flex-shrink-0" />
+          <span className="text-sm text-slate-600">
+            Cálculo considerando {departamentos.length > 1 ? 'os departamentos' : 'o departamento'}:
+          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {departamentos.map((nome, i) => (
+              <span
+                key={nome}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-white rounded-full px-2.5 py-1"
+                style={{ backgroundColor: COLORS[i % COLORS.length] }}
+              >
+                {nome}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Cards-resumo ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <SummaryCard icon={<TableProperties className="w-5 h-5" />} color="blue"
+          label="Total de Passagens" value={totais.passagens.toLocaleString('pt-BR')} sub={periodoLabel} />
+        <SummaryCard icon={<DollarSign className="w-5 h-5" />} color="emerald"
+          label="Total OS (líquido)" value={fmtCurrency(totais.totalOs)} sub="Peças + Serviços" />
+        <SummaryCard icon={<Package className="w-5 h-5" />} color="amber"
+          label="Total Peças (líq.)" value={fmtCurrency(totais.totalPecas)} sub="abatido desconto" />
+        <SummaryCard icon={<Wrench className="w-5 h-5" />} color="violet"
+          label="Total Serviços (líq.)" value={fmtCurrency(totais.totalServicos)} sub="abatido desconto" />
+      </div>
+
+      {/* ── Gráficos ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Barras: passagens / valor por segmento */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-slate-700">
+              {metricaBar === 'quantidade' ? 'Passagens' : 'Total OS'} por segmento
+            </h3>
+            <MetricToggle value={metricaBar} onChange={setMetricaBar} />
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <XAxis dataKey="nome" tick={{ fontSize: 11, fill: '#64748b' }} />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#64748b' }}
+                tickFormatter={v => (metricaBar === 'valor' ? fmtCompact(v) : String(v))}
+                width={metricaBar === 'valor' ? 60 : 36}
+              />
+              <Tooltip
+                formatter={(v: number) => (metricaBar === 'valor' ? fmtCurrency(v) : v.toLocaleString('pt-BR'))}
+                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+              />
+              <Bar
+                dataKey={metricaBar === 'quantidade' ? 'passagens' : 'totalOs'}
+                name={metricaBar === 'quantidade' ? 'Passagens' : 'Total OS'}
+                radius={[6, 6, 0, 0]}
+              >
+                {chartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Pizza/donut: participação no Total OS */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <h3 className="text-sm font-bold text-slate-700 mb-4">Participação no Total OS</h3>
+          {donutData.length === 0 ? (
+            <div className="h-[280px] flex items-center justify-center text-sm text-slate-400">
+              Sem valores no período.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={donutData}
+                  dataKey="totalOs"
+                  nameKey="nome"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={2}
+                >
+                  {donutData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip
+                  formatter={(v: number) => fmtCurrency(v)}
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Barras empilhadas: Peças x Serviços por segmento */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 lg:col-span-2">
+          <h3 className="text-sm font-bold text-slate-700 mb-4">Peças × Serviços (líquidos) por segmento</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <XAxis dataKey="nome" tick={{ fontSize: 11, fill: '#64748b' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={fmtCompact} width={60} />
+              <Tooltip
+                formatter={(v: number) => fmtCurrency(v)}
+                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="totalPecas" name="Peças" stackId="v" fill="#f59e0b" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="totalServicos" name="Serviços" stackId="v" fill="#7c3aed" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* ── Tabela de detalhe ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100">
+          <h3 className="text-sm font-bold text-slate-700">Detalhe por segmento</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50">
+                <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500">Segmento</th>
+                <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500">Anos</th>
+                <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Passagens</th>
+                <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Total Peças</th>
+                <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Total Serviços</th>
+                <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Total OS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map(s => {
+                const isSem = s.id === SEGMENTO_SEM_SEGMENTO;
+                return (
+                  <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/60">
+                    <td className="px-5 py-2.5 font-medium text-slate-700">
+                      {isSem ? <span className="text-slate-400">{s.nome}</span> : s.nome}
+                    </td>
+                    <td className="px-5 py-2.5 text-slate-500 text-xs">
+                      {s.anos.length ? s.anos.join(', ') : '—'}
+                    </td>
+                    <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-slate-700">{s.passagens.toLocaleString('pt-BR')}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums text-slate-600">{fmtCurrency(s.totalPecas)}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums text-slate-600">{fmtCurrency(s.totalServicos)}</td>
+                    <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-slate-800">{fmtCurrency(s.totalOs)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-slate-50 font-bold">
+                <td className="px-5 py-3 text-slate-800" colSpan={2}>Total</td>
+                <td className="px-5 py-3 text-right tabular-nums text-slate-800">{totais.passagens.toLocaleString('pt-BR')}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-slate-800">{fmtCurrency(totais.totalPecas)}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-slate-800">{fmtCurrency(totais.totalServicos)}</td>
+                <td className="px-5 py-3 text-right tabular-nums text-blue-700">{fmtCurrency(totais.totalOs)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
     </>
   );
 }

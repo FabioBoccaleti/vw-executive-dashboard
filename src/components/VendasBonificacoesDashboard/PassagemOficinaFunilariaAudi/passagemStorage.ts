@@ -64,6 +64,52 @@ export async function setRegrasAnoChassi(regras: RegraAnoChassi[]): Promise<bool
   return kvSet(REGRA_ANO_CHASSI_KEY, regras);
 }
 
+/**
+ * Lista os anos de veículo distintos já cadastrados na Regra Ano / Chassi,
+ * ordenados crescentemente. Base para a seleção de anos na Segmentação.
+ */
+export async function getAnosCadastrados(): Promise<number[]> {
+  const regras = await getRegrasAnoChassi();
+  const set = new Set<number>();
+  for (const r of regras) if (Number.isFinite(r.ano)) set.add(r.ano);
+  return [...set].sort((a, b) => a - b);
+}
+
+// ─── Segmentação (agrupamento de anos de veículo em segmentos) ───────────────
+export interface Segmento {
+  id: string;
+  nome: string;      // nome do segmento (ex. "Segmento 1")
+  anos: number[];    // anos de veículo que compõem o segmento (exclusivos entre segmentos)
+}
+
+const SEGMENTACAO_KEY = 'passagem_oficina_funilaria_audi_segmentacao';
+
+export async function getSegmentos(): Promise<Segmento[]> {
+  return (await kvGet<Segmento[]>(SEGMENTACAO_KEY)) ?? [];
+}
+
+export async function setSegmentos(segmentos: Segmento[]): Promise<boolean> {
+  return kvSet(SEGMENTACAO_KEY, segmentos);
+}
+
+/**
+ * Configuração global da Segmentação. `departamentoIds` lista os ids dos grupos
+ * de "Regra Departamentos" considerados no cálculo; vazio = todos os grupos.
+ */
+export interface SegmentacaoConfig {
+  departamentoIds: string[];
+}
+
+const SEGMENTACAO_CONFIG_KEY = 'passagem_oficina_funilaria_audi_segmentacao_config';
+
+export async function getSegmentacaoConfig(): Promise<SegmentacaoConfig> {
+  return (await kvGet<SegmentacaoConfig>(SEGMENTACAO_CONFIG_KEY)) ?? { departamentoIds: [] };
+}
+
+export async function setSegmentacaoConfig(config: SegmentacaoConfig): Promise<boolean> {
+  return kvSet(SEGMENTACAO_CONFIG_KEY, config);
+}
+
 // ─── Categoria (de-para código → categoria) ──────────────────────────────────
 export interface CategoriaOS {
   id: string;
@@ -264,6 +310,117 @@ export function analisarPorAno(
       totalOs: v.totalPecas + v.totalServicos,
     }))
     .sort((a, b) => a.anoNum - b.anoNum);
+}
+
+/** Resultado agregado por segmento (grupo de anos de veículo). */
+export interface SegmentoAnalise {
+  id: string;             // id do segmento, ou SEGMENTO_SEM_SEGMENTO
+  nome: string;           // nome do segmento, ou "Sem segmento"
+  anos: number[];         // anos que compõem o segmento
+  passagens: number;
+  totalPecas: number;
+  totalServicos: number;
+  totalOs: number;
+}
+
+export const SEGMENTO_SEM_SEGMENTO = 'sem-segmento';
+export const SEGMENTO_SEM_SEGMENTO_LABEL = 'Sem segmento';
+
+/**
+ * Agrega passagens e valores por segmento de ano do veículo. O ano vem da
+ * Regra Ano / Chassi (posição 10 → ano) e cada ano é mapeado para o segmento
+ * que o contém (Cadastro → Segmentação). Aplica as mesmas regras por
+ * departamento (elegibilidade + modo de contagem). Veículos cujo ano não está
+ * em nenhum segmento (ou sem ano determinável) caem em "Sem segmento".
+ *
+ * Retorna uma linha por segmento cadastrado (mesmo zerado) e, quando houver
+ * dados, também a linha "Sem segmento".
+ */
+export function analisarPorSegmento(
+  rows: PassagemRow[],
+  grupos: RegraDepartamento[],
+  segmentos: Segmento[],
+  regrasAnoChassi: RegraAnoChassi[],
+): SegmentoAnalise[] {
+  const anoByLetra = new Map<string, number>();
+  for (const r of regrasAnoChassi) anoByLetra.set(r.letra.toUpperCase(), r.ano);
+
+  const anoDoChassi = (chassi: string): number | null => {
+    const c = (chassi ?? '').trim();
+    if (c.length < 10) return null;
+    return anoByLetra.get(c.charAt(9).toUpperCase()) ?? null;
+  };
+
+  // ano → id do segmento
+  const segByAno = new Map<number, string>();
+  for (const s of segmentos) for (const ano of s.anos) segByAno.set(ano, s.id);
+
+  const segDoChassi = (chassi: string): string => {
+    const ano = anoDoChassi(chassi);
+    if (ano == null) return SEGMENTO_SEM_SEGMENTO;
+    return segByAno.get(ano) ?? SEGMENTO_SEM_SEGMENTO;
+  };
+
+  const acc = new Map<string, { passagens: number; totalPecas: number; totalServicos: number }>();
+  const ensure = (id: string) => {
+    let v = acc.get(id);
+    if (!v) { v = { passagens: 0, totalPecas: 0, totalServicos: 0 }; acc.set(id, v); }
+    return v;
+  };
+
+  for (const g of grupos) {
+    const regra = g.contagem ?? defaultRegraContagem();
+    const deps = new Set(g.departamentos);
+    const elegiveis = rows.filter(r => deps.has((r.nomeDepartamento ?? '').trim()) && osElegivel(r, regra));
+
+    for (const r of elegiveis) {
+      const v = ensure(segDoChassi(r.chassi));
+      v.totalPecas += (r.valTotalPecas ?? 0) - (r.descontoPeca ?? 0);
+      v.totalServicos += (r.valTotalServicos ?? 0) - (r.descontoServ ?? 0);
+    }
+
+    if (regra.modoContagem === 'porOs') {
+      for (const r of elegiveis) ensure(segDoChassi(r.chassi)).passagens += 1;
+    } else {
+      const keyToLabel = new Map<string, string>();
+      for (const r of elegiveis) {
+        const partes = [r.chassi?.trim() ?? ''];
+        if (regra.modoContagem === 'porDia') partes.push(r.dtaEmissao?.trim() ?? '');
+        if (regra.considerarCategoria) partes.push(r.categoriaOs?.trim() ?? '');
+        const key = partes.join('|');
+        if (!keyToLabel.has(key)) keyToLabel.set(key, segDoChassi(r.chassi));
+      }
+      for (const label of keyToLabel.values()) ensure(label).passagens += 1;
+    }
+  }
+
+  const result: SegmentoAnalise[] = segmentos.map(s => {
+    const v = acc.get(s.id) ?? { passagens: 0, totalPecas: 0, totalServicos: 0 };
+    return {
+      id: s.id,
+      nome: s.nome,
+      anos: [...s.anos].sort((a, b) => a - b),
+      passagens: v.passagens,
+      totalPecas: v.totalPecas,
+      totalServicos: v.totalServicos,
+      totalOs: v.totalPecas + v.totalServicos,
+    };
+  });
+
+  const sem = acc.get(SEGMENTO_SEM_SEGMENTO);
+  if (sem && (sem.passagens > 0 || sem.totalPecas !== 0 || sem.totalServicos !== 0)) {
+    result.push({
+      id: SEGMENTO_SEM_SEGMENTO,
+      nome: SEGMENTO_SEM_SEGMENTO_LABEL,
+      anos: [],
+      passagens: sem.passagens,
+      totalPecas: sem.totalPecas,
+      totalServicos: sem.totalServicos,
+      totalOs: sem.totalPecas + sem.totalServicos,
+    });
+  }
+
+  return result;
 }
 
 /** Um chassi que caiu no grupo "Não identificado" (sem ano determinável). */

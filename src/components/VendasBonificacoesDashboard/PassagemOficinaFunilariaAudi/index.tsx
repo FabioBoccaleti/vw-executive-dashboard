@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from 'react';
-import { TableProperties, Upload, BookOpen, Ruler, BarChart2, ListChecks, Tag, FolderTree } from 'lucide-react';
+import { TableProperties, Upload, BookOpen, Ruler, BarChart2, ListChecks, Tag, FolderTree, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogFooter,
@@ -9,6 +9,7 @@ import { getPassagemMes, setPassagemMes, type PassagemRow } from './passagemStor
 import { RegraAnoChassiSection } from './RegraAnoChassiSection';
 import { CategoriaSection } from './CategoriaSection';
 import { RegraDepartamentosSection } from './RegraDepartamentosSection';
+import { SegmentacaoSection } from './SegmentacaoSection';
 import { AnaliseSection } from './AnaliseSection';
 
 interface Props {
@@ -122,12 +123,13 @@ function fmtCurrency(n: number): string {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-type CadastroSectionId = 'regraAnoChassi' | 'categoria' | 'regraDepartamentos';
+type CadastroSectionId = 'regraAnoChassi' | 'categoria' | 'regraDepartamentos' | 'segmentacao';
 interface CadastroMenuItem { id: CadastroSectionId; label: string; description: string; icon: React.ReactNode; }
 const CADASTRO_MENU: CadastroMenuItem[] = [
   { id: 'regraAnoChassi', label: 'Regra Ano / Chassi', description: 'Regras por ano e chassi', icon: <Ruler className="w-5 h-5" /> },
   { id: 'categoria', label: 'Categoria', description: 'Categorias de OS', icon: <Tag className="w-5 h-5" /> },
   { id: 'regraDepartamentos', label: 'Regra Departamentos', description: 'Agrupamento de departamentos', icon: <FolderTree className="w-5 h-5" /> },
+  { id: 'segmentacao', label: 'Segmentação', description: 'Agrupamento de anos em segmentos', icon: <Layers className="w-5 h-5" /> },
 ];
 
 export function PassagemOficinaFunilariaAudiDashboard({ onBack }: Props) {
@@ -528,6 +530,8 @@ export function PassagemOficinaFunilariaAudiDashboard({ onBack }: Props) {
               {cadastroSection === 'categoria' && <CategoriaSection />}
 
               {cadastroSection === 'regraDepartamentos' && <RegraDepartamentosSection />}
+
+              {cadastroSection === 'segmentacao' && <SegmentacaoSection />}
             </div>
           </main>
         </div>
