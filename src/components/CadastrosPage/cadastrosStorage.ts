@@ -376,3 +376,49 @@ export async function loadSignDriveTiposVenda(): Promise<TipoVendaSignDrive[]> {
 export async function saveSignDriveTiposVenda(items: TipoVendaSignDrive[]): Promise<boolean> {
   return kvSet(KEY_SIGNDRIVE_TIPOS_VENDA, items);
 }
+
+// ── Sign&Drive: Regras de Remuneração ─────────────────────────────────────────
+const KEY_SIGNDRIVE_REGRAS = 'signdrive_cadastro_regras';
+
+/** Faixa por quantidade de vendas: de–até (vazio = "em diante") → valor. */
+export interface FaixaQtdSignDrive {
+  id: string;
+  de: string;    // quantidade mínima de vendas
+  ate: string;   // quantidade máxima ('' = em diante)
+  valor: string; // % (comissão) ou % / R$ (prêmio), conforme a unidade
+}
+
+export type ComissaoModoSignDrive = 'fixa' | 'faixas';
+export type PremioModoSignDrive = 'fixo' | 'faixas';
+export type PremioUnidadeSignDrive = 'percentual' | 'valor'; // % ou R$
+
+/**
+ * Regra de remuneração do Sign&Drive, associada a um cargo.
+ * Pode conter Comissão (sempre em %) e/ou Prêmio (em % ou R$).
+ * O cálculo que combina esses parâmetros será definido posteriormente.
+ */
+export interface RegraRemuneracaoSignDrive {
+  id: string;
+  nome: string;
+  cargo: string; // CargoVendedor
+
+  // Comissão (sempre em %)
+  comissaoAtiva: boolean;
+  comissaoModo: ComissaoModoSignDrive;  // 'fixa' | 'faixas'
+  comissaoPercentual: string;           // usado quando 'fixa'
+  comissaoFaixas: FaixaQtdSignDrive[];  // usado quando 'faixas' (valor = %)
+
+  // Prêmio (unidade selecionável: % ou R$)
+  premioAtivo: boolean;
+  premioModo: PremioModoSignDrive;      // 'fixo' | 'faixas'
+  premioUnidade: PremioUnidadeSignDrive; // 'percentual' | 'valor'
+  premioValor: string;                  // usado quando 'fixo'
+  premioFaixas: FaixaQtdSignDrive[];    // usado quando 'faixas'
+}
+
+export async function loadSignDriveRegras(): Promise<RegraRemuneracaoSignDrive[]> {
+  return (await kvGet<RegraRemuneracaoSignDrive[]>(KEY_SIGNDRIVE_REGRAS)) ?? [];
+}
+export async function saveSignDriveRegras(items: RegraRemuneracaoSignDrive[]): Promise<boolean> {
+  return kvSet(KEY_SIGNDRIVE_REGRAS, items);
+}

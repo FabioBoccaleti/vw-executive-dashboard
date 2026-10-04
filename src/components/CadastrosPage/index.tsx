@@ -26,6 +26,7 @@ import { EsteticaSalariosFixosSection } from './sections/EsteticaSalariosFixosSe
 import { SignDriveVeiculosSection } from './sections/SignDriveVeiculosSection';
 import { SignDriveVendedoresSection } from './sections/SignDriveVendedoresSection';
 import { SignDriveTipoVendaSection } from './sections/SignDriveTipoVendaSection';
+import { SignDriveRegrasSection } from './sections/SignDriveRegrasSection';
 
 type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos' | 'aliquotas' | 'dsr' | 'salariosFixos' | 'tipoVenda';
 
@@ -188,12 +189,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
             {isAssinatura && activeSection === 'veiculos'             && <SignDriveVeiculosSection />}
             {isAssinatura && activeSection === 'vendedores'           && <SignDriveVendedoresSection />}
             {isAssinatura && activeSection === 'tipoVenda'            && <SignDriveTipoVendaSection />}
-            {isAssinatura && activeSection === 'regras'               && (
-              <div className="text-center space-y-3 py-16">
-                <p className="text-lg font-semibold text-slate-700">Em desenvolvimento</p>
-                <p className="text-sm text-slate-400">As regras de remuneração estarão disponíveis em breve.</p>
-              </div>
-            )}
+            {isAssinatura && activeSection === 'regras'               && <SignDriveRegrasSection />}
           </div>
         </main>
       </div>
