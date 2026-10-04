@@ -21,6 +21,7 @@ interface ColDef { key: string; label: string; type: ColType; width: number; }
 const COLUMNS: ColDef[] = [
   { key: 'dataRegistro',            label: 'Registro da Venda',            type: 'date',     width: 140 },
   { key: 'dataVenda',               label: 'Data da Venda',                type: 'date',     width: 130 },
+  { key: 'numeroPedido',            label: 'Número do Pedido',             type: 'text',     width: 150 },
   { key: 'cliente',                 label: 'Cliente',                      type: 'text',     width: 185 },
   { key: 'tipoVenda',              label: 'Produto',                      type: 'text',     width: 150 },
   { key: 'veiculo',                 label: 'Veículo',                      type: 'text',     width: 160 },
@@ -68,18 +69,21 @@ function isoToBR(iso: string): string { if (!iso) return ''; const [y, m, d] = i
 function brToISO(br: string): string { if (!br) return ''; const [d, m, y] = br.split('/'); return d && m && y ? `${y}-${m}-${d}` : ''; }
 
 type RegisterDraft = {
-  dataVenda: string; cliente: string; produto: string; veiculo: string;
+  dataVenda: string; numeroPedido: string; cliente: string; produto: string; veiculo: string;
   chassi: string; placa: string; vendedor: string; valorContrato: string;
   pctComissaoVendaOverride: string;
 };
 const emptyDraft = (): RegisterDraft => ({
-  dataVenda: todayISO(), cliente: '', produto: '', veiculo: '',
+  dataVenda: todayISO(), numeroPedido: '', cliente: '', produto: '', veiculo: '',
   chassi: '', placa: '', vendedor: '', valorContrato: '',
   pctComissaoVendaOverride: '',
 });
 
 // Produto que permite alterar o % de comissão da venda no registro (desconto)
 const PRODUTO_COMISSAO_EDITAVEL = 'Sign and Drive Empresas';
+// Produto em que o Número do Pedido e o Chassi não são obrigatórios.
+// Comparação robusta (ignora maiúsculas/minúsculas e espaços) com o produto cadastrado.
+const isEmNegociacao = (produto: string): boolean => (produto ?? '').trim().toLowerCase().startsWith('em negocia');
 
 // ─── Zona de inserção de linha (hover entre as linhas) ─────────────────────
 function InsertZoneRow({ colSpan, onInsert }: { colSpan: number; onInsert: () => void }) {
@@ -252,13 +256,13 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
 
   // Edição inline
   type EditDraft = {
-    dataVenda: string; cliente: string; produto: string; veiculo: string;
+    dataVenda: string; numeroPedido: string; cliente: string; produto: string; veiculo: string;
     chassi: string; placa: string; vendedor: string; valorContrato: string;
     dataEntrega: string; nfComissao: string;
   };
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft>({
-    dataVenda: '', cliente: '', produto: '', veiculo: '', chassi: '', placa: '', vendedor: '', valorContrato: '', dataEntrega: '', nfComissao: '',
+    dataVenda: '', numeroPedido: '', cliente: '', produto: '', veiculo: '', chassi: '', placa: '', vendedor: '', valorContrato: '', dataEntrega: '', nfComissao: '',
   });
 
   // Edição das comissões (com senha)
@@ -319,8 +323,17 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   };
 
   const registerVenda = async () => {
-    if (!draft.cliente.trim() || !draft.produto || !draft.veiculo || !draft.chassi.trim() || !draft.vendedor || !draft.valorContrato.trim()) {
-      toast.error('Preencha Cliente, Produto, Veículo, Chassi, Vendedor e Valor do Contrato.');
+    const emNegociacao = isEmNegociacao(draft.produto);
+    if (!draft.cliente.trim() || !draft.produto || !draft.veiculo || !draft.vendedor || !draft.valorContrato.trim()) {
+      toast.error('Preencha Cliente, Produto, Veículo, Vendedor e Valor do Contrato.');
+      return;
+    }
+    if (!emNegociacao && !draft.chassi.trim()) {
+      toast.error('Informe o Chassi.');
+      return;
+    }
+    if (!emNegociacao && !draft.numeroPedido.trim()) {
+      toast.error('Informe o Número do Pedido.');
       return;
     }
     const valor = parseBR(draft.valorContrato);
@@ -328,6 +341,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       id: crypto.randomUUID(),
       dataRegistro: todayBR(),
       dataVenda: isoToBR(draft.dataVenda) || todayBR(),
+      numeroPedido: draft.numeroPedido.trim(),
       cliente: draft.cliente.trim(),
       tipoVenda: draft.produto,
       veiculo: draft.veiculo,
@@ -448,6 +462,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     setEditingId(row.id);
     setEditDraft({
       dataVenda: brToISO(row.dataVenda),
+      numeroPedido: row.numeroPedido ?? '',
       cliente: row.cliente,
       produto: row.tipoVenda,
       veiculo: row.veiculo,
@@ -462,14 +477,24 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
 
   const saveEditRow = async () => {
     if (!editingId) return;
-    if (!editDraft.cliente.trim() || !editDraft.produto || !editDraft.veiculo || !editDraft.chassi.trim() || !editDraft.vendedor || !editDraft.valorContrato.trim()) {
-      toast.error('Preencha Cliente, Produto, Veículo, Chassi, Vendedor e Valor do Contrato.');
+    const emNegociacao = isEmNegociacao(editDraft.produto);
+    if (!editDraft.cliente.trim() || !editDraft.produto || !editDraft.veiculo || !editDraft.vendedor || !editDraft.valorContrato.trim()) {
+      toast.error('Preencha Cliente, Produto, Veículo, Vendedor e Valor do Contrato.');
+      return;
+    }
+    if (!emNegociacao && !editDraft.chassi.trim()) {
+      toast.error('Informe o Chassi.');
+      return;
+    }
+    if (!emNegociacao && !editDraft.numeroPedido.trim()) {
+      toast.error('Informe o Número do Pedido.');
       return;
     }
     const valor = parseBR(editDraft.valorContrato);
     const updated = rows.map(r => r.id === editingId ? {
       ...r,
       dataVenda: isoToBR(editDraft.dataVenda) || r.dataVenda,
+      numeroPedido: editDraft.numeroPedido.trim(),
       cliente: editDraft.cliente.trim(),
       tipoVenda: editDraft.produto,
       veiculo: editDraft.veiculo,
@@ -569,6 +594,8 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     switch (col.key) {
       case 'dataVenda':
         return <input type="date" value={editDraft.dataVenda} onChange={e => setEditDraft(p => ({ ...p, dataVenda: e.target.value }))} className={editInputClass} />;
+      case 'numeroPedido':
+        return <input type="text" value={editDraft.numeroPedido} onChange={e => setEditDraft(p => ({ ...p, numeroPedido: e.target.value }))} className={editInputClass} />;
       case 'cliente':
         return <input type="text" value={editDraft.cliente} onChange={e => setEditDraft(p => ({ ...p, cliente: e.target.value }))} className={editInputClass} />;
       case 'tipoVenda':
@@ -934,6 +961,10 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                 <input type="date" value={draft.dataVenda} onChange={e => setDraft(p => ({ ...p, dataVenda: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </div>
               <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-600">Número do Pedido {!isEmNegociacao(draft.produto) && <span className="text-red-500">*</span>}</label>
+                <input type="text" value={draft.numeroPedido} onChange={e => setDraft(p => ({ ...p, numeroPedido: e.target.value }))} placeholder="Ex: 123456" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              </div>
+              <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-600">Cliente <span className="text-red-500">*</span></label>
                 <input type="text" value={draft.cliente} onChange={e => setDraft(p => ({ ...p, cliente: e.target.value }))} placeholder="Nome do cliente" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </div>
@@ -952,7 +983,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-slate-600">Chassi <span className="text-red-500">*</span></label>
+                <label className="text-xs font-semibold text-slate-600">Chassi {!isEmNegociacao(draft.produto) && <span className="text-red-500">*</span>}</label>
                 <input type="text" value={draft.chassi} onChange={e => setDraft(p => ({ ...p, chassi: e.target.value }))} placeholder="Ex: 9BWZZZ377VT004251" className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </div>
               <div className="flex flex-col gap-1">

@@ -6,6 +6,7 @@ export interface AssinaturaRow {
   id: string;
   dataRegistro: string;
   dataVenda: string;
+  numeroPedido: string;
   cliente: string;
   tipoVenda: string;
   veiculo: string;
