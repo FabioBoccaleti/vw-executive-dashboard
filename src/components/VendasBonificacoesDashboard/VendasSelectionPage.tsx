@@ -13,6 +13,8 @@ const ESTETICA_SUBS: VendasSubModuleId[] = ['estetica.tabela', 'estetica.analise
 const ASSINATURA_SUBS: VendasSubModuleId[] = ['assinatura_signdrive.tabela', 'assinatura_signdrive.analise', 'assinatura_signdrive.cadastro'];
 const FINANCIAMENTO_BV_SUBS: VendasSubModuleId[] = ['financiamento_bv.vendas', 'financiamento_bv.acelera', 'financiamento_bv.cadastro'];
 const VPECAS_COND_SUBS: VendasSubModuleId[] = ['vpecas_cond.relatorios', 'vpecas_cond.resumo'];
+const PASSAGEM_VW_SUBS: VendasSubModuleId[] = ['passagem_vw.cadastro', 'passagem_vw.passagens', 'passagem_vw.situacoes', 'passagem_vw.analise'];
+const PASSAGEM_AUDI_SUBS: VendasSubModuleId[] = ['passagem_audi.cadastro', 'passagem_audi.passagens', 'passagem_audi.situacoes', 'passagem_audi.analise'];
 
 interface VendasSelectionPageProps {
   onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi') => void;
@@ -27,6 +29,8 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
   const canAssinatura = isAdmin() || ASSINATURA_SUBS.some(s => canAccessVendasSub(s));
   const canFinanciamentoBV = isAdmin() || FINANCIAMENTO_BV_SUBS.some(s => canAccessVendasSub(s));
   const canVPecasCond     = isAdmin() || VPECAS_COND_SUBS.some(s => canAccessVendasSub(s));
+  const canPassagemVW     = isAdmin() || PASSAGEM_VW_SUBS.some(s => canAccessVendasSub(s));
+  const canPassagemAudi   = isAdmin() || PASSAGEM_AUDI_SUBS.some(s => canAccessVendasSub(s));
 
 
 
@@ -199,6 +203,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
           </button>
 
           {/* Card — Passagem Oficina e Funilaria VW */}
+          {canPassagemVW && (
           <button
             onClick={() => onSelect('passagem-oficina-funilaria-vw')}
             className="w-56 bg-white rounded-2xl border-2 border-rose-400 shadow-md hover:shadow-xl hover:border-rose-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
@@ -212,8 +217,10 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
               </h2>
             </div>
           </button>
+          )}
 
           {/* Card — Passagem Oficina e Funilaria Audi */}
+          {canPassagemAudi && (
           <button
             onClick={() => onSelect('passagem-oficina-funilaria-audi')}
             className="w-56 bg-white rounded-2xl border-2 border-slate-400 shadow-md hover:shadow-xl hover:border-slate-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
@@ -227,6 +234,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
               </h2>
             </div>
           </button>
+          )}
 
         </div>
       </div>

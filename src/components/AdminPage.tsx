@@ -358,6 +358,50 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
               ))}
             </div>
           </div>
+
+          {/* Passagem Oficina e Funilaria VW */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Passagem Oficina e Funilaria VW</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {(['passagem_vw.cadastro', 'passagem_vw.passagens', 'passagem_vw.situacoes', 'passagem_vw.analise'] as VendasSubModuleId[]).map(s => (
+                <button
+                  key={s} type="button"
+                  onClick={() => toggleVendasSub(s)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                    form.vendasSubModules.includes(s)
+                      ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 font-medium'
+                      : 'border-border bg-background text-muted-foreground hover:border-input',
+                  )}
+                >
+                  {form.vendasSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                  {VENDAS_SUB_MODULE_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Passagem Oficina e Funilaria Audi */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Passagem Oficina e Funilaria Audi</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {(['passagem_audi.cadastro', 'passagem_audi.passagens', 'passagem_audi.situacoes', 'passagem_audi.analise'] as VendasSubModuleId[]).map(s => (
+                <button
+                  key={s} type="button"
+                  onClick={() => toggleVendasSub(s)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                    form.vendasSubModules.includes(s)
+                      ? 'border-slate-500 bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium'
+                      : 'border-border bg-background text-muted-foreground hover:border-input',
+                  )}
+                >
+                  {form.vendasSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                  {VENDAS_SUB_MODULE_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

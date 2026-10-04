@@ -58,7 +58,15 @@ export type VendasSubModuleId =
   | 'assinatura_signdrive.analise'
   | 'assinatura_signdrive.cadastro'
   | 'vpecas_cond.relatorios'
-  | 'vpecas_cond.resumo';
+  | 'vpecas_cond.resumo'
+  | 'passagem_vw.cadastro'
+  | 'passagem_vw.passagens'
+  | 'passagem_vw.situacoes'
+  | 'passagem_vw.analise'
+  | 'passagem_audi.cadastro'
+  | 'passagem_audi.passagens'
+  | 'passagem_audi.situacoes'
+  | 'passagem_audi.analise';
 
 // Subpermissões do módulo folha_pagamento
 export type FolhaSubModuleId =
@@ -148,6 +156,14 @@ export const VENDAS_SUB_MODULE_LABELS: Record<VendasSubModuleId, string> = {
   'assinatura_signdrive.cadastro': 'Cadastro',
   'vpecas_cond.relatorios': 'Relatórios',
   'vpecas_cond.resumo': 'Resumo',
+  'passagem_vw.cadastro': 'Cadastro',
+  'passagem_vw.passagens': 'Passagens',
+  'passagem_vw.situacoes': 'Situações',
+  'passagem_vw.analise': 'Análise',
+  'passagem_audi.cadastro': 'Cadastro',
+  'passagem_audi.passagens': 'Passagens',
+  'passagem_audi.situacoes': 'Situações',
+  'passagem_audi.analise': 'Análise',
 };
 
 export interface UserRecord {

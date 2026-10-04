@@ -11,6 +11,7 @@ import { CategoriaSection } from './CategoriaSection';
 import { RegraDepartamentosSection } from './RegraDepartamentosSection';
 import { SegmentacaoSection } from './SegmentacaoSection';
 import { AnaliseSection } from './AnaliseSection';
+import { useAuth } from '@/contexts/useAuth';
 
 interface Props {
   onBack: () => void;
@@ -135,6 +136,24 @@ const CADASTRO_MENU: CadastroMenuItem[] = [
 export function PassagemOficinaFunilariaAudiDashboard({ onBack }: Props) {
   const now = new Date();
   const [activeTab, setActiveTab] = useState<'passagens' | 'situacoes' | 'cadastro' | 'analise'>('analise');
+  const { canAccessVendasSub, isAdmin } = useAuth();
+  const canCadastro = isAdmin() || canAccessVendasSub('passagem_audi.cadastro');
+  const canPassagens = isAdmin() || canAccessVendasSub('passagem_audi.passagens');
+  const canSituacoes = isAdmin() || canAccessVendasSub('passagem_audi.situacoes');
+  const canAnalise = isAdmin() || canAccessVendasSub('passagem_audi.analise');
+  const allowedTabs = useMemo(() => {
+    const t: Array<'cadastro' | 'passagens' | 'situacoes' | 'analise'> = [];
+    if (canCadastro) t.push('cadastro');
+    if (canPassagens) t.push('passagens');
+    if (canSituacoes) t.push('situacoes');
+    if (canAnalise) t.push('analise');
+    return t;
+  }, [canCadastro, canPassagens, canSituacoes, canAnalise]);
+  useEffect(() => {
+    if (allowedTabs.length > 0 && !allowedTabs.includes(activeTab)) {
+      setActiveTab(allowedTabs.includes('analise') ? 'analise' : allowedTabs[0]);
+    }
+  }, [allowedTabs, activeTab]);
   const [cadastroSection, setCadastroSection] = useState<CadastroSectionId>('regraAnoChassi');
   const currentCadastro = CADASTRO_MENU.find(m => m.id === cadastroSection);
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
@@ -223,24 +242,7 @@ export function PassagemOficinaFunilariaAudiDashboard({ onBack }: Props) {
 
       {/* ── Abas ── */}
       <div className="flex border-b border-slate-200 bg-white px-4">
-        <button
-          onClick={() => setActiveTab('passagens')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
-            activeTab === 'passagens' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <TableProperties className="w-4 h-4" />
-          Passagens
-        </button>
-        <button
-          onClick={() => setActiveTab('situacoes')}
-          className={`px-5 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
-            activeTab === 'situacoes' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          <ListChecks className="w-4 h-4" />
-          Situações
-        </button>
+        {canCadastro && (
         <button
           onClick={() => setActiveTab('cadastro')}
           className={`px-5 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
@@ -250,6 +252,30 @@ export function PassagemOficinaFunilariaAudiDashboard({ onBack }: Props) {
           <BookOpen className="w-4 h-4" />
           Cadastro
         </button>
+        )}
+        {canPassagens && (
+        <button
+          onClick={() => setActiveTab('passagens')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+            activeTab === 'passagens' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <TableProperties className="w-4 h-4" />
+          Passagens
+        </button>
+        )}
+        {canSituacoes && (
+        <button
+          onClick={() => setActiveTab('situacoes')}
+          className={`px-5 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
+            activeTab === 'situacoes' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <ListChecks className="w-4 h-4" />
+          Situações
+        </button>
+        )}
+        {canAnalise && (
         <button
           onClick={() => setActiveTab('analise')}
           className={`px-5 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 transition-colors ${
@@ -259,10 +285,11 @@ export function PassagemOficinaFunilariaAudiDashboard({ onBack }: Props) {
           <BarChart2 className="w-4 h-4" />
           Análise
         </button>
+        )}
       </div>
 
       {/* ── Content ── */}
-      {activeTab === 'passagens' && (
+      {canPassagens && activeTab === 'passagens' && (
         <div className="flex-1 flex flex-col p-4 gap-4 min-h-0">
           {/* Seletor de ano e mês + importar */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
@@ -380,7 +407,7 @@ export function PassagemOficinaFunilariaAudiDashboard({ onBack }: Props) {
       )}
 
       {/* ── Situações ── */}
-      {activeTab === 'situacoes' && (
+      {canSituacoes && activeTab === 'situacoes' && (
         <div className="flex-1 flex flex-col p-4 gap-4 min-h-0">
           {/* Seletor de ano e mês (mesmo estado das Passagens) */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
@@ -485,7 +512,7 @@ export function PassagemOficinaFunilariaAudiDashboard({ onBack }: Props) {
       )}
 
       {/* ── Cadastro ── */}
-      {activeTab === 'cadastro' && (
+      {canCadastro && activeTab === 'cadastro' && (
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar */}
           <aside className="w-64 bg-white border-r border-slate-200 flex-shrink-0 overflow-y-auto">
@@ -538,7 +565,7 @@ export function PassagemOficinaFunilariaAudiDashboard({ onBack }: Props) {
       )}
 
       {/* ── Análise ── */}
-      {activeTab === 'analise' && <AnaliseSection />}
+      {canAnalise && activeTab === 'analise' && <AnaliseSection />}
 
       {/* Dialog de confirmação de mês/ano */}
       <AlertDialog open={pendingFile !== null} onOpenChange={(open) => { if (!open) setPendingFile(null); }}>
