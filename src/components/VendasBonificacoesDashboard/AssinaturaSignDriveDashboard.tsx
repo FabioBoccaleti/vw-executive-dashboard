@@ -40,6 +40,7 @@ const COLUMNS: ColDef[] = [
   { key: 'nfComissao',              label: 'Nº NF de Comissão',            type: 'text',     width: 150 },
   { key: 'situacaoComissao',        label: 'Situação da Comissão',         type: 'text',     width: 160 },
   { key: 'situacaoComissaoVendedor', label: 'Sit. Comissão vendedor',      type: 'text',     width: 170 },
+  { key: 'estimativaComissaoVendedor', label: 'Estimativa Comissão Vendedor', type: 'text',   width: 200 },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────
