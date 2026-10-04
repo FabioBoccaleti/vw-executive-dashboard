@@ -5,6 +5,19 @@ import { Pencil, Trash2, Check, X, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { loadSignDriveVendedores, saveSignDriveVendedores, CARGOS_VENDEDOR, type Vendedor, type CargoVendedor } from '../cadastrosStorage';
 
+function parseBRNumber(s: string): number {
+  if (!s) return 0;
+  let clean = s.trim().replace(/R\$\s*/g, '');
+  if (clean.includes(',')) clean = clean.replace(/\./g, '').replace(',', '.');
+  return parseFloat(clean) || 0;
+}
+
+function fmtSalario(raw?: string): string {
+  if (!raw || !raw.trim()) return '—';
+  const n = parseBRNumber(raw);
+  return isNaN(n) ? '—' : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
 export function SignDriveVendedoresSection() {
   const [items, setItems] = useState<Vendedor[]>([]);
   const [saving, setSaving] = useState(false);
@@ -12,10 +25,12 @@ export function SignDriveVendedoresSection() {
   const [novoNome, setNovoNome] = useState('');
   const [novoCodigo, setNovoCodigo] = useState('');
   const [novoCargo, setNovoCargo] = useState<CargoVendedor>('Vendedor');
+  const [novoSalario, setNovoSalario] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNome, setEditNome] = useState('');
   const [editCodigo, setEditCodigo] = useState('');
   const [editCargo, setEditCargo] = useState<CargoVendedor>('Vendedor');
+  const [editSalario, setEditSalario] = useState('');
 
   const sortAlpha = (list: Vendedor[]) =>
     [...list].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
@@ -43,9 +58,10 @@ export function SignDriveVendedoresSection() {
       toast.error('Já existe um vendedor com esse código.');
       return;
     }
-    await persist(sortAlpha([...items, { id: crypto.randomUUID(), codigo, nome, cargo: novoCargo }]));
+    await persist(sortAlpha([...items, { id: crypto.randomUUID(), codigo, nome, cargo: novoCargo, salarioFixo: novoSalario.trim() || undefined }]));
     setNovoNome('');
     setNovoCodigo('');
+    setNovoSalario('');
     toast.success('Vendedor cadastrado');
   };
 
@@ -57,7 +73,7 @@ export function SignDriveVendedoresSection() {
       toast.error('Já existe um vendedor com esse código.');
       return;
     }
-    await persist(sortAlpha(items.map(i => i.id === editingId ? { ...i, codigo, nome, cargo: editCargo } : i)));
+    await persist(sortAlpha(items.map(i => i.id === editingId ? { ...i, codigo, nome, cargo: editCargo, salarioFixo: editSalario.trim() || undefined } : i)));
     setEditingId(null);
     toast.success('Vendedor atualizado');
   };
@@ -93,6 +109,13 @@ export function SignDriveVendedoresSection() {
         >
           {CARGOS_VENDEDOR.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
+        <Input
+          placeholder="Salário Fixo (R$)..."
+          value={novoSalario}
+          onChange={e => setNovoSalario(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') add(); }}
+          className="w-40"
+        />
         <Button onClick={add} disabled={saving || !novoNome.trim()} size="sm" style={{ background: '#1e3a8a' }} className="text-white hover:opacity-90">
           <Plus className="w-4 h-4 mr-1" /> Adicionar
         </Button>
@@ -105,12 +128,13 @@ export function SignDriveVendedoresSection() {
               <th className="text-white text-left px-4 py-3 text-xs font-semibold w-32">Código</th>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold">Nome</th>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold">Cargo</th>
+              <th className="text-white text-left px-4 py-3 text-xs font-semibold w-40">Salário Fixo</th>
               <th className="text-white text-center px-4 py-3 text-xs font-semibold w-24">Ações</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 && (
-              <tr><td colSpan={4} className="text-center text-slate-400 text-xs py-8">Nenhum vendedor cadastrado</td></tr>
+              <tr><td colSpan={5} className="text-center text-slate-400 text-xs py-8">Nenhum vendedor cadastrado</td></tr>
             )}
             {items.map((item, idx) => (
               <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
@@ -136,6 +160,13 @@ export function SignDriveVendedoresSection() {
                     </select>
                   ) : item.cargo}
                 </td>
+                <td className="px-4 py-2 text-xs text-slate-700 w-40">
+                  {editingId === item.id ? (
+                    <Input value={editSalario} onChange={e => setEditSalario(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
+                      className="h-7 text-xs" placeholder="Salário Fixo (R$)..." />
+                  ) : fmtSalario(item.salarioFixo)}
+                </td>
                 <td className="px-4 py-2">
                   <div className="flex items-center justify-center gap-1.5">
                     {editingId === item.id ? (
@@ -145,7 +176,7 @@ export function SignDriveVendedoresSection() {
                       </>
                     ) : (
                       <>
-                        <button onClick={() => { setEditingId(item.id); setEditNome(item.nome); setEditCodigo(item.codigo ?? ''); setEditCargo(item.cargo); }} className="text-blue-500 hover:text-blue-700 p-1 rounded"><Pencil className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => { setEditingId(item.id); setEditNome(item.nome); setEditCodigo(item.codigo ?? ''); setEditCargo(item.cargo); setEditSalario(item.salarioFixo ?? ''); }} className="text-blue-500 hover:text-blue-700 p-1 rounded"><Pencil className="w-3.5 h-3.5" /></button>
                         <button onClick={() => remove(item.id)} className="text-red-400 hover:text-red-600 p-1 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
                       </>
                     )}

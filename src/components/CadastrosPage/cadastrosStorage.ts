@@ -51,6 +51,7 @@ export interface Vendedor {
   codigo?: string;
   nome: string;
   cargo: CargoVendedor;
+  salarioFixo?: string;
 }
 
 export async function loadVendedores(): Promise<Vendedor[]> {
