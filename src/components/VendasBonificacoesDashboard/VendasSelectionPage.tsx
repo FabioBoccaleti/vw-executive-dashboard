@@ -15,7 +15,7 @@ const FINANCIAMENTO_BV_SUBS: VendasSubModuleId[] = ['financiamento_bv.vendas', '
 const VPECAS_COND_SUBS: VendasSubModuleId[] = ['vpecas_cond.relatorios', 'vpecas_cond.resumo'];
 
 interface VendasSelectionPageProps {
-  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade' | 'passagem-oficina-funilaria-vw') => void;
+  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi') => void;
   onChangeBrand: () => void;
 }
 
@@ -209,6 +209,21 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">
                 Passagem Oficina<br />e Funilaria VW
+              </h2>
+            </div>
+          </button>
+
+          {/* Card — Passagem Oficina e Funilaria Audi */}
+          <button
+            onClick={() => onSelect('passagem-oficina-funilaria-audi')}
+            className="w-56 bg-white rounded-2xl border-2 border-slate-400 shadow-md hover:shadow-xl hover:border-slate-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
+          >
+            <div className="p-4 rounded-full bg-slate-50 group-hover:bg-slate-100 transition-colors">
+              <Hammer className="w-10 h-10 text-slate-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 leading-snug">
+                Passagem Oficina<br />e Funilaria Audi
               </h2>
             </div>
           </button>

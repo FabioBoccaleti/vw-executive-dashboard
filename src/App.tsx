@@ -40,6 +40,7 @@ import { BaseGerencialDashboard } from '@/components/BaseGerencialDashboard'
 import { ComparativoRedeVwDashboard } from '@/components/ComparativoRedeVwDashboard'
 import { GradeTestDriveAudiDashboard } from '@/components/VendasBonificacoesDashboard/GradeTestDriveAudi'
 import { PassagemOficinaFunilariaVWDashboard } from '@/components/VendasBonificacoesDashboard/PassagemOficinaFunilariaVW'
+import { PassagemOficinaFunilariaAudiDashboard } from '@/components/VendasBonificacoesDashboard/PassagemOficinaFunilariaAudi'
 
 function AppContent() {
   const { session, isLoading: authLoading, isAdmin, logout } = useAuth()
@@ -51,7 +52,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<'app' | 'admin' | 'cadastros'>(() =>
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
-  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade' | 'passagem-oficina-funilaria-vw'>('selection')
+  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi'>('selection')
   const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis' | 'premios'>('selection')
   const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica' | 'assinatura-signdrive'>('blindagem')
   
@@ -318,6 +319,8 @@ function AppContent() {
           <GradeTestDriveAudiDashboard onBack={() => setVendasSubPage('selection')} />
         ) : vendasSubPage === 'passagem-oficina-funilaria-vw' ? (
           <PassagemOficinaFunilariaVWDashboard onBack={() => setVendasSubPage('selection')} />
+        ) : vendasSubPage === 'passagem-oficina-funilaria-audi' ? (
+          <PassagemOficinaFunilariaAudiDashboard onBack={() => setVendasSubPage('selection')} />
         ) : (
           <VendasBonificacoesDashboard
             onChangeBrand={() => setVendasSubPage('selection')}
