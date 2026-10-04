@@ -155,7 +155,7 @@ async function exportTabelaExcel(exportRows: AssinaturaRow[]): Promise<void> {
   const PCT_FMT = '0.00"%"';
 
   const cellValue = (row: AssinaturaRow, col: ColDef): string | number | Date | null => {
-    if (col.key === 'situacaoComissao') return row.anulada ? 'Anulada' : (row.nfComissao ?? '').trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
+    if (col.key === 'situacaoComissao') return row.anulada ? 'Anulada' : isEmNegociacao(row.tipoVenda) ? 'Em Negociação' : (row.nfComissao ?? '').trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
     const raw = (row as unknown as Record<string, string>)[col.key] ?? '';
     if (col.type === 'currency') return raw === '' ? null : (parseFloat(raw) || 0);
     if (col.type === 'percent')  return raw === '' ? null : (parseFloat(raw) || 0);
@@ -509,8 +509,8 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       impostosComissao: String(editPreview.impostos),
       totalComissaoLiquida: String(editPreview.totalLiquida),
       pctRentabilidadeLiquida: String(editPreview.rentLiquida),
-      dataEntrega: isoToBR(editDraft.dataEntrega),
-      nfComissao: editDraft.nfComissao.trim(),
+      dataEntrega: emNegociacao ? '' : isoToBR(editDraft.dataEntrega),
+      nfComissao: emNegociacao ? '' : editDraft.nfComissao.trim(),
       comissaoEditada: false,
     } : r);
     await persist(updated);
@@ -519,8 +519,8 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   };
 
   const viewRows = useMemo(() => {
-    if (viewMode === 'comissoes') return rows.filter(r => !(r.nfComissao ?? '').trim() && !r.anulada);
-    if (viewMode === 'pendente') return rows.filter(r => !(r.dataEntrega ?? '').trim() && !r.anulada);
+    if (viewMode === 'comissoes') return rows.filter(r => !(r.nfComissao ?? '').trim() && !r.anulada && !isEmNegociacao(r.tipoVenda));
+    if (viewMode === 'pendente') return rows.filter(r => !(r.dataEntrega ?? '').trim() && !r.anulada && !isEmNegociacao(r.tipoVenda));
     return rows;
   }, [rows, viewMode]);
 
@@ -534,8 +534,8 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
 
   const counts = useMemo(() => ({
     todas: rows.length,
-    comissoes: rows.filter(r => !(r.nfComissao ?? '').trim() && !r.anulada).length,
-    pendente: rows.filter(r => !(r.dataEntrega ?? '').trim() && !r.anulada).length,
+    comissoes: rows.filter(r => !(r.nfComissao ?? '').trim() && !r.anulada && !isEmNegociacao(r.tipoVenda)).length,
+    pendente: rows.filter(r => !(r.dataEntrega ?? '').trim() && !r.anulada && !isEmNegociacao(r.tipoVenda)).length,
   }), [rows]);
 
   const hasActiveFilters = Object.values(filters).some(v => v.trim() !== '');
@@ -552,7 +552,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   const editInputClass = 'w-full min-w-0 bg-white border border-blue-300 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400';
   const comissaoInputClass = 'w-full min-w-0 bg-white border border-emerald-400 rounded px-1.5 py-1 text-xs text-right focus:outline-none focus:ring-2 focus:ring-emerald-400';
 
-  const situacaoText = (row: AssinaturaRow, nf: string) => row.anulada ? 'Anulada' : nf.trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
+  const situacaoText = (row: AssinaturaRow, nf: string) => row.anulada ? 'Anulada' : isEmNegociacao(row.tipoVenda) ? 'Em Negociação' : nf.trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
 
   const renderCellContent = (col: ColDef, row: AssinaturaRow) => {
     const editing = editingId === row.id;
@@ -633,11 +633,15 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       case 'totalComissaoLiquida': return fmtCurrency(String(editPreview.totalLiquida));
       case 'pctRentabilidadeLiquida': return fmtPct(String(editPreview.rentLiquida));
       case 'dataEntrega':
-        return <input type="date" value={editDraft.dataEntrega} onChange={e => setEditDraft(p => ({ ...p, dataEntrega: e.target.value }))} className={editInputClass} />;
+        return isEmNegociacao(editDraft.produto)
+          ? <input type="text" value="—" disabled className={`${editInputClass} bg-slate-100 text-slate-400 text-center cursor-not-allowed`} />
+          : <input type="date" value={editDraft.dataEntrega} onChange={e => setEditDraft(p => ({ ...p, dataEntrega: e.target.value }))} className={editInputClass} />;
       case 'nfComissao':
-        return <input type="text" value={editDraft.nfComissao} onChange={e => setEditDraft(p => ({ ...p, nfComissao: e.target.value }))} className={editInputClass} />;
+        return isEmNegociacao(editDraft.produto)
+          ? <input type="text" value="—" disabled className={`${editInputClass} bg-slate-100 text-slate-400 text-center cursor-not-allowed`} />
+          : <input type="text" value={editDraft.nfComissao} onChange={e => setEditDraft(p => ({ ...p, nfComissao: e.target.value }))} className={editInputClass} />;
       case 'situacaoComissao':
-        return editDraft.nfComissao.trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
+        return isEmNegociacao(editDraft.produto) ? 'Em Negociação' : editDraft.nfComissao.trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
       default:
         return fmtCell(col, val);
     }
@@ -786,6 +790,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                   const isEven = idx % 2 === 0;
                   const rowBg = editing ? '#eff6ff' : editingComissao ? '#ecfdf5' : isComissaoPrompt ? '#ecfdf5' : isLocking ? '#fffbeb' : isDelete ? '#fef2f2' : row.anulada ? '#f1f5f9' : isEven ? '#ffffff' : '#f8fafc';
                   const nf = editing ? editDraft.nfComissao : (row.nfComissao ?? '');
+                  const produtoAtual = editing ? editDraft.produto : row.tipoVenda;
                   return (
                     <Fragment key={row.id}>
                     <tr style={{ background: rowBg }} className="transition-colors">
@@ -795,7 +800,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
                       {COLUMNS.map((col, ci) => {
                         const isRight = col.type === 'currency' || col.type === 'percent';
                         const isSituacao = col.key === 'situacaoComissao';
-                        const situacaoColor = row.anulada ? 'text-slate-500' : nf.trim() ? 'text-emerald-600' : 'text-amber-600';
+                        const situacaoColor = row.anulada ? 'text-slate-500' : isEmNegociacao(produtoAtual) ? 'text-blue-600' : nf.trim() ? 'text-emerald-600' : 'text-amber-600';
                         return (
                           <td key={`c-${col.key}-${ci}`} className={`px-3 py-1.5 text-xs border-r border-slate-100 whitespace-nowrap ${isRight && !editing ? 'text-right' : ''} ${isSituacao ? 'font-semibold ' + situacaoColor : row.anulada && !editing ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
                             {renderCellContent(col, row)}
