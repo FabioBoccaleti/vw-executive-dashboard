@@ -132,7 +132,7 @@ const CADASTRO_MENU: CadastroMenuItem[] = [
 
 export function PassagemOficinaFunilariaVWDashboard({ onBack }: Props) {
   const now = new Date();
-  const [activeTab, setActiveTab] = useState<'passagens' | 'situacoes' | 'cadastro' | 'analise'>('passagens');
+  const [activeTab, setActiveTab] = useState<'passagens' | 'situacoes' | 'cadastro' | 'analise'>('analise');
   const [cadastroSection, setCadastroSection] = useState<CadastroSectionId>('regraAnoChassi');
   const currentCadastro = CADASTRO_MENU.find(m => m.id === cadastroSection);
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());

@@ -9,6 +9,7 @@ import {
   getRegrasAnoChassi,
   getCategorias,
   getPassagensPeriodo,
+  getMesMaisRecenteComDados,
   analisarGrupos,
   analisarPorAno,
   analisarPorModelo,
@@ -70,6 +71,10 @@ export function AnaliseSection() {
     getRegrasDepartamentos().then(setGrupos);
     getRegrasAnoChassi().then(setRegrasAnoChassi);
     getCategorias().then(setCategoriasCadastro);
+    // Abre no mês mais recente que tem arquivo importado (qualquer ano)
+    getMesMaisRecenteComDados().then(r => {
+      if (r) { setYear(r.year); setPeriodo(r.month); }
+    });
   }, []);
 
   const loadRows = useCallback(async (y: number, p: Periodo) => {

@@ -632,4 +632,20 @@ export async function getCategoriasDistintas(): Promise<string[]> {
   });
 }
 
+/**
+ * Descobre o mês mais recente (qualquer ano) que possui arquivo importado,
+ * olhando as chaves de dados mensais. Retorna null se não houver nenhum.
+ */
+export async function getMesMaisRecenteComDados(): Promise<{ year: number; month: number } | null> {
+  const keys = await kvKeys(`passagem_oficina_funilaria_vw_2*`);
+  let best: { year: number; month: number } | null = null;
+  for (const k of keys) {
+    const m = /_(\d{4})_(\d{2})$/.exec(k);
+    if (!m) continue;
+    const year = +m[1], month = +m[2];
+    if (!best || year * 100 + month > best.year * 100 + best.month) best = { year, month };
+  }
+  return best;
+}
+
 
