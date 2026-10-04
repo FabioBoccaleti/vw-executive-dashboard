@@ -8,6 +8,7 @@ import { saveAs } from 'file-saver';
 import { loadAssinaturaRows, saveAssinaturaRows, type AssinaturaRow } from './assinaturaStorage';
 import { loadSignDriveCatalogo, type CatalogoVeiculos } from './catalogoStorage';
 import { loadSignDriveVendedores, loadSignDriveTiposVenda, type Vendedor, type TipoVendaSignDrive } from '@/components/CadastrosPage/cadastrosStorage';
+import { SignDriveAnalise } from './SignDriveAnalise';
 
 interface AssinaturaSignDriveDashboardProps {
   onChangeBrand: () => void;
@@ -937,7 +938,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       )}
 
       {activeTab === 'analise' && canAnalise && (
-        <div className="flex-1 overflow-auto p-6" />
+        <SignDriveAnalise rows={rows} />
       )}
 
       {/* ── Modal Registrar Venda ── */}
