@@ -566,6 +566,125 @@ export function faturamentoPontos(
     .sort((a, b) => a.ordem - b.ordem);
 }
 
+/** Célula da tabela de prazo médio de encerramento (média de dias + nº de OS). */
+export interface PrazoEncerramentoCelula {
+  mediaDias: number | null; // null quando não há OS no cruzamento
+  qtdOs: number;
+}
+
+/** Linha (departamento) da tabela de prazo médio de encerramento. */
+export interface PrazoEncerramentoLinha {
+  departamento: string;
+  porCategoria: Record<string, PrazoEncerramentoCelula>;
+  geral: PrazoEncerramentoCelula;
+}
+
+export interface PrazoEncerramentoResumo {
+  categorias: string[];                                       // códigos de Categoria OS (colunas)
+  linhas: PrazoEncerramentoLinha[];                           // por departamento (OS com valor > 0)
+  totalPorCategoria: Record<string, PrazoEncerramentoCelula>; // rodapé "Geral (valor > 0)"
+  geral: PrazoEncerramentoCelula;                             // canto do rodapé
+  zeroPorCategoria: Record<string, PrazoEncerramentoCelula>;  // linha "OS R$ 0,00"
+  zeroGeral: PrazoEncerramentoCelula;
+}
+
+/** Diferença, em dias corridos, entre duas datas 'dd/mm/yyyy'. null se inválidas. */
+function diffDiasBR(emissao: string, encerramento: string): number | null {
+  const a = parseDataBR(emissao);
+  const b = parseDataBR(encerramento);
+  if (!a || !b) return null;
+  const ini = Date.UTC(a.y, a.m - 1, a.d);
+  const fim = Date.UTC(b.y, b.m - 1, b.d);
+  return Math.round((fim - ini) / 86400000);
+}
+
+/**
+ * Calcula a média de dias entre Dt. Emissão e Dt. Encerramento das OS, numa
+ * tabela Departamento × Categoria. Considera apenas departamentos agrupados e
+ * OS com as duas datas válidas (prazo >= 0). As OS com valor > 0 formam as
+ * linhas por departamento e o rodapé "Geral"; as OS com valor == 0 são
+ * resumidas à parte (linha "OS R$ 0,00").
+ */
+export function analisarPrazoEncerramento(
+  rows: PassagemRow[],
+  grupos: RegraDepartamento[],
+): PrazoEncerramentoResumo {
+  const grupoByDepto = new Map<string, string>();
+  for (const g of grupos) for (const d of g.departamentos) grupoByDepto.set(d, g.nome);
+
+  type Acc = { soma: number; qtd: number };
+  const bump = (m: Map<string, Acc>, k: string, dias: number) => {
+    let v = m.get(k);
+    if (!v) { v = { soma: 0, qtd: 0 }; m.set(k, v); }
+    v.soma += dias; v.qtd += 1;
+  };
+
+  const catSet = new Set<string>();
+  const depCatAcc = new Map<string, Map<string, Acc>>(); // depto -> categoria -> Acc (valor > 0)
+  const depGeralAcc = new Map<string, Acc>();            // depto -> Acc (valor > 0)
+  const catTotalAcc = new Map<string, Acc>();            // categoria -> Acc (valor > 0)
+  const geralAcc: Acc = { soma: 0, qtd: 0 };             // valor > 0
+  const zeroCatAcc = new Map<string, Acc>();             // categoria -> Acc (valor == 0)
+  const zeroGeralAcc: Acc = { soma: 0, qtd: 0 };         // valor == 0
+
+  for (const r of rows) {
+    const grupoNome = grupoByDepto.get((r.nomeDepartamento ?? '').trim());
+    if (!grupoNome) continue;
+    const dias = diffDiasBR(r.dtaEmissao, r.dtaEncerramento);
+    if (dias === null || dias < 0) continue;
+    const cat = (r.categoriaOs ?? '').trim() || SEM_CATEGORIA;
+    catSet.add(cat);
+
+    if ((r.valTotalOs ?? 0) === 0) {
+      bump(zeroCatAcc, cat, dias);
+      zeroGeralAcc.soma += dias; zeroGeralAcc.qtd += 1;
+      continue;
+    }
+
+    let cm = depCatAcc.get(grupoNome);
+    if (!cm) { cm = new Map(); depCatAcc.set(grupoNome, cm); }
+    bump(cm, cat, dias);
+    bump(depGeralAcc, grupoNome, dias);
+    bump(catTotalAcc, cat, dias);
+    geralAcc.soma += dias; geralAcc.qtd += 1;
+  }
+
+  const media = (a?: Acc): PrazoEncerramentoCelula =>
+    a && a.qtd > 0 ? { mediaDias: a.soma / a.qtd, qtdOs: a.qtd } : { mediaDias: null, qtdOs: 0 };
+
+  const sortCodigo = (a: string, b: string) => {
+    if (a === SEM_CATEGORIA) return 1;
+    if (b === SEM_CATEGORIA) return -1;
+    const na = Number(a), nb = Number(b);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a.localeCompare(b, 'pt-BR');
+  };
+
+  const categorias = [...catSet].sort(sortCodigo);
+  const celulasPorCat = (src: Map<string, Acc>): Record<string, PrazoEncerramentoCelula> => {
+    const out: Record<string, PrazoEncerramentoCelula> = {};
+    for (const cat of categorias) out[cat] = media(src.get(cat));
+    return out;
+  };
+
+  const linhas: PrazoEncerramentoLinha[] = [...depCatAcc.keys()]
+    .map(dep => ({
+      departamento: dep,
+      porCategoria: celulasPorCat(depCatAcc.get(dep)!),
+      geral: media(depGeralAcc.get(dep)),
+    }))
+    .sort((a, b) => (b.geral.qtdOs - a.geral.qtdOs) || a.departamento.localeCompare(b.departamento, 'pt-BR'));
+
+  return {
+    categorias,
+    linhas,
+    totalPorCategoria: celulasPorCat(catTotalAcc),
+    geral: media(geralAcc),
+    zeroPorCategoria: celulasPorCat(zeroCatAcc),
+    zeroGeral: media(zeroGeralAcc),
+  };
+}
+
 export async function getRegrasDepartamentos(): Promise<RegraDepartamento[]> {
   return (await kvGet<RegraDepartamento[]>(REGRA_DEPARTAMENTOS_KEY)) ?? [];
 }

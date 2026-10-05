@@ -16,6 +16,7 @@ import {
   analisarPorAno,
   analisarPorModelo,
   analisarOsPorCategoria,
+  analisarPrazoEncerramento,
   analisarPorSegmento,
   faturamentoPontos,
   listarChassisNaoIdentificados,
@@ -31,6 +32,8 @@ import {
   type AnoAnalise,
   type ModeloAnalise,
   type OsCategoriaResumo,
+  type PrazoEncerramentoResumo,
+  type PrazoEncerramentoCelula,
   type SegmentoAnalise,
 } from './passagemStorage';
 import {
@@ -51,6 +54,11 @@ function fmtCurrency(n: number): string {
 function fmtCompact(n: number): string {
   if (Math.abs(n) >= 1000) return `R$ ${(n / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}k`;
   return fmtCurrency(n);
+}
+
+function fmtDias(c: PrazoEncerramentoCelula): string {
+  if (c.mediaDias === null) return '—';
+  return c.mediaDias.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
 export function AnaliseSection() {
@@ -807,6 +815,11 @@ function OsCategoriaView({
     [rows, grupos, agruparPorMes, fatDepto, fatCategoria],
   );
 
+  const prazo: PrazoEncerramentoResumo = useMemo(
+    () => analisarPrazoEncerramento(rows, grupos),
+    [rows, grupos],
+  );
+
   const catChart = useMemo(
     () => resumo.porCategoria.map(c => ({
       rotulo: nomeCategoriaByCodigo.get(c.categoria) ? `${c.categoria} · ${nomeCategoriaByCodigo.get(c.categoria)}` : c.categoria,
@@ -985,6 +998,74 @@ function OsCategoriaView({
                       <td className="px-5 py-3 text-right tabular-nums text-slate-800">{resumo.totalOs.toLocaleString('pt-BR')}</td>
                       <td className="px-5 py-3 text-right tabular-nums text-violet-700">{fmtCurrency(resumo.faturamento)}</td>
                       <td className="px-5 py-3 text-right tabular-nums text-amber-600">{resumo.totalOsZero.toLocaleString('pt-BR')}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Média de dias para encerramento das OS */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <h3 className="text-sm font-bold text-slate-700">Média de dias para encerramento das OS</h3>
+              <span className="text-xs text-slate-400">Dt. Encerramento − Dt. Emissão · apenas OS com as duas datas</span>
+            </div>
+            {prazo.linhas.length === 0 && prazo.zeroGeral.qtdOs === 0 ? (
+              <div className="h-[120px] flex items-center justify-center text-sm text-slate-400">
+                Sem OS com datas válidas para o período.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50">
+                      <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500">Departamento</th>
+                      {prazo.categorias.map(cat => (
+                        <th key={cat} className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500 whitespace-nowrap">
+                          {cat}{nomeCategoriaByCodigo.get(cat) ? ` · ${nomeCategoriaByCodigo.get(cat)}` : ''}
+                        </th>
+                      ))}
+                      <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500">Média geral</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prazo.linhas.map(l => (
+                      <tr key={l.departamento} className="border-t border-slate-100 hover:bg-slate-50/60">
+                        <td className="px-5 py-2.5 text-slate-700 font-medium">{l.departamento}</td>
+                        {prazo.categorias.map(cat => (
+                          <td key={cat} className="px-5 py-2.5 text-right tabular-nums text-slate-600" title={`${l.porCategoria[cat].qtdOs} OS`}>
+                            {fmtDias(l.porCategoria[cat])}
+                          </td>
+                        ))}
+                        <td className="px-5 py-2.5 text-right tabular-nums font-semibold text-slate-700" title={`${l.geral.qtdOs} OS`}>
+                          {fmtDias(l.geral)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-slate-200 bg-slate-50 font-bold">
+                      <td className="px-5 py-3 text-slate-800">Geral (valor &gt; 0)</td>
+                      {prazo.categorias.map(cat => (
+                        <td key={cat} className="px-5 py-3 text-right tabular-nums text-slate-800" title={`${prazo.totalPorCategoria[cat].qtdOs} OS`}>
+                          {fmtDias(prazo.totalPorCategoria[cat])}
+                        </td>
+                      ))}
+                      <td className="px-5 py-3 text-right tabular-nums text-violet-700" title={`${prazo.geral.qtdOs} OS`}>
+                        {fmtDias(prazo.geral)}
+                      </td>
+                    </tr>
+                    <tr className="border-t border-slate-100 bg-amber-50/50 font-semibold text-amber-700">
+                      <td className="px-5 py-3">OS R$ 0,00</td>
+                      {prazo.categorias.map(cat => (
+                        <td key={cat} className="px-5 py-3 text-right tabular-nums" title={`${prazo.zeroPorCategoria[cat].qtdOs} OS`}>
+                          {fmtDias(prazo.zeroPorCategoria[cat])}
+                        </td>
+                      ))}
+                      <td className="px-5 py-3 text-right tabular-nums" title={`${prazo.zeroGeral.qtdOs} OS`}>
+                        {fmtDias(prazo.zeroGeral)}
+                      </td>
                     </tr>
                   </tfoot>
                 </table>
