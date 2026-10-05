@@ -83,7 +83,7 @@ export function SegmentacaoSection() {
       const [a, deps] = await Promise.all([getAnosCadastrados(), getRegrasDepartamentos()]);
       setAnos(a);
       setDepartamentos(deps.filter(d => d.departamentos.length > 0));
-      toast.success(`${a.length} ano(s) encontrado(s) na Regra Ano / Chassi.`);
+      toast.success(`${a.length} ano(s) encontrado(s) na Regra Ano-modelo / Chassi.`);
     } finally {
       setRefreshing(false);
     }
@@ -217,7 +217,7 @@ export function SegmentacaoSection() {
       {/* Info de anos detectados */}
       <div className="flex items-center justify-between mb-5 text-xs text-slate-500">
         <span>
-          {anos.length} ano(s) cadastrado(s) na Regra Ano / Chassi
+          {anos.length} ano(s) cadastrado(s) na Regra Ano-modelo / Chassi
           {anos.length > 0 && <> · <span className="font-semibold text-slate-600">{naoSegmentados}</span> sem segmento</>}
         </span>
         <button
@@ -274,7 +274,7 @@ export function SegmentacaoSection() {
             <div className="p-4">
               {anos.length === 0 ? (
                 <p className="text-xs text-slate-400 text-center py-4">
-                  Nenhum ano cadastrado. Cadastre anos em "Regra Ano / Chassi" e clique em "Atualizar anos".
+                  Nenhum ano cadastrado. Cadastre anos em "Regra Ano-modelo / Chassi" e clique em "Atualizar anos".
                 </p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">

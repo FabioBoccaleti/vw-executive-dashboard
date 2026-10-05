@@ -446,7 +446,7 @@ export function AnaliseSection() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <CarFront className="w-4 h-4 text-slate-400" />
-                <h3 className="text-sm font-bold text-slate-700">Passagens por ano do veículo</h3>
+                <h3 className="text-sm font-bold text-slate-700">Passagens por ano-modelo do veículo</h3>
               </div>
               <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
                 <button
@@ -706,7 +706,7 @@ export function AnaliseSection() {
             <DialogTitle>Chassis não identificados</DialogTitle>
             <DialogDescription>
               {chassisNaoId.length} chassi(s) sem ano determinável. Cadastre o código da posição 10
-              em <strong>Cadastro → Regra Ano / Chassi</strong> para identificá-los.
+              em <strong>Cadastro → Regra Ano-modelo / Chassi</strong> para identificá-los.
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-auto -mx-1">

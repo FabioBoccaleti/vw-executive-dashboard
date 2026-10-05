@@ -213,7 +213,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">
-                Passagem Oficina<br />e Funilaria VW
+                Nº Passagens Acessorios,<br />Oficina e Funilaria VW
               </h2>
             </div>
           </button>
@@ -230,7 +230,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">
-                Passagem Oficina<br />e Funilaria Audi
+                Nº Passagens Acessorios,<br />Oficina e Funilaria Audi
               </h2>
             </div>
           </button>

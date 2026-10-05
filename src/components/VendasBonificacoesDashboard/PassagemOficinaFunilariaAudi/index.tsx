@@ -127,7 +127,7 @@ function fmtCurrency(n: number): string {
 type CadastroSectionId = 'regraAnoChassi' | 'categoria' | 'regraDepartamentos' | 'segmentacao';
 interface CadastroMenuItem { id: CadastroSectionId; label: string; description: string; icon: React.ReactNode; }
 const CADASTRO_MENU: CadastroMenuItem[] = [
-  { id: 'regraAnoChassi', label: 'Regra Ano / Chassi', description: 'Regras por ano e chassi', icon: <Ruler className="w-5 h-5" /> },
+  { id: 'regraAnoChassi', label: 'Regra Ano-modelo / Chassi', description: 'Regras por ano e chassi', icon: <Ruler className="w-5 h-5" /> },
   { id: 'categoria', label: 'Categoria', description: 'Categorias de OS', icon: <Tag className="w-5 h-5" /> },
   { id: 'regraDepartamentos', label: 'Regra Departamentos', description: 'Agrupamento de departamentos', icon: <FolderTree className="w-5 h-5" /> },
   { id: 'segmentacao', label: 'Segmentação', description: 'Agrupamento de anos em segmentos', icon: <Layers className="w-5 h-5" /> },
@@ -229,7 +229,7 @@ export function PassagemOficinaFunilariaAudiDashboard({ onBack }: Props) {
       {/* ── Header ── */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm flex-shrink-0">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Passagem Oficina e Funilaria Audi</h1>
+          <h1 className="text-lg font-bold text-slate-800">Nº Passagens Acessorios, Oficina e Funilaria Audi</h1>
           <p className="text-xs text-slate-500 mt-0.5">Demonstrativo de Vendas e Bonificações</p>
         </div>
         <button

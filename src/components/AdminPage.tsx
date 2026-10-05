@@ -359,9 +359,9 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
             </div>
           </div>
 
-          {/* Passagem Oficina e Funilaria VW */}
+          {/* Nº Passagens Acessorios, Oficina e Funilaria VW */}
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Passagem Oficina e Funilaria VW</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nº Passagens Acessorios, Oficina e Funilaria VW</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {(['passagem_vw.cadastro', 'passagem_vw.passagens', 'passagem_vw.situacoes', 'passagem_vw.analise'] as VendasSubModuleId[]).map(s => (
                 <button
@@ -381,9 +381,9 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
             </div>
           </div>
 
-          {/* Passagem Oficina e Funilaria Audi */}
+          {/* Nº Passagens Acessorios, Oficina e Funilaria Audi */}
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Passagem Oficina e Funilaria Audi</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nº Passagens Acessorios, Oficina e Funilaria Audi</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {(['passagem_audi.cadastro', 'passagem_audi.passagens', 'passagem_audi.situacoes', 'passagem_audi.analise'] as VendasSubModuleId[]).map(s => (
                 <button
