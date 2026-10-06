@@ -33,6 +33,11 @@ const MONTHS = [
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
 ];
 
+const MONTHS_SHORT = [
+  'Jan','Fev','Mar','Abr','Mai','Jun',
+  'Jul','Ago','Set','Out','Nov','Dez',
+];
+
 function fmtNum(v: string): string {
   const n = parseFloat(v.replace(/\./g, '').replace(',', '.'));
   if (isNaN(n)) return v;
@@ -1165,10 +1170,10 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
             <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 700, color: '#111', width: `${DESC_PCT}%` }}>Descrição</th>
             {prevPeriods.map(p => (
               <th key={`${p.year}-${p.month}`} style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111', width: `${monthPct}%` }}>
-                {MONTHS[p.month - 1]}/{p.year}
+                {MONTHS_SHORT[p.month - 1]}/{String(p.year).slice(-2)}
               </th>
             ))}
-            <th style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111', width: `${monthPct}%` }}>{MONTHS[month - 1]}/{year}</th>
+            <th style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111', width: `${monthPct}%` }}>{MONTHS_SHORT[month - 1]}/{String(year).slice(-2)}</th>
             <th style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111', backgroundColor: '#cbd5e1', width: `${VAR_PCT}%` }}>Var. M/M</th>
             <th style={{ textAlign: 'center', padding: '4px 6px', fontWeight: 700, color: '#111', backgroundColor: '#cbd5e1', width: `${TOTAL_PCT}%` }}>Total</th>
           </tr>
