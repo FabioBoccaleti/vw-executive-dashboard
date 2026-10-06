@@ -29,6 +29,16 @@
   forced-color-adjust: none !important;
 }
 
+/* ─── DRE: evita quebra de linha nos valores numéricos das tabelas de ──────── */
+/* impressão (a coluna Descrição, a primeira, continua quebrando normalmente).  */
+/* Mantém a altura das linhas previsível para o auto-ajuste de escala.          */
+.print-table td:not(:first-child),
+.print-table th:not(:first-child),
+.vw-print-dept td:not(:first-child),
+.vw-print-dept th:not(:first-child) {
+  white-space: nowrap;
+}
+
 /* Reforço explícito quando dark mode está ativo */
 @media (prefers-color-scheme: dark) {
   .dre-header-red,

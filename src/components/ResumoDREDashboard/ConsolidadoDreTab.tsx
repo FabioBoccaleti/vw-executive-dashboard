@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, RefreshCw, Printer } from 'lucide-react';
 import { ScrollProgressBar } from './ScrollProgressBar';
+import { printWithAutoFit } from './printAutoFit';
 import {
   loadDreVw,
   createEmptyDreVwRow,
@@ -520,7 +521,7 @@ export function ConsolidadoDreTab({ year, month }: ConsolidadoDreTabProps) {
 
         {/* Botão Imprimir PDF */}
         <button
-          onClick={() => window.print()}
+          onClick={() => printWithAutoFit()}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors my-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200"
         >
           <Printer className="w-3.5 h-3.5" />
@@ -1155,7 +1156,7 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
         title={`CONSOLIDADO — ${deptLabel}${deptKey === 'direta' ? ' (VW somente)' : ''}`}
         subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`}
       />
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
+      <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
         <thead>
           <tr style={{ backgroundColor: '#e2e8f0', borderBottom: `2px solid ${CON_COLOR}` }}>
             <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 700, color: '#111', width: '22%' }}>Descrição</th>

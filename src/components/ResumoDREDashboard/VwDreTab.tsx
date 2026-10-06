@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Save, Loader2, RefreshCw, Trash2, Plus, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { ScrollProgressBar } from './ScrollProgressBar';
+import { printWithAutoFit } from './printAutoFit';
 import {
   loadDreVw,
   saveDreVw,
@@ -477,7 +478,7 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
 
         {/* Botão Imprimir PDF */}
         <button
-          onClick={() => window.print()}
+          onClick={() => printWithAutoFit()}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors my-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 mr-1"
         >
           <Printer className="w-3.5 h-3.5" />
@@ -1212,7 +1213,7 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
       <PrintHeader title={`VW NORTE — ${deptLabel}`} subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} />
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
+      <table className="vw-print-dept" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
         <thead>
           <tr style={{ backgroundColor: '#e2e8f0', borderBottom: `2px solid ${VW_COLOR}` }}>
             <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 700, color: '#111', width: '22%' }}>Descrição</th>

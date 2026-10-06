@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Save, Loader2, RefreshCw, Trash2, Plus, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { ScrollProgressBar } from './ScrollProgressBar';
+import { printWithAutoFit } from './printAutoFit';
 import {
   loadDreAudi,
   saveDreAudi,
@@ -465,7 +466,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
 
         {/* Botão Imprimir PDF */}
         <button
-          onClick={() => window.print()}
+          onClick={() => printWithAutoFit()}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-colors my-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 mr-1"
         >
           <Printer className="w-3.5 h-3.5" />
