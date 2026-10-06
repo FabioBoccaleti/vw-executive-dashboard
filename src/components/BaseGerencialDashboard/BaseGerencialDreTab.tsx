@@ -24,6 +24,7 @@ import {
   processDepartamentoData,
   type DepartamentoData,
 } from './baseGerencialDataProcessor';
+import { CustosRescisoesTab } from './CustosRescisoesTab';
 
 const MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
@@ -182,6 +183,7 @@ export function BaseGerencialDreTab({
   onYearChange,
 }: Props) {
   const [activeDepartment, setActiveDepartment] = useState<(typeof DEPARTMENTS)[number]>('Veículos Novos');
+  const [showCustos, setShowCustos] = useState(false);
   const [allDadosOperacionais, setAllDadosOperacionais] = useState<Record<string, { volumeVendas?: number }>>({});
   const [dreRules, setDreRules] = useState<BaseGerencialDreRules>({});
   const [departmentValues, setDepartmentValues] = useState<MonthlyValues>(createEmptyMonthlyValues);
@@ -404,9 +406,9 @@ export function BaseGerencialDreTab({
         {DEPARTMENTS.map(department => (
           <button
             key={department}
-            onClick={() => setActiveDepartment(department)}
+            onClick={() => { setActiveDepartment(department); setShowCustos(false); }}
             className={`px-3 py-2 text-xs font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
-              activeDepartment === department
+              !showCustos && activeDepartment === department
                 ? 'text-slate-700 border-emerald-600'
                 : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300'
             }`}
@@ -414,9 +416,22 @@ export function BaseGerencialDreTab({
             {department}
           </button>
         ))}
+        <button
+          key="custos-rescisoes"
+          onClick={() => setShowCustos(true)}
+          className={`px-3 py-2 text-xs font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
+            showCustos
+              ? 'text-slate-700 border-emerald-600'
+              : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300'
+          }`}
+        >
+          Custos de Rescisões
+        </button>
       </div>
 
-      {isAudiVendaDireta ? (
+      {showCustos ? (
+        <CustosRescisoesTab marca={marca} year={year} />
+      ) : isAudiVendaDireta ? (
         <div className="flex-1 flex items-center justify-center bg-white rounded-xl border border-slate-200 shadow-sm">
           <div className="text-center space-y-2">
             <p className="text-slate-500 font-medium">Dados incluídos em Veículos Novos</p>
