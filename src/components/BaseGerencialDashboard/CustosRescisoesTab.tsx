@@ -14,6 +14,8 @@ const ACCOUNTS = [
   '5510102004',
   '5510102008',
   '5520102013',
+  '5520102002',
+  '5520102004',
 ];
 
 // Departamentos (colunas) — seguem as regras por departamento já existentes.
