@@ -185,6 +185,11 @@ export function parseVal(v: string | number | undefined): number {
   if (s.includes(',')) {
     return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
   }
+  // Formato brasileiro inteiro: pontos apenas como separador de milhar, sem vírgula
+  // (ex: "24.238.266" gravado pela Base Gerencial) → remove todos os pontos
+  if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) {
+    return parseFloat(s.replace(/\./g, '')) || 0;
+  }
   // Formato inglês/neutro: ponto já é decimal (ex: "29762782.56") ou inteiro
   return parseFloat(s) || 0;
 }
