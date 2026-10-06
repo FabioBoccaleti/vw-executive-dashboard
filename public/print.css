@@ -30,12 +30,10 @@
 }
 
 /* ─── DRE: evita quebra de linha nos valores numéricos das tabelas de ──────── */
-/* impressão (a coluna Descrição, a primeira, continua quebrando normalmente).  */
-/* Mantém a altura das linhas previsível para o auto-ajuste de escala.          */
+/* impressão (a coluna Descrição, a primeira, e os cabeçalhos continuam         */
+/* podendo quebrar). Mantém a altura das linhas de dados previsível.            */
 .print-table td:not(:first-child),
-.print-table th:not(:first-child),
-.vw-print-dept td:not(:first-child),
-.vw-print-dept th:not(:first-child) {
+.vw-print-dept td:not(:first-child) {
   white-space: nowrap;
 }
 

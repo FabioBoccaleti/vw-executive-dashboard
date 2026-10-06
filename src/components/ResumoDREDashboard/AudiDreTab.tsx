@@ -1295,21 +1295,24 @@ function PrintDeptTable({
   month: number;
 }) {
   const totalCols = 1 + prevPeriods.length + 1 + 1 + 1;
+  const nMonths = prevPeriods.length + 1;
+  const DESC_PCT = 16, VAR_PCT = 6, TOTAL_PCT = 12;
+  const monthPct = (100 - DESC_PCT - VAR_PCT - TOTAL_PCT) / nMonths;
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
       <PrintHeader title={`Audi Lapa/Pinheiros — ${deptLabel}`} subtitle={`${MONTHS[month - 1]} de ${year}`} />
-      <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
+      <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt', tableLayout: 'fixed' }}>
         <thead>
           <tr style={{ backgroundColor: '#e2e8f0', borderBottom: '2px solid #bb0a30' }}>
-            <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 700, color: '#111111', fontSize: '9pt', width: '28%' }}>Descrição</th>
+            <th style={{ textAlign: 'left', padding: '4px 6px', fontWeight: 700, color: '#111111', width: `${DESC_PCT}%` }}>Descrição</th>
             {prevPeriods.map(p => (
-              <th key={`${p.year}-${p.month}`} style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111111', fontSize: '9pt', width: '14%' }}>
+              <th key={`${p.year}-${p.month}`} style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111111', width: `${monthPct}%` }}>
                 {MONTHS[p.month - 1]}/{p.year}
               </th>
             ))}
-            <th style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111111', fontSize: '9pt', width: '14%' }}>{MONTHS[month - 1]}/{year}</th>
-            <th style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111111', fontSize: '9pt', width: '10%', borderLeft: '1px solid #94a3b8' }}>Var. M/M</th>
-            <th style={{ textAlign: 'center', padding: '4px 6px', fontWeight: 700, color: '#111111', fontSize: '9pt', backgroundColor: '#cbd5e1', width: '14%' }}>Total</th>
+            <th style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111111', width: `${monthPct}%` }}>{MONTHS[month - 1]}/{year}</th>
+            <th style={{ textAlign: 'center', padding: '4px 4px', fontWeight: 700, color: '#111111', width: `${VAR_PCT}%`, borderLeft: '1px solid #94a3b8' }}>Var. M/M</th>
+            <th style={{ textAlign: 'center', padding: '4px 6px', fontWeight: 700, color: '#111111', backgroundColor: '#cbd5e1', width: `${TOTAL_PCT}%` }}>Total</th>
           </tr>
         </thead>
         <tbody>
