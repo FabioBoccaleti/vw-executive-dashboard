@@ -1253,9 +1253,10 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
             const totalVal = isQuant
               ? (() => { const t = deptList.reduce((s, dep) => s + (parseInt(dep.quant) || 0), 0); return t > 0 ? t.toString() : '—'; })()
               : (() => {
-                  const s = line.field === 'receitaOperacionalLiquida'
-                    ? DEPTS.reduce((acc, dept) => dept.key === 'adm' ? acc : acc + parseVal(data[dept.key][line.field]), 0)
-                    : parseVal(sumDepts(deptList, line.field));
+                  const s = DEPTS.reduce((acc, d) => {
+                    if (d.key === 'adm' && line.field === 'receitaOperacionalLiquida') return acc;
+                    return acc + parseVal(data[d.key][line.field]);
+                  }, 0);
                   return s !== 0 ? formatDreAmount(s) : '—';
                 })();
             const rowStyle: React.CSSProperties = line.isTotal
