@@ -815,13 +815,15 @@ export default function AnaliseVendaProdutos() {
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="bg-violet-700 text-white">
-                        {['Código', 'Descrição', 'Qtde', 'Receita Bruta', 'Rec. Líq.', 'Lucro Bruto', '% Margem'].map(h => (
+                        {['Código', 'Descrição', 'Qtde', 'Receita Bruta', 'Rec. Líq.', 'Lucro Bruto', '% Margem', 'Lucro Líq.', '% L. Líq.'].map(h => (
                           <th key={h} className="px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {productData.map((p, i) => (
+                      {productData.map((p, i) => {
+                        const pLiqPct = p.recLiq !== 0 ? p.lucroLiquido / p.recLiq * 100 : 0;
+                        return (
                         <tr key={p.pub} className={i % 2 === 0 ? 'bg-white' : 'bg-violet-50/40'}>
                           <td className="px-2.5 py-1.5 font-mono font-bold text-violet-700 text-[11px]">{p.pub}</td>
                           <td className="px-2.5 py-1.5 text-slate-500 text-[10px] max-w-[160px] truncate">{p.des || '—'}</td>
@@ -830,8 +832,11 @@ export default function AnaliseVendaProdutos() {
                           <td className="px-2.5 py-1.5 font-mono text-right text-teal-700 text-[11px]">{fmtBRL(p.recLiq)}</td>
                           <td className={`px-2.5 py-1.5 font-mono text-right font-semibold text-[11px] ${p.lucroBruto >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtBRL(p.lucroBruto)}</td>
                           <td className={`px-2.5 py-1.5 font-mono text-right font-semibold text-[11px] ${p.lbPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtPct(p.lbPct)}</td>
+                          <td className={`px-2.5 py-1.5 font-mono text-right font-semibold text-[11px] ${p.lucroLiquido >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtBRL(p.lucroLiquido)}</td>
+                          <td className={`px-2.5 py-1.5 font-mono text-right font-semibold text-[11px] ${pLiqPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmtPct(pLiqPct)}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                       <tr className="bg-violet-100 font-bold border-t-2 border-violet-300">
                         <td colSpan={2} className="px-2.5 py-1.5 text-violet-800 text-[10px] uppercase tracking-wide">Total</td>
                         <td className="px-2.5 py-1.5 font-mono text-right text-slate-700">{fmtQtd(metrics.qtd)}</td>
@@ -839,6 +844,8 @@ export default function AnaliseVendaProdutos() {
                         <td className="px-2.5 py-1.5 font-mono text-right text-teal-800">{fmtBRL(metrics.recLiq)}</td>
                         <td className={`px-2.5 py-1.5 font-mono text-right ${metrics.lucroBruto >= 0 ? 'text-emerald-800' : 'text-rose-700'}`}>{fmtBRL(metrics.lucroBruto)}</td>
                         <td className={`px-2.5 py-1.5 font-mono text-right ${metrics.lbPct >= 0 ? 'text-emerald-800' : 'text-rose-700'}`}>{fmtPct(metrics.lbPct)}</td>
+                        <td className={`px-2.5 py-1.5 font-mono text-right ${margemLiquidaValor >= 0 ? 'text-emerald-800' : 'text-rose-700'}`}>{fmtBRL(margemLiquidaValor)}</td>
+                        <td className={`px-2.5 py-1.5 font-mono text-right ${margemLiquidaPct >= 0 ? 'text-emerald-800' : 'text-rose-700'}`}>{fmtPct(margemLiquidaPct)}</td>
                       </tr>
                     </tbody>
                   </table>
