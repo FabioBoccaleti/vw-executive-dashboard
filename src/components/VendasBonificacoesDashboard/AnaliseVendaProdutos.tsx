@@ -3,8 +3,10 @@ import {
   ComposedChart, Bar, Line, BarChart, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, ChevronDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { loadProdutosRows } from './produtosMonitoradosStorage';
+import { loadVendasDsr, type VendasDsrConfig } from './vendedoresRemuneracaoStorage';
+import { loadRemuneracaoProdutos, type RemuneracaoProdutosMap } from './remuneracaoProdutosStorage';
 import type { VPecasItemRow } from './vPecasItemStorage';
 
 // ─── Paleta ───────────────────────────────────────────────────────────────────
@@ -75,6 +77,55 @@ function aggRows(rows: VPecasItemRow[]): Agg {
 }
 
 type RankKey = 'valVenda' | 'recLiq' | 'lucroBruto';
+
+// ─── Remuneração por Produto ───────────────────────────────────────────────────
+type RemunMode = 'total' | 'com' | 'dsr' | 'provEnc';
+
+const parseRemunVal = (s?: string | null) =>
+  parseFloat(String(s ?? '').replace(/\./g, '').replace(',', '.')) || 0;
+
+const AVATAR_BG = ['#7c3aed', '#f97316', '#10b981', '#ef4444', '#0d9488', '#f59e0b', '#e879f9', '#06b6d4'];
+function avatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_BG[Math.abs(h) % AVATAR_BG.length];
+}
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+}
+
+function dsrPctForRow(cfgs: VendasDsrConfig[], r: VPecasItemRow): number {
+  const p = rowPeriod(r);
+  if (!p) return 0;
+  const c = cfgs.find(x => x.ano === p.year && x.mes === p.month);
+  return c ? parseFloat(c.percentual) || 0 : 0;
+}
+
+// Remuneração de uma linha de venda de produto, seguindo a regra do gráfico
+// "Remunerações e Comissões" (Novos): base = comissão/prêmio + DSR;
+// prov = base × 7/36; enc = (base + prov) × 0,358.
+// Comissão = % sobre a Receita Bruta (VAL_VENDA) e gera DSR (% do mês da venda).
+// Prêmio = valor fixo × quantidade vendida (sem DSR).
+function calcRemunRow(r: VPecasItemRow, remMap: RemuneracaoProdutosMap, dsrCfg: VendasDsrConfig[]) {
+  const code = r.data['ITEM_ESTOQUE_PUB']?.trim() || '';
+  const rem = remMap[code];
+  if (!rem) return null;
+  const valor = parseRemunVal(rem.valor);
+  if (valor <= 0) return null;
+  let com = 0, dsr = 0;
+  if (rem.tipo === 'comissao') {
+    com = n(r.data['VAL_VENDA']) * valor / 100;
+    dsr = com * dsrPctForRow(dsrCfg, r) / 100;
+  } else {
+    com = valor * n(r.data['QUANTIDADE']);
+  }
+  const base = com + dsr;
+  const prov = base * 7 / 36;
+  const enc  = (base + prov) * 0.358;
+  return { com, dsr, prov, enc };
+}
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 function SH({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
@@ -291,8 +342,15 @@ export default function AnaliseVendaProdutos() {
   const [cmpMetric,  setCmpMetric]  = useState<RankKey>('valVenda');
   const [showPrevYear, setShowPrevYear] = useState(false);
 
+  const [remMap, setRemMap]             = useState<RemuneracaoProdutosMap>({});
+  const [dsrCfg, setDsrCfg]             = useState<VendasDsrConfig[]>([]);
+  const [remunMode, setRemunMode]       = useState<RemunMode>('total');
+  const [showAllRemun, setShowAllRemun] = useState(false);
+
   useEffect(() => {
-    loadProdutosRows().then(rows => {
+    Promise.all([loadProdutosRows(), loadRemuneracaoProdutos(), loadVendasDsr()]).then(([rows, rem, dsr]) => {
+      setRemMap(rem);
+      setDsrCfg(dsr);
       setAllRows(rows);
       if (rows.length > 0) {
         const years = rows.map(getYr).filter(y => y > 2000);
@@ -445,6 +503,31 @@ export default function AnaliseVendaProdutos() {
     }
     return entry;
   }), [yearRows, topVendors, cmpMetric]);
+
+  // ─── Remuneração por Vendedor (Comissão/Prêmio + DSR + Prov.+Enc.) ──────────
+  const remuneracaoVendorData = useMemo(() => {
+    const map = new Map<string, { com: number; dsr: number; prov: number; enc: number }>();
+    for (const r of filteredRows) {
+      const c = calcRemunRow(r, remMap, dsrCfg);
+      if (!c) continue;
+      const k = r.data['NOME_VENDEDOR']?.trim() || '(sem vendedor)';
+      const prev = map.get(k) ?? { com: 0, dsr: 0, prov: 0, enc: 0 };
+      map.set(k, { com: prev.com + c.com, dsr: prev.dsr + c.dsr, prov: prev.prov + c.prov, enc: prev.enc + c.enc });
+    }
+    return [...map.entries()]
+      .map(([name, d]) => ({ name, com: d.com, dsr: d.dsr, provEnc: d.prov + d.enc, total: d.com + d.dsr + d.prov + d.enc }))
+      .sort((a, b) => b.total - a.total);
+  }, [filteredRows, remMap, dsrCfg]);
+
+  const remunTotals = useMemo(() => ({
+    com:     remuneracaoVendorData.reduce((s, v) => s + v.com, 0),
+    dsr:     remuneracaoVendorData.reduce((s, v) => s + v.dsr, 0),
+    provEnc: remuneracaoVendorData.reduce((s, v) => s + v.provEnc, 0),
+    total:   remuneracaoVendorData.reduce((s, v) => s + v.total, 0),
+  }), [remuneracaoVendorData]);
+
+  const remunVisible = showAllRemun ? remuneracaoVendorData : remuneracaoVendorData.slice(0, 8);
+  const remunPeriodLabel = month !== null ? `${MS[month - 1].toUpperCase()}/${year}` : `Ano ${year}`;
 
   // Prev key for monthly chart line
   const prevDataKey = `prev${cmpMetric.charAt(0).toUpperCase()}${cmpMetric.slice(1)}` as 'prevValVenda' | 'prevRecLiq' | 'prevLucroBruto';
@@ -859,6 +942,112 @@ export default function AnaliseVendaProdutos() {
               </>
             )}
           </div>
+        </div>
+
+        {/* ── Remunerações por Produto (por vendedor) ── */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+            <SH>Remunerações por Produto — {remunPeriodLabel}</SH>
+            <div className="flex items-center gap-2 flex-wrap">
+              {([
+                { key: 'total',   label: 'Total Folha' },
+                { key: 'com',     label: 'Comissão/Prêmio' },
+                { key: 'dsr',     label: 'DSR' },
+                { key: 'provEnc', label: 'Prov.+Enc.' },
+              ] as { key: RemunMode; label: string }[]).map(opt => (
+                <button key={opt.key} onClick={() => setRemunMode(opt.key)}
+                  className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${
+                    remunMode === opt.key
+                      ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-700'
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {remuneracaoVendorData.length === 0 ? (
+            <div className="py-10 text-center text-sm text-slate-400">
+              Nenhuma remuneração calculada para este período. Cadastre a remuneração dos produtos em{' '}
+              <strong>Cadastros → Remuneração Produtos</strong>.
+            </div>
+          ) : (
+            <>
+              {/* Sub-totais */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                {[
+                  { label: 'Total Folha',     value: remunTotals.total,   color: '#ef4444', bcolor: 'border-red-300' },
+                  { label: 'Comissão/Prêmio', value: remunTotals.com,     color: '#3b82f6', bcolor: 'border-blue-300' },
+                  { label: 'DSR',             value: remunTotals.dsr,     color: '#10b981', bcolor: 'border-emerald-300' },
+                  { label: 'Prov.+Enc.',      value: remunTotals.provEnc, color: '#64748b', bcolor: 'border-slate-300' },
+                ].map(item => (
+                  <div key={item.label} className={`rounded-xl bg-slate-50 border ${item.bcolor} border-l-4 px-4 py-3`}>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold mb-1">{item.label}</p>
+                    <p className="text-sm font-bold font-mono" style={{ color: item.color }}>{fmtBRLF(item.value)}</p>
+                    {item.label !== 'Total Folha' && remunTotals.total > 0 && (
+                      <p className="text-[10px] text-slate-400 mt-0.5">{fmtPct(item.value / remunTotals.total * 100)} do total</p>
+                    )}
+                    {item.label === 'Total Folha' && metrics.valVenda > 0 && (
+                      <p className="text-[10px] text-slate-400 mt-0.5">{fmtPct(item.value / metrics.valVenda * 100)} da receita</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Ranking individual */}
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-3">Ranking individual</p>
+              <div className="space-y-0.5">
+                {remunVisible.map((v, i) => {
+                  const barColors: Record<RemunMode, string> = { total: '#ef4444', com: '#3b82f6', dsr: '#10b981', provEnc: '#64748b' };
+                  const displayVal = remunMode === 'com' ? v.com : remunMode === 'dsr' ? v.dsr : remunMode === 'provEnc' ? v.provEnc : v.total;
+                  const topVal = (remuneracaoVendorData[0]?.[remunMode] ?? 1) as number;
+                  const barPct = topVal > 0 ? Math.min(100, (displayVal / topVal) * 100) : 0;
+                  const barColor = barColors[remunMode];
+                  return (
+                    <div key={v.name} className="flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-slate-50 transition-colors group">
+                      <span className="text-xs font-bold text-slate-300 w-5 text-right flex-shrink-0">{i + 1}</span>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
+                        style={{ background: avatarColor(v.name) }}>
+                        {getInitials(v.name)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-xs font-semibold text-slate-700 truncate">{v.name}</span>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            {remunMode === 'total' && (
+                              <div className="hidden sm:flex gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span className="text-[10px] text-blue-500 font-mono tabular-nums">C/P {fmtBRL(v.com)}</span>
+                                <span className="text-[10px] text-emerald-500 font-mono tabular-nums">DSR {fmtBRL(v.dsr)}</span>
+                                <span className="text-[10px] text-slate-400 font-mono tabular-nums">Enc {fmtBRL(v.provEnc)}</span>
+                              </div>
+                            )}
+                            <div className="text-right">
+                              <p className="text-[10px] text-slate-400 leading-none mb-0.5">
+                                {remunMode === 'total' ? 'Total Folha' : remunMode === 'com' ? 'Comissão/Prêmio' : remunMode === 'dsr' ? 'DSR' : 'Prov.+Enc.'}
+                              </p>
+                              <p className="text-xs font-mono font-bold tabular-nums" style={{ color: barColor }}>{fmtBRL(displayVal)}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-1">
+                          <div className="h-1 rounded-full transition-all duration-300" style={{ width: `${barPct}%`, background: barColor }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {remuneracaoVendorData.length > 8 && (
+                <button onClick={() => setShowAllRemun(v => !v)}
+                  className="mt-3 w-full text-center text-xs font-semibold text-slate-400 hover:text-slate-700 py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5">
+                  {showAllRemun
+                    ? <><ChevronUp className="w-3.5 h-3.5" /> Mostrar menos</>
+                    : <><ChevronDown className="w-3.5 h-3.5" /> Ver todos os {remuneracaoVendorData.length} vendedores</>}
+                </button>
+              )}
+            </>
+          )}
         </div>
 
       </div>

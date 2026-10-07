@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Users, Car, CalendarCog, Receipt } from 'lucide-react';
+import { Users, Car, CalendarCog, Receipt, Boxes } from 'lucide-react';
 import { VeiculosRegrasPage } from './VeiculosRegrasPage';
 import { VendedoresRemuneracaoPage } from './VendedoresRemuneracaoPage';
 import { VendasDsrSection } from './VendasDsrSection';
 import { AliquotasImpostoSection } from './AliquotasImpostoSection';
+import { RemuneracaoProdutosSection } from './RemuneracaoProdutosSection';
 
-type SectionId = 'vendedores' | 'veiculos' | 'dsr' | 'aliquotas';
+type SectionId = 'vendedores' | 'remuneracaoProdutos' | 'veiculos' | 'dsr' | 'aliquotas';
 
 interface MenuItem {
   id: SectionId;
@@ -20,6 +21,12 @@ const MENU_ITEMS: MenuItem[] = [
     label: 'Vendedores e Regra de Remuneração de Venda de Veículos',
     description: 'Percentuais de comissão e bônus de produtividade por modalidade de venda',
     icon: <Users className="w-5 h-5" />,
+  },
+  {
+    id: 'remuneracaoProdutos',
+    label: 'Remuneração Produtos',
+    description: 'Regras de remuneração por produto',
+    icon: <Boxes className="w-5 h-5" />,
   },
   {
     id: 'veiculos',
@@ -88,6 +95,8 @@ export function CadastrosVWPage() {
 
           {/* Placeholders — conteúdo será implementado futuramente */}
           {activeSection === 'vendedores' && <VendedoresRemuneracaoPage />}
+
+          {activeSection === 'remuneracaoProdutos' && <RemuneracaoProdutosSection />}
 
           {activeSection === 'veiculos' && <VeiculosRegrasPage />}
 
