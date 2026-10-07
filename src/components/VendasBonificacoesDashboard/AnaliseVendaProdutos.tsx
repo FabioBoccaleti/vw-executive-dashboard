@@ -76,7 +76,7 @@ function aggRows(rows: VPecasItemRow[]): Agg {
     lbPct: recLiq !== 0 ? lucroBruto / recLiq * 100 : 0 };
 }
 
-type RankKey = 'valVenda' | 'recLiq' | 'lucroBruto';
+type RankKey = 'valVenda' | 'recLiq' | 'lucroBruto' | 'lucroLiquido';
 
 // ─── Remuneração por Produto ───────────────────────────────────────────────────
 type RemunMode = 'total' | 'com' | 'dsr' | 'provEnc';
@@ -157,11 +157,12 @@ function KpiCard({ label, value, sub, color = 'text-slate-800', accent, delta, d
   );
 }
 
-function MetricToggle({ value, onChange }: { value: RankKey; onChange: (v: RankKey) => void }) {
+function MetricToggle({ value, onChange, withLucroLiquido = false }: { value: RankKey; onChange: (v: RankKey) => void; withLucroLiquido?: boolean }) {
   const opts: { k: RankKey; label: string }[] = [
     { k: 'valVenda',   label: 'Receita Bruta' },
     { k: 'recLiq',     label: 'Rec. Líquida' },
     { k: 'lucroBruto', label: 'Lucro Bruto' },
+    ...(withLucroLiquido ? [{ k: 'lucroLiquido' as RankKey, label: 'Lucro Líquido' }] : []),
   ];
   return (
     <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
@@ -455,9 +456,13 @@ export default function AnaliseVendaProdutos() {
     }
     return [...map.values()].map(({ pub, des, rows }) => {
       const a = aggRows(rows);
-      return { pub, des, ...a };
+      const folha = rows.reduce((s, r) => {
+        const c = calcRemunRow(r, remMap, dsrCfg);
+        return s + (c ? c.com + c.dsr + c.prov + c.enc : 0);
+      }, 0);
+      return { pub, des, ...a, lucroLiquido: a.lucroBruto - folha };
     }).sort((a, b) => b[rankMetric] - a[rankMetric]);
-  }, [filteredRows, rankMetric]);
+  }, [filteredRows, rankMetric, remMap, dsrCfg]);
 
   const productMax     = useMemo(() => Math.max(...productData.map(p => p[rankMetric]), 1), [productData, rankMetric]);
   const productPieData = useMemo(() => {
@@ -478,9 +483,13 @@ export default function AnaliseVendaProdutos() {
     }
     return [...map.entries()].map(([name, rows]) => {
       const a = aggRows(rows);
-      return { name, ...a };
+      const folha = rows.reduce((s, r) => {
+        const c = calcRemunRow(r, remMap, dsrCfg);
+        return s + (c ? c.com + c.dsr + c.prov + c.enc : 0);
+      }, 0);
+      return { name, ...a, lucroLiquido: a.lucroBruto - folha };
     }).sort((a, b) => b[rankMetric] - a[rankMetric]);
-  }, [filteredRows, rankMetric]);
+  }, [filteredRows, rankMetric, remMap, dsrCfg]);
 
   const vendorMax     = useMemo(() => Math.max(...vendorData.map(v => v[rankMetric]), 1), [vendorData, rankMetric]);
   const vendorPieData = useMemo(() => {
@@ -543,7 +552,7 @@ export default function AnaliseVendaProdutos() {
   const prevDataKey = `prev${cmpMetric.charAt(0).toUpperCase()}${cmpMetric.slice(1)}` as 'prevValVenda' | 'prevRecLiq' | 'prevLucroBruto';
 
   const metricLabel: Record<RankKey, string> = {
-    valVenda: 'Receita Bruta', recLiq: 'Rec. Líquida', lucroBruto: 'Lucro Bruto',
+    valVenda: 'Receita Bruta', recLiq: 'Rec. Líquida', lucroBruto: 'Lucro Bruto', lucroLiquido: 'Lucro Líquido',
   };
   const deltaLabel = month !== null ? 'vs mesmo mês ano ant.' : 'vs ano anterior';
 
@@ -647,7 +656,7 @@ export default function AnaliseVendaProdutos() {
               deltaLabel="pp vs ant."
             />
             <KpiCard
-              label="Margem Líquida"
+              label="Lucro Líquido"
               value={fmtBRL(margemLiquidaValor)}
               color={margemLiquidaValor >= 0 ? 'text-emerald-700' : 'text-rose-600'}
               accent={margemLiquidaValor >= 0 ? EMERALD : ROSE}
@@ -735,7 +744,7 @@ export default function AnaliseVendaProdutos() {
 
         {/* ─── Rankings ──────────────────────────────────────────────────── */}
         <div>
-          <SH right={<MetricToggle value={rankMetric} onChange={setRankMetric} />}>
+          <SH right={<MetricToggle value={rankMetric} onChange={setRankMetric} withLucroLiquido />}>
             Rankings — ordenado por {metricLabel[rankMetric]}
           </SH>
         </div>
@@ -928,7 +937,7 @@ export default function AnaliseVendaProdutos() {
                   <table className="w-full text-xs border-collapse">
                     <thead>
                       <tr className="bg-violet-700 text-white">
-                        {['#', 'Vendedor', 'Qtde', 'Receita Bruta', 'Rec. Líq.', 'Lucro Bruto', '% Margem', 'Margem Líq.', '% M. Líq.'].map(h => (
+                        {['#', 'Vendedor', 'Qtde', 'Receita Bruta', 'Rec. Líq.', 'Lucro Bruto', '% Margem', 'Lucro Líq.', '% L. Líq.'].map(h => (
                           <th key={h} className="px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
