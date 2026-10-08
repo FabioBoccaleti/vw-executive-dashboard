@@ -1,12 +1,15 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, AlertCircle, Car, DollarSign, Percent, CalendarClock, Wallet } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronRight, AlertCircle, Car, DollarSign, Percent, CalendarClock, Wallet, Printer, FileDown } from 'lucide-react';
+import { toast } from 'sonner';
 import { getMonitoramentoBVDay, listMonitoramentoBVDates, type MonitoramentoBVBrand } from './storage';
 import { analyzeDay, FAIXAS, PRODUTO_LINHA_ESPECIAL, type BucketResult, type DayAnalysis, type EspecialResumo } from './analysis';
+import { exportAnaliseExcel } from './export';
 
 interface Props {
   brand: MonitoramentoBVBrand;
 }
 
+const BRAND_LABEL: Record<MonitoramentoBVBrand, string> = { vw: 'VW', audi: 'Audi' };
 const MONTHS_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 const fmtBRL = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -18,6 +21,41 @@ function formatDateBR(iso: string) {
   return `${day}/${month}/${year}`;
 }
 
+function printAnalise() {
+  const printSource = document.getElementById('monitoramento-print-area');
+  const root = document.getElementById('print-root');
+  if (!printSource || !root) { window.print(); return; }
+
+  const clone = printSource.cloneNode(true) as HTMLElement;
+  clone.style.display = 'block';
+  root.innerHTML = clone.outerHTML;
+
+  const style = document.createElement('style');
+  style.textContent = `
+    @page { size: A4 landscape; margin: 1cm; }
+    #print-root { font-family: Inter, sans-serif; background: white; }
+    #print-root, #print-root * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      forced-color-adjust: none !important;
+      color-scheme: light !important;
+    }
+    #print-root .break-inside-avoid {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+  `;
+  document.head.appendChild(style);
+
+  window.onafterprint = () => {
+    document.head.removeChild(style);
+    root.innerHTML = '';
+    window.onafterprint = null;
+  };
+
+  window.print();
+}
+
 export function AnaliseTab({ brand }: Props) {
   const [dates, setDates] = useState<string[]>([]);
   const [year, setYear] = useState<number>(new Date().getFullYear());
@@ -26,11 +64,20 @@ export function AnaliseTab({ brand }: Props) {
   const [analyses, setAnalyses] = useState<Record<string, DayAnalysis>>({});
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const initRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     void listMonitoramentoBVDates(brand).then(result => {
-      if (!cancelled) setDates(result);
+      if (cancelled) return;
+      setDates(result);
+      // Na primeira carga da marca, abre no ano/mês do dia mais recente importado.
+      if (!initRef.current && result.length > 0) {
+        const latest = result[0];
+        setYear(Number(latest.slice(0, 4)));
+        setMonth(Number(latest.slice(5, 7)));
+        initRef.current = true;
+      }
     });
     return () => { cancelled = true; };
   }, [brand]);
@@ -157,7 +204,35 @@ export function AnaliseTab({ brand }: Props) {
             <p className="text-sm text-slate-500">Selecione ao menos um dia.</p>
           ) : singleAnalysis ? (
             singleAnalysis.reconhecido ? (
-              <SingleDayView analysis={singleAnalysis} expanded={expanded} setExpanded={setExpanded} />
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-end gap-2 no-print">
+                  <button
+                    onClick={printAnalise}
+                    className="inline-flex items-center gap-1.5 border border-slate-300 text-slate-700 rounded px-3 py-1.5 text-sm font-semibold hover:bg-slate-50"
+                  >
+                    <Printer className="w-4 h-4" />Imprimir PDF
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await exportAnaliseExcel(brand, singleAnalysis);
+                      } catch {
+                        toast.error('Não foi possível gerar o Excel.');
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 bg-emerald-600 text-white rounded px-3 py-1.5 text-sm font-semibold hover:bg-emerald-700"
+                  >
+                    <FileDown className="w-4 h-4" />Exportar Excel
+                  </button>
+                </div>
+                <div id="monitoramento-print-area">
+                  <div className="mb-4">
+                    <h2 className="text-base font-bold text-slate-800">Monitoramento de Custo Financeiro Estoque Rotativo Banco Volks</h2>
+                    <p className="text-xs text-slate-500">{BRAND_LABEL[brand]} · {formatDateBR(singleAnalysis.date)}</p>
+                  </div>
+                  <SingleDayView analysis={singleAnalysis} expanded={expanded} setExpanded={setExpanded} />
+                </div>
+              </div>
             ) : (
               <div className="py-12 text-center text-amber-700 bg-amber-50 border border-amber-200 rounded-lg">
                 Não foi possível reconhecer a tabela (coluna "Chassi") no arquivo de {formatDateBR(singleAnalysis.date)}.
@@ -176,7 +251,7 @@ export function AnaliseTab({ brand }: Props) {
 
 function KpiCard({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: string; accent: string }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-4 flex items-center gap-3">
+    <div className="bg-white border border-slate-200 rounded-lg p-4 flex items-center gap-3 break-inside-avoid">
       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${accent}`}>{icon}</div>
       <div>
         <p className="text-xs text-slate-500">{label}</p>
@@ -263,7 +338,7 @@ function ProdutoTable({
   total: DayAnalysis['vendidos'];
 }) {
   return (
-    <div>
+    <div className="break-inside-avoid">
       <h3 className="text-sm font-bold text-slate-700 mb-2">{title}</h3>
       <div className="overflow-auto border border-slate-200 rounded-lg">
         <table className="min-w-full text-xs">
@@ -316,7 +391,7 @@ function EspecialSection({
   setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }) {
   return (
-    <div className="border border-sky-200 rounded-lg p-4 bg-sky-50/40 space-y-3">
+    <div className="border border-sky-200 rounded-lg p-4 bg-sky-50/40 space-y-3 break-inside-avoid">
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center flex-shrink-0">
           <Wallet className="w-5 h-5 text-sky-600" />
@@ -425,7 +500,7 @@ function EspecialSection({
 
 function GrupoCard({ title, grupo, accent }: { title: string; grupo: DayAnalysis['vendidos']; accent: string }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-4">
+    <div className="bg-white border border-slate-200 rounded-lg p-4 break-inside-avoid">
       <p className={`text-sm font-bold ${accent}`}>{title}</p>
       <div className="grid grid-cols-3 gap-2 mt-3">
         <div>
@@ -465,7 +540,7 @@ function FaixasTable({
   const totalValor = buckets.reduce((sum, b) => sum + b.valorNf, 0);
 
   return (
-    <div>
+    <div className="break-inside-avoid">
       <h3 className="text-sm font-bold text-slate-700">{title}</h3>
       <p className="text-xs text-slate-400 mb-2">{subtitle}</p>
       <div className="overflow-hidden border border-slate-200 rounded-lg">

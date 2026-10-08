@@ -62,7 +62,7 @@ function parseWorkbook(
 export function MonitoramentoCustoFinanceiroBVDashboard({ onBack }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [brand, setBrand] = useState<MonitoramentoBVBrand>('vw');
-  const [view, setView] = useState<'importacao' | 'analise'>('importacao');
+  const [view, setView] = useState<'importacao' | 'analise'>('analise');
   const [date, setDate] = useState<string>(todayISO());
   const [data, setData] = useState<MonitoramentoBVDayData | null>(null);
   const [importedDates, setImportedDates] = useState<string[]>([]);
