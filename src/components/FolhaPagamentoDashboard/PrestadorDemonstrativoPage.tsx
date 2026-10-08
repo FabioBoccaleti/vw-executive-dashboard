@@ -870,22 +870,40 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
       // Base trimestral: soma o Lucro Líquido do trimestre-calendário anterior
       // (3 meses), apenas quando o demonstrativo é o primeiro mês após o
       // fechamento do trimestre. Fora disso, trimestralByDept fica null → base 0.
+      // Cada mês é resolvido como no item de mês único: prioriza o Dashboard
+      // Executivo e usa resumo_dre como fallback. Isso evita perder o mês mais
+      // recente do trimestre, que às vezes só existe no resumo_dre.
       const quarterMonths = previousQuarterMonths(year, month);
       let trimestralByDept: Record<string, number> | null = null;
       if (quarterMonths.length === 3) {
         const acc = Object.fromEntries(deptEntries.map(([dk]) => [dk, 0])) as Record<string, number>;
-        const quarterYears = [...new Set(quarterMonths.map(q => q.year))];
-        for (const qy of quarterYears) {
-          const qResults = await Promise.all(
-            deptEntries.map(([dk, dept]) =>
-              loadDREDataAsync(qy as 2024 | 2025 | 2026 | 2027, dept as any, brand).then(d => ({ dk, d }))
-            )
-          );
-          for (const { dk, d } of qResults) {
-            for (const qm of quarterMonths) {
-              if (qm.year !== qy) continue;
-              acc[dk] += extractLucroLiquido(d, qm.month - 1);
-            }
+        const monthRows = await Promise.all(
+          quarterMonths.map(async qm => {
+            const qKey = `resumo_dre:${prestador.brand}:${qm.year}-${String(qm.month).padStart(2, '0')}`;
+            const qYr = qm.year as 2024 | 2025 | 2026 | 2027;
+            const [qKvRow, qDreResults] = await Promise.all([
+              kvGet<any>(qKey),
+              Promise.all(
+                deptEntries.map(([dk, dept]) =>
+                  loadDREDataAsync(qYr, dept as any, brand).then(d => ({ dk, d }))
+                )
+              ),
+            ]);
+            const qSynthetic = Object.fromEntries(
+              qDreResults.map(({ dk, d }) => [dk, extractLucroLiquido(d, qm.month - 1)])
+            ) as Record<string, number>;
+            const useSynthetic = Object.values(qSynthetic).some(v => v !== 0);
+            return Object.fromEntries(
+              deptEntries.map(([dk]) => [
+                dk,
+                useSynthetic ? qSynthetic[dk] : parseValDre(qKvRow?.[dk]?.lucroLiquidoExercicio),
+              ])
+            ) as Record<string, number>;
+          })
+        );
+        for (const row of monthRows) {
+          for (const [dk] of deptEntries) {
+            acc[dk] += Number(row[dk] ?? 0);
           }
         }
         trimestralByDept = acc;
