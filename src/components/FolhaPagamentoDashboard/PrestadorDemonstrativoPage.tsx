@@ -168,6 +168,28 @@ function nextMonth(y: number, m: number) {
   return m === 12 ? { year: y + 1, month: 1 } : { year: y, month: m + 1 };
 }
 
+/** Meses dos quais o demonstrativo é o primeiro mês de um novo trimestre-calendário. */
+const QUARTER_START_MONTHS = [1, 4, 7, 10];
+
+/**
+ * Retorna os 3 meses do trimestre-calendário anterior, mas apenas quando o
+ * demonstrativo (`month`) é o primeiro mês após o fechamento do trimestre
+ * (janeiro, abril, julho ou outubro). Nos demais meses retorna lista vazia,
+ * de modo que a base trimestral fica zerada.
+ *
+ * Ex.: Outubro → [Set, Ago, Jul]; Julho → [Jun, Mai, Abr]; Janeiro → [Dez, Nov, Out do ano anterior].
+ */
+function previousQuarterMonths(year: number, month: number): Array<{ year: number; month: number }> {
+  if (!QUARTER_START_MONTHS.includes(month)) return [];
+  const months: Array<{ year: number; month: number }> = [];
+  let cur = { year, month };
+  for (let i = 0; i < 3; i++) {
+    cur = prevMonth(cur.year, cur.month);
+    months.push(cur);
+  }
+  return months;
+}
+
 // ─── Selector de Período ──────────────────────────────────────────────────────
 
 function PeriodSelector({
@@ -407,7 +429,9 @@ function DemonstrativoTable({
                           <>
                             <div className="text-sm font-medium text-slate-700 tabular-nums">{fmtBRL(item.valorBaseCalculo)}</div>
                             <div className="text-[10px] text-slate-700 mt-0.5">
-                              {MONTHS_SHORT[dreMonth - 1]}/{String(dreYear).slice(-2)}
+                              {item.descricao === DESCRICAO_TRIMESTRAL
+                                ? `${MONTHS_SHORT[((dreMonth - 3) % 12 + 12) % 12]}–${MONTHS_SHORT[dreMonth - 1]}/${String(dreYear).slice(-2)}`
+                                : `${MONTHS_SHORT[dreMonth - 1]}/${String(dreYear).slice(-2)}`}
                             </div>
                           </>
                         ) : (
@@ -842,6 +866,31 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
       if (Object.values(synthetic).some(v => v.lucroLiquidoExercicio !== 0)) {
         dreRow = synthetic;
       }
+
+      // Base trimestral: soma o Lucro Líquido do trimestre-calendário anterior
+      // (3 meses), apenas quando o demonstrativo é o primeiro mês após o
+      // fechamento do trimestre. Fora disso, trimestralByDept fica null → base 0.
+      const quarterMonths = previousQuarterMonths(year, month);
+      let trimestralByDept: Record<string, number> | null = null;
+      if (quarterMonths.length === 3) {
+        const acc = Object.fromEntries(deptEntries.map(([dk]) => [dk, 0])) as Record<string, number>;
+        const quarterYears = [...new Set(quarterMonths.map(q => q.year))];
+        for (const qy of quarterYears) {
+          const qResults = await Promise.all(
+            deptEntries.map(([dk, dept]) =>
+              loadDREDataAsync(qy as 2024 | 2025 | 2026 | 2027, dept as any, brand).then(d => ({ dk, d }))
+            )
+          );
+          for (const { dk, d } of qResults) {
+            for (const qm of quarterMonths) {
+              if (qm.year !== qy) continue;
+              acc[dk] += extractLucroLiquido(d, qm.month - 1);
+            }
+          }
+        }
+        trimestralByDept = acc;
+      }
+
       const base = existing ?? buildLancamentoVazio(prestador, year, month);
 
       // Somente sincroniza dados do cadastro e recalcula DRE quando o lançamento
@@ -940,11 +989,13 @@ export function PrestadorDemonstrativoPage({ prestador, isAdmin, onBack, onOpenR
             };
 
             if (item.descricao === DESCRICAO_TRIMESTRAL) {
-              // Soma os departamentos selecionados nos chips
+              // Soma o Lucro Líquido do trimestre-calendário anterior para os
+              // departamentos selecionados nos chips. Fora do primeiro mês do
+              // trimestre subsequente, trimestralByDept é null → base 0.
               const deps = prestItem?.departamentos ?? [];
               valorBase = deps.reduce((sum, dep) => {
                 const dk = CHIP_TO_DEPT[dep];
-                const raw = dk ? parseValDre(dreRow[dk]?.lucroLiquidoExercicio) : 0;
+                const raw = dk && trimestralByDept ? Number(trimestralByDept[dk] ?? 0) : 0;
                 if (dk) addBase(dk, raw);
                 return sum + Math.max(0, raw);
               }, 0);
