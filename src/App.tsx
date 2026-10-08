@@ -9,6 +9,7 @@ import { PeliculasDashboard } from '@/components/VendasBonificacoesDashboard/Pel
 import { EsteticaDashboard } from '@/components/VendasBonificacoesDashboard/EsteticaDashboard'
 import { ImportarPDFPage } from '@/components/VendasBonificacoesDashboard/ImportarPDFPage'
 import { FinanciamentoBancoVolksDashboard } from '@/components/VendasBonificacoesDashboard/FinanciamentoBancoVolksDashboard'
+import { MonitoramentoCustoFinanceiroBVDashboard } from '@/components/VendasBonificacoesDashboard/MonitoramentoCustoFinanceiroBVDashboard'
 import { AssinaturaSignDriveDashboard } from '@/components/VendasBonificacoesDashboard/AssinaturaSignDriveDashboard'
 import { VPecasCondicaoPagamentoDashboard } from '@/components/VendasBonificacoesDashboard/VPecasCondicaoPagamentoDashboard'
 import { FolhaSelectionPage } from '@/components/FolhaPagamentoDashboard/FolhaSelectionPage'
@@ -52,7 +53,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<'app' | 'admin' | 'cadastros'>(() =>
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
-  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi'>('selection')
+  const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'monitoramento-custo-financeiro-estoque-rotativo-bv' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi'>('selection')
   const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis' | 'premios'>('selection')
   const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica' | 'assinatura-signdrive'>('blindagem')
   
@@ -283,6 +284,10 @@ function AppContent() {
           />
         ) : vendasSubPage === 'financiamento-banco-volks' ? (
           <FinanciamentoBancoVolksDashboard
+            onBack={() => setVendasSubPage('selection')}
+          />
+        ) : vendasSubPage === 'monitoramento-custo-financeiro-estoque-rotativo-bv' ? (
+          <MonitoramentoCustoFinanceiroBVDashboard
             onBack={() => setVendasSubPage('selection')}
           />
         ) : vendasSubPage === 'vpecas-condicao-pagamento' ? (
