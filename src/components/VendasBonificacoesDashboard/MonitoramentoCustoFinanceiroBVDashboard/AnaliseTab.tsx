@@ -209,14 +209,14 @@ function SingleDayView({
 
       {/* Vendidos x Não vendidos */}
       <div className="grid gap-3 md:grid-cols-2">
-        <GrupoCard title="Veículos com data de venda" grupo={analysis.vendidos} accent="text-emerald-700" />
-        <GrupoCard title="Veículos sem data de venda" grupo={analysis.naoVendidos} accent="text-amber-700" />
+        <GrupoCard title="Veículos Vendidos com Programação de pagamento" grupo={analysis.vendidos} accent="text-emerald-700" />
+        <GrupoCard title="Veículos em Estoque" grupo={analysis.naoVendidos} accent="text-amber-700" />
       </div>
 
       {/* Faixas de dias */}
       <div className="grid gap-5 lg:grid-cols-2">
         <FaixasTable
-          title="Faixas de dias — Vendidos"
+          title="Média de dias em estoque — Veículos Vendidos com programação de pagamento"
           subtitle="Dias = Data da Venda − Emissão NF"
           buckets={analysis.bucketsVendidos}
           groupKey="v"
@@ -224,7 +224,7 @@ function SingleDayView({
           setExpanded={setExpanded}
         />
         <FaixasTable
-          title="Faixas de dias — Sem data de venda"
+          title="Média de dias em Estoque — Veículos em Estoque"
           subtitle="Dias = Data base do arquivo − Emissão NF"
           buckets={analysis.bucketsNaoVendidos}
           groupKey="n"
@@ -239,12 +239,12 @@ function SingleDayView({
       {/* Por produto — separado por grupo */}
       <div className="space-y-5">
         <ProdutoTable
-          title="Resumo por produto — Vendidos"
+          title="Resumo por Linha de Financiamento — Veículos Vendidos"
           rows={analysis.porProdutoVendidos}
           total={analysis.vendidos}
         />
         <ProdutoTable
-          title="Resumo por produto — Sem data de venda"
+          title="Resumo por Linha de Financiamento — Veículos em Estoque"
           rows={analysis.porProdutoNaoVendidos}
           total={analysis.naoVendidos}
         />
