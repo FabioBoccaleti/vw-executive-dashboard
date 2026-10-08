@@ -91,10 +91,37 @@ export interface ProdutoResult {
   mediaDias: number | null;
 }
 
+/** Produto faturado em linha especial: vencimento no fim da carência (Data p/ Liq.). */
+export const PRODUTO_LINHA_ESPECIAL = 'FP-CES-ESP';
+
+export interface EspecialVehicle {
+  chassi: string;
+  produto: string;
+  valorNf: number;
+  diasCaixa: number;
+  dataVenda: Date | null;
+  dataPLiq: Date | null;
+}
+
+export interface EspecialBucket {
+  label: string;
+  qtd: number;
+  valorNf: number;
+  veiculos: EspecialVehicle[];
+}
+
+export interface EspecialResumo {
+  qtd: number;
+  valorNf: number;
+  mediaDias: number | null;
+  buckets: EspecialBucket[];
+}
+
 export interface GrupoResumo {
   qtd: number;
   valorNf: number;
   juros: number;
+  mediaDias: number | null;
 }
 
 export interface DayAnalysis {
@@ -108,6 +135,9 @@ export interface DayAnalysis {
   bucketsVendidos: BucketResult[];
   bucketsNaoVendidos: BucketResult[];
   porProduto: ProdutoResult[];
+  porProdutoVendidos: ProdutoResult[];
+  porProdutoNaoVendidos: ProdutoResult[];
+  linhaEspecial: EspecialResumo;
   veiculos: VehicleRow[];
   /** Nenhuma tabela/coluna reconhecida no arquivo. */
   reconhecido: boolean;
@@ -137,6 +167,7 @@ interface ColumnMap {
   produto: number;
   emissaoNf: number;
   dataVenda: number;
+  dataPLiq: number;
   valorNf: number;
   juros: number;
   mora: number;
@@ -162,6 +193,7 @@ function detectTable(data: MonitoramentoBVDayData): DetectedTable | null {
         produto: indexOf('produto'),
         emissaoNf: indexOf('emissaonf'),
         dataVenda: indexOf('datadavenda'),
+        dataPLiq: indexOf('datapliq'),
         valorNf: indexOf('valornf'),
         juros: indexOf('juros'),
         mora: indexOf('mora'),
@@ -175,7 +207,7 @@ function detectTable(data: MonitoramentoBVDayData): DetectedTable | null {
 
 // ─── Análise de um dia ───────────────────────────────────────────────────────
 
-const EMPTY_GRUPO: GrupoResumo = { qtd: 0, valorNf: 0, juros: 0 };
+const EMPTY_GRUPO: GrupoResumo = { qtd: 0, valorNf: 0, juros: 0, mediaDias: null };
 
 export function analyzeDay(data: MonitoramentoBVDayData): DayAnalysis {
   const detected = detectTable(data);
@@ -192,6 +224,14 @@ export function analyzeDay(data: MonitoramentoBVDayData): DayAnalysis {
     bucketsVendidos: FAIXAS.map(f => ({ label: f.label, qtd: 0, juros: 0, valorNf: 0, veiculos: [] })),
     bucketsNaoVendidos: FAIXAS.map(f => ({ label: f.label, qtd: 0, juros: 0, valorNf: 0, veiculos: [] })),
     porProduto: [],
+    porProdutoVendidos: [],
+    porProdutoNaoVendidos: [],
+    linhaEspecial: {
+      qtd: 0,
+      valorNf: 0,
+      mediaDias: null,
+      buckets: FAIXAS.map(f => ({ label: f.label, qtd: 0, valorNf: 0, veiculos: [] })),
+    },
     veiculos: [],
     reconhecido: Boolean(detected),
   };
@@ -201,9 +241,13 @@ export function analyzeDay(data: MonitoramentoBVDayData): DayAnalysis {
   const { headerRow, rows, columns } = detected;
   const cell = (row: unknown[], index: number) => (index >= 0 ? row[index] : undefined);
 
-  const produtoMap = new Map<string, { qtd: number; valorNf: number; juros: number; somaDias: number; comDias: number }>();
   let somaDiasGeral = 0;
   let comDiasGeral = 0;
+  let somaDiasVendidos = 0;
+  let comDiasVendidos = 0;
+  let somaDiasNaoVendidos = 0;
+  let comDiasNaoVendidos = 0;
+  let somaDiasCaixa = 0;
 
   for (let r = headerRow + 1; r < rows.length; r++) {
     const row = rows[r];
@@ -218,6 +262,7 @@ export function analyzeDay(data: MonitoramentoBVDayData): DayAnalysis {
       parseNumberBR(cell(row, columns.multa));
     const emissaoNf = parseDateCell(cell(row, columns.emissaoNf));
     const dataVenda = parseDateCell(cell(row, columns.dataVenda));
+    const dataPLiq = parseDateCell(cell(row, columns.dataPLiq));
     const vendido = dataVenda !== null;
 
     let diasEstoque: number | null = null;
@@ -248,21 +293,53 @@ export function analyzeDay(data: MonitoramentoBVDayData): DayAnalysis {
 
       somaDiasGeral += diasEstoque;
       comDiasGeral += 1;
+      if (vendido) {
+        somaDiasVendidos += diasEstoque;
+        comDiasVendidos += 1;
+      } else {
+        somaDiasNaoVendidos += diasEstoque;
+        comDiasNaoVendidos += 1;
+      }
     }
 
-    const acc = produtoMap.get(produto) ?? { qtd: 0, valorNf: 0, juros: 0, somaDias: 0, comDias: 0 };
-    acc.qtd += 1;
-    acc.valorNf += valorNf;
-    acc.juros += juros;
-    if (diasEstoque !== null) {
-      acc.somaDias += diasEstoque;
-      acc.comDias += 1;
+    // Linha especial (FP-CES-ESP): dias de caixa = Data p/ Liq. − Data da Venda.
+    if (produto.toUpperCase() === PRODUTO_LINHA_ESPECIAL && dataVenda && dataPLiq) {
+      const diasCaixa = Math.max(0, diffInDays(dataPLiq, dataVenda));
+      const especialBucket = base.linhaEspecial.buckets[faixaIndex(diasCaixa)];
+      especialBucket.qtd += 1;
+      especialBucket.valorNf += valorNf;
+      especialBucket.veiculos.push({ chassi, produto, valorNf, diasCaixa, dataVenda, dataPLiq });
+      base.linhaEspecial.qtd += 1;
+      base.linhaEspecial.valorNf += valorNf;
+      somaDiasCaixa += diasCaixa;
     }
-    produtoMap.set(produto, acc);
   }
 
   base.mediaDiasGeral = comDiasGeral > 0 ? somaDiasGeral / comDiasGeral : null;
-  base.porProduto = Array.from(produtoMap.entries())
+  base.vendidos.mediaDias = comDiasVendidos > 0 ? somaDiasVendidos / comDiasVendidos : null;
+  base.naoVendidos.mediaDias = comDiasNaoVendidos > 0 ? somaDiasNaoVendidos / comDiasNaoVendidos : null;
+  base.linhaEspecial.mediaDias = base.linhaEspecial.qtd > 0 ? somaDiasCaixa / base.linhaEspecial.qtd : null;
+  base.porProduto = groupByProduto(base.veiculos);
+  base.porProdutoVendidos = groupByProduto(base.veiculos.filter(v => v.vendido));
+  base.porProdutoNaoVendidos = groupByProduto(base.veiculos.filter(v => !v.vendido));
+
+  return base;
+}
+
+function groupByProduto(vehicles: VehicleRow[]): ProdutoResult[] {
+  const map = new Map<string, { qtd: number; valorNf: number; juros: number; somaDias: number; comDias: number }>();
+  for (const v of vehicles) {
+    const acc = map.get(v.produto) ?? { qtd: 0, valorNf: 0, juros: 0, somaDias: 0, comDias: 0 };
+    acc.qtd += 1;
+    acc.valorNf += v.valorNf;
+    acc.juros += v.juros;
+    if (v.diasEstoque !== null) {
+      acc.somaDias += v.diasEstoque;
+      acc.comDias += 1;
+    }
+    map.set(v.produto, acc);
+  }
+  return Array.from(map.entries())
     .map(([produto, acc]) => ({
       produto,
       qtd: acc.qtd,
@@ -271,6 +348,4 @@ export function analyzeDay(data: MonitoramentoBVDayData): DayAnalysis {
       mediaDias: acc.comDias > 0 ? acc.somaDias / acc.comDias : null,
     }))
     .sort((a, b) => b.juros - a.juros);
-
-  return base;
 }

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, AlertCircle, Car, DollarSign, Percent, CalendarClock } from 'lucide-react';
+import { ChevronDown, ChevronRight, AlertCircle, Car, DollarSign, Percent, CalendarClock, Wallet } from 'lucide-react';
 import { getMonitoramentoBVDay, listMonitoramentoBVDates, type MonitoramentoBVBrand } from './storage';
-import { analyzeDay, FAIXAS, type BucketResult, type DayAnalysis } from './analysis';
+import { analyzeDay, FAIXAS, PRODUTO_LINHA_ESPECIAL, type BucketResult, type DayAnalysis, type EspecialResumo } from './analysis';
 
 interface Props {
   brand: MonitoramentoBVBrand;
@@ -233,22 +233,56 @@ function SingleDayView({
         />
       </div>
 
-      {/* Por produto */}
-      <div>
-        <h3 className="text-sm font-bold text-slate-700 mb-2">Resumo por produto</h3>
-        <div className="overflow-auto border border-slate-200 rounded-lg">
-          <table className="min-w-full text-xs">
-            <thead className="bg-slate-50 text-slate-600">
+      {/* Linha especial (FP-CES-ESP) — dias de caixa */}
+      <EspecialSection especial={analysis.linhaEspecial} expanded={expanded} setExpanded={setExpanded} />
+
+      {/* Por produto — separado por grupo */}
+      <div className="space-y-5">
+        <ProdutoTable
+          title="Resumo por produto — Vendidos"
+          rows={analysis.porProdutoVendidos}
+          total={analysis.vendidos}
+        />
+        <ProdutoTable
+          title="Resumo por produto — Sem data de venda"
+          rows={analysis.porProdutoNaoVendidos}
+          total={analysis.naoVendidos}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ProdutoTable({
+  title,
+  rows,
+  total,
+}: {
+  title: string;
+  rows: DayAnalysis['porProduto'];
+  total: DayAnalysis['vendidos'];
+}) {
+  return (
+    <div>
+      <h3 className="text-sm font-bold text-slate-700 mb-2">{title}</h3>
+      <div className="overflow-auto border border-slate-200 rounded-lg">
+        <table className="min-w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-3 py-2">Produto</th>
+              <th className="text-right px-3 py-2">Veículos</th>
+              <th className="text-right px-3 py-2">Valor NF</th>
+              <th className="text-right px-3 py-2">Juros</th>
+              <th className="text-right px-3 py-2">Média dias</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
               <tr>
-                <th className="text-left px-3 py-2">Produto</th>
-                <th className="text-right px-3 py-2">Veículos</th>
-                <th className="text-right px-3 py-2">Valor NF</th>
-                <th className="text-right px-3 py-2">Juros</th>
-                <th className="text-right px-3 py-2">Média dias</th>
+                <td colSpan={5} className="px-3 py-4 text-center text-slate-400">Nenhum veículo neste grupo.</td>
               </tr>
-            </thead>
-            <tbody>
-              {analysis.porProduto.map(item => (
+            ) : (
+              rows.map(item => (
                 <tr key={item.produto} className="odd:bg-white even:bg-slate-50">
                   <td className="px-3 py-1.5 font-medium text-slate-700">{item.produto}</td>
                   <td className="px-3 py-1.5 text-right tabular-nums">{fmtInt(item.qtd)}</td>
@@ -256,18 +290,135 @@ function SingleDayView({
                   <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(item.juros)}</td>
                   <td className="px-3 py-1.5 text-right tabular-nums">{fmtDias(item.mediaDias)}</td>
                 </tr>
-              ))}
-              <tr className="bg-sky-50 font-bold">
+              ))
+            )}
+            <tr className="bg-sky-50 font-bold">
+              <td className="px-3 py-1.5">Total</td>
+              <td className="px-3 py-1.5 text-right tabular-nums">{fmtInt(total.qtd)}</td>
+              <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(total.valorNf)}</td>
+              <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(total.juros)}</td>
+              <td className="px-3 py-1.5 text-right tabular-nums">{fmtDias(total.mediaDias)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function EspecialSection({
+  especial,
+  expanded,
+  setExpanded,
+}: {
+  especial: EspecialResumo;
+  expanded: Record<string, boolean>;
+  setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+}) {
+  return (
+    <div className="border border-sky-200 rounded-lg p-4 bg-sky-50/40 space-y-3">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center flex-shrink-0">
+          <Wallet className="w-5 h-5 text-sky-600" />
+        </div>
+        <div>
+          <h3 className="text-sm font-bold text-slate-800">Linha especial ({PRODUTO_LINHA_ESPECIAL}) — dias de caixa</h3>
+          <p className="text-xs text-slate-500">
+            Veículos com vencimento no fim da carência. Dias de caixa = Data p/ Liq. − Data da Venda (considera apenas veículos com as duas datas).
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="bg-white border border-slate-200 rounded-lg p-3">
+          <p className="text-xs text-slate-500">Veículos</p>
+          <p className="text-lg font-bold text-slate-800 tabular-nums">{fmtInt(especial.qtd)}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-3">
+          <p className="text-xs text-slate-500">Valor NF total</p>
+          <p className="text-lg font-bold text-slate-800 tabular-nums">{fmtBRL(especial.valorNf)}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-3">
+          <p className="text-xs text-slate-500">Média de dias de caixa</p>
+          <p className="text-lg font-bold text-slate-800 tabular-nums">{fmtDias(especial.mediaDias)}</p>
+        </div>
+      </div>
+
+      {especial.qtd === 0 ? (
+        <p className="text-sm text-slate-500">Nenhum veículo {PRODUTO_LINHA_ESPECIAL} com Data da Venda e Data p/ Liq. neste dia.</p>
+      ) : (
+        <div className="overflow-hidden border border-slate-200 rounded-lg bg-white">
+          <table className="min-w-full text-xs">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="text-left px-3 py-2 w-8"></th>
+                <th className="text-left px-3 py-2">Faixa de dias de caixa</th>
+                <th className="text-right px-3 py-2">Veículos</th>
+                <th className="text-right px-3 py-2">Média dias</th>
+                <th className="text-right px-3 py-2">Valor NF</th>
+              </tr>
+            </thead>
+            <tbody>
+              {especial.buckets.map((bucket, index) => {
+                const key = `e:${index}`;
+                const isOpen = expanded[key];
+                const canExpand = bucket.veiculos.length > 0;
+                const mediaFaixa = bucket.qtd > 0
+                  ? bucket.veiculos.reduce((sum, v) => sum + v.diasCaixa, 0) / bucket.qtd
+                  : null;
+                return (
+                  <Fragment key={key}>
+                    <tr
+                      className={`border-t border-slate-100 ${canExpand ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+                      onClick={() => canExpand && setExpanded(prev => ({ ...prev, [key]: !prev[key] }))}
+                    >
+                      <td className="px-3 py-1.5 text-slate-400">
+                        {canExpand ? (isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />) : null}
+                      </td>
+                      <td className="px-3 py-1.5 font-medium text-slate-700">{FAIXAS[index].label}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{fmtInt(bucket.qtd)}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{fmtDias(mediaFaixa)}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(bucket.valorNf)}</td>
+                    </tr>
+                    {isOpen && (
+                      <tr>
+                        <td></td>
+                        <td colSpan={4} className="px-3 py-2 bg-slate-50">
+                          <table className="min-w-full text-[11px]">
+                            <thead className="text-slate-500">
+                              <tr>
+                                <th className="text-left px-2 py-1">Chassi</th>
+                                <th className="text-right px-2 py-1">Dias de caixa</th>
+                                <th className="text-right px-2 py-1">Valor NF</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {bucket.veiculos.map(veiculo => (
+                                <tr key={veiculo.chassi} className="border-t border-slate-200">
+                                  <td className="px-2 py-1 font-mono">{veiculo.chassi}</td>
+                                  <td className="px-2 py-1 text-right tabular-nums">{fmtDias(veiculo.diasCaixa)}</td>
+                                  <td className="px-2 py-1 text-right tabular-nums">{fmtBRL(veiculo.valorNf)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+              <tr className="bg-sky-50 font-bold border-t border-slate-200">
+                <td></td>
                 <td className="px-3 py-1.5">Total</td>
-                <td className="px-3 py-1.5 text-right tabular-nums">{fmtInt(analysis.totalVeiculos)}</td>
-                <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(analysis.totalValorNf)}</td>
-                <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(analysis.totalJuros)}</td>
-                <td className="px-3 py-1.5 text-right tabular-nums">{fmtDias(analysis.mediaDiasGeral)}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{fmtInt(especial.qtd)}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{fmtDias(especial.mediaDias)}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(especial.valorNf)}</td>
               </tr>
             </tbody>
           </table>
         </div>
-      </div>
+      )}
     </div>
   );
 }
