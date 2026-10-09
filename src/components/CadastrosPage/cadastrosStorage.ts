@@ -392,6 +392,22 @@ export type ComissaoModoSignDrive = 'fixa' | 'faixas';
 export type PremioModoSignDrive = 'fixo' | 'faixas';
 export type PremioUnidadeSignDrive = 'percentual' | 'valor'; // % ou R$
 
+/** Base de cálculo sobre a qual o % da comissão incide. */
+export type BaseCalculoSignDrive =
+  | 'valorContrato'
+  | 'comissaoEntrega'
+  | 'comissaoVenda'
+  | 'totalComissoesBruta'
+  | 'totalComissaoLiquida';
+
+export const BASES_CALCULO_SIGNDRIVE: { key: BaseCalculoSignDrive; label: string }[] = [
+  { key: 'valorContrato', label: 'Valor do Contrato' },
+  { key: 'comissaoEntrega', label: 'Valor da Comissão de Entrega' },
+  { key: 'comissaoVenda', label: 'Valor da Comissão de Venda' },
+  { key: 'totalComissoesBruta', label: 'Total das Comissões Bruta' },
+  { key: 'totalComissaoLiquida', label: 'Total das Comissão Líquida' },
+];
+
 /**
  * Regra de remuneração do Sign&Drive, associada a um cargo.
  * Pode conter Comissão (sempre em %) e/ou Prêmio (em % ou R$).
@@ -410,6 +426,8 @@ export interface RegraRemuneracaoSignDrive {
   comissaoModo: ComissaoModoSignDrive;  // 'fixa' | 'faixas'
   comissaoPercentual: string;           // usado quando 'fixa'
   comissaoFaixas: FaixaQtdSignDrive[];  // usado quando 'faixas' (valor = %)
+  /** Bases de cálculo sobre as quais o % da comissão incide (pode ser mais de uma). */
+  comissaoBases: BaseCalculoSignDrive[];
 
   // Prêmio (unidade selecionável: % ou R$)
   premioAtivo: boolean;

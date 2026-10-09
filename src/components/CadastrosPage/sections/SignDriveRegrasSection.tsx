@@ -7,9 +7,11 @@ import {
   loadSignDriveRegras,
   saveSignDriveRegras,
   loadSignDriveTiposVenda,
+  BASES_CALCULO_SIGNDRIVE,
   CARGOS_VENDEDOR,
   type RegraRemuneracaoSignDrive,
   type TipoVendaSignDrive,
+  type BaseCalculoSignDrive,
   type FaixaQtdSignDrive,
   type ComissaoModoSignDrive,
   type PremioModoSignDrive,
@@ -31,6 +33,7 @@ const emptyRegra = (): Omit<RegraRemuneracaoSignDrive, 'id'> => ({
   comissaoModo: 'fixa',
   comissaoPercentual: '',
   comissaoFaixas: [emptyFaixa()],
+  comissaoBases: [],
   premioAtivo: false,
   premioModo: 'fixo',
   premioUnidade: 'valor',
@@ -113,6 +116,12 @@ function RegraForm({ draft, setDraft, tiposElegiveis }: { draft: Draft; setDraft
       ? (p.tiposVendaIds ?? []).filter(x => x !== id)
       : [...(p.tiposVendaIds ?? []), id],
   }));
+  const toggleBase = (key: BaseCalculoSignDrive) => setDraft(p => ({
+    ...p,
+    comissaoBases: (p.comissaoBases ?? []).includes(key)
+      ? (p.comissaoBases ?? []).filter(x => x !== key)
+      : [...(p.comissaoBases ?? []), key],
+  }));
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
@@ -191,6 +200,31 @@ function RegraForm({ draft, setDraft, tiposElegiveis }: { draft: Draft; setDraft
               <FaixasQtdEditor faixas={draft.comissaoFaixas.length ? draft.comissaoFaixas : [emptyFaixa()]}
                 onChange={f => setDraft(p => ({ ...p, comissaoFaixas: f }))} valorLabel="Comissão (%)" />
             )}
+
+            {/* Base de cálculo da comissão */}
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <label className="text-xs font-medium text-slate-600">Base de cálculo</label>
+                <span className="text-red-500">*</span>
+              </div>
+              <p className="text-xs text-slate-400 mb-2">Sobre qual(is) valor(es) o % da comissão incide (pode marcar mais de uma).</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {BASES_CALCULO_SIGNDRIVE.map(b => {
+                  const checked = (draft.comissaoBases ?? []).includes(b.key);
+                  return (
+                    <label
+                      key={b.key}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm cursor-pointer transition-colors ${
+                        checked ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <input type="checkbox" checked={checked} onChange={() => toggleBase(b.key)} className="accent-blue-700" />
+                      <span className="font-medium">{b.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -245,11 +279,17 @@ function RegraForm({ draft, setDraft, tiposElegiveis }: { draft: Draft; setDraft
 }
 
 // ─── Resumo textual de uma regra ────────────────────────────────────────────
+const BASE_LABEL = new Map(BASES_CALCULO_SIGNDRIVE.map(b => [b.key, b.label] as const));
 function resumoComissao(r: RegraRemuneracaoSignDrive): string {
   if (!r.comissaoAtiva) return '';
-  if (r.comissaoModo === 'fixa') return `Comissão fixa ${r.comissaoPercentual || '—'}%`;
-  const fs = r.comissaoFaixas.filter(f => f.de || f.valor);
-  return `Comissão por faixa (${fs.length} faixa${fs.length !== 1 ? 's' : ''})`;
+  const base = r.comissaoModo === 'fixa'
+    ? `Comissão fixa ${r.comissaoPercentual || '—'}%`
+    : (() => {
+        const fs = r.comissaoFaixas.filter(f => f.de || f.valor);
+        return `Comissão por faixa (${fs.length} faixa${fs.length !== 1 ? 's' : ''})`;
+      })();
+  const bases = (r.comissaoBases ?? []).map(k => BASE_LABEL.get(k) ?? k);
+  return bases.length ? `${base} · base: ${bases.join(', ')}` : base;
 }
 function resumoPremio(r: RegraRemuneracaoSignDrive): string {
   if (!r.premioAtivo) return '';
@@ -302,6 +342,7 @@ export function SignDriveRegrasSection() {
     if (r.comissaoAtiva) {
       if (r.comissaoModo === 'fixa' && !r.comissaoPercentual.trim()) { toast.error('Informe o percentual da comissão fixa.'); return false; }
       if (r.comissaoModo === 'faixas' && !r.comissaoFaixas.some(f => f.de.trim() && f.valor.trim())) { toast.error('Preencha ao menos uma faixa de comissão.'); return false; }
+      if ((r.comissaoBases ?? []).length === 0) { toast.error('Selecione a base de cálculo da comissão.'); return false; }
     }
     if (r.premioAtivo) {
       if (r.premioModo === 'fixo' && !r.premioValor.trim()) { toast.error('Informe o valor do prêmio.'); return false; }
@@ -323,6 +364,7 @@ export function SignDriveRegrasSection() {
     setEditDraft({
       ...rest,
       tiposVendaIds: rest.tiposVendaIds ?? [],
+      comissaoBases: rest.comissaoBases ?? [],
       comissaoFaixas: rest.comissaoFaixas.length ? rest.comissaoFaixas : [emptyFaixa()],
       premioFaixas: rest.premioFaixas.length ? rest.premioFaixas : [emptyFaixa()],
     });

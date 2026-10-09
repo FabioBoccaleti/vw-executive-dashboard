@@ -20,6 +20,7 @@ function makeRegra(overrides: Partial<RegraRemuneracaoSignDrive> = {}): RegraRem
       { id: 'f1', de: '1', ate: '5', valor: '8' },
       { id: 'f2', de: '6', ate: '', valor: '10' },
     ],
+    comissaoBases: [],
     premioAtivo: false,
     premioModo: 'fixo',
     premioUnidade: 'percentual',
