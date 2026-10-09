@@ -671,6 +671,35 @@ function ComparisonView({ days, analyses }: { days: string[]; analyses: Record<s
                 ))}
               </tr>
             ))}
+            <tr className="bg-slate-100">
+              <td className="px-3 py-1.5 font-bold text-slate-700" colSpan={cols.length + 1}>Linha especial ({PRODUTO_LINHA_ESPECIAL}) — dias de caixa</td>
+            </tr>
+            <tr className="odd:bg-white even:bg-slate-50">
+              <td className="px-3 py-1.5 font-medium text-slate-700">Veículos</td>
+              {cols.map(col => <td key={col.day} className="px-3 py-1.5 text-right tabular-nums">{fmtInt(col.a!.linhaEspecial.qtd)}</td>)}
+            </tr>
+            <tr className="odd:bg-white even:bg-slate-50">
+              <td className="px-3 py-1.5 font-medium text-slate-700">Valor NF total</td>
+              {cols.map(col => <td key={col.day} className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(col.a!.linhaEspecial.valorNf)}</td>)}
+            </tr>
+            <tr className="odd:bg-white even:bg-slate-50">
+              <td className="px-3 py-1.5 font-medium text-slate-700">Média de dias de caixa</td>
+              {cols.map(col => <td key={col.day} className="px-3 py-1.5 text-right tabular-nums">{fmtDias(col.a!.linhaEspecial.mediaDias)}</td>)}
+            </tr>
+            <tr className="bg-slate-50">
+              <td className="px-3 py-1.5 font-semibold text-slate-600" colSpan={cols.length + 1}>Valor NF por faixa de dias de caixa (veículos)</td>
+            </tr>
+            {FAIXAS.map((faixa, index) => (
+              <tr key={`esp-${faixa.label}`} className="odd:bg-white even:bg-slate-50">
+                <td className="px-3 py-1.5 font-medium text-slate-700">{faixa.label}</td>
+                {cols.map(col => (
+                  <td key={col.day} className="px-3 py-1.5 text-right tabular-nums">
+                    {fmtBRL(col.a!.linhaEspecial.buckets[index].valorNf)}
+                    <span className="text-slate-400"> ({fmtInt(col.a!.linhaEspecial.buckets[index].qtd)})</span>
+                  </td>
+                ))}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
