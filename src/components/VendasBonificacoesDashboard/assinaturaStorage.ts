@@ -25,6 +25,8 @@ export interface AssinaturaRow {
   nfComissao: string;
   situacaoComissao: string;
   situacaoComissaoVendedor: string;
+  /** Valor congelado da estimativa de comissão (preenchido ao travar via Sit. Comissão vendedor). */
+  estimativaComissaoVendedor?: string;
   anulada?: boolean;
   comissaoEditada?: boolean;
 }

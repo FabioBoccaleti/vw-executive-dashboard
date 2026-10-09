@@ -7,7 +7,8 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { loadAssinaturaRows, saveAssinaturaRows, type AssinaturaRow } from './assinaturaStorage';
 import { loadSignDriveCatalogo, type CatalogoVeiculos } from './catalogoStorage';
-import { loadSignDriveVendedores, loadSignDriveTiposVenda, type Vendedor, type TipoVendaSignDrive } from '@/components/CadastrosPage/cadastrosStorage';
+import { loadSignDriveVendedores, loadSignDriveTiposVenda, loadSignDriveRegras, type Vendedor, type TipoVendaSignDrive, type RegraRemuneracaoSignDrive, type BaseCalculoSignDrive } from '@/components/CadastrosPage/cadastrosStorage';
+import { percentualComissaoRegra } from './signDriveRemuneracao';
 import { SignDriveAnalise } from './SignDriveAnalise';
 
 interface AssinaturaSignDriveDashboardProps {
@@ -86,6 +87,77 @@ const PRODUTO_COMISSAO_EDITAVEL = 'Sign and Drive Empresas';
 // Produto em que o Número do Pedido e o Chassi não são obrigatórios.
 // Comparação robusta (ignora maiúsculas/minúsculas e espaços) com o produto cadastrado.
 const isEmNegociacao = (produto: string): boolean => (produto ?? '').trim().toLowerCase().startsWith('em negocia');
+
+// ─── Cálculo da Estimativa de Comissão do Vendedor ──────────────────────────
+const BASE_FIELD: Record<BaseCalculoSignDrive, keyof AssinaturaRow> = {
+  valorContrato:        'valorContrato',
+  comissaoEntrega:      'comissaoEntrega',
+  comissaoVenda:        'comissaoVenda',
+  totalComissoesBruta:  'totalComissoesBruta',
+  totalComissaoLiquida: 'totalComissaoLiquida',
+};
+
+const isComissaoCongelada = (row: AssinaturaRow): boolean =>
+  (row.situacaoComissaoVendedor ?? '').trim() !== '';
+
+/**
+ * Calcula a Estimativa de Comissão do Vendedor por linha.
+ * - A regra aplicável é a de comissão cujo Cargo = cargo do vendedor e cujos
+ *   tipos de venda incluem o Produto da linha.
+ * - A faixa é definida pela quantidade de vendas NÃO congeladas do mesmo
+ *   vendedor dentro da mesma regra (somando todos os tipos da regra).
+ * - A base é a soma das colunas marcadas como base na regra.
+ * - Linhas anuladas / "Em Negociação" / sem regra ficam de fora.
+ *
+ * Retorna os valores apenas das linhas não congeladas elegíveis, e o conjunto
+ * de ids elegíveis (com regra aplicável, congeladas ou não).
+ */
+function computeEstimativas(
+  rows: AssinaturaRow[],
+  regras: RegraRemuneracaoSignDrive[],
+  vendedores: Vendedor[],
+  tiposVenda: TipoVendaSignDrive[],
+): { values: Map<string, number>; eligibleIds: Set<string> } {
+  const cargoByVendedor = new Map(vendedores.map(v => [v.nome, v.cargo] as const));
+  const tipoIdByDesc = new Map(tiposVenda.map(t => [t.descricao, t.id] as const));
+  const regrasComissao = regras.filter(r => r.comissaoAtiva);
+
+  const ruleFor = (row: AssinaturaRow): RegraRemuneracaoSignDrive | null => {
+    if (row.anulada || isEmNegociacao(row.tipoVenda)) return null;
+    const cargo = cargoByVendedor.get(row.vendedor);
+    const tipoId = tipoIdByDesc.get(row.tipoVenda);
+    if (!cargo || !tipoId) return null;
+    return regrasComissao.find(r => r.cargo === cargo && (r.tiposVendaIds ?? []).includes(tipoId)) ?? null;
+  };
+
+  const eligibleIds = new Set<string>();
+  const groups = new Map<string, { rule: RegraRemuneracaoSignDrive; rows: AssinaturaRow[] }>();
+
+  for (const row of rows) {
+    const rule = ruleFor(row);
+    if (!rule) continue;
+    eligibleIds.add(row.id);
+    if (isComissaoCongelada(row)) continue; // congelada: não entra na contagem
+    const key = `${row.vendedor}||${rule.id}`;
+    let g = groups.get(key);
+    if (!g) { g = { rule, rows: [] }; groups.set(key, g); }
+    g.rows.push(row);
+  }
+
+  const values = new Map<string, number>();
+  for (const { rule, rows: grp } of groups.values()) {
+    const pct = percentualComissaoRegra(rule, grp.length);
+    for (const row of grp) {
+      const base = (rule.comissaoBases ?? []).reduce(
+        (s, b) => s + parseBR(String(row[BASE_FIELD[b]] ?? '')),
+        0,
+      );
+      values.set(row.id, base * pct / 100);
+    }
+  }
+
+  return { values, eligibleIds };
+}
 
 // ─── Zona de inserção de linha (hover entre as linhas) ─────────────────────
 function InsertZoneRow({ colSpan, onInsert }: { colSpan: number; onInsert: () => void }) {
@@ -251,6 +323,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   const [catalogo, setCatalogo] = useState<CatalogoVeiculos>({ marcas: [], modelos: [] });
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [tiposVenda, setTiposVenda] = useState<TipoVendaSignDrive[]>([]);
+  const [regras, setRegras] = useState<RegraRemuneracaoSignDrive[]>([]);
 
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [draft, setDraft] = useState<RegisterDraft>(emptyDraft());
@@ -260,11 +333,11 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   type EditDraft = {
     dataVenda: string; numeroPedido: string; cliente: string; produto: string; veiculo: string;
     chassi: string; placa: string; vendedor: string; valorContrato: string;
-    dataEntrega: string; nfComissao: string;
+    dataEntrega: string; nfComissao: string; situacaoComissaoVendedor: string;
   };
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft>({
-    dataVenda: '', numeroPedido: '', cliente: '', produto: '', veiculo: '', chassi: '', placa: '', vendedor: '', valorContrato: '', dataEntrega: '', nfComissao: '',
+    dataVenda: '', numeroPedido: '', cliente: '', produto: '', veiculo: '', chassi: '', placa: '', vendedor: '', valorContrato: '', dataEntrega: '', nfComissao: '', situacaoComissaoVendedor: '',
   });
 
   // Edição das comissões (com senha)
@@ -287,7 +360,14 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     loadSignDriveCatalogo().then(setCatalogo);
     loadSignDriveVendedores().then(setVendedores);
     loadSignDriveTiposVenda().then(setTiposVenda);
+    loadSignDriveRegras().then(setRegras);
   }, []);
+
+  // Estimativa de comissão do vendedor por linha (calculada ao vivo)
+  const estim = useMemo(
+    () => computeEstimativas(rows, regras, vendedores, tiposVenda),
+    [rows, regras, vendedores, tiposVenda],
+  );
 
   const veiculoOptions = useMemo(() => {
     const marcaNome = (id: string) => catalogo.marcas.find(m => m.id === id)?.nome ?? '';
@@ -474,6 +554,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       valorContrato: row.valorContrato,
       dataEntrega: brToISO(row.dataEntrega ?? ''),
       nfComissao: row.nfComissao ?? '',
+      situacaoComissaoVendedor: row.situacaoComissaoVendedor ?? '',
     });
   };
 
@@ -493,6 +574,9 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       return;
     }
     const valor = parseBR(editDraft.valorContrato);
+    const prevRow = rows.find(r => r.id === editingId);
+    const novaSituacaoVendedor = emNegociacao ? '' : editDraft.situacaoComissaoVendedor.trim();
+    const eraCongelada = (prevRow?.situacaoComissaoVendedor ?? '').trim() !== '';
     const updated = rows.map(r => r.id === editingId ? {
       ...r,
       dataVenda: isoToBR(editDraft.dataVenda) || r.dataVenda,
@@ -513,9 +597,30 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       pctRentabilidadeLiquida: String(editPreview.rentLiquida),
       dataEntrega: emNegociacao ? '' : isoToBR(editDraft.dataEntrega),
       nfComissao: emNegociacao ? '' : editDraft.nfComissao.trim(),
+      situacaoComissaoVendedor: novaSituacaoVendedor,
       comissaoEditada: false,
     } : r);
-    await persist(updated);
+
+    // Congelamento da Estimativa de Comissão do Vendedor:
+    // - Ao passar de vazia → preenchida, congela o valor calculado no momento.
+    // - Já congelada: mantém o valor anterior.
+    // - Voltou a ficar vazia: volta a ser calculada ao vivo (limpa o congelado).
+    let finalRows = updated;
+    if (novaSituacaoVendedor !== '') {
+      if (!eraCongelada) {
+        const probe = updated.map(x => x.id === editingId ? { ...x, situacaoComissaoVendedor: '' } : x);
+        const snap = computeEstimativas(probe, regras, vendedores, tiposVenda).values.get(editingId);
+        finalRows = updated.map(x => x.id === editingId
+          ? { ...x, estimativaComissaoVendedor: snap != null ? String(snap) : undefined }
+          : x);
+      }
+    } else {
+      finalRows = updated.map(x => x.id === editingId
+        ? { ...x, estimativaComissaoVendedor: undefined }
+        : x);
+    }
+
+    await persist(finalRows);
     setEditingId(null);
     toast.success('Registro atualizado');
   };
@@ -581,6 +686,19 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     // ── Modo exibição ──
     if (!editing) {
       if (col.key === 'situacaoComissao') return situacaoText(row, row.nfComissao ?? '');
+      if (col.key === 'estimativaComissaoVendedor') {
+        if (!estim.eligibleIds.has(row.id)) return '—';
+        if (isComissaoCongelada(row)) {
+          const stored = row.estimativaComissaoVendedor;
+          return stored != null && stored !== '' ? (
+            <span className="inline-flex items-center gap-1">
+              {fmtCurrency(stored)}
+              <span title="Comissão congelada (Sit. Comissão vendedor preenchida)" className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />
+            </span>
+          ) : '—';
+        }
+        return fmtCurrency(String(estim.values.get(row.id) ?? 0));
+      }
       if ((col.key === 'comissaoEntrega' || col.key === 'comissaoVenda') && row.comissaoEditada) {
         return (
           <span className="inline-flex items-center gap-1">
@@ -644,6 +762,16 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
           : <input type="text" value={editDraft.nfComissao} onChange={e => setEditDraft(p => ({ ...p, nfComissao: e.target.value }))} className={editInputClass} />;
       case 'situacaoComissao':
         return isEmNegociacao(editDraft.produto) ? 'Em Negociação' : editDraft.nfComissao.trim() ? 'Nota Fiscal Emitida' : 'Comissão a Receber';
+      case 'situacaoComissaoVendedor':
+        return isEmNegociacao(editDraft.produto)
+          ? <input type="text" value="—" disabled className={`${editInputClass} bg-slate-100 text-slate-400 text-center cursor-not-allowed`} />
+          : <input type="text" value={editDraft.situacaoComissaoVendedor} onChange={e => setEditDraft(p => ({ ...p, situacaoComissaoVendedor: e.target.value }))} placeholder="ex: Pago" className={editInputClass} />;
+      case 'estimativaComissaoVendedor': {
+        if (!estim.eligibleIds.has(row.id)) return '—';
+        const live = estim.values.get(row.id);
+        if (live != null) return fmtCurrency(String(live));
+        return row.estimativaComissaoVendedor ? fmtCurrency(row.estimativaComissaoVendedor) : '—';
+      }
       default:
         return fmtCell(col, val);
     }
