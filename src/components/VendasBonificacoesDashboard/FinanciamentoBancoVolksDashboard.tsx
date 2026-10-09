@@ -17,6 +17,12 @@ import {
   type RemuneracaoProdutoRegra,
   type TipoPremio,
 } from './financiamentoRemuneracaoStorage';
+import {
+  loadFinanciamentoMatriculas,
+  saveFinanciamentoMatriculas,
+  resolveFinanciamentoMatricula,
+  type FinanciamentoMatriculasMap,
+} from './financiamentoMatriculasStorage';
 import { useAuth } from '@/contexts/useAuth';
 
 const MONTHS = [
@@ -256,6 +262,10 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   type VendasInnerTab = 'tabela' | 'resumo-novos' | 'resumo-usados' | 'resumo-total' | 'demonstrativo';
   const [vendasInnerTab, setVendasInnerTab] = useState<VendasInnerTab>('tabela');
 
+  // ── Demonstrativo: Matrículas dos vendedores (Resumo Geral) ──
+  const [matriculasMap, setMatriculasMap] = useState<FinanciamentoMatriculasMap>({});
+  const [matriculaDrafts, setMatriculaDrafts] = useState<Record<string, string>>({});
+
   // ── Demonstrativo: Assinaturas Digitais ──
   const [demoAssinaturas, setDemoAssinaturas] = useState<Record<string, Partial<Record<CampoAssinaturaComissao, AssinaturaDigital>>>>({});
   const [demoAssinaDialog, setDemoAssinaDialog] = useState<{
@@ -350,6 +360,35 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     kvGet<Record<string, Partial<Record<CampoAssinaturaComissao, AssinaturaDigital>>>>(      `financiamento:assinaturas:${vendasYear}:${vendasMonth}`
     ).then(d => setDemoAssinaturas(d ?? {}));
   }, [activeSection, vendasInnerTab, vendasYear, vendasMonth]);
+
+  // Carrega matrículas dos vendedores (mapa completo, usado p/ cópia automática)
+  useEffect(() => {
+    if (activeSection !== 'vendas' || vendasInnerTab !== 'demonstrativo') return;
+    loadFinanciamentoMatriculas().then(m => setMatriculasMap(m ?? {}));
+  }, [activeSection, vendasInnerTab, vendasYear, vendasMonth]);
+
+  /** Valor exibido: explícito do mês ou copiado do mês anterior mais recente. */
+  function getDisplayMatricula(vendedor: string): string {
+    const pk = `${vendasYear}-${vendasMonth}`;
+    const explicit = matriculasMap[pk]?.[vendedor];
+    if (explicit !== undefined) return explicit;
+    return resolveFinanciamentoMatricula(matriculasMap, vendasYear, vendasMonth, vendedor);
+  }
+
+  function commitMatricula(vendedor: string, raw: string) {
+    const value = raw.replace(/\D/g, '');
+    const pk = `${vendasYear}-${vendasMonth}`;
+    setMatriculasMap(prev => {
+      const next: FinanciamentoMatriculasMap = { ...prev, [pk]: { ...(prev[pk] ?? {}), [vendedor]: value } };
+      void saveFinanciamentoMatriculas(next);
+      return next;
+    });
+    setMatriculaDrafts(d => {
+      const n = { ...d };
+      delete n[vendedor];
+      return n;
+    });
+  }
 
   async function handleGarantidoChange(vendedor: string, value: string) {
     if (aceleraPago) return;
@@ -1788,6 +1827,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                           <tr className="bg-slate-800 text-white">
                             <th className="px-2 py-1.5 text-center border border-slate-700 w-6">#</th>
                             <th className="px-2 py-1.5 text-left border border-slate-700">Vendedor</th>
+                            <th className="px-2 py-1.5 text-left border border-slate-700">Matrícula</th>
                             <th className="px-2 py-1.5 text-right border border-slate-700 bg-emerald-800">Comissão Financiamento</th>
                             <th className="px-2 py-1.5 text-right border border-slate-700">Comissão Vendedor Novos</th>
                             <th className="px-2 py-1.5 text-right border border-slate-700">Comissão Vendedor Usados</th>
@@ -1802,6 +1842,22 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                             <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                               <td className="px-2 py-1 border border-slate-200 text-slate-800 text-center font-mono">{i + 1}</td>
                               <td className="px-2 py-1 border border-slate-200 font-semibold text-slate-800">{v.vendedor}</td>
+                              <td className="px-2 py-1 border border-slate-200 text-slate-800">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={matriculaDrafts[v.vendedor] ?? getDisplayMatricula(v.vendedor)}
+                                  onChange={e => {
+                                    const val = e.target.value.replace(/\D/g, '');
+                                    setMatriculaDrafts(d => ({ ...d, [v.vendedor]: val }));
+                                  }}
+                                  onBlur={() => commitMatricula(v.vendedor, matriculaDrafts[v.vendedor] ?? getDisplayMatricula(v.vendedor))}
+                                  onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                                  placeholder="—"
+                                  className="w-20 px-1 py-0.5 border border-slate-200 rounded text-[9px] tabular-nums focus:outline-none focus:border-blue-400 print:hidden"
+                                />
+                                <span className="hidden print:inline">{getDisplayMatricula(v.vendedor) || '—'}</span>
+                              </td>
                               <td className="px-2 py-1 border border-slate-200 text-right font-medium text-emerald-700 bg-emerald-50">{v.comissaoFinanciamento !== 0 ? 'R$ ' + fmtBRL(v.comissaoFinanciamento) : '—'}</td>
                               <td className="px-2 py-1 border border-slate-200 text-right text-slate-800">{v.comissaoNovos !== 0 ? 'R$ ' + fmtBRL(v.comissaoNovos) : '—'}</td>
                               <td className="px-2 py-1 border border-slate-200 text-right text-slate-800">{v.comissaoUsados !== 0 ? 'R$ ' + fmtBRL(v.comissaoUsados) : '—'}</td>
@@ -1816,6 +1872,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                           <tr className="bg-slate-800 text-white font-bold text-[9px]">
                             <td className="px-2 py-1.5 border border-slate-700 text-center">{resumoVendedores.length}</td>
                             <td className="px-2 py-1.5 border border-slate-700">TOTAL</td>
+                            <td className="px-2 py-1.5 border border-slate-700"></td>
                             <td className="px-2 py-1.5 border border-slate-700 text-right bg-emerald-900">R$ {fmtBRL(resumoTotalComissaoFinanciamento)}</td>
                             <td className="px-2 py-1.5 border border-slate-700 text-right">R$ {fmtBRL(resumoTotalComissaoNovos)}</td>
                             <td className="px-2 py-1.5 border border-slate-700 text-right">R$ {fmtBRL(resumoTotalComissaoUsados)}</td>
