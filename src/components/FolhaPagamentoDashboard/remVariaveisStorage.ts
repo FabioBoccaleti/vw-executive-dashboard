@@ -110,6 +110,7 @@ export interface KpiColaborador {
 export interface Colaborador {
   id: string;
   nome: string;
+  matricula: string;
   cargo?: string;
   departamento?: string;
   brand: RvBrand;

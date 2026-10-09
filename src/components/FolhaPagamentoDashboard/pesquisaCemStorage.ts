@@ -14,6 +14,7 @@ export type PesquisaTituloMap = TituloMap;
 export interface PesquisaColaborador {
   id: string;
   nome: string;
+  matricula: string;
   funcao: string;
   valorPorPesquisa: number;
   departamento: PesquisaDepto;
@@ -69,6 +70,7 @@ export async function saveTitulos(map: PesquisaTituloMap): Promise<void> {
 export interface PesquisaLinhaSnapshot {
   colaboradorId: string;
   nome: string;
+  matricula: string;
   funcao: string;
   departamento: PesquisaDepto;
   valorPorPesquisa: number;

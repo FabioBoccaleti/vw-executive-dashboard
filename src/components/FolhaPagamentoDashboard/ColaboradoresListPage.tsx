@@ -61,6 +61,7 @@ function ColaboradorDialog({
   const isEdit = !!initial;
   const [form, setForm] = useState({
     nome: initial?.nome ?? '',
+    matricula: initial?.matricula ?? '',
     cargo: initial?.cargo ?? '',
     departamento: initial?.departamento ?? '',
     brand: (initial?.brand ?? 'vw') as RvBrand,
@@ -137,6 +138,7 @@ function ColaboradorDialog({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.nome.trim()) { toast.error('Informe o nome do colaborador.'); return; }
+    if (!form.matricula.trim()) { toast.error('Informe a matrícula do colaborador.'); return; }
     if (itens.length === 0) { toast.error('Adicione ao menos um item de remuneração.'); return; }
     for (const it of itens) {
       if (!it.descricao.trim()) { toast.error('Preencha a descrição de todos os itens.'); return; }
@@ -151,6 +153,7 @@ function ColaboradorDialog({
     onConfirm({
       id: initial?.id ?? crypto.randomUUID(),
       nome: form.nome,
+      matricula: form.matricula.trim(),
       cargo: form.cargo || undefined,
       departamento: form.departamento || undefined,
       brand: form.brand,
@@ -201,6 +204,19 @@ function ColaboradorDialog({
                 onChange={e => setField('nome', e.target.value)}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
                 placeholder="Nome completo do colaborador"
+              />
+            </div>
+
+            <div className="col-span-2 flex flex-col gap-1">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                Matrícula <span className="text-red-500">*</span>
+              </label>
+              <input
+                value={form.matricula}
+                inputMode="numeric"
+                onChange={e => setField('matricula', e.target.value.replace(/\D/g, ''))}
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                placeholder="Número da matrícula"
               />
             </div>
 

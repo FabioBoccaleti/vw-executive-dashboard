@@ -75,7 +75,7 @@ const thS = (align = 'left') => `background:#334155;color:white;padding:5px 8px;
 const tfB = 'background:#1e293b;color:white;padding:6px 8px;font-size:9px;font-weight:700;';
 
 // ─── Plantão aos Sábados ──────────────────────────────────────────────────────
-interface LinhaValorDepto { nome: string; funcao: string; departamento: PlantaoDepto; unidades: number; total: number; }
+interface LinhaValorDepto { nome: string; matricula: string; funcao: string; departamento: PlantaoDepto; unidades: number; total: number; }
 
 function buildBlocoUnidades(titulo: string, competencia: string, pago: boolean, assinaturas: AssinaturasMap | undefined, linhas: LinhaValorDepto[], unidadesLabel: string): string {
   const deptosPresentes = DEPTOS.filter(dep => linhas.some(l => l.departamento === dep));
@@ -90,6 +90,7 @@ function buildBlocoUnidades(titulo: string, competencia: string, pago: boolean, 
     const totalCell = showTotal ? `<td style="${tdB}text-align:right;font-weight:700;color:#6d28d9;">R$ ${fmtBRL(l.total)}</td>` : '';
     return `<tr>
       <td style="${tdB}">${escapeHtml(l.nome)}</td>
+      <td style="${tdB}color:#64748b;">${escapeHtml(l.matricula || '—')}</td>
       <td style="${tdB}color:#64748b;">${escapeHtml(l.funcao || '—')}</td>
       <td style="${tdB}text-align:center;color:#64748b;">${l.unidades}</td>
       ${depCells}${totalCell}
@@ -102,9 +103,9 @@ function buildBlocoUnidades(titulo: string, competencia: string, pago: boolean, 
 
   return `${headerHtml(titulo, competencia, pago, totalGeral)}
     <table style="width:100%;border-collapse:collapse;">
-      <thead><tr><th style="${thS()}">Colaborador</th><th style="${thS()}">Função</th><th style="${thS('center')}">${unidadesLabel}</th>${depTh}${totalTh}</tr></thead>
+      <thead><tr><th style="${thS()}">Colaborador</th><th style="${thS()}">Matrícula</th><th style="${thS()}">Função</th><th style="${thS('center')}">${unidadesLabel}</th>${depTh}${totalTh}</tr></thead>
       <tbody>${rowsHtml}</tbody>
-      <tfoot><tr><td style="${tfB}" colspan="2">Total</td><td style="${tfB}text-align:center;">${totalUnid}</td>${depTf}${totalTf}</tr></tfoot>
+      <tfoot><tr><td style="${tfB}" colspan="3">Total</td><td style="${tfB}text-align:center;">${totalUnid}</td>${depTf}${totalTf}</tr></tfoot>
     </table>
     ${assinaturasHtml(assinaturas, CAMPO_LABELS_CS)}`;
 }
@@ -118,10 +119,10 @@ async function buildPlantaoBlock(year: number, month: number): Promise<string> {
   const pago = lancamento?.pago ?? false;
   const selForPk = selecao[pk] ?? {};
   const linhasLive: LinhaValorDepto[] = colaboradores
-    .map(c => { const dias = selForPk[c.id] ?? []; return { nome: c.nome, funcao: c.funcao, departamento: c.departamento, unidades: dias.length, total: c.valorPorSabado * dias.length }; })
+    .map(c => { const dias = selForPk[c.id] ?? []; return { nome: c.nome, matricula: c.matricula, funcao: c.funcao, departamento: c.departamento, unidades: dias.length, total: c.valorPorSabado * dias.length }; })
     .filter(l => l.unidades > 0);
   const linhas: LinhaValorDepto[] = pago && lancamento?.snapshotLinhas?.length
-    ? lancamento.snapshotLinhas.map(s => ({ nome: s.nome, funcao: s.funcao, departamento: s.departamento, unidades: s.dias.length, total: s.total }))
+    ? lancamento.snapshotLinhas.map(s => ({ nome: s.nome, matricula: s.matricula, funcao: s.funcao, departamento: s.departamento, unidades: s.dias.length, total: s.total }))
     : linhasLive;
   if (linhas.length === 0) return '';
   const titulo = pago && lancamento?.titulo ? lancamento.titulo : tituloEfetivo(titulos, year, month);
@@ -139,10 +140,10 @@ async function buildPesquisaBlock(year: number, month: number): Promise<string> 
   const pago = lancamento?.pago ?? false;
   const respForPk = respostas[pk] ?? {};
   const linhasLive: LinhaValorDepto[] = colaboradores
-    .map(c => { const qtd = respForPk[c.id] ?? 0; return { nome: c.nome, funcao: c.funcao, departamento: c.departamento, unidades: qtd, total: c.valorPorPesquisa * qtd }; })
+    .map(c => { const qtd = respForPk[c.id] ?? 0; return { nome: c.nome, matricula: c.matricula, funcao: c.funcao, departamento: c.departamento, unidades: qtd, total: c.valorPorPesquisa * qtd }; })
     .filter(l => l.unidades > 0);
   const linhas: LinhaValorDepto[] = pago && lancamento?.snapshotLinhas?.length
-    ? lancamento.snapshotLinhas.map(s => ({ nome: s.nome, funcao: s.funcao, departamento: s.departamento, unidades: s.qtd, total: s.total }))
+    ? lancamento.snapshotLinhas.map(s => ({ nome: s.nome, matricula: s.matricula, funcao: s.funcao, departamento: s.departamento, unidades: s.qtd, total: s.total }))
     : linhasLive;
   if (linhas.length === 0) return '';
   const titulo = pago && lancamento?.titulo ? lancamento.titulo : tituloEfetivo(titulos, year, month);
@@ -151,7 +152,7 @@ async function buildPesquisaBlock(year: number, month: number): Promise<string> 
 }
 
 // ─── Diversos ─────────────────────────────────────────────────────────────────
-interface LinhaDiversos { nome: string; funcao: string; motivo: string; departamento: PlantaoDepto; valor: number; }
+interface LinhaDiversos { nome: string; matricula: string; funcao: string; motivo: string; departamento: PlantaoDepto; valor: number; }
 
 async function buildDiversosBlock(year: number, month: number): Promise<string> {
   const pk = periodoKey(year, month);
@@ -162,10 +163,10 @@ async function buildDiversosBlock(year: number, month: number): Promise<string> 
   const pago = lancamento?.pago ?? false;
   const premForPk = premiacoes[pk] ?? {};
   const linhasLive: LinhaDiversos[] = colaboradores
-    .map(c => { const p = premForPk[c.id]; return { nome: c.nome, funcao: c.funcao, motivo: p?.motivo ?? '', departamento: p?.departamento ?? 'novos', valor: p?.valor ?? 0 }; })
+    .map(c => { const p = premForPk[c.id]; return { nome: c.nome, matricula: c.matricula, funcao: c.funcao, motivo: p?.motivo ?? '', departamento: p?.departamento ?? 'novos', valor: p?.valor ?? 0 }; })
     .filter(l => l.valor > 0);
   const linhas: LinhaDiversos[] = pago && lancamento?.snapshotLinhas?.length
-    ? lancamento.snapshotLinhas.map(s => ({ nome: s.nome, funcao: s.funcao, motivo: s.motivo, departamento: s.departamento, valor: s.valor }))
+    ? lancamento.snapshotLinhas.map(s => ({ nome: s.nome, matricula: s.matricula, funcao: s.funcao, motivo: s.motivo, departamento: s.departamento, valor: s.valor }))
     : linhasLive;
   if (linhas.length === 0) return '';
   const titulo = pago && lancamento?.titulo ? lancamento.titulo : tituloEfetivo(titulos, year, month);
@@ -177,6 +178,7 @@ async function buildDiversosBlock(year: number, month: number): Promise<string> 
     totalGeral += l.valor;
     return `<tr>
       <td style="${tdB}">${escapeHtml(l.nome)}</td>
+      <td style="${tdB}color:#64748b;">${escapeHtml(l.matricula || '—')}</td>
       <td style="${tdB}color:#64748b;">${escapeHtml(l.funcao || '—')}</td>
       <td style="${tdB}color:#64748b;">${escapeHtml(l.motivo || '—')}</td>
       <td style="${tdB}">${DEPTO_LABELS[l.departamento]}</td>
@@ -186,9 +188,9 @@ async function buildDiversosBlock(year: number, month: number): Promise<string> 
 
   return `${headerHtml(titulo, competencia, pago, totalGeral)}
     <table style="width:100%;border-collapse:collapse;">
-      <thead><tr><th style="${thS()}">Colaborador</th><th style="${thS()}">Função</th><th style="${thS()}">Motivo da Bonificação</th><th style="${thS()}">Departamento</th><th style="${thS('right')}">Valor</th></tr></thead>
+      <thead><tr><th style="${thS()}">Colaborador</th><th style="${thS()}">Matrícula</th><th style="${thS()}">Função</th><th style="${thS()}">Motivo da Bonificação</th><th style="${thS()}">Departamento</th><th style="${thS('right')}">Valor</th></tr></thead>
       <tbody>${rowsHtml}</tbody>
-      <tfoot><tr><td style="${tfB}" colspan="4">Total</td><td style="${tfB}text-align:right;">R$ ${fmtBRL(totalGeral)}</td></tr></tfoot>
+      <tfoot><tr><td style="${tfB}" colspan="5">Total</td><td style="${tfB}text-align:right;">R$ ${fmtBRL(totalGeral)}</td></tr></tfoot>
     </table>
     ${assinaturasHtml(lancamento?.assinaturas)}`;
 }

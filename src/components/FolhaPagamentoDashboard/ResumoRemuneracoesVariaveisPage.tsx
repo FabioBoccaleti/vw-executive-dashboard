@@ -93,6 +93,7 @@ export function ResumoRemuneracoesVariaveisPage() {
           }">${l.colaborador.brand.toUpperCase()}</span>
           ${l.colaborador.nome}
         </td>
+        <td style="padding:8px 12px;font-size:11px;color:#64748b;">${l.colaborador.matricula || '—'}</td>
         <td style="padding:8px 12px;font-size:11px;color:#64748b;">${l.colaborador.departamento ?? '—'}</td>
         <td style="padding:8px 12px;text-align:center;font-size:11px;">
           <span style="padding:2px 8px;border-radius:999px;${
@@ -113,6 +114,7 @@ export function ResumoRemuneracoesVariaveisPage() {
           <thead>
             <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
               <th style="padding:10px 12px;text-align:left;font-size:10px;color:#64748b;text-transform:uppercase;">Colaborador</th>
+              <th style="padding:10px 12px;text-align:left;font-size:10px;color:#64748b;text-transform:uppercase;">Matrícula</th>
               <th style="padding:10px 12px;text-align:left;font-size:10px;color:#64748b;text-transform:uppercase;">Departamento</th>
               <th style="padding:10px 12px;text-align:center;font-size:10px;color:#64748b;text-transform:uppercase;">Status</th>
               <th style="padding:10px 12px;text-align:right;font-size:10px;color:#64748b;text-transform:uppercase;">Total</th>
@@ -121,7 +123,7 @@ export function ResumoRemuneracoesVariaveisPage() {
           <tbody>${rows}</tbody>
           <tfoot>
             <tr style="background:#0f172a;">
-              <td colspan="3" style="padding:12px 16px;font-size:13px;font-weight:700;color:white;">Total Geral</td>
+              <td colspan="4" style="padding:12px 16px;font-size:13px;font-weight:700;color:white;">Total Geral</td>
               <td style="padding:12px 16px;text-align:right;font-size:16px;font-weight:700;color:white;">${fmtBRL(totalGeral)}</td>
             </tr>
           </tfoot>
@@ -239,6 +241,7 @@ export function ResumoRemuneracoesVariaveisPage() {
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="text-left px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Colaborador</th>
+                  <th className="text-left px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Matrícula</th>
                   <th className="text-left px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Departamento</th>
                   <th className="text-center px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider w-32">Status</th>
                   <th className="text-right px-5 py-3 text-xs font-bold text-slate-600 uppercase tracking-wider w-40">Total</th>
@@ -257,6 +260,7 @@ export function ResumoRemuneracoesVariaveisPage() {
                         <span className="text-sm font-medium text-slate-800">{l.colaborador.nome}</span>
                       </div>
                     </td>
+                    <td className="px-5 py-3 text-sm text-slate-500 tabular-nums">{l.colaborador.matricula || '—'}</td>
                     <td className="px-5 py-3 text-sm text-slate-500">{l.colaborador.departamento ?? '—'}</td>
                     <td className="px-5 py-3 text-center">
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
@@ -271,7 +275,7 @@ export function ResumoRemuneracoesVariaveisPage() {
               </tbody>
               <tfoot>
                 <tr className="bg-slate-900">
-                  <td colSpan={3} className="px-5 py-3 text-sm font-bold text-white">Total Geral</td>
+                  <td colSpan={4} className="px-5 py-3 text-sm font-bold text-white">Total Geral</td>
                   <td className="px-5 py-3 text-right text-base font-bold text-white tabular-nums">{fmtBRL(totalGeral)}</td>
                 </tr>
               </tfoot>

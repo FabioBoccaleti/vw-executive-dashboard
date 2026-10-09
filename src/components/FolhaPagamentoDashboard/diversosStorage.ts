@@ -14,6 +14,7 @@ export type DiversosTituloMap = TituloMap;
 export interface DiversosColaborador {
   id: string;
   nome: string;
+  matricula: string;
   funcao: string;
   ativo: boolean;
   ordem?: number;
@@ -72,6 +73,7 @@ export async function saveTitulos(map: DiversosTituloMap): Promise<void> {
 export interface DiversosLinhaSnapshot {
   colaboradorId: string;
   nome: string;
+  matricula: string;
   funcao: string;
   motivo: string;
   departamento: DiversosDepto;

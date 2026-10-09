@@ -14,6 +14,7 @@ export const DEPTOS: PlantaoDepto[] = ['novos', 'usados', 'vd'];
 export interface PlantaoColaborador {
   id: string;
   nome: string;
+  matricula: string;
   funcao: string;
   valorPorSabado: number;
   departamento: PlantaoDepto;
@@ -102,6 +103,7 @@ export function tituloEfetivo(map: TituloMap, year: number, month: number): stri
 export interface PlantaoLinhaSnapshot {
   colaboradorId: string;
   nome: string;
+  matricula: string;
   funcao: string;
   departamento: PlantaoDepto;
   valorPorSabado: number;

@@ -38,6 +38,7 @@ const escapeHtml = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;')
 interface LinhaDemo {
   colaboradorId: string;
   nome: string;
+  matricula: string;
   funcao: string;
   motivo: string;
   departamento: DiversosDepto;
@@ -92,7 +93,7 @@ export function DiversosView({ onCompetencia }: { onCompetencia?: (year: number,
       .map(c => {
         const p = premForPk[c.id];
         return {
-          colaboradorId: c.id, nome: c.nome, funcao: c.funcao,
+          colaboradorId: c.id, nome: c.nome, matricula: c.matricula, funcao: c.funcao,
           motivo: p?.motivo ?? '', departamento: p?.departamento ?? 'novos', valor: p?.valor ?? 0,
         };
       })
@@ -211,6 +212,7 @@ export function DiversosView({ onCompetencia }: { onCompetencia?: (year: number,
       totalGeral += l.valor;
       return `<tr>
         <td style="${tdB}">${escapeHtml(l.nome)}</td>
+        <td style="${tdB}color:#64748b;">${escapeHtml(l.matricula || '—')}</td>
         <td style="${tdB}color:#64748b;">${escapeHtml(l.funcao || '—')}</td>
         <td style="${tdB}color:#64748b;">${escapeHtml(l.motivo || '—')}</td>
         <td style="${tdB}">${DEPTO_LABELS[l.departamento]}</td>
@@ -245,9 +247,9 @@ export function DiversosView({ onCompetencia }: { onCompetencia?: (year: number,
           <span style="margin-left:8px;font-size:8px;color:#cbd5e1;">Total: R$ ${fmtBRL(totalGeral)}</span></div>
       </div>
       <table style="width:100%;border-collapse:collapse;">
-        <thead><tr><th style="${thS()}">Colaborador</th><th style="${thS()}">Função</th><th style="${thS()}">Motivo da Bonificação</th><th style="${thS()}">Departamento</th><th style="${thS('right')}">Valor</th></tr></thead>
+        <thead><tr><th style="${thS()}">Colaborador</th><th style="${thS()}">Matrícula</th><th style="${thS()}">Função</th><th style="${thS()}">Motivo da Bonificação</th><th style="${thS()}">Departamento</th><th style="${thS('right')}">Valor</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
-        <tfoot><tr><td style="${tfB}" colspan="4">Total</td><td style="${tfB}text-align:right;">R$ ${fmtBRL(totalGeral)}</td></tr></tfoot>
+        <tfoot><tr><td style="${tfB}" colspan="5">Total</td><td style="${tfB}text-align:right;">R$ ${fmtBRL(totalGeral)}</td></tr></tfoot>
       </table>
       <div style="margin-top:12px;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;">
         <p style="font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin:0 0 8px;">ASSINATURAS</p>
@@ -575,6 +577,7 @@ function DemonstrativoTab({
                 <thead>
                   <tr className="bg-slate-100 text-[10px] uppercase tracking-wider text-slate-500">
                     <th className="text-left px-3 py-2 font-semibold">Colaborador</th>
+                    <th className="text-left px-3 py-2 font-semibold">Matrícula</th>
                     <th className="text-left px-3 py-2 font-semibold">Função</th>
                     <th className="text-left px-3 py-2 font-semibold">Motivo da Bonificação</th>
                     <th className="text-left px-3 py-2 font-semibold">Departamento</th>
@@ -585,6 +588,7 @@ function DemonstrativoTab({
                   {linhas.map(l => (
                     <tr key={l.colaboradorId} className="border-t border-slate-100">
                       <td className="px-3 py-2 font-medium text-slate-800">{l.nome}</td>
+                      <td className="px-3 py-2 text-slate-500 tabular-nums">{l.matricula || '—'}</td>
                       <td className="px-3 py-2 text-slate-500">{l.funcao || '—'}</td>
                       <td className="px-3 py-2 text-slate-500">{l.motivo || '—'}</td>
                       <td className="px-3 py-2 text-slate-600">{DEPTO_LABELS[l.departamento]}</td>
@@ -594,7 +598,7 @@ function DemonstrativoTab({
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-800 text-white font-bold text-xs">
-                    <td className="px-3 py-2.5 text-left" colSpan={4}>Total</td>
+                    <td className="px-3 py-2.5 text-left" colSpan={5}>Total</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">R$ {fmtBRL(totalGeral)}</td>
                   </tr>
                 </tfoot>
@@ -644,11 +648,13 @@ function ColaboradorDialog({
   onConfirm: (data: Omit<DiversosColaborador, 'id' | 'ativo' | 'ordem'>) => void;
 }) {
   const [nome, setNome] = useState(initial?.nome ?? '');
+  const [matricula, setMatricula] = useState(initial?.matricula ?? '');
   const [funcao, setFuncao] = useState(initial?.funcao ?? '');
 
   function submit() {
     if (!nome.trim()) { toast.error('Informe o nome.'); return; }
-    onConfirm({ nome: nome.trim(), funcao: funcao.trim() });
+    if (!matricula.trim()) { toast.error('Informe a matrícula.'); return; }
+    onConfirm({ nome: nome.trim(), matricula: matricula.trim(), funcao: funcao.trim() });
   }
 
   return (
@@ -662,6 +668,10 @@ function ColaboradorDialog({
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Nome <span className="text-red-500">*</span></label>
             <input value={nome} onChange={e => setNome(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" placeholder="Nome do colaborador" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Matrícula <span className="text-red-500">*</span></label>
+            <input value={matricula} inputMode="numeric" onChange={e => setMatricula(e.target.value.replace(/\D/g, ''))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" placeholder="Número da matrícula" />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Função</label>
