@@ -30,6 +30,8 @@ import {
   type AcaoExtrasMap,
   type AcaoItemSnapshot,
 } from './acoesVendasStorage';
+import { loadAcoesMatriculas, saveAcoesMatriculas } from './acoesMatriculasStorage';
+import type { AcoesMatriculasMap } from './acoesMatriculasStorage';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] as const;
@@ -38,6 +40,28 @@ const MONTH_NAMES = [
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
 ];
 const AVAILABLE_YEARS = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
+
+const periodValue = (pk: string): number => {
+  const [y, m] = pk.split('-').map(Number);
+  return y * 12 + m;
+};
+
+/** Retorna a matrícula do mês anterior mais recente que tenha valor preenchido. */
+function resolveMatriculaCarryForward(map: AcoesMatriculasMap, pk: string, vendedor: string): string {
+  const target = periodValue(pk);
+  let best = '';
+  let bestVal = -1;
+  for (const [k, rec] of Object.entries(map)) {
+    if (!/^\d{4}-\d{1,2}$/.test(k)) continue;
+    const val = periodValue(k);
+    const mat = rec[vendedor];
+    if (val < target && mat && mat.trim() && val > bestVal) {
+      bestVal = val;
+      best = mat;
+    }
+  }
+  return best;
+}
 
 const CAMPO_LABELS: Record<CampoAssinaturaComissao, string> = {
   financeiro:         'Financeiro',
@@ -136,6 +160,7 @@ export function AcoesVendasView() {
   const [lancamentos, setLancamentos] = useState<AcaoLancamentosMap>({});
   const [configMap, setConfigMap] = useState<AcaoConfigMap>({});
   const [extras, setExtras] = useState<AcaoExtrasMap>({});
+  const [matriculasMap, setMatriculasMap] = useState<AcoesMatriculasMap>({});
   const [loading, setLoading] = useState(true);
 
   const [selectedVendedor, setSelectedVendedor] = useState<string | null>(null);
@@ -159,7 +184,8 @@ export function AcoesVendasView() {
       loadAcaoLancamentos(),
       loadAcaoConfig(),
       loadAcaoExtras(),
-    ]).then(([rn, ru, pn, pu, prn, pru, lancs, cfg, ext]) => {
+      loadAcoesMatriculas(),
+    ]).then(([rn, ru, pn, pu, prn, pru, lancs, cfg, ext, mats]) => {
       setRowsNovos(rn);
       setRowsUsados(ru);
       setPeriodoNovos(pn);
@@ -169,6 +195,7 @@ export function AcoesVendasView() {
       setLancamentos(lancs);
       setConfigMap(cfg);
       setExtras(ext);
+      setMatriculasMap(mats ?? {});
     }).finally(() => setLoading(false));
   }, []);
 
@@ -352,6 +379,42 @@ export function AcoesVendasView() {
     setLancamentos(next);
     await saveAcaoLancamentos(next);
   };
+
+  // ── Matrícula do vendedor ──────────────────────────────────────────────────
+  /**
+   * Salva a matrícula aplicando a alteração a todos os meses NÃO pagos.
+   * Meses pagos (demonstrativo da ação pago) permanecem congelados.
+   */
+  function commitMatricula(vendedor: string, raw: string) {
+    const value = raw.replace(/\D/g, '');
+    const allPeriods = new Set<string>([
+      ...Object.keys(lancamentos),
+      ...Object.keys(matriculasMap),
+      pk,
+    ]);
+
+    setMatriculasMap(prev => {
+      const next: AcoesMatriculasMap = {};
+      for (const [k, rec] of Object.entries(prev)) next[k] = { ...rec };
+
+      for (const periodo of allPeriods) {
+        if (!/^\d{4}-\d{1,2}$/.test(periodo)) continue;
+        const locked = lancamentos[periodo]?.[vendedor]?.pago ?? false;
+        if (locked) {
+          // Congela meses pagos que ainda não têm valor explícito.
+          if (next[periodo]?.[vendedor] === undefined) {
+            const frozen = resolveMatriculaCarryForward(next, periodo, vendedor);
+            if (frozen) next[periodo] = { ...(next[periodo] ?? {}), [vendedor]: frozen };
+          }
+        } else {
+          next[periodo] = { ...(next[periodo] ?? {}), [vendedor]: value };
+        }
+      }
+
+      void saveAcoesMatriculas(next);
+      return next;
+    });
+  }
 
   function getLancamento(vendedor: string): AcaoLancamento | undefined {
     return lancamentos[pk]?.[vendedor];
@@ -722,6 +785,9 @@ export function AcoesVendasView() {
             nomeAcao={nomeAcao}
             competencia={competencia}
             printHtml={printHtml}
+            matriculasMap={matriculasMap}
+            pk={pk}
+            onCommitMatricula={commitMatricula}
           />
         )}
       </div>
@@ -1402,6 +1468,7 @@ function SecaoTabela({ label, itens, periodoLabel }: { label: string; itens: Pre
 // ─── Aba: Resumo ──────────────────────────────────────────────────────────────
 function ResumoTab({
   premiadosNovos, premiadosUsados, lancamentosPk, nomeAcao, competencia, printHtml,
+  matriculasMap, pk, onCommitMatricula,
 }: {
   premiadosNovos: PremiadoItem[];
   premiadosUsados: PremiadoItem[];
@@ -1409,14 +1476,34 @@ function ResumoTab({
   nomeAcao: string;
   competencia: string;
   printHtml: (html: string) => void;
+  matriculasMap: AcoesMatriculasMap;
+  pk: string;
+  onCommitMatricula: (vendedor: string, raw: string) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [matriculaDrafts, setMatriculaDrafts] = useState<Record<string, string>>({});
 
   function toggleExpand(v: string) {
     setExpanded(prev => {
       const next = new Set(prev);
       if (next.has(v)) next.delete(v); else next.add(v);
       return next;
+    });
+  }
+
+  /** Valor exibido para o período atual (explícito ou copiado do mês anterior). */
+  function getDisplayMatricula(vendedor: string): string {
+    const explicit = matriculasMap[pk]?.[vendedor];
+    if (explicit !== undefined) return explicit;
+    return resolveMatriculaCarryForward(matriculasMap, pk, vendedor);
+  }
+
+  function handleCommitMatricula(vendedor: string, raw: string) {
+    onCommitMatricula(vendedor, raw);
+    setMatriculaDrafts(d => {
+      const n = { ...d };
+      delete n[vendedor];
+      return n;
     });
   }
 
@@ -1451,6 +1538,7 @@ function ResumoTab({
       const statusTxt = `${pago ? 'Pago' : 'Pendente'}${assinados.length ? ' · ' + assinados.join(', ') : ''}`;
       return `<tr>
         <td>${escapeHtml(fixVendedorName(l.vendedor))}</td>
+        <td>${escapeHtml(getDisplayMatricula(l.vendedor)) || '—'}</td>
         <td style="text-align:center">${l.qtdN}</td>
         <td style="text-align:right">R$ ${fmtBRL(l.valN)}</td>
         <td style="text-align:center">${l.qtdU}</td>
@@ -1465,6 +1553,7 @@ function ResumoTab({
       <table style="width:100%;border-collapse:collapse;font-size:11px;">
         <thead><tr style="background:#f1f5f9;">
           <th style="text-align:left;padding:6px;border-bottom:1px solid #cbd5e1;">Vendedor</th>
+          <th style="text-align:left;padding:6px;border-bottom:1px solid #cbd5e1;">Matrícula</th>
           <th style="padding:6px;border-bottom:1px solid #cbd5e1;">Qtd Novos</th>
           <th style="text-align:right;padding:6px;border-bottom:1px solid #cbd5e1;">Valor Novos</th>
           <th style="padding:6px;border-bottom:1px solid #cbd5e1;">Qtd Usados</th>
@@ -1475,6 +1564,7 @@ function ResumoTab({
         <tbody>${rowsHtml}</tbody>
         <tfoot><tr style="background:#1e293b;color:white;font-weight:700;">
           <td style="padding:6px;">Total geral</td>
+          <td style="padding:6px;"></td>
           <td style="text-align:center;padding:6px;">${totais.qtdN}</td>
           <td style="text-align:right;padding:6px;">R$ ${fmtBRL(totais.valN)}</td>
           <td style="text-align:center;padding:6px;">${totais.qtdU}</td>
@@ -1520,6 +1610,7 @@ function ResumoTab({
                 <tr className="border-b border-slate-200">
                   <th className={`${thCls} w-8`} />
                   <th className={thCls}>Vendedor</th>
+                  <th className={thCls}>Matrícula</th>
                   <th className={`${thCls} text-right`}>Qtd Novos</th>
                   <th className={`${thCls} text-right`}>Valor Novos</th>
                   <th className={`${thCls} text-right`}>Qtd Usados</th>
@@ -1540,6 +1631,27 @@ function ResumoTab({
                           {isExp ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                         </td>
                         <td className={`${tdCls} font-medium text-slate-800`}>{fixVendedorName(l.vendedor)}</td>
+                        <td className={tdCls} onClick={e => e.stopPropagation()}>
+                          {pago ? (
+                            <span className="text-sm text-slate-600 tabular-nums">
+                              {getDisplayMatricula(l.vendedor) || <span className="text-slate-300">—</span>}
+                            </span>
+                          ) : (
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={matriculaDrafts[l.vendedor] ?? getDisplayMatricula(l.vendedor)}
+                              onChange={e => {
+                                const v = e.target.value.replace(/\D/g, '');
+                                setMatriculaDrafts(d => ({ ...d, [l.vendedor]: v }));
+                              }}
+                              onBlur={() => handleCommitMatricula(l.vendedor, matriculaDrafts[l.vendedor] ?? getDisplayMatricula(l.vendedor))}
+                              onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                              placeholder="—"
+                              className="w-24 border border-slate-200 rounded px-2 py-1 text-sm tabular-nums focus:outline-none focus:border-blue-400"
+                            />
+                          )}
+                        </td>
                         <td className={numCls}>{l.qtdN || <span className="text-slate-300">—</span>}</td>
                         <td className={numCls}>{l.qtdN ? `R$ ${fmtBRL(l.valN)}` : <span className="text-slate-300">—</span>}</td>
                         <td className={numCls}>{l.qtdU || <span className="text-slate-300">—</span>}</td>
@@ -1568,7 +1680,7 @@ function ResumoTab({
 
                       {isExp && (
                         <tr>
-                          <td colSpan={8} className="bg-slate-50/70 border-b border-slate-100 px-10 py-4">
+                          <td colSpan={9} className="bg-slate-50/70 border-b border-slate-100 px-10 py-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                               {l.novos.length > 0 && <DetalhePremios label="Novos" itens={l.novos} />}
                               {l.usados.length > 0 && <DetalhePremios label="Usados" itens={l.usados} />}
@@ -1584,6 +1696,7 @@ function ResumoTab({
                 <tr className="bg-slate-800 text-white font-bold text-xs">
                   <td className="px-4 py-2.5" />
                   <td className="px-4 py-2.5 text-left">Total geral</td>
+                  <td className="px-4 py-2.5" />
                   <td className="px-4 py-2.5 text-right tabular-nums">{totais.qtdN}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">R$ {fmtBRL(totais.valN)}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{totais.qtdU}</td>

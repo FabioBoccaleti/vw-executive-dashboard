@@ -5,6 +5,8 @@ import {
   deleteLancamento,
 } from './comissoesLancamentosStorage';
 import type { LancamentosMap, LinhaComissao, CampoAssinaturaComissao, AssinaturaDigital } from './comissoesLancamentosStorage';
+import { loadMatriculas, saveMatriculas } from './comissoesMatriculasStorage';
+import type { MatriculasMap } from './comissoesMatriculasStorage';
 import type { VendasResultadoRow } from '@/components/VendasBonificacoesDashboard/vendasResultadoStorage';
 import { kvGet } from '@/lib/kvClient';
 
@@ -22,6 +24,28 @@ const fmtBRL = (v: number) =>
 
 const sumLinhas = (linhas: Record<string, LinhaComissao>): number =>
   Object.values(linhas).reduce((s, l) => s + l.comVenda + l.comLB, 0);
+
+const periodValue = (pk: string): number => {
+  const [y, m] = pk.split('-').map(Number);
+  return y * 12 + m;
+};
+
+/** Retorna a matrícula do mês anterior mais recente que tenha valor preenchido. */
+function resolveMatriculaCarryForward(map: MatriculasMap, pk: string, vendedor: string): string {
+  const target = periodValue(pk);
+  let best = '';
+  let bestVal = -1;
+  for (const [k, rec] of Object.entries(map)) {
+    if (!/^\d{4}-\d{1,2}$/.test(k)) continue;
+    const val = periodValue(k);
+    const mat = rec[vendedor];
+    if (val < target && mat && mat.trim() && val > bestVal) {
+      bestVal = val;
+      best = mat;
+    }
+  }
+  return best;
+}
 
 function normalizeKeyPart(v: string | undefined): string {
   return String(v ?? '').trim().toUpperCase();
@@ -119,6 +143,9 @@ export function ComissoesResumoView() {
   const [inativosNovos, setInativosNovos] = useState<Set<string>>(new Set());
   const [inativosUsados,setInativosUsados]= useState<Set<string>>(new Set());
 
+  const [matriculasMap, setMatriculasMap] = useState<MatriculasMap>({});
+  const [matriculaDrafts, setMatriculaDrafts] = useState<Record<string, string>>({});
+
   const [expanded,       setExpanded]       = useState<Set<string>>(new Set());
   const [deleteTarget,   setDeleteTarget]   = useState<string | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
@@ -133,11 +160,13 @@ export function ComissoesResumoView() {
       loadLancamentos('usados'),
       kvGet<string[]>('comissoes:inativos:novos'),
       kvGet<string[]>('comissoes:inativos:usados'),
-    ]).then(([n, u, inN, inU]) => {
+      loadMatriculas(),
+    ]).then(([n, u, inN, inU, mats]) => {
       setNovosMap(n);
       setUsadosMap(u);
       setInativosNovos(new Set(inN ?? []));
       setInativosUsados(new Set(inU ?? []));
+      setMatriculasMap(mats ?? {});
 
       // Auto-seleciona o último mês que tenha pelo menos um lançamento
       const keysComDados = new Set([
@@ -222,6 +251,57 @@ export function ComissoesResumoView() {
     });
   }
 
+  // ── Matrícula ─────────────────────────────────────────────────────────────
+  /** Valor exibido para o período atual (explícito ou copiado do mês anterior). */
+  function getDisplayMatricula(vendedor: string): string {
+    const pk = `${year}-${month}`;
+    const explicit = matriculasMap[pk]?.[vendedor];
+    if (explicit !== undefined) return explicit;
+    return resolveMatriculaCarryForward(matriculasMap, pk, vendedor);
+  }
+
+  /** Um mês está travado para o vendedor se Novos OU Usados estiverem pagos. */
+  function isMatriculaLocked(pk: string, vendedor: string): boolean {
+    return (novosMap[pk]?.[vendedor]?.pago ?? false) || (usadosMap[pk]?.[vendedor]?.pago ?? false);
+  }
+
+  /**
+   * Salva a matrícula aplicando a alteração a todos os meses NÃO pagos.
+   * Meses pagos permanecem congelados com o valor que já tinham.
+   */
+  function commitMatricula(vendedor: string, raw: string) {
+    const value = raw.replace(/\D/g, '');
+    const allPeriods = new Set([...Object.keys(novosMap), ...Object.keys(usadosMap)]);
+    allPeriods.add(`${year}-${month}`);
+
+    setMatriculasMap(prev => {
+      const next: MatriculasMap = {};
+      for (const [k, rec] of Object.entries(prev)) next[k] = { ...rec };
+
+      for (const pk of allPeriods) {
+        if (!/^\d{4}-\d{1,2}$/.test(pk)) continue;
+        if (isMatriculaLocked(pk, vendedor)) {
+          // Congela meses pagos que ainda não têm valor explícito.
+          if (next[pk]?.[vendedor] === undefined) {
+            const frozen = resolveMatriculaCarryForward(next, pk, vendedor);
+            if (frozen) next[pk] = { ...(next[pk] ?? {}), [vendedor]: frozen };
+          }
+        } else {
+          next[pk] = { ...(next[pk] ?? {}), [vendedor]: value };
+        }
+      }
+
+      void saveMatriculas(next);
+      return next;
+    });
+
+    setMatriculaDrafts(d => {
+      const n = { ...d };
+      delete n[vendedor];
+      return n;
+    });
+  }
+
   // ── Delete ────────────────────────────────────────────────────────────────
   async function handleDeleteConfirm() {
     if (deletePassword !== '1985') {
@@ -269,6 +349,7 @@ export function ComissoesResumoView() {
     const rowsHtml = rows.map(r => `
       <tr>
         <td>${fixName(r.vendedor)}</td>
+        <td>${getDisplayMatricula(r.vendedor) || '<span class="dash">—</span>'}</td>
         <td class="num">${r.novos  !== null ? 'R$ ' + fmtBRL(r.novos)  : '<span class="dash">—</span>'}</td>
         <td class="num">${r.usados !== null ? 'R$ ' + fmtBRL(r.usados) : '<span class="dash">—</span>'}</td>
         <td class="num"><strong>R$ ${fmtBRL(r.total)}</strong></td>
@@ -300,6 +381,7 @@ tfoot td { font-weight: bold; background: #f8fafc; border-top: 2px solid #cbd5e1
 <table>
   <thead><tr>
     <th>Vendedor</th>
+    <th>Matrícula</th>
     <th style="text-align:right">Novos</th>
     <th style="text-align:right">Usados</th>
     <th style="text-align:right">Total</th>
@@ -308,6 +390,7 @@ tfoot td { font-weight: bold; background: #f8fafc; border-top: 2px solid #cbd5e1
   <tbody>${rowsHtml}</tbody>
   <tfoot><tr>
     <td>Total Geral</td>
+    <td></td>
     <td class="num">R$ ${fmtBRL(totals.novos)}</td>
     <td class="num">R$ ${fmtBRL(totals.usados)}</td>
     <td class="num">R$ ${fmtBRL(totals.total)}</td>
@@ -392,6 +475,7 @@ tfoot td { font-weight: bold; background: #f8fafc; border-top: 2px solid #cbd5e1
                 <tr className="border-b border-slate-200">
                   <th className={`${thCls} w-8`} />
                   <th className={thCls}>Vendedor</th>
+                  <th className={thCls}>Matrícula</th>
                   <th className={`${thCls} text-right`}>Novos</th>
                   <th className={`${thCls} text-right`}>Usados</th>
                   <th className={`${thCls} text-right`}>Total</th>
@@ -419,6 +503,27 @@ tfoot td { font-weight: bold; background: #f8fafc; border-top: 2px solid #cbd5e1
                           }
                         </td>
                         <td className={`${tdCls} font-medium text-slate-800`}>{fixName(r.vendedor)}</td>
+                        <td className={tdCls} onClick={e => e.stopPropagation()}>
+                          {(!!r.novosPago || !!r.usadosPago) ? (
+                            <span className="text-sm text-slate-600 tabular-nums">
+                              {getDisplayMatricula(r.vendedor) || <span className="text-slate-300">—</span>}
+                            </span>
+                          ) : (
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={matriculaDrafts[r.vendedor] ?? getDisplayMatricula(r.vendedor)}
+                              onChange={e => {
+                                const v = e.target.value.replace(/\D/g, '');
+                                setMatriculaDrafts(d => ({ ...d, [r.vendedor]: v }));
+                              }}
+                              onBlur={() => commitMatricula(r.vendedor, matriculaDrafts[r.vendedor] ?? getDisplayMatricula(r.vendedor))}
+                              onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                              placeholder="—"
+                              className="w-24 border border-slate-200 rounded px-2 py-1 text-sm tabular-nums focus:outline-none focus:border-blue-400"
+                            />
+                          )}
+                        </td>
                         <td className={numCls}>
                           {r.novos !== null
                             ? `R$ ${fmtBRL(r.novos)}`
@@ -510,7 +615,7 @@ tfoot td { font-weight: bold; background: #f8fafc; border-top: 2px solid #cbd5e1
                       {/* Detalhe expandido */}
                       {isExp && (
                         <tr>
-                          <td colSpan={7} className="bg-slate-50/70 border-b border-slate-100 px-10 py-4">
+                          <td colSpan={8} className="bg-slate-50/70 border-b border-slate-100 px-10 py-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
 
                               {/* Detalhe Novos */}
