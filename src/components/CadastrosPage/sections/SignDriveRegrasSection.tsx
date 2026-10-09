@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, Plus, X, Percent, Gift } from 'lucide-react';
+import { Pencil, Trash2, Plus, X, Percent, Gift, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   loadSignDriveRegras,
   saveSignDriveRegras,
+  loadSignDriveTiposVenda,
   CARGOS_VENDEDOR,
   type RegraRemuneracaoSignDrive,
+  type TipoVendaSignDrive,
   type FaixaQtdSignDrive,
   type ComissaoModoSignDrive,
   type PremioModoSignDrive,
@@ -24,6 +26,7 @@ const emptyFaixa = (): FaixaQtdSignDrive => ({ id: newId(), de: '', ate: '', val
 const emptyRegra = (): Omit<RegraRemuneracaoSignDrive, 'id'> => ({
   nome: '',
   cargo: CARGOS_VENDEDOR[0],
+  tiposVendaIds: [],
   comissaoAtiva: true,
   comissaoModo: 'fixa',
   comissaoPercentual: '',
@@ -102,8 +105,14 @@ function FaixasQtdEditor({
 }
 
 // ─── Formulário de regra (criar/editar) ─────────────────────────────────────
-function RegraForm({ draft, setDraft }: { draft: Draft; setDraft: (fn: (p: Draft) => Draft) => void; }) {
+function RegraForm({ draft, setDraft, tiposElegiveis }: { draft: Draft; setDraft: (fn: (p: Draft) => Draft) => void; tiposElegiveis: TipoVendaSignDrive[]; }) {
   const premioUnidadeLabel = draft.premioUnidade === 'percentual' ? 'Prêmio (%)' : 'Prêmio (R$)';
+  const toggleTipo = (id: string) => setDraft(p => ({
+    ...p,
+    tiposVendaIds: (p.tiposVendaIds ?? []).includes(id)
+      ? (p.tiposVendaIds ?? []).filter(x => x !== id)
+      : [...(p.tiposVendaIds ?? []), id],
+  }));
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
@@ -119,6 +128,38 @@ function RegraForm({ draft, setDraft }: { draft: Draft; setDraft: (fn: (p: Draft
             {CARGOS_VENDEDOR.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
+      </div>
+
+      {/* ── Tipos de venda aos quais a regra se aplica ── */}
+      <div className="border rounded-lg p-3">
+        <div className="flex items-center gap-1.5 mb-1">
+          <Tag className="w-4 h-4 text-blue-600" />
+          <span className="text-sm font-semibold text-slate-700">Aplicar a quais tipos de venda</span>
+          <span className="text-red-500">*</span>
+        </div>
+        <p className="text-xs text-slate-400 mb-2">Apenas tipos com % Comissão da Venda ou % Comissão Entrega preenchido.</p>
+        {tiposElegiveis.length === 0 ? (
+          <p className="text-xs text-amber-600">
+            Nenhum tipo de venda elegível. Cadastre um "Tipo da Venda / Produto" com % de comissão (venda ou entrega) preenchido.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {tiposElegiveis.map(t => {
+              const checked = (draft.tiposVendaIds ?? []).includes(t.id);
+              return (
+                <label
+                  key={t.id}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm cursor-pointer transition-colors ${
+                    checked ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <input type="checkbox" checked={checked} onChange={() => toggleTipo(t.id)} className="accent-blue-700" />
+                  <span className="font-medium truncate">{t.descricao}</span>
+                </label>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── Comissão ── */}
@@ -220,6 +261,7 @@ function resumoPremio(r: RegraRemuneracaoSignDrive): string {
 
 export function SignDriveRegrasSection() {
   const [items, setItems] = useState<RegraRemuneracaoSignDrive[]>([]);
+  const [tiposVenda, setTiposVenda] = useState<TipoVendaSignDrive[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -228,8 +270,18 @@ export function SignDriveRegrasSection() {
   const [editDraft, setEditDraft] = useState<Draft>(emptyRegra());
 
   useEffect(() => {
-    loadSignDriveRegras().then(d => { setItems(d); setLoading(false); });
+    Promise.all([loadSignDriveRegras(), loadSignDriveTiposVenda()]).then(([regras, tipos]) => {
+      setItems(regras);
+      setTiposVenda(tipos);
+      setLoading(false);
+    });
   }, []);
+
+  // Tipos elegíveis: com % Comissão da Venda OU % Comissão Entrega preenchido.
+  const tiposElegiveis = tiposVenda.filter(
+    t => (t.pctComissaoVenda ?? '').trim() !== '' || (t.pctComissaoEntrega ?? '').trim() !== '',
+  );
+  const tipoById = new Map(tiposVenda.map(t => [t.id, t] as const));
 
   const persist = async (updated: RegraRemuneracaoSignDrive[]) => {
     setSaving(true);
@@ -245,6 +297,7 @@ export function SignDriveRegrasSection() {
 
   const isValid = (r: Draft): boolean => {
     if (!r.nome.trim()) { toast.error('Informe o nome da regra.'); return false; }
+    if ((r.tiposVendaIds ?? []).length === 0) { toast.error('Selecione ao menos um tipo de venda.'); return false; }
     if (!r.comissaoAtiva && !r.premioAtivo) { toast.error('Ative ao menos Comissão ou Prêmio.'); return false; }
     if (r.comissaoAtiva) {
       if (r.comissaoModo === 'fixa' && !r.comissaoPercentual.trim()) { toast.error('Informe o percentual da comissão fixa.'); return false; }
@@ -269,6 +322,7 @@ export function SignDriveRegrasSection() {
     setEditingId(r.id);
     setEditDraft({
       ...rest,
+      tiposVendaIds: rest.tiposVendaIds ?? [],
       comissaoFaixas: rest.comissaoFaixas.length ? rest.comissaoFaixas : [emptyFaixa()],
       premioFaixas: rest.premioFaixas.length ? rest.premioFaixas : [emptyFaixa()],
     });
@@ -305,7 +359,7 @@ export function SignDriveRegrasSection() {
       {creating && (
         <div className="border rounded-lg p-4 mb-5 bg-slate-50/60">
           <h3 className="text-sm font-bold text-slate-800 mb-3">Nova regra de remuneração</h3>
-          <RegraForm draft={novo} setDraft={setNovo} />
+          <RegraForm draft={novo} setDraft={setNovo} tiposElegiveis={tiposElegiveis} />
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" size="sm" onClick={() => { setCreating(false); setNovo(emptyRegra()); }}>Cancelar</Button>
             <Button size="sm" disabled={saving} onClick={addRegra} style={{ background: '#1e3a8a' }} className="text-white hover:opacity-90">Salvar regra</Button>
@@ -326,7 +380,7 @@ export function SignDriveRegrasSection() {
             {editingId === r.id ? (
               <div className="p-4 bg-blue-50/40">
                 <h3 className="text-sm font-bold text-slate-800 mb-3">Editar regra</h3>
-                <RegraForm draft={editDraft} setDraft={setEditDraft} />
+                <RegraForm draft={editDraft} setDraft={setEditDraft} tiposElegiveis={tiposElegiveis} />
                 <div className="flex justify-end gap-2 mt-4">
                   <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancelar</Button>
                   <Button size="sm" disabled={saving} onClick={saveEdit} style={{ background: '#1e3a8a' }} className="text-white hover:opacity-90">Salvar alterações</Button>
@@ -343,6 +397,16 @@ export function SignDriveRegrasSection() {
                     {r.comissaoAtiva && <span className="text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">{resumoComissao(r)}</span>}
                     {r.premioAtivo && <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">{resumoPremio(r)}</span>}
                   </div>
+                  {(r.tiposVendaIds ?? []).length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                      <Tag className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                      {(r.tiposVendaIds ?? []).map(id => (
+                        <span key={id} className="text-[10px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                          {tipoById.get(id)?.descricao ?? '—'}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button onClick={() => startEdit(r)} className="text-blue-500 hover:text-blue-700 p-1 rounded"><Pencil className="w-4 h-4" /></button>

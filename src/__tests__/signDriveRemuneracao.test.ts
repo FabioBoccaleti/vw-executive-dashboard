@@ -12,6 +12,7 @@ function makeRegra(overrides: Partial<RegraRemuneracaoSignDrive> = {}): RegraRem
     id: 'r1',
     nome: 'Comissão Vendedor',
     cargo: 'Vendedor',
+    tiposVendaIds: [],
     comissaoAtiva: true,
     comissaoModo: 'faixas',
     comissaoPercentual: '',

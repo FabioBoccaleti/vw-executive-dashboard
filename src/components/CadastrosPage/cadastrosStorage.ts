@@ -402,6 +402,9 @@ export interface RegraRemuneracaoSignDrive {
   nome: string;
   cargo: string; // CargoVendedor
 
+  /** Tipos de venda/produto aos quais esta regra se aplica (ids de TipoVendaSignDrive). */
+  tiposVendaIds: string[];
+
   // Comissão (sempre em %)
   comissaoAtiva: boolean;
   comissaoModo: ComissaoModoSignDrive;  // 'fixa' | 'faixas'
