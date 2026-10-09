@@ -39,6 +39,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
+import { SegmentacaoTrimestralModal } from './SegmentacaoTrimestralModal';
 
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const YEARS = [2024, 2025, 2026, 2027, 2028, 2029, 2030];
@@ -74,6 +75,7 @@ export function AnaliseSection() {
   const [showNaoId, setShowNaoId] = useState(false);
   const [showAnoTable, setShowAnoTable] = useState(false);
   const [showModeloTable, setShowModeloTable] = useState(false);
+  const [showTrimestral, setShowTrimestral] = useState(false);
 
   const [grupos, setGrupos] = useState<RegraDepartamento[]>([]);
   const [regrasAnoChassi, setRegrasAnoChassi] = useState<RegraAnoChassi[]>([]);
@@ -741,10 +743,22 @@ export function AnaliseSection() {
           )}
 
           {subAba === 'segmentacao' && (
-            <SegmentacaoView data={segmentoData} segmentos={segmentos} periodoLabel={periodoLabel} departamentos={departamentosSegmentacao} />
+            <SegmentacaoView data={segmentoData} segmentos={segmentos} periodoLabel={periodoLabel} departamentos={departamentosSegmentacao} onOpenTrimestral={() => setShowTrimestral(true)} />
           )}
         </>
       )}
+
+      {/* ── Modal: visão trimestral da segmentação ── */}
+      <SegmentacaoTrimestralModal
+        open={showTrimestral}
+        onClose={() => setShowTrimestral(false)}
+        year={year}
+        periodo={periodo}
+        vendedor={vendedor}
+        grupos={gruposSegmentacao}
+        segmentos={segmentos}
+        regrasAnoChassi={regrasAnoChassi}
+      />
 
       {/* ── Modal: chassis não identificados ── */}
       <Dialog open={showNaoId} onOpenChange={setShowNaoId}>
@@ -1079,12 +1093,13 @@ function OsCategoriaView({
 }
 
 function SegmentacaoView({
-  data, segmentos, periodoLabel, departamentos,
+  data, segmentos, periodoLabel, departamentos, onOpenTrimestral,
 }: {
   data: SegmentoAnalise[];
   segmentos: Segmento[];
   periodoLabel: string;
   departamentos: string[];
+  onOpenTrimestral: () => void;
 }) {
   const [metricaBar, setMetricaBar] = useState<'quantidade' | 'valor'>('quantidade');
 
@@ -1244,8 +1259,15 @@ function SegmentacaoView({
 
       {/* ── Tabela de detalhe ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100">
+        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
           <h3 className="text-sm font-bold text-slate-700">Detalhe por segmento</h3>
+          <button
+            onClick={onOpenTrimestral}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Visão trimestral
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
