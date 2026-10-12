@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Calculator } from 'lucide-react'
 import { Toaster } from '@/components/ui/sonner'
 import { VWFinancialDashboard } from '@/components/VWFinancialDashboard'
 import { DespesasDashboard } from '@/components/DespesasDashboard'
@@ -54,7 +55,7 @@ function AppContent() {
     window.location.pathname === '/admin' ? 'admin' : 'app'
   )
   const [vendasSubPage, setVendasSubPage] = useState<'selection' | 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'monitoramento-custo-financeiro-estoque-rotativo-bv' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi'>('selection')
-  const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis' | 'premios'>('selection')
+  const [folhaSubPage, setFolhaSubPage] = useState<'selection' | 'salarios_fixo' | 'remuneracoes_pj' | 'calculo_comissoes_vw' | 'calculo_comissoes_vw_pos_vendas' | 'remuneracoes_variaveis' | 'premios' | 'comissoes_signdrive_produtos'>('selection')
   const [cadastrosVariant, setCadastrosVariant] = useState<'blindagem' | 'peliculas' | 'estetica' | 'assinatura-signdrive'>('blindagem')
   
   // Inicializa o banco de dados em produção
@@ -256,6 +257,30 @@ function AppContent() {
           <RemuneracoesVariaveisDashboard onBack={() => setFolhaSubPage('selection')} />
         ) : folhaSubPage === 'premios' ? (
           <PremiosDashboard onBack={() => setFolhaSubPage('selection')} />
+        ) : folhaSubPage === 'comissoes_signdrive_produtos' ? (
+          <div className="min-h-screen bg-slate-100 flex flex-col">
+            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
+              <div>
+                <h1 className="text-lg font-bold text-slate-800">Calculo de Comissões Sign&Drive e Produtos</h1>
+                <p className="text-xs text-slate-500 mt-0.5">Folha de Pagamento</p>
+              </div>
+              <button
+                onClick={() => setFolhaSubPage('selection')}
+                className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
+              >
+                ← Voltar
+              </button>
+            </header>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center space-y-3">
+                <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mx-auto">
+                  <Calculator className="w-8 h-8 text-teal-500" />
+                </div>
+                <p className="text-lg font-semibold text-slate-700">Em desenvolvimento</p>
+                <p className="text-sm text-slate-400">Este módulo estará disponível em breve.</p>
+              </div>
+            </div>
+          </div>
         ) : null
       ) : brand === 'vendas_bonificacoes' ? (
         vendasSubPage === 'selection' ? (
