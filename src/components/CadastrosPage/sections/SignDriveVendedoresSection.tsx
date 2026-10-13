@@ -24,11 +24,13 @@ export function SignDriveVendedoresSection() {
   const [loading, setLoading] = useState(true);
   const [novoNome, setNovoNome] = useState('');
   const [novoCodigo, setNovoCodigo] = useState('');
+  const [novoMatricula, setNovoMatricula] = useState('');
   const [novoCargo, setNovoCargo] = useState<CargoVendedor>('Vendedor');
   const [novoSalario, setNovoSalario] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNome, setEditNome] = useState('');
   const [editCodigo, setEditCodigo] = useState('');
+  const [editMatricula, setEditMatricula] = useState('');
   const [editCargo, setEditCargo] = useState<CargoVendedor>('Vendedor');
   const [editSalario, setEditSalario] = useState('');
 
@@ -53,14 +55,17 @@ export function SignDriveVendedoresSection() {
   const add = async () => {
     const nome = novoNome.trim();
     if (!nome) return;
+    const matricula = novoMatricula.trim();
+    if (!matricula) { toast.error('Informe a matrícula do vendedor.'); return; }
     const codigo = novoCodigo.trim() || undefined;
     if (codigo && items.some(i => i.codigo?.toLowerCase() === codigo.toLowerCase())) {
       toast.error('Já existe um vendedor com esse código.');
       return;
     }
-    await persist(sortAlpha([...items, { id: crypto.randomUUID(), codigo, nome, cargo: novoCargo, salarioFixo: novoSalario.trim() || undefined }]));
+    await persist(sortAlpha([...items, { id: crypto.randomUUID(), codigo, nome, matricula, cargo: novoCargo, salarioFixo: novoSalario.trim() || undefined }]));
     setNovoNome('');
     setNovoCodigo('');
+    setNovoMatricula('');
     setNovoSalario('');
     toast.success('Vendedor cadastrado');
   };
@@ -68,12 +73,14 @@ export function SignDriveVendedoresSection() {
   const saveEdit = async () => {
     const nome = editNome.trim();
     if (!nome || !editingId) return;
+    const matricula = editMatricula.trim();
+    if (!matricula) { toast.error('Informe a matrícula do vendedor.'); return; }
     const codigo = editCodigo.trim() || undefined;
     if (codigo && items.some(i => i.id !== editingId && i.codigo?.toLowerCase() === codigo.toLowerCase())) {
       toast.error('Já existe um vendedor com esse código.');
       return;
     }
-    await persist(sortAlpha(items.map(i => i.id === editingId ? { ...i, codigo, nome, cargo: editCargo, salarioFixo: editSalario.trim() || undefined } : i)));
+    await persist(sortAlpha(items.map(i => i.id === editingId ? { ...i, codigo, nome, matricula, cargo: editCargo, salarioFixo: editSalario.trim() || undefined } : i)));
     setEditingId(null);
     toast.success('Vendedor atualizado');
   };
@@ -87,7 +94,7 @@ export function SignDriveVendedoresSection() {
 
   return (
     <div>
-      <div className="flex gap-2 mb-5">
+      <div className="flex flex-wrap gap-2 mb-5">
         <Input
           placeholder="Código (opcional)..."
           value={novoCodigo}
@@ -96,11 +103,18 @@ export function SignDriveVendedoresSection() {
           className="w-36"
         />
         <Input
+          placeholder="Matrícula..."
+          value={novoMatricula}
+          onChange={e => setNovoMatricula(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') add(); }}
+          className="w-32"
+        />
+        <Input
           placeholder="Nome do vendedor..."
           value={novoNome}
           onChange={e => setNovoNome(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') add(); }}
-          className="flex-1"
+          className="flex-1 min-w-[180px]"
         />
         <select
           value={novoCargo}
@@ -116,7 +130,7 @@ export function SignDriveVendedoresSection() {
           onKeyDown={e => { if (e.key === 'Enter') add(); }}
           className="w-40"
         />
-        <Button onClick={add} disabled={saving || !novoNome.trim()} size="sm" style={{ background: '#1e3a8a' }} className="text-white hover:opacity-90">
+        <Button onClick={add} disabled={saving || !novoNome.trim() || !novoMatricula.trim()} size="sm" style={{ background: '#1e3a8a' }} className="text-white hover:opacity-90">
           <Plus className="w-4 h-4 mr-1" /> Adicionar
         </Button>
       </div>
@@ -126,6 +140,7 @@ export function SignDriveVendedoresSection() {
           <thead>
             <tr style={{ background: '#1e3a8a' }}>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold w-32">Código</th>
+              <th className="text-white text-left px-4 py-3 text-xs font-semibold w-32">Matrícula</th>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold">Nome</th>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold">Cargo</th>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold w-40">Salário Fixo</th>
@@ -134,7 +149,7 @@ export function SignDriveVendedoresSection() {
           </thead>
           <tbody>
             {items.length === 0 && (
-              <tr><td colSpan={5} className="text-center text-slate-400 text-xs py-8">Nenhum vendedor cadastrado</td></tr>
+              <tr><td colSpan={6} className="text-center text-slate-400 text-xs py-8">Nenhum vendedor cadastrado</td></tr>
             )}
             {items.map((item, idx) => (
               <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
@@ -144,6 +159,13 @@ export function SignDriveVendedoresSection() {
                       onKeyDown={e => { if (e.key === 'Escape') setEditingId(null); }}
                       className="h-7 text-xs" placeholder="Código..." />
                   ) : <span className="text-slate-500 font-mono">{item.codigo ?? '—'}</span>}
+                </td>
+                <td className="px-4 py-2 text-xs text-slate-700 w-32">
+                  {editingId === item.id ? (
+                    <Input value={editMatricula} onChange={e => setEditMatricula(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
+                      className="h-7 text-xs" placeholder="Matrícula..." />
+                  ) : <span className="text-slate-600 font-mono">{item.matricula ?? '—'}</span>}
                 </td>
                 <td className="px-4 py-2 text-xs text-slate-700">
                   {editingId === item.id ? (
@@ -176,7 +198,7 @@ export function SignDriveVendedoresSection() {
                       </>
                     ) : (
                       <>
-                        <button onClick={() => { setEditingId(item.id); setEditNome(item.nome); setEditCodigo(item.codigo ?? ''); setEditCargo(item.cargo); setEditSalario(item.salarioFixo ?? ''); }} className="text-blue-500 hover:text-blue-700 p-1 rounded"><Pencil className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => { setEditingId(item.id); setEditNome(item.nome); setEditCodigo(item.codigo ?? ''); setEditMatricula(item.matricula ?? ''); setEditCargo(item.cargo); setEditSalario(item.salarioFixo ?? ''); }} className="text-blue-500 hover:text-blue-700 p-1 rounded"><Pencil className="w-3.5 h-3.5" /></button>
                         <button onClick={() => remove(item.id)} className="text-red-400 hover:text-red-600 p-1 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
                       </>
                     )}

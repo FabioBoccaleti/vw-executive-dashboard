@@ -155,6 +155,12 @@ export function SignDriveDemonstrativoView({ year, month }: SignDriveDemonstrati
   const comp = month != null ? `${MONTH_NAMES[month - 1]} de ${year}` : `Ano ${year}`;
   const totalVendas = useMemo(() => [...vendedorRows.values()].reduce((s, a) => s + a.length, 0), [vendedorRows]);
 
+  const matriculaByVendedor = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const v of vendedores) if (v.matricula) m.set(v.nome, v.matricula);
+    return m;
+  }, [vendedores]);
+
   // ── Ações ──────────────────────────────────────────────────────────────────
   const pagarRows = useCallback(async (target: AssinaturaRow[]) => {
     if (saving) return;
@@ -296,6 +302,7 @@ export function SignDriveDemonstrativoView({ year, month }: SignDriveDemonstrati
             <div>
               <p class="head-sub">Demonstrativo de Comissão de Vendas Sign Drive</p>
               <h2>${esc(fixVendedorName(nome))}</h2>
+              ${matriculaByVendedor.get(nome) ? `<p class="head-veic">Matrícula: ${esc(matriculaByVendedor.get(nome))}</p>` : ''}
               <p class="head-veic">Veículos Novos</p>
             </div>
             <div class="head-right">
@@ -370,7 +377,7 @@ export function SignDriveDemonstrativoView({ year, month }: SignDriveDemonstrati
     win.document.close();
     win.focus();
     setTimeout(() => win.print(), 350);
-  }, [vendedorRows, estim, comp, assinMap, pk, isPaid, isPendente]);
+  }, [vendedorRows, estim, comp, assinMap, pk, isPaid, isPendente, matriculaByVendedor]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   if (loading) {
@@ -423,6 +430,9 @@ export function SignDriveDemonstrativoView({ year, month }: SignDriveDemonstrati
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-300">Demonstrativo de Comissão de Vendas Sign Drive</p>
               <h2 className="text-xl font-bold mt-0.5">{fixVendedorName(selected)}</h2>
+              {matriculaByVendedor.get(selected) && (
+                <p className="text-xs text-slate-300 mt-0.5">Matrícula: {matriculaByVendedor.get(selected)}</p>
+              )}
               <p className="text-xs text-slate-300 mt-0.5">Veículos Novos</p>
             </div>
             <div className="text-right">

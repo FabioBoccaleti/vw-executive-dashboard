@@ -52,6 +52,8 @@ export interface Vendedor {
   nome: string;
   cargo: CargoVendedor;
   salarioFixo?: string;
+  /** Matrícula do vendedor (usada no Sign&Drive). */
+  matricula?: string;
 }
 
 export async function loadVendedores(): Promise<Vendedor[]> {
