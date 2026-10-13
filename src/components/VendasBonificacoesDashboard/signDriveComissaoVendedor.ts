@@ -73,7 +73,7 @@ export function computeEstimativas(
     const rule = ruleFor(row);
     if (!rule) continue;
     eligibleIds.add(row.id);
-    if (isComissaoCongelada(row)) continue; // congelada: não entra na contagem
+    if (isComissaoCongelada(row) || row.estimativaEditada) continue; // congelada ou override manual: não entra na contagem
     const key = `${row.vendedor}||${rule.id}`;
     let g = groups.get(key);
     if (!g) { g = { rule, rows: [] }; groups.set(key, g); }
@@ -97,14 +97,14 @@ export function computeEstimativas(
 
 /**
  * Valor efetivo da Comissão do Vendedor para uma linha:
- * - congelada: usa o valor congelado em `estimativaComissaoVendedor`;
- * - não congelada: usa o valor recalculado em `values`.
+ * - congelada ou com override manual: usa o valor em `estimativaComissaoVendedor`;
+ * - caso contrário: usa o valor recalculado em `values`.
  */
 export function comissaoVendedorValor(
   row: AssinaturaRow,
   values: Map<string, number>,
 ): number {
-  if (isComissaoCongelada(row)) {
+  if (isComissaoCongelada(row) || row.estimativaEditada) {
     return parseBR(String(row.estimativaComissaoVendedor ?? ''));
   }
   return values.get(row.id) ?? 0;

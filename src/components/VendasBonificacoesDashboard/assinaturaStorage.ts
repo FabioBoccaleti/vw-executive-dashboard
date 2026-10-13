@@ -27,6 +27,8 @@ export interface AssinaturaRow {
   situacaoComissaoVendedor: string;
   /** Valor congelado da estimativa de comissão (preenchido ao travar via Sit. Comissão vendedor). */
   estimativaComissaoVendedor?: string;
+  /** Indica que a Estimativa Comissão Vendedor foi editada manualmente (override). */
+  estimativaEditada?: boolean;
   /** Data (ISO "YYYY-MM-DD") em que a comissão do vendedor foi marcada como paga. */
   dataPagamentoComissaoVendedor?: string;
   anulada?: boolean;

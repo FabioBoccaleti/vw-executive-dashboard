@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { useAuth } from '@/contexts/useAuth';
 import { Button } from '@/components/ui/button';
-import { LogOut, Key, BookOpen, TableProperties, BarChart2, Search, FilePlus, X, Trash2, Pencil, Lock, LockOpen, Coins, Download, FileText, Truck, Plus } from 'lucide-react';
+import { LogOut, Key, BookOpen, TableProperties, BarChart2, Search, FilePlus, X, Trash2, Pencil, Lock, LockOpen, Coins, Download, FileText, Truck, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -295,7 +295,8 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
 
   // Edição das comissões (com senha)
   const [editComissaoId, setEditComissaoId] = useState<string | null>(null);
-  const [editComissao, setEditComissao] = useState<{ comissaoEntrega: string; comissaoVenda: string }>({ comissaoEntrega: '', comissaoVenda: '' });
+  const [editComissao, setEditComissao] = useState<{ comissaoEntrega: string; comissaoVenda: string; estimativa: string }>({ comissaoEntrega: '', comissaoVenda: '', estimativa: '' });
+  const [estimativaManual, setEstimativaManual] = useState(false);
   const [comissaoPromptId, setComissaoPromptId] = useState<string | null>(null);
   const [comissaoPassword, setComissaoPassword] = useState('');
 
@@ -437,15 +438,21 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   const requestEditComissao = (row: AssinaturaRow) => { setComissaoPromptId(row.id); setComissaoPassword(''); };
   const confirmComissao = (row: AssinaturaRow) => {
     if (comissaoPassword === '1985') {
+      const override = !!row.estimativaEditada;
+      setEstimativaManual(override);
+      setEditComissao({
+        comissaoEntrega: row.comissaoEntrega,
+        comissaoVenda: row.comissaoVenda,
+        estimativa: override ? (row.estimativaComissaoVendedor ?? '') : '',
+      });
       setEditComissaoId(row.id);
-      setEditComissao({ comissaoEntrega: row.comissaoEntrega, comissaoVenda: row.comissaoVenda });
       setComissaoPromptId(null); setComissaoPassword('');
     } else { toast.error('Senha incorreta'); setComissaoPassword(''); }
   };
   const saveEditComissao = async () => {
     if (!editComissaoId) return;
-    const updated = rows.map(r => r.id === editComissaoId ? {
-      ...r,
+    const estimManual = estimativaManual && editComissao.estimativa.trim() !== '';
+    const base = {
       comissaoEntrega: String(comissaoPreview.comissaoEntrega),
       comissaoVenda: String(comissaoPreview.comissaoVenda),
       totalComissoesBruta: String(comissaoPreview.total),
@@ -454,9 +461,24 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
       totalComissaoLiquida: String(comissaoPreview.totalLiquida),
       pctRentabilidadeLiquida: String(comissaoPreview.rentLiquida),
       comissaoEditada: true,
-    } : r);
+    };
+    const updated = rows.map(r => {
+      if (r.id !== editComissaoId) return r;
+      if (estimManual) {
+        return { ...r, ...base, estimativaEditada: true, estimativaComissaoVendedor: String(parseBR(editComissao.estimativa)) };
+      }
+      // Automático: Estimativa recalculada pela regra a partir das comissões.
+      // Em linha congelada (paga), grava o snapshot recalculado; caso contrário,
+      // deixa em branco para ser recalculada ao vivo.
+      return {
+        ...r, ...base,
+        estimativaEditada: false,
+        estimativaComissaoVendedor: isComissaoCongelada(r) ? String(comissaoPreview.estimativaAuto) : undefined,
+      };
+    });
     await persist(updated);
     setEditComissaoId(null);
+    setEstimativaManual(false);
     toast.success('Comissões atualizadas');
   };
 
@@ -490,8 +512,16 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     const impostos = total * pctImpostos / 100;
     const totalLiquida = total - impostos;
     const rentLiquida = valor > 0 ? totalLiquida / valor * 100 : 0;
-    return { comissaoEntrega, comissaoVenda, total, rentBruta, impostos, totalLiquida, rentLiquida };
-  }, [editComissao, editComissaoId, rows, tiposVenda]);
+    // Estimativa recalculada pela regra usando as comissões editadas.
+    let estimativaAuto = 0;
+    if (row && editComissaoId) {
+      const probe = rows.map(r => r.id === editComissaoId
+        ? { ...r, comissaoEntrega: String(comissaoEntrega), comissaoVenda: String(comissaoVenda), totalComissoesBruta: String(total), totalComissaoLiquida: String(totalLiquida), situacaoComissaoVendedor: '', estimativaEditada: false }
+        : r);
+      estimativaAuto = computeEstimativas(probe, regras, vendedores, tiposVenda).values.get(editComissaoId) ?? 0;
+    }
+    return { comissaoEntrega, comissaoVenda, total, rentBruta, impostos, totalLiquida, rentLiquida, estimativaAuto };
+  }, [editComissao, editComissaoId, rows, tiposVenda, regras, vendedores]);
 
   const startEdit = (row: AssinaturaRow) => {
     setEditingId(row.id);
@@ -559,15 +589,16 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     // - Já congelada: mantém o valor anterior.
     // - Voltou a ficar vazia: volta a ser calculada ao vivo (limpa o congelado).
     let finalRows = updated;
+    const prevOverride = !!prevRow?.estimativaEditada;
     if (novaSituacaoVendedor !== '') {
-      if (!eraCongelada) {
+      if (!eraCongelada && !prevOverride) {
         const probe = updated.map(x => x.id === editingId ? { ...x, situacaoComissaoVendedor: '' } : x);
         const snap = computeEstimativas(probe, regras, vendedores, tiposVenda).values.get(editingId);
         finalRows = updated.map(x => x.id === editingId
           ? { ...x, estimativaComissaoVendedor: snap != null ? String(snap) : undefined }
           : x);
       }
-    } else {
+    } else if (!prevOverride) {
       finalRows = updated.map(x => x.id === editingId
         ? { ...x, estimativaComissaoVendedor: undefined }
         : x);
@@ -626,6 +657,32 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
           return <input type="text" value={editComissao.comissaoEntrega} onChange={e => setEditComissao(p => ({ ...p, comissaoEntrega: e.target.value }))} className={comissaoInputClass} />;
         case 'comissaoVenda':
           return <input type="text" value={editComissao.comissaoVenda} onChange={e => setEditComissao(p => ({ ...p, comissaoVenda: e.target.value }))} className={comissaoInputClass} />;
+        case 'estimativaComissaoVendedor': {
+          const autoStr = String(Math.round(comissaoPreview.estimativaAuto * 100) / 100);
+          return (
+            <div className="flex items-center gap-1">
+              <input
+                type="text"
+                value={estimativaManual ? editComissao.estimativa : autoStr}
+                onChange={e => { setEstimativaManual(true); setEditComissao(p => ({ ...p, estimativa: e.target.value })); }}
+                title={estimativaManual ? 'Valor manual. Use o botão para voltar ao automático.' : 'Recalculada automaticamente ao mudar Entrega/Venda. Edite para fixar um valor.'}
+                className={comissaoInputClass}
+              />
+              {estimativaManual ? (
+                <button
+                  type="button"
+                  onClick={() => { setEstimativaManual(false); setEditComissao(p => ({ ...p, estimativa: '' })); }}
+                  title="Voltar ao automático"
+                  className="flex-shrink-0 text-blue-500 hover:text-emerald-600 p-0.5 rounded"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <span className="flex-shrink-0 text-[9px] font-semibold text-emerald-600 uppercase tracking-wide" title="Recalculada automaticamente">auto</span>
+              )}
+            </div>
+          );
+        }
         case 'totalComissoesBruta':     return fmtCurrency(String(comissaoPreview.total));
         case 'pctRentabilidadeBruta':   return fmtPct(String(comissaoPreview.rentBruta));
         case 'impostosComissao':        return fmtCurrency(String(comissaoPreview.impostos));
@@ -647,6 +704,15 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
             <span className="inline-flex items-center gap-1">
               {fmtCurrency(stored)}
               <span title="Comissão congelada (Sit. Comissão vendedor preenchida)" className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />
+            </span>
+          ) : '—';
+        }
+        if (row.estimativaEditada) {
+          const stored = row.estimativaComissaoVendedor;
+          return stored != null && stored !== '' ? (
+            <span className="inline-flex items-center gap-1">
+              {fmtCurrency(stored)}
+              <span title="Estimativa editada manualmente" className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
             </span>
           ) : '—';
         }
