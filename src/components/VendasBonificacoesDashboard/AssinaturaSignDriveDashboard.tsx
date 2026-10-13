@@ -464,16 +464,19 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
     };
     const updated = rows.map(r => {
       if (r.id !== editComissaoId) return r;
+      // Congelada (Sit. Comissão vendedor preenchida): Estimativa travada — não
+      // edita, não recalcula, nada muda. Só altera Entrega/Venda e derivados.
+      if (isComissaoCongelada(r)) {
+        return { ...r, ...base };
+      }
       if (estimManual) {
         return { ...r, ...base, estimativaEditada: true, estimativaComissaoVendedor: String(parseBR(editComissao.estimativa)) };
       }
-      // Automático: Estimativa recalculada pela regra a partir das comissões.
-      // Em linha congelada (paga), grava o snapshot recalculado; caso contrário,
-      // deixa em branco para ser recalculada ao vivo.
+      // Automático: Estimativa recalculada ao vivo pela regra a partir das comissões.
       return {
         ...r, ...base,
         estimativaEditada: false,
-        estimativaComissaoVendedor: isComissaoCongelada(r) ? String(comissaoPreview.estimativaAuto) : undefined,
+        estimativaComissaoVendedor: undefined,
       };
     });
     await persist(updated);
@@ -658,6 +661,16 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
         case 'comissaoVenda':
           return <input type="text" value={editComissao.comissaoVenda} onChange={e => setEditComissao(p => ({ ...p, comissaoVenda: e.target.value }))} className={comissaoInputClass} />;
         case 'estimativaComissaoVendedor': {
+          // Congelada: valor travado (somente leitura, não recalcula).
+          if (isComissaoCongelada(row)) {
+            const stored = row.estimativaComissaoVendedor;
+            return stored != null && stored !== '' ? (
+              <span className="inline-flex items-center gap-1">
+                {fmtCurrency(stored)}
+                <span title="Comissão congelada (Sit. Comissão vendedor preenchida)" className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />
+              </span>
+            ) : '—';
+          }
           const autoStr = String(Math.round(comissaoPreview.estimativaAuto * 100) / 100);
           return (
             <div className="flex items-center gap-1">
