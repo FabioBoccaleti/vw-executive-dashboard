@@ -440,7 +440,7 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Visões</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {(['folha.analise', 'folha.relacao', 'folha.pj', 'folha.comissoes_vw', 'folha.remuneracoes_variaveis', 'folha.premios'] as FolhaSubModuleId[]).map(s => (
+              {(['folha.analise', 'folha.relacao', 'folha.pj', 'folha.comissoes_vw', 'folha.comissoes_signdrive_produtos', 'folha.remuneracoes_variaveis', 'folha.premios'] as FolhaSubModuleId[]).map(s => (
                 <button
                   key={s} type="button"
                   onClick={() => toggleFolhaSub(s)}

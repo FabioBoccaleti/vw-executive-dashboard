@@ -87,6 +87,7 @@ export type FolhaSubModuleId =
   | 'folha.comissoes_vw.calculo.novos'
   | 'folha.comissoes_vw.calculo.usados'
   | 'folha.comissoes_vw.resumo'
+  | 'folha.comissoes_signdrive_produtos'
   | 'folha.remuneracoes_variaveis'
   | 'folha.premios'
   | 'folha.premios.plantao_sabado'
@@ -111,6 +112,7 @@ export const FOLHA_SUB_MODULE_LABELS: Record<FolhaSubModuleId, string> = {
   'folha.comissoes_vw.calculo.novos':  'Novos',
   'folha.comissoes_vw.calculo.usados': 'Usados',
   'folha.comissoes_vw.resumo':         'Resumo',
+  'folha.comissoes_signdrive_produtos': 'Cálculo de Comissões Sign&Drive e Produtos',
   'folha.remuneracoes_variaveis':      'Remunerações Variáveis',
   'folha.premios':                     'Prêmios',
   'folha.premios.plantao_sabado':      'Plantão aos Sábados',

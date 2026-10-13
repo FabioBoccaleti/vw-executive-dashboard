@@ -11,6 +11,7 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
   const admin = isAdmin();
   const canPJ          = admin || canAccessFolhaSub('folha.pj');
   const canComissoesVW = admin || canAccessFolhaSub('folha.comissoes_vw');
+  const canSignDriveProdutos = admin || canAccessFolhaSub('folha.comissoes_signdrive_produtos');
   const canRemVariaveis = admin || canAccessFolhaSub('folha.remuneracoes_variaveis');
   const canPremios     = admin || canAccessFolhaSub('folha.premios');
   return (
@@ -117,6 +118,7 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
           )}
 
           {/* Card — Calculo de Comissões Sign&Drive e Produtos */}
+          {canSignDriveProdutos && (
           <button
             onClick={() => onSelect('comissoes_signdrive_produtos')}
             className="w-44 mx-auto bg-white rounded-2xl border-2 border-teal-400 shadow-md hover:shadow-xl hover:border-teal-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
@@ -130,6 +132,7 @@ export function FolhaSelectionPage({ onSelect, onChangeBrand }: FolhaSelectionPa
               </h2>
             </div>
           </button>
+          )}
 
           {/* Card — Prêmios */}
           {canPremios && (
