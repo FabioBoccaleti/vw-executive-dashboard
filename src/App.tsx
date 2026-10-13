@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { Calculator } from 'lucide-react'
 import { Toaster } from '@/components/ui/sonner'
 import { VWFinancialDashboard } from '@/components/VWFinancialDashboard'
 import { DespesasDashboard } from '@/components/DespesasDashboard'
@@ -20,6 +19,7 @@ import { RemuneracoesPJDashboard } from '@/components/FolhaPagamentoDashboard/Re
 import { CalculoComissoesVWPage } from '@/components/FolhaPagamentoDashboard/CalculoComissoesVWPage'
 import { CalculoComissoesVWPosVendasPage } from '@/components/FolhaPagamentoDashboard/CalculoComissoesVWPosVendasPage'
 import { RemuneracoesVariaveisDashboard } from '@/components/FolhaPagamentoDashboard/RemuneracoesVariaveisDashboard'
+import { ComissoesSignDriveProdutosPage } from '@/components/FolhaPagamentoDashboard/ComissoesSignDriveProdutosPage'
 import { CadastrosPage } from '@/components/CadastrosPage'
 import { BrandSelector } from '@/components/BrandSelector'
 import { Brand, getSavedBrand, saveBrand, applyBrandTheme } from '@/lib/brands'
@@ -258,29 +258,7 @@ function AppContent() {
         ) : folhaSubPage === 'premios' ? (
           <PremiosDashboard onBack={() => setFolhaSubPage('selection')} />
         ) : folhaSubPage === 'comissoes_signdrive_produtos' ? (
-          <div className="min-h-screen bg-slate-100 flex flex-col">
-            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
-              <div>
-                <h1 className="text-lg font-bold text-slate-800">Calculo de Comissões Sign&Drive e Produtos</h1>
-                <p className="text-xs text-slate-500 mt-0.5">Folha de Pagamento</p>
-              </div>
-              <button
-                onClick={() => setFolhaSubPage('selection')}
-                className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
-              >
-                ← Voltar
-              </button>
-            </header>
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mx-auto">
-                  <Calculator className="w-8 h-8 text-teal-500" />
-                </div>
-                <p className="text-lg font-semibold text-slate-700">Em desenvolvimento</p>
-                <p className="text-sm text-slate-400">Este módulo estará disponível em breve.</p>
-              </div>
-            </div>
-          </div>
+          <ComissoesSignDriveProdutosPage onBack={() => setFolhaSubPage('selection')} />
         ) : null
       ) : brand === 'vendas_bonificacoes' ? (
         vendasSubPage === 'selection' ? (

@@ -7,8 +7,8 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { loadAssinaturaRows, saveAssinaturaRows, type AssinaturaRow } from './assinaturaStorage';
 import { loadSignDriveCatalogo, type CatalogoVeiculos } from './catalogoStorage';
-import { loadSignDriveVendedores, loadSignDriveTiposVenda, loadSignDriveRegras, type Vendedor, type TipoVendaSignDrive, type RegraRemuneracaoSignDrive, type BaseCalculoSignDrive } from '@/components/CadastrosPage/cadastrosStorage';
-import { percentualComissaoRegra } from './signDriveRemuneracao';
+import { loadSignDriveVendedores, loadSignDriveTiposVenda, loadSignDriveRegras, type Vendedor, type TipoVendaSignDrive, type RegraRemuneracaoSignDrive } from '@/components/CadastrosPage/cadastrosStorage';
+import { computeEstimativas as computeEstimativasShared } from './signDriveComissaoVendedor';
 import { SignDriveAnalise } from './SignDriveAnalise';
 
 interface AssinaturaSignDriveDashboardProps {
@@ -88,15 +88,6 @@ const PRODUTO_COMISSAO_EDITAVEL = 'Sign and Drive Empresas';
 // Comparação robusta (ignora maiúsculas/minúsculas e espaços) com o produto cadastrado.
 const isEmNegociacao = (produto: string): boolean => (produto ?? '').trim().toLowerCase().startsWith('em negocia');
 
-// ─── Cálculo da Estimativa de Comissão do Vendedor ──────────────────────────
-const BASE_FIELD: Record<BaseCalculoSignDrive, keyof AssinaturaRow> = {
-  valorContrato:        'valorContrato',
-  comissaoEntrega:      'comissaoEntrega',
-  comissaoVenda:        'comissaoVenda',
-  totalComissoesBruta:  'totalComissoesBruta',
-  totalComissaoLiquida: 'totalComissaoLiquida',
-};
-
 const isComissaoCongelada = (row: AssinaturaRow): boolean =>
   (row.situacaoComissaoVendedor ?? '').trim() !== '';
 
@@ -118,45 +109,7 @@ function computeEstimativas(
   vendedores: Vendedor[],
   tiposVenda: TipoVendaSignDrive[],
 ): { values: Map<string, number>; eligibleIds: Set<string> } {
-  const cargoByVendedor = new Map(vendedores.map(v => [v.nome, v.cargo] as const));
-  const tipoIdByDesc = new Map(tiposVenda.map(t => [t.descricao, t.id] as const));
-  const regrasComissao = regras.filter(r => r.comissaoAtiva);
-
-  const ruleFor = (row: AssinaturaRow): RegraRemuneracaoSignDrive | null => {
-    if (row.anulada || isEmNegociacao(row.tipoVenda)) return null;
-    const cargo = cargoByVendedor.get(row.vendedor);
-    const tipoId = tipoIdByDesc.get(row.tipoVenda);
-    if (!cargo || !tipoId) return null;
-    return regrasComissao.find(r => r.cargo === cargo && (r.tiposVendaIds ?? []).includes(tipoId)) ?? null;
-  };
-
-  const eligibleIds = new Set<string>();
-  const groups = new Map<string, { rule: RegraRemuneracaoSignDrive; rows: AssinaturaRow[] }>();
-
-  for (const row of rows) {
-    const rule = ruleFor(row);
-    if (!rule) continue;
-    eligibleIds.add(row.id);
-    if (isComissaoCongelada(row)) continue; // congelada: não entra na contagem
-    const key = `${row.vendedor}||${rule.id}`;
-    let g = groups.get(key);
-    if (!g) { g = { rule, rows: [] }; groups.set(key, g); }
-    g.rows.push(row);
-  }
-
-  const values = new Map<string, number>();
-  for (const { rule, rows: grp } of groups.values()) {
-    const pct = percentualComissaoRegra(rule, grp.length);
-    for (const row of grp) {
-      const base = (rule.comissaoBases ?? []).reduce(
-        (s, b) => s + parseBR(String(row[BASE_FIELD[b]] ?? '')),
-        0,
-      );
-      values.set(row.id, base * pct / 100);
-    }
-  }
-
-  return { values, eligibleIds };
+  return computeEstimativasShared(rows, regras, vendedores, tiposVenda);
 }
 
 // ─── Zona de inserção de linha (hover entre as linhas) ─────────────────────
