@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Car, Shield, Users, Percent, Store, Wrench, ShoppingBag, UserCheck, Receipt, CalendarCog, WalletCards, Tag } from 'lucide-react';
+import { ArrowLeft, Car, Shield, Users, Percent, Store, Wrench, ShoppingBag, UserCheck, Receipt, CalendarCog, WalletCards, Tag, Settings2 } from 'lucide-react';
 import { VeiculosSection } from './sections/VeiculosSection';
 import { BlinadorasSection } from './sections/BlinadorasSection';
 import { VendedoresSection } from './sections/VendedoresSection';
@@ -23,12 +23,13 @@ import { EsteticaVendedoresAcessoriosSection } from './sections/EsteticaVendedor
 import { EsteticaAliquotasSection } from './sections/EsteticaAliquotasSection';
 import { EsteticaDsrSection } from './sections/EsteticaDsrSection';
 import { EsteticaSalariosFixosSection } from './sections/EsteticaSalariosFixosSection';
+import { EsteticaCustoPreparacaoSection } from './sections/EsteticaCustoPreparacaoSection';
 import { SignDriveVeiculosSection } from './sections/SignDriveVeiculosSection';
 import { SignDriveVendedoresSection } from './sections/SignDriveVendedoresSection';
 import { SignDriveTipoVendaSection } from './sections/SignDriveTipoVendaSection';
 import { SignDriveRegrasSection } from './sections/SignDriveRegrasSection';
 
-type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos' | 'aliquotas' | 'dsr' | 'salariosFixos' | 'tipoVenda';
+type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos' | 'aliquotas' | 'dsr' | 'salariosFixos' | 'custoPreparacao' | 'tipoVenda';
 
 interface MenuItem {
   id: SectionId;
@@ -67,6 +68,7 @@ const MENU_ESTETICA: MenuItem[] = [
   { id: 'dsr',                   label: 'DSR',                        description: 'Percentual de DSR por Ano e Mês',   icon: <CalendarCog className="w-5 h-5" /> },
   { id: 'regras',                label: 'Regras de Remuneração',     description: 'Percentuais e bases de cálculo', icon: <Percent className="w-5 h-5" /> },
   { id: 'salariosFixos',         label: 'Salários Fixo',              description: 'Custos fixos dos colaboradores', icon: <WalletCards className="w-5 h-5" /> },
+  { id: 'custoPreparacao',       label: 'Custo sobre Preparação do Serviço', description: 'Percentual por período de validade', icon: <Settings2 className="w-5 h-5" /> },
 ];
 
 const MENU_SIGNDRIVE: MenuItem[] = [
@@ -186,6 +188,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
             {isEstetica   && activeSection === 'dsr'                   && <EsteticaDsrSection />}
             {isEstetica   && activeSection === 'regras'               && <EsteticaRegrasSection />}
             {isEstetica   && activeSection === 'salariosFixos'         && <EsteticaSalariosFixosSection />}
+            {isEstetica   && activeSection === 'custoPreparacao'       && <EsteticaCustoPreparacaoSection />}
             {isAssinatura && activeSection === 'veiculos'             && <SignDriveVeiculosSection />}
             {isAssinatura && activeSection === 'vendedores'           && <SignDriveVendedoresSection />}
             {isAssinatura && activeSection === 'tipoVenda'            && <SignDriveTipoVendaSection />}

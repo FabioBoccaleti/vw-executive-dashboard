@@ -314,6 +314,25 @@ export async function saveEsteticaDsr(items: DsrConfig[]): Promise<boolean> {
   return kvSet(KEY_ESTETICA_DSR, items);
 }
 
+// ── Estética: Custo sobre Preparação do Serviço ───────────────────────────────
+const KEY_ESTETICA_CUSTO_PREPARACAO = 'estetica_cadastro_custo_preparacao';
+
+export interface CustoPreparacaoConfig {
+  id: string;
+  anoInicio: number;
+  mesInicio: number; // 1–12
+  anoFim: number;
+  mesFim: number;    // 1–12
+  percentual: string; // % de custo sobre a preparação do serviço (ex: "5.00")
+}
+
+export async function loadEsteticaCustoPreparacao(): Promise<CustoPreparacaoConfig[]> {
+  return (await kvGet<CustoPreparacaoConfig[]>(KEY_ESTETICA_CUSTO_PREPARACAO)) ?? [];
+}
+export async function saveEsteticaCustoPreparacao(items: CustoPreparacaoConfig[]): Promise<boolean> {
+  return kvSet(KEY_ESTETICA_CUSTO_PREPARACAO, items);
+}
+
 // ── Estética: Salários Fixos ──────────────────────────────────────────────────
 const KEY_ESTETICA_SALARIOS_FIXOS = 'estetica_cadastro_salarios_fixos';
 
@@ -325,6 +344,14 @@ export interface SalarioFixoEstetica {
   encargosProvisoes: string;
   planoSaude: string;
   valeTransporte: string;
+  // Período de validade do colaborador. anoInicio/mesInicio são obrigatórios
+  // a partir desta versão; registros antigos sem esses campos são considerados
+  // ativos desde sempre. anoFim/mesFim são opcionais — ausentes = colaborador
+  // ainda ativo (sem data de término).
+  anoInicio?: number;
+  mesInicio?: number; // 1–12
+  anoFim?: number;
+  mesFim?: number;    // 1–12
 }
 
 export async function loadEsteticaSalariosFixos(): Promise<SalarioFixoEstetica[]> {

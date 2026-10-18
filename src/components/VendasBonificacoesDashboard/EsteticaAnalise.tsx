@@ -5,7 +5,11 @@ import {
 } from 'recharts';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { type EsteticaRow } from './esteticaStorage';
-import { loadEsteticaDsr, type DsrConfig } from '@/components/CadastrosPage/cadastrosStorage';
+import {
+  loadEsteticaDsr, type DsrConfig,
+  loadEsteticaCustoPreparacao, type CustoPreparacaoConfig,
+  loadEsteticaSalariosFixos, type SalarioFixoEstetica,
+} from '@/components/CadastrosPage/cadastrosStorage';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -39,12 +43,101 @@ function validRows(rows: EsteticaRow[]): EsteticaRow[] {
   return rows.filter(r => SITUACOES_VALIDAS.has(r.situacao));
 }
 
+/** Converte ano/mês em um valor comparável (ex: 2026-03 → 24315). */
+function toComparable(ano: number, mes: number) {
+  return ano * 12 + mes;
+}
+
+/**
+ * Custo do Serviço de uma venda: Valor da Venda × % cadastrado em
+ * "Custo sobre Preparação do Serviço", respeitando o período de validade
+ * do percentual (mês/ano de início e fim). Se o mês/ano da venda não
+ * estiver coberto por nenhum período cadastrado, o custo é 0.
+ */
+function calcCustoServico(row: EsteticaRow, custoPreparacaoList: CustoPreparacaoConfig[]): number {
+  const yr = getRowYear(row); const mo = getRowMonth(row);
+  if (!yr || !mo) return 0;
+  const alvo = toComparable(yr, mo);
+  const config = custoPreparacaoList.find(c => {
+    const inicio = toComparable(c.anoInicio, c.mesInicio);
+    const fim = toComparable(c.anoFim, c.mesFim);
+    return alvo >= inicio && alvo <= fim;
+  });
+  if (!config) return 0;
+  const pct = parseFloat(config.percentual || '0') / 100;
+  return n(row.valorVenda) * pct;
+}
+
 function filterRows(rows: EsteticaRow[], year: number | 'Todos', monthChip: number | null): EsteticaRow[] {
   return rows.filter(r => {
     if (year !== 'Todos' && getRowYear(r) !== year) return false;
     if (monthChip !== null && getRowMonth(r) !== monthChip) return false;
     return true;
   });
+}
+
+/** Parser de moeda no formato BR (ex: "3.710,00" → 3710). Usado nos valores
+ * cadastrados em Salários Fixos, que são digitados no formato brasileiro. */
+function parseCurrencyBR(value: string | undefined): number {
+  if (!value) return 0;
+  const normalized = value.trim().replace(/\s/g, '').replace(/R\$/gi, '').replace(/\./g, '').replace(',', '.');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Custo do Funcionário: soma de Salário Fixo + Encargos e Provisões + Plano de
+ * Saúde + Vale Transporte (mesmo cálculo usado na aba Cadastro). */
+function employeeCostBR(item: SalarioFixoEstetica): number {
+  return parseCurrencyBR(item.salarioFixo)
+    + parseCurrencyBR(item.encargosProvisoes)
+    + parseCurrencyBR(item.planoSaude)
+    + parseCurrencyBR(item.valeTransporte);
+}
+
+/** Verifica se o colaborador está ativo no mês/ano informado, respeitando o
+ * período de validade cadastrado (início obrigatório a partir de agora, fim
+ * opcional = colaborador ainda ativo). Registros antigos sem início cadastrado
+ * são considerados sempre ativos (sem restrição), para não quebrar totais
+ * já existentes. */
+function isColaboradorAtivoNoMes(item: SalarioFixoEstetica, ano: number, mes: number): boolean {
+  const alvo = toComparable(ano, mes);
+  if (item.anoInicio && item.mesInicio) {
+    if (alvo < toComparable(item.anoInicio, item.mesInicio)) return false;
+  }
+  if (item.anoFim && item.mesFim) {
+    if (alvo > toComparable(item.anoFim, item.mesFim)) return false;
+  }
+  return true;
+}
+
+/** Soma acumulada (mês a mês) do Salário Fixo e do Custo do Funcionário dos
+ * colaboradores ativos, ao longo de uma lista de meses/anos (um colaborador
+ * ativo durante todo o período é contado uma vez por mês ativo). */
+function calcSalariosFixoTotals(months: { ano: number; mes: number }[], list: SalarioFixoEstetica[]) {
+  let totalSalariosFixo = 0;
+  let totalCustoFolhaFixa = 0;
+  months.forEach(({ ano, mes }) => {
+    list.forEach(item => {
+      if (isColaboradorAtivoNoMes(item, ano, mes)) {
+        totalSalariosFixo += parseCurrencyBR(item.salarioFixo);
+        totalCustoFolhaFixa += employeeCostBR(item);
+      }
+    });
+  });
+  return { totalSalariosFixo, totalCustoFolhaFixa };
+}
+
+/** Monta a lista de meses/anos cobertos pelo filtro selecionado (Ano/Mês),
+ * usada para acumular os valores de Salários Fixos no período correto. */
+function monthsForFilter(year: number | 'Todos', monthChip: number | null, availableYears: number[]): { ano: number; mes: number }[] {
+  if (monthChip !== null) {
+    if (year === 'Todos') return availableYears.map(y => ({ ano: y, mes: monthChip }));
+    return [{ ano: year, mes: monthChip }];
+  }
+  const years = year === 'Todos' ? availableYears : [year];
+  const out: { ano: number; mes: number }[] = [];
+  years.forEach(y => { for (let m = 1; m <= 12; m++) out.push({ ano: y, mes: m }); });
+  return out;
 }
 
 // ─── Métricas ─────────────────────────────────────────────────────────────────
@@ -64,17 +157,27 @@ interface Metrics {
   comissaoAcessoriosComDSR: number;
   totalProvisoes: number;
   totalEncargos: number;
+  totalSalariosFixo: number;
+  totalCustoFolhaFixa: number;
   resultado: number;
   pctResultado: number;
 }
 
-function calcMetrics(rows: EsteticaRow[], dsrList: DsrConfig[]): Metrics {
+function calcMetrics(
+  rows: EsteticaRow[],
+  dsrList: DsrConfig[],
+  custoPreparacaoList: CustoPreparacaoConfig[],
+  months: { ano: number; mes: number }[],
+  salariosFixosList: SalarioFixoEstetica[],
+): Metrics {
   const qtd               = rows.length;
   const totalVenda        = rows.reduce((a, r) => a + n(r.valorVenda), 0);
   const totalImpostos     = rows.reduce((a, r) => a + n(r.impostos), 0);
   const totalRL           = rows.reduce((a, r) => a + n(r.receitaLiquida), 0);
-  const totalCusto        = rows.reduce((a, r) => a + n(r.custoPrestador), 0);
-  const totalLucro        = rows.reduce((a, r) => a + n(r.lucroBruto), 0);
+  // Custo do Serviço: Valor da Venda × % cadastrado em "Custo sobre Preparação do Serviço",
+  // respeitando o período de validade do percentual (substitui o Custo Prestador real nesta análise).
+  const totalCusto        = rows.reduce((a, r) => a + calcCustoServico(r, custoPreparacaoList), 0);
+  const totalLucro        = totalRL - totalCusto;
   const pctLucroMedio     = totalRL > 0 ? (totalLucro / totalRL) * 100 : 0;
   const ticketMedio       = qtd > 0 ? totalVenda / qtd : 0;
   const totalComissaoVendedor   = rows.reduce((a, r) => a + n(r.comissaoVendedor), 0);
@@ -106,9 +209,13 @@ function calcMetrics(rows: EsteticaRow[], dsrList: DsrConfig[]): Metrics {
   const fgts           = baseEncargos * 0.08;
   const inss           = baseEncargos * 0.278;
   const totalEncargos  = fgts + inss;
-  const resultado                = totalLucro - comissaoVendedorComDSR - comissaoAcessoriosComDSR - totalProvisoes - totalEncargos;
+  // Custo Folha Fixa: Custo do Funcionário (Salário Fixo + Encargos/Provisões + Plano
+  // de Saúde + Vale Transporte) dos colaboradores cadastrados, acumulado mês a mês
+  // conforme o período de validade de cada colaborador, e deduzido do Resultado.
+  const { totalSalariosFixo, totalCustoFolhaFixa } = calcSalariosFixoTotals(months, salariosFixosList);
+  const resultado                = totalLucro - comissaoVendedorComDSR - comissaoAcessoriosComDSR - totalProvisoes - totalEncargos - totalCustoFolhaFixa;
   const pctResultado             = totalRL > 0 ? (resultado / totalRL) * 100 : 0;
-  return { qtd, totalVenda, totalImpostos, totalRL, totalCusto, totalLucro, pctLucroMedio, ticketMedio, totalComissaoVendedor, totalComissaoAcessorios, totalComissoes, comissaoVendedorComDSR, comissaoAcessoriosComDSR, totalProvisoes, totalEncargos, resultado, pctResultado };
+  return { qtd, totalVenda, totalImpostos, totalRL, totalCusto, totalLucro, pctLucroMedio, ticketMedio, totalComissaoVendedor, totalComissaoAcessorios, totalComissoes, comissaoVendedorComDSR, comissaoAcessoriosComDSR, totalProvisoes, totalEncargos, totalSalariosFixo, totalCustoFolhaFixa, resultado, pctResultado };
 }
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
@@ -258,8 +365,12 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
   const [sortAcess, setSortAcess] = useState<'totalRL' | 'lucro' | 'qtd'>('totalRL');
   const [selectedProduto, setSelectedProduto] = useState<string>('Todos');
   const [dsrList, setDsrList] = useState<DsrConfig[]>([]);
+  const [custoPreparacaoList, setCustoPreparacaoList] = useState<CustoPreparacaoConfig[]>([]);
+  const [salariosFixosList, setSalariosFixosList] = useState<SalarioFixoEstetica[]>([]);
 
   useEffect(() => { loadEsteticaDsr().then(setDsrList); }, []);
+  useEffect(() => { loadEsteticaCustoPreparacao().then(setCustoPreparacaoList); }, []);
+  useEffect(() => { loadEsteticaSalariosFixos().then(setSalariosFixosList); }, []);
 
   // Apenas linhas com situação válida
   const baseRows = useMemo(() => validRows(rows), [rows]);
@@ -287,15 +398,18 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
     [baseRows, selectedYear, monthChip]
   );
 
-  const metrics = useMemo(() => calcMetrics(filteredRows, dsrList), [filteredRows, dsrList]);
+  const metrics = useMemo(
+    () => calcMetrics(filteredRows, dsrList, custoPreparacaoList, monthsForFilter(selectedYear, monthChip, availableYears), salariosFixosList),
+    [filteredRows, dsrList, custoPreparacaoList, selectedYear, monthChip, availableYears, salariosFixosList]
+  );
 
   // Métricas mês anterior (para deltas)
   const prevMonthMetrics = useMemo(() => {
     if (monthChip === null || selectedYear === 'Todos') return null;
     const prevM = monthChip === 1 ? 12 : monthChip - 1;
     const prevY = monthChip === 1 ? (selectedYear as number) - 1 : selectedYear as number;
-    return calcMetrics(filterRows(baseRows, prevY, prevM), dsrList);
-  }, [baseRows, selectedYear, monthChip, dsrList]);
+    return calcMetrics(filterRows(baseRows, prevY, prevM), dsrList, custoPreparacaoList, [{ ano: prevY, mes: prevM }], salariosFixosList);
+  }, [baseRows, selectedYear, monthChip, dsrList, custoPreparacaoList, salariosFixosList]);
 
   // Dados mensais
   const monthlyData = useMemo(() => {
@@ -535,14 +649,17 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
       const byVendedor = (r: EsteticaRow) =>
         slot.vendedor === 'Todos' || (r.vendedor?.trim() || '') === slot.vendedor;
       const slotRows     = filterByPeriod(baseRows, slot).filter(byVendedor);
-      const prevSlotRows = filterByPeriod(baseRows, prevPeriodSlot(slot)).filter(byVendedor);
+      const prevSlot     = prevPeriodSlot(slot);
+      const prevSlotRows = filterByPeriod(baseRows, prevSlot).filter(byVendedor);
+      const slotMonths     = periodMonths(slot.tipo, slot.value).map(m => ({ ano: slot.year, mes: m }));
+      const prevSlotMonths = periodMonths(prevSlot.tipo, prevSlot.value).map(m => ({ ano: prevSlot.year, mes: m }));
       return {
         slot,
-        metrics: calcMetrics(slotRows, dsrList),
-        prevMetrics: calcMetrics(prevSlotRows, dsrList),
+        metrics: calcMetrics(slotRows, dsrList, custoPreparacaoList, slotMonths, salariosFixosList),
+        prevMetrics: calcMetrics(prevSlotRows, dsrList, custoPreparacaoList, prevSlotMonths, salariosFixosList),
       };
     }),
-    [periods, baseRows, dsrList]
+    [periods, baseRows, dsrList, custoPreparacaoList, salariosFixosList]
   );
   const addPeriod = () => { if (periods.length < 4) setPeriods(p => [...p, { year: currentYear, tipo: 'mes', value: currentMonth, vendedor: 'Todos' }]); };
   const removePeriod = (i: number) => setPeriods(p => p.filter((_, idx) => idx !== i));
@@ -554,7 +671,7 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
     { label: 'Valor da Venda',          key: 'totalVenda',             fmt: fmtBRLFull },
     { label: 'Impostos',                key: 'totalImpostos',          fmt: fmtBRLFull },
     { label: 'Receita Líquida',         key: 'totalRL',                fmt: fmtBRLFull,      trend: true },
-    { label: 'Custo Prestador',         key: 'totalCusto',             fmt: fmtBRLFull },
+    { label: 'Custo do Serviço',         key: 'totalCusto',             fmt: fmtBRLFull },
     { label: 'Lucro Bruto',             key: 'totalLucro',             fmt: fmtBRLFull,      trend: true },
     { label: '% Lucro Bruto',           key: 'pctLucroMedio',          fmt: fmtPct,          trend: true },
     { label: 'Ticket Médio',            key: 'ticketMedio',            fmt: fmtBRLFull },
@@ -562,6 +679,8 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
     { label: 'Com. + DSR Serv. Estética', key: 'comissaoAcessoriosComDSR', fmt: fmtBRLFull },
     { label: 'Provisões',                key: 'totalProvisoes',           fmt: fmtBRLFull },
     { label: 'Encargos',                 key: 'totalEncargos',            fmt: fmtBRLFull },
+    { label: 'Salários Fixo',             key: 'totalSalariosFixo',        fmt: fmtBRLFull },
+    { label: 'Custo Folha Fixa',          key: 'totalCustoFolhaFixa',      fmt: fmtBRLFull },
     { label: 'Resultado',                key: 'resultado',                fmt: fmtBRLFull,     highlight: true, trend: true },
     { label: '% Resultado',               key: 'pctResultado',             fmt: fmtPct,         highlight: true, trend: true },
   ];
@@ -637,7 +756,7 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
           <KpiCard label="Valor da Venda"    value={fmtBRL(metrics.totalVenda)}      color="text-indigo-600"  accentColor={ACCENT} />
           <KpiCard label="Receita Líquida"   value={fmtBRL(metrics.totalRL)}         color="text-sky-600"     accentColor={ACCENT}
             sub={metrics.totalVenda > 0 ? `Impostos: ${fmtBRL(metrics.totalImpostos)}` : undefined} />
-          <KpiCard label="Custo Prestador"   value={fmtBRL(metrics.totalCusto)}      color="text-red-500"     accentColor={ACCENT} />
+          <KpiCard label="Custo do Serviço"  value={fmtBRL(metrics.totalCusto)}      color="text-red-500"     accentColor={ACCENT} />
           <KpiCard label="Lucro Bruto"       value={fmtBRL(metrics.totalLucro)}      color="text-emerald-600" accentColor={ACCENT}
             sub={metrics.totalRL > 0 ? `${fmtPct(metrics.pctLucroMedio)} da RL` : undefined} />
           <KpiCard label="% Lucro Bruto Médio" value={fmtPct(metrics.pctLucroMedio)}
@@ -647,25 +766,27 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
         </div>
 
         {/* Cards de comissões */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2">
           <KpiCard label="Comissão Vendedor"          value={fmtBRL(metrics.totalComissaoVendedor)}   color="text-violet-600" accentColor="#8b5cf6"
             sub={metrics.totalRL > 0 ? `${fmtPct(metrics.totalComissaoVendedor / metrics.totalRL * 100)} da RL` : undefined} />
           <KpiCard label="Comissão Vendedor Serv. Estética" value={fmtBRL(metrics.totalComissaoAcessorios)} color="text-fuchsia-600" accentColor="#d946ef"
             sub={metrics.totalRL > 0 ? `${fmtPct(metrics.totalComissaoAcessorios / metrics.totalRL * 100)} da RL` : undefined} />
           <KpiCard label="Total de Comissões"         value={fmtBRL(metrics.totalComissoes)}          color="text-slate-800"  accentColor="#475569"
             sub={metrics.totalLucro > 0 ? `${fmtPct(metrics.totalComissoes / metrics.totalLucro * 100)} do lucro` : undefined} />
+          <KpiCard label="Salários Fixo"               value={fmtBRL(metrics.totalSalariosFixo)}       color="text-teal-600"  accentColor="#0f766e"
+            sub="Cadastro de Salários Fixos" />
         </div>
 
-        {/* Cards bottom-line: Custo Folha + Resultado */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-          {/* Custo Folha */}
+        {/* Cards bottom-line: Custo Folha Comissões + Custo Folha Fixa + Resultado */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+          {/* Custo Folha Comissões */}
           {(() => {
             const totalCustoFolha = custoComissoesData.custoFolhaVendedor + custoComissoesData.custoFolhaAcessorios;
             return (
               <div className="bg-white rounded-xl border border-amber-200 shadow-sm px-4 py-3 flex items-center gap-4"
                    style={{ borderLeft: '4px solid #f59e0b' }}>
                 <div className="flex-1 min-w-0">
-                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide leading-tight block">Custo Folha</span>
+                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide leading-tight block">Custo Folha Comissões</span>
                   <span className="text-xl font-bold text-amber-600 leading-tight font-mono">{fmtBRL(totalCustoFolha)}</span>
                   <span className="text-xs text-slate-400 block mt-0.5">
                     {metrics.totalLucro > 0 ? `${fmtPct(totalCustoFolha / metrics.totalLucro * 100)} do Lucro Bruto` : 'Comissões + DSR + Provisões + Encargos'}
@@ -678,6 +799,18 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
               </div>
             );
           })()}
+
+          {/* Custo Folha Fixa */}
+          <div className="bg-white rounded-xl border border-orange-200 shadow-sm px-4 py-3 flex items-center gap-4"
+               style={{ borderLeft: '4px solid #f97316' }}>
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide leading-tight block">Custo Folha Fixa</span>
+              <span className="text-xl font-bold text-orange-600 leading-tight font-mono">{fmtBRL(metrics.totalCustoFolhaFixa)}</span>
+              <span className="text-xs text-slate-400 block mt-0.5">
+                {metrics.totalLucro > 0 ? `${fmtPct(metrics.totalCustoFolhaFixa / metrics.totalLucro * 100)} do Lucro Bruto` : 'Cadastro de Salários Fixos'}
+              </span>
+            </div>
+          </div>
 
           {/* Resultado */}
           {(() => {
@@ -693,7 +826,7 @@ export function EsteticaAnalise({ rows }: EsteticaAnaliseProps) {
                   <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide leading-tight block">Resultado</span>
                   <span className={`text-xl font-bold leading-tight font-mono ${valueColor}`}>{fmtBRL(metrics.resultado)}</span>
                   <span className="text-xs text-slate-400 block mt-0.5">
-                    {metrics.totalRL > 0 ? `${fmtPct(pctRL)} da Receita Líquida` : 'Lucro Bruto − Custo Folha'}
+                    {metrics.totalRL > 0 ? `${fmtPct(pctRL)} da Receita Líquida` : 'Lucro Bruto − Custo Folha Comissões − Custo Folha Fixa'}
                   </span>
                 </div>
               </div>

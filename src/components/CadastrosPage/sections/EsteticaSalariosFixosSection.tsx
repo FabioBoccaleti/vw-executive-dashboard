@@ -11,14 +11,29 @@ import {
 
 type SalarioDraft = Omit<SalarioFixoEstetica, 'id'>;
 
-const emptyDraft = (): SalarioDraft => ({
-  nome: '',
-  cargo: '',
-  salarioFixo: '',
-  encargosProvisoes: '',
-  planoSaude: '',
-  valeTransporte: '',
-});
+const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const availableYears = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 2 + i);
+
+const emptyDraft = (): SalarioDraft => {
+  const now = new Date();
+  return {
+    nome: '',
+    cargo: '',
+    salarioFixo: '',
+    encargosProvisoes: '',
+    planoSaude: '',
+    valeTransporte: '',
+    anoInicio: now.getFullYear(),
+    mesInicio: now.getMonth() + 1,
+    anoFim: undefined,
+    mesFim: undefined,
+  };
+};
+
+/** Converte ano/mês em um valor comparável (ex: 2026-03 → 24315). */
+function toComparable(ano: number, mes: number) {
+  return ano * 12 + mes;
+}
 
 function parseCurrency(value: string): number {
   const normalized = value.trim().replace(/\s/g, '').replace(/R\$/gi, '').replace(/\./g, '').replace(',', '.');
@@ -68,6 +83,66 @@ function FormFields({ draft, onChange }: { draft: SalarioDraft; onChange: (draft
           {formatCurrency(employeeCost(draft))}
         </div>
       </div>
+
+      <div className="md:col-span-2 border-t border-slate-200 pt-3 mt-1">
+        <p className="text-xs font-semibold text-slate-500 mb-2">Período de validade do colaborador</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <p className="text-[11px] font-medium text-slate-500 mb-1">Início *</p>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={draft.mesInicio ?? ''}
+                onChange={event => onChange({ ...draft, mesInicio: Number(event.target.value) })}
+                className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              >
+                {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+              </select>
+              <select
+                value={draft.anoInicio ?? ''}
+                onChange={event => onChange({ ...draft, anoInicio: Number(event.target.value) })}
+                className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              >
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[11px] font-medium text-slate-500">Fim</p>
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-500 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={draft.anoFim === undefined && draft.mesFim === undefined}
+                  onChange={event => onChange({
+                    ...draft,
+                    anoFim: event.target.checked ? undefined : (draft.anoInicio ?? new Date().getFullYear()),
+                    mesFim: event.target.checked ? undefined : (draft.mesInicio ?? new Date().getMonth() + 1),
+                  })}
+                />
+                Colaborador ativo (sem término)
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={draft.mesFim ?? ''}
+                disabled={draft.anoFim === undefined && draft.mesFim === undefined}
+                onChange={event => onChange({ ...draft, mesFim: Number(event.target.value) })}
+                className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 disabled:bg-slate-50 disabled:text-slate-400"
+              >
+                {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+              </select>
+              <select
+                value={draft.anoFim ?? ''}
+                disabled={draft.anoFim === undefined && draft.mesFim === undefined}
+                onChange={event => onChange({ ...draft, anoFim: Number(event.target.value) })}
+                className="w-full border border-slate-300 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 disabled:bg-slate-50 disabled:text-slate-400"
+              >
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -101,7 +176,13 @@ export function EsteticaSalariosFixosSection() {
     }
   };
 
-  const isValid = (item: SalarioDraft) => item.nome.trim() !== '' && item.cargo.trim() !== '';
+  const isValid = (item: SalarioDraft) => {
+    if (item.nome.trim() === '' || item.cargo.trim() === '') return false;
+    if (!item.anoInicio || !item.mesInicio) return false;
+    const temFim = item.anoFim !== undefined && item.mesFim !== undefined;
+    if (temFim && toComparable(item.anoFim!, item.mesFim!) < toComparable(item.anoInicio, item.mesInicio)) return false;
+    return true;
+  };
 
   const add = async () => {
     if (!isValid(draft)) return;
@@ -142,11 +223,12 @@ export function EsteticaSalariosFixosSection() {
       </div>
 
       <div className="border rounded-lg overflow-x-auto">
-        <table className="w-full min-w-[920px] text-sm">
+        <table className="w-full min-w-[1080px] text-sm">
           <thead>
             <tr style={{ background: '#0f766e' }}>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold">Colaborador</th>
               <th className="text-white text-left px-4 py-3 text-xs font-semibold">Cargo</th>
+              <th className="text-white text-left px-4 py-3 text-xs font-semibold">Período</th>
               <th className="text-white text-right px-4 py-3 text-xs font-semibold">Salário Fixo</th>
               <th className="text-white text-right px-4 py-3 text-xs font-semibold">Encargos e Provisões</th>
               <th className="text-white text-right px-4 py-3 text-xs font-semibold">Plano de Saúde</th>
@@ -157,14 +239,14 @@ export function EsteticaSalariosFixosSection() {
           </thead>
           <tbody>
             {items.length === 0 && (
-              <tr><td colSpan={8} className="py-8 text-center text-xs text-slate-400">Nenhum colaborador cadastrado</td></tr>
+              <tr><td colSpan={9} className="py-8 text-center text-xs text-slate-400">Nenhum colaborador cadastrado</td></tr>
             )}
             {items.map((item, index) => {
               const isEditing = editDraft?.id === item.id;
               const rowClass = index % 2 === 0 ? 'bg-white' : 'bg-slate-50';
               return isEditing && editDraft ? (
                 <tr key={item.id} className={rowClass}>
-                  <td colSpan={7} className="px-4 py-3"><FormFields draft={editDraft} onChange={updated => setEditDraft({ ...editDraft, ...updated })} /></td>
+                  <td colSpan={8} className="px-4 py-3"><FormFields draft={editDraft} onChange={updated => setEditDraft({ ...editDraft, ...updated })} /></td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1.5">
                       <button type="button" title="Salvar" onClick={saveEdit} disabled={saving} className="text-green-600 hover:text-green-700 p-1 rounded"><Check className="w-3.5 h-3.5" /></button>
@@ -176,6 +258,11 @@ export function EsteticaSalariosFixosSection() {
                 <tr key={item.id} className={rowClass}>
                   <td className="px-4 py-2 text-xs font-medium text-slate-700">{item.nome}</td>
                   <td className="px-4 py-2 text-xs text-slate-700">{item.cargo}</td>
+                  <td className="px-4 py-2 text-xs text-slate-700 whitespace-nowrap">
+                    {item.anoInicio && item.mesInicio ? `${MONTHS[item.mesInicio - 1].slice(0, 3)}/${item.anoInicio}` : '—'}
+                    {' – '}
+                    {item.anoFim && item.mesFim ? `${MONTHS[item.mesFim - 1].slice(0, 3)}/${item.anoFim}` : <span className="text-emerald-600 font-semibold">Ativo</span>}
+                  </td>
                   <td className="px-4 py-2 text-right text-xs font-mono text-slate-700">{formatCurrency(parseCurrency(item.salarioFixo))}</td>
                   <td className="px-4 py-2 text-right text-xs font-mono text-slate-700">{formatCurrency(parseCurrency(item.encargosProvisoes))}</td>
                   <td className="px-4 py-2 text-right text-xs font-mono text-slate-700">{formatCurrency(parseCurrency(item.planoSaude))}</td>
@@ -194,7 +281,7 @@ export function EsteticaSalariosFixosSection() {
           {items.length > 0 && (
             <tfoot>
               <tr className="bg-teal-50 border-t border-teal-100">
-                <td colSpan={6} className="px-4 py-3 text-right text-xs font-bold uppercase text-teal-800">Custo total dos colaboradores</td>
+                <td colSpan={7} className="px-4 py-3 text-right text-xs font-bold uppercase text-teal-800">Custo total dos colaboradores</td>
                 <td className="px-4 py-3 text-right text-sm font-bold font-mono text-teal-900">{formatCurrency(totalCost)}</td>
                 <td />
               </tr>
