@@ -542,6 +542,22 @@ function isExpense(label: string) {
   return normalized.includes('despesa') || normalized.includes('juros') || normalized.includes('custo') || normalized.includes('imposto');
 }
 
+const DEPARTAMENTO_SECTIONS = ['nv', 'uv', 'pa', 'ac', 'paac', 'me', 'bp', 'mebp'];
+
+function complementaresCutoffIndex(sectionName: string, rows: DemonstrativoRow[]) {
+  const section = normalizeName(sectionName);
+  if (section === 'tot') {
+    return rows.findIndex(row => normalizeName(row.label).includes('resultadoliquidodoexercicio'));
+  }
+  if (DEPARTAMENTO_SECTIONS.includes(section)) {
+    return rows.findIndex(row => {
+      const normalized = normalizeName(row.label);
+      return normalized.includes('lucrooperliquido') && normalized.includes('comadm');
+    });
+  }
+  return -1;
+}
+
 function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProps) {
   const [periodicity, setPeriodicity] = useState<DemonstrativoPeriodicity>('mensal');
   const [periodNumber, setPeriodNumber] = useState(month);
@@ -550,8 +566,13 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
   const [sections, setSections] = useState<string[]>([]);
   const [rows, setRows] = useState<DemonstrativoRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showComplementares, setShowComplementares] = useState(false);
   const options = periodOptions(periodicity);
   const baseGroup = GROUPS.find(group => group.key === comparisonBase) as GroupDef;
+
+  useEffect(() => {
+    setShowComplementares(false);
+  }, [sectionIndex]);
 
   useEffect(() => {
     if (periodicity === 'mensal') setPeriodNumber(month);
@@ -624,6 +645,12 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
     { title: 'Lucro antes do IR (LAIR)', match: (label: string) => label.includes('lair') },
   ];
 
+  const currentSectionName = sections[Math.min(sectionIndex, Math.max(0, sections.length - 1))] ?? '';
+  const resultadoIndex = complementaresCutoffIndex(currentSectionName, rows);
+  const hasComplementares = resultadoIndex >= 0 && resultadoIndex < rows.length - 1;
+  const mainRows = hasComplementares ? rows.slice(0, resultadoIndex + 1) : rows;
+  const complementaresRows = hasComplementares ? rows.slice(resultadoIndex + 1) : [];
+
   return (
     <div className="space-y-4">
       <div>
@@ -644,7 +671,7 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
             return <div key={card.title} className="rounded-lg border border-red-100 bg-red-50 px-4 py-3"><p className="text-xs text-slate-500">{card.title}</p><p className="mt-1 text-sm font-bold text-[#a60d26]">AC Lapa: {formatValor(row.sorana)}{row.soranaPercent != null ? ` (${formatNumber(row.soranaPercent, true)})` : ''}</p><p className="text-xs text-slate-600">{baseGroup.label}: {formatValor(row.base)}{row.basePercent != null ? ` (${formatNumber(row.basePercent, true)})` : ''}</p></div>;
           })}
         </div>
-        <div className="overflow-x-auto border border-slate-200"><table className="min-w-[820px] w-full text-xs border-collapse"><thead className="sticky top-0 bg-[#c8102e] text-white"><tr>{['Indicador', 'AC Lapa', 'AC Lapa %', `${baseGroup.label} sem Sorana`, `${baseGroup.short} %`, `Dif. x ${baseGroup.short}`].map(header => <th key={header} className="px-3 py-2 text-left whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{rows.map((row, index) => <DemonstrativoTableRow key={`${row.label}-${index}`} row={row} />)}</tbody></table></div>
+        <div className="overflow-x-auto border border-slate-200"><table className="min-w-[820px] w-full text-xs border-collapse"><thead className="sticky top-0 bg-[#c8102e] text-white"><tr>{['Indicador', 'AC Lapa', 'AC Lapa %', `${baseGroup.label} sem Sorana`, `${baseGroup.short} %`, `Dif. x ${baseGroup.short}`].map(header => <th key={header} className="px-3 py-2 text-left whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{mainRows.map((row, index) => <DemonstrativoTableRow key={`${row.label}-${index}`} row={row} />)}{hasComplementares && <tr><td colSpan={6} className="border border-slate-200 bg-slate-100 px-3 py-2"><button type="button" onClick={() => setShowComplementares(value => !value)} className="text-xs font-semibold text-[#c8102e] hover:text-[#a60d26]">{showComplementares ? '▾ Ocultar indicadores complementares' : `▸ Mostrar indicadores complementares — ${complementaresRows.length} linhas`}</button></td></tr>}{hasComplementares && showComplementares && complementaresRows.map((row, index) => <DemonstrativoTableRow key={`comp-${row.label}-${index}`} row={row} />)}</tbody></table></div>
       </>}
     </div>
   );
