@@ -271,12 +271,12 @@ export function SignDriveDemonstrativoView({ year, month }: SignDriveDemonstrati
           <td>${esc(r.tipoVenda)}</td>
           <td>${esc(r.cliente)}</td>
           <td class="r">${fmtMoney(Number(String(r.valorContrato).replace(',', '.')) || 0)}</td>
-          <td class="r">${fmtMoney(Number(String(r.totalComissoesBruta).replace(',', '.')) || 0)}</td>
+          <td class="r">${fmtMoney(Number(String(r.totalComissaoLiquida).replace(',', '.')) || 0)}</td>
           <td class="com">${fmtMoney(com)}</td>
         </tr>`;
       }).join('');
       const totContrato = vr.reduce((s, r) => s + (Number(String(r.valorContrato).replace(',', '.')) || 0), 0);
-      const totBruta = vr.reduce((s, r) => s + (Number(String(r.totalComissoesBruta).replace(',', '.')) || 0), 0);
+      const totLiquida = vr.reduce((s, r) => s + (Number(String(r.totalComissaoLiquida).replace(',', '.')) || 0), 0);
       const totCom = vr.reduce((s, r) => s + comissaoVendedorValor(r, estim.values), 0);
 
       const sigCells = CAMPOS.map(campo => {
@@ -314,13 +314,13 @@ export function SignDriveDemonstrativoView({ year, month }: SignDriveDemonstrati
           <table>
             <thead><tr>
               <th>Data da Venda</th><th>Data da Entrega</th><th>Produto</th><th>Cliente</th>
-              <th class="r">Valor do Contrato</th><th class="r">Total das Comissões Bruta</th><th class="r">Comissão Vendedor</th>
+              <th class="r">Valor do Contrato</th><th class="r">Total das Comissão Líquida</th><th class="r">Comissão Vendedor</th>
             </tr></thead>
             <tbody>${linhas}</tbody>
             <tfoot><tr>
               <td colspan="4">Totais</td>
               <td class="r">${fmtMoney(totContrato)}</td>
-              <td class="r">${fmtMoney(totBruta)}</td>
+              <td class="r">${fmtMoney(totLiquida)}</td>
               <td class="com">${fmtMoney(totCom)}</td>
             </tr></tfoot>
           </table>
@@ -397,7 +397,7 @@ export function SignDriveDemonstrativoView({ year, month }: SignDriveDemonstrati
     const hasPend = vr.some(isPendente);
     const hasPaid = vr.some(isPaid);
     const totContrato = vr.reduce((s, r) => s + (Number(String(r.valorContrato).replace(',', '.')) || 0), 0);
-    const totBruta = vr.reduce((s, r) => s + (Number(String(r.totalComissoesBruta).replace(',', '.')) || 0), 0);
+    const totLiquida = vr.reduce((s, r) => s + (Number(String(r.totalComissaoLiquida).replace(',', '.')) || 0), 0);
     const totCom = vr.reduce((s, r) => s + comissaoVendedorValor(r, estim.values), 0);
 
     return (
@@ -467,7 +467,7 @@ export function SignDriveDemonstrativoView({ year, month }: SignDriveDemonstrati
                   <th className="px-3 py-2 text-left font-semibold">Produto</th>
                   <th className="px-3 py-2 text-left font-semibold">Cliente</th>
                   <th className="px-3 py-2 text-right font-semibold">Valor do Contrato</th>
-                  <th className="px-3 py-2 text-right font-semibold">Total das Comissões Bruta</th>
+                  <th className="px-3 py-2 text-right font-semibold">Total das Comissão Líquida</th>
                   <th className="px-3 py-2 text-right font-semibold">Comissão Vendedor</th>
                 </tr>
               </thead>
@@ -481,7 +481,7 @@ export function SignDriveDemonstrativoView({ year, month }: SignDriveDemonstrati
                       <td className="px-3 py-2">{r.tipoVenda}</td>
                       <td className="px-3 py-2">{r.cliente}</td>
                       <td className="px-3 py-2 text-right">{fmtMoney(Number(String(r.valorContrato).replace(',', '.')) || 0)}</td>
-                      <td className="px-3 py-2 text-right">{fmtMoney(Number(String(r.totalComissoesBruta).replace(',', '.')) || 0)}</td>
+                      <td className="px-3 py-2 text-right">{fmtMoney(Number(String(r.totalComissaoLiquida).replace(',', '.')) || 0)}</td>
                       <td className="px-3 py-2 text-right font-semibold text-violet-700">{fmtMoney(com)}</td>
                     </tr>
                   );
@@ -491,7 +491,7 @@ export function SignDriveDemonstrativoView({ year, month }: SignDriveDemonstrati
                 <tr className="bg-slate-50 font-semibold">
                   <td className="px-3 py-2" colSpan={4}>Totais</td>
                   <td className="px-3 py-2 text-right">{fmtMoney(totContrato)}</td>
-                  <td className="px-3 py-2 text-right">{fmtMoney(totBruta)}</td>
+                  <td className="px-3 py-2 text-right">{fmtMoney(totLiquida)}</td>
                   <td className="px-3 py-2 text-right text-violet-700">{fmtMoney(totCom)}</td>
                 </tr>
               </tfoot>
