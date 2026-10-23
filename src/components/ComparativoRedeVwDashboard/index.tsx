@@ -524,7 +524,77 @@ interface DemonstrativoRow {
   satelitePercent: number | null;
 }
 
-const DEMONSTRATIVO_SECTIONS = EXPECTED_SHEETS.slice(1).map((name, index) => ({ name, sheetIndex: index + 1 }));
+interface DemonstrativoSection {
+  key: string;
+  name: string;
+  sheetIndex: number;
+  adjusted: boolean;
+}
+
+const DEMONSTRATIVO_SECTIONS: DemonstrativoSection[] = [
+  { key: 'geral', name: EXPECTED_SHEETS[1], sheetIndex: 1, adjusted: false },
+  { key: 'geral-ajustado', name: `${EXPECTED_SHEETS[1]} Ajustado`, sheetIndex: 1, adjusted: true },
+  { key: 'veiculos-novos', name: EXPECTED_SHEETS[2], sheetIndex: 2, adjusted: false },
+  { key: 'veiculos-seminovos', name: EXPECTED_SHEETS[3], sheetIndex: 3, adjusted: false },
+  { key: 'pa', name: EXPECTED_SHEETS[4], sheetIndex: 4, adjusted: false },
+  { key: 'assistencia-tecnica', name: EXPECTED_SHEETS[5], sheetIndex: 5, adjusted: false },
+];
+
+const ADJUSTED_ANCHORS: { anchor: string; admin: string }[] = [
+  { anchor: 'despesasoperacionaiscomvendas', admin: 'despesasadministrativascomvendas' },
+  { anchor: 'despesasoperacionaiscompessoal', admin: 'despesasadministrativascompessoal' },
+  { anchor: 'despesasoperacionaisdiretas', admin: 'despesasadministrativasdiretas' },
+  { anchor: 'despesasoperacionaisindiretas', admin: 'despesasadministrativasindiretas' },
+  { anchor: 'despesascomativos', admin: 'despesasadministrativascomativos' },
+];
+
+const ADJUSTED_SUBTOTALS = new Set([
+  'margemdecontribuicaoi',
+  'margemdecontribuicaoii',
+  'margemdecontribuicaoiii',
+  'lucroatividadevw',
+  'lucrooperacional',
+]);
+
+function buildAdjustedDemonstrativoRows<T extends DemonstrativoRow>(rows: T[]): T[] {
+  const adminLabels = new Set(ADJUSTED_ANCHORS.map(item => item.admin));
+  const anchorToAdmin = new Map(ADJUSTED_ANCHORS.map(item => [item.anchor, item.admin]));
+  const adminByKey = new Map<string, T>();
+  rows.forEach(row => {
+    const key = normalizeName(row.label);
+    if (adminLabels.has(key)) adminByKey.set(key, row);
+  });
+
+  const result: T[] = [];
+  let accSorana = 0;
+  let accRegiao = 0;
+  let accSatelite = 0;
+
+  rows.forEach(row => {
+    const key = normalizeName(row.label);
+    if (adminLabels.has(key)) return;
+    if (ADJUSTED_SUBTOTALS.has(key)) {
+      result.push({
+        ...row,
+        sorana: row.sorana === null ? null : row.sorana - accSorana,
+        regiao: row.regiao === null ? null : row.regiao - accRegiao,
+        satelite: row.satelite === null ? null : row.satelite - accSatelite,
+      });
+      return;
+    }
+    result.push(row);
+    const adminKey = anchorToAdmin.get(key);
+    if (!adminKey) return;
+    const adminRow = adminByKey.get(adminKey);
+    if (!adminRow) return;
+    result.push(adminRow);
+    accSorana += adminRow.sorana ?? 0;
+    accRegiao += adminRow.regiao ?? 0;
+    accSatelite += adminRow.satelite ?? 0;
+  });
+
+  return result;
+}
 
 function periodMonths(year: number, month: number, periodicity: DemonstrativoPeriodicity, periodNumber: number) {
   if (periodicity === 'mensal') return [{ year, month: periodNumber }];
@@ -552,11 +622,12 @@ function isExpense(label: string) {
 function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProps) {
   const [periodicity, setPeriodicity] = useState<DemonstrativoPeriodicity>('mensal');
   const [periodNumber, setPeriodNumber] = useState(month);
-  const [sectionIndex, setSectionIndex] = useState(1);
+  const [sectionKey, setSectionKey] = useState('geral');
   const [comparisonBase, setComparisonBase] = useState<'regiao' | 'satelite'>('regiao');
   const [rows, setRows] = useState<DemonstrativoRow[]>([]);
   const [loading, setLoading] = useState(false);
   const options = periodOptions(periodicity);
+  const currentSection = DEMONSTRATIVO_SECTIONS.find(section => section.key === sectionKey) ?? DEMONSTRATIVO_SECTIONS[0];
 
   useEffect(() => {
     if (periodicity === 'mensal') setPeriodNumber(month);
@@ -567,6 +638,7 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
     let cancelled = false;
     async function load() {
       setLoading(true);
+      const section = DEMONSTRATIVO_SECTIONS.find(item => item.key === sectionKey) ?? DEMONSTRATIVO_SECTIONS[0];
       const periods = periodMonths(year, month, periodicity, periodNumber);
       const loaded = await Promise.all(periods.map(async period => ({
         data: await getComparativoRedeVwMonth(period.year, period.month),
@@ -574,7 +646,7 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
       })));
       if (cancelled) return;
       const monthlyRows = loaded.flatMap(({ data: monthData, concessionarias: monthlyCounts }) => {
-        const sheet = monthData?.sheets[sectionIndex];
+        const sheet = monthData?.sheets[section.sheetIndex];
         const values = sheet?.rows ?? [];
         const salesRow = values.find(row => isVendasLiquidas(String(row[0] ?? '')));
         const sales = {
@@ -623,7 +695,8 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
         return { ...first, sorana, regiao, satelite, soranaPercent: null, regiaoPercent: null, satelitePercent: null, periodCount };
       });
       const sales = consolidated.find(row => isVendasLiquidas(row.label));
-      setRows(consolidated.map(row => ({
+      const orderedRows = section.adjusted ? buildAdjustedDemonstrativoRows(consolidated) : consolidated;
+      setRows(orderedRows.map(row => ({
         ...row,
         soranaPercent: row.unit.includes('%') && sales?.sorana ? (row.sorana ?? 0) / sales.sorana * 100 : null,
         regiaoPercent: row.unit.includes('%') && sales?.regiao ? (row.regiao ?? 0) / sales.regiao * 100 : null,
@@ -633,7 +706,7 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
     }
     void load();
     return () => { cancelled = true; };
-  }, [year, month, periodicity, periodNumber, sectionIndex, concessionarias]);
+  }, [year, month, periodicity, periodNumber, sectionKey, concessionarias]);
 
   return (
     <div className="space-y-4">
@@ -646,9 +719,9 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
         <label className="text-xs font-semibold text-slate-600">Período<select value={periodNumber} onChange={event => setPeriodNumber(Number(event.target.value))} className="block mt-1 border border-slate-300 rounded px-3 py-2 text-sm">{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         <div className="text-xs font-semibold text-slate-600">Comparar com<div className="mt-1 inline-flex rounded border border-slate-300 overflow-hidden">{([['regiao', 'Região'], ['satelite', 'Satélite']] as const).map(([value, label]) => <button key={value} onClick={() => setComparisonBase(value)} className={`px-4 py-2 text-sm font-semibold ${comparisonBase === value ? 'bg-teal-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>{label}</button>)}</div></div>
       </div>
-      <div className="flex gap-1 overflow-x-auto border-b border-slate-200">{DEMONSTRATIVO_SECTIONS.map(section => <button key={section.sheetIndex} onClick={() => setSectionIndex(section.sheetIndex)} className={`whitespace-nowrap px-3 py-2 text-xs font-semibold border-b-2 ${sectionIndex === section.sheetIndex ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>{section.name}</button>)}</div>
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200">{DEMONSTRATIVO_SECTIONS.map(section => <button key={section.key} onClick={() => setSectionKey(section.key)} className={`whitespace-nowrap px-3 py-2 text-xs font-semibold border-b-2 ${sectionKey === section.key ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>{section.name}</button>)}</div>
       {loading ? <div className="py-12 text-center text-slate-500">Calculando demonstrativo...</div> : rows.length === 0 ? <div className="py-12 text-center text-slate-500">Não há dados ajustados para o período selecionado.</div> : <>
-        <div className="grid gap-3 md:grid-cols-3">{(sectionIndex === 1
+        <div className="grid gap-3 md:grid-cols-3">{(currentSection.sheetIndex === 1
           ? [{ title: 'Lucro Bruto', match: (label: string) => label.includes('lucrobruto') }, { title: 'Margem de Contribuição I', match: (label: string) => label.includes('margemdecontribuicaoi') }, { title: 'Lucro antes do Imposto de Renda (L.A.I.R.)', match: (label: string) => label.includes('lair') || label.includes('lucroantesdoimpostoderenda') }]
           : [{ title: 'Lucro Bruto', match: (label: string) => label.includes('lucrobruto') }, { title: 'Margem de Contribuição', match: (label: string) => label.includes('margemdecontribuicao') }, { title: 'Lucro Operacional VW', match: (label: string) => label.includes('lucrooperacionalvw') }]
         ).map(card => { const row = rows.find(item => card.match(normalizeName(item.label))); const baseValue = comparisonBase === 'regiao' ? row?.regiao : row?.satelite; const basePercent = comparisonBase === 'regiao' ? row?.regiaoPercent : row?.satelitePercent; const baseName = comparisonBase === 'regiao' ? 'Região' : 'Satélite'; return <div key={card.title} className="rounded-lg border border-teal-100 bg-teal-50 px-4 py-3"><p className="text-xs text-slate-500">{card.title}</p><p className="mt-1 text-sm font-bold text-teal-800">Sorana: {formatDemonstrativoValue(row?.sorana ?? null)}{row?.soranaPercent != null ? ` (${formatNumber(row.soranaPercent, true)})` : ''}</p><p className="text-xs text-slate-600">{baseName}: {formatDemonstrativoValue(baseValue ?? null)}{basePercent != null ? ` (${formatNumber(basePercent, true)})` : ''}</p></div>; })}</div>
