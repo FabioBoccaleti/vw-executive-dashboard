@@ -626,8 +626,13 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
   const [comparisonBase, setComparisonBase] = useState<'regiao' | 'satelite'>('regiao');
   const [rows, setRows] = useState<DemonstrativoRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showComplementares, setShowComplementares] = useState(false);
   const options = periodOptions(periodicity);
   const currentSection = DEMONSTRATIVO_SECTIONS.find(section => section.key === sectionKey) ?? DEMONSTRATIVO_SECTIONS[0];
+
+  useEffect(() => {
+    setShowComplementares(false);
+  }, [sectionKey]);
 
   useEffect(() => {
     if (periodicity === 'mensal') setPeriodNumber(month);
@@ -708,6 +713,13 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
     return () => { cancelled = true; };
   }, [year, month, periodicity, periodNumber, sectionKey, concessionarias]);
 
+  const cutoffIndex = currentSection.sheetIndex === 1
+    ? rows.findIndex(row => { const normalized = normalizeName(row.label); return normalized.includes('lair') || normalized.includes('lucroantesdoimpostoderenda'); })
+    : rows.findIndex(row => normalizeName(row.label) === 'lucrooperacionalvw');
+  const hasComplementares = cutoffIndex >= 0 && cutoffIndex < rows.length - 1;
+  const mainRows = hasComplementares ? rows.slice(0, cutoffIndex + 1) : rows;
+  const complementaresRows = hasComplementares ? rows.slice(cutoffIndex + 1) : [];
+
   return (
     <div className="space-y-4">
       <div>
@@ -725,7 +737,7 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
           ? [{ title: 'Lucro Bruto', match: (label: string) => label.includes('lucrobruto') }, { title: 'Margem de Contribuição I', match: (label: string) => label.includes('margemdecontribuicaoi') }, { title: 'Lucro antes do Imposto de Renda (L.A.I.R.)', match: (label: string) => label.includes('lair') || label.includes('lucroantesdoimpostoderenda') }]
           : [{ title: 'Lucro Bruto', match: (label: string) => label.includes('lucrobruto') }, { title: 'Margem de Contribuição', match: (label: string) => label.includes('margemdecontribuicao') }, { title: 'Lucro Operacional VW', match: (label: string) => label.includes('lucrooperacionalvw') }]
         ).map(card => { const row = rows.find(item => card.match(normalizeName(item.label))); const baseValue = comparisonBase === 'regiao' ? row?.regiao : row?.satelite; const basePercent = comparisonBase === 'regiao' ? row?.regiaoPercent : row?.satelitePercent; const baseName = comparisonBase === 'regiao' ? 'Região' : 'Satélite'; return <div key={card.title} className="rounded-lg border border-teal-100 bg-teal-50 px-4 py-3"><p className="text-xs text-slate-500">{card.title}</p><p className="mt-1 text-sm font-bold text-teal-800">Sorana: {formatDemonstrativoValue(row?.sorana ?? null)}{row?.soranaPercent != null ? ` (${formatNumber(row.soranaPercent, true)})` : ''}</p><p className="text-xs text-slate-600">{baseName}: {formatDemonstrativoValue(baseValue ?? null)}{basePercent != null ? ` (${formatNumber(basePercent, true)})` : ''}</p></div>; })}</div>
-        <div className="overflow-x-auto border border-slate-200"><table className="min-w-[820px] w-full text-xs border-collapse"><thead className="sticky top-0 bg-teal-700 text-white"><tr>{['Indicador', 'Unidade', 'Sorana', 'Sorana %', `${comparisonBase === 'regiao' ? 'Região' : 'Satélite'} sem Sorana`, `${comparisonBase === 'regiao' ? 'Região' : 'Satélite'} %`, `Dif. x ${comparisonBase === 'regiao' ? 'Região' : 'Satélite'}`].map(header => <th key={header} className="px-3 py-2 text-left whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{rows.map((row, index) => <DemonstrativoTableRow key={`${row.label}-${index}`} row={row} comparisonBase={comparisonBase} />)}</tbody></table></div>
+        <div className="overflow-x-auto border border-slate-200"><table className="min-w-[820px] w-full text-xs border-collapse"><thead className="sticky top-0 bg-teal-700 text-white"><tr>{['Indicador', 'Unidade', 'Sorana', 'Sorana %', `${comparisonBase === 'regiao' ? 'Região' : 'Satélite'} sem Sorana`, `${comparisonBase === 'regiao' ? 'Região' : 'Satélite'} %`, `Dif. x ${comparisonBase === 'regiao' ? 'Região' : 'Satélite'}`].map(header => <th key={header} className="px-3 py-2 text-left whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{mainRows.map((row, index) => <DemonstrativoTableRow key={`${row.label}-${index}`} row={row} comparisonBase={comparisonBase} />)}{hasComplementares && <tr><td colSpan={7} className="border border-slate-200 bg-slate-100 px-3 py-2"><button type="button" onClick={() => setShowComplementares(value => !value)} className="text-xs font-semibold text-teal-700 hover:text-teal-800">{showComplementares ? '▾ Ocultar indicadores complementares' : `▸ Mostrar indicadores complementares — ${complementaresRows.length} linhas`}</button></td></tr>}{hasComplementares && showComplementares && complementaresRows.map((row, index) => <DemonstrativoTableRow key={`comp-${row.label}-${index}`} row={row} comparisonBase={comparisonBase} />)}</tbody></table></div>
       </>}
     </div>
   );
