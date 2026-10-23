@@ -211,6 +211,64 @@ export function DemonstrativosVariaveisListPage({ onOpenColaborador }: Demonstra
           </div>`;
       }).join('');
 
+      const resumoBlock = `
+        <div style="border:1px solid #e2e8f0;border-top:none;background:#f8fafc;padding:16px 24px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+            <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+              <div style="display:flex;align-items:center;gap:12px;"><span style="color:#64748b;">Salário Fixo</span><span style="font-weight:600;color:#334155;">${fmtBRL(c.salarioFixo ?? 0)}</span></div>
+              <div style="display:flex;align-items:center;gap:12px;"><span style="color:#64748b;">Remuneração Variável</span><span style="font-weight:600;color:#334155;">${fmtBRL(total)}</span></div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;border:1px solid #99f6e4;background:#f0fdfa;border-radius:8px;padding:8px 16px;">
+              <span style="font-size:11px;font-weight:600;color:#0d9488;text-transform:uppercase;letter-spacing:.05em;">Total a Receber no Mês</span>
+              <span style="font-size:20px;font-weight:700;color:#0f766e;">${fmtBRL((c.salarioFixo ?? 0) + total)}</span>
+            </div>
+          </div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:8px;">O salário fixo já está cadastrado no RH; valor informativo para conferência do total a ser recebido pelo colaborador.</div>
+        </div>`;
+
+      const kpisHtml = (c.kpis ?? []).map(kpi => {
+        const atingido = (l.kpisAtingidos ?? []).includes(kpi.id);
+        const itemAfetado = c.itens.find(it => it.id === kpi.itemRemuneracaoId);
+        const temObjetivo = kpi.objetivo != null;
+        const alcancado = l.kpisAlcancado?.[kpi.id];
+        const bonusLabel = [
+          kpi.percentualBonus ? `+${kpi.percentualBonus}%` : null,
+          kpi.valorBonus ? `+${fmtBRL(kpi.valorBonus)}` : null,
+        ].filter(Boolean).join(' ') || '—';
+        return `
+          <div style="border-radius:8px;border:1px solid ${atingido ? '#99f6e4' : '#e2e8f0'};background:${atingido ? '#f0fdfa' : '#f8fafc'};">
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;">
+              <div style="width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;background:${atingido ? '#0d9488' : '#e2e8f0'};color:${atingido ? '#ffffff' : '#94a3b8'};">✓</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:500;color:${atingido ? '#115e59' : '#475569'};">${kpi.descricao || 'KPI'}</div>
+                ${itemAfetado ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px;">${itemAfetado.descricao}</div>` : ''}
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                <span style="font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid ${atingido ? '#5eead4' : '#cbd5e1'};background:${atingido ? '#ccfbf1' : '#f1f5f9'};color:${atingido ? '#0f766e' : '#64748b'};">${bonusLabel}</span>
+                <span style="font-size:11px;font-weight:600;color:${atingido ? '#0d9488' : '#94a3b8'};">${atingido ? 'Atingido' : 'Não atingido'}</span>
+              </div>
+            </div>
+            ${temObjetivo ? `
+              <div style="display:flex;align-items:center;gap:16px;padding:0 16px 10px;">
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:600;">Meta:</span>
+                  <span style="font-size:11px;font-weight:700;color:#64748b;">${kpi.condicao === '<=' ? '≤' : '≥'}</span>
+                  <span style="font-size:11px;font-weight:700;color:#475569;">${kpi.objetivo?.toLocaleString('pt-BR')}${kpi.unidade ? ` ${kpi.unidade}` : ''}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:600;">Alcançado:</span>
+                  <span style="font-size:11px;font-weight:700;${alcancado == null ? 'font-style:italic;' : ''}color:${alcancado != null ? (atingido ? '#0f766e' : '#ef4444') : '#94a3b8'};">${alcancado != null ? `${alcancado.toLocaleString('pt-BR')}${kpi.unidade ? ` ${kpi.unidade}` : ''}` : '—'}</span>
+                </div>
+              </div>` : ''}
+          </div>`;
+      }).join('');
+
+      const kpisBlock = (c.kpis && c.kpis.length > 0) ? `
+        <div style="border:1px solid #e2e8f0;border-top:none;padding:16px 24px;background:#ffffff;">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">KPIs</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">${kpisHtml}</div>
+        </div>` : '';
+
       return `
         <div style="page-break-after:always;font-family:Inter,sans-serif;max-width:700px;margin:0 auto;">
           <div style="background:${brandColor(c.brand)};padding:16px 24px;border-radius:8px 8px 0 0;color:white;display:flex;justify-content:space-between;align-items:flex-start;">
@@ -245,6 +303,8 @@ export function DemonstrativosVariaveisListPage({ onOpenColaborador }: Demonstra
               </tr>
             </tfoot>
           </table>
+          ${resumoBlock}
+          ${kpisBlock}
           <div style="border:1px solid #e2e8f0;border-top:none;padding:16px 24px;border-radius:0 0 8px 8px;background:white;">
             <div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Assinaturas</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">${assinaturas}</div>
