@@ -27,7 +27,7 @@ import {
   type Modelo,
   type VeiculoGrade,
 } from './gradeTestDriveStorage';
-import { exportGestaoGradeExcel, exportResultadoVendasExcel } from './gradeTestDriveExport';
+import { exportGestaoGradeExcel, exportResultadoVendasExcel, exportVeiculosGradeExcel } from './gradeTestDriveExport';
 
 interface Props {
   onBack: () => void;
@@ -483,6 +483,21 @@ function VeiculosTab({ veiculos, grades, onSave }: { veiculos: VeiculoGrade[]; g
       {ordenados.length === 0 ? (
         <p className="text-sm text-slate-400">Nenhum veículo cadastrado.</p>
       ) : (
+        <>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-bold text-slate-800">Veículos cadastrados ({ordenados.length})</h3>
+          <button
+            onClick={() => void exportVeiculosGradeExcel({
+              titulo: `Grade de Test Drive Audi — Veículos (${formatDate(new Date().toISOString().slice(0, 10))})`,
+              filename: `veiculos-grade-test-drive-audi-${new Date().toISOString().slice(0, 10)}.xlsx`,
+              veiculos: ordenados,
+              grades,
+            })}
+            className="flex items-center gap-1.5 bg-cyan-600 text-white rounded px-3 py-2 text-sm font-semibold hover:bg-cyan-700"
+          >
+            <Download className="w-4 h-4" />Exportar Excel
+          </button>
+        </div>
         <div className="overflow-auto border border-slate-200 rounded-lg">
           <table className="min-w-[1100px] w-full text-xs">
             <thead className="bg-slate-100 text-slate-600">
@@ -534,6 +549,7 @@ function VeiculosTab({ veiculos, grades, onSave }: { veiculos: VeiculoGrade[]; g
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {vendaAlvo && (

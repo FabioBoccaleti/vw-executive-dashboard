@@ -2,8 +2,10 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import {
   CLASSIFICACAO_LABELS,
+  CONDICAO_PAGAMENTO_LABELS,
   calcularRentabilidade,
   diasEntreISO,
+  liberadoVendaVeiculo,
   situacaoVendaVeiculo,
   vencimentoGradeVeiculo,
   type GradeTrimestre,
@@ -180,6 +182,70 @@ export async function exportResultadoVendasExcel(params: {
   totalRow.eachCell(cell => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
   });
+
+  await download(wb, filename);
+}
+
+export async function exportVeiculosGradeExcel(params: {
+  titulo: string;
+  filename: string;
+  veiculos: VeiculoGrade[];
+  grades: GradeTrimestre[];
+}) {
+  const { titulo, filename, veiculos, grades } = params;
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Sorana Executive Dashboard';
+  wb.created = new Date();
+  const ws = wb.addWorksheet('Veículos', { properties: { tabColor: { argb: HEADER_FILL } } });
+
+  const headers = [
+    'Modelo', 'Chassi', 'Classificação', 'Compra', 'Valor', 'Pagamento',
+    'Venc. pgto', 'Liberado p/ venda', 'Venc. grade', 'Status',
+  ];
+  const widths = [10, 20, 16, 13, 16, 26, 13, 16, 13, 20];
+  ws.columns = widths.map(width => ({ width }));
+
+  styleTitle(ws.addRow([titulo]), headers.length, ws);
+  styleSectionHeader(ws.addRow(headers));
+
+  const alignments: Array<ExcelJS.Alignment['horizontal']> = [
+    'center', 'left', 'left', 'center', 'right', 'left', 'center', 'center', 'center', 'center',
+  ];
+
+  let totalValor = 0;
+  veiculos.forEach(v => {
+    totalValor += v.valorCompra;
+    const status = v.vendido ? `Vendido ${formatDate(v.dataVenda)}` : 'Em estoque';
+    const row = ws.addRow([
+      v.modelo,
+      v.chassi,
+      CLASSIFICACAO_LABELS[v.classificacao],
+      formatDate(v.dataCompra),
+      v.valorCompra,
+      CONDICAO_PAGAMENTO_LABELS[v.condicaoPagamento],
+      formatDate(v.dataVencimentoPagamento),
+      formatDate(liberadoVendaVeiculo(v, grades)),
+      formatDate(vencimentoGradeVeiculo(v, grades)),
+      status,
+    ]);
+    row.getCell(5).numFmt = CURRENCY_FMT;
+    alignments.forEach((horizontal, index) => {
+      row.getCell(index + 1).alignment = { vertical: 'middle', horizontal };
+    });
+  });
+
+  const totalRow = ws.addRow([
+    `Total (${veiculos.length})`, '', '', '', totalValor, '', '', '', '', '',
+  ]);
+  totalRow.font = { bold: true };
+  totalRow.getCell(5).numFmt = CURRENCY_FMT;
+  totalRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'right' };
+  totalRow.eachCell(cell => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+  });
+
+  ws.views = [{ state: 'frozen', ySplit: 2 }];
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: headers.length } };
 
   await download(wb, filename);
 }
