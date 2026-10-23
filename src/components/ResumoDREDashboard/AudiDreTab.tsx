@@ -905,15 +905,20 @@ function AjustesTable({
               <td className="w-7" />
               <td className="px-4 py-1.5">Lucro Líquido do Exercício</td>
               {DEPTS.map(d => {
-                const v = data[d.key].lucroLiquidoExercicio;
+                const raw = data[d.key].lucroLiquidoExercicio;
+                const display = month === 0
+                  ? (parseVal(raw) !== 0 ? formatDreAmount(parseVal(raw)) : '—')
+                  : (raw ? fmtNum(raw) : '—');
                 return (
                   <td key={d.key} className="px-3 py-1.5 text-center">
-                    {v ? fmtNum(v) : '—'}
+                    {display}
                   </td>
                 );
               })}
               <td className="px-3 py-1.5 text-center" style={{backgroundColor:'#9a0827'}}>
-                {totalLiquido ? fmtNum(totalLiquido) : '—'}
+                {month === 0
+                  ? (totalLiqNum !== 0 ? formatDreAmount(totalLiqNum) : '—')
+                  : (totalLiquido ? fmtNum(totalLiquido) : '—')}
               </td>
             </tr>
 
@@ -1422,10 +1427,13 @@ function PrintAjustesTable({ data, year, month }: { data: DreAudiRow; year: numb
           <tr className="dre-row-total" style={{ backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'black', borderBottom: '1px solid #9a0827' }}>
             <td style={{ padding: '2px 6px', fontWeight: 700 }}>Lucro Líquido do Exercício</td>
             {DEPTS.map(d => {
-              const v = data[d.key].lucroLiquidoExercicio;
-              return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: 700 }}>{v ? fmtNum(v) : '—'}</td>;
+              const raw = data[d.key].lucroLiquidoExercicio;
+              const display = month === 0
+                ? (parseVal(raw) !== 0 ? formatDreAmount(parseVal(raw)) : '—')
+                : (raw ? fmtNum(raw) : '—');
+              return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: 700 }}>{display}</td>;
             })}
-            <td className="dre-cell-total" style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827' }}>{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
+            <td className="dre-cell-total" style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundImage: 'linear-gradient(to bottom, #9a0827 0%, #9a0827 100%)', backgroundColor: '#9a0827' }}>{month === 0 ? (totalLiqNum !== 0 ? formatDreAmount(totalLiqNum) : '—') : (totalLiquido ? fmtNum(totalLiquido) : '—')}</td>
           </tr>
           {/* Linhas dinâmicas */}
           {data.ajustes.map((row, i) => {

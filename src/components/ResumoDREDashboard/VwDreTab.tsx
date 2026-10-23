@@ -831,11 +831,16 @@ function AjustesTable({ ajustes, onChange, onLabelChange, onAdd, onDelete, data,
               <td className="w-7" />
               <td className="px-4 py-1.5">Lucro Líquido do Exercício</td>
               {DEPTS.map(d => {
-                const v = data[d.key].lucroLiquidoExercicio;
-                return <td key={d.key} className="px-3 py-1.5 text-center">{v ? fmtNum(v) : '—'}</td>;
+                const raw = data[d.key].lucroLiquidoExercicio;
+                const display = month === 0
+                  ? (parseVal(raw) !== 0 ? formatDreAmount(parseVal(raw)) : '—')
+                  : (raw ? fmtNum(raw) : '—');
+                return <td key={d.key} className="px-3 py-1.5 text-center">{display}</td>;
               })}
               <td className="px-3 py-1.5 text-center text-white" style={{ backgroundColor: VW_COLOR_DRK }}>
-                {totalLiquido ? fmtNum(totalLiquido) : '—'}
+                {month === 0
+                  ? (totalLiqNum !== 0 ? formatDreAmount(totalLiqNum) : '—')
+                  : (totalLiquido ? fmtNum(totalLiquido) : '—')}
               </td>
             </tr>
 
@@ -1326,10 +1331,13 @@ function PrintAjustesTable({ data, year, month }: { data: DreVwRow; year: number
           <tr className="vw-row-total" style={{ backgroundImage: `linear-gradient(to bottom, ${VW_COLOR} 0%, ${VW_COLOR} 100%)`, backgroundColor: VW_COLOR, color: 'white', borderBottom: `1px solid ${VW_COLOR_DRK}` }}>
             <td style={{ padding: '2px 6px', fontWeight: 700 }}>Lucro Líquido do Exercício</td>
             {DEPTS.map(d => {
-              const v = data[d.key].lucroLiquidoExercicio;
-              return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: 700 }}>{v ? fmtNum(v) : '—'}</td>;
+              const raw = data[d.key].lucroLiquidoExercicio;
+              const display = month === 0
+                ? (parseVal(raw) !== 0 ? formatDreAmount(parseVal(raw)) : '—')
+                : (raw ? fmtNum(raw) : '—');
+              return <td key={d.key} style={{ textAlign: 'center', padding: '2px 4px', fontWeight: 700 }}>{display}</td>;
             })}
-            <td className="vw-cell-total" style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${VW_COLOR_DRK} 0%, ${VW_COLOR_DRK} 100%)`, backgroundColor: VW_COLOR_DRK }}>{totalLiquido ? fmtNum(totalLiquido) : '—'}</td>
+            <td className="vw-cell-total" style={{ textAlign: 'center', padding: '2px 6px', fontWeight: 700, backgroundImage: `linear-gradient(to bottom, ${VW_COLOR_DRK} 0%, ${VW_COLOR_DRK} 100%)`, backgroundColor: VW_COLOR_DRK }}>{month === 0 ? (totalLiqNum !== 0 ? formatDreAmount(totalLiqNum) : '—') : (totalLiquido ? fmtNum(totalLiquido) : '—')}</td>
           </tr>
           {data.ajustes.map((row, i) => {
             const rTotal = rowTotals[i];
