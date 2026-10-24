@@ -34,11 +34,30 @@ export interface EstoqueUsadosMeta {
   metaAudi: number;
 }
 
+// ─── Floor Plan ───────────────────────────────────────────────────────────────
+
+/** Valor de Floor Plan lançado em um dia, por banco */
+export interface FloorPlanDay {
+  itau: number;
+  volks: number;
+}
+
+/** Mapa de datas ('YYYY-MM-DD') → valores de Floor Plan do dia */
+export type FloorPlanMap = Record<string, FloorPlanDay>;
+
+/** Limites de crédito das linhas de Floor Plan, por banco */
+export interface FloorPlanLimits {
+  itau: number;
+  volks: number;
+}
+
 // ─── Chaves de storage ────────────────────────────────────────────────────────
 
-const ENTRY_PREFIX = 'estoque_usados:entry:';
-const META_KEY     = 'estoque_usados:meta';
-const INDEX_KEY    = 'estoque_usados:index';
+const ENTRY_PREFIX     = 'estoque_usados:entry:';
+const META_KEY         = 'estoque_usados:meta';
+const INDEX_KEY        = 'estoque_usados:index';
+const FLOORPLAN_KEY    = 'estoque_usados:floorplan';
+const FLOORPLAN_LIMITS_KEY = 'estoque_usados:floorplan_limits';
 
 // ─── Helpers de cálculo ───────────────────────────────────────────────────────
 
@@ -130,6 +149,54 @@ export async function loadMeta(): Promise<EstoqueUsadosMeta> {
     return (await kvGet<EstoqueUsadosMeta>(META_KEY)) ?? { metaVW: 0, metaAudi: 0 };
   } catch {
     return { metaVW: 0, metaAudi: 0 };
+  }
+}
+
+// ─── Floor Plan ───────────────────────────────────────────────────────────────
+
+/** Soma os valores de Floor Plan de um dia (Itaú + Volks) */
+export function calcTotalFloorPlan(d: Partial<FloorPlanDay> | null | undefined): number {
+  return (d?.itau ?? 0) + (d?.volks ?? 0);
+}
+
+/** Carrega o mapa completo de lançamentos de Floor Plan (por data) */
+export async function loadFloorPlanMap(): Promise<FloorPlanMap> {
+  try {
+    return (await kvGet<FloorPlanMap>(FLOORPLAN_KEY)) ?? {};
+  } catch (err) {
+    console.error('[EstoqueUsados] Erro ao carregar floor plan:', err);
+    return {};
+  }
+}
+
+/** Salva/atualiza os valores de Floor Plan de um único dia */
+export async function saveFloorPlanDay(date: string, day: FloorPlanDay): Promise<boolean> {
+  try {
+    const map = await loadFloorPlanMap();
+    map[date] = { itau: day.itau ?? 0, volks: day.volks ?? 0 };
+    return await kvSet(FLOORPLAN_KEY, map);
+  } catch (err) {
+    console.error('[EstoqueUsados] Erro ao salvar floor plan do dia:', err);
+    return false;
+  }
+}
+
+/** Carrega os limites das linhas de Floor Plan */
+export async function loadFloorPlanLimits(): Promise<FloorPlanLimits> {
+  try {
+    return (await kvGet<FloorPlanLimits>(FLOORPLAN_LIMITS_KEY)) ?? { itau: 0, volks: 0 };
+  } catch {
+    return { itau: 0, volks: 0 };
+  }
+}
+
+/** Salva os limites das linhas de Floor Plan */
+export async function saveFloorPlanLimits(limits: FloorPlanLimits): Promise<boolean> {
+  try {
+    return await kvSet(FLOORPLAN_LIMITS_KEY, { itau: limits.itau ?? 0, volks: limits.volks ?? 0 });
+  } catch (err) {
+    console.error('[EstoqueUsados] Erro ao salvar limites de floor plan:', err);
+    return false;
   }
 }
 

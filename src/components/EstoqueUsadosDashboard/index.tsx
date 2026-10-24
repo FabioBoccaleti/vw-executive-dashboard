@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { LayoutDashboard, PencilLine, History, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, PencilLine, History, ArrowLeft, Landmark } from 'lucide-react';
 import { toast } from 'sonner';
 import { DashboardTab }   from './DashboardTab';
 import { LancarDadosTab } from './LancarDadosTab';
 import { HistoricoTab }   from './HistoricoTab';
+import { FloorPlanTab }   from './FloorPlanTab';
 import {
   EstoqueUsadosEntry, EstoqueUsadosMeta,
   loadMeta, loadIndex, loadEntry, saveEntry,
@@ -12,7 +13,7 @@ import {
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-type Tab = 'dashboard' | 'lancar' | 'historico';
+type Tab = 'dashboard' | 'lancar' | 'historico' | 'floorplan';
 
 interface Props {
   onChangeBrand: () => void;
@@ -179,6 +180,12 @@ export function EstoqueUsadosDashboard({ onChangeBrand }: Props) {
             icon={<History className="w-3.5 h-3.5" />}
             label="Histórico"
           />
+          <TabBtn
+            active={activeTab === 'floorplan'}
+            onClick={() => setActiveTab('floorplan')}
+            icon={<Landmark className="w-3.5 h-3.5" />}
+            label="Floor Plan"
+          />
         </div>
 
         <div className="w-24" />
@@ -208,6 +215,11 @@ export function EstoqueUsadosDashboard({ onChangeBrand }: Props) {
             dates={historyDates}
             onView={handleViewHistoric}
             onDeleted={handleDeleted}
+          />
+        )}
+        {activeTab === 'floorplan' && (
+          <FloorPlanTab
+            dates={historyDates}
           />
         )}
       </div>
