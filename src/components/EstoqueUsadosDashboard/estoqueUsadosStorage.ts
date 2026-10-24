@@ -49,6 +49,9 @@ export type FloorPlanMap = Record<string, FloorPlanDay>;
 export interface FloorPlanLimits {
   itau: number;
   volks: number;
+  /** Utilização em Test Drive ou Frota (deduzida do disponível), por banco */
+  itauTestDrive: number;
+  volksTestDrive: number;
 }
 
 // ─── Chaves de storage ────────────────────────────────────────────────────────
@@ -184,16 +187,27 @@ export async function saveFloorPlanDay(date: string, day: FloorPlanDay): Promise
 /** Carrega os limites das linhas de Floor Plan */
 export async function loadFloorPlanLimits(): Promise<FloorPlanLimits> {
   try {
-    return (await kvGet<FloorPlanLimits>(FLOORPLAN_LIMITS_KEY)) ?? { itau: 0, volks: 0 };
+    const stored = await kvGet<Partial<FloorPlanLimits>>(FLOORPLAN_LIMITS_KEY);
+    return {
+      itau: stored?.itau ?? 0,
+      volks: stored?.volks ?? 0,
+      itauTestDrive: stored?.itauTestDrive ?? 0,
+      volksTestDrive: stored?.volksTestDrive ?? 0,
+    };
   } catch {
-    return { itau: 0, volks: 0 };
+    return { itau: 0, volks: 0, itauTestDrive: 0, volksTestDrive: 0 };
   }
 }
 
 /** Salva os limites das linhas de Floor Plan */
 export async function saveFloorPlanLimits(limits: FloorPlanLimits): Promise<boolean> {
   try {
-    return await kvSet(FLOORPLAN_LIMITS_KEY, { itau: limits.itau ?? 0, volks: limits.volks ?? 0 });
+    return await kvSet(FLOORPLAN_LIMITS_KEY, {
+      itau: limits.itau ?? 0,
+      volks: limits.volks ?? 0,
+      itauTestDrive: limits.itauTestDrive ?? 0,
+      volksTestDrive: limits.volksTestDrive ?? 0,
+    });
   } catch (err) {
     console.error('[EstoqueUsados] Erro ao salvar limites de floor plan:', err);
     return false;

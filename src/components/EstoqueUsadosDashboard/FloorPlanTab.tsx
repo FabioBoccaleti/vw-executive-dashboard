@@ -68,20 +68,28 @@ function CurrencyCell({
 // ─── Painel de Limite por banco ───────────────────────────────────────────────
 
 function LimitePanel({
-  cor, titulo, limite, utilizado, onChangeLimite,
+  cor, titulo, limite, utilizado, testDrive, onChangeLimite, onChangeTestDrive,
 }: {
   cor: string;
   titulo: string;
   limite: number;
   utilizado: number;
+  testDrive: number;
   onChangeLimite: (v: number) => void;
+  onChangeTestDrive: (v: number) => void;
 }) {
-  const disponivel = limite - utilizado;
-  const pct = limite > 0 ? Math.min(100, (utilizado / limite) * 100) : 0;
+  const consumido = utilizado + testDrive;
+  const disponivel = limite - consumido;
+  const pct = limite > 0 ? Math.min(100, (consumido / limite) * 100) : 0;
   const estourado = disponivel < 0;
+
   const [display, setDisplay] = useState(fmtBRL(limite));
   const [editing, setEditing] = useState(false);
   useEffect(() => { if (!editing) setDisplay(fmtBRL(limite)); }, [limite, editing]);
+
+  const [tdDisplay, setTdDisplay] = useState(fmtBRL(testDrive));
+  const [tdEditing, setTdEditing] = useState(false);
+  useEffect(() => { if (!tdEditing) setTdDisplay(fmtBRL(testDrive)); }, [testDrive, tdEditing]);
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
@@ -110,6 +118,26 @@ function LimitePanel({
             />
           </div>
         </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-slate-500">Utilização em Test Drive ou Frota</span>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-slate-400">R$</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={tdDisplay}
+              onFocus={e => { setTdEditing(true); e.target.select(); setTdDisplay(testDrive === 0 ? '' : String(testDrive).replace('.', ',')); }}
+              onChange={e => setTdDisplay(e.target.value)}
+              onBlur={e => {
+                const parsed = parseNum(e.target.value);
+                setTdEditing(false);
+                setTdDisplay(fmtBRL(parsed));
+                if (parsed !== testDrive) onChangeTestDrive(parsed);
+              }}
+              className="w-32 text-right text-sm font-semibold border border-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent tabular-nums"
+            />
+          </div>
+        </div>
         <div className="flex items-center justify-between text-xs">
           <span className="text-slate-500">Utilizado (dia mais recente)</span>
           <span className="tabular-nums font-medium text-slate-700">{fmtBRL(utilizado)}</span>
@@ -133,7 +161,7 @@ function LimitePanel({
 export function FloorPlanTab({ dates }: Props) {
   const [entries, setEntries]     = useState<Record<string, EstoqueUsadosEntry>>({});
   const [floorplan, setFloorplan] = useState<FloorPlanMap>({});
-  const [limits, setLimits]       = useState<FloorPlanLimits>({ itau: 0, volks: 0 });
+  const [limits, setLimits]       = useState<FloorPlanLimits>({ itau: 0, volks: 0, itauTestDrive: 0, volksTestDrive: 0 });
   const [loading, setLoading]     = useState(true);
   const [showPorMarca, setShowPorMarca] = useState(false);
   const [showPorBanco, setShowPorBanco] = useState(false);
@@ -185,12 +213,12 @@ export function FloorPlanTab({ dates }: Props) {
     if (!ok) toast.error('Erro ao salvar valor de Floor Plan.');
   }, [floorplan]);
 
-  const handleCommitLimit = useCallback(async (bank: 'itau' | 'volks', value: number) => {
-    const updated = { ...limits, [bank]: value };
+  const handleCommitLimit = useCallback(async (field: 'itau' | 'volks' | 'itauTestDrive' | 'volksTestDrive', value: number) => {
+    const updated = { ...limits, [field]: value };
     setLimits(updated);
     const ok = await saveFloorPlanLimits(updated);
-    if (ok) toast.success('Limite atualizado.');
-    else toast.error('Erro ao salvar limite.');
+    if (ok) toast.success('Valor atualizado.');
+    else toast.error('Erro ao salvar valor.');
   }, [limits]);
 
   // Dados do gráfico (ordem cronológica asc)
@@ -219,7 +247,8 @@ export function FloorPlanTab({ dates }: Props) {
     const fpTotal = calcTotalFloorPlan(fpMaisRecente);
     const cobertura = estTotal > 0 ? (fpTotal / estTotal) * 100 : 0;
     const limiteTotal = limits.itau + limits.volks;
-    const disponivelTotal = limiteTotal - fpTotal;
+    const testDriveTotal = limits.itauTestDrive + limits.volksTestDrive;
+    const disponivelTotal = limiteTotal - fpTotal - testDriveTotal;
     return { estTotal, fpTotal, cobertura, limiteTotal, disponivelTotal };
   }, [mostRecent, entries, fpMaisRecente, limits]);
 
@@ -293,12 +322,16 @@ export function FloorPlanTab({ dates }: Props) {
           <LimitePanel
             cor={COR_ITAU} titulo="Banco Itaú"
             limite={limits.itau} utilizado={fpMaisRecente?.itau ?? 0}
+            testDrive={limits.itauTestDrive}
             onChangeLimite={v => handleCommitLimit('itau', v)}
+            onChangeTestDrive={v => handleCommitLimit('itauTestDrive', v)}
           />
           <LimitePanel
             cor={COR_VOLKS} titulo="Banco Volks"
             limite={limits.volks} utilizado={fpMaisRecente?.volks ?? 0}
+            testDrive={limits.volksTestDrive}
             onChangeLimite={v => handleCommitLimit('volks', v)}
+            onChangeTestDrive={v => handleCommitLimit('volksTestDrive', v)}
           />
         </div>
       </div>
