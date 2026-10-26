@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { FileSpreadsheet, Upload, Trash2, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { FileSpreadsheet, Upload, Trash2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   deleteControleVeiculos,
   getControleVeiculos,
   setControleVeiculos,
+  extractVehicleTable,
   type ControleVeiculosBrand,
   type ControleVeiculosData,
+  type VehicleTable,
 } from './controleVeiculosStorage';
+import {
+  getRegras,
+  EMPTY_REGRAS,
+  type ControleVeiculosRegras,
+} from './controleVeiculosRegrasStorage';
 
 type SubTab = 'importar' | 'disponiveis' | 'garantia';
 
@@ -221,6 +228,117 @@ function ImportarBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
   );
 }
 
+// ─── Painel: Veículos Disponíveis por marca ───────────────────────────────────
+
+function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
+  const [loading, setLoading] = useState(true);
+  const [table, setTable] = useState<VehicleTable | null>(null);
+  const [regras, setRegras] = useState<ControleVeiculosRegras>(EMPTY_REGRAS);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const [data, loadedRegras] = await Promise.all([
+        getControleVeiculos(brand),
+        getRegras(),
+      ]);
+      if (cancelled) return;
+      setTable(extractVehicleTable(data));
+      setRegras(loadedRegras);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [brand]);
+
+  // Índices das colunas a exibir: "Sit" (sempre) + colunas das regras, na ordem do arquivo.
+  const columnIndices = useMemo(() => {
+    if (!table) return [];
+    const selected = new Set(regras.colunas);
+    const indices: number[] = [];
+    table.headers.forEach((header, index) => {
+      if (index === table.sitIndex || selected.has(header)) indices.push(index);
+    });
+    return indices;
+  }, [table, regras]);
+
+  const filteredRows = useMemo(() => {
+    if (!table || regras.situacoes.length === 0) return [];
+    const wanted = new Set(regras.situacoes.map(s => s.trim().toLowerCase()));
+    return table.rows.filter(row => {
+      const sit = String(row[table.sitIndex] ?? '').trim().toLowerCase();
+      return wanted.has(sit);
+    });
+  }, [table, regras]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 text-slate-400 py-20">
+        <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm">Carregando...</span>
+      </div>
+    );
+  }
+
+  if (!table) {
+    return (
+      <div className="py-16 text-center text-slate-500">
+        <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+        Nenhum arquivo importado para {BRAND_LABEL[brand]}. Importe em “Importar Arquivo”.
+      </div>
+    );
+  }
+
+  if (regras.situacoes.length === 0) {
+    return (
+      <div className="py-16 text-center text-slate-500">
+        <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+        Nenhuma situação (Sit) cadastrada nas Regras. Configure em “Regras” para listar os veículos.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-slate-500">
+        {filteredRows.length} veículo(s) · situações: {regras.situacoes.join(', ')}
+      </p>
+      <div className="overflow-auto max-h-[calc(100vh-430px)] border border-slate-200">
+        <table className="min-w-max text-xs border-collapse">
+          <thead>
+            <tr className="bg-sky-50 font-semibold">
+              {columnIndices.map(index => (
+                <th key={index} className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">
+                  {table.headers[index]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRows.length === 0 ? (
+              <tr>
+                <td colSpan={columnIndices.length || 1} className="border border-slate-200 px-3 py-6 text-center text-slate-400">
+                  Nenhum veículo corresponde às situações cadastradas.
+                </td>
+              </tr>
+            ) : (
+              filteredRows.map((row, rowIndex) => (
+                <tr key={rowIndex} className="odd:bg-white even:bg-slate-50">
+                  {columnIndices.map(index => (
+                    <td key={index} className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">
+                      {formatCell(row[index])}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Placeholder: abas em construção ──────────────────────────────────────────
 
 function PlaceholderPanel({ icon, title }: { icon: React.ReactNode; title: string }) {
@@ -229,6 +347,41 @@ function PlaceholderPanel({ icon, title }: { icon: React.ReactNode; title: strin
       {icon}
       <span className="text-sm font-medium text-slate-500">{title}</span>
       <span className="text-xs">Em breve.</span>
+    </div>
+  );
+}
+
+// ─── Painel: Veículos em Garantia (sub-abas por banco) ────────────────────────
+
+type GarantiaBanco = 'itau' | 'volks';
+
+const GARANTIA_BANCOS: { value: GarantiaBanco; label: string }[] = [
+  { value: 'itau', label: 'Banco Itau' },
+  { value: 'volks', label: 'Banco Volks' },
+];
+
+function GarantiaPanel() {
+  const [banco, setBanco] = useState<GarantiaBanco>('itau');
+  const label = GARANTIA_BANCOS.find(b => b.value === banco)?.label ?? '';
+
+  return (
+    <div className="space-y-5">
+      {/* Sub-abas por banco */}
+      <div className="flex border-b border-slate-200">
+        {GARANTIA_BANCOS.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => setBanco(value)}
+            className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              banco === value ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <PlaceholderPanel icon={<ShieldCheck className="w-10 h-10 text-slate-300" />} title={`Veículos em Garantia — ${label}`} />
     </div>
   );
 }
@@ -257,8 +410,8 @@ export function ControleVeiculosTab() {
           ))}
         </div>
 
-        {/* Seletores de marca VW / Audi (apenas na importação) */}
-        {subTab === 'importar' && (
+        {/* Seletores de marca VW / Audi (importação e disponíveis) */}
+        {(subTab === 'importar' || subTab === 'disponiveis') && (
           <div className="flex border-b border-slate-200 px-4 md:px-6">
             {(['vw', 'audi'] as ControleVeiculosBrand[]).map(item => (
               <button
@@ -276,12 +429,8 @@ export function ControleVeiculosTab() {
 
         <div className="p-4 md:p-6">
           {subTab === 'importar' && <ImportarBrandPanel key={brand} brand={brand} />}
-          {subTab === 'disponiveis' && (
-            <PlaceholderPanel icon={<CheckCircle2 className="w-10 h-10 text-slate-300" />} title="Veículos Disponíveis" />
-          )}
-          {subTab === 'garantia' && (
-            <PlaceholderPanel icon={<ShieldCheck className="w-10 h-10 text-slate-300" />} title="Veículos em Garantia" />
-          )}
+          {subTab === 'disponiveis' && <DisponiveisBrandPanel key={brand} brand={brand} />}
+          {subTab === 'garantia' && <GarantiaPanel />}
         </div>
       </div>
     </div>

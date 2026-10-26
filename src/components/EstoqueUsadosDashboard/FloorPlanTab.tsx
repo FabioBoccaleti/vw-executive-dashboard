@@ -4,7 +4,7 @@ import {
   ResponsiveContainer, Legend,
 } from 'recharts';
 import { toast } from 'sonner';
-import { Landmark, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Printer, Car } from 'lucide-react';
+import { Landmark, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Printer, Car, SlidersHorizontal } from 'lucide-react';
 import {
   EstoqueUsadosEntry, FloorPlanMap, FloorPlanLimits,
   loadFloorPlanMap, saveFloorPlanDay, loadFloorPlanLimits, saveFloorPlanLimits,
@@ -12,6 +12,7 @@ import {
 } from './estoqueUsadosStorage';
 import { kvBulkGet } from '@/lib/kvClient';
 import { ControleVeiculosTab } from './ControleVeiculosTab';
+import { RegrasTab } from './RegrasTab';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -690,7 +691,7 @@ function SubTabBtn({
 // ─── Componente principal (sub-abas) ──────────────────────────────────────────
 
 export function FloorPlanTab({ dates }: Props) {
-  const [subTab, setSubTab] = useState<'posicao' | 'controle'>('posicao');
+  const [subTab, setSubTab] = useState<'posicao' | 'controle' | 'regras'>('posicao');
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -709,6 +710,12 @@ export function FloorPlanTab({ dates }: Props) {
             icon={<Car className="w-3.5 h-3.5" />}
             label="Controle de Veículos"
           />
+          <SubTabBtn
+            active={subTab === 'regras'}
+            onClick={() => setSubTab('regras')}
+            icon={<SlidersHorizontal className="w-3.5 h-3.5" />}
+            label="Regras"
+          />
         </div>
       </div>
 
@@ -716,6 +723,7 @@ export function FloorPlanTab({ dates }: Props) {
       <div className="flex-1 flex flex-col min-h-0">
         {subTab === 'posicao'  && <PosicaoFloorPlanContent dates={dates} />}
         {subTab === 'controle' && <ControleVeiculosTab />}
+        {subTab === 'regras'   && <RegrasTab />}
       </div>
     </div>
   );
