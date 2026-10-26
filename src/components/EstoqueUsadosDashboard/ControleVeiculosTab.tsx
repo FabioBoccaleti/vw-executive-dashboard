@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { FileSpreadsheet, Upload, Trash2, AlertCircle } from 'lucide-react';
+import { FileSpreadsheet, Upload, Trash2, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   deleteControleVeiculos,
@@ -10,7 +10,13 @@ import {
   type ControleVeiculosData,
 } from './controleVeiculosStorage';
 
-type SubTab = 'importar';
+type SubTab = 'importar' | 'disponiveis' | 'garantia';
+
+const SUB_TABS: { value: SubTab; label: string }[] = [
+  { value: 'importar', label: 'Importar Arquivo' },
+  { value: 'disponiveis', label: 'Veículos Disponíveis' },
+  { value: 'garantia', label: 'Veículos em Garantia' },
+];
 
 const BRAND_LABEL: Record<ControleVeiculosBrand, string> = { vw: 'VW', audi: 'Audi' };
 
@@ -215,44 +221,67 @@ function ImportarBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
   );
 }
 
+// ─── Placeholder: abas em construção ──────────────────────────────────────────
+
+function PlaceholderPanel({ icon, title }: { icon: React.ReactNode; title: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 text-slate-400 py-20">
+      {icon}
+      <span className="text-sm font-medium text-slate-500">{title}</span>
+      <span className="text-xs">Em breve.</span>
+    </div>
+  );
+}
+
 // ─── Aba: Controle de Veículos ────────────────────────────────────────────────
 
 export function ControleVeiculosTab() {
-  const [subTab] = useState<SubTab>('importar');
+  const [subTab, setSubTab] = useState<SubTab>('importar');
   const [brand, setBrand] = useState<ControleVeiculosBrand>('vw');
 
   return (
     <div className="flex-1 bg-slate-50 overflow-auto p-4 md:p-6">
       <div className="bg-white rounded-lg shadow-sm">
-        {/* Sub-aba: Importar Arquivo */}
-        <div className="flex gap-2 border-b border-slate-100 px-4 md:px-6 pt-4">
-          <button
-            onClick={() => { /* única sub-aba por enquanto */ }}
-            className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${
-              subTab === 'importar' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Importar Arquivo
-          </button>
-        </div>
-
-        {/* Seletores de marca VW / Audi */}
-        <div className="flex border-b border-slate-200 px-4 md:px-6">
-          {(['vw', 'audi'] as ControleVeiculosBrand[]).map(item => (
+        {/* Sub-abas: Importar Arquivo / Veículos Disponíveis / Veículos em Garantia */}
+        <div className="flex flex-wrap gap-2 border-b border-slate-100 px-4 md:px-6 pt-4">
+          {SUB_TABS.map(({ value, label }) => (
             <button
-              key={item}
-              onClick={() => setBrand(item)}
-              className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
-                brand === item ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+              key={value}
+              onClick={() => setSubTab(value)}
+              className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${
+                subTab === value ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {BRAND_LABEL[item]}
+              {label}
             </button>
           ))}
         </div>
 
+        {/* Seletores de marca VW / Audi (apenas na importação) */}
+        {subTab === 'importar' && (
+          <div className="flex border-b border-slate-200 px-4 md:px-6">
+            {(['vw', 'audi'] as ControleVeiculosBrand[]).map(item => (
+              <button
+                key={item}
+                onClick={() => setBrand(item)}
+                className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                  brand === item ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {BRAND_LABEL[item]}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="p-4 md:p-6">
-          <ImportarBrandPanel key={brand} brand={brand} />
+          {subTab === 'importar' && <ImportarBrandPanel key={brand} brand={brand} />}
+          {subTab === 'disponiveis' && (
+            <PlaceholderPanel icon={<CheckCircle2 className="w-10 h-10 text-slate-300" />} title="Veículos Disponíveis" />
+          )}
+          {subTab === 'garantia' && (
+            <PlaceholderPanel icon={<ShieldCheck className="w-10 h-10 text-slate-300" />} title="Veículos em Garantia" />
+          )}
         </div>
       </div>
     </div>
