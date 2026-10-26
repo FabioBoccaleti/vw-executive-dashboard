@@ -44,8 +44,34 @@ function normalizeHeader(value: unknown): string {
   return String(value ?? '').trim();
 }
 
-function isSitHeader(value: unknown): boolean {
+export function isSitHeader(value: unknown): boolean {
   return normalizeHeader(value).toLowerCase().replace(/\.+$/, '') === 'sit';
+}
+
+/** Formata uma célula da planilha para exibição/armazenamento como texto. */
+export function formatVehicleCell(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return value.toLocaleDateString('pt-BR');
+  if (typeof value === 'number') return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 }).format(value);
+  return String(value);
+}
+
+/** Converte uma linha (alinhada a headers) em um registro header -> valor formatado. */
+export function buildRowRecord(headers: string[], row: unknown[]): Record<string, string> {
+  const record: Record<string, string> = {};
+  headers.forEach((header, index) => {
+    if (!header) return;
+    record[header] = formatVehicleCell(row[index]);
+  });
+  return record;
+}
+
+/** Identidade estável de uma linha (usa todos os campos do registro). */
+export function rowIdentity(record: Record<string, string>): string {
+  return Object.keys(record)
+    .sort()
+    .map(key => `${key}=${record[key]}`)
+    .join('|');
 }
 
 /**
