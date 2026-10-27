@@ -2,11 +2,11 @@
 
 export type UserRole = 'admin' | 'gestor' | 'leitura';
 
-export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'central_vendas_vw' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora';
+export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'central_vendas_vw' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora' | 'controle_veiculos_floorplan';
 
 export type BrandId = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'base_gerencial' | 'vw_outros' | 'audi_outros';
 
-export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_pagamentos_evora'];
+export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_pagamentos_evora', 'controle_veiculos_floorplan'];
 
 export const ALL_BRANDS: BrandId[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'despesas_depto_vw', 'ieo', 'base_gerencial', 'vw_outros', 'audi_outros'];
 
@@ -21,6 +21,7 @@ export const MODULE_LABELS: Record<ModuleId, string> = {
   analise_evolutiva_despesas: 'Análise Evolutiva de Despesas',
   numeros_estoque_usados: 'Números de Estoque de Usados',
   controle_pagamentos_evora: 'Controle de Pagamentos Evora',
+  controle_veiculos_floorplan: 'Controle de Veículos FloorPlan',
 };
 
 export const BRAND_LABELS: Record<BrandId, string> = {

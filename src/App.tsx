@@ -33,6 +33,7 @@ import { ResumoDREDashboard } from '@/components/ResumoDREDashboard'
 import { AnaliseProjecoesDashboard } from '@/components/AnaliseProjecoesDashboard'
 import { AnaliseDespesasDashboard } from '@/components/AnaliseDespesasDashboard'
 import { EstoqueUsadosDashboard } from '@/components/EstoqueUsadosDashboard'
+import { ControleVeiculosFloorplanPage } from '@/components/EstoqueUsadosDashboard/ControleVeiculosFloorplanPage'
 import { ControlePagamentosEvoraDashboard } from '@/components/ControlePagamentosEvoraDashboard'
 import { DespesasAdministracaoDashboard } from '@/components/DespesasAdministracaoDashboard'
 import { DespesasDeptoAudiDashboard } from '@/components/DespesasDeptoAudiDashboard'
@@ -338,6 +339,8 @@ function AppContent() {
         )
       ) : brand === 'numeros_estoque_usados' ? (
         <EstoqueUsadosDashboard onChangeBrand={handleChangeBrand} />
+      ) : brand === 'controle_veiculos_floorplan' ? (
+        <ControleVeiculosFloorplanPage onChangeBrand={handleChangeBrand} />
       ) : brand === 'controle_pagamentos_evora' ? (
         <ControlePagamentosEvoraDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'custos_alugueis' ? (

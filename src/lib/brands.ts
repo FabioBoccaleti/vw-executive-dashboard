@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'base_gerencial' | 'comparativo_rede_vw' | 'comparativo_rede_audi' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'base_gerencial' | 'comparativo_rede_vw' | 'comparativo_rede_audi' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora' | 'controle_veiculos_floorplan';
 
 // Interface de configuraÃ§Ã£o visual da marca
 export interface BrandConfig {
@@ -588,10 +588,35 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-accent': '#8b5cf6',
     },
   },
+  controle_veiculos_floorplan: {
+    id: 'controle_veiculos_floorplan',
+    name: 'Controle de Veículos FloorPlan',
+    shortName: 'Controle Veículos',
+    colors: {
+      primary: '#0ea5e9',
+      primaryHover: '#0284c7',
+      primaryLight: '#e0f2fe',
+      secondary: '#38bdf8',
+      accent: '#7dd3fc',
+      headerBg: 'bg-[#0ea5e9]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#0ea5e9] hover:bg-[#0284c7]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-sky-100 dark:bg-sky-900/30',
+      badgeText: 'text-sky-800 dark:text-sky-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#0ea5e9',
+      '--brand-primary-hover': '#0284c7',
+      '--brand-primary-light': '#e0f2fe',
+      '--brand-secondary': '#38bdf8',
+      '--brand-accent': '#7dd3fc',
+    },
+  },
 };
 
 // Lista de marcas disponiveis
-export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_pagamentos_evora', 'comparativo_rede_vw', 'comparativo_rede_audi'];
+export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_veiculos_floorplan', 'controle_pagamentos_evora', 'comparativo_rede_vw', 'comparativo_rede_audi'];
 
 // Chave de armazenamento para marca selecionada
 export const SELECTED_BRAND_KEY = 'selected_brand';

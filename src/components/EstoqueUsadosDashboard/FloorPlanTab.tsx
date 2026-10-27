@@ -4,15 +4,13 @@ import {
   ResponsiveContainer, Legend,
 } from 'recharts';
 import { toast } from 'sonner';
-import { Landmark, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Printer, Car, SlidersHorizontal } from 'lucide-react';
+import { Landmark, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Printer } from 'lucide-react';
 import {
   EstoqueUsadosEntry, FloorPlanMap, FloorPlanLimits,
   loadFloorPlanMap, saveFloorPlanDay, loadFloorPlanLimits, saveFloorPlanLimits,
   calcTotalFloorPlan, formatDateBR, fmtBRL, parseNum,
 } from './estoqueUsadosStorage';
 import { kvBulkGet } from '@/lib/kvClient';
-import { ControleVeiculosTab } from './ControleVeiculosTab';
-import { RegrasTab } from './RegrasTab';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -158,9 +156,9 @@ function LimitePanel({
   );
 }
 
-// ─── Conteúdo: Posição FloorPlan ──────────────────────────────────────────────
+// ─── Componente principal: Floor Plan ─────────────────────────────────────────
 
-function PosicaoFloorPlanContent({ dates }: Props) {
+export function FloorPlanTab({ dates }: Props) {
   const [entries, setEntries]     = useState<Record<string, EstoqueUsadosEntry>>({});
   const [floorplan, setFloorplan] = useState<FloorPlanMap>({});
   const [limits, setLimits]       = useState<FloorPlanLimits>({ itau: 0, volks: 0, itauTestDrive: 0, volksTestDrive: 0 });
@@ -659,72 +657,6 @@ function PosicaoFloorPlanContent({ dates }: Props) {
         </div>
       </div>
 
-    </div>
-  );
-}
-
-// ─── Sub-aba: botão ───────────────────────────────────────────────────────────
-
-function SubTabBtn({
-  active, onClick, icon, label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition-all ${
-        active
-          ? 'bg-white text-indigo-700 shadow-sm'
-          : 'text-slate-500 hover:text-slate-700 hover:bg-white/60'
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
-// ─── Componente principal (sub-abas) ──────────────────────────────────────────
-
-export function FloorPlanTab({ dates }: Props) {
-  const [subTab, setSubTab] = useState<'posicao' | 'controle' | 'regras'>('posicao');
-
-  return (
-    <div className="flex-1 flex flex-col min-h-0">
-      {/* Barra de sub-abas */}
-      <div className="bg-white border-b border-slate-200 px-6 py-2.5 print:hidden">
-        <div className="inline-flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-          <SubTabBtn
-            active={subTab === 'posicao'}
-            onClick={() => setSubTab('posicao')}
-            icon={<Landmark className="w-3.5 h-3.5" />}
-            label="Posição FloorPlan"
-          />
-          <SubTabBtn
-            active={subTab === 'controle'}
-            onClick={() => setSubTab('controle')}
-            icon={<Car className="w-3.5 h-3.5" />}
-            label="Controle de Veículos"
-          />
-          <SubTabBtn
-            active={subTab === 'regras'}
-            onClick={() => setSubTab('regras')}
-            icon={<SlidersHorizontal className="w-3.5 h-3.5" />}
-            label="Regras"
-          />
-        </div>
-      </div>
-
-      {/* Conteúdo da sub-aba */}
-      <div className="flex-1 flex flex-col min-h-0">
-        {subTab === 'posicao'  && <PosicaoFloorPlanContent dates={dates} />}
-        {subTab === 'controle' && <ControleVeiculosTab />}
-        {subTab === 'regras'   && <RegrasTab />}
-      </div>
     </div>
   );
 }
