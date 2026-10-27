@@ -47,6 +47,14 @@ function parseYear(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Extrai a quantidade de dias de estoque de uma célula (ex.: 3, "11"). */
+function parseDias(value: unknown): number | null {
+  const digits = String(value ?? '').replace(/[^\d]/g, '');
+  if (digits === '') return null;
+  const n = parseInt(digits, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Soma dias a uma data ISO 'YYYY-MM-DD' e retorna outra data ISO. */
 function addDaysISO(iso: string, days: number): string {
   const [y, m, d] = iso.split('-').map(Number);
@@ -407,6 +415,10 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
     () => (table ? table.headers.findIndex(h => headerMatches(h, 'disp')) : -1),
     [table],
   );
+  const diasIndex = useMemo(
+    () => (table ? table.headers.findIndex(h => headerMatches(h, 'dias')) : -1),
+    [table],
+  );
 
   // Regra de negociação (Prop/Disp): bloqueia inclusão quando a coluna considerada vale "Sim".
   function emNegociacao(row: unknown[]): boolean {
@@ -435,17 +447,32 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
     setDataInclusao(todayISO());
   }
 
-  // Regra de ano por banco: habilita o botão apenas se o veículo estiver dentro da regra.
-  function bankEnabled(banco: GarantiaBanco, row: unknown[]): boolean {
-    if (!table) return false;
+  // Regras por banco (ano + dias de estoque): habilita o botão apenas se o veículo estiver dentro das regras.
+  function bankStatus(banco: GarantiaBanco, row: unknown[]): { enabled: boolean; reason?: string } {
+    if (!table) return { enabled: false };
+    const label = GARANTIA_BANCO_LABEL[banco];
+
+    // Regra de ano a partir de.
     const ano = banco === 'itau' ? regras.anoItau : regras.anoVolks;
-    if (ano == null) return true; // sem ano configurado → sem restrição
-    const base = banco === 'itau' ? regras.baseAnoItau : regras.baseAnoVolks;
-    const colIndex = table.headers.findIndex(h => h.toLowerCase().replace(/\.+$/, '') === base);
-    if (colIndex < 0) return false; // coluna base ausente → desabilitado
-    const year = parseYear(row[colIndex]);
-    if (year == null) return false; // ano inválido → desabilitado
-    return year >= ano;
+    if (ano != null) {
+      const base = banco === 'itau' ? regras.baseAnoItau : regras.baseAnoVolks;
+      const colIndex = table.headers.findIndex(h => headerMatches(h, base));
+      if (colIndex < 0) return { enabled: false, reason: `Coluna de ano (${base}) ausente (${label})` };
+      const year = parseYear(row[colIndex]);
+      if (year == null) return { enabled: false, reason: `Ano inválido (${label})` };
+      if (year < ano) return { enabled: false, reason: `Fora da regra de ano (${label})` };
+    }
+
+    // Regra de dias de estoque máximo (bloqueia quando dias ≥ limite).
+    const maxDias = banco === 'itau' ? regras.diasEstoqueItau : regras.diasEstoqueVolks;
+    if (maxDias != null && diasIndex >= 0) {
+      const dias = parseDias(row[diasIndex]);
+      if (dias != null && dias >= maxDias) {
+        return { enabled: false, reason: `Dias de estoque (${dias}) acima do limite (${maxDias}) — ${label}` };
+      }
+    }
+
+    return { enabled: true };
   }
 
   async function confirmIncluir() {
@@ -556,22 +583,22 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
                       ) : (
                         <div className="flex items-center gap-2">
                           {(() => {
-                            const enItau = bankEnabled('itau', row);
-                            const enVolks = bankEnabled('volks', row);
+                            const stItau = bankStatus('itau', row);
+                            const stVolks = bankStatus('volks', row);
                             return (
                               <>
                                 <button
                                   onClick={() => openIncluir('itau', row)}
-                                  disabled={!enItau}
-                                  title={!enItau ? 'Fora da regra de ano (Banco Itau)' : undefined}
+                                  disabled={!stItau.enabled}
+                                  title={!stItau.enabled ? stItau.reason : undefined}
                                   className="inline-flex items-center gap-1 border border-sky-300 text-sky-700 rounded px-2.5 py-1 font-medium hover:bg-sky-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                                 >
                                   <Plus className="w-3.5 h-3.5" />Incluir Banco Itau
                                 </button>
                                 <button
                                   onClick={() => openIncluir('volks', row)}
-                                  disabled={!enVolks}
-                                  title={!enVolks ? 'Fora da regra de ano (Banco Volks)' : undefined}
+                                  disabled={!stVolks.enabled}
+                                  title={!stVolks.enabled ? stVolks.reason : undefined}
                                   className="inline-flex items-center gap-1 border border-sky-300 text-sky-700 rounded px-2.5 py-1 font-medium hover:bg-sky-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                                 >
                                   <Plus className="w-3.5 h-3.5" />Incluir Banco Volks

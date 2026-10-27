@@ -67,6 +67,7 @@ export function RegrasTab() {
   const anoValue = banco === 'itau' ? regras.anoItau : regras.anoVolks;
   const baseValue = banco === 'itau' ? regras.baseAnoItau : regras.baseAnoVolks;
   const diasVencimentoValue = banco === 'itau' ? regras.diasVencimentoItau : regras.diasVencimentoVolks;
+  const diasEstoqueValue = banco === 'itau' ? regras.diasEstoqueItau : regras.diasEstoqueVolks;
   const taxaJurosValue = banco === 'itau' ? regras.taxaJurosItau : regras.taxaJurosVolks;
 
   // Sincroniza o texto da taxa ao trocar de banco ou após carregar (sem reformatar durante a digitação).
@@ -90,6 +91,12 @@ export function RegrasTab() {
   function setDiasVencimento(value: number | null) {
     setRegrasState(prev =>
       banco === 'itau' ? { ...prev, diasVencimentoItau: value } : { ...prev, diasVencimentoVolks: value },
+    );
+  }
+
+  function setDiasEstoque(value: number | null) {
+    setRegrasState(prev =>
+      banco === 'itau' ? { ...prev, diasEstoqueItau: value } : { ...prev, diasEstoqueVolks: value },
     );
   }
 
@@ -247,6 +254,31 @@ export function RegrasTab() {
               onChange={e => {
                 const raw = e.target.value.trim();
                 setDiasVencimento(raw === '' ? null : Number(raw));
+              }}
+              className="w-40 border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200"
+            />
+          </section>
+
+          <div className="border-t border-slate-100" />
+
+          {/* Dias de estoque máximo (por banco) */}
+          <section>
+            <div className="flex items-center gap-2 mb-1">
+              <Landmark className="w-4 h-4 text-slate-500" />
+              <h3 className="text-sm font-bold text-slate-700">Dias de Estoque — {bancoLabel}</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">
+              Dias de estoque máximo. Veículos com dias de estoque maiores ou iguais a este valor ficam indisponíveis para este banco. (Em branco = regra inativa.)
+            </p>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              placeholder="Ex.: 120"
+              value={diasEstoqueValue ?? ''}
+              onChange={e => {
+                const raw = e.target.value.trim();
+                setDiasEstoque(raw === '' ? null : Number(raw));
               }}
               className="w-40 border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200"
             />

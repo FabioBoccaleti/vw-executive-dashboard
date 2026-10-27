@@ -19,6 +19,10 @@ export interface ControleVeiculosRegras {
   diasVencimentoItau: number | null;
   /** Dias de vencimento — Banco Volks. */
   diasVencimentoVolks: number | null;
+  /** Dias de estoque máximo — Banco Itau. Veículo com dias de estoque ≥ este valor fica indisponível. Em branco (null) = regra inativa. */
+  diasEstoqueItau: number | null;
+  /** Dias de estoque máximo — Banco Volks. Veículo com dias de estoque ≥ este valor fica indisponível. Em branco (null) = regra inativa. */
+  diasEstoqueVolks: number | null;
   /** Taxa de juros praticada (%) — Banco Itau. */
   taxaJurosItau: number | null;
   /** Taxa de juros praticada (%) — Banco Volks. */
@@ -40,6 +44,8 @@ export const EMPTY_REGRAS: ControleVeiculosRegras = {
   baseAnoVolks: 'mod',
   diasVencimentoItau: null,
   diasVencimentoVolks: null,
+  diasEstoqueItau: null,
+  diasEstoqueVolks: null,
   taxaJurosItau: null,
   taxaJurosVolks: null,
   considerarProp: false,
