@@ -42,3 +42,28 @@ export async function removeGarantia(banco: GarantiaBanco, id: string): Promise<
   const list = await listGarantia(banco);
   return kvSet(keyFor(banco), list.filter(e => e.id !== id));
 }
+
+// ─── Histórico de movimentação (veículos pagos) ───────────────────────────────
+
+export interface VeiculoHistoricoEntry extends VeiculoGarantiaEntry {
+  /** Data de pagamento (ISO 'YYYY-MM-DD'). */
+  dataPagamento: string;
+}
+
+const historicoKeyFor = (banco: GarantiaBanco) => `estoque-usados-veiculos-historico:${banco}`;
+
+export async function listHistorico(banco: GarantiaBanco): Promise<VeiculoHistoricoEntry[]> {
+  return (await kvGet<VeiculoHistoricoEntry[]>(historicoKeyFor(banco))) ?? [];
+}
+
+export async function addHistorico(banco: GarantiaBanco, entry: VeiculoHistoricoEntry): Promise<boolean> {
+  const list = await listHistorico(banco);
+  const filtered = list.filter(e => e.id !== entry.id);
+  filtered.push(entry);
+  return kvSet(historicoKeyFor(banco), filtered);
+}
+
+export async function removeHistorico(banco: GarantiaBanco, id: string): Promise<boolean> {
+  const list = await listHistorico(banco);
+  return kvSet(historicoKeyFor(banco), list.filter(e => e.id !== id));
+}

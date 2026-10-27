@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { FileSpreadsheet, Upload, Trash2, AlertCircle, ShieldCheck, Plus, History } from 'lucide-react';
+import { FileSpreadsheet, Upload, Trash2, AlertCircle, ShieldCheck, Plus, History, Banknote, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   deleteControleVeiculos,
@@ -23,9 +23,13 @@ import {
   addGarantia,
   listGarantia,
   removeGarantia,
+  addHistorico,
+  listHistorico,
+  removeHistorico,
   GARANTIA_BANCO_LABEL,
   type GarantiaBanco,
   type VeiculoGarantiaEntry,
+  type VeiculoHistoricoEntry,
 } from './veiculosGarantiaStorage';
 import { fmtBRL, parseNum, formatDateBR } from './estoqueUsadosStorage';
 
@@ -554,6 +558,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
   const [entries, setEntries] = useState<VeiculoGarantiaEntry[]>([]);
   const [regras, setRegras] = useState<ControleVeiculosRegras>(EMPTY_REGRAS);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [confirmPayId, setConfirmPayId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -573,6 +578,21 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
       void load();
     } else {
       toast.error('Erro ao remover o veículo.');
+    }
+  }
+
+  async function handlePay(id: string) {
+    setConfirmPayId(null);
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+    const historicoEntry: VeiculoHistoricoEntry = { ...entry, dataPagamento: todayISO() };
+    const okAdd = await addHistorico(banco, historicoEntry);
+    const okRemove = okAdd && await removeGarantia(banco, id);
+    if (okAdd && okRemove) {
+      toast.success('Veículo pago e movido para o Histórico de Movimentação.');
+      void load();
+    } else {
+      toast.error('Erro ao registrar o pagamento.');
     }
   }
 
@@ -645,12 +665,20 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
                     )}
                   </td>
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">
-                    <button
-                      onClick={() => setConfirmRemoveId(entry.id)}
-                      className="inline-flex items-center gap-1 border border-red-300 text-red-600 rounded px-2.5 py-1 font-medium hover:bg-red-50"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />Remover
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setConfirmPayId(entry.id)}
+                        className="inline-flex items-center gap-1 border border-emerald-300 text-emerald-700 rounded px-2.5 py-1 font-medium hover:bg-emerald-50"
+                      >
+                        <Banknote className="w-3.5 h-3.5" />Pagar
+                      </button>
+                      <button
+                        onClick={() => setConfirmRemoveId(entry.id)}
+                        className="inline-flex items-center gap-1 border border-red-300 text-red-600 rounded px-2.5 py-1 font-medium hover:bg-red-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />Remover
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -667,6 +695,141 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => setConfirmRemoveId(null)} className="px-3 py-2 text-sm text-slate-600">Cancelar</button>
               <button onClick={() => void handleRemove(confirmRemoveId)} className="px-3 py-2 text-sm bg-red-600 text-white rounded">Remover</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmPayId && (
+        <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md shadow-xl">
+            <h2 className="font-bold text-slate-800">Registrar pagamento?</h2>
+            <p className="text-sm text-slate-600 mt-2">
+              O veículo será pago com a data de hoje ({formatDateBR(todayISO())}) e movido para o Histórico de Movimentação de {GARANTIA_BANCO_LABEL[banco]}.
+            </p>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setConfirmPayId(null)} className="px-3 py-2 text-sm text-slate-600">Cancelar</button>
+              <button onClick={() => void handlePay(confirmPayId)} className="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded hover:bg-emerald-700">Pagar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
+  const [loading, setLoading] = useState(true);
+  const [entries, setEntries] = useState<VeiculoHistoricoEntry[]>([]);
+  const [regras, setRegras] = useState<ControleVeiculosRegras>(EMPTY_REGRAS);
+  const [confirmEstornoId, setConfirmEstornoId] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    const [list, loadedRegras] = await Promise.all([listHistorico(banco), getRegras()]);
+    setEntries(list);
+    setRegras(loadedRegras);
+    setLoading(false);
+  }
+
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [banco]);
+
+  async function handleEstorno(id: string) {
+    setConfirmEstornoId(null);
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+    const { dataPagamento: _dataPagamento, ...garantiaEntry } = entry;
+    const okAdd = await addGarantia(banco, garantiaEntry);
+    const okRemove = okAdd && await removeHistorico(banco, id);
+    if (okAdd && okRemove) {
+      toast.success('Pagamento estornado. Veículo devolvido à garantia.');
+      void load();
+    } else {
+      toast.error('Erro ao estornar o pagamento.');
+    }
+  }
+
+  const ruleCols = useMemo(() => {
+    if (entries.length === 0) return [];
+    const keys = Object.keys(entries[0].record);
+    const sitKey = keys.find(isSitHeader);
+    const selected = new Set(regras.colunas);
+    return keys.filter(key => key === sitKey || selected.has(key));
+  }, [entries, regras]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 text-slate-400 py-20">
+        <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+        <span className="text-sm">Carregando...</span>
+      </div>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div className="py-16 text-center text-slate-500">
+        <History className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+        Nenhuma movimentação registrada em {GARANTIA_BANCO_LABEL[banco]}.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-slate-500">{entries.length} veículo(s) pago(s).</p>
+      <div className="overflow-auto max-h-[calc(100vh-430px)] border border-slate-200">
+        <table className="min-w-max text-xs border-collapse">
+          <thead>
+            <tr className="bg-sky-50 font-semibold">
+              {ruleCols.map(col => (
+                <th key={col} className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">{col}</th>
+              ))}
+              <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Marca</th>
+              <th className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">Valor da Garantia</th>
+              <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de inclusão</th>
+              <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de vencimento</th>
+              <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de pagamento</th>
+              <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map(entry => {
+              const dias = entry.diasVencimento ?? null;
+              const vencimentoISO = dias != null ? addDaysISO(entry.dataInclusao, dias) : null;
+              return (
+                <tr key={entry.id} className="odd:bg-white even:bg-slate-50">
+                  {ruleCols.map(col => (
+                    <td key={col} className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{entry.record[col] ?? ''}</td>
+                  ))}
+                  <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{BRAND_LABEL[entry.brand]}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(entry.valorGarantia)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{formatDateBR(entry.dataInclusao)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{vencimentoISO ? formatDateBR(vencimentoISO) : '—'}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{formatDateBR(entry.dataPagamento)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">
+                    <button
+                      onClick={() => setConfirmEstornoId(entry.id)}
+                      className="inline-flex items-center gap-1 border border-amber-300 text-amber-700 rounded px-2.5 py-1 font-medium hover:bg-amber-50"
+                    >
+                      <Undo2 className="w-3.5 h-3.5" />Estornar
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {confirmEstornoId && (
+        <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md shadow-xl">
+            <h2 className="font-bold text-slate-800">Estornar pagamento?</h2>
+            <p className="text-sm text-slate-600 mt-2">O veículo voltará para a aba de garantia de {GARANTIA_BANCO_LABEL[banco]}.</p>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setConfirmEstornoId(null)} className="px-3 py-2 text-sm text-slate-600">Cancelar</button>
+              <button onClick={() => void handleEstorno(confirmEstornoId)} className="px-4 py-2 text-sm font-semibold bg-amber-600 text-white rounded hover:bg-amber-700">Estornar</button>
             </div>
           </div>
         </div>
@@ -695,11 +858,7 @@ function HistoricoMovimentacaoPanel() {
         ))}
       </div>
 
-      <div className="flex flex-col items-center justify-center gap-2 text-slate-400 py-20">
-        <History className="w-10 h-10 text-slate-300" />
-        <span className="text-sm font-medium text-slate-500">Histórico de Movimentação — {GARANTIA_BANCO_LABEL[banco]}</span>
-        <span className="text-xs">Em breve.</span>
-      </div>
+      <HistoricoBancoPanel key={banco} banco={banco} />
     </div>
   );
 }
