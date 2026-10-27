@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { FileSpreadsheet, Upload, Trash2, AlertCircle, ShieldCheck, Plus, History, Banknote, Undo2 } from 'lucide-react';
+import { FileSpreadsheet, Upload, Trash2, AlertCircle, ShieldCheck, Plus, History, Banknote, Undo2, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   deleteControleVeiculos,
@@ -84,6 +84,37 @@ const SUB_TABS: { value: SubTab; label: string }[] = [
 ];
 
 const BRAND_LABEL: Record<ControleVeiculosBrand, string> = { vw: 'VW', audi: 'Audi' };
+
+/** Identifica o cabeçalho da coluna "Chassi". */
+function isChassiHeader(value: string): boolean {
+  return value.trim().toLowerCase().replace(/\.+$/, '') === 'chassi';
+}
+
+/** Campo de busca por chassi (reutilizável). */
+function ChassiSearch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-center gap-2 border border-slate-300 rounded px-3 py-1.5 w-full max-w-xs">
+      <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Buscar por chassi..."
+        className="flex-1 min-w-0 text-xs focus:outline-none"
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          className="text-slate-400 hover:text-slate-600 shrink-0"
+          title="Limpar busca"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
 
 function formatCell(value: unknown) {
   if (value === null || value === undefined) return '';
@@ -306,6 +337,7 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
   const [valorStr, setValorStr] = useState('');
   const [dataInclusao, setDataInclusao] = useState(todayISO());
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
 
   async function refreshIncluidos() {
     const [itau, volks] = await Promise.all([listGarantia('itau'), listGarantia('volks')]);
@@ -356,6 +388,19 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
       return wanted.has(sit);
     });
   }, [table, regras]);
+
+  const chassiIndex = useMemo(
+    () => (table ? table.headers.findIndex(isChassiHeader) : -1),
+    [table],
+  );
+
+  const visibleRows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term || chassiIndex < 0) return filteredRows;
+    return filteredRows.filter(row =>
+      String(row[chassiIndex] ?? '').toLowerCase().includes(term),
+    );
+  }, [filteredRows, search, chassiIndex]);
 
   function openIncluir(banco: GarantiaBanco, row: unknown[]) {
     if (!table) return;
@@ -436,9 +481,13 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-slate-500">
-        {filteredRows.length} veículo(s) · situações: {regras.situacoes.join(', ')}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-slate-500">
+          {visibleRows.length} veículo(s)
+          {search.trim() ? ` · filtrados de ${filteredRows.length}` : ''} · situações: {regras.situacoes.join(', ')}
+        </p>
+        {chassiIndex >= 0 && <ChassiSearch value={search} onChange={setSearch} />}
+      </div>
       <div className="overflow-auto max-h-[calc(100vh-430px)] border border-slate-200">
         <table className="min-w-max text-xs border-collapse">
           <thead>
@@ -452,14 +501,16 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
             </tr>
           </thead>
           <tbody>
-            {filteredRows.length === 0 ? (
+            {visibleRows.length === 0 ? (
               <tr>
                 <td colSpan={columnIndices.length + 1} className="border border-slate-200 px-3 py-6 text-center text-slate-400">
-                  Nenhum veículo corresponde às situações cadastradas.
+                  {search.trim()
+                    ? 'Nenhum veículo encontrado para o chassi buscado.'
+                    : 'Nenhum veículo corresponde às situações cadastradas.'}
                 </td>
               </tr>
             ) : (
-              filteredRows.map((row, rowIndex) => {
+              visibleRows.map((row, rowIndex) => {
                 const id = rowIdentity(buildRowRecord(table.headers, row));
                 const incluidoEm = incluidos[id];
                 return (
@@ -768,6 +819,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [confirmPayId, setConfirmPayId] = useState<string | null>(null);
   const [showManual, setShowManual] = useState(false);
+  const [search, setSearch] = useState('');
 
   async function load() {
     setLoading(true);
@@ -816,6 +868,17 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
 
   const taxaJuros = banco === 'itau' ? regras.taxaJurosItau : regras.taxaJurosVolks;
 
+  const chassiKey = useMemo(
+    () => (entries.length > 0 ? Object.keys(entries[0].record).find(isChassiHeader) ?? null : null),
+    [entries],
+  );
+
+  const visibleEntries = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term || !chassiKey) return entries;
+    return entries.filter(e => (e.record[chassiKey] ?? '').toLowerCase().includes(term));
+  }, [entries, search, chassiKey]);
+
   const totais = useMemo(() => {
     let totalValor = 0;
     let totalJuros = 0;
@@ -847,14 +910,17 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
   ) : null;
 
   const header = (
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="text-xs text-slate-500">{entries.length} veículo(s) em garantia.</p>
-      <button
-        onClick={() => setShowManual(true)}
-        className="inline-flex items-center gap-1 border border-sky-300 text-sky-700 rounded px-2.5 py-1 text-xs font-medium hover:bg-sky-50"
-      >
-        <Plus className="w-3.5 h-3.5" />Incluir Garantia
-      </button>
+      <div className="flex items-center gap-2">
+        {entries.length > 0 && chassiKey && <ChassiSearch value={search} onChange={setSearch} />}
+        <button
+          onClick={() => setShowManual(true)}
+          className="inline-flex items-center gap-1 border border-sky-300 text-sky-700 rounded px-2.5 py-1 text-xs font-medium hover:bg-sky-50 shrink-0"
+        >
+          <Plus className="w-3.5 h-3.5" />Incluir Garantia
+        </button>
+      </div>
     </div>
   );
 
@@ -892,7 +958,13 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
             </tr>
           </thead>
           <tbody>
-            {entries.map(entry => {
+            {visibleEntries.length === 0 ? (
+              <tr>
+                <td colSpan={ruleCols.length + 8} className="border border-slate-200 px-3 py-6 text-center text-slate-400">
+                  Nenhum veículo encontrado para o chassi buscado.
+                </td>
+              </tr>
+            ) : visibleEntries.map(entry => {
               const dias = entry.diasVencimento ?? null;
               const vencimentoISO = dias != null ? addDaysISO(entry.dataInclusao, dias) : null;
               const vencido = vencimentoISO != null && todayISO() > vencimentoISO;
@@ -989,6 +1061,7 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
   const [entries, setEntries] = useState<VeiculoHistoricoEntry[]>([]);
   const [regras, setRegras] = useState<ControleVeiculosRegras>(EMPTY_REGRAS);
   const [confirmEstornoId, setConfirmEstornoId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   async function load() {
     setLoading(true);
@@ -1025,6 +1098,17 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
 
   const taxaJuros = banco === 'itau' ? regras.taxaJurosItau : regras.taxaJurosVolks;
 
+  const chassiKey = useMemo(
+    () => (entries.length > 0 ? Object.keys(entries[0].record).find(isChassiHeader) ?? null : null),
+    [entries],
+  );
+
+  const visibleEntries = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term || !chassiKey) return entries;
+    return entries.filter(e => (e.record[chassiKey] ?? '').toLowerCase().includes(term));
+  }, [entries, search, chassiKey]);
+
   const totais = useMemo(() => {
     let totalValor = 0;
     let totalJuros = 0;
@@ -1057,7 +1141,10 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-slate-500">{entries.length} veículo(s) pago(s).</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-slate-500">{entries.length} veículo(s) pago(s).</p>
+        {chassiKey && <ChassiSearch value={search} onChange={setSearch} />}
+      </div>
       <div className="overflow-auto max-h-[calc(100vh-430px)] border border-slate-200">
         <table className="min-w-max text-xs border-collapse">
           <thead>
@@ -1076,7 +1163,13 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
             </tr>
           </thead>
           <tbody>
-            {entries.map(entry => {
+            {visibleEntries.length === 0 ? (
+              <tr>
+                <td colSpan={ruleCols.length + 8} className="border border-slate-200 px-3 py-6 text-center text-slate-400">
+                  Nenhum veículo encontrado para o chassi buscado.
+                </td>
+              </tr>
+            ) : visibleEntries.map(entry => {
               const dias = entry.diasVencimento ?? null;
               const vencimentoISO = dias != null ? addDaysISO(entry.dataInclusao, dias) : null;
               const diasEmGarantia = diffDaysISO(entry.dataInclusao, entry.dataPagamento);
