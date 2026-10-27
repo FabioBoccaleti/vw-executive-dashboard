@@ -65,6 +65,14 @@ export function ControleVeiculosFloorplanPage({ onChangeBrand }: Props) {
         <div className="w-24" />
       </div>
 
+      {/* Título da página */}
+      <div className="bg-white border-b border-slate-200 px-6 py-3">
+        <h1 className="flex items-center gap-2 text-base font-bold text-slate-800">
+          <Car className="w-5 h-5 text-sky-600" />
+          Controle de Veículos FloorPlan
+        </h1>
+      </div>
+
       {/* Conteúdo da aba ativa */}
       <div className="flex-1 flex flex-col min-h-0">
         {activeTab === 'controle' && <ControleVeiculosTab />}
