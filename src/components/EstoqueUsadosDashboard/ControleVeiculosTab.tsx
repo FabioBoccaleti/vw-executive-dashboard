@@ -58,6 +58,17 @@ function addDaysISO(iso: string, days: number): string {
   return `${yy}-${mm}-${dd}`;
 }
 
+/** Diferença em dias entre duas datas ISO 'YYYY-MM-DD' (toISO - fromISO). */
+function diffDaysISO(fromISO: string, toISO: string): number | null {
+  if (!fromISO || !toISO) return null;
+  const [fy, fm, fd] = fromISO.split('-').map(Number);
+  const [ty, tm, td] = toISO.split('-').map(Number);
+  const from = new Date(fy, (fm ?? 1) - 1, fd ?? 1);
+  const to = new Date(ty, (tm ?? 1) - 1, td ?? 1);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return null;
+  return Math.round((to.getTime() - from.getTime()) / 86400000);
+}
+
 type SubTab = 'importar' | 'disponiveis' | 'garantia';
 
 const SUB_TABS: { value: SubTab; label: string }[] = [
@@ -636,6 +647,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Marca</th>
               <th className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">Valor da Garantia</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de inclusão</th>
+              <th className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">Dias em Garantia</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de vencimento</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Status</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Ações</th>
@@ -646,6 +658,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
               const dias = entry.diasVencimento ?? null;
               const vencimentoISO = dias != null ? addDaysISO(entry.dataInclusao, dias) : null;
               const vencido = vencimentoISO != null && todayISO() > vencimentoISO;
+              const diasEmGarantia = diffDaysISO(entry.dataInclusao, todayISO());
               return (
                 <tr key={entry.id} className={vencido ? 'bg-yellow-100' : 'odd:bg-white even:bg-slate-50'}>
                   {ruleCols.map(col => (
@@ -654,6 +667,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{BRAND_LABEL[entry.brand]}</td>
                   <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(entry.valorGarantia)}</td>
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{formatDateBR(entry.dataInclusao)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{diasEmGarantia ?? '—'}</td>
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{vencimentoISO ? formatDateBR(vencimentoISO) : '—'}</td>
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">
                     {vencimentoISO == null ? (
@@ -788,6 +802,7 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Marca</th>
               <th className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">Valor da Garantia</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de inclusão</th>
+              <th className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">Dias em Garantia</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de vencimento</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de pagamento</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Ações</th>
@@ -797,6 +812,7 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
             {entries.map(entry => {
               const dias = entry.diasVencimento ?? null;
               const vencimentoISO = dias != null ? addDaysISO(entry.dataInclusao, dias) : null;
+              const diasEmGarantia = diffDaysISO(entry.dataInclusao, entry.dataPagamento);
               return (
                 <tr key={entry.id} className="odd:bg-white even:bg-slate-50">
                   {ruleCols.map(col => (
@@ -805,6 +821,7 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{BRAND_LABEL[entry.brand]}</td>
                   <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(entry.valorGarantia)}</td>
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{formatDateBR(entry.dataInclusao)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{diasEmGarantia ?? '—'}</td>
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{vencimentoISO ? formatDateBR(vencimentoISO) : '—'}</td>
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{formatDateBR(entry.dataPagamento)}</td>
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">
