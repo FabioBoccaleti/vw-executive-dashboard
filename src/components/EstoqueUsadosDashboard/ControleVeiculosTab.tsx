@@ -570,12 +570,204 @@ const GARANTIA_BANCOS: { value: GarantiaBanco; label: string }[] = [
   { value: 'volks', label: GARANTIA_BANCO_LABEL.volks },
 ];
 
+// ─── Modal: inclusão manual de veículo em garantia ────────────────────────────
+
+interface BrandTableInfo {
+  headers: string[];
+  sitHeader: string | null;
+}
+
+function IncluirGarantiaManualModal({
+  banco, regras, onClose, onSaved,
+}: {
+  banco: GarantiaBanco;
+  regras: ControleVeiculosRegras;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [brand, setBrand] = useState<ControleVeiculosBrand>('vw');
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [valorStr, setValorStr] = useState('');
+  const [dataInclusao, setDataInclusao] = useState(todayISO());
+  const [saving, setSaving] = useState(false);
+  const [infos, setInfos] = useState<Record<ControleVeiculosBrand, BrandTableInfo>>({
+    vw: { headers: [], sitHeader: null },
+    audi: { headers: [], sitHeader: null },
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [vwData, audiData] = await Promise.all([
+        getControleVeiculos('vw'),
+        getControleVeiculos('audi'),
+      ]);
+      if (cancelled) return;
+      const build = (data: Awaited<ReturnType<typeof getControleVeiculos>>): BrandTableInfo => {
+        const table = extractVehicleTable(data);
+        if (!table) return { headers: [], sitHeader: null };
+        return { headers: table.headers, sitHeader: table.headers.find(isSitHeader) ?? null };
+      };
+      setInfos({ vw: build(vwData), audi: build(audiData) });
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Colunas a preencher = Sit + colunas configuradas nas Regras (na ordem do arquivo quando disponível).
+  const columns = useMemo(() => {
+    const info = infos[brand];
+    const selected = new Set(regras.colunas);
+    if (info.headers.length > 0) {
+      return info.headers.filter(h => (info.sitHeader != null && h === info.sitHeader) || selected.has(h));
+    }
+    return ['Sit', ...regras.colunas];
+  }, [infos, brand, regras.colunas]);
+
+  const ano = banco === 'itau' ? regras.anoItau : regras.anoVolks;
+  const base = banco === 'itau' ? regras.baseAnoItau : regras.baseAnoVolks;
+  const baseCol = useMemo(
+    () => columns.find(col => col.toLowerCase().replace(/\.+$/, '') === base) ?? null,
+    [columns, base],
+  );
+
+  async function handleSave() {
+    // Regra de ano mínimo: bloqueia inclusão fora da regra (igual ao fluxo automático).
+    if (ano != null) {
+      if (!baseCol) {
+        toast.error(`A coluna base do ano (${base === 'fab' ? 'Fabricação' : 'Modelo'}) não está disponível. Configure-a nas Regras.`);
+        return;
+      }
+      const year = parseYear(values[baseCol]);
+      if (year == null) {
+        toast.error(`Informe um ano válido em "${baseCol}".`);
+        return;
+      }
+      if (year < ano) {
+        toast.error(`Ano ${year} está abaixo do mínimo (${ano}) para ${GARANTIA_BANCO_LABEL[banco]}.`);
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      const record: Record<string, string> = {};
+      columns.forEach(col => { record[col] = (values[col] ?? '').trim(); });
+      const id = rowIdentity(record);
+      const entry: VeiculoGarantiaEntry = {
+        id,
+        brand,
+        record,
+        valorGarantia: parseNum(valorStr),
+        dataInclusao,
+        diasVencimento: banco === 'itau' ? regras.diasVencimentoItau : regras.diasVencimentoVolks,
+        includedAt: new Date().toISOString(),
+      };
+      const ok = await addGarantia(banco, entry);
+      if (ok) {
+        toast.success(`Veículo incluído manualmente em ${GARANTIA_BANCO_LABEL[banco]}.`);
+        onSaved();
+        onClose();
+      } else {
+        toast.error('Erro ao incluir o veículo.');
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg p-6 max-w-lg w-full shadow-xl max-h-[90vh] overflow-auto">
+        <h2 className="font-bold text-slate-800">Incluir garantia manual em {GARANTIA_BANCO_LABEL[banco]}</h2>
+        <p className="text-sm text-slate-500 mt-1">Preencha os dados do veículo. As mesmas regras da aba são aplicadas.</p>
+
+        <div className="mt-4 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Marca</label>
+            <div className="flex gap-2">
+              {(['vw', 'audi'] as ControleVeiculosBrand[]).map(item => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setBrand(item)}
+                  className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${
+                    brand === item ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {BRAND_LABEL[item]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {columns.map(col => (
+              <div key={col}>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  {col}
+                  {baseCol === col && ano != null && (
+                    <span className="ml-1 font-normal text-slate-400">(mín. {ano})</span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  value={values[col] ?? ''}
+                  onChange={e => setValues(prev => ({ ...prev, [col]: e.target.value }))}
+                  className="w-full text-sm border border-slate-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Valor da Garantia</label>
+              <div className="flex items-center gap-2 border border-slate-300 rounded px-3 py-2">
+                <span className="text-xs text-slate-400">R$</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={valorStr}
+                  onChange={e => setValorStr(e.target.value)}
+                  placeholder="0,00"
+                  className="flex-1 text-sm focus:outline-none"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Data de inclusão</label>
+              <input
+                type="date"
+                value={dataInclusao}
+                onChange={e => setDataInclusao(e.target.value)}
+                className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6">
+          <button onClick={onClose} className="px-3 py-2 text-sm text-slate-600">Cancelar</button>
+          <button
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="px-4 py-2 text-sm font-semibold bg-sky-600 text-white rounded hover:bg-sky-700 disabled:opacity-50"
+          >
+            {saving ? 'Incluindo...' : 'Incluir'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<VeiculoGarantiaEntry[]>([]);
   const [regras, setRegras] = useState<ControleVeiculosRegras>(EMPTY_REGRAS);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [confirmPayId, setConfirmPayId] = useState<string | null>(null);
+  const [showManual, setShowManual] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -633,18 +825,43 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
     );
   }
 
+  const manualModal = showManual ? (
+    <IncluirGarantiaManualModal
+      banco={banco}
+      regras={regras}
+      onClose={() => setShowManual(false)}
+      onSaved={() => void load()}
+    />
+  ) : null;
+
+  const header = (
+    <div className="flex items-center justify-between gap-2">
+      <p className="text-xs text-slate-500">{entries.length} veículo(s) em garantia.</p>
+      <button
+        onClick={() => setShowManual(true)}
+        className="inline-flex items-center gap-1 border border-sky-300 text-sky-700 rounded px-2.5 py-1 text-xs font-medium hover:bg-sky-50"
+      >
+        <Plus className="w-3.5 h-3.5" />Incluir Garantia
+      </button>
+    </div>
+  );
+
   if (entries.length === 0) {
     return (
-      <div className="py-16 text-center text-slate-500">
-        <ShieldCheck className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-        Nenhum veículo incluído em {GARANTIA_BANCO_LABEL[banco]}.
+      <div className="space-y-3">
+        {header}
+        <div className="py-16 text-center text-slate-500">
+          <ShieldCheck className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+          Nenhum veículo incluído em {GARANTIA_BANCO_LABEL[banco]}.
+        </div>
+        {manualModal}
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-slate-500">{entries.length} veículo(s) em garantia.</p>
+      {header}
       <div className="overflow-auto max-h-[calc(100vh-430px)] border border-slate-200">
         <table className="min-w-max text-xs border-collapse">
           <thead>
@@ -739,6 +956,8 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
           </div>
         </div>
       )}
+
+      {manualModal}
     </div>
   );
 }
