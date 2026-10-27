@@ -122,6 +122,14 @@ export function RegrasTab() {
     );
   }
 
+  function setConsiderarProp(value: boolean) {
+    setRegrasState(prev => ({ ...prev, considerarProp: value }));
+  }
+
+  function setConsiderarDisp(value: boolean) {
+    setRegrasState(prev => ({ ...prev, considerarDisp: value }));
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -311,6 +319,47 @@ export function RegrasTab() {
             ) : (
               <p className="text-xs text-slate-400 mt-3">Nenhuma situação cadastrada.</p>
             )}
+          </section>
+
+          <div className="border-t border-slate-100" />
+
+          {/* Regra de negociação (Prop/Disp) — vale para ambos os bancos */}
+          <section>
+            <h3 className="text-sm font-bold text-slate-700">Veículos em negociação (Prop / Disp)</h3>
+            <p className="text-xs text-slate-500 mt-0.5 mb-3">
+              Aplicável a ambos os bancos. Quando marcada como “Sim”, veículos com valor “Sim” na coluna correspondente
+              ficam indisponíveis para inclusão em garantia e exibem a mensagem “Veículo em negociação”. Cada coluna é independente.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {([
+                { key: 'prop', label: 'Considerar coluna "Prop"', value: regras.considerarProp, onChange: setConsiderarProp },
+                { key: 'disp', label: 'Considerar coluna "Disp"', value: regras.considerarDisp, onChange: setConsiderarDisp },
+              ] as const).map(({ key, label, value, onChange }) => (
+                <div key={key} className="flex items-center justify-between border border-slate-200 rounded px-3 py-2.5">
+                  <span className="text-sm text-slate-700">{label}</span>
+                  <div className="inline-flex rounded border border-slate-300 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => onChange(true)}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        value ? 'bg-sky-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Sim
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onChange(false)}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        !value ? 'bg-sky-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      Não
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
 
           <div className="border-t border-slate-100" />

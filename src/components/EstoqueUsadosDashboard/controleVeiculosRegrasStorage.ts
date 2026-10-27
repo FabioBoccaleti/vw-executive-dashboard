@@ -23,6 +23,10 @@ export interface ControleVeiculosRegras {
   taxaJurosItau: number | null;
   /** Taxa de juros praticada (%) — Banco Volks. */
   taxaJurosVolks: number | null;
+  /** Considerar a coluna "Prop" como regra: veículo com Prop = "Sim" fica em negociação (bloqueado). Vale para ambos os bancos. */
+  considerarProp: boolean;
+  /** Considerar a coluna "Disp" como regra: veículo com Disp = "Sim" fica em negociação (bloqueado). Vale para ambos os bancos. */
+  considerarDisp: boolean;
 }
 
 const KEY = 'estoque-usados-controle-veiculos-regras';
@@ -38,6 +42,8 @@ export const EMPTY_REGRAS: ControleVeiculosRegras = {
   diasVencimentoVolks: null,
   taxaJurosItau: null,
   taxaJurosVolks: null,
+  considerarProp: false,
+  considerarDisp: false,
 };
 
 export async function getRegras(): Promise<ControleVeiculosRegras> {

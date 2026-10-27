@@ -90,6 +90,11 @@ function isChassiHeader(value: string): boolean {
   return value.trim().toLowerCase().replace(/\.+$/, '') === 'chassi';
 }
 
+/** Compara um cabeçalho (ignorando caixa e pontuação final) a um nome base. */
+function headerMatches(header: string, name: string): boolean {
+  return header.trim().toLowerCase().replace(/\.+$/, '') === name;
+}
+
 /** Campo de busca por chassi (reutilizável). */
 function ChassiSearch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
@@ -394,6 +399,23 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
     [table],
   );
 
+  const propIndex = useMemo(
+    () => (table ? table.headers.findIndex(h => headerMatches(h, 'prop')) : -1),
+    [table],
+  );
+  const dispIndex = useMemo(
+    () => (table ? table.headers.findIndex(h => headerMatches(h, 'disp')) : -1),
+    [table],
+  );
+
+  // Regra de negociação (Prop/Disp): bloqueia inclusão quando a coluna considerada vale "Sim".
+  function emNegociacao(row: unknown[]): boolean {
+    const isSim = (idx: number) => idx >= 0 && String(row[idx] ?? '').trim().toLowerCase() === 'sim';
+    if (regras.considerarProp && isSim(propIndex)) return true;
+    if (regras.considerarDisp && isSim(dispIndex)) return true;
+    return false;
+  }
+
   const visibleRows = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term || chassiIndex < 0) return filteredRows;
@@ -525,6 +547,11 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
                         <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
                           <ShieldCheck className="w-3.5 h-3.5" />
                           Já incluído ({GARANTIA_BANCO_LABEL[incluidoEm]})
+                        </span>
+                      ) : emNegociacao(row) ? (
+                        <span className="inline-flex items-center gap-1 text-amber-700 font-medium">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          Veículo em negociação
                         </span>
                       ) : (
                         <div className="flex items-center gap-2">
