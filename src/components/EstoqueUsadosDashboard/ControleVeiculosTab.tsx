@@ -69,6 +69,12 @@ function diffDaysISO(fromISO: string, toISO: string): number | null {
   return Math.round((to.getTime() - from.getTime()) / 86400000);
 }
 
+/** Estimativa de juros simples: valor × (taxa%/100) × (dias/30). */
+function estimativaJuros(valor: number, taxaPct: number | null, dias: number | null): number | null {
+  if (taxaPct == null || dias == null) return null;
+  return valor * (taxaPct / 100) * (dias / 30);
+}
+
 type SubTab = 'importar' | 'disponiveis' | 'garantia';
 
 const SUB_TABS: { value: SubTab; label: string }[] = [
@@ -616,6 +622,8 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
     return keys.filter(key => key === sitKey || selected.has(key));
   }, [entries, regras]);
 
+  const taxaJuros = banco === 'itau' ? regras.taxaJurosItau : regras.taxaJurosVolks;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 text-slate-400 py-20">
@@ -646,6 +654,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
               ))}
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Marca</th>
               <th className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">Valor da Garantia</th>
+              <th className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">Estimativa de Juros</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de inclusão</th>
               <th className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">Dias em Garantia</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de vencimento</th>
@@ -659,6 +668,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
               const vencimentoISO = dias != null ? addDaysISO(entry.dataInclusao, dias) : null;
               const vencido = vencimentoISO != null && todayISO() > vencimentoISO;
               const diasEmGarantia = diffDaysISO(entry.dataInclusao, todayISO());
+              const juros = estimativaJuros(entry.valorGarantia, taxaJuros, diasEmGarantia);
               return (
                 <tr key={entry.id} className={vencido ? 'bg-yellow-100' : 'odd:bg-white even:bg-slate-50'}>
                   {ruleCols.map(col => (
@@ -666,6 +676,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
                   ))}
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{BRAND_LABEL[entry.brand]}</td>
                   <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(entry.valorGarantia)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{juros != null ? `R$ ${fmtBRL(juros)}` : '—'}</td>
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{formatDateBR(entry.dataInclusao)}</td>
                   <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{diasEmGarantia ?? '—'}</td>
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{vencimentoISO ? formatDateBR(vencimentoISO) : '—'}</td>
@@ -771,6 +782,8 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
     return keys.filter(key => key === sitKey || selected.has(key));
   }, [entries, regras]);
 
+  const taxaJuros = banco === 'itau' ? regras.taxaJurosItau : regras.taxaJurosVolks;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 text-slate-400 py-20">
@@ -801,6 +814,7 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
               ))}
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Marca</th>
               <th className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">Valor da Garantia</th>
+              <th className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">Estimativa de Juros</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de inclusão</th>
               <th className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">Dias em Garantia</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de vencimento</th>
@@ -813,6 +827,7 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
               const dias = entry.diasVencimento ?? null;
               const vencimentoISO = dias != null ? addDaysISO(entry.dataInclusao, dias) : null;
               const diasEmGarantia = diffDaysISO(entry.dataInclusao, entry.dataPagamento);
+              const juros = estimativaJuros(entry.valorGarantia, taxaJuros, diasEmGarantia);
               return (
                 <tr key={entry.id} className="odd:bg-white even:bg-slate-50">
                   {ruleCols.map(col => (
@@ -820,6 +835,7 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
                   ))}
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{BRAND_LABEL[entry.brand]}</td>
                   <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(entry.valorGarantia)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{juros != null ? `R$ ${fmtBRL(juros)}` : '—'}</td>
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{formatDateBR(entry.dataInclusao)}</td>
                   <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{diasEmGarantia ?? '—'}</td>
                   <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{vencimentoISO ? formatDateBR(vencimentoISO) : '—'}</td>

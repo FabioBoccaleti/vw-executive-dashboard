@@ -12,6 +12,7 @@ import {
   type ControleVeiculosRegras,
   type BaseAnoColuna,
 } from './controleVeiculosRegrasStorage';
+import { parseNum } from './estoqueUsadosStorage';
 
 type Banco = 'itau' | 'volks';
 
@@ -32,6 +33,8 @@ export function RegrasTab() {
   const [regras, setRegrasState] = useState<ControleVeiculosRegras>(EMPTY_REGRAS);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   const [novaSituacao, setNovaSituacao] = useState('');
+  // Texto editável do campo de taxa (preserva vírgula/decimais enquanto digita).
+  const [taxaInput, setTaxaInput] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +67,13 @@ export function RegrasTab() {
   const anoValue = banco === 'itau' ? regras.anoItau : regras.anoVolks;
   const baseValue = banco === 'itau' ? regras.baseAnoItau : regras.baseAnoVolks;
   const diasVencimentoValue = banco === 'itau' ? regras.diasVencimentoItau : regras.diasVencimentoVolks;
+  const taxaJurosValue = banco === 'itau' ? regras.taxaJurosItau : regras.taxaJurosVolks;
+
+  // Sincroniza o texto da taxa ao trocar de banco ou após carregar (sem reformatar durante a digitação).
+  useEffect(() => {
+    setTaxaInput(taxaJurosValue != null ? String(taxaJurosValue).replace('.', ',') : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [banco, loading]);
 
   function setAno(value: number | null) {
     setRegrasState(prev =>
@@ -80,6 +90,12 @@ export function RegrasTab() {
   function setDiasVencimento(value: number | null) {
     setRegrasState(prev =>
       banco === 'itau' ? { ...prev, diasVencimentoItau: value } : { ...prev, diasVencimentoVolks: value },
+    );
+  }
+
+  function setTaxaJuros(value: number | null) {
+    setRegrasState(prev =>
+      banco === 'itau' ? { ...prev, taxaJurosItau: value } : { ...prev, taxaJurosVolks: value },
     );
   }
 
@@ -226,6 +242,35 @@ export function RegrasTab() {
               }}
               className="w-40 border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200"
             />
+          </section>
+
+          <div className="border-t border-slate-100" />
+
+          {/* Taxa de juros (por banco) */}
+          <section>
+            <div className="flex items-center gap-2 mb-1">
+              <Landmark className="w-4 h-4 text-slate-500" />
+              <h3 className="text-sm font-bold text-slate-700">Taxa de Juros — {bancoLabel}</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">
+              Taxa de juros praticada pelo banco. (Ex.: 1,75%)
+            </p>
+            <div className="flex items-center gap-2 w-40 border border-slate-300 rounded px-3 py-2 focus-within:ring-2 focus-within:ring-sky-200">
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="Ex.: 1,75"
+                value={taxaInput}
+                onChange={e => {
+                  const raw = e.target.value;
+                  setTaxaInput(raw);
+                  const trimmed = raw.trim();
+                  setTaxaJuros(trimmed === '' ? null : parseNum(trimmed));
+                }}
+                className="flex-1 text-sm focus:outline-none"
+              />
+              <span className="text-xs text-slate-400">%</span>
+            </div>
           </section>
 
           <div className="border-t border-slate-100" />
