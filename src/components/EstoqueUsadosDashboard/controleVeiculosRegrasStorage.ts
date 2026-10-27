@@ -15,6 +15,10 @@ export interface ControleVeiculosRegras {
   baseAnoItau: BaseAnoColuna;
   /** Coluna base para o ano — Banco Volks (Fabricação ou Modelo). */
   baseAnoVolks: BaseAnoColuna;
+  /** Dias de vencimento — Banco Itau. */
+  diasVencimentoItau: number | null;
+  /** Dias de vencimento — Banco Volks. */
+  diasVencimentoVolks: number | null;
 }
 
 const KEY = 'estoque-usados-controle-veiculos-regras';
@@ -26,6 +30,8 @@ export const EMPTY_REGRAS: ControleVeiculosRegras = {
   anoVolks: null,
   baseAnoItau: 'mod',
   baseAnoVolks: 'mod',
+  diasVencimentoItau: null,
+  diasVencimentoVolks: null,
 };
 
 export async function getRegras(): Promise<ControleVeiculosRegras> {

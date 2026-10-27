@@ -63,6 +63,7 @@ export function RegrasTab() {
 
   const anoValue = banco === 'itau' ? regras.anoItau : regras.anoVolks;
   const baseValue = banco === 'itau' ? regras.baseAnoItau : regras.baseAnoVolks;
+  const diasVencimentoValue = banco === 'itau' ? regras.diasVencimentoItau : regras.diasVencimentoVolks;
 
   function setAno(value: number | null) {
     setRegrasState(prev =>
@@ -73,6 +74,12 @@ export function RegrasTab() {
   function setBase(value: BaseAnoColuna) {
     setRegrasState(prev =>
       banco === 'itau' ? { ...prev, baseAnoItau: value } : { ...prev, baseAnoVolks: value },
+    );
+  }
+
+  function setDiasVencimento(value: number | null) {
+    setRegrasState(prev =>
+      banco === 'itau' ? { ...prev, diasVencimentoItau: value } : { ...prev, diasVencimentoVolks: value },
     );
   }
 
@@ -194,6 +201,31 @@ export function RegrasTab() {
                 </div>
               </div>
             </div>
+          </section>
+
+          <div className="border-t border-slate-100" />
+
+          {/* Dias de vencimento (por banco) */}
+          <section>
+            <div className="flex items-center gap-2 mb-1">
+              <Landmark className="w-4 h-4 text-slate-500" />
+              <h3 className="text-sm font-bold text-slate-700">Dias de Vencimento — {bancoLabel}</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">
+              Quantidade de dias de vencimento. (Esta regra será utilizada posteriormente.)
+            </p>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              placeholder="Ex.: 90"
+              value={diasVencimentoValue ?? ''}
+              onChange={e => {
+                const raw = e.target.value.trim();
+                setDiasVencimento(raw === '' ? null : Number(raw));
+              }}
+              className="w-40 border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200"
+            />
           </section>
 
           <div className="border-t border-slate-100" />

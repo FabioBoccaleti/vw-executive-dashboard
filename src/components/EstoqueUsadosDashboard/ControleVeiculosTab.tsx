@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { FileSpreadsheet, Upload, Trash2, AlertCircle, ShieldCheck, Plus } from 'lucide-react';
+import { FileSpreadsheet, Upload, Trash2, AlertCircle, ShieldCheck, Plus, History } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   deleteControleVeiculos,
@@ -41,6 +41,17 @@ function parseYear(value: unknown): number | null {
   if (digits.length < 4) return null;
   const n = parseInt(digits.slice(0, 4), 10);
   return Number.isFinite(n) ? n : null;
+}
+
+/** Soma dias a uma data ISO 'YYYY-MM-DD' e retorna outra data ISO. */
+function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+  dt.setDate(dt.getDate() + days);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
 }
 
 type SubTab = 'importar' | 'disponiveis' | 'garantia';
@@ -359,6 +370,7 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
         record: target.record,
         valorGarantia: parseNum(valorStr),
         dataInclusao,
+        diasVencimento: target.banco === 'itau' ? regras.diasVencimentoItau : regras.diasVencimentoVolks,
         includedAt: new Date().toISOString(),
       };
       const ok = await addGarantia(target.banco, entry);
@@ -604,28 +616,45 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Marca</th>
               <th className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">Valor da Garantia</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de inclusão</th>
+              <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Data de vencimento</th>
+              <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Status</th>
               <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {entries.map(entry => (
-              <tr key={entry.id} className="odd:bg-white even:bg-slate-50">
-                {ruleCols.map(col => (
-                  <td key={col} className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{entry.record[col] ?? ''}</td>
-                ))}
-                <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{BRAND_LABEL[entry.brand]}</td>
-                <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(entry.valorGarantia)}</td>
-                <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{formatDateBR(entry.dataInclusao)}</td>
-                <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">
-                  <button
-                    onClick={() => setConfirmRemoveId(entry.id)}
-                    className="inline-flex items-center gap-1 border border-red-300 text-red-600 rounded px-2.5 py-1 font-medium hover:bg-red-50"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />Remover
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {entries.map(entry => {
+              const dias = entry.diasVencimento ?? null;
+              const vencimentoISO = dias != null ? addDaysISO(entry.dataInclusao, dias) : null;
+              const vencido = vencimentoISO != null && todayISO() > vencimentoISO;
+              return (
+                <tr key={entry.id} className={vencido ? 'bg-yellow-100' : 'odd:bg-white even:bg-slate-50'}>
+                  {ruleCols.map(col => (
+                    <td key={col} className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{entry.record[col] ?? ''}</td>
+                  ))}
+                  <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{BRAND_LABEL[entry.brand]}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(entry.valorGarantia)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{formatDateBR(entry.dataInclusao)}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{vencimentoISO ? formatDateBR(vencimentoISO) : '—'}</td>
+                  <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">
+                    {vencimentoISO == null ? (
+                      <span className="text-slate-400">—</span>
+                    ) : vencido ? (
+                      <span className="inline-flex items-center rounded-full bg-amber-200 text-amber-800 px-2 py-0.5 font-semibold">Vencido</span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 font-semibold">A vencer</span>
+                    )}
+                  </td>
+                  <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">
+                    <button
+                      onClick={() => setConfirmRemoveId(entry.id)}
+                      className="inline-flex items-center gap-1 border border-red-300 text-red-600 rounded px-2.5 py-1 font-medium hover:bg-red-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />Remover
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -646,19 +675,19 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
   );
 }
 
-function GarantiaPanel() {
-  const [banco, setBanco] = useState<GarantiaBanco>('itau');
+function HistoricoMovimentacaoPanel() {
+  const [banco, setBanco] = useState<GarantiaBanco>('volks');
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Sub-abas por banco */}
-      <div className="flex border-b border-slate-200">
-        {GARANTIA_BANCOS.map(({ value, label }) => (
+      <div className="flex gap-2">
+        {([['volks', GARANTIA_BANCO_LABEL.volks], ['itau', GARANTIA_BANCO_LABEL.itau]] as [GarantiaBanco, string][]).map(([value, label]) => (
           <button
             key={value}
             onClick={() => setBanco(value)}
-            className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
-              banco === value ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+            className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${
+              banco === value ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             {label}
@@ -666,7 +695,46 @@ function GarantiaPanel() {
         ))}
       </div>
 
-      <GarantiaBancoPanel key={banco} banco={banco} />
+      <div className="flex flex-col items-center justify-center gap-2 text-slate-400 py-20">
+        <History className="w-10 h-10 text-slate-300" />
+        <span className="text-sm font-medium text-slate-500">Histórico de Movimentação — {GARANTIA_BANCO_LABEL[banco]}</span>
+        <span className="text-xs">Em breve.</span>
+      </div>
+    </div>
+  );
+}
+
+function GarantiaPanel() {
+  const [view, setView] = useState<GarantiaBanco | 'historico'>('itau');
+
+  return (
+    <div className="space-y-5">
+      {/* Abas: Banco Itau / Banco Volks / Histórico de Movimentação */}
+      <div className="flex border-b border-slate-200">
+        {GARANTIA_BANCOS.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => setView(value)}
+            className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+              view === value ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          onClick={() => setView('historico')}
+          className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+            view === 'historico' ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Histórico de Movimentação
+        </button>
+      </div>
+
+      {view === 'historico'
+        ? <HistoricoMovimentacaoPanel />
+        : <GarantiaBancoPanel key={view} banco={view} />}
     </div>
   );
 }

@@ -19,6 +19,8 @@ export interface VeiculoGarantiaEntry {
   valorGarantia: number;
   /** Data de inclusão (ISO 'YYYY-MM-DD'). */
   dataInclusao: string;
+  /** Dias de vencimento vigentes no momento da inclusão (congelado). */
+  diasVencimento?: number | null;
   /** Momento em que foi incluído (timestamp ISO). */
   includedAt: string;
 }
