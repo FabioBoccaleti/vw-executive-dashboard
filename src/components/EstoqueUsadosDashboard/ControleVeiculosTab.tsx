@@ -816,6 +816,18 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
 
   const taxaJuros = banco === 'itau' ? regras.taxaJurosItau : regras.taxaJurosVolks;
 
+  const totais = useMemo(() => {
+    let totalValor = 0;
+    let totalJuros = 0;
+    entries.forEach(entry => {
+      totalValor += entry.valorGarantia;
+      const diasEmGarantia = diffDaysISO(entry.dataInclusao, todayISO());
+      const juros = estimativaJuros(entry.valorGarantia, taxaJuros, diasEmGarantia);
+      if (juros != null) totalJuros += juros;
+    });
+    return { totalValor, totalJuros };
+  }, [entries, taxaJuros]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 text-slate-400 py-20">
@@ -926,6 +938,16 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
               );
             })}
           </tbody>
+          <tfoot>
+            <tr className="bg-sky-100 font-semibold text-slate-700">
+              <td colSpan={ruleCols.length + 1} className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">
+                Total ({entries.length} veículo{entries.length === 1 ? '' : 's'})
+              </td>
+              <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(totais.totalValor)}</td>
+              <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(totais.totalJuros)}</td>
+              <td className="border border-slate-200 px-3 py-1.5" colSpan={5}></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 
@@ -1003,6 +1025,18 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
 
   const taxaJuros = banco === 'itau' ? regras.taxaJurosItau : regras.taxaJurosVolks;
 
+  const totais = useMemo(() => {
+    let totalValor = 0;
+    let totalJuros = 0;
+    entries.forEach(entry => {
+      totalValor += entry.valorGarantia;
+      const diasEmGarantia = diffDaysISO(entry.dataInclusao, entry.dataPagamento);
+      const juros = estimativaJuros(entry.valorGarantia, taxaJuros, diasEmGarantia);
+      if (juros != null) totalJuros += juros;
+    });
+    return { totalValor, totalJuros };
+  }, [entries, taxaJuros]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 text-slate-400 py-20">
@@ -1071,6 +1105,16 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
               );
             })}
           </tbody>
+          <tfoot>
+            <tr className="bg-sky-100 font-semibold text-slate-700">
+              <td colSpan={ruleCols.length + 1} className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">
+                Total ({entries.length} veículo{entries.length === 1 ? '' : 's'})
+              </td>
+              <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(totais.totalValor)}</td>
+              <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(totais.totalJuros)}</td>
+              <td className="border border-slate-200 px-3 py-1.5" colSpan={5}></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 
