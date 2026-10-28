@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Wrench } from 'lucide-react';
+import { EstoquePecasDashboard } from '@/components/EstoquePecasDashboard/EstoquePecasDashboard';
 
 interface Props {
   onChangeBrand: () => void;
@@ -26,29 +27,10 @@ export function AnaliseEstoquePecasPage({ onChangeBrand }: Props) {
   if (subPage !== 'selection') {
     const card = SUB_CARDS.find((c) => c.id === subPage)!;
     return (
-      <div className="min-h-screen bg-slate-100 flex flex-col">
-        <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
-          <div>
-            <h1 className="text-lg font-bold text-slate-800">{card.name}</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Análise de Estoque de Peças</p>
-          </div>
-          <button
-            onClick={() => setSubPage('selection')}
-            className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
-          >
-            ← Voltar
-          </button>
-        </header>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center space-y-3">
-            <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center mx-auto">
-              <Wrench className="w-8 h-8 text-slate-500" />
-            </div>
-            <p className="text-lg font-semibold text-slate-700">Em desenvolvimento</p>
-            <p className="text-sm text-slate-400">Este módulo estará disponível em breve.</p>
-          </div>
-        </div>
-      </div>
+      <EstoquePecasDashboard
+        marca={{ id: card.id, name: card.name, primary: card.primary, primaryLight: card.primaryLight }}
+        onBack={() => setSubPage('selection')}
+      />
     );
   }
 
