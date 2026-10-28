@@ -2,8 +2,8 @@ import { kvGet, kvSet } from '@/lib/kvClient';
 
 export type EstoquePecasMarcaId = 'audi' | 'vw';
 
-/** Dados de um inventário importado, de um mês específico, por marca. */
-export interface InventarioImport {
+/** Dados de uma tabela importada (inventário ou movimentação), por marca e mês. */
+export interface ImportedTable {
   marca: EstoquePecasMarcaId;
   /** Mês de referência no formato 'YYYY-MM' */
   month: string;
@@ -17,10 +17,20 @@ export interface InventarioImport {
   rows: string[][];
 }
 
+/** Alias para a importação de inventário. */
+export type InventarioImport = ImportedTable;
+/** Alias para a importação de movimentação de itens. */
+export type MovimentacaoImport = ImportedTable;
+
 const INVENTARIO_PREFIX = 'estoque_pecas:inventario:';
+const MOVIMENTACAO_PREFIX = 'estoque_pecas:movimentacao:';
 
 function inventarioKey(marca: EstoquePecasMarcaId, month: string): string {
   return `${INVENTARIO_PREFIX}${marca}:${month}`;
+}
+
+function movimentacaoKey(marca: EstoquePecasMarcaId, month: string): string {
+  return `${MOVIMENTACAO_PREFIX}${marca}:${month}`;
 }
 
 export async function saveInventario(data: InventarioImport): Promise<boolean> {
@@ -32,6 +42,17 @@ export async function getInventario(
   month: string,
 ): Promise<InventarioImport | null> {
   return kvGet<InventarioImport>(inventarioKey(marca, month));
+}
+
+export async function saveMovimentacao(data: MovimentacaoImport): Promise<boolean> {
+  return kvSet(movimentacaoKey(data.marca, data.month), data);
+}
+
+export async function getMovimentacao(
+  marca: EstoquePecasMarcaId,
+  month: string,
+): Promise<MovimentacaoImport | null> {
+  return kvGet<MovimentacaoImport>(movimentacaoKey(marca, month));
 }
 
 /**
