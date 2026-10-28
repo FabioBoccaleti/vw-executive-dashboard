@@ -34,7 +34,8 @@ import {
   type VeiculoHistoricoEntry,
 } from './veiculosGarantiaStorage';
 import { fmtBRL, parseNum, formatDateBR } from './estoqueUsadosStorage';
-import { todayISO, addDaysISO, diffDaysISO, estimativaJuros } from './controleVeiculosCalc';
+import { todayISO, addDaysISO, diffDaysISO, estimativaJuros, computeSaldoItau, computeSaldoVolksPorDN, type SaldoInfo } from './controleVeiculosCalc';
+import { getLimites, EMPTY_LIMITES, type ControleVeiculosLimites } from './controleVeiculosLimitesStorage';
 
 /** Extrai um ano (4 dígitos) de uma célula como 2013, "2.013", "2013" etc. */
 function parseYear(value: unknown): number | null {
@@ -126,6 +127,64 @@ function DNSelect({
       <option value="" disabled>— Selecione —</option>
       {opts.map(dn => <option key={dn} value={dn}>{dn}</option>)}
     </select>
+  );
+}
+
+/** Pill compacto que mostra apenas o Saldo Disponível de uma linha de crédito. */
+function SaldoBadge({ label, info }: { label: string; info: SaldoInfo }) {
+  const semLimite = info.limite == null;
+  const negativo = !semLimite && info.saldo < 0;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs whitespace-nowrap"
+      title={semLimite ? 'Limite não cadastrado no Cadastro de Limites' : 'Saldo disponível'}
+    >
+      <span className="text-slate-500">{label}</span>
+      {semLimite ? (
+        <span className="text-slate-400">sem limite</span>
+      ) : (
+        <span className={`font-semibold ${negativo ? 'text-red-600' : 'text-emerald-700'}`}>R$ {fmtBRL(info.saldo)}</span>
+      )}
+    </span>
+  );
+}
+
+/** Faixa com os saldos disponíveis (Itaú único; Volks por DN). */
+function LimitesStrip({
+  limites, regras, garantiaItau, garantiaVolks, bancos,
+}: {
+  limites: ControleVeiculosLimites;
+  regras: ControleVeiculosRegras;
+  garantiaItau: VeiculoGarantiaEntry[];
+  garantiaVolks: VeiculoGarantiaEntry[];
+  bancos: GarantiaBanco[];
+}) {
+  const itau = useMemo(() => computeSaldoItau(limites, garantiaItau, regras), [limites, garantiaItau, regras]);
+  const volks = useMemo(() => computeSaldoVolksPorDN(limites, garantiaVolks, regras), [limites, garantiaVolks, regras]);
+
+  const showItau = bancos.includes('itau');
+  const showVolks = bancos.includes('volks');
+  if (!showItau && !showVolks) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+      {showItau && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-semibold text-slate-600">Banco Itaú:</span>
+          <SaldoBadge label="Saldo" info={itau} />
+        </div>
+      )}
+      {showVolks && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-semibold text-slate-600">Banco Volks:</span>
+          {volks.length === 0 ? (
+            <span className="text-xs text-slate-400">nenhum DN cadastrado</span>
+          ) : (
+            volks.map(row => <SaldoBadge key={row.dn} label={`DN ${row.dn}`} info={row} />)
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -345,24 +404,31 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
   const [dnStr, setDnStr] = useState('');
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [limites, setLimites] = useState<ControleVeiculosLimites>(EMPTY_LIMITES);
+  const [garantiaItau, setGarantiaItau] = useState<VeiculoGarantiaEntry[]>([]);
+  const [garantiaVolks, setGarantiaVolks] = useState<VeiculoGarantiaEntry[]>([]);
 
   async function refreshIncluidos() {
-    const [itau, volks] = await Promise.all([listGarantia('itau'), listGarantia('volks')]);
+    const [itau, volks, loadedLimites] = await Promise.all([listGarantia('itau'), listGarantia('volks'), getLimites()]);
     const map: Record<string, GarantiaBanco> = {};
     itau.forEach(e => { map[e.id] = 'itau'; });
     volks.forEach(e => { map[e.id] = 'volks'; });
     setIncluidos(map);
+    setGarantiaItau(itau);
+    setGarantiaVolks(volks);
+    setLimites(loadedLimites);
   }
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const [data, loadedRegras, itau, volks] = await Promise.all([
+      const [data, loadedRegras, itau, volks, loadedLimites] = await Promise.all([
         getControleVeiculos(brand),
         getRegras(),
         listGarantia('itau'),
         listGarantia('volks'),
+        getLimites(),
       ]);
       if (cancelled) return;
       setTable(extractVehicleTable(data));
@@ -371,6 +437,9 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
       itau.forEach(e => { map[e.id] = 'itau'; });
       volks.forEach(e => { map[e.id] = 'volks'; });
       setIncluidos(map);
+      setGarantiaItau(itau);
+      setGarantiaVolks(volks);
+      setLimites(loadedLimites);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -530,6 +599,13 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
 
   return (
     <div className="space-y-3">
+      <LimitesStrip
+        limites={limites}
+        regras={regras}
+        garantiaItau={garantiaItau}
+        garantiaVolks={garantiaVolks}
+        bancos={['itau', 'volks']}
+      />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-slate-500">
           {visibleRows.length} veículo(s)
@@ -919,6 +995,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<VeiculoGarantiaEntry[]>([]);
   const [regras, setRegras] = useState<ControleVeiculosRegras>(EMPTY_REGRAS);
+  const [limites, setLimites] = useState<ControleVeiculosLimites>(EMPTY_LIMITES);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [confirmPayId, setConfirmPayId] = useState<string | null>(null);
   const [showManual, setShowManual] = useState(false);
@@ -926,9 +1003,10 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
 
   async function load() {
     setLoading(true);
-    const [list, loadedRegras] = await Promise.all([listGarantia(banco), getRegras()]);
+    const [list, loadedRegras, loadedLimites] = await Promise.all([listGarantia(banco), getRegras(), getLimites()]);
     setEntries(list);
     setRegras(loadedRegras);
+    setLimites(loadedLimites);
     setLoading(false);
   }
 
@@ -1039,10 +1117,21 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
     </div>
   );
 
+  const limitesStrip = (
+    <LimitesStrip
+      limites={limites}
+      regras={regras}
+      garantiaItau={banco === 'itau' ? entries : []}
+      garantiaVolks={banco === 'volks' ? entries : []}
+      bancos={[banco]}
+    />
+  );
+
   if (entries.length === 0) {
     return (
       <div className="space-y-3">
         {header}
+        {limitesStrip}
         <div className="py-16 text-center text-slate-500">
           <ShieldCheck className="w-10 h-10 mx-auto mb-2 text-slate-300" />
           Nenhum veículo incluído em {GARANTIA_BANCO_LABEL[banco]}.
@@ -1055,6 +1144,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
   return (
     <div className="space-y-3">
       {header}
+      {limitesStrip}
       <div className="overflow-auto max-h-[calc(100vh-430px)] border border-slate-200">
         <table className="min-w-max text-xs border-collapse">
           <thead>

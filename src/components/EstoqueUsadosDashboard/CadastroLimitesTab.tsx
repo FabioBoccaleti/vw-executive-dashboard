@@ -16,25 +16,7 @@ import {
   type VeiculoGarantiaEntry,
 } from './veiculosGarantiaStorage';
 import { fmtBRL, parseNum } from './estoqueUsadosStorage';
-import { todayISO, diffDaysISO, estimativaJuros } from './controleVeiculosCalc';
-
-/** Soma o valor de garantia e a provisão de juros de uma lista de veículos. */
-function somarTotais(entries: VeiculoGarantiaEntry[], taxaPct: number | null): { utilizado: number; juros: number } {
-  let utilizado = 0;
-  let juros = 0;
-  entries.forEach(entry => {
-    utilizado += entry.valorGarantia;
-    const dias = diffDaysISO(entry.dataInclusao, todayISO());
-    const j = estimativaJuros(entry.valorGarantia, taxaPct, dias);
-    if (j != null) juros += j;
-  });
-  return { utilizado, juros };
-}
-
-/** Saldo disponível = Limite − Utilizado − (abater ? Juros : 0). */
-function calcSaldo(limite: number | null, utilizado: number, juros: number, abater: boolean): number {
-  return (limite ?? 0) - utilizado - (abater ? juros : 0);
-}
+import { somarTotais, calcSaldo } from './controleVeiculosCalc';
 
 function CurrencyInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
