@@ -21,6 +21,8 @@ export interface VeiculoGarantiaEntry {
   dataInclusao: string;
   /** Dias de vencimento vigentes no momento da inclusão (congelado). */
   diasVencimento?: number | null;
+  /** Linha de crédito (DN) escolhida — exclusivo do Banco Volks. */
+  linhaCreditoDN?: string;
   /** Momento em que foi incluído (timestamp ISO). */
   includedAt: string;
 }
@@ -41,6 +43,12 @@ export async function addGarantia(banco: GarantiaBanco, entry: VeiculoGarantiaEn
 export async function removeGarantia(banco: GarantiaBanco, id: string): Promise<boolean> {
   const list = await listGarantia(banco);
   return kvSet(keyFor(banco), list.filter(e => e.id !== id));
+}
+
+/** Atualiza (cadastra/muda) a linha de crédito (DN) de um veículo em garantia. */
+export async function updateGarantiaDN(banco: GarantiaBanco, id: string, dn: string): Promise<boolean> {
+  const list = await listGarantia(banco);
+  return kvSet(keyFor(banco), list.map(e => (e.id === id ? { ...e, linhaCreditoDN: dn } : e)));
 }
 
 // ─── Histórico de movimentação (veículos pagos) ───────────────────────────────
@@ -66,4 +74,10 @@ export async function addHistorico(banco: GarantiaBanco, entry: VeiculoHistorico
 export async function removeHistorico(banco: GarantiaBanco, id: string): Promise<boolean> {
   const list = await listHistorico(banco);
   return kvSet(historicoKeyFor(banco), list.filter(e => e.id !== id));
+}
+
+/** Atualiza (cadastra/muda) a linha de crédito (DN) de um veículo no histórico. */
+export async function updateHistoricoDN(banco: GarantiaBanco, id: string, dn: string): Promise<boolean> {
+  const list = await listHistorico(banco);
+  return kvSet(historicoKeyFor(banco), list.map(e => (e.id === id ? { ...e, linhaCreditoDN: dn } : e)));
 }

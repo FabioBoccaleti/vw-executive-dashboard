@@ -33,6 +33,7 @@ export function RegrasTab() {
   const [regras, setRegrasState] = useState<ControleVeiculosRegras>(EMPTY_REGRAS);
   const [availableColumns, setAvailableColumns] = useState<string[]>([]);
   const [novaSituacao, setNovaSituacao] = useState('');
+  const [novoDN, setNovoDN] = useState('');
   // Texto editável do campo de taxa (preserva vírgula/decimais enquanto digita).
   const [taxaInput, setTaxaInput] = useState('');
 
@@ -119,6 +120,21 @@ export function RegrasTab() {
 
   function removeSituacao(value: string) {
     setRegrasState(prev => ({ ...prev, situacoes: prev.situacoes.filter(s => s !== value) }));
+  }
+
+  function addDN() {
+    const value = novoDN.trim();
+    if (!value) return;
+    setRegrasState(prev =>
+      prev.linhasCreditoDNVolks.some(d => d.toLowerCase() === value.toLowerCase())
+        ? prev
+        : { ...prev, linhasCreditoDNVolks: [...prev.linhasCreditoDNVolks, value] },
+    );
+    setNovoDN('');
+  }
+
+  function removeDN(value: string) {
+    setRegrasState(prev => ({ ...prev, linhasCreditoDNVolks: prev.linhasCreditoDNVolks.filter(d => d !== value) }));
   }
 
   function toggleColuna(coluna: string) {
@@ -312,6 +328,53 @@ export function RegrasTab() {
               <span className="text-xs text-slate-400">%</span>
             </div>
           </section>
+
+          {banco === 'volks' && (
+            <>
+              <div className="border-t border-slate-100" />
+
+              {/* Linhas de crédito (DN) — exclusivo do Banco Volks */}
+              <section>
+                <div className="flex items-center gap-2 mb-1">
+                  <Landmark className="w-4 h-4 text-slate-500" />
+                  <h3 className="text-sm font-bold text-slate-700">Linhas de Crédito (DN) — {bancoLabel}</h3>
+                </div>
+                <p className="text-xs text-slate-500 mb-3">
+                  Exclusivo do Banco Volks. Cadastre as linhas de crédito (DN) que poderão ser selecionadas ao incluir um veículo em garantia.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={novoDN}
+                    onChange={e => setNovoDN(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDN(); } }}
+                    placeholder="Ex.: DN 123456"
+                    className="w-56 border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  />
+                  <button
+                    onClick={addDN}
+                    className="inline-flex items-center gap-1 border border-sky-300 text-sky-700 rounded px-3 py-2 text-sm font-medium hover:bg-sky-50"
+                  >
+                    <Plus className="w-4 h-4" />Adicionar
+                  </button>
+                </div>
+                {regras.linhasCreditoDNVolks.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {regras.linhasCreditoDNVolks.map(dn => (
+                      <span key={dn} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 rounded-full pl-3 pr-1.5 py-1 text-xs font-medium">
+                        {dn}
+                        <button onClick={() => removeDN(dn)} className="text-slate-400 hover:text-red-600">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 mt-3">Nenhuma linha de crédito (DN) cadastrada.</p>
+                )}
+              </section>
+            </>
+          )}
 
           <div className="border-t border-slate-100" />
 

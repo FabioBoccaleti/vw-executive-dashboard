@@ -23,9 +23,11 @@ import {
   addGarantia,
   listGarantia,
   removeGarantia,
+  updateGarantiaDN,
   addHistorico,
   listHistorico,
   removeHistorico,
+  updateHistoricoDN,
   GARANTIA_BANCO_LABEL,
   type GarantiaBanco,
   type VeiculoGarantiaEntry,
@@ -134,6 +136,30 @@ function formatCell(value: unknown) {
   if (value instanceof Date) return value.toLocaleDateString('pt-BR');
   if (typeof value === 'number') return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 }).format(value);
   return String(value);
+}
+
+/** Select de linha de crédito (DN) editável diretamente na tabela (apenas DNs cadastrados). */
+function DNSelect({
+  value, options, onChange,
+}: {
+  value: string | undefined;
+  options: string[];
+  onChange: (dn: string) => void;
+}) {
+  const current = value ?? '';
+  const opts = current && !options.includes(current) ? [current, ...options] : options;
+  return (
+    <select
+      value={current}
+      onChange={e => { const v = e.target.value; if (v) onChange(v); }}
+      className={`text-xs border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sky-200 ${
+        current ? 'border-slate-300 bg-white' : 'border-amber-400 bg-amber-50 text-amber-700'
+      }`}
+    >
+      <option value="" disabled>— Selecione —</option>
+      {opts.map(dn => <option key={dn} value={dn}>{dn}</option>)}
+    </select>
+  );
 }
 
 function parseWorkbook(
@@ -349,6 +375,7 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
   const [target, setTarget] = useState<IncluirTarget | null>(null);
   const [valorStr, setValorStr] = useState('');
   const [dataInclusao, setDataInclusao] = useState(todayISO());
+  const [dnStr, setDnStr] = useState('');
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -445,6 +472,7 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
     setTarget({ banco, id, record, modelo });
     setValorStr('');
     setDataInclusao(todayISO());
+    setDnStr('');
   }
 
   // Regras por banco (ano + dias de estoque): habilita o botão apenas se o veículo estiver dentro das regras.
@@ -477,6 +505,10 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
 
   async function confirmIncluir() {
     if (!target) return;
+    if (target.banco === 'volks' && !dnStr) {
+      toast.error('Selecione a linha de crédito (DN).');
+      return;
+    }
     setSaving(true);
     try {
       const entry: VeiculoGarantiaEntry = {
@@ -486,6 +518,7 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
         valorGarantia: parseNum(valorStr),
         dataInclusao,
         diasVencimento: target.banco === 'itau' ? regras.diasVencimentoItau : regras.diasVencimentoVolks,
+        ...(target.banco === 'volks' ? { linhaCreditoDN: dnStr } : {}),
         includedAt: new Date().toISOString(),
       };
       const ok = await addGarantia(target.banco, entry);
@@ -649,13 +682,34 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
                   className="border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200"
                 />
               </div>
+              {target.banco === 'volks' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Linha de crédito (DN) <span className="text-red-500">*</span>
+                  </label>
+                  {regras.linhasCreditoDNVolks.length === 0 ? (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                      Nenhuma linha de crédito (DN) cadastrada. Cadastre em Regras → Banco Volks.
+                    </p>
+                  ) : (
+                    <select
+                      value={dnStr}
+                      onChange={e => setDnStr(e.target.value)}
+                      className="w-full border border-slate-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200"
+                    >
+                      <option value="" disabled>— Selecione —</option>
+                      {regras.linhasCreditoDNVolks.map(dn => <option key={dn} value={dn}>{dn}</option>)}
+                    </select>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 mt-6">
               <button onClick={() => setTarget(null)} className="px-3 py-2 text-sm text-slate-600">Cancelar</button>
               <button
                 onClick={() => void confirmIncluir()}
-                disabled={saving}
+                disabled={saving || (target.banco === 'volks' && !dnStr)}
                 className="px-4 py-2 text-sm font-semibold bg-sky-600 text-white rounded hover:bg-sky-700 disabled:opacity-50"
               >
                 {saving ? 'Incluindo...' : 'Incluir'}
@@ -694,6 +748,7 @@ function IncluirGarantiaManualModal({
   const [values, setValues] = useState<Record<string, string>>({});
   const [valorStr, setValorStr] = useState('');
   const [dataInclusao, setDataInclusao] = useState(todayISO());
+  const [dnStr, setDnStr] = useState('');
   const [saving, setSaving] = useState(false);
   const [infos, setInfos] = useState<Record<ControleVeiculosBrand, BrandTableInfo>>({
     vw: { headers: [], sitHeader: null },
@@ -753,6 +808,11 @@ function IncluirGarantiaManualModal({
       }
     }
 
+    if (banco === 'volks' && !dnStr) {
+      toast.error('Selecione a linha de crédito (DN).');
+      return;
+    }
+
     setSaving(true);
     try {
       const record: Record<string, string> = {};
@@ -765,6 +825,7 @@ function IncluirGarantiaManualModal({
         valorGarantia: parseNum(valorStr),
         dataInclusao,
         diasVencimento: banco === 'itau' ? regras.diasVencimentoItau : regras.diasVencimentoVolks,
+        ...(banco === 'volks' ? { linhaCreditoDN: dnStr } : {}),
         includedAt: new Date().toISOString(),
       };
       const ok = await addGarantia(banco, entry);
@@ -848,6 +909,27 @@ function IncluirGarantiaManualModal({
                 className="w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200"
               />
             </div>
+            {banco === 'volks' && (
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Linha de crédito (DN) <span className="text-red-500">*</span>
+                </label>
+                {regras.linhasCreditoDNVolks.length === 0 ? (
+                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                    Nenhuma linha de crédito (DN) cadastrada. Cadastre em Regras → Banco Volks.
+                  </p>
+                ) : (
+                  <select
+                    value={dnStr}
+                    onChange={e => setDnStr(e.target.value)}
+                    className="w-full border border-slate-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  >
+                    <option value="" disabled>— Selecione —</option>
+                    {regras.linhasCreditoDNVolks.map(dn => <option key={dn} value={dn}>{dn}</option>)}
+                  </select>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -855,7 +937,7 @@ function IncluirGarantiaManualModal({
           <button onClick={onClose} className="px-3 py-2 text-sm text-slate-600">Cancelar</button>
           <button
             onClick={() => void handleSave()}
-            disabled={saving}
+            disabled={saving || (banco === 'volks' && !dnStr)}
             className="px-4 py-2 text-sm font-semibold bg-sky-600 text-white rounded hover:bg-sky-700 disabled:opacity-50"
           >
             {saving ? 'Incluindo...' : 'Incluir'}
@@ -910,6 +992,18 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
       toast.error('Erro ao registrar o pagamento.');
     }
   }
+
+  async function handleChangeDN(id: string, dn: string) {
+    const ok = await updateGarantiaDN(banco, id, dn);
+    if (ok) {
+      toast.success('Linha de crédito (DN) atualizada.');
+      void load();
+    } else {
+      toast.error('Erro ao atualizar a linha de crédito (DN).');
+    }
+  }
+
+  const showDN = banco === 'volks';
 
   // Colunas das regras (Sit sempre + colunas selecionadas), na ordem da linha.
   const ruleCols = useMemo(() => {
@@ -998,6 +1092,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
         <table className="min-w-max text-xs border-collapse">
           <thead>
             <tr className="bg-sky-50 font-semibold">
+              {showDN && <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">DN</th>}
               {ruleCols.map(col => (
                 <th key={col} className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">{col}</th>
               ))}
@@ -1014,7 +1109,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
           <tbody>
             {visibleEntries.length === 0 ? (
               <tr>
-                <td colSpan={ruleCols.length + 8} className="border border-slate-200 px-3 py-6 text-center text-slate-400">
+                <td colSpan={ruleCols.length + (showDN ? 9 : 8)} className="border border-slate-200 px-3 py-6 text-center text-slate-400">
                   Nenhum veículo encontrado para o chassi buscado.
                 </td>
               </tr>
@@ -1026,6 +1121,15 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
               const juros = estimativaJuros(entry.valorGarantia, taxaJuros, diasEmGarantia);
               return (
                 <tr key={entry.id} className={vencido ? 'bg-yellow-100' : 'odd:bg-white even:bg-slate-50'}>
+                  {showDN && (
+                    <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">
+                      <DNSelect
+                        value={entry.linhaCreditoDN}
+                        options={regras.linhasCreditoDNVolks}
+                        onChange={dn => void handleChangeDN(entry.id, dn)}
+                      />
+                    </td>
+                  )}
                   {ruleCols.map(col => (
                     <td key={col} className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{entry.record[col] ?? ''}</td>
                   ))}
@@ -1066,7 +1170,7 @@ function GarantiaBancoPanel({ banco }: { banco: GarantiaBanco }) {
           </tbody>
           <tfoot>
             <tr className="bg-sky-100 font-semibold text-slate-700">
-              <td colSpan={ruleCols.length + 1} className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">
+              <td colSpan={ruleCols.length + (showDN ? 2 : 1)} className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">
                 Total ({entries.length} veículo{entries.length === 1 ? '' : 's'})
               </td>
               <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(totais.totalValor)}</td>
@@ -1142,6 +1246,18 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
     }
   }
 
+  async function handleChangeDN(id: string, dn: string) {
+    const ok = await updateHistoricoDN(banco, id, dn);
+    if (ok) {
+      toast.success('Linha de crédito (DN) atualizada.');
+      void load();
+    } else {
+      toast.error('Erro ao atualizar a linha de crédito (DN).');
+    }
+  }
+
+  const showDN = banco === 'volks';
+
   const ruleCols = useMemo(() => {
     if (entries.length === 0) return [];
     const keys = Object.keys(entries[0].record);
@@ -1203,6 +1319,7 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
         <table className="min-w-max text-xs border-collapse">
           <thead>
             <tr className="bg-sky-50 font-semibold">
+              {showDN && <th className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">DN</th>}
               {ruleCols.map(col => (
                 <th key={col} className="border border-slate-200 px-3 py-1.5 text-left whitespace-nowrap">{col}</th>
               ))}
@@ -1219,7 +1336,7 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
           <tbody>
             {visibleEntries.length === 0 ? (
               <tr>
-                <td colSpan={ruleCols.length + 8} className="border border-slate-200 px-3 py-6 text-center text-slate-400">
+                <td colSpan={ruleCols.length + (showDN ? 9 : 8)} className="border border-slate-200 px-3 py-6 text-center text-slate-400">
                   Nenhum veículo encontrado para o chassi buscado.
                 </td>
               </tr>
@@ -1230,6 +1347,15 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
               const juros = estimativaJuros(entry.valorGarantia, taxaJuros, diasEmGarantia);
               return (
                 <tr key={entry.id} className="odd:bg-white even:bg-slate-50">
+                  {showDN && (
+                    <td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">
+                      <DNSelect
+                        value={entry.linhaCreditoDN}
+                        options={regras.linhasCreditoDNVolks}
+                        onChange={dn => void handleChangeDN(entry.id, dn)}
+                      />
+                    </td>
+                  )}
                   {ruleCols.map(col => (
                     <td key={col} className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{entry.record[col] ?? ''}</td>
                   ))}
@@ -1254,7 +1380,7 @@ function HistoricoBancoPanel({ banco }: { banco: GarantiaBanco }) {
           </tbody>
           <tfoot>
             <tr className="bg-sky-100 font-semibold text-slate-700">
-              <td colSpan={ruleCols.length + 1} className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">
+              <td colSpan={ruleCols.length + (showDN ? 2 : 1)} className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">
                 Total ({entries.length} veículo{entries.length === 1 ? '' : 's'})
               </td>
               <td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">R$ {fmtBRL(totais.totalValor)}</td>

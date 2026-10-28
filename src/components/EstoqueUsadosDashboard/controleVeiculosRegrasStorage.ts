@@ -31,6 +31,8 @@ export interface ControleVeiculosRegras {
   considerarProp: boolean;
   /** Considerar a coluna "Disp" como regra: veículo com Disp = "Sim" fica em negociação (bloqueado). Vale para ambos os bancos. */
   considerarDisp: boolean;
+  /** Linhas de crédito (DN) cadastradas — exclusivo do Banco Volks. */
+  linhasCreditoDNVolks: string[];
 }
 
 const KEY = 'estoque-usados-controle-veiculos-regras';
@@ -50,6 +52,7 @@ export const EMPTY_REGRAS: ControleVeiculosRegras = {
   taxaJurosVolks: null,
   considerarProp: false,
   considerarDisp: false,
+  linhasCreditoDNVolks: [],
 };
 
 export async function getRegras(): Promise<ControleVeiculosRegras> {
