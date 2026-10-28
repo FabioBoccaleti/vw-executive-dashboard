@@ -52,10 +52,16 @@ export function EstoquePecasDashboard({ marca, onBack }: Props) {
             {/* Sub-abas de importação */}
             <Tabs value={importSubTab} onValueChange={(v) => setImportSubTab(v as ImportSubTab)}>
               <TabsList>
-                <TabsTrigger value="inventario">
+                <TabsTrigger
+                  value="inventario"
+                  style={importSubTab === 'inventario' ? { backgroundColor: marca.primary, color: '#fff' } : undefined}
+                >
                   Importação de Arquivo Inventario de Estoque
                 </TabsTrigger>
-                <TabsTrigger value="movimentacao">
+                <TabsTrigger
+                  value="movimentacao"
+                  style={importSubTab === 'movimentacao' ? { backgroundColor: marca.primary, color: '#fff' } : undefined}
+                >
                   Importação de Arquivo Movimentação de Itens
                 </TabsTrigger>
               </TabsList>
