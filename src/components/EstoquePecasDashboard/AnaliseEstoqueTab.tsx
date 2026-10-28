@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
   PieChart, Pie, Legend,
 } from 'recharts';
-import { Loader2, AlertCircle, TrendingDown, Boxes, PackageX, Timer, Search } from 'lucide-react';
+import { Loader2, AlertCircle, TrendingDown, Boxes, PackageX, Timer, Search, ChevronRight, ChevronDown } from 'lucide-react';
 import type { EstoquePecasMarca } from './EstoquePecasDashboard';
 import { getInventario, getMovimentacao, type ImportedTable } from './estoquePecasStorage';
 import { buildAnalise, AGING_BUCKETS, type AnaliseResult, type AnaliseItem } from './estoqueAnalise';
@@ -187,6 +187,8 @@ function AnaliseConteudo({
   setFiltroStatus: (v: 'todos' | 'parados' | 'movimentando' | 'sem_info') => void;
   itensFiltrados: AnaliseItem[];
 }) {
+  const [expandedFaixa, setExpandedFaixa] = useState<string | null>(null);
+
   const donutData = [
     { name: 'Movimentando', value: analise.valorMovimentando, color: '#16a34a' },
     { name: 'Parado', value: analise.valorParado, color: marca.primary },
@@ -275,9 +277,10 @@ function AnaliseConteudo({
 
       {/* Resumo por faixa + ABC + Grupos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Resumo por faixa */}
+        {/* Resumo por faixa (expansível) */}
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
-          <h4 className="text-sm font-bold text-slate-700 mb-3">Resumo por faixa de dias</h4>
+          <h4 className="text-sm font-bold text-slate-700 mb-1">Resumo por faixa de dias</h4>
+          <p className="text-xs text-slate-400 mb-3">Clique em uma faixa para ver os itens.</p>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-slate-500 border-b border-slate-100">
@@ -287,13 +290,25 @@ function AnaliseConteudo({
               </tr>
             </thead>
             <tbody>
-              {analise.buckets.map((b) => (
-                <tr key={b.label} className="border-b border-slate-50">
-                  <td className="py-1.5 text-slate-700">{b.label}</td>
-                  <td className="py-1.5 text-right tabular-nums text-slate-600">{fmtInt(b.skus)}</td>
-                  <td className="py-1.5 text-right tabular-nums text-slate-700">{fmtCurrency(b.valor)}</td>
-                </tr>
-              ))}
+              {analise.buckets.map((b) => {
+                const isOpen = expandedFaixa === b.label;
+                const itensFaixa = isOpen
+                  ? analise.itens
+                      .filter((it) => it.faixa === b.label)
+                      .sort((a, c) => c.valorTotal - a.valorTotal)
+                  : [];
+                return (
+                  <FaixaRow
+                    key={b.label}
+                    label={b.label}
+                    skus={b.skus}
+                    valor={b.valor}
+                    isOpen={isOpen}
+                    onToggle={() => setExpandedFaixa(isOpen ? null : b.label)}
+                    itens={itensFaixa}
+                  />
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -461,6 +476,69 @@ function AnaliseConteudo({
         </div>
       </div>
     </div>
+  );
+}
+
+function FaixaRow({
+  label, skus, valor, isOpen, onToggle, itens,
+}: {
+  label: string;
+  skus: number;
+  valor: number;
+  isOpen: boolean;
+  onToggle: () => void;
+  itens: AnaliseItem[];
+}) {
+  return (
+    <>
+      <tr
+        className="border-b border-slate-50 cursor-pointer hover:bg-slate-50"
+        onClick={onToggle}
+      >
+        <td className="py-1.5 text-slate-700">
+          <span className="inline-flex items-center gap-1">
+            {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+            {label}
+          </span>
+        </td>
+        <td className="py-1.5 text-right tabular-nums text-slate-600">{fmtInt(skus)}</td>
+        <td className="py-1.5 text-right tabular-nums text-slate-700">{fmtCurrency(valor)}</td>
+      </tr>
+      {isOpen && (
+        <tr>
+          <td colSpan={3} className="p-0">
+            {itens.length === 0 ? (
+              <p className="text-xs text-slate-400 px-2 py-2">Nenhum item nesta faixa.</p>
+            ) : (
+              <div className="max-h-64 overflow-auto bg-slate-50 rounded-md my-1">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-slate-100">
+                    <tr className="text-slate-500">
+                      <th className="text-left px-2 py-1 font-medium">Item</th>
+                      <th className="text-right px-2 py-1 font-medium">Qtd</th>
+                      <th className="text-right px-2 py-1 font-medium">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {itens.map((it, i) => (
+                      <tr key={`${it.codigoInterno}-${i}`} className="border-b border-slate-100 last:border-0">
+                        <td className="px-2 py-1 text-slate-700">
+                          <span className="block truncate max-w-[180px]" title={`${it.codigo} — ${it.descricao}`}>
+                            {it.descricao || it.codigo}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1 text-right tabular-nums text-slate-600">{fmtInt(it.quantidade)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-slate-700">{fmtCurrency(it.valorTotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
