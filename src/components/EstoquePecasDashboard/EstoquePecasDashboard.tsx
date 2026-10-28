@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { FolderInput } from 'lucide-react';
+import { FolderInput, BarChart3 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { InventarioEstoqueTab } from './InventarioEstoqueTab';
 import { MovimentacaoItensTab } from './MovimentacaoItensTab';
+import { AnaliseEstoqueTab } from './AnaliseEstoqueTab';
 
 export interface EstoquePecasMarca {
   id: 'audi' | 'vw';
@@ -16,7 +17,7 @@ interface Props {
   onBack: () => void;
 }
 
-type MainTab = 'importacao';
+type MainTab = 'importacao' | 'analise';
 type ImportSubTab = 'inventario' | 'movimentacao';
 
 export function EstoquePecasDashboard({ marca, onBack }: Props) {
@@ -46,6 +47,10 @@ export function EstoquePecasDashboard({ marca, onBack }: Props) {
               <FolderInput className="w-4 h-4" />
               Importação de Arquivo
             </TabsTrigger>
+            <TabsTrigger value="analise" className="gap-1.5">
+              <BarChart3 className="w-4 h-4" />
+              Análise de Estoque
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="importacao" className="mt-4">
@@ -74,6 +79,10 @@ export function EstoquePecasDashboard({ marca, onBack }: Props) {
                 <MovimentacaoItensTab marca={marca} />
               </TabsContent>
             </Tabs>
+          </TabsContent>
+
+          <TabsContent value="analise" className="mt-4">
+            <AnaliseEstoqueTab marca={marca} />
           </TabsContent>
         </Tabs>
       </div>
