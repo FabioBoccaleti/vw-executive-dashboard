@@ -2,11 +2,11 @@
 
 export type UserRole = 'admin' | 'gestor' | 'leitura';
 
-export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'central_vendas_vw' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora' | 'controle_veiculos_floorplan';
+export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'central_vendas_vw' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'analise_estoque_pecas' | 'controle_pagamentos_evora' | 'controle_veiculos_floorplan';
 
 export type BrandId = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'base_gerencial' | 'vw_outros' | 'audi_outros';
 
-export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_pagamentos_evora', 'controle_veiculos_floorplan'];
+export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'analise_estoque_pecas', 'controle_pagamentos_evora', 'controle_veiculos_floorplan'];
 
 export const ALL_BRANDS: BrandId[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'despesas_depto_vw', 'ieo', 'base_gerencial', 'vw_outros', 'audi_outros'];
 
@@ -20,6 +20,7 @@ export const MODULE_LABELS: Record<ModuleId, string> = {
   custos_alugueis: 'Custos com Aluguéis',
   analise_evolutiva_despesas: 'Análise Evolutiva de Despesas',
   numeros_estoque_usados: 'Números de Estoque de Usados',
+  analise_estoque_pecas: 'Análise de Estoque de Peças',
   controle_pagamentos_evora: 'Controle de Pagamentos Evora',
   controle_veiculos_floorplan: 'Controle de Veículos FloorPlan',
 };

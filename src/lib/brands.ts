@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'base_gerencial' | 'comparativo_rede_vw' | 'comparativo_rede_audi' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'controle_pagamentos_evora' | 'controle_veiculos_floorplan';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'base_gerencial' | 'comparativo_rede_vw' | 'comparativo_rede_audi' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'analise_estoque_pecas' | 'controle_pagamentos_evora' | 'controle_veiculos_floorplan';
 
 // Interface de configuraÃ§Ã£o visual da marca
 export interface BrandConfig {
@@ -563,6 +563,31 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-accent': '#a5b4fc',
     }
   },
+  analise_estoque_pecas: {
+    id: 'analise_estoque_pecas',
+    name: 'Análise de Estoque de Peças',
+    shortName: 'Estoque Peças',
+    colors: {
+      primary: '#475569',
+      primaryHover: '#334155',
+      primaryLight: '#f1f5f9',
+      secondary: '#64748b',
+      accent: '#94a3b8',
+      headerBg: 'bg-[#475569]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#475569] hover:bg-[#334155]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-slate-100 dark:bg-slate-800/60',
+      badgeText: 'text-slate-800 dark:text-slate-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#475569',
+      '--brand-primary-hover': '#334155',
+      '--brand-primary-light': '#f1f5f9',
+      '--brand-secondary': '#64748b',
+      '--brand-accent': '#94a3b8',
+    },
+  },
   controle_pagamentos_evora: {
     id: 'controle_pagamentos_evora',
     name: 'Controle de Pagamentos Evora',
@@ -616,7 +641,7 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
 };
 
 // Lista de marcas disponiveis
-export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_veiculos_floorplan', 'controle_pagamentos_evora', 'comparativo_rede_vw', 'comparativo_rede_audi'];
+export const AVAILABLE_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros', 'aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_veiculos_floorplan', 'analise_estoque_pecas', 'controle_pagamentos_evora', 'comparativo_rede_vw', 'comparativo_rede_audi'];
 
 // Chave de armazenamento para marca selecionada
 export const SELECTED_BRAND_KEY = 'selected_brand';
