@@ -149,8 +149,8 @@ export function RegrasTab() {
     setRegrasState(prev => ({ ...prev, considerarProp: value }));
   }
 
-  function setConsiderarDisp(value: boolean) {
-    setRegrasState(prev => ({ ...prev, considerarDisp: value }));
+  function setConsiderarRes(value: boolean) {
+    setRegrasState(prev => ({ ...prev, considerarRes: value }));
   }
 
   async function handleSave() {
@@ -418,9 +418,9 @@ export function RegrasTab() {
 
           <div className="border-t border-slate-100" />
 
-          {/* Regra de negociação (Prop/Disp) — vale para ambos os bancos */}
+          {/* Regra de negociação (Prop/Res) — vale para ambos os bancos */}
           <section>
-            <h3 className="text-sm font-bold text-slate-700">Veículos em negociação (Prop / Disp)</h3>
+            <h3 className="text-sm font-bold text-slate-700">Veículos em negociação (Prop / Res)</h3>
             <p className="text-xs text-slate-500 mt-0.5 mb-3">
               Aplicável a ambos os bancos. Quando marcada como “Sim”, veículos com valor “Sim” na coluna correspondente
               ficam indisponíveis para inclusão em garantia e exibem a mensagem “Veículo em negociação”. Cada coluna é independente.
@@ -428,7 +428,7 @@ export function RegrasTab() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {([
                 { key: 'prop', label: 'Considerar coluna "Prop"', value: regras.considerarProp, onChange: setConsiderarProp },
-                { key: 'disp', label: 'Considerar coluna "Disp"', value: regras.considerarDisp, onChange: setConsiderarDisp },
+                { key: 'res', label: 'Considerar coluna "Res"', value: regras.considerarRes, onChange: setConsiderarRes },
               ] as const).map(({ key, label, value, onChange }) => (
                 <div key={key} className="flex items-center justify-between border border-slate-200 rounded px-3 py-2.5">
                   <span className="text-sm text-slate-700">{label}</span>

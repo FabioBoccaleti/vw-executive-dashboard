@@ -29,8 +29,8 @@ export interface ControleVeiculosRegras {
   taxaJurosVolks: number | null;
   /** Considerar a coluna "Prop" como regra: veículo com Prop = "Sim" fica em negociação (bloqueado). Vale para ambos os bancos. */
   considerarProp: boolean;
-  /** Considerar a coluna "Disp" como regra: veículo com Disp = "Sim" fica em negociação (bloqueado). Vale para ambos os bancos. */
-  considerarDisp: boolean;
+  /** Considerar a coluna "Res" como regra: veículo com Res = "Sim" fica em negociação (bloqueado). Vale para ambos os bancos. */
+  considerarRes: boolean;
   /** Linhas de crédito (DN) cadastradas — exclusivo do Banco Volks. */
   linhasCreditoDNVolks: string[];
 }
@@ -51,7 +51,7 @@ export const EMPTY_REGRAS: ControleVeiculosRegras = {
   taxaJurosItau: null,
   taxaJurosVolks: null,
   considerarProp: false,
-  considerarDisp: false,
+  considerarRes: false,
   linhasCreditoDNVolks: [],
 };
 

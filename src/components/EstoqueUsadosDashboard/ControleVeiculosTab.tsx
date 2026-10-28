@@ -474,8 +474,8 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
     () => (table ? table.headers.findIndex(h => headerMatches(h, 'prop')) : -1),
     [table],
   );
-  const dispIndex = useMemo(
-    () => (table ? table.headers.findIndex(h => headerMatches(h, 'disp')) : -1),
+  const resIndex = useMemo(
+    () => (table ? table.headers.findIndex(h => headerMatches(h, 'res')) : -1),
     [table],
   );
   const diasIndex = useMemo(
@@ -483,11 +483,11 @@ function DisponiveisBrandPanel({ brand }: { brand: ControleVeiculosBrand }) {
     [table],
   );
 
-  // Regra de negociação (Prop/Disp): bloqueia inclusão quando a coluna considerada vale "Sim".
+  // Regra de negociação (Prop/Res): bloqueia inclusão quando a coluna considerada vale "Sim".
   function emNegociacao(row: unknown[]): boolean {
     const isSim = (idx: number) => idx >= 0 && String(row[idx] ?? '').trim().toLowerCase() === 'sim';
     if (regras.considerarProp && isSim(propIndex)) return true;
-    if (regras.considerarDisp && isSim(dispIndex)) return true;
+    if (regras.considerarRes && isSim(resIndex)) return true;
     return false;
   }
 
