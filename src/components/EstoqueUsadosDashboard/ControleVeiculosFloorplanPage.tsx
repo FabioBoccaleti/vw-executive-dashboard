@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { ArrowLeft, Car, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Car, SlidersHorizontal, Wallet } from 'lucide-react';
 import { ControleVeiculosTab } from './ControleVeiculosTab';
 import { RegrasTab } from './RegrasTab';
+import { CadastroLimitesTab } from './CadastroLimitesTab';
 
 interface Props {
   onChangeBrand: () => void;
 }
 
-type Tab = 'controle' | 'regras';
+type Tab = 'controle' | 'regras' | 'limites';
 
 function TabBtn({
   active, onClick, icon, label,
@@ -60,6 +61,12 @@ export function ControleVeiculosFloorplanPage({ onChangeBrand }: Props) {
             icon={<SlidersHorizontal className="w-3.5 h-3.5" />}
             label="Regras"
           />
+          <TabBtn
+            active={activeTab === 'limites'}
+            onClick={() => setActiveTab('limites')}
+            icon={<Wallet className="w-3.5 h-3.5" />}
+            label="Cadastro de Limites"
+          />
         </div>
 
         <div className="w-24" />
@@ -77,6 +84,7 @@ export function ControleVeiculosFloorplanPage({ onChangeBrand }: Props) {
       <div className="flex-1 flex flex-col min-h-0">
         {activeTab === 'controle' && <ControleVeiculosTab />}
         {activeTab === 'regras' && <RegrasTab />}
+        {activeTab === 'limites' && <CadastroLimitesTab />}
       </div>
     </div>
   );
