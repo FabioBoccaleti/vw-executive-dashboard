@@ -12,6 +12,7 @@ import {
 } from './duplicatasStorage';
 import {
   parseDuplicatas, analyze, resumoPorDepartamento, startOfDay,
+  topClientesPorValor, topClientesPorVencido,
   type Duplicata, type FaixaResult, type ClienteResumo, type DeptResumo,
 } from './duplicatasAnalise';
 
@@ -211,8 +212,10 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
       <TopClientesTable
         title="Maiores clientes a receber"
         icon={<Users className="w-4 h-4" />}
-        clientes={analysis.topClientes}
-        valueOf={(c) => c.total}
+        duplicatas={duplicatas}
+        departamentos={departamentosDisponiveis}
+        marca={marca}
+        mode="valor"
         valueLabel="Total a receber"
         groupKey="tc"
         expanded={expanded}
@@ -221,8 +224,10 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
       <TopClientesTable
         title="Maiores clientes com valor vencido"
         icon={<AlertTriangle className="w-4 h-4 text-rose-600" />}
-        clientes={analysis.topClientesVencido}
-        valueOf={(c) => c.vencido}
+        duplicatas={duplicatas}
+        departamentos={departamentosDisponiveis}
+        marca={marca}
+        mode="vencido"
         valueLabel="Valor vencido"
         groupKey="tv"
         expanded={expanded}
@@ -466,32 +471,56 @@ function FaixasTable({ title, subtitle, faixas, total, groupKey, accentClass, ex
 }
 
 // ─── Top clientes ────────────────────────────────────────────────────────────
-function TopClientesTable({ title, icon, clientes, valueOf, valueLabel, groupKey, expanded, toggle }: {
+function TopClientesTable({ title, icon, duplicatas, departamentos, marca, mode, valueLabel, groupKey, expanded, toggle }: {
   title: string;
   icon: React.ReactNode;
-  clientes: ClienteResumo[];
-  valueOf: (c: ClienteResumo) => number;
+  duplicatas: Duplicata[];
+  departamentos: string[];
+  marca: DuplicatasMarca;
+  mode: 'valor' | 'vencido';
   valueLabel: string;
   groupKey: string;
   expanded: Record<string, boolean>;
   toggle: (key: string) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const [dept, setDept] = useState<string>('__todos__');
+
+  const filtradas = useMemo(
+    () => (dept === '__todos__' ? duplicatas : duplicatas.filter((d) => d.departamento === dept)),
+    [duplicatas, dept],
+  );
+  const clientes = useMemo(
+    () => (mode === 'valor' ? topClientesPorValor(filtradas) : topClientesPorVencido(filtradas)),
+    [filtradas, mode],
+  );
+  const valueOf = (c: ClienteResumo) => (mode === 'valor' ? c.total : c.vencido);
   const visible = showAll ? clientes : clientes.slice(0, TOP_N);
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-2 mb-2">
+      <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
         <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">{icon}{title}</h3>
-        {clientes.length > TOP_N && (
-          <button
-            type="button"
-            onClick={() => setShowAll((p) => !p)}
-            className="text-xs font-medium text-sky-700 border border-sky-200 rounded-md px-3 py-1.5 hover:bg-sky-50"
+        <div className="flex items-center gap-2">
+          <select
+            value={dept}
+            onChange={(e) => setDept(e.target.value)}
+            className="border border-slate-300 rounded-md px-2 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 min-w-[170px]"
+            style={{ ['--tw-ring-color' as string]: marca.primary }}
           >
-            {showAll ? `Ver top ${TOP_N}` : `Ver todos (${fmtInt(clientes.length)})`}
-          </button>
-        )}
+            <option value="__todos__">Todos os departamentos</option>
+            {departamentos.map((d) => (<option key={d} value={d}>{d}</option>))}
+          </select>
+          {clientes.length > TOP_N && (
+            <button
+              type="button"
+              onClick={() => setShowAll((p) => !p)}
+              className="text-xs font-medium text-sky-700 border border-sky-200 rounded-md px-3 py-1.5 hover:bg-sky-50"
+            >
+              {showAll ? `Ver top ${TOP_N}` : `Ver todos (${fmtInt(clientes.length)})`}
+            </button>
+          )}
+        </div>
       </div>
       <div className="overflow-hidden border border-slate-200 rounded-lg">
         <table className="min-w-full text-xs">
