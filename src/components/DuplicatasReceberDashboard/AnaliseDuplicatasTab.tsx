@@ -177,6 +177,8 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
           marca={marca}
           activeFilter={deptFilter}
           onSelect={(dep) => setDeptFilter((prev) => (prev === dep ? '__todos__' : dep))}
+          expanded={expanded}
+          toggle={toggle}
         />
         <DeptChart rows={resumoDept} />
       </div>
@@ -245,11 +247,13 @@ function KpiCard({ icon, label, value, accent, sub }: { icon: React.ReactNode; l
 }
 
 // ─── Resumo por departamento ────────────────────────────────────────────────
-function ResumoDepartamentoTable({ rows, marca, activeFilter, onSelect }: {
+function ResumoDepartamentoTable({ rows, marca, activeFilter, onSelect, expanded, toggle }: {
   rows: DeptResumo[];
   marca: DuplicatasMarca;
   activeFilter: string;
   onSelect: (dep: string) => void;
+  expanded: Record<string, boolean>;
+  toggle: (key: string) => void;
 }) {
   const totals = rows.reduce((a, r) => ({ qtd: a.qtd + r.qtd, total: a.total + r.total, vencido: a.vencido + r.vencido, aVencer: a.aVencer + r.aVencer }), { qtd: 0, total: 0, vencido: 0, aVencer: 0 });
   const percTotal = totals.total > 0 ? (totals.vencido / totals.total) * 100 : 0;
@@ -260,6 +264,7 @@ function ResumoDepartamentoTable({ rows, marca, activeFilter, onSelect }: {
         <table className="min-w-full text-xs">
           <thead className="bg-slate-50 text-slate-600">
             <tr>
+              <th className="text-left px-3 py-2 w-8"></th>
               <th className="text-left px-3 py-2">Departamento</th>
               <th className="text-right px-3 py-2">Dupl.</th>
               <th className="text-right px-3 py-2">Total</th>
@@ -271,23 +276,68 @@ function ResumoDepartamentoTable({ rows, marca, activeFilter, onSelect }: {
           <tbody>
             {rows.map((r) => {
               const active = activeFilter === r.departamento;
+              const key = `rd:${r.departamento}`;
+              const isOpen = expanded[key];
               return (
-                <tr
-                  key={r.departamento}
-                  onClick={() => onSelect(r.departamento)}
-                  className="border-t border-slate-100 cursor-pointer hover:bg-slate-50"
-                  style={active ? { backgroundColor: marca.primaryLight } : undefined}
-                >
-                  <td className="px-3 py-1.5 font-medium text-slate-700">{r.departamento}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">{fmtInt(r.qtd)}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(r.total)}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums text-rose-600">{fmtBRL(r.vencido)}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums text-emerald-700">{fmtBRL(r.aVencer)}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">{fmtPerc(r.percVencido)}</td>
-                </tr>
+                <Fragment key={r.departamento}>
+                  <tr
+                    onClick={() => onSelect(r.departamento)}
+                    className="border-t border-slate-100 cursor-pointer hover:bg-slate-50"
+                    style={active ? { backgroundColor: marca.primaryLight } : undefined}
+                  >
+                    <td
+                      className="px-3 py-1.5 text-slate-400"
+                      onClick={(e) => { e.stopPropagation(); toggle(key); }}
+                    >
+                      {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </td>
+                    <td className="px-3 py-1.5 font-medium text-slate-700">{r.departamento}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{fmtInt(r.qtd)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(r.total)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-rose-600">{fmtBRL(r.vencido)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-emerald-700">{fmtBRL(r.aVencer)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{fmtPerc(r.percVencido)}</td>
+                  </tr>
+                  {isOpen && (
+                    <tr>
+                      <td></td>
+                      <td colSpan={6} className="px-3 py-2 bg-slate-50">
+                        <table className="min-w-full text-[11px]">
+                          <thead className="text-slate-500">
+                            <tr>
+                              <th className="text-left px-2 py-1">Cliente</th>
+                              <th className="text-left px-2 py-1">Título</th>
+                              <th className="text-left px-2 py-1">Origem</th>
+                              <th className="text-left px-2 py-1">Vencimento</th>
+                              <th className="text-left px-2 py-1">Situação</th>
+                              <th className="text-right px-2 py-1">Valor</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {r.duplicatas.map((d, di) => (
+                              <tr key={`${d.titulo}-${di}`} className="border-t border-slate-200">
+                                <td className="px-2 py-1">{d.clienteNome}</td>
+                                <td className="px-2 py-1">{d.titulo || '—'}</td>
+                                <td className="px-2 py-1">{d.nomeOrigem || '—'}</td>
+                                <td className="px-2 py-1 tabular-nums">{fmtDateBR(d.vencimento)}</td>
+                                <td className="px-2 py-1">
+                                  {d.vencido
+                                    ? <span className="text-rose-600 font-medium">Vencida ({fmtInt(d.diasAtraso)}d)</span>
+                                    : <span className="text-emerald-700">A vencer</span>}
+                                </td>
+                                <td className="px-2 py-1 text-right tabular-nums">{fmtBRL(d.valor)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
             <tr className="bg-sky-50 font-bold border-t border-slate-200">
+              <td></td>
               <td className="px-3 py-1.5">Total</td>
               <td className="px-3 py-1.5 text-right tabular-nums">{fmtInt(totals.qtd)}</td>
               <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(totals.total)}</td>
@@ -298,7 +348,7 @@ function ResumoDepartamentoTable({ rows, marca, activeFilter, onSelect }: {
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-slate-400 mt-1">Clique num departamento para filtrar as análises abaixo.</p>
+      <p className="text-[11px] text-slate-400 mt-1">Clique na seta para ver os títulos; clique na linha para filtrar as análises abaixo.</p>
     </div>
   );
 }
@@ -356,7 +406,7 @@ function FaixasTable({ title, subtitle, faixas, total, groupKey, accentClass, ex
             {faixas.map((f, index) => {
               const key = `${groupKey}:${index}`;
               const isOpen = expanded[key];
-              const canExpand = f.clientes.length > 0;
+              const canExpand = f.duplicatas.length > 0;
               return (
                 <Fragment key={key}>
                   <tr
@@ -378,16 +428,20 @@ function FaixasTable({ title, subtitle, faixas, total, groupKey, accentClass, ex
                           <thead className="text-slate-500">
                             <tr>
                               <th className="text-left px-2 py-1">Cliente</th>
-                              <th className="text-right px-2 py-1">Duplicatas</th>
+                              <th className="text-left px-2 py-1">Título</th>
+                              <th className="text-left px-2 py-1">Origem</th>
+                              <th className="text-left px-2 py-1">Vencimento</th>
                               <th className="text-right px-2 py-1">Valor</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {f.clientes.map((c) => (
-                              <tr key={c.clienteId} className="border-t border-slate-200">
-                                <td className="px-2 py-1">{c.clienteNome}</td>
-                                <td className="px-2 py-1 text-right tabular-nums">{fmtInt(c.qtd)}</td>
-                                <td className="px-2 py-1 text-right tabular-nums">{fmtBRL(c.valor)}</td>
+                            {f.duplicatas.map((d, di) => (
+                              <tr key={`${d.titulo}-${di}`} className="border-t border-slate-200">
+                                <td className="px-2 py-1">{d.clienteNome}</td>
+                                <td className="px-2 py-1">{d.titulo || '—'}</td>
+                                <td className="px-2 py-1">{d.nomeOrigem || '—'}</td>
+                                <td className="px-2 py-1 tabular-nums">{fmtDateBR(d.vencimento)}</td>
+                                <td className="px-2 py-1 text-right tabular-nums">{fmtBRL(d.valor)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -473,7 +527,8 @@ function TopClientesTable({ title, icon, clientes, valueOf, valueLabel, groupKey
                           <thead className="text-slate-500">
                             <tr>
                               <th className="text-left px-2 py-1">Departamento</th>
-                              <th className="text-left px-2 py-1">Duplicata</th>
+                              <th className="text-left px-2 py-1">Título</th>
+                              <th className="text-left px-2 py-1">Origem</th>
                               <th className="text-left px-2 py-1">Vencimento</th>
                               <th className="text-left px-2 py-1">Situação</th>
                               <th className="text-right px-2 py-1">Valor</th>
@@ -483,7 +538,8 @@ function TopClientesTable({ title, icon, clientes, valueOf, valueLabel, groupKey
                             {c.duplicatas.map((d, di) => (
                               <tr key={`${d.duplicata}-${di}`} className="border-t border-slate-200">
                                 <td className="px-2 py-1">{d.departamento}</td>
-                                <td className="px-2 py-1">{d.duplicata || d.titulo || '—'}</td>
+                                <td className="px-2 py-1">{d.titulo || d.duplicata || '—'}</td>
+                                <td className="px-2 py-1">{d.nomeOrigem || '—'}</td>
                                 <td className="px-2 py-1 tabular-nums">{fmtDateBR(d.vencimento)}</td>
                                 <td className="px-2 py-1">
                                   {d.vencido

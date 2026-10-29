@@ -64,6 +64,7 @@ export interface Duplicata {
   clienteId: string;
   clienteNome: string;
   cgccpf: string;
+  nomeOrigem: string;
   titulo: string;
   duplicata: string;
   valor: number;
@@ -82,6 +83,7 @@ interface ColumnMap {
   cliente: number;
   nomeCliente: number;
   cgccpf: number;
+  nomeOrigem: number;
   titulo: number;
   duplicata: number;
   vencido: number;
@@ -98,6 +100,7 @@ function detectColumns(headers: string[]): ColumnMap {
     cliente: idx('cliente'),
     nomeCliente: idx('nomecliente'),
     cgccpf: idx('cgccpf'),
+    nomeOrigem: idx('nomeorigem'),
     titulo: idx('titulo'),
     duplicata: idx('duplicata'),
     vencido: idx('vencido'),
@@ -116,16 +119,22 @@ export function parseDuplicatas(
   const ref = startOfDay(referenceDate);
   const cell = (row: string[], i: number) => (i >= 0 ? (row[i] ?? '') : '');
 
-  return data.rows.map((row) => {
+  return data.rows.flatMap((row) => {
     const deptNumero = String(cell(row, cols.departamento)).trim();
     const deptNomeArquivo = String(cell(row, cols.nomeDepartamento)).trim();
     const departamento = map[deptNumero] ?? DEPARTAMENTO_NAO_CLASSIFICADO;
-    const clienteNome = String(cell(row, cols.nomeCliente)).trim() || '(sem nome)';
+    const nomeClienteRaw = String(cell(row, cols.nomeCliente)).trim();
+    const clienteNome = nomeClienteRaw || '(sem nome)';
     const cgccpf = String(cell(row, cols.cgccpf)).trim();
     const clienteCod = String(cell(row, cols.cliente)).trim();
     const clienteId = cgccpf || clienteCod || clienteNome;
+    const titulo = String(cell(row, cols.titulo)).trim();
     const valor = parseNumberBR(cell(row, cols.vencido)) + parseNumberBR(cell(row, cols.avencer));
     const vencimento = parseDateBR(cell(row, cols.dtaVencimento));
+
+    // Ignora linhas de total/subtotal do arquivo: não têm vencimento nem título
+    // (apenas valores somados). Não são duplicatas a receber.
+    if (!vencimento && !titulo) return [];
 
     let vencido = false;
     let diasAtraso = 0;
@@ -140,21 +149,22 @@ export function parseDuplicatas(
       }
     }
 
-    return {
+    return [{
       deptNumero,
       deptNomeArquivo,
       departamento,
       clienteId,
       clienteNome,
       cgccpf,
-      titulo: String(cell(row, cols.titulo)).trim(),
+      nomeOrigem: String(cell(row, cols.nomeOrigem)).trim(),
+      titulo,
       duplicata: String(cell(row, cols.duplicata)).trim(),
       valor,
       vencimento,
       vencido,
       diasAtraso,
       diasAteVencer,
-    };
+    }];
   });
 }
 
@@ -165,6 +175,10 @@ export function distinctDepartamentosArquivo(data: DuplicatasImport): Array<{ nu
   for (const row of data.rows) {
     const numero = String(cols.departamento >= 0 ? row[cols.departamento] ?? '' : '').trim();
     if (!numero) continue;
+    const titulo = String(cols.titulo >= 0 ? row[cols.titulo] ?? '' : '').trim();
+    const vencimento = parseDateBR(cols.dtaVencimento >= 0 ? row[cols.dtaVencimento] ?? '' : '');
+    // Ignora linhas de total/subtotal (sem vencimento e sem título).
+    if (!vencimento && !titulo) continue;
     const nome = String(cols.nomeDepartamento >= 0 ? row[cols.nomeDepartamento] ?? '' : '').trim();
     const acc = map.get(numero) ?? { nome, qtd: 0 };
     acc.qtd += 1;
@@ -218,27 +232,28 @@ export interface FaixaResult {
   label: string;
   qtd: number;
   valor: number;
-  /** Clientes da faixa, agregados e ordenados por valor desc. */
-  clientes: ClienteValor[];
+  /** Títulos da faixa, ordenados por vencimento (mais próximo primeiro). */
+  duplicatas: Duplicata[];
 }
 
 function buildFaixas(duplicatas: Duplicata[], faixas: Faixa[], tipo: 'vencido' | 'avencer'): FaixaResult[] {
-  const buckets = faixas.map((f) => ({ label: f.label, qtd: 0, valor: 0, clientes: new Map<string, ClienteValor>() }));
+  const buckets = faixas.map((f) => ({ label: f.label, qtd: 0, valor: 0, duplicatas: [] as Duplicata[] }));
   for (const d of duplicatas) {
     const dias = tipo === 'vencido' ? d.diasAtraso : d.diasAteVencer;
     const b = buckets[faixaIndex(faixas, dias)];
     b.qtd += 1;
     b.valor += d.valor;
-    const c = b.clientes.get(d.clienteId) ?? { clienteId: d.clienteId, clienteNome: d.clienteNome, qtd: 0, valor: 0 };
-    c.qtd += 1;
-    c.valor += d.valor;
-    b.clientes.set(d.clienteId, c);
+    b.duplicatas.push(d);
   }
   return buckets.map((b) => ({
     label: b.label,
     qtd: b.qtd,
     valor: b.valor,
-    clientes: Array.from(b.clientes.values()).sort((a, z) => z.valor - a.valor),
+    duplicatas: b.duplicatas.sort((a, z) => {
+      const av = a.vencimento ? a.vencimento.getTime() : Infinity;
+      const zv = z.vencimento ? z.vencimento.getTime() : Infinity;
+      return av - zv;
+    }),
   }));
 }
 
@@ -287,6 +302,8 @@ export interface DeptResumo {
   vencido: number;
   aVencer: number;
   percVencido: number;
+  /** Duplicatas do departamento, ordenadas por vencimento (mais próximo primeiro). */
+  duplicatas: Duplicata[];
 }
 
 /** Ordem canônica dos departamentos de classificação (+ "Não classificado" por último). */
@@ -298,15 +315,23 @@ export function resumoPorDepartamento(duplicatas: Duplicata[]): DeptResumo[] {
   const ordem = departamentosOrdenados();
   const map = new Map<string, DeptResumo>();
   for (const dep of ordem) {
-    map.set(dep, { departamento: dep, qtd: 0, total: 0, vencido: 0, aVencer: 0, percVencido: 0 });
+    map.set(dep, { departamento: dep, qtd: 0, total: 0, vencido: 0, aVencer: 0, percVencido: 0, duplicatas: [] });
   }
   for (const d of duplicatas) {
-    const r = map.get(d.departamento) ?? { departamento: d.departamento, qtd: 0, total: 0, vencido: 0, aVencer: 0, percVencido: 0 };
+    const r = map.get(d.departamento) ?? { departamento: d.departamento, qtd: 0, total: 0, vencido: 0, aVencer: 0, percVencido: 0, duplicatas: [] };
     r.qtd += 1;
     r.total += d.valor;
     if (d.vencido) r.vencido += d.valor;
     else r.aVencer += d.valor;
+    r.duplicatas.push(d);
     map.set(d.departamento, r);
+  }
+  for (const r of map.values()) {
+    r.duplicatas.sort((a, z) => {
+      const av = a.vencimento ? a.vencimento.getTime() : Infinity;
+      const zv = z.vencimento ? z.vencimento.getTime() : Infinity;
+      return av - zv;
+    });
   }
   return Array.from(map.values())
     .map((r) => ({ ...r, percVencido: r.total > 0 ? (r.vencido / r.total) * 100 : 0 }))
