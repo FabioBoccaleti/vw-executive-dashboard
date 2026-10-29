@@ -3,10 +3,12 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
   PieChart, Pie, Legend,
 } from 'recharts';
-import { Loader2, AlertCircle, TrendingDown, Boxes, PackageX, Timer, Search, ChevronRight, ChevronDown } from 'lucide-react';
+import { Loader2, AlertCircle, TrendingDown, Boxes, PackageX, Timer, Search, ChevronRight, ChevronDown, FileDown } from 'lucide-react';
+import { toast } from 'sonner';
 import type { EstoquePecasMarca } from './EstoquePecasDashboard';
 import { getInventario, getMovimentacao, getLatestMonthWithBoth, type ImportedTable } from './estoquePecasStorage';
 import { buildAnalise, AGING_BUCKETS, type AnaliseResult, type AnaliseItem } from './estoqueAnalise';
+import { exportEstoqueExcel } from './estoqueExport';
 
 const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -52,6 +54,7 @@ export function AnaliseEstoqueTab({ marca }: Props) {
 
   const [search, setSearch] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'parados' | 'movimentando' | 'sem_info'>('todos');
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,6 +92,19 @@ export function AnaliseEstoqueTab({ marca }: Props) {
     const n = parseInt(thresholdInput, 10);
     if (Number.isFinite(n) && n >= 0) setThreshold(n);
     else setThresholdInput(String(threshold));
+  };
+
+  const handleExport = async () => {
+    if (!analise) return;
+    setExporting(true);
+    try {
+      await exportEstoqueExcel({ marca, month, analise });
+    } catch (err) {
+      console.error('Erro ao exportar Excel:', err);
+      toast.error('Erro ao gerar o Excel.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const itensFiltrados = useMemo(() => {
@@ -152,6 +168,14 @@ export function AnaliseEstoqueTab({ marca }: Props) {
             </button>
           </div>
         </div>
+        <button
+          onClick={handleExport}
+          disabled={exporting || !analise}
+          className="ml-auto inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60"
+        >
+          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+          {exporting ? 'Gerando...' : 'Exportar Excel'}
+        </button>
       </div>
 
       {faltando.length > 0 ? (
