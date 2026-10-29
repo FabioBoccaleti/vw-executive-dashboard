@@ -388,8 +388,8 @@ function ProdutoTable({
 }
 
 const FONTE_LABEL: Record<VencimentoFonte, string> = {
-  vencimento: 'Vencimento',
-  datapliq: 'Data p/ Liq.',
+  vencimento: 'Em estoque',
+  datapliq: 'Vendido',
 };
 
 function VencimentosTable({
@@ -480,7 +480,7 @@ function VencimentosTable({
                               <tr>
                                 <th className="text-left px-2 py-1">Chassi</th>
                                 <th className="text-left px-2 py-1">Produto</th>
-                                <th className="text-left px-2 py-1">Origem da data</th>
+                                <th className="text-left px-2 py-1">Situação</th>
                                 <th className="text-right px-2 py-1">Valor NF</th>
                               </tr>
                             </thead>

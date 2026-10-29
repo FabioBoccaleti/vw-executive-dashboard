@@ -73,6 +73,7 @@ export async function exportAnaliseExcel(brand: MonitoramentoBVBrand, analysis: 
   buildFaixaSheet(wb, 'Dias - Em Estoque', analysis.bucketsNaoVendidos);
   buildFinanciamentoSheet(wb, analysis);
   buildEspecialSheet(wb, analysis.linhaEspecial);
+  buildVencimentosSheet(wb, analysis);
 
   await download(wb, `Monitoramento_BV_${marca}_${analysis.date}.xlsx`);
 }
@@ -213,6 +214,77 @@ function buildEspecialSheet(wb: ExcelJS.Workbook, especial: EspecialResumo) {
       row.getCell(3).numFmt = INT_FMT;
       row.getCell(4).numFmt = CURRENCY_FMT;
       borderDataRow(row);
+    }
+  }
+}
+
+function vencimentoSituacao(dia: DayAnalysis['vencimentos'][number]): string {
+  if (dia.vencido) return 'Vencido';
+  if (dia.dentro30) return 'Próximos 30 dias';
+  return 'Futuro';
+}
+
+const VENCIMENTO_FONTE_LABEL: Record<'vencimento' | 'datapliq', string> = {
+  vencimento: 'Em estoque',
+  datapliq: 'Vendido',
+};
+
+function buildVencimentosSheet(wb: ExcelJS.Workbook, analysis: DayAnalysis) {
+  const ws = wb.addWorksheet('Vencimentos', { properties: { tabColor: { argb: HEADER_FILL } } });
+  ws.columns = [{ width: 16 }, { width: 18 }, { width: 24 }, { width: 18 }, { width: 14 }, { width: 18 }];
+
+  const vencimentos = analysis.vencimentos;
+
+  styleTitle(ws, ws.addRow(['Vencimentos dos Veículos']), 6);
+  const subtitle = ws.addRow([
+    'Vencimento = Data p/ Liq. quando preenchida; senão, coluna Vencimento (apenas produtos ROT).',
+  ]);
+  subtitle.getCell(1).font = { italic: true, color: { argb: 'FF64748B' } };
+  const infoRow = ws.addRow([`Data base: ${dateBR(analysis.date)}`]);
+  infoRow.getCell(1).font = { italic: true, color: { argb: 'FF64748B' } };
+  ws.addRow([]);
+
+  // Resumo por dia.
+  styleTitle(ws, ws.addRow(['Resumo por dia de vencimento']), 6);
+  styleHeader(ws.addRow(['Data de vencimento', 'Situação do vencimento', 'Veículos', 'Valor NF']));
+  if (vencimentos.length === 0) {
+    borderDataRow(ws.addRow(['Nenhum veículo com data de vencimento', '', '', '']));
+  } else {
+    for (const dia of vencimentos) {
+      const row = ws.addRow([dateBR(dia.dateISO), vencimentoSituacao(dia), dia.qtd, dia.valorNf]);
+      row.getCell(3).numFmt = INT_FMT;
+      row.getCell(4).numFmt = CURRENCY_FMT;
+      borderDataRow(row);
+    }
+  }
+  const totalQtd = vencimentos.reduce((s, d) => s + d.qtd, 0);
+  const totalValor = vencimentos.reduce((s, d) => s + d.valorNf, 0);
+  const totalRow = ws.addRow(['Total', '', totalQtd, totalValor]);
+  totalRow.getCell(3).numFmt = INT_FMT;
+  totalRow.getCell(4).numFmt = CURRENCY_FMT;
+  styleTotal(totalRow);
+  ws.addRow([]);
+
+  // Detalhado por chassi.
+  styleTitle(ws, ws.addRow(['Detalhado por chassi']), 6);
+  styleHeader(ws.addRow(['Data de vencimento', 'Situação do vencimento', 'Chassi', 'Produto', 'Situação', 'Valor NF']));
+  if (vencimentos.length === 0) {
+    borderDataRow(ws.addRow(['Nenhum veículo com data de vencimento', '', '', '', '', '']));
+  } else {
+    for (const dia of vencimentos) {
+      const situacao = vencimentoSituacao(dia);
+      for (const v of dia.veiculos) {
+        const row = ws.addRow([
+          dateBR(dia.dateISO),
+          situacao,
+          v.chassi,
+          v.produto,
+          VENCIMENTO_FONTE_LABEL[v.fonte],
+          v.valorNf,
+        ]);
+        row.getCell(6).numFmt = CURRENCY_FMT;
+        borderDataRow(row);
+      }
     }
   }
 }
