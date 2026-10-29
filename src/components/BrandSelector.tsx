@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BRAND_CONFIGS, type Brand } from '@/lib/brands';
-import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, TrendingUp, Settings, LogOut, Users, Home, Activity, Package, CreditCard, Target, Wrench } from 'lucide-react';
+import { Building2, Car, ChevronRight, ChevronDown, Layers, CheckCircle, DollarSign, BarChart2, TrendingUp, Settings, LogOut, Users, Home, Activity, Package, CreditCard, Target, Wrench, Landmark } from 'lucide-react';
 import { PasswordDialog } from '@/components/PasswordDialog';
 import { useAuth } from '@/contexts/useAuth';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
 
 const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'despesas_depto_vw', 'ieo', 'base_gerencial', 'comparativo_rede_vw', 'comparativo_rede_audi', 'vw_outros', 'audi_outros'];
-const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_veiculos_floorplan', 'analise_estoque_pecas', 'controle_pagamentos_evora'];
+const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_veiculos_floorplan', 'analise_estoque_pecas', 'analise_financeira', 'controle_pagamentos_evora'];
 const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despesas'];
 
 interface BrandSelectorProps {
@@ -30,6 +30,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
   const showAnaliseDespesas      = canAccessModule('analise_evolutiva_despesas');
   const showEstoqueUsados        = canAccessModule('numeros_estoque_usados');
   const showAnaliseEstoquePecas  = canAccessModule('analise_estoque_pecas');
+  const showAnaliseFinanceira    = canAccessModule('analise_financeira');
   const showControlePagamentosEvora = canAccessModule('controle_pagamentos_evora');
   const showControleVeiculosFloorplan = canAccessModule('controle_veiculos_floorplan');
 
@@ -43,6 +44,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
     if (b === 'analise_evolutiva_despesas')   return showAnaliseDespesas;
     if (b === 'numeros_estoque_usados')       return showEstoqueUsados;
     if (b === 'analise_estoque_pecas')        return showAnaliseEstoquePecas;
+    if (b === 'analise_financeira')           return showAnaliseFinanceira;
     if (b === 'controle_veiculos_floorplan')  return showControleVeiculosFloorplan;
     if (b === 'controle_pagamentos_evora')    return showControlePagamentosEvora;
     return false;
@@ -93,6 +95,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
     if (brand === 'analise_evolutiva_despesas')      return <Activity className={size} />;
     if (brand === 'numeros_estoque_usados')          return <Package className={size} />;
     if (brand === 'analise_estoque_pecas')           return <Wrench className={size} />;
+    if (brand === 'analise_financeira')              return <Landmark className={size} />;
     if (brand === 'controle_veiculos_floorplan')     return <Car className={size} />;
     if (brand === 'controle_pagamentos_evora')       return <CreditCard className={size} />;
     if (brand === 'analise_projecoes')             return <BarChart2 className={size} />;
