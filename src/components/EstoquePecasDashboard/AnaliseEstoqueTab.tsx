@@ -188,6 +188,12 @@ function AnaliseConteudo({
   itensFiltrados: AnaliseItem[];
 }) {
   const [expandedFaixa, setExpandedFaixa] = useState<string | null>(null);
+  const [showAllParados, setShowAllParados] = useState(false);
+
+  const paradosOrdenados = useMemo(
+    () => analise.itens.filter((it) => it.parado).sort((a, b) => b.valorTotal - a.valorTotal),
+    [analise.itens],
+  );
 
   const donutData = [
     { name: 'Movimentando', value: analise.valorMovimentando, color: '#16a34a' },
@@ -372,15 +378,30 @@ function AnaliseConteudo({
         </div>
       </div>
 
-      {/* Top 10 parados */}
+      {/* Itens parados (top 10 + expandir todos) */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
-        <h4 className="text-sm font-bold text-slate-700 mb-3">Top 10 itens parados por valor</h4>
-        {analise.topParados.length === 0 ? (
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-sm font-bold text-slate-700">
+            {showAllParados
+              ? `Itens parados por valor (${fmtInt(paradosOrdenados.length)})`
+              : 'Top 10 itens parados por valor'}
+          </h4>
+          {paradosOrdenados.length > 10 && (
+            <button
+              onClick={() => setShowAllParados((v) => !v)}
+              className="text-xs font-semibold px-3 py-1.5 rounded-md border transition-colors"
+              style={{ color: marca.primary, borderColor: marca.primary }}
+            >
+              {showAllParados ? 'Ver os 10 principais' : `Ver todos (${fmtInt(paradosOrdenados.length)})`}
+            </button>
+          )}
+        </div>
+        {paradosOrdenados.length === 0 ? (
           <p className="text-sm text-slate-400">Nenhum item acima do limiar de {fmtInt(analise.threshold)} dias.</p>
         ) : (
-          <div className="overflow-auto">
+          <div className={`overflow-auto ${showAllParados ? 'max-h-[60vh]' : ''}`}>
             <table className="w-full text-sm">
-              <thead>
+              <thead className={showAllParados ? 'sticky top-0 bg-white z-10' : ''}>
                 <tr className="text-slate-500 border-b border-slate-200">
                   <th className="text-left py-2 font-medium">Código</th>
                   <th className="text-left py-2 font-medium">Descrição</th>
@@ -390,7 +411,7 @@ function AnaliseConteudo({
                 </tr>
               </thead>
               <tbody>
-                {analise.topParados.map((it, i) => (
+                {(showAllParados ? paradosOrdenados : paradosOrdenados.slice(0, 10)).map((it, i) => (
                   <tr key={`${it.codigoInterno}-${i}`} className="border-b border-slate-50">
                     <td className="py-1.5 text-slate-700 whitespace-nowrap">{it.codigo}</td>
                     <td className="py-1.5 text-slate-600">{it.descricao}</td>
