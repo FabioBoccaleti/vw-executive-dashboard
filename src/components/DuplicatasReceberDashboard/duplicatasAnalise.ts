@@ -349,6 +349,42 @@ export interface ClienteResumo {
   duplicatas: Duplicata[];
 }
 
+export interface OrigemResumo {
+  origem: string;
+  qtd: number;
+  total: number;
+  vencido: number;
+  aVencer: number;
+  percVencido: number;
+  /** Títulos da origem, ordenados por vencimento (mais próximo primeiro). */
+  duplicatas: Duplicata[];
+}
+
+/** Resumo agrupado por NOME_ORIGEM, ordenado por total (desc). */
+export function resumoPorOrigem(duplicatas: Duplicata[]): OrigemResumo[] {
+  const map = new Map<string, OrigemResumo>();
+  for (const d of duplicatas) {
+    const origem = d.nomeOrigem || '(sem origem)';
+    const r = map.get(origem) ?? { origem, qtd: 0, total: 0, vencido: 0, aVencer: 0, percVencido: 0, duplicatas: [] };
+    r.qtd += 1;
+    r.total += d.valor;
+    if (d.vencido) r.vencido += d.valor;
+    else r.aVencer += d.valor;
+    r.duplicatas.push(d);
+    map.set(origem, r);
+  }
+  for (const r of map.values()) {
+    r.duplicatas.sort((a, z) => {
+      const av = a.vencimento ? a.vencimento.getTime() : Infinity;
+      const zv = z.vencimento ? z.vencimento.getTime() : Infinity;
+      return av - zv;
+    });
+  }
+  return Array.from(map.values())
+    .map((r) => ({ ...r, percVencido: r.total > 0 ? (r.vencido / r.total) * 100 : 0 }))
+    .sort((a, b) => b.total - a.total);
+}
+
 function agruparPorCliente(duplicatas: Duplicata[]): ClienteResumo[] {
   const map = new Map<string, ClienteResumo>();
   for (const d of duplicatas) {

@@ -11,9 +11,9 @@ import {
   getAvailableMonths, getDuplicatas, getDepartamentoMap, type DuplicatasImport, type DepartamentoMap,
 } from './duplicatasStorage';
 import {
-  parseDuplicatas, analyze, resumoPorDepartamento, startOfDay,
+  parseDuplicatas, analyze, resumoPorDepartamento, resumoPorOrigem, startOfDay,
   topClientesPorValor, topClientesPorVencido,
-  type Duplicata, type FaixaResult, type ClienteResumo, type DeptResumo,
+  type Duplicata, type FaixaResult, type ClienteResumo, type DeptResumo, type OrigemResumo,
 } from './duplicatasAnalise';
 
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -96,6 +96,7 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
     [duplicatas, deptFilter],
   );
   const analysis = useMemo(() => analyze(filtradas), [filtradas]);
+  const resumoOrigem = useMemo(() => resumoPorOrigem(filtradas), [filtradas]);
 
   const toggle = (key: string) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
 
@@ -183,6 +184,9 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
         />
         <DeptChart rows={resumoDept} />
       </div>
+
+      {/* Resumo por origem */}
+      <ResumoOrigemTable rows={resumoOrigem} expanded={expanded} toggle={toggle} />
 
       {/* Aging */}
       <div className="grid gap-5 lg:grid-cols-2">
@@ -377,6 +381,104 @@ function DeptChart({ rows }: { rows: DeptResumo[] }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
+    </div>
+  );
+}
+
+// ─── Resumo por origem ───────────────────────────────────────────────────────
+function ResumoOrigemTable({ rows, expanded, toggle }: {
+  rows: OrigemResumo[];
+  expanded: Record<string, boolean>;
+  toggle: (key: string) => void;
+}) {
+  const totals = rows.reduce((a, r) => ({ qtd: a.qtd + r.qtd, total: a.total + r.total, vencido: a.vencido + r.vencido, aVencer: a.aVencer + r.aVencer }), { qtd: 0, total: 0, vencido: 0, aVencer: 0 });
+  const percTotal = totals.total > 0 ? (totals.vencido / totals.total) * 100 : 0;
+  return (
+    <div>
+      <h3 className="text-sm font-bold text-slate-700 mb-2">Resumo por origem</h3>
+      <div className="overflow-auto border border-slate-200 rounded-lg">
+        <table className="min-w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-3 py-2 w-8"></th>
+              <th className="text-left px-3 py-2">Origem</th>
+              <th className="text-right px-3 py-2">Dupl.</th>
+              <th className="text-right px-3 py-2">Total</th>
+              <th className="text-right px-3 py-2">Vencido</th>
+              <th className="text-right px-3 py-2">A vencer</th>
+              <th className="text-right px-3 py-2">% Venc.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr><td colSpan={7} className="px-3 py-4 text-center text-slate-400">Nenhuma duplicata neste grupo.</td></tr>
+            ) : rows.map((r) => {
+              const key = `ro:${r.origem}`;
+              const isOpen = expanded[key];
+              return (
+                <Fragment key={r.origem}>
+                  <tr className="border-t border-slate-100 cursor-pointer hover:bg-slate-50" onClick={() => toggle(key)}>
+                    <td className="px-3 py-1.5 text-slate-400">{isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</td>
+                    <td className="px-3 py-1.5 font-medium text-slate-700">{r.origem}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{fmtInt(r.qtd)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(r.total)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-rose-600">{fmtBRL(r.vencido)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-emerald-700">{fmtBRL(r.aVencer)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{fmtPerc(r.percVencido)}</td>
+                  </tr>
+                  {isOpen && (
+                    <tr>
+                      <td></td>
+                      <td colSpan={6} className="px-3 py-2 bg-slate-50">
+                        <table className="min-w-full text-[11px]">
+                          <thead className="text-slate-500">
+                            <tr>
+                              <th className="text-left px-2 py-1">Cliente</th>
+                              <th className="text-left px-2 py-1">Departamento</th>
+                              <th className="text-left px-2 py-1">Título</th>
+                              <th className="text-left px-2 py-1">Vencimento</th>
+                              <th className="text-left px-2 py-1">Situação</th>
+                              <th className="text-right px-2 py-1">Valor</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {r.duplicatas.map((d, di) => (
+                              <tr key={`${d.titulo}-${di}`} className="border-t border-slate-200">
+                                <td className="px-2 py-1">{d.clienteNome}</td>
+                                <td className="px-2 py-1">{d.departamento}</td>
+                                <td className="px-2 py-1">{d.titulo || '—'}</td>
+                                <td className="px-2 py-1 tabular-nums">{fmtDateBR(d.vencimento)}</td>
+                                <td className="px-2 py-1">
+                                  {d.vencido
+                                    ? <span className="text-rose-600 font-medium">Vencida ({fmtInt(d.diasAtraso)}d)</span>
+                                    : <span className="text-emerald-700">A vencer</span>}
+                                </td>
+                                <td className="px-2 py-1 text-right tabular-nums">{fmtBRL(d.valor)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+            {rows.length > 0 && (
+              <tr className="bg-sky-50 font-bold border-t border-slate-200">
+                <td></td>
+                <td className="px-3 py-1.5">Total</td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{fmtInt(totals.qtd)}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(totals.total)}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums text-rose-700">{fmtBRL(totals.vencido)}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums text-emerald-700">{fmtBRL(totals.aVencer)}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{fmtPerc(percTotal)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[11px] text-slate-400 mt-1">Clique na seta para ver os títulos da origem.</p>
     </div>
   );
 }
