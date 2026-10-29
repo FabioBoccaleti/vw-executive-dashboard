@@ -25,7 +25,7 @@ const MARCAS: DuplicatasMarca[] = [
 ];
 
 export function DuplicatasReceberDashboard({ onBack }: Props) {
-  const [mainTab, setMainTab] = useState<MainTab>('importacao');
+  const [mainTab, setMainTab] = useState<MainTab>('analise');
   const [importMarca, setImportMarca] = useState<DuplicatasMarcaId>('audi');
   const [analiseMarca, setAnaliseMarca] = useState<DuplicatasMarcaId>('audi');
   const [parametrosMarca, setParametrosMarca] = useState<DuplicatasMarcaId>('audi');
