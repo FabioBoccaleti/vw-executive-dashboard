@@ -1,8 +1,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronDown, ChevronRight, Loader2, Wallet, AlertTriangle, CalendarClock,
-  Users, Receipt, TrendingUp, Filter,
+  Users, Receipt, TrendingUp, Filter, FileDown,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
@@ -15,6 +16,7 @@ import {
   topClientesPorValor, topClientesPorVencido,
   type Duplicata, type FaixaResult, type ClienteResumo, type DeptResumo, type OrigemResumo,
 } from './duplicatasAnalise';
+import { exportDuplicatasExcel } from './duplicatasExport';
 
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 function formatMonthLabel(month: string): string {
@@ -50,6 +52,7 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
   const [loading, setLoading] = useState(true);
   const [deptFilter, setDeptFilter] = useState<string>('__todos__');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [exporting, setExporting] = useState(false);
 
   const referenceDate = useMemo(() => startOfDay(new Date()), []);
 
@@ -100,6 +103,19 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
 
   const toggle = (key: string) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  const handleExport = async () => {
+    if (!month || duplicatas.length === 0) return;
+    setExporting(true);
+    try {
+      await exportDuplicatasExcel({ marca, month, referenceDate, duplicatas });
+    } catch (err) {
+      console.error('Erro ao exportar Excel:', err);
+      toast.error('Erro ao gerar o Excel.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="mt-4 flex items-center justify-center py-16 text-slate-400 gap-2">
@@ -149,9 +165,19 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
             {departamentosDisponiveis.map((d) => (<option key={d} value={d}>{d}</option>))}
           </select>
         </div>
-        <div className="ml-auto text-right">
-          <p className="text-sm font-medium text-slate-700">Posição em {fmtDateBR(referenceDate)}</p>
-          <p className="text-xs text-slate-400">Vencido/a vencer calculado por DTA_VENCIMENTO</p>
+        <div className="ml-auto flex items-end gap-4">
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60"
+          >
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+            {exporting ? 'Gerando...' : 'Exportar Excel'}
+          </button>
+          <div className="text-right">
+            <p className="text-sm font-medium text-slate-700">Posição em {fmtDateBR(referenceDate)}</p>
+            <p className="text-xs text-slate-400">Vencido/a vencer calculado por DTA_VENCIMENTO</p>
+          </div>
         </div>
       </div>
 
