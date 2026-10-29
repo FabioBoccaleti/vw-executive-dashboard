@@ -91,6 +91,7 @@ export interface AnaliseItem {
   dias: number | null; // null = sem informação de dias
   parado: boolean;
   faixa: string | null;
+  classeAbc: 'A' | 'B' | 'C';
 }
 
 export interface AgingBucketResult {
@@ -190,7 +191,7 @@ export function buildAnalise(
     const parado = dias !== null && dias >= threshold;
     const faixa = dias !== null ? bucketForDias(dias)?.label ?? null : null;
 
-    return { codigo, codigoInterno, descricao, grupo, quantidade, valorUnit, valorTotal, dias, parado, faixa };
+    return { codigo, codigoInterno, descricao, grupo, quantidade, valorUnit, valorTotal, dias, parado, faixa, classeAbc: 'C' };
   });
 
   // Totais
@@ -283,6 +284,7 @@ function computeAbc(itens: AnaliseItem[], totalValor: number): AbcResult[] {
     if (pctAcum < 80) classe = 'A';
     else if (pctAcum < 95) classe = 'B';
     else classe = 'C';
+    it.classeAbc = classe;
     acc[classe].skus += 1;
     acc[classe].valor += it.valorTotal;
     cumulative += it.valorTotal;

@@ -200,6 +200,7 @@ function AnaliseConteudo({
   itensFiltrados: AnaliseItem[];
 }) {
   const [expandedFaixa, setExpandedFaixa] = useState<string | null>(null);
+  const [expandedAbc, setExpandedAbc] = useState<'A' | 'B' | 'C' | null>(null);
   const [showAllParados, setShowAllParados] = useState(false);
 
   const paradosOrdenados = useMemo(
@@ -334,7 +335,7 @@ function AnaliseConteudo({
         {/* Curva ABC */}
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
           <h4 className="text-sm font-bold text-slate-700 mb-1">Curva ABC (por valor)</h4>
-          <p className="text-xs text-slate-400 mb-3">A ≤ 80% · B ≤ 95% · C restante do valor</p>
+          <p className="text-xs text-slate-400 mb-3">A ≤ 80% · B ≤ 95% · C restante · clique para ver os itens</p>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-slate-500 border-b border-slate-100">
@@ -345,19 +346,26 @@ function AnaliseConteudo({
               </tr>
             </thead>
             <tbody>
-              {analise.abc.map((a) => (
-                <tr key={a.classe} className="border-b border-slate-50">
-                  <td className="py-1.5">
-                    <span className="inline-flex items-center gap-1.5 font-semibold" style={{ color: ABC_COLORS[a.classe] }}>
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ABC_COLORS[a.classe] }} />
-                      {a.classe}
-                    </span>
-                  </td>
-                  <td className="py-1.5 text-right tabular-nums text-slate-600">{fmtInt(a.skus)}</td>
-                  <td className="py-1.5 text-right tabular-nums text-slate-700">{fmtCurrency(a.valor)}</td>
-                  <td className="py-1.5 text-right tabular-nums text-slate-600">{fmtPct(a.pctValor)}</td>
-                </tr>
-              ))}
+              {analise.abc.map((a) => {
+                const isOpen = expandedAbc === a.classe;
+                const itensClasse = isOpen
+                  ? analise.itens
+                      .filter((it) => it.classeAbc === a.classe)
+                      .sort((x, y) => y.valorTotal - x.valorTotal)
+                  : [];
+                return (
+                  <AbcRow
+                    key={a.classe}
+                    classe={a.classe}
+                    skus={a.skus}
+                    valor={a.valor}
+                    pctValor={a.pctValor}
+                    isOpen={isOpen}
+                    onToggle={() => setExpandedAbc(isOpen ? null : a.classe)}
+                    itens={itensClasse}
+                  />
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -542,6 +550,69 @@ function FaixaRow({
           <td colSpan={3} className="p-0">
             {itens.length === 0 ? (
               <p className="text-xs text-slate-400 px-2 py-2">Nenhum item nesta faixa.</p>
+            ) : (
+              <div className="max-h-64 overflow-auto bg-slate-50 rounded-md my-1">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-slate-100">
+                    <tr className="text-slate-500">
+                      <th className="text-left px-2 py-1 font-medium">Item</th>
+                      <th className="text-right px-2 py-1 font-medium">Qtd</th>
+                      <th className="text-right px-2 py-1 font-medium">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {itens.map((it, i) => (
+                      <tr key={`${it.codigoInterno}-${i}`} className="border-b border-slate-100 last:border-0">
+                        <td className="px-2 py-1 text-slate-700">
+                          <span className="block truncate max-w-[180px]" title={`${it.codigo} — ${it.descricao}`}>
+                            {it.descricao || it.codigo}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1 text-right tabular-nums text-slate-600">{fmtInt(it.quantidade)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-slate-700">{fmtCurrency(it.valorTotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function AbcRow({
+  classe, skus, valor, pctValor, isOpen, onToggle, itens,
+}: {
+  classe: 'A' | 'B' | 'C';
+  skus: number;
+  valor: number;
+  pctValor: number;
+  isOpen: boolean;
+  onToggle: () => void;
+  itens: AnaliseItem[];
+}) {
+  return (
+    <>
+      <tr className="border-b border-slate-50 cursor-pointer hover:bg-slate-50" onClick={onToggle}>
+        <td className="py-1.5">
+          <span className="inline-flex items-center gap-1.5 font-semibold" style={{ color: ABC_COLORS[classe] }}>
+            {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ABC_COLORS[classe] }} />
+            {classe}
+          </span>
+        </td>
+        <td className="py-1.5 text-right tabular-nums text-slate-600">{fmtInt(skus)}</td>
+        <td className="py-1.5 text-right tabular-nums text-slate-700">{fmtCurrency(valor)}</td>
+        <td className="py-1.5 text-right tabular-nums text-slate-600">{fmtPct(pctValor)}</td>
+      </tr>
+      {isOpen && (
+        <tr>
+          <td colSpan={4} className="p-0">
+            {itens.length === 0 ? (
+              <p className="text-xs text-slate-400 px-2 py-2">Nenhum item nesta classe.</p>
             ) : (
               <div className="max-h-64 overflow-auto bg-slate-50 rounded-md my-1">
                 <table className="w-full text-xs">
