@@ -18,6 +18,43 @@ export interface DuplicatasImport {
 }
 
 const DUPLICATAS_PREFIX = 'duplicatas_receber:posicao:';
+const DEPT_MAP_PREFIX = 'duplicatas_receber:dept_map:';
+
+/** Departamentos de classificação (ordem de exibição). */
+export const DEPARTAMENTOS = [
+  'Veículos Novos',
+  'Veículos Usados',
+  'Venda Direta',
+  'Peças',
+  'Acessórios',
+  'Oficina',
+  'Funilaria',
+  'Administração',
+] as const;
+
+export type DepartamentoCustom = typeof DEPARTAMENTOS[number];
+
+/** Rótulo usado para duplicatas cujo departamento do arquivo ainda não foi classificado. */
+export const DEPARTAMENTO_NAO_CLASSIFICADO = 'Não classificado';
+
+/**
+ * Mapeamento do número de DEPARTAMENTO do arquivo para um departamento de classificação.
+ * Exclusivo: cada número do arquivo aponta para no máximo um departamento.
+ */
+export type DepartamentoMap = Record<string, DepartamentoCustom>;
+
+function deptMapKey(marca: DuplicatasMarcaId): string {
+  return `${DEPT_MAP_PREFIX}${marca}`;
+}
+
+export async function getDepartamentoMap(marca: DuplicatasMarcaId): Promise<DepartamentoMap> {
+  const saved = await kvGet<DepartamentoMap>(deptMapKey(marca));
+  return saved ?? {};
+}
+
+export async function saveDepartamentoMap(marca: DuplicatasMarcaId, map: DepartamentoMap): Promise<boolean> {
+  return kvSet(deptMapKey(marca), map);
+}
 
 function duplicatasKey(marca: DuplicatasMarcaId, month: string): string {
   return `${DUPLICATAS_PREFIX}${marca}:${month}`;

@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { FolderInput, BarChart3 } from 'lucide-react';
+import { FolderInput, BarChart3, SlidersHorizontal } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ImportacaoDuplicatasTab } from './ImportacaoDuplicatasTab';
 import { AnaliseDuplicatasTab } from './AnaliseDuplicatasTab';
+import { DepartamentosTab } from './DepartamentosTab';
 import type { DuplicatasMarcaId } from './duplicatasStorage';
 
 export interface DuplicatasMarca {
@@ -16,7 +17,7 @@ interface Props {
   onBack: () => void;
 }
 
-type MainTab = 'importacao' | 'analise';
+type MainTab = 'importacao' | 'analise' | 'parametros';
 
 const MARCAS: DuplicatasMarca[] = [
   { id: 'audi', name: 'Audi', primary: '#bb0a30', primaryLight: '#fce8ec' },
@@ -27,6 +28,7 @@ export function DuplicatasReceberDashboard({ onBack }: Props) {
   const [mainTab, setMainTab] = useState<MainTab>('importacao');
   const [importMarca, setImportMarca] = useState<DuplicatasMarcaId>('audi');
   const [analiseMarca, setAnaliseMarca] = useState<DuplicatasMarcaId>('audi');
+  const [parametrosMarca, setParametrosMarca] = useState<DuplicatasMarcaId>('audi');
 
   const accent = '#4f46e5';
 
@@ -63,6 +65,14 @@ export function DuplicatasReceberDashboard({ onBack }: Props) {
             >
               <BarChart3 className="w-5 h-5" />
               Análise
+            </TabsTrigger>
+            <TabsTrigger
+              value="parametros"
+              className="gap-2 text-base px-5 py-2.5"
+              style={mainTab === 'parametros' ? { backgroundColor: accent, color: '#fff' } : undefined}
+            >
+              <SlidersHorizontal className="w-5 h-5" />
+              Parâmetros
             </TabsTrigger>
           </TabsList>
 
@@ -105,6 +115,28 @@ export function DuplicatasReceberDashboard({ onBack }: Props) {
               {MARCAS.map((m) => (
                 <TabsContent key={m.id} value={m.id}>
                   <AnaliseDuplicatasTab marca={m} />
+                </TabsContent>
+              ))}
+            </Tabs>
+          </TabsContent>
+
+          <TabsContent value="parametros" className="mt-4">
+            <Tabs value={parametrosMarca} onValueChange={(v) => setParametrosMarca(v as DuplicatasMarcaId)}>
+              <TabsList>
+                {MARCAS.map((m) => (
+                  <TabsTrigger
+                    key={m.id}
+                    value={m.id}
+                    style={parametrosMarca === m.id ? { backgroundColor: m.primary, color: '#fff' } : undefined}
+                  >
+                    {m.name}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {MARCAS.map((m) => (
+                <TabsContent key={m.id} value={m.id}>
+                  <DepartamentosTab marca={m} />
                 </TabsContent>
               ))}
             </Tabs>
