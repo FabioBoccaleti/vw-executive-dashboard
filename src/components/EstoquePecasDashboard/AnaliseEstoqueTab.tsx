@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { Loader2, AlertCircle, TrendingDown, Boxes, PackageX, Timer, Search, ChevronRight, ChevronDown } from 'lucide-react';
 import type { EstoquePecasMarca } from './EstoquePecasDashboard';
-import { getInventario, getMovimentacao, type ImportedTable } from './estoquePecasStorage';
+import { getInventario, getMovimentacao, getLatestMonthWithBoth, type ImportedTable } from './estoquePecasStorage';
 import { buildAnalise, AGING_BUCKETS, type AnaliseResult, type AnaliseItem } from './estoqueAnalise';
 
 const MONTH_NAMES = [
@@ -43,9 +43,10 @@ interface Props {
 
 export function AnaliseEstoqueTab({ marca }: Props) {
   const [month, setMonth] = useState<string>(currentMonth());
+  const [monthResolved, setMonthResolved] = useState(false);
   const [threshold, setThreshold] = useState<number>(180);
   const [thresholdInput, setThresholdInput] = useState<string>('180');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [inventario, setInventario] = useState<ImportedTable | null>(null);
   const [movimentacao, setMovimentacao] = useState<ImportedTable | null>(null);
 
@@ -66,7 +67,18 @@ export function AnaliseEstoqueTab({ marca }: Props) {
     }
   }, [marca.id, month]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+    setMonthResolved(false);
+    getLatestMonthWithBoth(marca.id).then((latest) => {
+      if (!active) return;
+      if (latest) setMonth(latest);
+      setMonthResolved(true);
+    });
+    return () => { active = false; };
+  }, [marca.id]);
+
+  useEffect(() => { if (monthResolved) load(); }, [load, monthResolved]);
 
   const analise: AnaliseResult | null = useMemo(() => {
     if (!inventario || !movimentacao) return null;
@@ -92,7 +104,7 @@ export function AnaliseEstoqueTab({ marca }: Props) {
   }, [analise, search, filtroStatus]);
 
   // ─── Estados de carregamento / ausência de dados ──────────────────────────────
-  if (loading) {
+  if (loading || !monthResolved) {
     return (
       <div className="mt-4 flex items-center justify-center py-16 text-slate-400 gap-2">
         <Loader2 className="w-5 h-5 animate-spin" /> Carregando...
@@ -233,9 +245,9 @@ function AnaliseConteudo({
         <KpiCard
           icon={<Timer className="w-5 h-5" />}
           color="#475569"
-          label="Item mais antigo"
-          value={analise.maisAntigo?.dias != null ? `${fmtInt(analise.maisAntigo.dias)} dias` : '—'}
-          sub={analise.maiorValorParado ? `Maior parado: ${fmtCurrency(analise.maiorValorParado.valorTotal)}` : '—'}
+          label="Maior valor parado"
+          value={analise.maiorValorParado ? fmtCurrency(analise.maiorValorParado.valorTotal) : '—'}
+          sub={analise.maiorValorParado?.dias != null ? `${fmtInt(analise.maiorValorParado.dias)} dias parado` : '—'}
         />
       </div>
 

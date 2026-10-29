@@ -7,8 +7,10 @@ import {
   parseInventarioTxt,
   saveMovimentacao,
   getMovimentacao,
+  deleteMovimentacao,
   type MovimentacaoImport,
 } from './estoquePecasStorage';
+import { RemoverDadosButton } from './RemoverDadosButton';
 
 const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -125,6 +127,12 @@ export function MovimentacaoItensTab({ marca }: Props) {
     }
   };
 
+  const handleRemove = async () => {
+    await deleteMovimentacao(marca.id, month);
+    setData(null);
+    toast.success(`Movimentação de ${formatMonthLabel(month)} removida.`);
+  };
+
   return (
     <div className="mt-4 space-y-4">
       {/* Barra de controles */}
@@ -161,12 +169,18 @@ export function MovimentacaoItensTab({ marca }: Props) {
         />
 
         {data && (
-          <div className="ml-auto text-right">
-            <p className="text-sm font-medium text-slate-700">{data.rows.length} itens</p>
-            <p className="text-xs text-slate-400">
-              {data.fileName} · importado em {new Date(data.importedAt).toLocaleString('pt-BR')}
-            </p>
-          </div>
+          <>
+            <RemoverDadosButton
+              alvo={`a movimentação de ${formatMonthLabel(month)}`}
+              onConfirm={handleRemove}
+            />
+            <div className="ml-auto text-right">
+              <p className="text-sm font-medium text-slate-700">{data.rows.length} itens</p>
+              <p className="text-xs text-slate-400">
+                {data.fileName} · importado em {new Date(data.importedAt).toLocaleString('pt-BR')}
+              </p>
+            </div>
+          </>
         )}
       </div>
 

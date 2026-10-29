@@ -1,4 +1,4 @@
-import { kvGet, kvSet } from '@/lib/kvClient';
+import { kvGet, kvSet, kvKeys, kvDelete } from '@/lib/kvClient';
 
 export type EstoquePecasMarcaId = 'audi' | 'vw';
 
@@ -44,6 +44,10 @@ export async function getInventario(
   return kvGet<InventarioImport>(inventarioKey(marca, month));
 }
 
+export async function deleteInventario(marca: EstoquePecasMarcaId, month: string): Promise<boolean> {
+  return kvDelete(inventarioKey(marca, month));
+}
+
 export async function saveMovimentacao(data: MovimentacaoImport): Promise<boolean> {
   return kvSet(movimentacaoKey(data.marca, data.month), data);
 }
@@ -53,6 +57,41 @@ export async function getMovimentacao(
   month: string,
 ): Promise<MovimentacaoImport | null> {
   return kvGet<MovimentacaoImport>(movimentacaoKey(marca, month));
+}
+
+export async function deleteMovimentacao(marca: EstoquePecasMarcaId, month: string): Promise<boolean> {
+  return kvDelete(movimentacaoKey(marca, month));
+}
+
+/** Extrai o mês ('YYYY-MM') do fim de uma chave de storage. */
+function monthFromKey(key: string): string | null {
+  const m = key.match(/(\d{4}-\d{2})$/);
+  return m ? m[1] : null;
+}
+
+/** Lista os meses ('YYYY-MM') disponíveis por tipo de arquivo, para a marca. */
+export async function getAvailableMonths(
+  marca: EstoquePecasMarcaId,
+): Promise<{ inventario: string[]; movimentacao: string[] }> {
+  const [invKeys, movKeys] = await Promise.all([
+    kvKeys(`${INVENTARIO_PREFIX}${marca}:*`),
+    kvKeys(`${MOVIMENTACAO_PREFIX}${marca}:*`),
+  ]);
+  const inventario = invKeys.map(monthFromKey).filter((m): m is string => !!m);
+  const movimentacao = movKeys.map(monthFromKey).filter((m): m is string => !!m);
+  return { inventario, movimentacao };
+}
+
+/** Mês mais recente que possui AMBOS os arquivos importados (ou null se não houver). */
+export async function getLatestMonthWithBoth(
+  marca: EstoquePecasMarcaId,
+): Promise<string | null> {
+  const { inventario, movimentacao } = await getAvailableMonths(marca);
+  const movSet = new Set(movimentacao);
+  const both = inventario.filter((m) => movSet.has(m));
+  if (both.length === 0) return null;
+  both.sort(); // 'YYYY-MM' ordena lexicograficamente
+  return both[both.length - 1];
 }
 
 /**

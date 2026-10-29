@@ -21,7 +21,7 @@ type MainTab = 'importacao' | 'analise';
 type ImportSubTab = 'inventario' | 'movimentacao';
 
 export function EstoquePecasDashboard({ marca, onBack }: Props) {
-  const [mainTab, setMainTab] = useState<MainTab>('importacao');
+  const [mainTab, setMainTab] = useState<MainTab>('analise');
   const [importSubTab, setImportSubTab] = useState<ImportSubTab>('inventario');
 
   return (
@@ -42,13 +42,21 @@ export function EstoquePecasDashboard({ marca, onBack }: Props) {
       <div className="flex-1 p-6">
         {/* Abas principais */}
         <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as MainTab)}>
-          <TabsList>
-            <TabsTrigger value="importacao" className="gap-1.5">
-              <FolderInput className="w-4 h-4" />
+          <TabsList className="h-auto p-1">
+            <TabsTrigger
+              value="importacao"
+              className="gap-2 text-base px-5 py-2.5"
+              style={mainTab === 'importacao' ? { backgroundColor: marca.primary, color: '#fff' } : undefined}
+            >
+              <FolderInput className="w-5 h-5" />
               Importação de Arquivo
             </TabsTrigger>
-            <TabsTrigger value="analise" className="gap-1.5">
-              <BarChart3 className="w-4 h-4" />
+            <TabsTrigger
+              value="analise"
+              className="gap-2 text-base px-5 py-2.5"
+              style={mainTab === 'analise' ? { backgroundColor: marca.primary, color: '#fff' } : undefined}
+            >
+              <BarChart3 className="w-5 h-5" />
               Análise de Estoque
             </TabsTrigger>
           </TabsList>
