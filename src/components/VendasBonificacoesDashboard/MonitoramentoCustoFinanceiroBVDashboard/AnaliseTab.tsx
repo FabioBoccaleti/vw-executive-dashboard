@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, AlertCircle, Car, DollarSign, Percent, CalendarClock, Wallet, Printer, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { getMonitoramentoBVDay, listMonitoramentoBVDates, type MonitoramentoBVBrand } from './storage';
-import { analyzeDay, FAIXAS, PRODUTO_LINHA_ESPECIAL, type BucketResult, type DayAnalysis, type EspecialResumo } from './analysis';
+import { analyzeDay, FAIXAS, PRODUTO_LINHA_ESPECIAL, type BucketResult, type DayAnalysis, type EspecialResumo, type VencimentoDia, type VencimentoFonte } from './analysis';
 import { exportAnaliseExcel } from './export';
 
 interface Props {
@@ -323,6 +323,12 @@ function SingleDayView({
           rows={analysis.porProdutoNaoVendidos}
           total={analysis.naoVendidos}
         />
+        <VencimentosTable
+          vencimentos={analysis.vencimentos}
+          baseDateISO={analysis.date}
+          expanded={expanded}
+          setExpanded={setExpanded}
+        />
       </div>
     </div>
   );
@@ -374,6 +380,136 @@ function ProdutoTable({
               <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(total.juros)}</td>
               <td className="px-3 py-1.5 text-right tabular-nums">{fmtDias(total.mediaDias)}</td>
             </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+const FONTE_LABEL: Record<VencimentoFonte, string> = {
+  vencimento: 'Vencimento',
+  datapliq: 'Data p/ Liq.',
+};
+
+function VencimentosTable({
+  vencimentos,
+  baseDateISO,
+  expanded,
+  setExpanded,
+}: {
+  vencimentos: VencimentoDia[];
+  baseDateISO: string;
+  expanded: Record<string, boolean>;
+  setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+}) {
+  const [showAll, setShowAll] = useState(false);
+
+  const visibles = showAll ? vencimentos : vencimentos.filter(v => v.vencido || v.dentro30);
+  const totalQtd = visibles.reduce((sum, v) => sum + v.qtd, 0);
+  const totalValor = visibles.reduce((sum, v) => sum + v.valorNf, 0);
+  const temVencidos = vencimentos.some(v => v.vencido);
+
+  return (
+    <div className="break-inside-avoid">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div>
+          <h3 className="text-sm font-bold text-slate-700">Vencimentos dos Veículos</h3>
+          <p className="text-xs text-slate-400">
+            Data de vencimento = coluna <span className="font-medium">Data p/ Liq.</span> quando preenchida; caso contrário, a coluna <span className="font-medium">Vencimento</span> (apenas para produtos <span className="font-medium">ROT</span>).
+            {showAll ? ' Exibindo todos os vencimentos.' : ` Exibindo próximos 30 dias a partir de ${formatDateBR(baseDateISO)}${temVencidos ? ' e vencimentos em atraso' : ''}.`}
+          </p>
+        </div>
+        {vencimentos.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAll(prev => !prev)}
+            className="shrink-0 text-xs font-medium text-sky-700 border border-sky-200 rounded-md px-3 py-1.5 hover:bg-sky-50 print:hidden"
+          >
+            {showAll ? 'Ver apenas próximos 30 dias' : 'Ver todos os vencimentos'}
+          </button>
+        )}
+      </div>
+      <div className="overflow-hidden border border-slate-200 rounded-lg">
+        <table className="min-w-full text-xs">
+          <thead className="bg-slate-50 text-slate-600">
+            <tr>
+              <th className="text-left px-3 py-2 w-8"></th>
+              <th className="text-left px-3 py-2">Data de vencimento</th>
+              <th className="text-right px-3 py-2">Veículos</th>
+              <th className="text-right px-3 py-2">Valor NF</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibles.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-3 py-4 text-center text-slate-400">
+                  {vencimentos.length === 0 ? 'Nenhum veículo com data de vencimento.' : 'Nenhum vencimento nos próximos 30 dias.'}
+                </td>
+              </tr>
+            ) : (
+              visibles.map(dia => {
+                const key = `venc:${dia.dateISO}`;
+                const isOpen = expanded[key];
+                return (
+                  <Fragment key={key}>
+                    <tr
+                      className={`border-t border-slate-100 cursor-pointer hover:bg-slate-50 ${dia.vencido ? 'bg-rose-50/60' : ''}`}
+                      onClick={() => setExpanded(prev => ({ ...prev, [key]: !prev[key] }))}
+                    >
+                      <td className="px-3 py-1.5 text-slate-400">
+                        {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      </td>
+                      <td className="px-3 py-1.5 font-medium text-slate-700">
+                        <span className="tabular-nums">{formatDateBR(dia.dateISO)}</span>
+                        {dia.vencido && (
+                          <span className="ml-2 inline-flex items-center gap-1 text-rose-600 text-[11px] font-semibold">
+                            <AlertCircle className="w-3 h-3" /> Vencido
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{fmtInt(dia.qtd)}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(dia.valorNf)}</td>
+                    </tr>
+                    {isOpen && (
+                      <tr>
+                        <td></td>
+                        <td colSpan={3} className="px-3 py-2 bg-slate-50">
+                          <table className="min-w-full text-[11px]">
+                            <thead className="text-slate-500">
+                              <tr>
+                                <th className="text-left px-2 py-1">Chassi</th>
+                                <th className="text-left px-2 py-1">Produto</th>
+                                <th className="text-left px-2 py-1">Origem da data</th>
+                                <th className="text-right px-2 py-1">Valor NF</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dia.veiculos.map((veiculo, index) => (
+                                <tr key={`${veiculo.chassi}-${index}`} className="border-t border-slate-200">
+                                  <td className="px-2 py-1 font-mono">{veiculo.chassi}</td>
+                                  <td className="px-2 py-1">{veiculo.produto}</td>
+                                  <td className="px-2 py-1">{FONTE_LABEL[veiculo.fonte]}</td>
+                                  <td className="px-2 py-1 text-right tabular-nums">{fmtBRL(veiculo.valorNf)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })
+            )}
+            {visibles.length > 0 && (
+              <tr className="bg-sky-50 font-bold border-t border-slate-200">
+                <td></td>
+                <td className="px-3 py-1.5">Total</td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{fmtInt(totalQtd)}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{fmtBRL(totalValor)}</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

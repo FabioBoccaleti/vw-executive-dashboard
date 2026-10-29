@@ -57,6 +57,13 @@ export function isoToDate(iso: string): Date | null {
   return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
 }
 
+export function dateToISO(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function diffInDays(later: Date, earlier: Date): number {
   const ms = later.getTime() - earlier.getTime();
   return Math.floor(ms / 86400000);
@@ -124,6 +131,29 @@ export interface GrupoResumo {
   mediaDias: number | null;
 }
 
+/** Origem da data de vencimento efetiva de um veículo. */
+export type VencimentoFonte = 'vencimento' | 'datapliq';
+
+export interface VencimentoVehicle {
+  chassi: string;
+  produto: string;
+  valorNf: number;
+  /** De qual coluna veio a data: 'datapliq' tem prioridade sobre 'vencimento'. */
+  fonte: VencimentoFonte;
+}
+
+export interface VencimentoDia {
+  /** Data de vencimento no formato yyyy-mm-dd. */
+  dateISO: string;
+  qtd: number;
+  valorNf: number;
+  /** Vencimento anterior à data base do arquivo. */
+  vencido: boolean;
+  /** Vencimento dentro dos próximos 30 dias a partir da data base. */
+  dentro30: boolean;
+  veiculos: VencimentoVehicle[];
+}
+
 export interface DayAnalysis {
   date: string;
   totalVeiculos: number;
@@ -139,6 +169,8 @@ export interface DayAnalysis {
   porProdutoNaoVendidos: ProdutoResult[];
   linhaEspecial: EspecialResumo;
   veiculos: VehicleRow[];
+  /** Vencimentos agrupados por dia (todos os veículos), ordenados por data. */
+  vencimentos: VencimentoDia[];
   /** Nenhuma tabela/coluna reconhecida no arquivo. */
   reconhecido: boolean;
 }
@@ -168,6 +200,7 @@ interface ColumnMap {
   emissaoNf: number;
   dataVenda: number;
   dataPLiq: number;
+  vencimento: number;
   valorNf: number;
   juros: number;
   mora: number;
@@ -194,6 +227,7 @@ function detectTable(data: MonitoramentoBVDayData): DetectedTable | null {
         emissaoNf: indexOf('emissaonf'),
         dataVenda: indexOf('datadavenda'),
         dataPLiq: indexOf('datapliq'),
+        vencimento: indexOf('vencimento'),
         valorNf: indexOf('valornf'),
         juros: indexOf('juros'),
         mora: indexOf('mora'),
@@ -233,6 +267,7 @@ export function analyzeDay(data: MonitoramentoBVDayData): DayAnalysis {
       buckets: FAIXAS.map(f => ({ label: f.label, qtd: 0, valorNf: 0, veiculos: [] })),
     },
     veiculos: [],
+    vencimentos: [],
     reconhecido: Boolean(detected),
   };
 
@@ -249,6 +284,8 @@ export function analyzeDay(data: MonitoramentoBVDayData): DayAnalysis {
   let comDiasNaoVendidos = 0;
   let somaDiasCaixa = 0;
 
+  const vencMap = new Map<string, { valorNf: number; veiculos: VencimentoVehicle[] }>();
+
   for (let r = headerRow + 1; r < rows.length; r++) {
     const row = rows[r];
     const chassi = String(cell(row, columns.chassi) ?? '').trim();
@@ -263,7 +300,21 @@ export function analyzeDay(data: MonitoramentoBVDayData): DayAnalysis {
     const emissaoNf = parseDateCell(cell(row, columns.emissaoNf));
     const dataVenda = parseDateCell(cell(row, columns.dataVenda));
     const dataPLiq = parseDateCell(cell(row, columns.dataPLiq));
+    const vencimentoCol = parseDateCell(cell(row, columns.vencimento));
     const vendido = dataVenda !== null;
+
+    // Vencimento efetivo:
+    // - Com Data p/ Liq.: usa essa data (qualquer produto).
+    // - Sem Data p/ Liq.: usa a coluna Vencimento apenas para produtos "ROT";
+    //   demais produtos sem Data p/ Liq. ficam fora da tabela de vencimentos.
+    const vencEfetivo = dataPLiq ?? (produto.toUpperCase().includes('ROT') ? vencimentoCol : null);
+    if (vencEfetivo) {
+      const iso = dateToISO(vencEfetivo);
+      const acc = vencMap.get(iso) ?? { valorNf: 0, veiculos: [] };
+      acc.valorNf += valorNf;
+      acc.veiculos.push({ chassi, produto, valorNf, fonte: dataPLiq ? 'datapliq' : 'vencimento' });
+      vencMap.set(iso, acc);
+    }
 
     let diasEstoque: number | null = null;
     if (emissaoNf) {
@@ -322,6 +373,27 @@ export function analyzeDay(data: MonitoramentoBVDayData): DayAnalysis {
   base.porProduto = groupByProduto(base.veiculos);
   base.porProdutoVendidos = groupByProduto(base.veiculos.filter(v => v.vendido));
   base.porProdutoNaoVendidos = groupByProduto(base.veiculos.filter(v => !v.vendido));
+
+  base.vencimentos = Array.from(vencMap.entries())
+    .map(([dateISO, acc]) => {
+      const date = isoToDate(dateISO);
+      let vencido = false;
+      let dentro30 = false;
+      if (date && baseDate) {
+        const dias = diffInDays(date, baseDate);
+        vencido = dias < 0;
+        dentro30 = dias >= 0 && dias <= 30;
+      }
+      return {
+        dateISO,
+        qtd: acc.veiculos.length,
+        valorNf: acc.valorNf,
+        vencido,
+        dentro30,
+        veiculos: acc.veiculos.sort((a, b) => b.valorNf - a.valorNf),
+      };
+    })
+    .sort((a, b) => a.dateISO.localeCompare(b.dateISO));
 
   return base;
 }
