@@ -23,8 +23,8 @@ interface SubCard {
 const SUB_CARDS: SubCard[] = [
   { id: 'audi', name: 'Estoque de Peças Audi', primary: '#bb0a30', primaryLight: '#fce8ec', kind: 'pecas' },
   { id: 'vw', name: 'Estoque de Peças VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'pecas' },
-  { id: 'usados_vw', name: 'Estoque de Veículos Usados VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'usados', veiculoBrand: 'vw' },
   { id: 'usados_audi', name: 'Estoque de Veículos Usados Audi', primary: '#bb0a30', primaryLight: '#fce8ec', kind: 'usados', veiculoBrand: 'audi' },
+  { id: 'usados_vw', name: 'Estoque de Veículos Usados VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'usados', veiculoBrand: 'vw' },
 ];
 
 export function AnaliseEstoquePecasPage({ onChangeBrand }: Props) {
@@ -64,8 +64,8 @@ export function AnaliseEstoquePecasPage({ onChangeBrand }: Props) {
       </header>
 
       <div className="flex-1 flex items-start justify-center p-6">
-        <div className="w-full max-w-4xl mt-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="w-full max-w-3xl mt-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {SUB_CARDS.map((card) => (
               <Card
                 key={card.id}
@@ -73,14 +73,14 @@ export function AnaliseEstoquePecasPage({ onChangeBrand }: Props) {
                 style={{ ['--tw-ring-color' as string]: card.primary }}
                 onClick={() => setSubPage(card.id)}
               >
-                <CardContent className="p-6 flex flex-col items-center justify-center min-h-[150px] gap-3 text-center">
+                <CardContent className="p-8 flex flex-col items-center justify-center min-h-[200px] gap-4 text-center">
                   <div
-                    className="p-3 rounded-full transition-colors duration-300"
+                    className="p-4 rounded-full transition-colors duration-300"
                     style={{ backgroundColor: card.primaryLight, color: card.primary }}
                   >
-                    {card.kind === 'usados' ? <Car className="w-8 h-8" /> : <Wrench className="w-8 h-8" />}
+                    {card.kind === 'usados' ? <Car className="w-10 h-10" /> : <Wrench className="w-10 h-10" />}
                   </div>
-                  <h3 className="text-base font-bold text-slate-800">{card.name}</h3>
+                  <h3 className="text-lg font-bold text-slate-800">{card.name}</h3>
                 </CardContent>
               </Card>
             ))}
