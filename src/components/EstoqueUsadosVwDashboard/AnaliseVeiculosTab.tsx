@@ -6,7 +6,7 @@ import {
   Loader2, Boxes, DollarSign, Tag, Timer, PackageX, Search, ChevronRight, ChevronDown, Car, FileDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getInventarioVeiculos, getLatestMonthVeiculos, type VeiculoImport } from './veiculosStorage';
+import { getInventarioVeiculos, getLatestMonthVeiculos, type VeiculoImport, type VeiculoBrandId } from './veiculosStorage';
 import {
   buildAnaliseVeiculos, AGING_BUCKETS, type VeiculoAnaliseItem,
 } from './veiculosAnalise';
@@ -51,11 +51,13 @@ function fmtDate(iso: string | null): string {
 }
 
 interface Props {
+  brand: VeiculoBrandId;
+  name: string;
   primary: string;
   primaryLight: string;
 }
 
-export function AnaliseVeiculosTab({ primary, primaryLight }: Props) {
+export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props) {
   const [month, setMonth] = useState<string>(currentMonth());
   const [monthResolved, setMonthResolved] = useState(false);
   const [baseDate, setBaseDate] = useState<string>(todayISO());
@@ -77,23 +79,23 @@ export function AnaliseVeiculosTab({ primary, primaryLight }: Props) {
   useEffect(() => {
     let active = true;
     setMonthResolved(false);
-    getLatestMonthVeiculos().then((latest) => {
+    getLatestMonthVeiculos(brand).then((latest) => {
       if (!active) return;
       if (latest) setMonth(latest);
       setMonthResolved(true);
     });
     return () => { active = false; };
-  }, []);
+  }, [brand]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const inv = await getInventarioVeiculos(month);
+      const inv = await getInventarioVeiculos(brand, month);
       setData(inv);
     } finally {
       setLoading(false);
     }
-  }, [month]);
+  }, [brand, month]);
 
   useEffect(() => {
     if (monthResolved) load();
@@ -131,7 +133,7 @@ export function AnaliseVeiculosTab({ primary, primaryLight }: Props) {
     if (!analise) return;
     setExporting(true);
     try {
-      await exportVeiculosExcel({ primary, month, baseDate, analise });
+      await exportVeiculosExcel({ name, primary, month, baseDate, analise });
     } catch (err) {
       console.error('Erro ao exportar Excel:', err);
       toast.error('Erro ao gerar o Excel.');

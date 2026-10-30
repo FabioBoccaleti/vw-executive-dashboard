@@ -69,6 +69,7 @@ async function download(wb: ExcelJS.Workbook, filename: string) {
 }
 
 interface ExportParams {
+  name: string;
   primary: string;
   month: string;
   baseDate: string;
@@ -76,27 +77,27 @@ interface ExportParams {
 }
 
 /** Gera e baixa a análise de estoque de veículos usados em Excel, com uma aba por seção. */
-export async function exportVeiculosExcel({ primary, month, baseDate, analise }: ExportParams) {
+export async function exportVeiculosExcel({ name, primary, month, baseDate, analise }: ExportParams) {
   const theme: Theme = { title: hexToArgb(primary), header: hexToArgb(primary) };
 
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Sorana Executive Dashboard';
   wb.created = new Date();
 
-  buildResumoSheet(wb, theme, month, baseDate, analise);
+  buildResumoSheet(wb, theme, name, month, baseDate, analise);
   buildFaixaSheet(wb, theme, analise);
   buildMarcaSheet(wb, theme, analise);
   buildModeloSheet(wb, theme, analise);
   buildVeiculosSheet(wb, theme, analise);
 
-  await download(wb, `Estoque_Veiculos_Usados_VW_${month}.xlsx`);
+  await download(wb, `${name.replace(/\s+/g, '_')}_${month}.xlsx`);
 }
 
-function buildResumoSheet(wb: ExcelJS.Workbook, theme: Theme, month: string, baseDate: string, a: AnaliseVeiculosResult) {
+function buildResumoSheet(wb: ExcelJS.Workbook, theme: Theme, name: string, month: string, baseDate: string, a: AnaliseVeiculosResult) {
   const ws = wb.addWorksheet('Resumo', { properties: { tabColor: { argb: theme.header } } });
   ws.columns = [{ width: 40 }, { width: 22 }, { width: 12 }];
 
-  styleTitle(ws, ws.addRow(['Estoque de Veículos Usados VW']), 3, theme);
+  styleTitle(ws, ws.addRow([name]), 3, theme);
   const [by, bm, bd] = baseDate.split('-');
   const info = ws.addRow([`Mês: ${monthLabel(month)}`, `Data-base: ${bd}/${bm}/${by}`, `Parado > ${a.threshold} dias`]);
   info.font = { italic: true, color: { argb: 'FF64748B' } };

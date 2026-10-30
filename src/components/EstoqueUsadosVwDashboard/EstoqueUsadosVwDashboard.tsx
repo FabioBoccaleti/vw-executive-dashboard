@@ -3,24 +3,31 @@ import { FolderInput, BarChart3 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ImportacaoVeiculosTab } from './ImportacaoVeiculosTab';
 import { AnaliseVeiculosTab } from './AnaliseVeiculosTab';
+import type { VeiculoBrandId } from './veiculosStorage';
+
+export interface VeiculoBrandConfig {
+  id: VeiculoBrandId;
+  name: string;
+  primary: string;
+  primaryLight: string;
+}
 
 interface Props {
+  config: VeiculoBrandConfig;
   onBack: () => void;
 }
 
-const PRIMARY = '#001e50';
-const PRIMARY_LIGHT = '#e8f4fc';
-
 type MainTab = 'importacao' | 'analise';
 
-export function EstoqueUsadosVwDashboard({ onBack }: Props) {
+export function EstoqueUsadosVwDashboard({ config, onBack }: Props) {
   const [mainTab, setMainTab] = useState<MainTab>('analise');
+  const { id, name, primary, primaryLight } = config;
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Estoque de Veículos Usados VW</h1>
+          <h1 className="text-lg font-bold text-slate-800">{name}</h1>
           <p className="text-xs text-slate-500 mt-0.5">Análise de Estoque</p>
         </div>
         <button
@@ -37,7 +44,7 @@ export function EstoqueUsadosVwDashboard({ onBack }: Props) {
             <TabsTrigger
               value="importacao"
               className="gap-2 text-base px-5 py-2.5"
-              style={mainTab === 'importacao' ? { backgroundColor: PRIMARY, color: '#fff' } : undefined}
+              style={mainTab === 'importacao' ? { backgroundColor: primary, color: '#fff' } : undefined}
             >
               <FolderInput className="w-5 h-5" />
               Importação de Arquivo
@@ -45,7 +52,7 @@ export function EstoqueUsadosVwDashboard({ onBack }: Props) {
             <TabsTrigger
               value="analise"
               className="gap-2 text-base px-5 py-2.5"
-              style={mainTab === 'analise' ? { backgroundColor: PRIMARY, color: '#fff' } : undefined}
+              style={mainTab === 'analise' ? { backgroundColor: primary, color: '#fff' } : undefined}
             >
               <BarChart3 className="w-5 h-5" />
               Análise de Estoque
@@ -53,11 +60,11 @@ export function EstoqueUsadosVwDashboard({ onBack }: Props) {
           </TabsList>
 
           <TabsContent value="importacao" className="mt-4">
-            <ImportacaoVeiculosTab primary={PRIMARY} primaryLight={PRIMARY_LIGHT} />
+            <ImportacaoVeiculosTab brand={id} primary={primary} primaryLight={primaryLight} />
           </TabsContent>
 
           <TabsContent value="analise" className="mt-4">
-            <AnaliseVeiculosTab primary={PRIMARY} primaryLight={PRIMARY_LIGHT} />
+            <AnaliseVeiculosTab brand={id} name={name} primary={primary} primaryLight={primaryLight} />
           </TabsContent>
         </Tabs>
       </div>

@@ -3,12 +3,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Wrench, Car } from 'lucide-react';
 import { EstoquePecasDashboard } from '@/components/EstoquePecasDashboard/EstoquePecasDashboard';
 import { EstoqueUsadosVwDashboard } from '@/components/EstoqueUsadosVwDashboard/EstoqueUsadosVwDashboard';
+import type { VeiculoBrandId } from '@/components/EstoqueUsadosVwDashboard/veiculosStorage';
 
 interface Props {
   onChangeBrand: () => void;
 }
 
-type SubPage = 'selection' | 'audi' | 'vw' | 'usados_vw';
+type SubPage = 'selection' | 'audi' | 'vw' | 'usados_vw' | 'usados_audi';
 
 interface SubCard {
   id: Exclude<SubPage, 'selection'>;
@@ -16,12 +17,14 @@ interface SubCard {
   primary: string;
   primaryLight: string;
   kind: 'pecas' | 'usados';
+  veiculoBrand?: VeiculoBrandId;
 }
 
 const SUB_CARDS: SubCard[] = [
   { id: 'audi', name: 'Estoque de Peças Audi', primary: '#bb0a30', primaryLight: '#fce8ec', kind: 'pecas' },
   { id: 'vw', name: 'Estoque de Peças VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'pecas' },
-  { id: 'usados_vw', name: 'Estoque de Veículos Usados VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'usados' },
+  { id: 'usados_vw', name: 'Estoque de Veículos Usados VW', primary: '#001e50', primaryLight: '#e8f4fc', kind: 'usados', veiculoBrand: 'vw' },
+  { id: 'usados_audi', name: 'Estoque de Veículos Usados Audi', primary: '#bb0a30', primaryLight: '#fce8ec', kind: 'usados', veiculoBrand: 'audi' },
 ];
 
 export function AnaliseEstoquePecasPage({ onChangeBrand }: Props) {
@@ -30,7 +33,12 @@ export function AnaliseEstoquePecasPage({ onChangeBrand }: Props) {
   if (subPage !== 'selection') {
     const card = SUB_CARDS.find((c) => c.id === subPage)!;
     if (card.kind === 'usados') {
-      return <EstoqueUsadosVwDashboard onBack={() => setSubPage('selection')} />;
+      return (
+        <EstoqueUsadosVwDashboard
+          config={{ id: card.veiculoBrand!, name: card.name, primary: card.primary, primaryLight: card.primaryLight }}
+          onBack={() => setSubPage('selection')}
+        />
+      );
     }
     return (
       <EstoquePecasDashboard

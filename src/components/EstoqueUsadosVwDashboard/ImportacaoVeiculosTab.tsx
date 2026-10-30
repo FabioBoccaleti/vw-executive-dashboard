@@ -8,6 +8,7 @@ import {
   getInventarioVeiculos,
   deleteInventarioVeiculos,
   type VeiculoImport,
+  type VeiculoBrandId,
 } from './veiculosStorage';
 
 const MONTH_NAMES = [
@@ -28,11 +29,12 @@ function currentMonth(): string {
 }
 
 interface Props {
+  brand: VeiculoBrandId;
   primary: string;
   primaryLight: string;
 }
 
-export function ImportacaoVeiculosTab({ primary, primaryLight }: Props) {
+export function ImportacaoVeiculosTab({ brand, primary, primaryLight }: Props) {
   const [month, setMonth] = useState<string>(currentMonth());
   const [data, setData] = useState<VeiculoImport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -42,12 +44,12 @@ export function ImportacaoVeiculosTab({ primary, primaryLight }: Props) {
   const loadMonth = useCallback(async () => {
     setLoading(true);
     try {
-      const saved = await getInventarioVeiculos(month);
+      const saved = await getInventarioVeiculos(brand, month);
       setData(saved);
     } finally {
       setLoading(false);
     }
-  }, [month]);
+  }, [brand, month]);
 
   useEffect(() => {
     loadMonth();
@@ -73,7 +75,7 @@ export function ImportacaoVeiculosTab({ primary, primaryLight }: Props) {
         veiculos,
       };
 
-      const ok = await saveInventarioVeiculos(imported);
+      const ok = await saveInventarioVeiculos(brand, imported);
       if (!ok) {
         toast.error('Não foi possível salvar os dados importados.');
         return;
@@ -91,7 +93,7 @@ export function ImportacaoVeiculosTab({ primary, primaryLight }: Props) {
   };
 
   const handleRemove = async () => {
-    await deleteInventarioVeiculos(month);
+    await deleteInventarioVeiculos(brand, month);
     setData(null);
     toast.success(`Inventário de ${formatMonthLabel(month)} removido.`);
   };
