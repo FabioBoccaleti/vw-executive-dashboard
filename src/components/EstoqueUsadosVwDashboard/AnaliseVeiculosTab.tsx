@@ -3,12 +3,14 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
 import {
-  Loader2, Boxes, DollarSign, Tag, Timer, PackageX, Search, ChevronRight, ChevronDown, Car,
+  Loader2, Boxes, DollarSign, Tag, Timer, PackageX, Search, ChevronRight, ChevronDown, Car, FileDown,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { getInventarioVeiculos, getLatestMonthVeiculos, type VeiculoImport } from './veiculosStorage';
 import {
   buildAnaliseVeiculos, AGING_BUCKETS, type VeiculoAnaliseItem,
 } from './veiculosAnalise';
+import { exportVeiculosExcel } from './veiculosExport';
 
 const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -69,6 +71,7 @@ export function AnaliseVeiculosTab({ primary, primaryLight }: Props) {
   const [expandedMarca, setExpandedMarca] = useState<string | null>(null);
   const [expandedModelo, setExpandedModelo] = useState<string | null>(null);
   const [showAllModelos, setShowAllModelos] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Resolve o mês mais recente disponível ao abrir.
   useEffect(() => {
@@ -122,6 +125,19 @@ export function AnaliseVeiculosTab({ primary, primaryLight }: Props) {
     const n = Number(thresholdInput);
     if (Number.isFinite(n) && n >= 0) setThreshold(Math.round(n));
     else setThresholdInput(String(threshold));
+  };
+
+  const handleExport = async () => {
+    if (!analise) return;
+    setExporting(true);
+    try {
+      await exportVeiculosExcel({ primary, month, baseDate, analise });
+    } catch (err) {
+      console.error('Erro ao exportar Excel:', err);
+      toast.error('Erro ao gerar o Excel.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (!monthResolved || loading) {
@@ -191,9 +207,19 @@ export function AnaliseVeiculosTab({ primary, primaryLight }: Props) {
             style={{ ['--tw-ring-color' as string]: primary }}
           />
         </div>
-        <div className="ml-auto text-right">
-          <p className="text-sm font-medium text-slate-700">{formatMonthLabel(data.month)}</p>
-          <p className="text-xs text-slate-400">{data.fileName}</p>
+        <div className="ml-auto flex items-center gap-3">
+          <button
+            onClick={handleExport}
+            disabled={exporting || !analise}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60"
+          >
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+            {exporting ? 'Gerando...' : 'Exportar Excel'}
+          </button>
+          <div className="text-right">
+            <p className="text-sm font-medium text-slate-700">{formatMonthLabel(data.month)}</p>
+            <p className="text-xs text-slate-400">{data.fileName}</p>
+          </div>
         </div>
       </div>
 
