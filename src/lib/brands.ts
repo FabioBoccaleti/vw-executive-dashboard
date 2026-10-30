@@ -565,7 +565,7 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
   },
   analise_estoque_pecas: {
     id: 'analise_estoque_pecas',
-    name: 'Análise de Estoque de Peças',
+    name: 'Análise de Estoque',
     shortName: 'Estoque Peças',
     colors: {
       primary: '#475569',

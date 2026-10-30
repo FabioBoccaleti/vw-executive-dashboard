@@ -94,7 +94,12 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
     if (brand === 'custos_alugueis')                 return <Home className={size} />;
     if (brand === 'analise_evolutiva_despesas')      return <Activity className={size} />;
     if (brand === 'numeros_estoque_usados')          return <Package className={size} />;
-    if (brand === 'analise_estoque_pecas')           return <Wrench className={size} />;
+    if (brand === 'analise_estoque_pecas')           return (
+      <span className="flex items-center gap-1">
+        <Wrench className={size} />
+        <Car className={size} />
+      </span>
+    );
     if (brand === 'analise_financeira')              return <Landmark className={size} />;
     if (brand === 'controle_veiculos_floorplan')     return <Car className={size} />;
     if (brand === 'controle_pagamentos_evora')       return <CreditCard className={size} />;
