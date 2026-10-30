@@ -67,6 +67,8 @@ export function AnaliseVeiculosTab({ primary, primaryLight }: Props) {
   const [filtroFaixa, setFiltroFaixa] = useState<string>('todas');
   const [expandedFaixa, setExpandedFaixa] = useState<string | null>(null);
   const [expandedMarca, setExpandedMarca] = useState<string | null>(null);
+  const [expandedModelo, setExpandedModelo] = useState<string | null>(null);
+  const [showAllModelos, setShowAllModelos] = useState(false);
 
   // Resolve o mês mais recente disponível ao abrir.
   useEffect(() => {
@@ -357,10 +359,24 @@ export function AnaliseVeiculosTab({ primary, primaryLight }: Props) {
         </div>
       </div>
 
-      {/* Top modelos */}
+      {/* Modelos em estoque */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
-        <h4 className="text-sm font-bold text-slate-700 mb-3">Top modelos em estoque</h4>
-        <div className="overflow-auto max-h-[40vh]">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-sm font-bold text-slate-700">
+            {showAllModelos ? 'Modelos em estoque' : 'Top modelos em estoque'}
+          </h4>
+          {analise.modelos.length > 15 && (
+            <button
+              onClick={() => setShowAllModelos((v) => !v)}
+              className="text-xs font-semibold px-3 py-1.5 rounded-md border transition-colors hover:bg-slate-50"
+              style={{ color: primary, borderColor: primary }}
+            >
+              {showAllModelos ? 'Mostrar top 15' : `Mostrar todos (${fmtInt(analise.modelos.length)})`}
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-slate-400 mb-3">Clique em um modelo com mais de um veículo para ver os itens.</p>
+        <div className="overflow-auto max-h-[50vh]">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white">
               <tr className="text-slate-500 border-b border-slate-100">
@@ -370,13 +386,23 @@ export function AnaliseVeiculosTab({ primary, primaryLight }: Props) {
               </tr>
             </thead>
             <tbody>
-              {analise.modelos.slice(0, 15).map((m) => (
-                <tr key={m.modelo} className="border-b border-slate-50">
-                  <td className="py-1.5 text-slate-700 truncate max-w-[280px]" title={m.modelo}>{m.modelo}</td>
-                  <td className="py-1.5 text-right tabular-nums text-slate-600">{fmtInt(m.n)}</td>
-                  <td className="py-1.5 text-right tabular-nums text-slate-700">{fmtCurrency(m.valor)}</td>
-                </tr>
-              ))}
+              {(showAllModelos ? analise.modelos : analise.modelos.slice(0, 15)).map((m) => {
+                const isOpen = expandedModelo === m.modelo;
+                const itensModelo = isOpen
+                  ? analise.itens.filter((it) => it.modelo === m.modelo).sort((a, c) => c.valor - a.valor)
+                  : [];
+                return (
+                  <ModeloRow
+                    key={m.modelo}
+                    modelo={m.modelo}
+                    n={m.n}
+                    valor={m.valor}
+                    isOpen={isOpen}
+                    onToggle={() => setExpandedModelo(isOpen ? null : m.modelo)}
+                    itens={itensModelo}
+                  />
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -518,6 +544,66 @@ function ExpandRow({
                 </table>
               </div>
             )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function ModeloRow({
+  modelo, n, valor, isOpen, onToggle, itens,
+}: {
+  modelo: string;
+  n: number;
+  valor: number;
+  isOpen: boolean;
+  onToggle: () => void;
+  itens: VeiculoAnaliseItem[];
+}) {
+  const expandable = n > 1;
+  return (
+    <>
+      <tr
+        className={`border-b border-slate-50 ${expandable ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+        onClick={expandable ? onToggle : undefined}
+      >
+        <td className="py-1.5 text-slate-700">
+          <span className="inline-flex items-center gap-1 max-w-[280px]" title={modelo}>
+            {expandable ? (
+              isOpen ? <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            ) : (
+              <span className="w-3.5 shrink-0" />
+            )}
+            <span className="truncate">{modelo}</span>
+          </span>
+        </td>
+        <td className="py-1.5 text-right tabular-nums text-slate-600">{fmtInt(n)}</td>
+        <td className="py-1.5 text-right tabular-nums text-slate-700">{fmtCurrency(valor)}</td>
+      </tr>
+      {expandable && isOpen && (
+        <tr>
+          <td colSpan={3} className="p-0">
+            <div className="max-h-64 overflow-auto bg-slate-50 rounded-md my-1">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-slate-100">
+                  <tr className="text-slate-500">
+                    <th className="text-left px-2 py-1 font-medium">Chassi</th>
+                    <th className="text-right px-2 py-1 font-medium">Dias</th>
+                    <th className="text-right px-2 py-1 font-medium">Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itens.map((it, i) => (
+                    <tr key={`${it.veiculo}-${i}`} className="border-b border-slate-100 last:border-0">
+                      <td className="px-2 py-1 text-slate-700 whitespace-nowrap">{it.chassi || '—'}</td>
+                      <td className="px-2 py-1 text-right tabular-nums text-slate-600">{it.dias != null ? fmtInt(it.dias) : '—'}</td>
+                      <td className="px-2 py-1 text-right tabular-nums text-slate-700">{fmtCurrency(it.valor)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </td>
         </tr>
       )}
