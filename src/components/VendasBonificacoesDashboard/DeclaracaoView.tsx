@@ -255,7 +255,7 @@ function RelacaoTab({ rows }: { rows: VendasRow[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              {['Veículo', 'Chassi', 'Revenda', 'Blindadora', 'Data da Venda', 'Situação'].map(h => (
+              {['Veículo', 'Chassi', 'Revenda', 'Blindadora', 'Data da Venda', 'Vendedor', 'Situação'].map(h => (
                 <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
               <th className="px-4 py-2.5 w-16" />
@@ -264,7 +264,7 @@ function RelacaoTab({ rows }: { rows: VendasRow[] }) {
           <tbody>
             {relacao.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center text-slate-400 text-sm py-12">
+                <td colSpan={8} className="text-center text-slate-400 text-sm py-12">
                   Nenhuma venda com data em {MONTHS[month - 1]}/{year}.
                 </td>
               </tr>
@@ -277,6 +277,7 @@ function RelacaoTab({ rows }: { rows: VendasRow[] }) {
                   <td className="px-4 py-2 text-slate-700">{r.revenda || '—'}</td>
                   <td className="px-4 py-2 text-slate-700">{r.blindadora || '—'}</td>
                   <td className="px-4 py-2 font-mono text-slate-600 whitespace-nowrap">{fmtDate(r.dataVenda)}</td>
+                  <td className="px-4 py-2 text-slate-700">{r.nomeVendedor || '—'}</td>
                   <td className="px-4 py-2">
                     {pago ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
@@ -333,6 +334,7 @@ function DemonstrativoDialog({
   const [prestadorId, setPrestadorId] = useState(initialPrestador);
   const [codigoCliente, setCodigoCliente] = useState(pagamento?.codigoCliente ?? '');
   const [nomeCliente, setNomeCliente] = useState(pagamento?.nomeCliente ?? '');
+  const [observacao, setObservacao] = useState(pagamento?.observacao ?? '');
   const [reabrir, setReabrir] = useState(false);
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
@@ -343,7 +345,7 @@ function DemonstrativoDialog({
 
   async function persistPendente(patch: Partial<DeclaracaoPagamento>) {
     if (pago) return;
-    await onSave({ ...(pagamento ?? { pago: false }), pago: false, prestadorId, codigoCliente, nomeCliente, ...patch });
+    await onSave({ ...(pagamento ?? { pago: false }), pago: false, prestadorId, codigoCliente, nomeCliente, observacao, ...patch });
   }
 
   async function persistSelecao(id: string) {
@@ -361,6 +363,7 @@ function DemonstrativoDialog({
       valor: prestadorSel.valor,
       codigoCliente,
       nomeCliente,
+      observacao,
       dataPagamento: new Date().toISOString().split('T')[0],
     });
     toast.success('Demonstrativo marcado como pago.');
@@ -368,7 +371,7 @@ function DemonstrativoDialog({
 
   async function confirmarReabrir() {
     if (senha !== '1985') { setErro('Senha incorreta.'); return; }
-    await onSave({ pago: false, prestadorId: pagamento?.prestadorId, codigoCliente, nomeCliente });
+    await onSave({ pago: false, prestadorId: pagamento?.prestadorId, codigoCliente, nomeCliente, observacao });
     setReabrir(false);
     setSenha('');
     setErro(null);
@@ -398,9 +401,15 @@ function DemonstrativoDialog({
         ${dado('Chassi', row.chassi)}
         ${dado('Blindadora', row.blindadora)}
       </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:14px;">
+        ${dado('Vendedor', row.nomeVendedor)}
+      </div>
       <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:14px;">
         ${dado('Código Cliente', codigoCliente)}
         ${dado('Nome do Cliente', nomeCliente)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:14px;">
+        ${dado('Observação', observacao)}
       </div>
       <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
         <span style="font-size:12px;font-weight:600;color:#475569;">Valor a pagar pela Prestação de Serviço</span>
@@ -465,6 +474,12 @@ function DemonstrativoDialog({
             ))}
           </div>
 
+          {/* Vendedor (somente leitura) */}
+          <div className="rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2.5">
+            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide mb-1">Vendedor</p>
+            <p className="text-sm font-medium text-slate-700 break-words">{row.nomeVendedor || '—'}</p>
+          </div>
+
           {/* Cliente (preenchido pelo usuário) */}
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -485,6 +500,18 @@ function DemonstrativoDialog({
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
               )}
             </div>
+          </div>
+
+          {/* Observação */}
+          <div>
+            <label className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wide mb-1">Observação</label>
+            {pago ? (
+              <p className="text-sm font-medium text-slate-700 border border-slate-100 bg-slate-50/60 rounded-lg px-3 py-2 whitespace-pre-wrap min-h-[2.5rem]">{observacao || '—'}</p>
+            ) : (
+              <textarea value={observacao} onChange={e => setObservacao(e.target.value)} onBlur={() => persistPendente({ observacao })}
+                rows={3} placeholder="Escreva um comentário…"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-amber-400" />
+            )}
           </div>
 
           {/* Valor a pagar */}

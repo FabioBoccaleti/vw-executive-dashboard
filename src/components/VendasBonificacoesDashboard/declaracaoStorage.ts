@@ -29,6 +29,7 @@ export interface DeclaracaoPagamento {
   valor?: string;          // congelado ao marcar como pago
   codigoCliente?: string;  // preenchido pelo usuário
   nomeCliente?: string;    // preenchido pelo usuário
+  observacao?: string;     // comentário livre preenchido pelo usuário
   dataPagamento?: string;  // "YYYY-MM-DD"
 }
 
