@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Layers, Car, Sparkles, Banknote, Wrench, ClipboardList, Grid3X3, Key, Hammer, Gauge } from 'lucide-react';
+import { Shield, Layers, Car, Sparkles, Banknote, Wrench, ClipboardList, Key, Hammer } from 'lucide-react';
 import { useAuth } from '@/contexts/useAuth';
 import type { VendasSubModuleId } from '@/lib/authTypes';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
@@ -17,7 +17,7 @@ const PASSAGEM_VW_SUBS: VendasSubModuleId[] = ['passagem_vw.cadastro', 'passagem
 const PASSAGEM_AUDI_SUBS: VendasSubModuleId[] = ['passagem_audi.cadastro', 'passagem_audi.passagens', 'passagem_audi.situacoes', 'passagem_audi.analise'];
 
 interface VendasSelectionPageProps {
-  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'monitoramento-custo-financeiro-estoque-rotativo-bv' | 'vpecas-condicao-pagamento' | 'despachante' | 'grade-test-drive-audi-rentabilidade' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi') => void;
+  onSelect: (option: 'blindagem' | 'peliculas' | 'estetica' | 'importar-pdf' | 'assinatura-sign-drive' | 'financiamento-banco-volks' | 'vpecas-condicao-pagamento' | 'despachante' | 'passagem-oficina-funilaria-vw' | 'passagem-oficina-funilaria-audi') => void;
   onChangeBrand: () => void;
 }
 
@@ -155,21 +155,6 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
           </button>
           )}
 
-          {/* Card — Monitoramento de Custo Financeiro Estoque Rotativo Banco Volks */}
-          <button
-            onClick={() => onSelect('monitoramento-custo-financeiro-estoque-rotativo-bv')}
-            className="w-56 bg-white rounded-2xl border-2 border-sky-400 shadow-md hover:shadow-xl hover:border-sky-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
-          >
-            <div className="p-4 rounded-full bg-sky-50 group-hover:bg-sky-100 transition-colors">
-              <Gauge className="w-10 h-10 text-sky-500" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-800 leading-snug">
-                Monitoramento de Custo Financeiro<br />Estoque Rotativo Banco Volks
-              </h2>
-            </div>
-          </button>
-
           {/* Card — Vendas Peças, Oficina e Funilaria por Condição de Pagamento */}
           {canVPecasCond && (
           <button
@@ -198,21 +183,6 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
             <div>
               <h2 className="text-base font-bold text-slate-800 leading-snug">
                 Serviços de Despachante
-              </h2>
-            </div>
-          </button>
-
-          {/* Card — Grade de Test Drive Audi e Rentabilidade */}
-          <button
-            onClick={() => onSelect('grade-test-drive-audi-rentabilidade')}
-            className="w-56 bg-white rounded-2xl border-2 border-cyan-400 shadow-md hover:shadow-xl hover:border-cyan-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
-          >
-            <div className="p-4 rounded-full bg-cyan-50 group-hover:bg-cyan-100 transition-colors">
-              <Grid3X3 className="w-10 h-10 text-cyan-500" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-800 leading-snug">
-                Grade de Test Drive Audi<br />e Rentabilidade
               </h2>
             </div>
           </button>

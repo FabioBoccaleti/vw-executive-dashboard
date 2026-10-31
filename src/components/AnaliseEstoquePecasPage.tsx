@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Wrench, Car } from 'lucide-react';
+import { Wrench, Car, Gauge, Grid3X3 } from 'lucide-react';
 import { EstoquePecasDashboard } from '@/components/EstoquePecasDashboard/EstoquePecasDashboard';
 import { EstoqueUsadosVwDashboard } from '@/components/EstoqueUsadosVwDashboard/EstoqueUsadosVwDashboard';
+import { GradeTestDriveAudiDashboard } from '@/components/VendasBonificacoesDashboard/GradeTestDriveAudi';
+import { MonitoramentoCustoFinanceiroBVDashboard } from '@/components/VendasBonificacoesDashboard/MonitoramentoCustoFinanceiroBVDashboard';
 import type { VeiculoBrandId } from '@/components/EstoqueUsadosVwDashboard/veiculosStorage';
 
 interface Props {
   onChangeBrand: () => void;
 }
 
-type SubPage = 'selection' | 'audi' | 'vw' | 'usados_vw' | 'usados_audi';
+type SubPage = 'selection' | 'audi' | 'vw' | 'usados_vw' | 'usados_audi' | 'grade_test_drive' | 'monitoramento_bv';
 
 interface SubCard {
-  id: Exclude<SubPage, 'selection'>;
+  id: 'audi' | 'vw' | 'usados_vw' | 'usados_audi';
   name: string;
   primary: string;
   primaryLight: string;
@@ -29,6 +31,14 @@ const SUB_CARDS: SubCard[] = [
 
 export function AnaliseEstoquePecasPage({ onChangeBrand }: Props) {
   const [subPage, setSubPage] = useState<SubPage>('selection');
+
+  if (subPage === 'grade_test_drive') {
+    return <GradeTestDriveAudiDashboard onBack={() => setSubPage('selection')} />;
+  }
+
+  if (subPage === 'monitoramento_bv') {
+    return <MonitoramentoCustoFinanceiroBVDashboard onBack={() => setSubPage('selection')} />;
+  }
 
   if (subPage !== 'selection') {
     const card = SUB_CARDS.find((c) => c.id === subPage)!;
@@ -84,6 +94,40 @@ export function AnaliseEstoquePecasPage({ onChangeBrand }: Props) {
                 </CardContent>
               </Card>
             ))}
+
+            <Card
+              key="grade_test_drive"
+              className="cursor-pointer transition-all duration-300 h-full hover:shadow-md"
+              style={{ ['--tw-ring-color' as string]: '#0891b2' }}
+              onClick={() => setSubPage('grade_test_drive')}
+            >
+              <CardContent className="p-8 flex flex-col items-center justify-center min-h-[200px] gap-4 text-center">
+                <div
+                  className="p-4 rounded-full transition-colors duration-300"
+                  style={{ backgroundColor: '#cffafe', color: '#0891b2' }}
+                >
+                  <Grid3X3 className="w-10 h-10" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">Grade de Test Drive Audi e Rentabilidade</h3>
+              </CardContent>
+            </Card>
+
+            <Card
+              key="monitoramento_bv"
+              className="cursor-pointer transition-all duration-300 h-full hover:shadow-md"
+              style={{ ['--tw-ring-color' as string]: '#0284c7' }}
+              onClick={() => setSubPage('monitoramento_bv')}
+            >
+              <CardContent className="p-8 flex flex-col items-center justify-center min-h-[200px] gap-4 text-center">
+                <div
+                  className="p-4 rounded-full transition-colors duration-300"
+                  style={{ backgroundColor: '#e0f2fe', color: '#0284c7' }}
+                >
+                  <Gauge className="w-10 h-10" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">Monitoramento de Custo Financeiro Estoque Rotativo Banco Volks</h3>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
