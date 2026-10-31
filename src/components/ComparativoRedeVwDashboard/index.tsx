@@ -556,6 +556,23 @@ const ADJUSTED_SUBTOTALS = new Set([
   'lucrooperacional',
 ]);
 
+// Linhas de total (Operacional + Administrativa) exibidas após cada par de despesas.
+const ADJUSTED_EXPENSE_TOTALS: Record<string, string> = {
+  despesasoperacionaiscomvendas: 'Total de Despesas c/ Vendas',
+  despesasoperacionaiscompessoal: 'Total de Despesas c/ Pessoal',
+  despesasoperacionaisdiretas: 'Total de Despesas Diretas',
+  despesasoperacionaisindiretas: 'Total de Despesas Indiretas',
+  despesascomativos: 'Total de Despesas com Ativos',
+};
+
+// Totais somados no card recolhível de resumo de despesas (não inclui Vendas).
+const DESPESAS_RESUMO_LABELS = new Set([
+  'totaldedespesascpessoal',
+  'totaldedespesasdiretas',
+  'totaldedespesasindiretas',
+  'totaldedespesascomativos',
+]);
+
 function buildAdjustedDemonstrativoRows<T extends DemonstrativoRow>(rows: T[]): T[] {
   const adminLabels = new Set(ADJUSTED_ANCHORS.map(item => item.admin));
   const anchorToAdmin = new Map(ADJUSTED_ANCHORS.map(item => [item.anchor, item.admin]));
@@ -591,6 +608,19 @@ function buildAdjustedDemonstrativoRows<T extends DemonstrativoRow>(rows: T[]): 
     accSorana += adminRow.sorana ?? 0;
     accRegiao += adminRow.regiao ?? 0;
     accSatelite += adminRow.satelite ?? 0;
+
+    const totalLabel = ADJUSTED_EXPENSE_TOTALS[key];
+    if (totalLabel) {
+      const sumNullable = (a: number | null, b: number | null) =>
+        a === null && b === null ? null : (a ?? 0) + (b ?? 0);
+      result.push({
+        ...row,
+        label: totalLabel,
+        sorana: sumNullable(row.sorana, adminRow.sorana),
+        regiao: sumNullable(row.regiao, adminRow.regiao),
+        satelite: sumNullable(row.satelite, adminRow.satelite),
+      });
+    }
   });
 
   return result;
@@ -627,11 +657,13 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
   const [rows, setRows] = useState<DemonstrativoRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [showComplementares, setShowComplementares] = useState(false);
+  const [showDespesasResumo, setShowDespesasResumo] = useState(false);
   const options = periodOptions(periodicity);
   const currentSection = DEMONSTRATIVO_SECTIONS.find(section => section.key === sectionKey) ?? DEMONSTRATIVO_SECTIONS[0];
 
   useEffect(() => {
     setShowComplementares(false);
+    setShowDespesasResumo(false);
   }, [sectionKey]);
 
   useEffect(() => {
@@ -720,6 +752,28 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
   const mainRows = hasComplementares ? rows.slice(0, cutoffIndex + 1) : rows;
   const complementaresRows = hasComplementares ? rows.slice(cutoffIndex + 1) : [];
 
+  const despesasResumo = (() => {
+    if (!currentSection.adjusted) return null;
+    const totais = rows.filter(row => DESPESAS_RESUMO_LABELS.has(normalizeName(row.label)));
+    if (totais.length === 0) return null;
+    const soma = (field: 'sorana' | 'regiao' | 'satelite' | 'soranaPercent' | 'regiaoPercent' | 'satelitePercent') =>
+      totais.reduce<number | null>((total, row) => {
+        const value = row[field];
+        return value === null ? total : (total ?? 0) + value;
+      }, null);
+    return {
+      sorana: soma('sorana'),
+      soranaPercent: soma('soranaPercent'),
+      regiao: soma('regiao'),
+      regiaoPercent: soma('regiaoPercent'),
+      satelite: soma('satelite'),
+      satelitePercent: soma('satelitePercent'),
+    };
+  })();
+  const resumoBaseName = comparisonBase === 'regiao' ? 'Região' : 'Satélite';
+  const resumoBaseValue = comparisonBase === 'regiao' ? despesasResumo?.regiao : despesasResumo?.satelite;
+  const resumoBasePercent = comparisonBase === 'regiao' ? despesasResumo?.regiaoPercent : despesasResumo?.satelitePercent;
+
   return (
     <div className="space-y-4">
       <div>
@@ -737,7 +791,8 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
           ? [{ title: 'Lucro Bruto', match: (label: string) => label.includes('lucrobruto') }, { title: 'Margem de Contribuição I', match: (label: string) => label.includes('margemdecontribuicaoi') }, { title: 'Lucro antes do Imposto de Renda (L.A.I.R.)', match: (label: string) => label.includes('lair') || label.includes('lucroantesdoimpostoderenda') }]
           : [{ title: 'Lucro Bruto', match: (label: string) => label.includes('lucrobruto') }, { title: 'Margem de Contribuição', match: (label: string) => label.includes('margemdecontribuicao') }, { title: 'Lucro Operacional VW', match: (label: string) => label.includes('lucrooperacionalvw') }]
         ).map(card => { const row = rows.find(item => card.match(normalizeName(item.label))); const baseValue = comparisonBase === 'regiao' ? row?.regiao : row?.satelite; const basePercent = comparisonBase === 'regiao' ? row?.regiaoPercent : row?.satelitePercent; const baseName = comparisonBase === 'regiao' ? 'Região' : 'Satélite'; return <div key={card.title} className="rounded-lg border border-teal-100 bg-teal-50 px-4 py-3"><p className="text-xs text-slate-500">{card.title}</p><p className="mt-1 text-sm font-bold text-teal-800">Sorana: {formatDemonstrativoValue(row?.sorana ?? null)}{row?.soranaPercent != null ? ` (${formatNumber(row.soranaPercent, true)})` : ''}</p><p className="text-xs text-slate-600">{baseName}: {formatDemonstrativoValue(baseValue ?? null)}{basePercent != null ? ` (${formatNumber(basePercent, true)})` : ''}</p></div>; })}</div>
-        <div className="overflow-x-auto border border-slate-200"><table className="min-w-[820px] w-full text-xs border-collapse"><thead className="sticky top-0 bg-teal-700 text-white"><tr>{['Indicador', 'Unidade', 'Sorana', 'Sorana %', `${comparisonBase === 'regiao' ? 'Região' : 'Satélite'} sem Sorana`, `${comparisonBase === 'regiao' ? 'Região' : 'Satélite'} %`, `Dif. x ${comparisonBase === 'regiao' ? 'Região' : 'Satélite'}`].map(header => <th key={header} className="px-3 py-2 text-left whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{mainRows.map((row, index) => <DemonstrativoTableRow key={`${row.label}-${index}`} row={row} comparisonBase={comparisonBase} />)}{hasComplementares && <tr><td colSpan={7} className="border border-slate-200 bg-slate-100 px-3 py-2"><button type="button" onClick={() => setShowComplementares(value => !value)} className="text-xs font-semibold text-teal-700 hover:text-teal-800">{showComplementares ? '▾ Ocultar indicadores complementares' : `▸ Mostrar indicadores complementares — ${complementaresRows.length} linhas`}</button></td></tr>}{hasComplementares && showComplementares && complementaresRows.map((row, index) => <DemonstrativoTableRow key={`comp-${row.label}-${index}`} row={row} comparisonBase={comparisonBase} />)}</tbody></table></div>
+                {currentSection.adjusted && despesasResumo && <div><button type="button" onClick={() => setShowDespesasResumo(value => !value)} className="text-xs font-semibold text-teal-700 hover:text-teal-800">{showDespesasResumo ? '▾ Ocultar total de despesas' : '▸ Mostrar total de despesas (Pessoal + Diretas + Indiretas + Ativos)'}</button>{showDespesasResumo && <div className="mt-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 md:max-w-sm"><p className="text-xs text-slate-500">Total de Despesas (Pessoal + Diretas + Indiretas + Ativos)</p><p className="mt-1 text-sm font-bold text-teal-800">Sorana: {formatDemonstrativoValue(despesasResumo.sorana)}{despesasResumo.soranaPercent != null ? ` (${formatNumber(despesasResumo.soranaPercent, true)})` : ''}</p><p className="text-xs text-slate-600">{resumoBaseName}: {formatDemonstrativoValue(resumoBaseValue ?? null)}{resumoBasePercent != null ? ` (${formatNumber(resumoBasePercent, true)})` : ''}</p></div>}</div>}
+                <div className="overflow-x-auto border border-slate-200"><table className="min-w-[820px] w-full text-xs border-collapse"><thead className="sticky top-0 bg-teal-700 text-white"><tr>{['Indicador', 'Unidade', 'Sorana', 'Sorana %', `${comparisonBase === 'regiao' ? 'Região' : 'Satélite'} sem Sorana`, `${comparisonBase === 'regiao' ? 'Região' : 'Satélite'} %`, `Dif. x ${comparisonBase === 'regiao' ? 'Região' : 'Satélite'}`].map(header => <th key={header} className="px-3 py-2 text-left whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{mainRows.map((row, index) => <DemonstrativoTableRow key={`${row.label}-${index}`} row={row} comparisonBase={comparisonBase} />)}{hasComplementares && <tr><td colSpan={7} className="border border-slate-200 bg-slate-100 px-3 py-2"><button type="button" onClick={() => setShowComplementares(value => !value)} className="text-xs font-semibold text-teal-700 hover:text-teal-800">{showComplementares ? '▾ Ocultar indicadores complementares' : `▸ Mostrar indicadores complementares — ${complementaresRows.length} linhas`}</button></td></tr>}{hasComplementares && showComplementares && complementaresRows.map((row, index) => <DemonstrativoTableRow key={`comp-${row.label}-${index}`} row={row} comparisonBase={comparisonBase} />)}</tbody></table></div>
       </>}
     </div>
   );
@@ -755,17 +810,20 @@ function DemonstrativoTableRow({ row, comparisonBase }: { row: DemonstrativoRow;
   const isClosingResult = normalizedLabel.includes('lai') || normalizedLabel.includes('lucroantesdoimpostoderenda');
   const isPrimaryResult = normalizedLabel.includes('lucrobruto') || normalizedLabel.includes('lucrooperacionalvw') || normalizedLabel.includes('lucrooperacionalii') || normalizedLabel.includes('lucrooperacionaliii');
   const isIntermediateMargin = normalizedLabel.includes('margemdecontribuicao') || normalizedLabel.includes('lucroatividadevw');
+  const isExpenseTotal = normalizedLabel.includes('totaldedespesas');
   const rowClass = isClosingResult
     ? 'bg-emerald-100 font-bold border-t-2 border-emerald-600'
     : isPrimaryResult
       ? 'bg-emerald-50 font-semibold border-t border-emerald-200'
       : isIntermediateMargin
         ? 'bg-sky-50 font-semibold border-t border-sky-200'
-        : isFinancialExpense
-          ? 'bg-rose-50 font-semibold border-t border-rose-200'
-          : isFinancial
-            ? 'bg-amber-50 font-semibold border-t border-amber-200'
-            : 'odd:bg-white even:bg-slate-50';
+        : isExpenseTotal
+          ? 'bg-teal-50 text-teal-800 font-semibold border-t border-teal-200'
+          : isFinancialExpense
+            ? 'bg-rose-50 font-semibold border-t border-rose-200'
+            : isFinancial
+              ? 'bg-amber-50 font-semibold border-t border-amber-200'
+              : 'odd:bg-white even:bg-slate-50';
   return <tr className={rowClass}><td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap font-medium">{row.label}</td><td className="border border-slate-200 px-3 py-1.5 whitespace-nowrap">{row.unit}</td><td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatDemonstrativoValue(row.sorana)}</td><td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatNumber(row.soranaPercent, true)}</td><td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatDemonstrativoValue(baseValue)}</td><td className="border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap">{formatNumber(basePercent, true)}</td><td className={`border border-slate-200 px-3 py-1.5 text-right whitespace-nowrap ${favorable(differenceBase)}`}>{formatDemonstrativoValue(differenceBase)}</td></tr>;
 }
 
