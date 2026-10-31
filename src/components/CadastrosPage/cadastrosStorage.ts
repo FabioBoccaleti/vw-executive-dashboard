@@ -472,3 +472,43 @@ export async function loadSignDriveRegras(): Promise<RegraRemuneracaoSignDrive[]
 export async function saveSignDriveRegras(items: RegraRemuneracaoSignDrive[]): Promise<boolean> {
   return kvSet(KEY_SIGNDRIVE_REGRAS, items);
 }
+
+// ── Sign&Drive: Salários Fixo (com histórico de vigência) ─────────────────────
+const KEY_SIGNDRIVE_SALARIOS_FIXOS = 'signdrive_cadastro_salarios_fixos';
+
+/**
+ * Uma vigência de salário de um colaborador. Modelo "início-aberto": vale a
+ * partir de anoInicio/mesInicio até o mês anterior à próxima vigência; a vigência
+ * mais recente permanece em aberto. Todos os valores de custo podem variar por vigência.
+ */
+export interface VigenciaSalarioSignDrive {
+  id: string;
+  anoInicio: number;
+  mesInicio: number; // 1–12
+  salarioFixo: string;
+  encargosProvisoes: string;
+  planoSaude: string;
+  valeTransporte: string;
+}
+
+export interface SalarioFixoSignDrive {
+  id: string;
+  nome: string;
+  cargo: string;
+  // Período de validade do colaborador (anoInicio/mesInicio obrigatórios;
+  // anoFim/mesFim ausentes = colaborador ainda ativo, sem término).
+  anoInicio?: number;
+  mesInicio?: number; // 1–12
+  anoFim?: number;
+  mesFim?: number;    // 1–12
+  // Histórico de vigências de salário (ordenado por data de início).
+  vigencias: VigenciaSalarioSignDrive[];
+}
+
+export async function loadSignDriveSalariosFixos(): Promise<SalarioFixoSignDrive[]> {
+  return (await kvGet<SalarioFixoSignDrive[]>(KEY_SIGNDRIVE_SALARIOS_FIXOS)) ?? [];
+}
+
+export async function saveSignDriveSalariosFixos(items: SalarioFixoSignDrive[]): Promise<boolean> {
+  return kvSet(KEY_SIGNDRIVE_SALARIOS_FIXOS, items);
+}

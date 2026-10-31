@@ -28,6 +28,7 @@ import { SignDriveVeiculosSection } from './sections/SignDriveVeiculosSection';
 import { SignDriveVendedoresSection } from './sections/SignDriveVendedoresSection';
 import { SignDriveTipoVendaSection } from './sections/SignDriveTipoVendaSection';
 import { SignDriveRegrasSection } from './sections/SignDriveRegrasSection';
+import { SignDriveSalariosFixosSection } from './sections/SignDriveSalariosFixosSection';
 
 type SectionId = 'veiculos' | 'blindadoras' | 'prestadores' | 'vendedores' | 'vendedoresAcessorios' | 'revendas' | 'regras' | 'produtos' | 'aliquotas' | 'dsr' | 'salariosFixos' | 'custoPreparacao' | 'tipoVenda';
 
@@ -76,6 +77,7 @@ const MENU_SIGNDRIVE: MenuItem[] = [
   { id: 'vendedores', label: 'Vendedores',            description: 'Equipe de vendas e cargos',       icon: <Users className="w-5 h-5" /> },
   { id: 'tipoVenda',  label: 'Tipo da Venda / Produto', description: 'Tipos, % comissão e % impostos',   icon: <Tag className="w-5 h-5" /> },
   { id: 'regras',     label: 'Regras de Remuneração', description: 'Percentuais e bases de cálculo',  icon: <Percent className="w-5 h-5" /> },
+  { id: 'salariosFixos', label: 'Salários Fixo',       description: 'Custos fixos dos colaboradores',  icon: <WalletCards className="w-5 h-5" /> },
 ];
 
 interface CadastrosPageProps {
@@ -193,6 +195,7 @@ export function CadastrosPage({ onBack, variant = 'blindagem' }: CadastrosPagePr
             {isAssinatura && activeSection === 'vendedores'           && <SignDriveVendedoresSection />}
             {isAssinatura && activeSection === 'tipoVenda'            && <SignDriveTipoVendaSection />}
             {isAssinatura && activeSection === 'regras'               && <SignDriveRegrasSection />}
+            {isAssinatura && activeSection === 'salariosFixos'        && <SignDriveSalariosFixosSection />}
           </div>
         </main>
       </div>
