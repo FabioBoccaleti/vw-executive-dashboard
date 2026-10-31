@@ -81,12 +81,13 @@ export function SignDriveAnalise({ rows }: { rows: AssinaturaRow[] }) {
       const p = parseDataBR(r.dataVenda);
       if (p) set.add(p.y);
     }
-    if (set.size === 0) set.add(new Date().getFullYear());
+    // O ano corrente sempre está disponível para seleção (abrimos nele por padrão).
+    set.add(new Date().getFullYear());
     return [...set].sort((a, b) => b - a);
   }, [efetivadas]);
 
-  const [year, setYear] = useState<number>(() => anosDisponiveis[0]);
-  const [periodo, setPeriodo] = useState<Periodo>('ano');
+  const [year, setYear] = useState<number>(() => new Date().getFullYear());
+  const [periodo, setPeriodo] = useState<Periodo>(() => new Date().getMonth() + 1);
   const [metricaMes, setMetricaMes] = useState<'quantidade' | 'valor'>('quantidade');
   const [metricaVendedor, setMetricaVendedor] = useState<'quantidade' | 'valor'>('quantidade');
 

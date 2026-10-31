@@ -264,7 +264,7 @@ export function AssinaturaSignDriveDashboard({ onChangeBrand, onOpenCadastros }:
   const canAnalise = isAdmin() || canAccessVendasSub('assinatura_signdrive.analise');
   const canCadastro = isAdmin() || canAccessVendasSub('assinatura_signdrive.cadastro');
 
-  const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>(canTabela ? 'tabela' : 'analise');
+  const [activeTab, setActiveTab] = useState<'tabela' | 'analise'>(canAnalise ? 'analise' : 'tabela');
   const [viewMode, setViewMode] = useState<'todas' | 'comissoes' | 'pendente'>('todas');
   const [filters, setFilters] = useState<Record<string, string>>({});
   const setFilter = (key: string, value: string) => setFilters(prev => ({ ...prev, [key]: value }));
