@@ -573,6 +573,17 @@ const DESPESAS_RESUMO_LABELS = new Set([
   'totaldedespesascomativos',
 ]);
 
+// Linhas de despesa operacional somadas no card de resumo das abas departamentais
+// (Veículos Novos, Seminovos, P&A, Assistência Técnica): Pessoal + Diretas + Indiretas + Ativos.
+const DESPESAS_DEPARTAMENTO_LABELS = new Set([
+  'despesasoperacionaiscompessoal',
+  'despesascompessoal',
+  'despesasoperacionaisdiretas',
+  'despesasoperacionaisindiretas',
+  'despesasoperacionaiscomativos',
+  'despesascomativos',
+]);
+
 function buildAdjustedDemonstrativoRows<T extends DemonstrativoRow>(rows: T[]): T[] {
   const adminLabels = new Set(ADJUSTED_ANCHORS.map(item => item.admin));
   const anchorToAdmin = new Map(ADJUSTED_ANCHORS.map(item => [item.anchor, item.admin]));
@@ -824,8 +835,10 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
   const complementaresRows = hasComplementares ? displayRows.slice(cutoffIndex + 1) : [];
 
   const despesasResumo = (() => {
-    if (!currentSection.adjusted) return null;
-    const totais = displayRows.filter(row => DESPESAS_RESUMO_LABELS.has(normalizeName(row.label)));
+    const isDepartamento = currentSection.sheetIndex >= 2;
+    if (!currentSection.adjusted && !isDepartamento) return null;
+    const labelSet = currentSection.adjusted ? DESPESAS_RESUMO_LABELS : DESPESAS_DEPARTAMENTO_LABELS;
+    const totais = displayRows.filter(row => labelSet.has(normalizeName(row.label)));
     if (totais.length === 0) return null;
     const soma = (field: 'sorana' | 'regiao' | 'satelite' | 'soranaPercent' | 'regiaoPercent' | 'satelitePercent') =>
       totais.reduce<number | null>((total, row) => {
@@ -863,7 +876,7 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
           ? [{ title: 'Lucro Bruto', match: (label: string) => label.includes('lucrobruto') }, { title: 'Margem de Contribuição I', match: (label: string) => label.includes('margemdecontribuicaoi') }, { title: 'Lucro antes do Imposto de Renda (L.A.I.R.)', match: (label: string) => label.includes('lair') || label.includes('lucroantesdoimpostoderenda') }]
           : [{ title: 'Lucro Bruto', match: (label: string) => label.includes('lucrobruto') }, { title: 'Margem de Contribuição', match: (label: string) => label.includes('margemdecontribuicao') }, { title: 'Lucro Operacional VW', match: (label: string) => label.includes('lucrooperacionalvw') }]
         ).map(card => { const row = displayRows.find(item => card.match(normalizeName(item.label))); const baseValue = comparisonBase === 'regiao' ? row?.regiao : row?.satelite; const basePercent = comparisonBase === 'regiao' ? row?.regiaoPercent : row?.satelitePercent; const baseName = comparisonBase === 'regiao' ? 'Região' : 'Satélite'; return <div key={card.title} className="rounded-lg border border-teal-100 bg-teal-50 px-4 py-3"><p className="text-xs text-slate-500">{card.title}</p><p className="mt-1 text-sm font-bold text-teal-800">Sorana: {formatDemonstrativoValue(row?.sorana ?? null)}{row?.soranaPercent != null ? ` (${formatNumber(row.soranaPercent, true)})` : ''}</p><p className="text-xs text-slate-600">{baseName}: {formatDemonstrativoValue(baseValue ?? null)}{basePercent != null ? ` (${formatNumber(basePercent, true)})` : ''}</p></div>; })}</div>
-                {currentSection.adjusted && despesasResumo && <div><button type="button" onClick={() => setShowDespesasResumo(value => !value)} className="text-xs font-semibold text-teal-700 hover:text-teal-800">{showDespesasResumo ? '▾ Ocultar total de despesas' : '▸ Mostrar total de despesas (Pessoal + Diretas + Indiretas + Ativos)'}</button>{showDespesasResumo && <div className="mt-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 md:max-w-sm"><p className="text-xs text-slate-500">Total de Despesas (Pessoal + Diretas + Indiretas + Ativos)</p><p className="mt-1 text-sm font-bold text-teal-800">Sorana: {formatDemonstrativoValue(despesasResumo.sorana)}{despesasResumo.soranaPercent != null ? ` (${formatNumber(despesasResumo.soranaPercent, true)})` : ''}</p><p className="text-xs text-slate-600">{resumoBaseName}: {formatDemonstrativoValue(resumoBaseValue ?? null)}{resumoBasePercent != null ? ` (${formatNumber(resumoBasePercent, true)})` : ''}</p></div>}</div>}
+                {despesasResumo && <div><button type="button" onClick={() => setShowDespesasResumo(value => !value)} className="text-xs font-semibold text-teal-700 hover:text-teal-800">{showDespesasResumo ? '▾ Ocultar total de despesas' : '▸ Mostrar total de despesas (Pessoal + Diretas + Indiretas + Ativos)'}</button>{showDespesasResumo && <div className="mt-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 md:max-w-sm"><p className="text-xs text-slate-500">Total de Despesas (Pessoal + Diretas + Indiretas + Ativos)</p><p className="mt-1 text-sm font-bold text-teal-800">Sorana: {formatDemonstrativoValue(despesasResumo.sorana)}{despesasResumo.soranaPercent != null ? ` (${formatNumber(despesasResumo.soranaPercent, true)})` : ''}</p><p className="text-xs text-slate-600">{resumoBaseName}: {formatDemonstrativoValue(resumoBaseValue ?? null)}{resumoBasePercent != null ? ` (${formatNumber(resumoBasePercent, true)})` : ''}</p></div>}</div>}
                 <div className="overflow-x-auto border border-slate-200"><table className="min-w-[820px] w-full text-xs border-collapse"><thead className="sticky top-0 bg-teal-700 text-white"><tr>{['Indicador', 'Unidade', 'Sorana', 'Sorana %', `${comparisonBase === 'regiao' ? 'Região' : 'Satélite'} sem Sorana`, `${comparisonBase === 'regiao' ? 'Região' : 'Satélite'} %`, `Dif. x ${comparisonBase === 'regiao' ? 'Região' : 'Satélite'}`].map(header => <th key={header} className="px-3 py-2 text-left whitespace-nowrap">{header}</th>)}</tr></thead><tbody>{mainRows.map((row, index) => <DemonstrativoTableRow key={`${row.label}-${index}`} row={row} comparisonBase={comparisonBase} />)}{hasComplementares && <tr><td colSpan={7} className="border border-slate-200 bg-slate-100 px-3 py-2"><button type="button" onClick={() => setShowComplementares(value => !value)} className="text-xs font-semibold text-teal-700 hover:text-teal-800">{showComplementares ? '▾ Ocultar indicadores complementares' : `▸ Mostrar indicadores complementares — ${complementaresRows.length} linhas`}</button></td></tr>}{hasComplementares && showComplementares && complementaresRows.map((row, index) => <DemonstrativoTableRow key={`comp-${row.label}-${index}`} row={row} comparisonBase={comparisonBase} />)}</tbody></table></div>
       </>}
     </div>
