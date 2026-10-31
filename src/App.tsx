@@ -8,6 +8,7 @@ import { VendasSelectionPage } from '@/components/VendasBonificacoesDashboard/Ve
 import { PeliculasDashboard } from '@/components/VendasBonificacoesDashboard/PeliculasDashboard'
 import { EsteticaDashboard } from '@/components/VendasBonificacoesDashboard/EsteticaDashboard'
 import { ImportarPDFPage } from '@/components/VendasBonificacoesDashboard/ImportarPDFPage'
+import { ServicosDespachanteDashboard } from '@/components/VendasBonificacoesDashboard/ServicosDespachante'
 import { FinanciamentoBancoVolksDashboard } from '@/components/VendasBonificacoesDashboard/FinanciamentoBancoVolksDashboard'
 import { AssinaturaSignDriveDashboard } from '@/components/VendasBonificacoesDashboard/AssinaturaSignDriveDashboard'
 import { VPecasCondicaoPagamentoDashboard } from '@/components/VendasBonificacoesDashboard/VPecasCondicaoPagamentoDashboard'
@@ -296,31 +297,7 @@ function AppContent() {
             onBack={() => setVendasSubPage('selection')}
           />
         ) : vendasSubPage === 'despachante' ? (
-          <div className="min-h-screen bg-slate-100 flex flex-col">
-            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm">
-              <div>
-                <h1 className="text-lg font-bold text-slate-800">Serviços de Despachante</h1>
-                <p className="text-xs text-slate-500 mt-0.5">Demonstrativo de Vendas e Bonificações</p>
-              </div>
-              <button
-                onClick={() => setVendasSubPage('selection')}
-                className="text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded px-3 py-1.5 transition-colors hover:bg-slate-50"
-              >
-                ← Voltar
-              </button>
-            </header>
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center space-y-3">
-                <div className="w-16 h-16 rounded-full bg-violet-100 flex items-center justify-center mx-auto">
-                  <svg className="w-8 h-8 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l5.653-4.655m5.24-6.029-.79 2.895M5.28 8.28l2.895-.79M15 3h2.25M15 3v2.25M3 15h2.25M3 15v2.25" />
-                  </svg>
-                </div>
-                <p className="text-lg font-semibold text-slate-700">Em desenvolvimento</p>
-                <p className="text-sm text-slate-400">Este módulo estará disponível em breve.</p>
-              </div>
-            </div>
-          </div>
+          <ServicosDespachanteDashboard onBack={() => setVendasSubPage('selection')} />
         ) : vendasSubPage === 'passagem-oficina-funilaria-vw' ? (
           <PassagemOficinaFunilariaVWDashboard onBack={() => setVendasSubPage('selection')} />
         ) : vendasSubPage === 'passagem-oficina-funilaria-audi' ? (
