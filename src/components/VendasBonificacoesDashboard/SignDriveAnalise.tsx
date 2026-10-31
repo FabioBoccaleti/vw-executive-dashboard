@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { TrendingUp, DollarSign, Wrench, Package, Users, Tag } from 'lucide-react';
 import type { AssinaturaRow } from './assinaturaStorage';
+import { SignDriveRemuneracaoVendedores, useSignDriveRemuneracao } from './SignDriveRemuneracaoVendedores';
 
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#db2777', '#7c3aed', '#0891b2', '#dc2626', '#4d7c0f', '#9333ea', '#0d9488'];
@@ -46,13 +47,14 @@ function MetricToggle({ value, onChange }: { value: 'quantidade' | 'valor'; onCh
 
 function SummaryCard({ icon, label, value, sub, color }: {
   icon: React.ReactNode; label: string; value: string; sub: string;
-  color: 'blue' | 'emerald' | 'amber' | 'violet';
+  color: 'blue' | 'emerald' | 'amber' | 'violet' | 'rose';
 }) {
   const colorMap = {
     blue: 'bg-blue-50 text-blue-600',
     emerald: 'bg-emerald-50 text-emerald-600',
     amber: 'bg-amber-50 text-amber-600',
     violet: 'bg-violet-50 text-violet-600',
+    rose: 'bg-rose-50 text-rose-600',
   } as const;
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
@@ -103,6 +105,8 @@ export function SignDriveAnalise({ rows }: { rows: AssinaturaRow[] }) {
   }, [doAno, periodo]);
 
   const periodoLabel = periodo === 'ano' ? `Ano ${anoAtual}` : `${MONTHS[(periodo as number) - 1]}/${anoAtual}`;
+
+  const { data: remData, totals: remTotals } = useSignDriveRemuneracao(rows, anoAtual, periodo);
 
   const kpis = useMemo(() => {
     let valorContratos = 0, comissaoBruta = 0, comissaoLiquida = 0;
@@ -189,6 +193,10 @@ export function SignDriveAnalise({ rows }: { rows: AssinaturaRow[] }) {
     );
   }
 
+  const custoColaborador = remTotals.salary + remTotals.benefits + remTotals.encCadastrados;
+  const custoComissoes = remTotals.comissoesDSR + remTotals.encComissao;
+  const resultadoLiquido = kpis.comissaoLiquida - custoColaborador - custoComissoes;
+
   return (
     <div className="flex-1 overflow-auto p-4 flex flex-col gap-4 bg-slate-100">
       {/* ── Filtros ── */}
@@ -229,6 +237,16 @@ export function SignDriveAnalise({ rows }: { rows: AssinaturaRow[] }) {
           label="Comissões (Bruta)" value={fmtCurrency(kpis.comissaoBruta)} sub={`Rent. ${kpis.rentMedia.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`} />
         <SummaryCard icon={<Wrench className="w-5 h-5" />} color="violet"
           label="Comissões (Líquida)" value={fmtCurrency(kpis.comissaoLiquida)} sub="abatido impostos" />
+      </div>
+
+      {/* ── Custos de remuneração ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <SummaryCard icon={<Users className="w-5 h-5" />} color="rose"
+          label="Custo Colaborador" value={fmtCurrency(custoColaborador)} sub="Salário + Benefícios + Encargos s/ salário" />
+        <SummaryCard icon={<Tag className="w-5 h-5" />} color="amber"
+          label="Custo Comissões Colaborador" value={fmtCurrency(custoComissoes)} sub="Comissões + DSR + Encargos s/ comissões" />
+        <SummaryCard icon={<TrendingUp className="w-5 h-5" />} color={resultadoLiquido >= 0 ? 'emerald' : 'rose'}
+          label="Resultado Líquido da Operação" value={fmtCurrency(resultadoLiquido)} sub="Com. Líquida − Custo Colaborador − Custo Comissões" />
       </div>
 
       {/* ── Gráficos ── */}
@@ -363,6 +381,9 @@ export function SignDriveAnalise({ rows }: { rows: AssinaturaRow[] }) {
           </table>
         </div>
       </div>
+
+      {/* ── Remuneração por vendedor ── */}
+      <SignDriveRemuneracaoVendedores data={remData} totals={remTotals} periodoLabel={periodoLabel} />
     </div>
   );
 }
