@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
   PieChart, Pie, Legend,
 } from 'recharts';
-import { Loader2, AlertCircle, TrendingDown, Boxes, PackageX, Timer, Search, ChevronRight, ChevronDown, FileDown } from 'lucide-react';
+import { Loader2, AlertCircle, TrendingDown, TrendingUp, Minus, Boxes, PackageX, Timer, Search, ChevronRight, ChevronDown, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import type { EstoquePecasMarca } from './EstoquePecasDashboard';
 import { getInventario, getMovimentacao, getLatestMonthWithBoth, type ImportedTable } from './estoquePecasStorage';
@@ -27,11 +27,22 @@ function currentMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/** Mês anterior a um mês ('YYYY-MM'), tratando virada de ano. */
+function prevMonthStr(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  if (!y || !m) return month;
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 const brCurrency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const brInteger = new Intl.NumberFormat('pt-BR');
 function fmtCurrency(n: number): string { return brCurrency.format(n); }
 function fmtInt(n: number): string { return brInteger.format(n); }
 function fmtPct(n: number): string { return `${n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`; }
+function signedCurrency(n: number): string { return `${n > 0 ? '+' : ''}${fmtCurrency(n)}`; }
+function signedInt(n: number): string { return `${n > 0 ? '+' : ''}${fmtInt(n)}`; }
+function signedPct(p: number | null): string { return p == null ? '—' : `${p > 0 ? '+' : ''}${fmtPct(p)}`; }
 /** Formato compacto para eixos (R$ 1,2 mi / R$ 350 mil). */
 function fmtCompact(n: number): string {
   if (Math.abs(n) >= 1_000_000) return `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
@@ -51,6 +62,8 @@ export function AnaliseEstoqueTab({ marca }: Props) {
   const [loading, setLoading] = useState(true);
   const [inventario, setInventario] = useState<ImportedTable | null>(null);
   const [movimentacao, setMovimentacao] = useState<ImportedTable | null>(null);
+  const [prevInventario, setPrevInventario] = useState<ImportedTable | null>(null);
+  const [prevMovimentacao, setPrevMovimentacao] = useState<ImportedTable | null>(null);
 
   const [search, setSearch] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'parados' | 'movimentando' | 'sem_info'>('todos');
@@ -59,12 +72,17 @@ export function AnaliseEstoqueTab({ marca }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [inv, mov] = await Promise.all([
+      const prev = prevMonthStr(month);
+      const [inv, mov, prevInv, prevMov] = await Promise.all([
         getInventario(marca.id, month),
         getMovimentacao(marca.id, month),
+        getInventario(marca.id, prev),
+        getMovimentacao(marca.id, prev),
       ]);
       setInventario(inv);
       setMovimentacao(mov);
+      setPrevInventario(prevInv);
+      setPrevMovimentacao(prevMov);
     } finally {
       setLoading(false);
     }
@@ -87,6 +105,11 @@ export function AnaliseEstoqueTab({ marca }: Props) {
     if (!inventario || !movimentacao) return null;
     return buildAnalise(inventario, movimentacao, threshold);
   }, [inventario, movimentacao, threshold]);
+
+  const prevAnalise: AnaliseResult | null = useMemo(() => {
+    if (!prevInventario || !prevMovimentacao) return null;
+    return buildAnalise(prevInventario, prevMovimentacao, threshold);
+  }, [prevInventario, prevMovimentacao, threshold]);
 
   const applyThreshold = () => {
     const n = parseInt(thresholdInput, 10);
@@ -195,6 +218,7 @@ export function AnaliseEstoqueTab({ marca }: Props) {
         <AnaliseConteudo
           marca={marca}
           analise={analise}
+          prevAnalise={prevAnalise}
           month={month}
           search={search}
           setSearch={setSearch}
@@ -212,10 +236,11 @@ export function AnaliseEstoqueTab({ marca }: Props) {
 const ABC_COLORS: Record<'A' | 'B' | 'C', string> = { A: '#16a34a', B: '#f59e0b', C: '#dc2626' };
 
 function AnaliseConteudo({
-  marca, analise, month, search, setSearch, filtroStatus, setFiltroStatus, itensFiltrados,
+  marca, analise, prevAnalise, month, search, setSearch, filtroStatus, setFiltroStatus, itensFiltrados,
 }: {
   marca: EstoquePecasMarca;
   analise: AnaliseResult;
+  prevAnalise: AnaliseResult | null;
   month: string;
   search: string;
   setSearch: (v: string) => void;
@@ -275,6 +300,9 @@ function AnaliseConteudo({
           sub={analise.maiorValorParado?.dias != null ? `${fmtInt(analise.maiorValorParado.dias)} dias parado` : '—'}
         />
       </div>
+
+      {/* Variação vs mês anterior */}
+      <VariacaoPecas analise={analise} prevAnalise={prevAnalise} month={month} />
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -667,6 +695,87 @@ function AbcRow({
         </tr>
       )}
     </>
+  );
+}
+
+function VariacaoPecas({ analise, prevAnalise, month }: {
+  analise: AnaliseResult; prevAnalise: AnaliseResult | null; month: string;
+}) {
+  const prevLabel = formatMonthLabel(prevMonthStr(month));
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-bold text-slate-700">Variação vs mês anterior</h4>
+        <span className="text-xs text-slate-400">{prevLabel} → {formatMonthLabel(month)}</span>
+      </div>
+      {!prevAnalise ? (
+        <p className="text-sm text-slate-400">
+          Mês anterior ({prevLabel}) não importado (inventário e movimentação) — sem comparação.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <VariacaoBloco
+            label="Valor total em estoque"
+            delta={analise.totalValor - prevAnalise.totalValor}
+            pct={prevAnalise.totalValor > 0 ? (analise.totalValor - prevAnalise.totalValor) / prevAnalise.totalValor * 100 : null}
+            deltaText={signedCurrency(analise.totalValor - prevAnalise.totalValor)}
+            anterior={fmtCurrency(prevAnalise.totalValor)}
+            atual={fmtCurrency(analise.totalValor)}
+          />
+          <VariacaoBloco
+            label="Itens em estoque"
+            delta={analise.totalSkus - prevAnalise.totalSkus}
+            pct={prevAnalise.totalSkus > 0 ? (analise.totalSkus - prevAnalise.totalSkus) / prevAnalise.totalSkus * 100 : null}
+            deltaText={signedInt(analise.totalSkus - prevAnalise.totalSkus)}
+            anterior={fmtInt(prevAnalise.totalSkus)}
+            atual={fmtInt(analise.totalSkus)}
+          />
+          <VariacaoBloco
+            label="Valor parado"
+            inverted
+            delta={analise.valorParado - prevAnalise.valorParado}
+            pct={prevAnalise.valorParado > 0 ? (analise.valorParado - prevAnalise.valorParado) / prevAnalise.valorParado * 100 : null}
+            deltaText={signedCurrency(analise.valorParado - prevAnalise.valorParado)}
+            anterior={fmtCurrency(prevAnalise.valorParado)}
+            atual={fmtCurrency(analise.valorParado)}
+          />
+          <VariacaoBloco
+            label="Itens parados"
+            inverted
+            delta={analise.skusParados - prevAnalise.skusParados}
+            pct={prevAnalise.skusParados > 0 ? (analise.skusParados - prevAnalise.skusParados) / prevAnalise.skusParados * 100 : null}
+            deltaText={signedInt(analise.skusParados - prevAnalise.skusParados)}
+            anterior={fmtInt(prevAnalise.skusParados)}
+            atual={fmtInt(analise.skusParados)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VariacaoBloco({ label, delta, pct, deltaText, anterior, atual, inverted = false }: {
+  label: string; delta: number; pct: number | null; deltaText: string; anterior: string; atual: string; inverted?: boolean;
+}) {
+  const up = delta > 0;
+  const down = delta < 0;
+  const bom = inverted ? down : up; // "bom" = verde
+  const ruim = inverted ? up : down;
+  const color = bom ? '#16a34a' : ruim ? '#dc2626' : '#64748b';
+  const bg = bom ? 'bg-green-50' : ruim ? 'bg-red-50' : 'bg-slate-50';
+  const Icon = up ? TrendingUp : down ? TrendingDown : Minus;
+  return (
+    <div className={`rounded-xl border border-slate-100 ${bg} p-4`}>
+      <p className="text-xs font-medium text-slate-500 mb-1">{label}</p>
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0" style={{ backgroundColor: color }}>
+          <Icon className="w-4 h-4" />
+        </div>
+        <span className="text-lg font-bold" style={{ color }}>{deltaText}</span>
+        <span className="text-sm font-semibold" style={{ color }}>({signedPct(pct)})</span>
+      </div>
+      <p className="text-xs text-slate-400 mt-1.5">Anterior: {anterior} · Atual: {atual}</p>
+    </div>
   );
 }
 
