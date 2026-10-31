@@ -4,6 +4,7 @@ import {
 } from 'recharts';
 import {
   Loader2, Boxes, DollarSign, Tag, Timer, PackageX, Search, ChevronRight, ChevronDown, Car, FileDown,
+  TrendingUp, TrendingDown, Minus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getInventarioVeiculos, getLatestMonthVeiculos, type VeiculoImport, type VeiculoBrandId } from './veiculosStorage';
@@ -34,6 +35,22 @@ function todayISO(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
+/** Último dia do mês ('YYYY-MM') em formato ISO 'YYYY-MM-DD'. */
+function lastDayOfMonthISO(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  if (!y || !m) return todayISO();
+  const day = new Date(y, m, 0).getDate(); // dia 0 do mês seguinte = último dia do mês atual
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** Mês anterior a um mês ('YYYY-MM'), tratando virada de ano. */
+function prevMonthStr(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  if (!y || !m) return month;
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 const brCurrency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const brInteger = new Intl.NumberFormat('pt-BR');
 function fmtCurrency(n: number): string { return brCurrency.format(n); }
@@ -49,6 +66,9 @@ function fmtDate(iso: string | null): string {
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
 }
+function signedInt(n: number): string { return `${n > 0 ? '+' : ''}${fmtInt(n)}`; }
+function signedCurrency(n: number): string { return `${n > 0 ? '+' : ''}${fmtCurrency(n)}`; }
+function signedPct(p: number | null): string { return p == null ? '—' : `${p > 0 ? '+' : ''}${fmtPct(p)}`; }
 
 interface Props {
   brand: VeiculoBrandId;
@@ -60,11 +80,12 @@ interface Props {
 export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props) {
   const [month, setMonth] = useState<string>(currentMonth());
   const [monthResolved, setMonthResolved] = useState(false);
-  const [baseDate, setBaseDate] = useState<string>(todayISO());
+  const [baseDate, setBaseDate] = useState<string>(lastDayOfMonthISO(currentMonth()));
   const [threshold, setThreshold] = useState<number>(90);
   const [thresholdInput, setThresholdInput] = useState<string>('90');
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<VeiculoImport | null>(null);
+  const [prevData, setPrevData] = useState<VeiculoImport | null>(null);
 
   const [search, setSearch] = useState('');
   const [filtroMarca, setFiltroMarca] = useState<string>('todas');
@@ -87,11 +108,21 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
     return () => { active = false; };
   }, [brand]);
 
+  // Ao selecionar um mês, define a data-base para o último dia desse mês
+  // (o usuário ainda pode alterá-la manualmente depois).
+  useEffect(() => {
+    setBaseDate(lastDayOfMonthISO(month));
+  }, [month]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const inv = await getInventarioVeiculos(brand, month);
+      const [inv, prevInv] = await Promise.all([
+        getInventarioVeiculos(brand, month),
+        getInventarioVeiculos(brand, prevMonthStr(month)),
+      ]);
       setData(inv);
+      setPrevData(prevInv);
     } finally {
       setLoading(false);
     }
@@ -105,6 +136,25 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
     if (!data) return null;
     return buildAnaliseVeiculos(data.veiculos, baseDate, threshold);
   }, [data, baseDate, threshold]);
+
+  const variacao = useMemo(() => {
+    if (!analise) return null;
+    if (!prevData) return { disponivel: false as const };
+    const prevVeics = prevData.veiculos.filter((v) => v.valor > 0);
+    const prevQtd = prevVeics.length;
+    const prevValor = prevVeics.reduce((s, v) => s + v.valor, 0);
+    const dQtd = analise.totalVeiculos - prevQtd;
+    const dValor = analise.totalValor - prevValor;
+    return {
+      disponivel: true as const,
+      prevQtd,
+      prevValor,
+      dQtd,
+      dValor,
+      pQtd: prevQtd > 0 ? (dQtd / prevQtd) * 100 : null,
+      pValor: prevValor > 0 ? (dValor / prevValor) * 100 : null,
+    };
+  }, [analise, prevData]);
 
   const itensFiltrados = useMemo(() => {
     if (!analise) return [] as VeiculoAnaliseItem[];
@@ -263,6 +313,42 @@ export function AnaliseVeiculosTab({ brand, name, primary, primaryLight }: Props
           sub={`${fmtPct(analise.pctParados)} · ${fmtCurrency(analise.valorParado)}`}
         />
       </div>
+
+      {/* Variação vs mês anterior */}
+      {variacao && (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-bold text-slate-700">Variação vs mês anterior</h4>
+            <span className="text-xs text-slate-400">
+              {formatMonthLabel(prevMonthStr(month))} → {formatMonthLabel(month)}
+            </span>
+          </div>
+          {!variacao.disponivel ? (
+            <p className="text-sm text-slate-400">
+              Mês anterior ({formatMonthLabel(prevMonthStr(month))}) não importado — sem comparação.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <VariacaoBloco
+                label="Veículos em estoque"
+                delta={variacao.dQtd}
+                pct={variacao.pQtd}
+                anterior={fmtInt(variacao.prevQtd)}
+                atual={fmtInt(analise.totalVeiculos)}
+                deltaText={signedInt(variacao.dQtd)}
+              />
+              <VariacaoBloco
+                label="Valor em estoque"
+                delta={variacao.dValor}
+                pct={variacao.pValor}
+                anterior={fmtCurrency(variacao.prevValor)}
+                atual={fmtCurrency(analise.totalValor)}
+                deltaText={signedCurrency(variacao.dValor)}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Gráfico de faixas + resumo por faixa */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -636,6 +722,29 @@ function ModeloRow({
         </tr>
       )}
     </>
+  );
+}
+
+function VariacaoBloco({ label, delta, pct, anterior, atual, deltaText }: {
+  label: string; delta: number; pct: number | null; anterior: string; atual: string; deltaText: string;
+}) {
+  const up = delta > 0;
+  const down = delta < 0;
+  const color = up ? '#16a34a' : down ? '#dc2626' : '#64748b';
+  const bg = up ? 'bg-green-50' : down ? 'bg-red-50' : 'bg-slate-50';
+  const Icon = up ? TrendingUp : down ? TrendingDown : Minus;
+  return (
+    <div className={`rounded-xl border border-slate-100 ${bg} p-4`}>
+      <p className="text-xs font-medium text-slate-500 mb-1">{label}</p>
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white shrink-0" style={{ backgroundColor: color }}>
+          <Icon className="w-4 h-4" />
+        </div>
+        <span className="text-xl font-bold" style={{ color }}>{deltaText}</span>
+        <span className="text-sm font-semibold" style={{ color }}>({signedPct(pct)})</span>
+      </div>
+      <p className="text-xs text-slate-400 mt-1.5">Anterior: {anterior} · Atual: {atual}</p>
+    </div>
   );
 }
 
