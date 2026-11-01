@@ -17,7 +17,20 @@ import {
   type DreTargetField,
 } from './ebitdaInfluenciaStorage';
 
-export function RegrasInfluenciaPanel() {
+interface RegrasInfluenciaPanelProps {
+  /** Carrega a regra salva. Padrão: Ebitda VW. */
+  loadRule?: () => Promise<InfluenciaDFRule>;
+  /** Salva a regra. Padrão: Ebitda VW. */
+  saveRule?: (rule: InfluenciaDFRule) => Promise<void>;
+  /** Lista as contas de Despesas Financeiras. Padrão: Ebitda VW. */
+  loadContas?: () => Promise<string[]>;
+}
+
+export function RegrasInfluenciaPanel({
+  loadRule = loadInfluenciaDF,
+  saveRule = saveInfluenciaDF,
+  loadContas = loadFinanceirasContas,
+}: RegrasInfluenciaPanelProps = {}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,7 +38,7 @@ export function RegrasInfluenciaPanel() {
   const [contas, setContas] = useState<string[]>([]);
 
   useEffect(() => {
-    Promise.all([loadInfluenciaDF(), loadFinanceirasContas()])
+    Promise.all([loadRule(), loadContas()])
       .then(([saved, contasList]) => {
         setContas(contasList);
         // undefined = regra antiga/nova → marca todas as contas por padrão.
@@ -35,7 +48,7 @@ export function RegrasInfluenciaPanel() {
         });
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [loadRule, loadContas]);
 
   function toggleZeroedLine(field: DreTargetField) {
     setRule(r => {
@@ -66,7 +79,7 @@ export function RegrasInfluenciaPanel() {
   async function handleSave() {
     setSaving(true);
     try {
-      await saveInfluenciaDF(rule);
+      await saveRule(rule);
       toast.success('Regra salva. Abra a aba DRE para ver o resultado.');
     } catch {
       toast.error('Erro ao salvar a regra.');

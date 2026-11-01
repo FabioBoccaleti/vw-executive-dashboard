@@ -206,9 +206,13 @@ interface AudiDreTabProps {
   year: number;
   month: number;
   diasUteis: number;
+  hideAjustes?: boolean;
+  readOnly?: boolean;
+  overlay?: (row: DreAudiRow, year: number, month: number) => Promise<DreAudiRow>;
+  ajustada?: boolean;
 }
 
-export function AudiDreTab({ year, month }: AudiDreTabProps) {
+export function AudiDreTab({ year, month, hideAjustes, readOnly, overlay, ajustada }: AudiDreTabProps) {
   const [data, setData]       = useState<DreAudiRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
@@ -235,7 +239,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
           loadDREDataAsync(yr, DEPT_KEY_TO_DEPT[d.key], 'audi')
             .then(dre => ({ deptKey: d.key as DeptKey, dre }))
         )),
-      ]).then(([kvResults, dreResults]) => {
+      ]).then(async ([kvResults, dreResults]) => {
         const dreLk: Record<string, any[] | null> = {};
         for (const { deptKey, dre } of dreResults) dreLk[deptKey] = dre;
         function hasData(dept: DreAudiDept) { return Object.values(dept).some(v => v !== ''); }
@@ -247,7 +251,10 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
           if (kv) row.ajustes = migrateAjustes(kv.ajustes);
           return row;
         }
-        const monthRows = kvResults.map((kv, i) => buildMRow(i + 1, kv ?? null));
+        const rawMonthRows = kvResults.map((kv, i) => buildMRow(i + 1, kv ?? null));
+        const monthRows = overlay
+          ? await Promise.all(rawMonthRows.map((r, i) => overlay(r, year, i + 1)))
+          : rawMonthRows;
         setAllMonthRows(monthRows);
         const summed = createEmptyDreAudiRow(year, 0);
         for (const row of monthRows) {
@@ -291,7 +298,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
     Promise.all([
       Promise.all(ajustesPromises),
       Promise.all(deptDrePromises),
-    ]).then(([ajustesResults, dreResults]) => {
+    ]).then(async ([ajustesResults, dreResults]) => {
       const [currentAjustes, ...prevAjustesArr] = ajustesResults;
 
       // Monta lookup: deptKey → year → DREData
@@ -323,11 +330,22 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
         return row;
       }
 
-      setData(buildRow(year, month, currentAjustes ?? null));
-      setPrevData(periods.map((p, i) => buildRow(p.year, p.month, prevAjustesArr[i] ?? null)));
+      const baseData = buildRow(year, month, currentAjustes ?? null);
+      const basePrev = periods.map((p, i) => buildRow(p.year, p.month, prevAjustesArr[i] ?? null));
+      if (overlay) {
+        const [adjData, adjPrev] = await Promise.all([
+          overlay(baseData, year, month),
+          Promise.all(basePrev.map((r, i) => overlay(r, periods[i].year, periods[i].month))),
+        ]);
+        setData(adjData);
+        setPrevData(adjPrev);
+      } else {
+        setData(baseData);
+        setPrevData(basePrev);
+      }
       setLoading(false);
     });
-  }, [year, month]);
+  }, [year, month, overlay]);
 
   // ── Save ─────────────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
@@ -450,16 +468,18 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
             {d.label}
           </button>
         ))}
-        <button
-          onClick={() => setActiveSection('ajustes' as any)}
-          className={`px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors ${
-            (activeSection as string) === 'ajustes'
-              ? 'border-[#bb0a30] text-[#bb0a30]'
-              : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Ajustes
-        </button>
+        {!hideAjustes && (
+          <button
+            onClick={() => setActiveSection('ajustes' as any)}
+            className={`px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors ${
+              (activeSection as string) === 'ajustes'
+                ? 'border-[#bb0a30] text-[#bb0a30]'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Ajustes
+          </button>
+        )}
 
         <div className="flex-1" />
 
@@ -479,6 +499,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
         </button>
 
         {/* Botão Salvar (apenas ajustes) */}
+        {!readOnly && (
         <button
           disabled={!dirty || saving}
           onClick={handleSave}
@@ -491,6 +512,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
           {saving ? 'Salvando...' : 'Salvar'}
         </button>
+        )}
       </div>
 
       {/* ── Conteúdo ────────────────────────────────────────────────────── */}
@@ -498,7 +520,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
 
         {/* RESUMO GERAL */}
         {activeSection === 'resumo' && month !== 0 && (
-          <ResumoTable data={data} deptList={deptList} year={year} month={month} />
+          <ResumoTable data={data} deptList={deptList} year={year} month={month} ajustada={ajustada} />
         )}
         {activeSection === 'resumo' && month === 0 && (
           <div className="flex flex-col gap-4">
@@ -514,8 +536,8 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
                 style={annualView === 'mensal' ? { backgroundColor: '#bb0a30', color: 'white' } : { backgroundColor: '#f1f5f9', color: '#64748b' }}
               >Evolução Mensal</button>
             </div>
-            {annualView === 'anual' && <ResumoTable data={data} deptList={deptList} year={year} month={0} />}
-            {annualView === 'mensal' && <AudiEvolucaoMensalTable allMonthRows={allMonthRows} year={year} />}
+            {annualView === 'anual' && <ResumoTable data={data} deptList={deptList} year={year} month={0} ajustada={ajustada} />}
+            {annualView === 'mensal' && <AudiEvolucaoMensalTable allMonthRows={allMonthRows} year={year} ajustada={ajustada} />}
           </div>
         )}
 
@@ -523,13 +545,13 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
         {DEPTS.map(d =>
           activeSection === d.key ? (
             month === 0
-              ? <AudiDeptEvolucaoTable key={d.key} deptKey={d.key} deptLabel={d.label} allMonthRows={allMonthRows} year={year} />
-              : <DeptTable key={d.key} deptKey={d.key} deptLabel={d.label} deptColor={d.color} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getYtdPeriods(year, month)} year={year} month={month} onChange={(field, value) => handleCellChange(d.key, field, value)} />
+              ? <AudiDeptEvolucaoTable key={d.key} deptKey={d.key} deptLabel={d.label} allMonthRows={allMonthRows} year={year} ajustada={ajustada} />
+              : <DeptTable key={d.key} deptKey={d.key} deptLabel={d.label} deptColor={d.color} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getYtdPeriods(year, month)} year={year} month={month} onChange={(field, value) => handleCellChange(d.key, field, value)} readOnly={readOnly} ajustada={ajustada} />
           ) : null
         )}
 
         {/* AJUSTES */}
-        {(activeSection as string) === 'ajustes' && (
+        {!hideAjustes && (activeSection as string) === 'ajustes' && (
           <AjustesTable
             ajustes={data.ajustes}
             onChange={handleAjusteChange}
@@ -551,6 +573,7 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
             prevData={prevData}
             year={year}
             month={month}
+            ajustada={ajustada}
           />,
           document.getElementById('print-root')!
         )
@@ -561,22 +584,40 @@ export function AudiDreTab({ year, month }: AudiDreTabProps) {
 
 // ─── Tabela Resumo Geral ───────────────────────────────────────────────────────
 
+function AjustadaBadge() {
+  return (
+    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-400 text-amber-950 align-middle">
+      DRE Ajustada
+    </span>
+  );
+}
+
+function PrintAjustadaBadge() {
+  return (
+    <span style={{ marginLeft: '6px', padding: '1px 5px', borderRadius: '8px', fontSize: '6.5pt', fontWeight: 700, backgroundColor: '#fbbf24', color: '#451a03' }}>
+      DRE Ajustada
+    </span>
+  );
+}
+
 function ResumoTable({
   data,
   deptList,
   year,
   month,
+  ajustada,
 }: {
   data: DreAudiRow;
   deptList: DreAudiDept[];
   year: number;
   month: number;
+  ajustada?: boolean;
 }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       {/* Cabeçalho */}
       <div className="bg-[#bb0a30] text-black px-6 py-3">
-        <h2 className="font-bold text-base">AUDI LAPA/PINHEIROS</h2>
+        <h2 className="font-bold text-base">AUDI LAPA/PINHEIROS{ajustada && <AjustadaBadge />}</h2>
         <p className="text-xs mt-0.5">{month === 0 ? `Ano ${year}` : `${MONTHS[month - 1]} de ${year}`} — Demonstrativo de Resultados</p>
       </div>
 
@@ -673,6 +714,8 @@ function DeptTable({
   year,
   month,
   onChange,
+  readOnly,
+  ajustada,
 }: {
   deptKey: DeptKey;
   deptLabel: string;
@@ -683,6 +726,8 @@ function DeptTable({
   year: number;
   month: number;
   onChange: (field: keyof DreAudiDept, value: string) => void;
+  readOnly?: boolean;
+  ajustada?: boolean;
 }) {
   const totalCols = 1 + prevPeriods.length + 1 + 1 + 1; // desc + prev + atual + total + %H
   return (
@@ -690,6 +735,7 @@ function DeptTable({
       <div className="px-6 py-3 text-black font-bold flex items-center gap-3 bg-[#bb0a30]">
         <span className="text-base">Audi Lapa/Pinheiros — {deptLabel}</span>
         <span className="text-xs opacity-75 font-normal">{MONTHS[month - 1]}/{year}</span>
+        {ajustada && <AjustadaBadge />}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -799,6 +845,7 @@ function DeptTable({
                           isTotal={line.isTotal}
                           isNegative={line.isNegative}
                           isQuant={isQuant}
+                          readOnly={readOnly}
                         />
                     }
                   </td>
@@ -1014,7 +1061,7 @@ function AjustesTable({
 
 // ─── Evolução Mensal (Anual) ─────────────────────────────────────────────────
 
-function AudiEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreAudiRow[]; year: number }) {
+function AudiEvolucaoMensalTable({ allMonthRows, year, ajustada }: { allMonthRows: DreAudiRow[]; year: number; ajustada?: boolean }) {
   const monthlyTotals = allMonthRows.map(row =>
     Object.fromEntries(DEPT_FIELDS.map(f => [
       f, DEPTS.reduce((s, d) => s + parseVal(row[d.key][f]), 0)
@@ -1027,7 +1074,7 @@ function AudiEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreAudi
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="bg-[#bb0a30] text-white px-6 py-3">
-        <h2 className="font-bold text-base">AUDI LAPA/PINHEIROS</h2>
+        <h2 className="font-bold text-base">AUDI LAPA/PINHEIROS{ajustada && <AjustadaBadge />}</h2>
         <p className="text-xs mt-0.5 opacity-80">Ano {year} — Evolução Mensal (todos os departamentos)</p>
       </div>
       <div className="overflow-x-auto">
@@ -1072,8 +1119,8 @@ function AudiEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreAudi
   );
 }
 
-function AudiDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
-  deptKey: DeptKey; deptLabel: string; allMonthRows: DreAudiRow[]; year: number;
+function AudiDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year, ajustada }: {
+  deptKey: DeptKey; deptLabel: string; allMonthRows: DreAudiRow[]; year: number; ajustada?: boolean;
 }) {
   const isAdm = deptKey === 'adm';
   const annualTotals = Object.fromEntries(DEPT_FIELDS.map(f => [
@@ -1083,7 +1130,7 @@ function AudiDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="bg-[#bb0a30] text-white px-6 py-3">
-        <h2 className="font-bold text-base">Audi Lapa/Pinheiros — {deptLabel}</h2>
+        <h2 className="font-bold text-base">Audi Lapa/Pinheiros — {deptLabel}{ajustada && <AjustadaBadge />}</h2>
         <p className="text-xs mt-0.5 opacity-80">Ano {year} — Evolução Mensal</p>
       </div>
       <div className="overflow-x-auto">
@@ -1144,11 +1191,13 @@ function PrintableReport({
   prevData,
   year,
   month,
+  ajustada,
 }: {
   data: DreAudiRow;
   prevData: DreAudiRow[];
   year: number;
   month: number;
+  ajustada?: boolean;
 }) {
   const deptList = DEPTS.map(d => data[d.key]);
   const prevPeriods = getYtdPeriods(year, month);
@@ -1171,7 +1220,7 @@ function PrintableReport({
 
       {/* ── Página 1: Resumo Geral ── */}
       <div className="print-page">
-        <PrintResumoTable data={data} deptList={deptList} year={year} month={month} />
+        <PrintResumoTable data={data} deptList={deptList} year={year} month={month} ajustada={ajustada} />
         <PrintFooter label="Resumo Geral" page={1} total={8} />
       </div>
 
@@ -1188,6 +1237,7 @@ function PrintableReport({
               prevPeriods={prevPeriods}
               year={year}
               month={month}
+              ajustada={ajustada}
             />
             <PrintFooter label={d.label} page={i + 2} total={8} />
           </div>
@@ -1204,10 +1254,10 @@ function PrintableReport({
 }
 
 // ── Cabeçalho padrão de cada página ─────────────────────────────────────────
-function PrintHeader({ title, subtitle }: { title: string; subtitle: string }) {
+function PrintHeader({ title, subtitle, ajustada }: { title: string; subtitle: string; ajustada?: boolean }) {
   return (
     <div className="dre-header-red" style={{ backgroundImage: 'linear-gradient(to bottom, #bb0a30 0%, #bb0a30 100%)', backgroundColor: '#bb0a30', color: 'black', padding: '6px 12px', marginBottom: '0' } as React.CSSProperties}>
-      <div style={{ fontWeight: 700, fontSize: '10pt' }}>{title}</div>
+      <div style={{ fontWeight: 700, fontSize: '10pt' }}>{title}{ajustada && <PrintAjustadaBadge />}</div>
       <div style={{ fontSize: '7.5pt', opacity: 0.8 }}>{subtitle}</div>
     </div>
   );
@@ -1224,10 +1274,10 @@ function PrintFooter({ label, page, total }: { label: string; page: number; tota
 }
 
 // ── Tabela Resumo Geral (impressão) ──────────────────────────────────────────
-function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; deptList: DreAudiDept[]; year: number; month: number }) {
+function PrintResumoTable({ data, deptList, year, month, ajustada }: { data: DreAudiRow; deptList: DreAudiDept[]; year: number; month: number; ajustada?: boolean }) {
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-      <PrintHeader title="AUDI LAPA/PINHEIROS" subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} />
+      <PrintHeader title="AUDI LAPA/PINHEIROS" subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} ajustada={ajustada} />
       <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
         <thead>
           <tr style={{ backgroundColor: '#e2e8f0', borderBottom: '2px solid #bb0a30' }}>
@@ -1295,7 +1345,7 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreAudiRow; d
 
 // ── Tabela por Departamento (impressão) ──────────────────────────────────────
 function PrintDeptTable({
-  deptLabel, deptKey, dept, prevDepts, prevPeriods, year, month,
+  deptLabel, deptKey, dept, prevDepts, prevPeriods, year, month, ajustada,
 }: {
   deptLabel: string;
   deptKey: DeptKey;
@@ -1304,6 +1354,7 @@ function PrintDeptTable({
   prevPeriods: { year: number; month: number }[];
   year: number;
   month: number;
+  ajustada?: boolean;
 }) {
   const totalCols = 1 + prevPeriods.length + 1 + 1 + 1;
   const nMonths = prevPeriods.length + 1;
@@ -1311,7 +1362,7 @@ function PrintDeptTable({
   const monthPct = (100 - DESC_PCT - VAR_PCT - TOTAL_PCT) / nMonths;
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-      <PrintHeader title={`Audi Lapa/Pinheiros — ${deptLabel}`} subtitle={`${MONTHS[month - 1]} de ${year}`} />
+      <PrintHeader title={`Audi Lapa/Pinheiros — ${deptLabel}`} subtitle={`${MONTHS[month - 1]} de ${year}`} ajustada={ajustada} />
       <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt', tableLayout: 'fixed' }}>
         <thead>
           <tr style={{ backgroundColor: '#e2e8f0', borderBottom: '2px solid #bb0a30' }}>
@@ -1479,12 +1530,14 @@ function EditableCell({
   isTotal = false,
   isNegative = false,
   isQuant = false,
+  readOnly = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   isTotal?: boolean;
   isNegative?: boolean;
   isQuant?: boolean;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft]     = useState('');
@@ -1501,6 +1554,14 @@ function EditableCell({
   function commitEdit() {
     onChange(draft);
     setEditing(false);
+  }
+
+  if (readOnly) {
+    return (
+      <span className={`block w-full text-center px-1 py-0.5 min-w-[5rem] ${!value ? 'text-slate-300' : ''}`}>
+        {display || '—'}
+      </span>
+    );
   }
 
   if (editing) {

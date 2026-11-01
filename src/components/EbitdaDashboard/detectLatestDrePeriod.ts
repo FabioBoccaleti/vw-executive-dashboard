@@ -9,7 +9,9 @@ import { loadDREDataAsync } from '@/lib/dbStorage';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-export async function detectLatestVwDrePeriod(): Promise<{ year: number; month: number } | null> {
+type DreBrand = 'vw' | 'audi';
+
+export async function detectLatestDrePeriod(brand: DreBrand): Promise<{ year: number; month: number } | null> {
   const yearsToCheck = [CURRENT_YEAR, CURRENT_YEAR - 1];
 
   for (const yr of yearsToCheck) {
@@ -26,9 +28,9 @@ export async function detectLatestVwDrePeriod(): Promise<{ year: number; month: 
       if (months.length > 0) return { year: yr, month: Math.max(...months) };
     } catch {}
 
-    // Estratégia 2: dados do Dashboard Executivo (vw_dre_YYYY_novos).
+    // Estratégia 2: dados do Dashboard Executivo (<brand>_dre_YYYY_novos).
     try {
-      const dreData = await loadDREDataAsync(yr as 2024 | 2025 | 2026 | 2027, 'novos', 'vw');
+      const dreData = await loadDREDataAsync(yr as 2024 | 2025 | 2026 | 2027, 'novos', brand);
       if (dreData && dreData.length > 0) {
         let lastMonth = 0;
         for (let m = 0; m < 12; m++) {
@@ -42,9 +44,9 @@ export async function detectLatestVwDrePeriod(): Promise<{ year: number; month: 
       }
     } catch {}
 
-    // Estratégia 3: chaves salvas manualmente (resumo_dre:vw:YYYY-MM).
+    // Estratégia 3: chaves salvas manualmente (resumo_dre:<brand>:YYYY-MM).
     try {
-      const keys = await kvKeys('resumo_dre:vw:*');
+      const keys = await kvKeys(`resumo_dre:${brand}:*`);
       const yearStr = String(yr);
       const months = keys
         .filter(k => k.includes(`:${yearStr}-`))
@@ -55,4 +57,9 @@ export async function detectLatestVwDrePeriod(): Promise<{ year: number; month: 
   }
 
   return null;
+}
+
+/** Compatibilidade: detecção da DRE VW. */
+export function detectLatestVwDrePeriod() {
+  return detectLatestDrePeriod('vw');
 }

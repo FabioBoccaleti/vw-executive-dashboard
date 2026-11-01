@@ -207,9 +207,10 @@ function GroupSection({
 interface Props {
   year: number;
   month: number;
+  onlyTipo?: TipoClassificacao;
 }
 
-export function FunalariaTab({ year, month }: Props) {
+export function FunalariaTab({ year, month, onlyTipo }: Props) {
   const isYearMode = month === 0;
 
   const [loading, setLoading] = useState(true);
@@ -323,6 +324,7 @@ export function FunalariaTab({ year, month }: Props) {
     if (valor === 0) continue;
     const tipo = classificacoes[conta];
     if (!tipo) continue;
+    if (onlyTipo && tipo !== onlyTipo) continue;
     groups.get(tipo)!.push({ conta, valor });
     grandTotal += valor;
     totalContas++;
