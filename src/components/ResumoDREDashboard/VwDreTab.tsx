@@ -217,9 +217,10 @@ interface VwDreTabProps {
   hideAjustes?: boolean;
   readOnly?: boolean;
   overlay?: (row: DreVwRow, year: number, month: number) => Promise<DreVwRow>;
+  ajustada?: boolean;
 }
 
-export function VwDreTab({ year, month, hideAjustes, readOnly, overlay }: VwDreTabProps) {
+export function VwDreTab({ year, month, hideAjustes, readOnly, overlay, ajustada }: VwDreTabProps) {
   const [data, setData]       = useState<DreVwRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
@@ -530,7 +531,7 @@ export function VwDreTab({ year, month, hideAjustes, readOnly, overlay }: VwDreT
       <div ref={scrollContainerRef} className="flex-1 overflow-auto p-6 min-h-0">
 
         {activeSection === 'resumo' && month !== 0 && (
-          <ResumoTable data={data} deptList={deptList} year={year} month={month} />
+          <ResumoTable data={data} deptList={deptList} year={year} month={month} ajustada={ajustada} />
         )}
         {activeSection === 'resumo' && month === 0 && (
           <div className="flex flex-col gap-4">
@@ -546,16 +547,16 @@ export function VwDreTab({ year, month, hideAjustes, readOnly, overlay }: VwDreT
                 style={annualView === 'mensal' ? { backgroundColor: VW_COLOR, color: 'white' } : { backgroundColor: '#f1f5f9', color: '#64748b' }}
               >Evolução Mensal</button>
             </div>
-            {annualView === 'anual' && <ResumoTable data={data} deptList={deptList} year={year} month={0} />}
-            {annualView === 'mensal' && <VwEvolucaoMensalTable allMonthRows={allMonthRows} year={year} />}
+            {annualView === 'anual' && <ResumoTable data={data} deptList={deptList} year={year} month={0} ajustada={ajustada} />}
+            {annualView === 'mensal' && <VwEvolucaoMensalTable allMonthRows={allMonthRows} year={year} ajustada={ajustada} />}
           </div>
         )}
 
         {DEPTS.map(d =>
           activeSection === d.key ? (
             month === 0
-              ? <VwDeptEvolucaoTable key={d.key} deptKey={d.key} deptLabel={d.label} allMonthRows={allMonthRows} year={year} />
-              : <DeptTable key={d.key} deptKey={d.key} deptLabel={d.label} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getYtdPeriods(year, month)} year={year} month={month} onChange={(field, value) => handleCellChange(d.key, field, value)} readOnly={readOnly} />
+              ? <VwDeptEvolucaoTable key={d.key} deptKey={d.key} deptLabel={d.label} allMonthRows={allMonthRows} year={year} ajustada={ajustada} />
+              : <DeptTable key={d.key} deptKey={d.key} deptLabel={d.label} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getYtdPeriods(year, month)} year={year} month={month} onChange={(field, value) => handleCellChange(d.key, field, value)} readOnly={readOnly} ajustada={ajustada} />
           ) : null
         )}
 
@@ -576,7 +577,7 @@ export function VwDreTab({ year, month, hideAjustes, readOnly, overlay }: VwDreT
       {/* ── Portal de Impressão ──────────────────────────────────────────── */}
       {typeof document !== 'undefined' && document.getElementById('print-root') &&
         createPortal(
-          <PrintableReport data={data} prevData={prevData} year={year} month={month} />,
+          <PrintableReport data={data} prevData={prevData} year={year} month={month} ajustada={ajustada} />,
           document.getElementById('print-root')!
         )
       }
@@ -584,16 +585,34 @@ export function VwDreTab({ year, month, hideAjustes, readOnly, overlay }: VwDreT
   );
 }
 
+// ─── Selo "DRE Ajustada" ──────────────────────────────────────────────────────
+
+function AjustadaBadge() {
+  return (
+    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-400 text-amber-950 align-middle">
+      DRE Ajustada
+    </span>
+  );
+}
+
+function PrintAjustadaBadge() {
+  return (
+    <span style={{ marginLeft: '6px', padding: '1px 5px', borderRadius: '8px', fontSize: '6.5pt', fontWeight: 700, backgroundColor: '#fbbf24', color: '#451a03' }}>
+      DRE Ajustada
+    </span>
+  );
+}
+
 // ─── Tabela Resumo Geral ──────────────────────────────────────────────────────
 
-function ResumoTable({ data, deptList, year, month }: {
-  data: DreVwRow; deptList: DreVwDept[]; year: number; month: number;
+function ResumoTable({ data, deptList, year, month, ajustada }: {
+  data: DreVwRow; deptList: DreVwDept[]; year: number; month: number; ajustada?: boolean;
 }) {
   const NCOLS = DEPTS.length + 2; // desc + depts + total
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="text-white px-6 py-3" style={{ backgroundColor: VW_COLOR }}>
-        <h2 className="font-bold text-base">VW NORTE</h2>
+        <h2 className="font-bold text-base">VW NORTE{ajustada && <AjustadaBadge />}</h2>
         <p className="text-xs mt-0.5 opacity-80">{month === 0 ? `Ano ${year}` : `${MONTHS[month - 1]} de ${year}`} — Demonstrativo de Resultados</p>
       </div>
       <div className="overflow-x-auto">
@@ -673,13 +692,14 @@ function ResumoTable({ data, deptList, year, month }: {
 
 // ─── Tabela por Departamento ──────────────────────────────────────────────────
 
-function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, month, onChange, readOnly }: {
+function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, month, onChange, readOnly, ajustada }: {
   deptKey: DeptKey; deptLabel: string;
   dept: DreVwDept; prevDepts: DreVwDept[];
   prevPeriods: { year: number; month: number }[];
   year: number; month: number;
   onChange: (field: keyof DreVwDept, value: string) => void;
   readOnly?: boolean;
+  ajustada?: boolean;
 }) {
   const totalCols = 1 + prevPeriods.length + 1 + 1 + 1;
   return (
@@ -687,6 +707,7 @@ function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, mon
       <div className="px-6 py-3 text-white font-bold flex items-center gap-3" style={{ backgroundColor: VW_COLOR }}>
         <span className="text-base">VW Norte — {deptLabel}</span>
         <span className="text-xs opacity-75 font-normal">{month === 0 ? `Ano ${year}` : `${MONTHS[month - 1]}/${year}`}</span>
+        {ajustada && <AjustadaBadge />}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -979,7 +1000,7 @@ function EditableCell({ value, onChange, isTotal = false, isNegative = false, is
 
 // ─── Evolução Mensal (Anual) ─────────────────────────────────────────────────
 
-function VwEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreVwRow[]; year: number }) {
+function VwEvolucaoMensalTable({ allMonthRows, year, ajustada }: { allMonthRows: DreVwRow[]; year: number; ajustada?: boolean }) {
   const monthlyTotals = allMonthRows.map(row =>
     Object.fromEntries(DEPT_FIELDS.map(f => [
       f, DEPTS.reduce((s, d) => s + parseVal(row[d.key][f]), 0)
@@ -992,7 +1013,7 @@ function VwEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreVwRow[
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="text-white px-6 py-3" style={{ backgroundColor: VW_COLOR }}>
-        <h2 className="font-bold text-base">VW NORTE</h2>
+        <h2 className="font-bold text-base">VW NORTE{ajustada && <AjustadaBadge />}</h2>
         <p className="text-xs mt-0.5 opacity-80">Ano {year} — Evolução Mensal (todos os departamentos)</p>
       </div>
       <div className="overflow-x-auto">
@@ -1036,8 +1057,8 @@ function VwEvolucaoMensalTable({ allMonthRows, year }: { allMonthRows: DreVwRow[
   );
 }
 
-function VwDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
-  deptKey: DeptKey; deptLabel: string; allMonthRows: DreVwRow[]; year: number;
+function VwDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year, ajustada }: {
+  deptKey: DeptKey; deptLabel: string; allMonthRows: DreVwRow[]; year: number; ajustada?: boolean;
 }) {
   const isAdm = deptKey === 'adm';
   const annualTotals = Object.fromEntries(DEPT_FIELDS.map(f => [
@@ -1047,7 +1068,7 @@ function VwDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="text-white px-6 py-3" style={{ backgroundColor: VW_COLOR }}>
-        <h2 className="font-bold text-base">VW Norte — {deptLabel}</h2>
+        <h2 className="font-bold text-base">VW Norte — {deptLabel}{ajustada && <AjustadaBadge />}</h2>
         <p className="text-xs mt-0.5 opacity-80">Ano {year} — Evolução Mensal</p>
       </div>
       <div className="overflow-x-auto">
@@ -1101,8 +1122,8 @@ function VwDeptEvolucaoTable({ deptKey, deptLabel, allMonthRows, year }: {
 
 // ─── Relatório Imprimível ─────────────────────────────────────────────────────
 
-function PrintableReport({ data, prevData, year, month }: {
-  data: DreVwRow; prevData: DreVwRow[]; year: number; month: number;
+function PrintableReport({ data, prevData, year, month, ajustada }: {
+  data: DreVwRow; prevData: DreVwRow[]; year: number; month: number; ajustada?: boolean;
 }) {
   const deptList = DEPTS.map(d => data[d.key]);
   const prevPeriods = getYtdPeriods(year, month);
@@ -1125,7 +1146,7 @@ function PrintableReport({ data, prevData, year, month }: {
 
       {/* Página 1: Resumo */}
       <div className="print-page">
-        <PrintResumoTable data={data} deptList={deptList} year={year} month={month} />
+        <PrintResumoTable data={data} deptList={deptList} year={year} month={month} ajustada={ajustada} />
         <PrintFooter label="Resumo Geral" page={1} total={totalPages} />
       </div>
 
@@ -1140,6 +1161,7 @@ function PrintableReport({ data, prevData, year, month }: {
             prevPeriods={prevPeriods}
             year={year}
             month={month}
+            ajustada={ajustada}
           />
           <PrintFooter label={d.label} page={i + 2} total={totalPages} />
         </div>
@@ -1154,10 +1176,10 @@ function PrintableReport({ data, prevData, year, month }: {
   );
 }
 
-function PrintHeader({ title, subtitle }: { title: string; subtitle: string }) {
+function PrintHeader({ title, subtitle, ajustada }: { title: string; subtitle: string; ajustada?: boolean }) {
   return (
     <div className="vw-header" style={{ backgroundImage: `linear-gradient(to bottom, ${VW_COLOR} 0%, ${VW_COLOR} 100%)`, backgroundColor: VW_COLOR, color: 'white', padding: '6px 12px', marginBottom: '0' } as React.CSSProperties}>
-      <div style={{ fontWeight: 700, fontSize: '10pt' }}>{title}</div>
+      <div style={{ fontWeight: 700, fontSize: '10pt' }}>{title}{ajustada && <PrintAjustadaBadge />}</div>
       <div style={{ fontSize: '7.5pt', opacity: 0.8 }}>{subtitle}</div>
     </div>
   );
@@ -1172,11 +1194,11 @@ function PrintFooter({ label, page, total }: { label: string; page: number; tota
   );
 }
 
-function PrintResumoTable({ data, deptList, year, month }: { data: DreVwRow; deptList: DreVwDept[]; year: number; month: number }) {
+function PrintResumoTable({ data, deptList, year, month, ajustada }: { data: DreVwRow; deptList: DreVwDept[]; year: number; month: number; ajustada?: boolean }) {
   const NCOLS = DEPTS.length + 2;
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-      <PrintHeader title="VW NORTE" subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} />
+      <PrintHeader title="VW NORTE" subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} ajustada={ajustada} />
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt' }}>
         <thead>
           <tr style={{ backgroundColor: '#e2e8f0', borderBottom: `2px solid ${VW_COLOR}` }}>
@@ -1244,11 +1266,12 @@ function PrintResumoTable({ data, deptList, year, month }: { data: DreVwRow; dep
   );
 }
 
-function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year, month }: {
+function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year, month, ajustada }: {
   deptLabel: string; deptKey: DeptKey;
   dept: DreVwDept; prevDepts: DreVwDept[];
   prevPeriods: { year: number; month: number }[];
   year: number; month: number;
+  ajustada?: boolean;
 }) {
   const totalCols = 1 + prevPeriods.length + 1 + 1 + 1;
   const nMonths = prevPeriods.length + 1;
@@ -1256,7 +1279,7 @@ function PrintDeptTable({ deptLabel, deptKey, dept, prevDepts, prevPeriods, year
   const monthPct = (100 - DESC_PCT - VAR_PCT - TOTAL_PCT) / nMonths;
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-      <PrintHeader title={`VW NORTE — ${deptLabel}`} subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} />
+      <PrintHeader title={`VW NORTE — ${deptLabel}`} subtitle={`${MONTHS[month - 1]} de ${year} — Demonstrativo de Resultados`} ajustada={ajustada} />
       <table className="vw-print-dept" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '7.5pt', tableLayout: 'fixed' }}>
         <thead>
           <tr style={{ backgroundColor: '#e2e8f0', borderBottom: `2px solid ${VW_COLOR}` }}>

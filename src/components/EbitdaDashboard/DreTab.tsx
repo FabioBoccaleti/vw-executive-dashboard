@@ -35,6 +35,8 @@ export function DreTab() {
     [rule],
   );
 
+  const ajustada = !!rule && (!!rule.targetField || (rule.zeroedLines?.length ?? 0) > 0);
+
   return (
     <div className="flex flex-col gap-3 flex-1 min-h-0">
       {/* Seletor de período */}
@@ -59,7 +61,7 @@ export function DreTab() {
 
       {/* Conteúdo da aba VW do Resumo DRE — somente leitura, sem Ajustes */}
       <div className="flex flex-col flex-1 min-h-0 bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <VwDreTab year={year} month={month} diasUteis={22} hideAjustes readOnly overlay={overlay} />
+        <VwDreTab year={year} month={month} diasUteis={22} hideAjustes readOnly overlay={overlay} ajustada={ajustada} />
       </div>
     </div>
   );
