@@ -181,9 +181,9 @@ function GroupSection({
   );
 }
 
-interface Props { year: number; month: number; }
+interface Props { year: number; month: number; onlyTipo?: TipoClassificacao; }
 
-export function ConsolidadoAdmTab({ year, month }: Props) {
+export function ConsolidadoAdmTab({ year, month, onlyTipo }: Props) {
   const isYearMode = month === 0;
   const [loading, setLoading] = useState(true);
   const [valorMap, setValorMap] = useState<Map<string, number>>(new Map());
@@ -298,6 +298,7 @@ export function ConsolidadoAdmTab({ year, month }: Props) {
     if (valor === 0) continue;
     const tipo = classificacoes[conta];
     if (!tipo) continue;
+    if (onlyTipo && tipo !== onlyTipo) continue;
     groups.get(tipo)!.push({ conta, valor });
     grandTotal += valor;
     totalContas++;

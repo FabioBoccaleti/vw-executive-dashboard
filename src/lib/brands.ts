@@ -5,7 +5,7 @@
  */
 
 // Tipo para identificar a marca
-export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'base_gerencial' | 'comparativo_rede_vw' | 'comparativo_rede_audi' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'analise_estoque_pecas' | 'controle_pagamentos_evora' | 'controle_veiculos_floorplan' | 'analise_financeira';
+export type Brand = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'base_gerencial' | 'comparativo_rede_vw' | 'comparativo_rede_audi' | 'ebitda' | 'vw_outros' | 'audi_outros' | 'aprovacao_despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'analise_estoque_pecas' | 'controle_pagamentos_evora' | 'controle_veiculos_floorplan' | 'analise_financeira';
 
 // Interface de configuraÃ§Ã£o visual da marca
 export interface BrandConfig {
@@ -360,6 +360,31 @@ export const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
       '--brand-primary-light': '#fde8eb',
       '--brand-secondary': '#e4002b',
       '--brand-accent': '#ff6b81',
+    }
+  },
+  ebitda: {
+    id: 'ebitda',
+    name: 'Ebitda',
+    shortName: 'Ebitda',
+    colors: {
+      primary: '#059669',
+      primaryHover: '#047857',
+      primaryLight: '#d1fae5',
+      secondary: '#10b981',
+      accent: '#34d399',
+      headerBg: 'bg-[#059669]',
+      headerText: 'text-white',
+      buttonBg: 'bg-[#059669] hover:bg-[#047857]',
+      buttonText: 'text-white',
+      badgeBg: 'bg-emerald-100 dark:bg-emerald-900/30',
+      badgeText: 'text-emerald-800 dark:text-emerald-200',
+    },
+    cssVariables: {
+      '--brand-primary': '#059669',
+      '--brand-primary-hover': '#047857',
+      '--brand-primary-light': '#d1fae5',
+      '--brand-secondary': '#10b981',
+      '--brand-accent': '#34d399',
     }
   },
   audi_outros: {

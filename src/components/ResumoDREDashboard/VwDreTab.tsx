@@ -214,9 +214,11 @@ interface VwDreTabProps {
   year: number;
   month: number;
   diasUteis: number;
+  hideAjustes?: boolean;
+  readOnly?: boolean;
 }
 
-export function VwDreTab({ year, month }: VwDreTabProps) {
+export function VwDreTab({ year, month, hideAjustes, readOnly }: VwDreTabProps) {
   const [data, setData]       = useState<DreVwRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
@@ -465,13 +467,15 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
             {d.label}
           </button>
         ))}
-        <button
-          onClick={() => setActiveSection('ajustes')}
-          className="px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors border-transparent text-slate-500 hover:text-slate-700"
-          style={activeSection === 'ajustes' ? { borderBottomColor: VW_COLOR, color: VW_COLOR } : {}}
-        >
-          Ajustes
-        </button>
+        {!hideAjustes && (
+          <button
+            onClick={() => setActiveSection('ajustes')}
+            className="px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors border-transparent text-slate-500 hover:text-slate-700"
+            style={activeSection === 'ajustes' ? { borderBottomColor: VW_COLOR, color: VW_COLOR } : {}}
+          >
+            Ajustes
+          </button>
+        )}
 
         <div className="flex-1" />
 
@@ -491,6 +495,7 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
         </button>
 
         {/* Botão Salvar */}
+        {!readOnly && (
         <button
           disabled={!dirty || saving}
           onClick={handleSave}
@@ -503,6 +508,7 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
           {saving ? 'Salvando...' : 'Salvar'}
         </button>
+        )}
       </div>
 
       {/* ── Conteúdo ─────────────────────────────────────────────────────── */}
@@ -534,11 +540,11 @@ export function VwDreTab({ year, month }: VwDreTabProps) {
           activeSection === d.key ? (
             month === 0
               ? <VwDeptEvolucaoTable key={d.key} deptKey={d.key} deptLabel={d.label} allMonthRows={allMonthRows} year={year} />
-              : <DeptTable key={d.key} deptKey={d.key} deptLabel={d.label} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getYtdPeriods(year, month)} year={year} month={month} onChange={(field, value) => handleCellChange(d.key, field, value)} />
+              : <DeptTable key={d.key} deptKey={d.key} deptLabel={d.label} dept={data[d.key]} prevDepts={prevData.map(row => row[d.key])} prevPeriods={getYtdPeriods(year, month)} year={year} month={month} onChange={(field, value) => handleCellChange(d.key, field, value)} readOnly={readOnly} />
           ) : null
         )}
 
-        {activeSection === 'ajustes' && (
+        {!hideAjustes && activeSection === 'ajustes' && (
           <AjustesTable
             ajustes={data.ajustes}
             onChange={handleAjusteChange}
@@ -652,12 +658,13 @@ function ResumoTable({ data, deptList, year, month }: {
 
 // ─── Tabela por Departamento ──────────────────────────────────────────────────
 
-function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, month, onChange }: {
+function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, month, onChange, readOnly }: {
   deptKey: DeptKey; deptLabel: string;
   dept: DreVwDept; prevDepts: DreVwDept[];
   prevPeriods: { year: number; month: number }[];
   year: number; month: number;
   onChange: (field: keyof DreVwDept, value: string) => void;
+  readOnly?: boolean;
 }) {
   const totalCols = 1 + prevPeriods.length + 1 + 1 + 1;
   return (
@@ -752,7 +759,7 @@ function DeptTable({ deptKey, deptLabel, dept, prevDepts, prevPeriods, year, mon
                   <td className="px-2 py-1 text-center">
                     {isAdmROL
                       ? <span className="block w-full text-center px-1 py-0.5 min-w-[5rem]">0,00</span>
-                      : <EditableCell value={dept[line.field]} onChange={v => onChange(line.field, v)} isTotal={line.isTotal} isNegative={line.isNegative} isQuant={isQuant} />
+                      : <EditableCell value={dept[line.field]} onChange={v => onChange(line.field, v)} isTotal={line.isTotal} isNegative={line.isNegative} isQuant={isQuant} readOnly={readOnly} />
                     }
                   </td>
                   <td className="px-2 py-1.5 text-center text-[0.68rem] border-l border-slate-200">{varMM || '—'}</td>
@@ -912,9 +919,9 @@ function AjustesTable({ ajustes, onChange, onLabelChange, onAdd, onDelete, data,
 
 // ─── Célula Editável ──────────────────────────────────────────────────────────
 
-function EditableCell({ value, onChange, isTotal = false, isNegative = false, isQuant = false }: {
+function EditableCell({ value, onChange, isTotal = false, isNegative = false, isQuant = false, readOnly = false }: {
   value: string; onChange: (v: string) => void;
-  isTotal?: boolean; isNegative?: boolean; isQuant?: boolean;
+  isTotal?: boolean; isNegative?: boolean; isQuant?: boolean; readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -923,6 +930,14 @@ function EditableCell({ value, onChange, isTotal = false, isNegative = false, is
   const display = value ? fmtNum(value) : '';
 
   function commitEdit() { onChange(draft); setEditing(false); }
+
+  if (readOnly) {
+    return (
+      <span className={`block w-full text-center px-1 py-0.5 min-w-[5rem] ${!value ? 'text-slate-300' : ''}`}>
+        {display || '—'}
+      </span>
+    );
+  }
 
   if (editing) {
     return (

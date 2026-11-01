@@ -7,7 +7,7 @@ import { PasswordDialog } from '@/components/PasswordDialog';
 import { useAuth } from '@/contexts/useAuth';
 import { BaseDateBadge } from '@/components/BaseDateBadge';
 
-const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'despesas_depto_vw', 'ieo', 'base_gerencial', 'comparativo_rede_vw', 'comparativo_rede_audi', 'vw_outros', 'audi_outros'];
+const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'despesas_depto_vw', 'ieo', 'base_gerencial', 'comparativo_rede_vw', 'comparativo_rede_audi', 'ebitda', 'vw_outros', 'audi_outros'];
 const DIRECT_BRANDS: Brand[] = ['aprovacao_despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'controle_veiculos_floorplan', 'analise_estoque_pecas', 'analise_financeira', 'controle_pagamentos_evora'];
 const PROTECTED_BRANDS: Brand[] = ['vw_outros', 'audi_outros', 'aprovacao_despesas'];
 
@@ -108,6 +108,7 @@ export function BrandSelector({ onSelectBrand, currentBrand, onAdminClick, onLog
     if (brand === 'base_gerencial')                  return <Layers className={size} />;
     if (brand === 'comparativo_rede_vw')             return <Layers className={size} />;
     if (brand === 'comparativo_rede_audi')           return <Layers className={size} />;
+    if (brand === 'ebitda')                          return <TrendingUp className={size} />;
     if (brand.includes('vw'))                        return <Car className={size} />;
     return <Building2 className={size} />;
   };

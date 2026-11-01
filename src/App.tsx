@@ -44,6 +44,7 @@ import { IEODashboard } from '@/components/IEODashboard'
 import { BaseGerencialDashboard } from '@/components/BaseGerencialDashboard'
 import { ComparativoRedeVwDashboard } from '@/components/ComparativoRedeVwDashboard'
 import { ComparativoRedeAudiDashboard } from '@/components/ComparativoRedeAudiDashboard'
+import { EbitdaDashboard } from '@/components/EbitdaDashboard'
 import { PassagemOficinaFunilariaVWDashboard } from '@/components/VendasBonificacoesDashboard/PassagemOficinaFunilariaVW'
 import { PassagemOficinaFunilariaAudiDashboard } from '@/components/VendasBonificacoesDashboard/PassagemOficinaFunilariaAudi'
 
@@ -91,7 +92,7 @@ function AppContent() {
     }
   }, [])
   
-  const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'vw_outros', 'audi_outros', 'comparativo_rede_vw', 'comparativo_rede_audi']
+  const DEMONSTRATIVO_BRANDS: Brand[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'vw_outros', 'audi_outros', 'comparativo_rede_vw', 'comparativo_rede_audi', 'ebitda']
 
   const handleBrandSelect = async (selectedBrand: Brand) => {
     saveBrand(selectedBrand)
@@ -336,6 +337,8 @@ function AppContent() {
         <ComparativoRedeVwDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'comparativo_rede_audi' ? (
         <ComparativoRedeAudiDashboard onChangeBrand={handleChangeBrand} />
+      ) : brand === 'ebitda' ? (
+        <EbitdaDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'resumo_dre' ? (
         <ResumoDREDashboard onChangeBrand={handleChangeBrand} />
       ) : brand === 'analise_projecoes' ? (
