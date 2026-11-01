@@ -181,9 +181,11 @@ export async function computeFinanceirasPorDreDepto(
 const g = (dept: DreVwDept, field: keyof DreVwDept) => parseDreValue(dept[field]);
 
 /** Recalcula as linhas de total/subtotal da DRE a partir das linhas base. */
-function recomputeDeptTotals(dept: DreVwDept): DreVwDept {
-  const lucroBruto =
-    g(dept, 'receitaOperacionalLiquida') + g(dept, 'custoOperacionalReceita');
+function recomputeDeptTotals(dept: DreVwDept, isAdm: boolean): DreVwDept {
+  // Administração não tem Receita Operacional Líquida (exibida como 0,00 no
+  // Resumo DRE via isAdmROL). Tratamos como 0 para não vazar valor no total.
+  const rol = isAdm ? 0 : g(dept, 'receitaOperacionalLiquida');
+  const lucroBruto = rol + g(dept, 'custoOperacionalReceita');
   const margem =
     lucroBruto + g(dept, 'outrasReceitasOperacionais') + g(dept, 'outrasDespesasOperacionais');
   const lucroLiq =
@@ -209,7 +211,7 @@ function recomputeDeptTotals(dept: DreVwDept): DreVwDept {
 }
 
 /** Aplica o delta financeiro à linha-alvo, zera as linhas marcadas e recalcula totais. */
-function applyToDept(dept: DreVwDept, financeiras: number, rule: InfluenciaDFRule): DreVwDept {
+function applyToDept(dept: DreVwDept, financeiras: number, rule: InfluenciaDFRule, isAdm: boolean): DreVwDept {
   const next: DreVwDept = { ...dept };
   // Influência: soma/deduz o valor financeiro na linha-alvo.
   if (rule.targetField && financeiras !== 0) {
@@ -220,7 +222,7 @@ function applyToDept(dept: DreVwDept, financeiras: number, rule: InfluenciaDFRul
   if (rule.zeroedLines) {
     for (const f of rule.zeroedLines) next[f] = '0';
   }
-  return recomputeDeptTotals(next);
+  return recomputeDeptTotals(next, isAdm);
 }
 
 /**
@@ -248,7 +250,7 @@ export function makeInfluenciaOverlay(
     const next: DreVwRow = { ...row };
     for (const k of DRE_DEPT_KEYS) {
       if (hasZero || fin[k] !== 0) {
-        next[k] = applyToDept(row[k], fin[k], rule);
+        next[k] = applyToDept(row[k], fin[k], rule, k === 'adm');
       }
     }
     return next;
