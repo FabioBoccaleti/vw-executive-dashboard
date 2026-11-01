@@ -49,6 +49,12 @@ export interface InfluenciaDFRule {
   sign: 1 | -1;
   /** Linhas da DRE que devem ser zeradas (0,00) antes de recalcular os totais. */
   zeroedLines?: DreTargetField[];
+  /**
+   * Contas do grupo Despesas Financeiras que entram na influência.
+   * `undefined` = todas (compatibilidade); `[]` = nenhuma (sem influência);
+   * lista = apenas as contas marcadas.
+   */
+  selectedContas?: string[];
 }
 
 export const DEFAULT_INFLUENCIA_RULE: InfluenciaDFRule = {
@@ -115,6 +121,8 @@ export async function loadInfluenciaDF(): Promise<InfluenciaDFRule> {
     targetField: saved.targetField ?? '',
     sign: saved.sign === 1 ? 1 : -1,
     zeroedLines: (saved.zeroedLines ?? []).filter(f => ZEROABLE_FIELDS.has(f)),
+    // undefined = todas as contas (compatibilidade com regras antigas)
+    selectedContas: Array.isArray(saved.selectedContas) ? saved.selectedContas : undefined,
   };
 }
 
@@ -122,15 +130,27 @@ export async function saveInfluenciaDF(rule: InfluenciaDFRule): Promise<void> {
   await kvSet(RULE_KEY, rule);
 }
 
+/** Retorna a lista (ordenada) de contas classificadas como Despesas Financeiras. */
+export async function loadFinanceirasContas(): Promise<string[]> {
+  const classif = await loadClassificacoes();
+  return Object.entries(classif)
+    .filter(([, tipo]) => tipo === 'financeiras')
+    .map(([conta]) => conta)
+    .sort((a, b) => a.localeCompare(b));
+}
+
 // ─── Cálculo das Despesas Financeiras por departamento da DRE ────────────────
 
 /**
  * Soma o subtotal de Despesas Financeiras de cada departamento (mapeado para a
  * DRE) para um mês específico (1-12). Diretoria é somada em Administração.
+ * Se `selectedContas` for informado, soma apenas essas contas; `undefined`
+ * considera todas as contas de Despesas Financeiras.
  */
 export async function computeFinanceirasPorDreDepto(
   year: number,
   month: number,
+  selectedContas?: string[],
 ): Promise<Record<DreDeptKey, number>> {
   const result: Record<DreDeptKey, number> = {
     novos: 0, direta: 0, usados: 0, pecas: 0, oficina: 0, funilaria: 0, adm: 0,
@@ -140,12 +160,15 @@ export async function computeFinanceirasPorDreDepto(
   if (!data) return result;
 
   const [classif, regras] = await Promise.all([loadClassificacoes(), loadRegrasDeptos()]);
+  const contaFilter = selectedContas ? new Set(selectedContas) : null;
 
   for (const { depto, dre } of DEPTO_TO_DRE) {
     const map = extractByDeptoRule(data, depto, regras);
     let sum = 0;
     for (const [conta, valor] of map) {
-      if (classif[conta] === 'financeiras') sum += valor;
+      if (classif[conta] !== 'financeiras') continue;
+      if (contaFilter && !contaFilter.has(conta)) continue;
+      sum += valor;
     }
     result[dre] += sum;
   }
@@ -211,14 +234,15 @@ export function makeInfluenciaOverlay(
 ): (row: DreVwRow, year: number, month: number) => Promise<DreVwRow> {
   return async (row, year, month) => {
     const hasZero = (rule.zeroedLines?.length ?? 0) > 0;
-    const hasInflu = !!rule.targetField;
+    // Influência efetiva: linha-alvo escolhida E ao menos uma conta (ou "todas").
+    const hasInflu = !!rule.targetField && (rule.selectedContas === undefined || rule.selectedContas.length > 0);
     if (!hasZero && !hasInflu) return row;
 
     let fin: Record<DreDeptKey, number> = {
       novos: 0, direta: 0, usados: 0, pecas: 0, oficina: 0, funilaria: 0, adm: 0,
     };
     if (hasInflu && month >= 1 && month <= 12) {
-      fin = await computeFinanceirasPorDreDepto(year, month);
+      fin = await computeFinanceirasPorDreDepto(year, month, rule.selectedContas);
     }
 
     const next: DreVwRow = { ...row };

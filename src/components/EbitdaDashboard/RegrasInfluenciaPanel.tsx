@@ -10,6 +10,7 @@ import { ChevronDown, Settings, Loader2 } from 'lucide-react';
 import {
   loadInfluenciaDF,
   saveInfluenciaDF,
+  loadFinanceirasContas,
   DRE_TARGET_LINES,
   ZEROABLE_LINES,
   type InfluenciaDFRule,
@@ -20,11 +21,19 @@ export function RegrasInfluenciaPanel() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [rule, setRule] = useState<InfluenciaDFRule>({ targetField: '', sign: -1, zeroedLines: [] });
+  const [rule, setRule] = useState<InfluenciaDFRule>({ targetField: '', sign: -1, zeroedLines: [], selectedContas: [] });
+  const [contas, setContas] = useState<string[]>([]);
 
   useEffect(() => {
-    loadInfluenciaDF()
-      .then(setRule)
+    Promise.all([loadInfluenciaDF(), loadFinanceirasContas()])
+      .then(([saved, contasList]) => {
+        setContas(contasList);
+        // undefined = regra antiga/nova → marca todas as contas por padrão.
+        setRule({
+          ...saved,
+          selectedContas: saved.selectedContas ?? [...contasList],
+        });
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -39,6 +48,21 @@ export function RegrasInfluenciaPanel() {
     });
   }
 
+  function toggleConta(conta: string) {
+    setRule(r => {
+      const current = r.selectedContas ?? [];
+      const exists = current.includes(conta);
+      return {
+        ...r,
+        selectedContas: exists ? current.filter(c => c !== conta) : [...current, conta],
+      };
+    });
+  }
+
+  function setAllContas(checked: boolean) {
+    setRule(r => ({ ...r, selectedContas: checked ? [...contas] : [] }));
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -50,6 +74,8 @@ export function RegrasInfluenciaPanel() {
       setSaving(false);
     }
   }
+
+  const selectedContasCount = (rule.selectedContas ?? []).length;
 
   const alvoLabel = rule.targetField
     ? DRE_TARGET_LINES.find(l => l.field === rule.targetField)?.label ?? '—'
@@ -124,6 +150,56 @@ export function RegrasInfluenciaPanel() {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Contas que influenciam */}
+          <div className="flex flex-col gap-2 border-t border-slate-100 pt-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                Contas que influenciam ({selectedContasCount}/{contas.length})
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setAllContas(true)}
+                  className="px-2.5 py-1 text-[11px] font-semibold rounded border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+                >
+                  Marcar todas
+                </button>
+                <button
+                  onClick={() => setAllContas(false)}
+                  className="px-2.5 py-1 text-[11px] font-semibold rounded border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+                >
+                  Desmarcar todas
+                </button>
+              </div>
+            </div>
+            {contas.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">
+                Nenhuma conta classificada como Despesas Financeiras encontrada.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {contas.map(conta => {
+                  const checked = (rule.selectedContas ?? []).includes(conta);
+                  return (
+                    <label key={conta} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleConta(conta)}
+                        className="w-4 h-4 accent-[#059669] cursor-pointer shrink-0"
+                      />
+                      <span className="font-mono text-xs">{conta}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {selectedContasCount === 0 && (
+              <p className="text-[11px] text-amber-600">
+                Nenhuma conta marcada: a linha-alvo não receberá influência.
+              </p>
+            )}
           </div>
 
           {/* Zerar linhas */}

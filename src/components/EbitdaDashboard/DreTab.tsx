@@ -35,7 +35,10 @@ export function DreTab() {
     [rule],
   );
 
-  const ajustada = !!rule && (!!rule.targetField || (rule.zeroedLines?.length ?? 0) > 0);
+  const ajustada = !!rule && (
+    (!!rule.targetField && (rule.selectedContas === undefined || rule.selectedContas.length > 0)) ||
+    (rule.zeroedLines?.length ?? 0) > 0
+  );
 
   return (
     <div className="flex flex-col gap-3 flex-1 min-h-0">
