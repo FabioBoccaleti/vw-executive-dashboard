@@ -11,6 +11,7 @@ import {
   loadInfluenciaDF,
   saveInfluenciaDF,
   DRE_TARGET_LINES,
+  ZEROABLE_LINES,
   type InfluenciaDFRule,
   type DreTargetField,
 } from './ebitdaInfluenciaStorage';
@@ -19,13 +20,24 @@ export function RegrasInfluenciaPanel() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [rule, setRule] = useState<InfluenciaDFRule>({ targetField: '', sign: -1 });
+  const [rule, setRule] = useState<InfluenciaDFRule>({ targetField: '', sign: -1, zeroedLines: [] });
 
   useEffect(() => {
     loadInfluenciaDF()
       .then(setRule)
       .finally(() => setLoading(false));
   }, []);
+
+  function toggleZeroedLine(field: DreTargetField) {
+    setRule(r => {
+      const current = r.zeroedLines ?? [];
+      const exists = current.includes(field);
+      return {
+        ...r,
+        zeroedLines: exists ? current.filter(f => f !== field) : [...current, field],
+      };
+    });
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -112,8 +124,33 @@ export function RegrasInfluenciaPanel() {
                 </button>
               </div>
             </div>
+          </div>
 
-            {/* Salvar */}
+          {/* Zerar linhas */}
+          <div className="flex flex-col gap-2 border-t border-slate-100 pt-3">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+              Zerar linhas (ficam 0,00 e os totais abaixo recalculam)
+            </span>
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              {ZEROABLE_LINES.map(l => {
+                const checked = (rule.zeroedLines ?? []).includes(l.field);
+                return (
+                  <label key={l.field} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleZeroedLine(l.field)}
+                      className="w-4 h-4 accent-[#059669] cursor-pointer"
+                    />
+                    {l.label}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Salvar */}
+          <div>
             <button
               onClick={handleSave}
               disabled={saving || loading}

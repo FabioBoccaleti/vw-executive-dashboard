@@ -47,12 +47,25 @@ export interface InfluenciaDFRule {
   targetField: DreTargetField | '';
   /** +1 soma na linha, -1 deduz da linha. */
   sign: 1 | -1;
+  /** Linhas da DRE que devem ser zeradas (0,00) antes de recalcular os totais. */
+  zeroedLines?: DreTargetField[];
 }
 
 export const DEFAULT_INFLUENCIA_RULE: InfluenciaDFRule = {
   targetField: '',
   sign: -1,
+  zeroedLines: [],
 };
+
+/** Linhas da DRE que podem ser zeradas individualmente (apenas no Ebitda VW). */
+export const ZEROABLE_LINES: { field: DreTargetField; label: string }[] = [
+  { field: 'outrasReceitasFinanceiras',     label: 'Outras Receitas Financeiras' },
+  { field: 'despFinanceirasNaoOperacional', label: '(-) Despesas Financeiras Não Operacional' },
+  { field: 'despesasNaoOperacionais',       label: '(-) Despesas Não Operacionais' },
+  { field: 'outrasRendasNaoOperacionais',   label: 'Outras Rendas Não Operacionais' },
+];
+
+const ZEROABLE_FIELDS = new Set<DreTargetField>(ZEROABLE_LINES.map(l => l.field));
 
 /** Linhas da DRE selecionáveis como alvo, na ordem da DRE. */
 export const DRE_TARGET_LINES: { field: DreTargetField; label: string }[] = [
@@ -101,6 +114,7 @@ export async function loadInfluenciaDF(): Promise<InfluenciaDFRule> {
   return {
     targetField: saved.targetField ?? '',
     sign: saved.sign === 1 ? 1 : -1,
+    zeroedLines: (saved.zeroedLines ?? []).filter(f => ZEROABLE_FIELDS.has(f)),
   };
 }
 
@@ -171,33 +185,47 @@ function recomputeDeptTotals(dept: DreVwDept): DreVwDept {
   };
 }
 
-/** Aplica o delta financeiro à linha-alvo do departamento e recalcula totais. */
+/** Aplica o delta financeiro à linha-alvo, zera as linhas marcadas e recalcula totais. */
 function applyToDept(dept: DreVwDept, financeiras: number, rule: InfluenciaDFRule): DreVwDept {
-  if (!rule.targetField) return dept;
   const next: DreVwDept = { ...dept };
-  const atual = parseDreValue(next[rule.targetField]);
-  next[rule.targetField] = String(Math.round(atual + rule.sign * financeiras));
+  // Influência: soma/deduz o valor financeiro na linha-alvo.
+  if (rule.targetField && financeiras !== 0) {
+    const atual = parseDreValue(next[rule.targetField]);
+    next[rule.targetField] = String(Math.round(atual + rule.sign * financeiras));
+  }
+  // Zerar linhas marcadas (zerar vence sobre a influência).
+  if (rule.zeroedLines) {
+    for (const f of rule.zeroedLines) next[f] = '0';
+  }
   return recomputeDeptTotals(next);
 }
 
 /**
  * Cria a função de overlay que o VwDreTab aplica após carregar cada linha.
  * Para o período (ano, mês) soma as Despesas Financeiras por departamento e
- * injeta na linha-alvo escolhida, recalculando os totais. Não altera a base.
+ * injeta na linha-alvo escolhida, zera as linhas marcadas e recalcula os
+ * totais. Não altera a base.
  */
 export function makeInfluenciaOverlay(
   rule: InfluenciaDFRule,
 ): (row: DreVwRow, year: number, month: number) => Promise<DreVwRow> {
   return async (row, year, month) => {
-    if (!rule.targetField || month < 1 || month > 12) return row;
+    const hasZero = (rule.zeroedLines?.length ?? 0) > 0;
+    const hasInflu = !!rule.targetField;
+    if (!hasZero && !hasInflu) return row;
 
-    const fin = await computeFinanceirasPorDreDepto(year, month);
-    const hasInfluence = DRE_DEPT_KEYS.some(k => fin[k] !== 0);
-    if (!hasInfluence) return row;
+    let fin: Record<DreDeptKey, number> = {
+      novos: 0, direta: 0, usados: 0, pecas: 0, oficina: 0, funilaria: 0, adm: 0,
+    };
+    if (hasInflu && month >= 1 && month <= 12) {
+      fin = await computeFinanceirasPorDreDepto(year, month);
+    }
 
     const next: DreVwRow = { ...row };
     for (const k of DRE_DEPT_KEYS) {
-      if (fin[k] !== 0) next[k] = applyToDept(row[k], fin[k], rule);
+      if (hasZero || fin[k] !== 0) {
+        next[k] = applyToDept(row[k], fin[k], rule);
+      }
     }
     return next;
   };
