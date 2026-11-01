@@ -18,6 +18,7 @@ import { FunalariaTab } from '@/components/DespesasDeptoVwDashboard/FunalariaTab
 import { AdministracaoTab } from '@/components/DespesasDeptoVwDashboard/AdministracaoTab';
 import { DireitoriaTab } from '@/components/DespesasDeptoVwDashboard/DireitoriaTab';
 import { ConsolidadoAdmTab } from '@/components/DespesasDeptoVwDashboard/ConsolidadoAdmTab';
+import { RegrasInfluenciaPanel } from './RegrasInfluenciaPanel';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_MODE = 0; // "Ano todo"
@@ -79,6 +80,9 @@ export function DespesasFinanceiraTab() {
       <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
         <YearSelector year={year} onYearChange={setYear} />
       </div>
+
+      {/* Regras de influência na DRE */}
+      <RegrasInfluenciaPanel />
 
       {/* Sub-abas por departamento */}
       <div className="flex items-center gap-0 border-b border-slate-200 overflow-x-auto">

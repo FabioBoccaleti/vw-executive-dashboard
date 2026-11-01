@@ -216,9 +216,10 @@ interface VwDreTabProps {
   diasUteis: number;
   hideAjustes?: boolean;
   readOnly?: boolean;
+  overlay?: (row: DreVwRow, year: number, month: number) => Promise<DreVwRow>;
 }
 
-export function VwDreTab({ year, month, hideAjustes, readOnly }: VwDreTabProps) {
+export function VwDreTab({ year, month, hideAjustes, readOnly, overlay }: VwDreTabProps) {
   const [data, setData]       = useState<DreVwRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
@@ -246,7 +247,7 @@ export function VwDreTab({ year, month, hideAjustes, readOnly }: VwDreTabProps) 
           loadDREDataAsync(yr, DEPT_KEY_TO_DEPT[d.key]!, 'vw')
             .then(dre => ({ deptKey: d.key as DeptKey, dre }))
         )),
-      ]).then(([kvResults, dreResults]) => {
+      ]).then(async ([kvResults, dreResults]) => {
         const dreLk: Record<string, any[] | null> = {};
         for (const { deptKey, dre } of dreResults) dreLk[deptKey] = dre;
         function hasData(dept: DreVwDept) { return Object.values(dept).some(v => v !== ''); }
@@ -259,7 +260,10 @@ export function VwDreTab({ year, month, hideAjustes, readOnly }: VwDreTabProps) 
           if (kv) row.ajustes = migrateVwAjustes(kv.ajustes);
           return row;
         }
-        const monthRows = kvResults.map((kv, i) => buildMRow(i + 1, kv ?? null));
+        const rawMonthRows = kvResults.map((kv, i) => buildMRow(i + 1, kv ?? null));
+        const monthRows = overlay
+          ? await Promise.all(rawMonthRows.map((r, i) => overlay(r, year, i + 1)))
+          : rawMonthRows;
         setAllMonthRows(monthRows);
         const summed = createEmptyDreVwRow(year, 0);
         for (const row of monthRows) {
@@ -308,7 +312,7 @@ export function VwDreTab({ year, month, hideAjustes, readOnly }: VwDreTabProps) 
     Promise.all([
       Promise.all(ajustesPromises),
       Promise.all(deptDrePromises),
-    ]).then(([ajustesResults, dreResults]) => {
+    ]).then(async ([ajustesResults, dreResults]) => {
       const [currentAjustes, ...prevAjustesArr] = ajustesResults;
 
       const dreLookup: Record<string, Record<number, any[] | null>> = {};
@@ -336,14 +340,25 @@ export function VwDreTab({ year, month, hideAjustes, readOnly }: VwDreTabProps) 
         return row;
       }
 
-      setData(buildRow(year, month, currentAjustes ?? null));
-      setPrevData(periods.map((p, i) => buildRow(p.year, p.month, prevAjustesArr[i] ?? null)));
+      const baseData = buildRow(year, month, currentAjustes ?? null);
+      const basePrev = periods.map((p, i) => buildRow(p.year, p.month, prevAjustesArr[i] ?? null));
+      if (overlay) {
+        const [adjData, adjPrev] = await Promise.all([
+          overlay(baseData, year, month),
+          Promise.all(basePrev.map((r, i) => overlay(r, periods[i].year, periods[i].month))),
+        ]);
+        setData(adjData);
+        setPrevData(adjPrev);
+      } else {
+        setData(baseData);
+        setPrevData(basePrev);
+      }
     }).catch(error => {
       console.error('Erro ao carregar DRE VW:', error);
       setData(createEmptyDreVwRow(year, month));
       setPrevData([]);
     }).finally(() => setLoading(false));
-  }, [year, month]);
+  }, [year, month, overlay]);
 
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {

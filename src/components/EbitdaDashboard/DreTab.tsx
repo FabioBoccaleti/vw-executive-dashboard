@@ -8,8 +8,9 @@
  * automaticamente. Possui seletor de período (ano + mês, com "Ano Completo").
  */
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { VwDreTab } from '@/components/ResumoDREDashboard/VwDreTab';
+import { loadInfluenciaDF, makeInfluenciaOverlay, type InfluenciaDFRule } from './ebitdaInfluenciaStorage';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_MONTH = new Date().getMonth() + 1;
@@ -23,6 +24,16 @@ const MONTHS_LABEL = [
 export function DreTab() {
   const [year, setYear] = useState(CURRENT_YEAR);
   const [month, setMonth] = useState(CURRENT_MONTH);
+  const [rule, setRule] = useState<InfluenciaDFRule | null>(null);
+
+  useEffect(() => {
+    loadInfluenciaDF().then(setRule);
+  }, []);
+
+  const overlay = useMemo(
+    () => (rule ? makeInfluenciaOverlay(rule) : undefined),
+    [rule],
+  );
 
   return (
     <div className="flex flex-col gap-3 flex-1 min-h-0">
@@ -48,7 +59,7 @@ export function DreTab() {
 
       {/* Conteúdo da aba VW do Resumo DRE — somente leitura, sem Ajustes */}
       <div className="flex flex-col flex-1 min-h-0 bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <VwDreTab year={year} month={month} diasUteis={22} hideAjustes readOnly />
+        <VwDreTab year={year} month={month} diasUteis={22} hideAjustes readOnly overlay={overlay} />
       </div>
     </div>
   );
