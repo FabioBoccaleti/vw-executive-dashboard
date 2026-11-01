@@ -38,21 +38,19 @@ export function EbitdaDashboard({ onChangeBrand }: Props) {
 
       <main className="flex-1 p-4 md:p-6 flex flex-col min-h-0">
         {view === 'selection' ? (
-          <div className="max-w-4xl mx-auto">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <Card
-                className="cursor-pointer transition-all duration-200 hover:shadow-lg"
-                style={{ ['--tw-ring-color' as string]: '#059669' }}
-                onClick={() => setView('ebitda_vw')}
-              >
-                <CardContent className="p-6 flex flex-col items-center justify-center gap-3 text-center min-h-[140px]">
-                  <div className="p-3 rounded-full bg-emerald-100 text-[#059669]">
-                    <Car className="w-8 h-8" />
-                  </div>
-                  <h3 className="text-base font-bold text-slate-700">Ebitda VW</h3>
-                </CardContent>
-              </Card>
-            </div>
+          <div className="flex justify-center pt-4">
+            <Card
+              className="cursor-pointer transition-all duration-200 hover:shadow-lg w-[260px]"
+              style={{ ['--tw-ring-color' as string]: '#059669' }}
+              onClick={() => setView('ebitda_vw')}
+            >
+              <CardContent className="p-8 flex flex-col items-center justify-center gap-4 text-center min-h-[200px]">
+                <div className="p-4 rounded-full bg-emerald-100 text-[#059669]">
+                  <Car className="w-11 h-11" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-700">Ebitda VW</h3>
+              </CardContent>
+            </Card>
           </div>
         ) : (
           <div className="w-full flex flex-col flex-1 min-h-0">
