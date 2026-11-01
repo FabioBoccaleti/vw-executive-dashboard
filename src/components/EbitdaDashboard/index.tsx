@@ -57,7 +57,7 @@ export function EbitdaDashboard({ onChangeBrand }: Props) {
         ) : (
           <div className="w-full flex flex-col flex-1 min-h-0">
             <h2 className="text-2xl font-bold text-slate-900 mb-4">Ebitda VW</h2>
-            <Tabs defaultValue="despesas_financeira" className="w-full flex flex-col flex-1 min-h-0">
+            <Tabs defaultValue="dre" className="w-full flex flex-col flex-1 min-h-0">
               <TabsList>
                 <TabsTrigger value="despesas_financeira">Despesas Financeira</TabsTrigger>
                 <TabsTrigger value="dre">DRE</TabsTrigger>

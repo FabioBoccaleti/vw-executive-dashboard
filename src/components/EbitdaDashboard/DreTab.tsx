@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { VwDreTab } from '@/components/ResumoDREDashboard/VwDreTab';
 import { loadInfluenciaDF, makeInfluenciaOverlay, type InfluenciaDFRule } from './ebitdaInfluenciaStorage';
+import { detectLatestVwDrePeriod } from './detectLatestDrePeriod';
 
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_MONTH = new Date().getMonth() + 1;
@@ -28,6 +29,16 @@ export function DreTab() {
 
   useEffect(() => {
     loadInfluenciaDF().then(setRule);
+  }, []);
+
+  // Ao abrir, posiciona no último mês/ano com dados na DRE VW.
+  useEffect(() => {
+    detectLatestVwDrePeriod().then(period => {
+      if (period) {
+        setYear(period.year);
+        setMonth(period.month);
+      }
+    });
   }, []);
 
   const overlay = useMemo(
