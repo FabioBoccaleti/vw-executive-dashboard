@@ -36,6 +36,7 @@ import {
 import { fmtBRL, parseNum, formatDateBR } from './estoqueUsadosStorage';
 import { todayISO, addDaysISO, diffDaysISO, estimativaJuros, computeSaldoItau, computeSaldoVolksPorDN, type SaldoInfo } from './controleVeiculosCalc';
 import { getLimites, EMPTY_LIMITES, type ControleVeiculosLimites } from './controleVeiculosLimitesStorage';
+import { exportGarantiaExcel } from './garantiaExport';
 
 /** Extrai um ano (4 dígitos) de uma célula como 2013, "2.013", "2013" etc. */
 function parseYear(value: unknown): number | null {
@@ -1491,29 +1492,61 @@ function HistoricoMovimentacaoPanel() {
 
 function GarantiaPanel() {
   const [view, setView] = useState<GarantiaBanco | 'historico'>('itau');
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const [regras, limites, garantiaItau, garantiaVolks, historicoItau, historicoVolks] = await Promise.all([
+        getRegras(),
+        getLimites(),
+        listGarantia('itau'),
+        listGarantia('volks'),
+        listHistorico('itau'),
+        listHistorico('volks'),
+      ]);
+      await exportGarantiaExcel({ regras, limites, garantiaItau, garantiaVolks, historicoItau, historicoVolks });
+      toast.success('Exportação em Excel gerada com sucesso.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao exportar para Excel.');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
-      {/* Abas: Banco Itau / Banco Volks / Histórico de Movimentação */}
-      <div className="flex border-b border-slate-200">
-        {GARANTIA_BANCOS.map(({ value, label }) => (
+      {/* Abas: Banco Itau / Banco Volks / Histórico de Movimentação + Exportar Excel */}
+      <div className="flex items-center justify-between border-b border-slate-200">
+        <div className="flex">
+          {GARANTIA_BANCOS.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setView(value)}
+              className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                view === value ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
           <button
-            key={value}
-            onClick={() => setView(value)}
+            onClick={() => setView('historico')}
             className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
-              view === value ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+              view === 'historico' ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            {label}
+            Histórico de Movimentação
           </button>
-        ))}
+        </div>
         <button
-          onClick={() => setView('historico')}
-          className={`px-6 py-3 text-sm font-semibold border-b-2 transition-colors ${
-            view === 'historico' ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
+          onClick={() => void handleExport()}
+          disabled={exporting}
+          className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Histórico de Movimentação
+          <FileSpreadsheet className="w-3.5 h-3.5" />
+          {exporting ? 'Exportando...' : 'Exportar Excel'}
         </button>
       </div>
 
@@ -1527,7 +1560,7 @@ function GarantiaPanel() {
 // ─── Aba: Controle de Veículos ────────────────────────────────────────────────
 
 export function ControleVeiculosTab() {
-  const [subTab, setSubTab] = useState<SubTab>('importar');
+  const [subTab, setSubTab] = useState<SubTab>('garantia');
   const [brand, setBrand] = useState<ControleVeiculosBrand>('vw');
 
   return (
