@@ -22,6 +22,8 @@ import {
   setAnaliseAliquota as persistAnaliseAliquota,
   getAnaliseDeducao as fetchAnaliseDeducao,
   setAnaliseDeducao as persistAnaliseDeducao,
+  getAnaliseRemGerencia as fetchAnaliseRemGerencia,
+  setAnaliseRemGerencia as persistAnaliseRemGerencia,
 } from './financiamentoAnaliseStorage';
 import { loadVendasDsr, type VendasDsrConfig } from './vendedoresRemuneracaoStorage';
 import {
@@ -312,12 +314,14 @@ function dsrPctFor(cfgs: VendasDsrConfig[], year: number, month: number): number
   return c ? parseFloat(c.percentual) || 0 : 0;
 }
 
-// ── Mês do escopo da Análise (linhas + %DSR + deduções Novos/Usados) ──
+// ── Mês do escopo da Análise (linhas + %DSR + deduções e remuneração gerência Novos/Usados) ──
 interface AnaliseMes {
   rows: Record<string, unknown>[];
   dsrPct: number;
   deducaoNovos: number;
   deducaoUsados: number;
+  remGerenciaNovos: number;
+  remGerenciaUsados: number;
 }
 
 interface SegmentoResultado {
@@ -329,13 +333,14 @@ interface SegmentoResultado {
   premios: number;
   dsr: number;
   provEnc: number;
+  remGerencia: number;
   totalRemuneracao: number;
   resultado: number;
 }
 
 /** Finaliza um acumulador de segmento calculando impostos, receita líquida, encargos e resultado. */
 function finalizeSegmento(
-  acc: { comissaoBruta: number; deducoes: number; comissaoPaga: number; premios: number; dsr: number },
+  acc: { comissaoBruta: number; deducoes: number; comissaoPaga: number; premios: number; dsr: number; remGerencia: number },
   aliquotaPct: number,
 ): SegmentoResultado {
   const impostos = (acc.comissaoBruta - acc.deducoes) * aliquotaPct / 100;
@@ -344,7 +349,8 @@ function finalizeSegmento(
   const provisoes = baseEnc * PROV_FACTOR;
   const encargos = (baseEnc + provisoes) * ENC_FACTOR;
   const provEnc = provisoes + encargos;
-  const totalRemuneracao = acc.comissaoPaga + acc.premios + acc.dsr + provEnc;
+  // Remuneração Gerência / Diretoria não gera encargos — entra direto no total.
+  const totalRemuneracao = acc.comissaoPaga + acc.premios + acc.dsr + provEnc + acc.remGerencia;
   return {
     comissaoBruta: acc.comissaoBruta,
     deducoes: acc.deducoes,
@@ -354,6 +360,7 @@ function finalizeSegmento(
     premios: acc.premios,
     dsr: acc.dsr,
     provEnc,
+    remGerencia: acc.remGerencia,
     totalRemuneracao,
     resultado: receitaLiquida - totalRemuneracao,
   };
@@ -363,8 +370,8 @@ function finalizeSegmento(
 function calcAnaliseSegmentos(meses: AnaliseMes[], regras: RemuneracaoProdutoRegra[], aliquotaPct: number): {
   novos: SegmentoResultado; usados: SegmentoResultado; total: SegmentoResultado;
 } {
-  const novos = { comissaoBruta: 0, deducoes: 0, comissaoPaga: 0, premios: 0, dsr: 0 };
-  const usados = { comissaoBruta: 0, deducoes: 0, comissaoPaga: 0, premios: 0, dsr: 0 };
+  const novos = { comissaoBruta: 0, deducoes: 0, comissaoPaga: 0, premios: 0, dsr: 0, remGerencia: 0 };
+  const usados = { comissaoBruta: 0, deducoes: 0, comissaoPaga: 0, premios: 0, dsr: 0, remGerencia: 0 };
   for (const mm of meses) {
     novos.comissaoBruta += mm.rows.filter(r => !isSemi(r)).reduce((a, r) => a + calcTotalComissoes(r), 0);
     usados.comissaoBruta += mm.rows.filter(r => isSemi(r)).reduce((a, r) => a + calcTotalComissoes(r), 0);
@@ -377,6 +384,8 @@ function calcAnaliseSegmentos(meses: AnaliseMes[], regras: RemuneracaoProdutoReg
     usados.dsr += resumo.comissaoVendedorUsados * mm.dsrPct / 100;
     novos.deducoes += mm.deducaoNovos;
     usados.deducoes += mm.deducaoUsados;
+    novos.remGerencia += mm.remGerenciaNovos;
+    usados.remGerencia += mm.remGerenciaUsados;
   }
   const totalAcc = {
     comissaoBruta: novos.comissaoBruta + usados.comissaoBruta,
@@ -384,6 +393,7 @@ function calcAnaliseSegmentos(meses: AnaliseMes[], regras: RemuneracaoProdutoReg
     comissaoPaga: novos.comissaoPaga + usados.comissaoPaga,
     premios: novos.premios + usados.premios,
     dsr: novos.dsr + usados.dsr,
+    remGerencia: novos.remGerencia + usados.remGerencia,
   };
   return {
     novos: finalizeSegmento(novos, aliquotaPct),
@@ -505,6 +515,10 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   const [analiseDeducaoUsadosTotal, setAnaliseDeducaoUsadosTotal] = useState(0); // soma do escopo (Usados)
   const [analiseDeducaoNovosInput, setAnaliseDeducaoNovosInput] = useState('');  // rascunho do mês (Novos)
   const [analiseDeducaoUsadosInput, setAnaliseDeducaoUsadosInput] = useState(''); // rascunho do mês (Usados)
+  const [analiseRemGerNovosTotal, setAnaliseRemGerNovosTotal] = useState(0);     // soma do escopo (Novos)
+  const [analiseRemGerUsadosTotal, setAnaliseRemGerUsadosTotal] = useState(0);   // soma do escopo (Usados)
+  const [analiseRemGerNovosInput, setAnaliseRemGerNovosInput] = useState('');    // rascunho do mês (Novos)
+  const [analiseRemGerUsadosInput, setAnaliseRemGerUsadosInput] = useState('');  // rascunho do mês (Usados)
   const [analiseSaving, setAnaliseSaving] = useState(false);
   const [analiseShowVendedores, setAnaliseShowVendedores] = useState(false);
 
@@ -605,21 +619,29 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
         const meses = [...vendasMonthsWithData].sort((a, b) => a - b);
         const datas = await Promise.all(meses.map(m => getFinanciamentoMes(vendasYear, m)));
         const deducoes = await Promise.all(meses.map(m => fetchAnaliseDeducao(vendasYear, m)));
+        const remGers = await Promise.all(meses.map(m => fetchAnaliseRemGerencia(vendasYear, m)));
         if (cancelled) return;
         setAnaliseMonths(meses.map((m, i) => ({
           rows: datas[i]?.rows ?? [],
           dsrPct: dsrPctFor(dsrCfg, vendasYear, m),
           deducaoNovos: deducoes[i].novos,
           deducaoUsados: deducoes[i].usados,
+          remGerenciaNovos: remGers[i].novos,
+          remGerenciaUsados: remGers[i].usados,
         })));
         setAnaliseDeducaoNovosTotal(deducoes.reduce((a, b) => a + b.novos, 0));
         setAnaliseDeducaoUsadosTotal(deducoes.reduce((a, b) => a + b.usados, 0));
         setAnaliseDeducaoNovosInput('');
         setAnaliseDeducaoUsadosInput('');
+        setAnaliseRemGerNovosTotal(remGers.reduce((a, b) => a + b.novos, 0));
+        setAnaliseRemGerUsadosTotal(remGers.reduce((a, b) => a + b.usados, 0));
+        setAnaliseRemGerNovosInput('');
+        setAnaliseRemGerUsadosInput('');
       } else {
-        const [data, deducao] = await Promise.all([
+        const [data, deducao, remGer] = await Promise.all([
           getFinanciamentoMes(vendasYear, vendasMonth),
           fetchAnaliseDeducao(vendasYear, vendasMonth),
+          fetchAnaliseRemGerencia(vendasYear, vendasMonth),
         ]);
         if (cancelled) return;
         setAnaliseMonths([{
@@ -627,11 +649,17 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
           dsrPct: dsrPctFor(dsrCfg, vendasYear, vendasMonth),
           deducaoNovos: deducao.novos,
           deducaoUsados: deducao.usados,
+          remGerenciaNovos: remGer.novos,
+          remGerenciaUsados: remGer.usados,
         }]);
         setAnaliseDeducaoNovosTotal(deducao.novos);
         setAnaliseDeducaoUsadosTotal(deducao.usados);
         setAnaliseDeducaoNovosInput(deducao.novos ? String(deducao.novos).replace('.', ',') : '');
         setAnaliseDeducaoUsadosInput(deducao.usados ? String(deducao.usados).replace('.', ',') : '');
+        setAnaliseRemGerNovosTotal(remGer.novos);
+        setAnaliseRemGerUsadosTotal(remGer.usados);
+        setAnaliseRemGerNovosInput(remGer.novos ? String(remGer.novos).replace('.', ',') : '');
+        setAnaliseRemGerUsadosInput(remGer.usados ? String(remGer.usados).replace('.', ',') : '');
       }
       setAnaliseLoading(false);
     })();
@@ -664,6 +692,24 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       toast.success('Deduções do mês salvas.');
     } catch {
       toast.error('Erro ao salvar as deduções.');
+    } finally {
+      setAnaliseSaving(false);
+    }
+  };
+
+  const handleSaveAnaliseRemGerencia = async () => {
+    const novos = parseNum(analiseRemGerNovosInput);
+    const usados = parseNum(analiseRemGerUsadosInput);
+    if (novos === analiseRemGerNovosTotal && usados === analiseRemGerUsadosTotal) return;
+    setAnaliseSaving(true);
+    try {
+      await persistAnaliseRemGerencia(vendasYear, vendasMonth, { novos, usados });
+      setAnaliseRemGerNovosTotal(novos);
+      setAnaliseRemGerUsadosTotal(usados);
+      setAnaliseMonths(prev => prev.map(m => ({ ...m, remGerenciaNovos: novos, remGerenciaUsados: usados })));
+      toast.success('Remuneração Gerência / Diretoria salva.');
+    } catch {
+      toast.error('Erro ao salvar a remuneração.');
     } finally {
       setAnaliseSaving(false);
     }
@@ -2569,6 +2615,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                 const money = (n: number) => `R$ ${fmtBRL(n)}`;
                 const cost = (n: number) => (n ? `- ${money(n)}` : money(0));
                 const pct = (n: number) => `${n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+                const remGerEditable = !analiseAnoTodo && isAdmin();
 
                 return (
                   <div className="max-w-7xl mx-auto space-y-5">
@@ -2708,22 +2755,53 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                             <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.comissaoPaga)}</td>
                           </tr>
                           <tr className="border-t border-slate-100">
-                            <td className="px-4 py-2 text-slate-600">(−) Prêmios</td>
-                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.novos.premios)}</td>
-                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.usados.premios)}</td>
-                            <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.premios)}</td>
-                          </tr>
-                          <tr className="border-t border-slate-100">
                             <td className="px-4 py-2 text-slate-600">(−) DSR sobre comissões</td>
                             <td className="px-4 py-2 text-right text-red-600">{cost(seg.novos.dsr)}</td>
                             <td className="px-4 py-2 text-right text-red-600">{cost(seg.usados.dsr)}</td>
                             <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.dsr)}</td>
                           </tr>
                           <tr className="border-t border-slate-100">
+                            <td className="px-4 py-2 text-slate-600">(−) Prêmios</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.novos.premios)}</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.usados.premios)}</td>
+                            <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.premios)}</td>
+                          </tr>
+                          <tr className="border-t border-slate-100">
                             <td className="px-4 py-2 text-slate-600">(−) Encargos e Provisões <span className="text-[11px] text-slate-400">(sobre comissões + DSR + prêmios)</span></td>
                             <td className="px-4 py-2 text-right text-red-600">{cost(seg.novos.provEnc)}</td>
                             <td className="px-4 py-2 text-right text-red-600">{cost(seg.usados.provEnc)}</td>
                             <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.provEnc)}</td>
+                          </tr>
+                          <tr className="border-t border-slate-100">
+                            <td className="px-4 py-2 text-slate-600">(−) Remuneração Gerência / Diretoria <span className="text-[11px] text-slate-400">(sem encargos)</span></td>
+                            {remGerEditable ? (
+                              <>
+                                <td className="px-2 py-1 text-right">
+                                  <input
+                                    value={analiseRemGerNovosInput}
+                                    onChange={e => setAnaliseRemGerNovosInput(e.target.value)}
+                                    onBlur={handleSaveAnaliseRemGerencia}
+                                    placeholder="0,00"
+                                    className="w-28 text-right text-red-600 text-sm border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                  />
+                                </td>
+                                <td className="px-2 py-1 text-right">
+                                  <input
+                                    value={analiseRemGerUsadosInput}
+                                    onChange={e => setAnaliseRemGerUsadosInput(e.target.value)}
+                                    onBlur={handleSaveAnaliseRemGerencia}
+                                    placeholder="0,00"
+                                    className="w-28 text-right text-red-600 text-sm border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                  />
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-4 py-2 text-right text-red-600">{cost(seg.novos.remGerencia)}</td>
+                                <td className="px-4 py-2 text-right text-red-600">{cost(seg.usados.remGerencia)}</td>
+                              </>
+                            )}
+                            <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.remGerencia)}</td>
                           </tr>
                           <tr className="border-t border-slate-200 bg-amber-50 font-bold text-amber-900">
                             <td className="px-4 py-2.5">(=) Total Remuneração + Encargos</td>
@@ -2821,7 +2899,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                     </div>
 
                     <p className="text-[11px] text-slate-400">
-                      DSR = comissão paga × %DSR do mês (Central de Vendas VW → Cadastro → DSR). Encargos e Provisões seguem a regra de "Remunerações e Comissões" (Novos): provisões = base × 7/36 e encargos = (base + provisões) × 35,8%, com base = comissão + prêmios + DSR.
+                      DSR = comissão paga × %DSR do mês (Central de Vendas VW → Cadastro → DSR). Encargos e Provisões seguem a regra de "Remunerações e Comissões" (Novos): provisões = base × 7/36 e encargos = (base + provisões) × 35,8%, com base = comissão + prêmios + DSR. A Remuneração Gerência / Diretoria entra no total sem gerar encargos.
                     </p>
                   </div>
                 );
