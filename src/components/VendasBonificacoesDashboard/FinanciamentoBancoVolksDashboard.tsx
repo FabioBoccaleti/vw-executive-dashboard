@@ -256,6 +256,31 @@ interface RemuneracaoResumoTotais {
   totalRemuneracao: number;
 }
 
+/** Verdadeiro para veículos usados/semi-novos (coluna "Tipo de Plano"). */
+function isSemi(r: Record<string, unknown>): boolean {
+  return String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi');
+}
+
+/** Remuneração (comissão de financiamento paga + prêmios) de um conjunto de linhas, dividida Novos/Usados. */
+function calcRemuneracaoForRows(rows: Record<string, unknown>[], regras: RemuneracaoProdutoRegra[]): {
+  comissaoNovos: number; comissaoUsados: number; premioNovos: number; premioUsados: number;
+} {
+  const novos = rows.filter(r => !isSemi(r));
+  const usados = rows.filter(r => isSemi(r));
+  let comissaoNovos = 0, comissaoUsados = 0, premioNovos = 0, premioUsados = 0;
+  for (const cfg of REMUNERACAO_PRODUTOS_CONFIG) {
+    const regra = regras.find(r => cfg.match(normProduto(r.produto)));
+    if (!regra) continue;
+    const premio = parseNum(regra.valorPremio);
+    const calc = (base: number) => regra.tipoPremio === 'percentual' ? base * premio / 100 : base * premio;
+    const vN = calc(cfg.getBase(novos));
+    const vU = calc(cfg.getBase(usados));
+    if (cfg.tipo === 'comissao') { comissaoNovos += vN; comissaoUsados += vU; }
+    else { premioNovos += vN; premioUsados += vU; }
+  }
+  return { comissaoNovos, comissaoUsados, premioNovos, premioUsados };
+}
+
 /**
  * Agrega a remuneração paga (comissões e prêmios) de todos os vendedores, usando as mesmas
  * regras do Demonstrativo de Pagamento. A Comissão Bruta considera todas as linhas (inclusive
@@ -267,18 +292,11 @@ function calcRemuneracaoResumoTotais(allRows: Record<string, unknown>[], regras:
   let comissaoVendedorNovos = 0, comissaoVendedorUsados = 0, premioNovos = 0, premioUsados = 0;
   for (const vendor of vendors) {
     const vendorRows = allRows.filter(r => String(r[VEND_COL_ANALISE] ?? '').trim() === vendor);
-    const novos = vendorRows.filter(r => !String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
-    const usados = vendorRows.filter(r => String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
-    for (const cfg of REMUNERACAO_PRODUTOS_CONFIG) {
-      const regra = regras.find(r => cfg.match(normProduto(r.produto)));
-      if (!regra) continue;
-      const premio = parseNum(regra.valorPremio);
-      const calc = (base: number) => regra.tipoPremio === 'percentual' ? base * premio / 100 : base * premio;
-      const vN = calc(cfg.getBase(novos));
-      const vU = calc(cfg.getBase(usados));
-      if (cfg.tipo === 'comissao') { comissaoVendedorNovos += vN; comissaoVendedorUsados += vU; }
-      else { premioNovos += vN; premioUsados += vU; }
-    }
+    const rem = calcRemuneracaoForRows(vendorRows, regras);
+    comissaoVendedorNovos += rem.comissaoNovos;
+    comissaoVendedorUsados += rem.comissaoUsados;
+    premioNovos += rem.premioNovos;
+    premioUsados += rem.premioUsados;
   }
   const totalRemuneracao = comissaoVendedorNovos + comissaoVendedorUsados + premioNovos + premioUsados;
   return { comissaoBruta, comissaoVendedorNovos, comissaoVendedorUsados, premioNovos, premioUsados, totalRemuneracao };
@@ -292,6 +310,140 @@ const ENC_FACTOR = 0.358;     // encargos sobre (base + provisões)
 function dsrPctFor(cfgs: VendasDsrConfig[], year: number, month: number): number {
   const c = cfgs.find(x => x.ano === year && x.mes === month);
   return c ? parseFloat(c.percentual) || 0 : 0;
+}
+
+// ── Mês do escopo da Análise (linhas + %DSR + deduções Novos/Usados) ──
+interface AnaliseMes {
+  rows: Record<string, unknown>[];
+  dsrPct: number;
+  deducaoNovos: number;
+  deducaoUsados: number;
+}
+
+interface SegmentoResultado {
+  comissaoBruta: number;
+  deducoes: number;
+  impostos: number;
+  receitaLiquida: number;
+  comissaoPaga: number;
+  premios: number;
+  dsr: number;
+  provEnc: number;
+  totalRemuneracao: number;
+  resultado: number;
+}
+
+/** Finaliza um acumulador de segmento calculando impostos, receita líquida, encargos e resultado. */
+function finalizeSegmento(
+  acc: { comissaoBruta: number; deducoes: number; comissaoPaga: number; premios: number; dsr: number },
+  aliquotaPct: number,
+): SegmentoResultado {
+  const impostos = (acc.comissaoBruta - acc.deducoes) * aliquotaPct / 100;
+  const receitaLiquida = acc.comissaoBruta - acc.deducoes - impostos;
+  const baseEnc = acc.comissaoPaga + acc.premios + acc.dsr;
+  const provisoes = baseEnc * PROV_FACTOR;
+  const encargos = (baseEnc + provisoes) * ENC_FACTOR;
+  const provEnc = provisoes + encargos;
+  const totalRemuneracao = acc.comissaoPaga + acc.premios + acc.dsr + provEnc;
+  return {
+    comissaoBruta: acc.comissaoBruta,
+    deducoes: acc.deducoes,
+    impostos,
+    receitaLiquida,
+    comissaoPaga: acc.comissaoPaga,
+    premios: acc.premios,
+    dsr: acc.dsr,
+    provEnc,
+    totalRemuneracao,
+    resultado: receitaLiquida - totalRemuneracao,
+  };
+}
+
+/** Resultado por segmento Novos / Usados / Total (DSR usa o %DSR de cada mês). */
+function calcAnaliseSegmentos(meses: AnaliseMes[], regras: RemuneracaoProdutoRegra[], aliquotaPct: number): {
+  novos: SegmentoResultado; usados: SegmentoResultado; total: SegmentoResultado;
+} {
+  const novos = { comissaoBruta: 0, deducoes: 0, comissaoPaga: 0, premios: 0, dsr: 0 };
+  const usados = { comissaoBruta: 0, deducoes: 0, comissaoPaga: 0, premios: 0, dsr: 0 };
+  for (const mm of meses) {
+    novos.comissaoBruta += mm.rows.filter(r => !isSemi(r)).reduce((a, r) => a + calcTotalComissoes(r), 0);
+    usados.comissaoBruta += mm.rows.filter(r => isSemi(r)).reduce((a, r) => a + calcTotalComissoes(r), 0);
+    const resumo = calcRemuneracaoResumoTotais(mm.rows, regras);
+    novos.comissaoPaga += resumo.comissaoVendedorNovos;
+    usados.comissaoPaga += resumo.comissaoVendedorUsados;
+    novos.premios += resumo.premioNovos;
+    usados.premios += resumo.premioUsados;
+    novos.dsr += resumo.comissaoVendedorNovos * mm.dsrPct / 100;
+    usados.dsr += resumo.comissaoVendedorUsados * mm.dsrPct / 100;
+    novos.deducoes += mm.deducaoNovos;
+    usados.deducoes += mm.deducaoUsados;
+  }
+  const totalAcc = {
+    comissaoBruta: novos.comissaoBruta + usados.comissaoBruta,
+    deducoes: novos.deducoes + usados.deducoes,
+    comissaoPaga: novos.comissaoPaga + usados.comissaoPaga,
+    premios: novos.premios + usados.premios,
+    dsr: novos.dsr + usados.dsr,
+  };
+  return {
+    novos: finalizeSegmento(novos, aliquotaPct),
+    usados: finalizeSegmento(usados, aliquotaPct),
+    total: finalizeSegmento(totalAcc, aliquotaPct),
+  };
+}
+
+interface VendedorResultado {
+  vendedor: string;
+  comissaoBruta: number;
+  impostos: number;
+  liquida: number;
+  comissaoMaisDsr: number;
+  premio: number;
+  provEnc: number;
+  resultado: number;
+}
+
+/** Resultado por vendedor — sem deduções, mas com impostos (Imposto = Comissão Bruta × alíquota). */
+function calcAnalisePorVendedor(meses: AnaliseMes[], regras: RemuneracaoProdutoRegra[], aliquotaPct: number): VendedorResultado[] {
+  const map = new Map<string, { bruta: number; comissaoPaga: number; premio: number; dsr: number }>();
+  for (const mm of meses) {
+    const groups = new Map<string, Record<string, unknown>[]>();
+    for (const r of mm.rows) {
+      const v = String(r[VEND_COL_ANALISE] ?? '').trim() || '(sem vendedor)';
+      if (!groups.has(v)) groups.set(v, []);
+      groups.get(v)!.push(r);
+    }
+    for (const [vendor, vrows] of groups) {
+      const bruta = vrows.reduce((a, r) => a + calcTotalComissoes(r), 0);
+      let comissaoPaga = 0, premio = 0, dsr = 0;
+      if (vendor !== '(sem vendedor)') {
+        const rem = calcRemuneracaoForRows(vrows, regras);
+        comissaoPaga = rem.comissaoNovos + rem.comissaoUsados;
+        premio = rem.premioNovos + rem.premioUsados;
+        dsr = comissaoPaga * mm.dsrPct / 100;
+      }
+      const prev = map.get(vendor) ?? { bruta: 0, comissaoPaga: 0, premio: 0, dsr: 0 };
+      map.set(vendor, {
+        bruta: prev.bruta + bruta,
+        comissaoPaga: prev.comissaoPaga + comissaoPaga,
+        premio: prev.premio + premio,
+        dsr: prev.dsr + dsr,
+      });
+    }
+  }
+  const rows = [...map.entries()].map(([vendedor, d]) => {
+    const impostos = d.bruta * aliquotaPct / 100;
+    const liquida = d.bruta - impostos;
+    const baseEnc = d.comissaoPaga + d.premio + d.dsr;
+    const provisoes = baseEnc * PROV_FACTOR;
+    const encargos = (baseEnc + provisoes) * ENC_FACTOR;
+    const provEnc = provisoes + encargos;
+    const comissaoMaisDsr = d.comissaoPaga + d.dsr;
+    const resultado = liquida - comissaoMaisDsr - d.premio - provEnc;
+    return { vendedor, comissaoBruta: d.bruta, impostos, liquida, comissaoMaisDsr, premio: d.premio, provEnc, resultado };
+  });
+  rows.sort((a, b) => b.resultado - a.resultado);
+  return rows;
 }
 
 interface Props {
@@ -346,12 +498,15 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   // ── Aba Análise de Resultado ──
   const [analiseAnoTodo, setAnaliseAnoTodo] = useState(false);
   const [analiseLoading, setAnaliseLoading] = useState(false);
-  const [analiseMonths, setAnaliseMonths] = useState<{ rows: Record<string, unknown>[]; dsrPct: number; deducao: number }[]>([]);
+  const [analiseMonths, setAnaliseMonths] = useState<AnaliseMes[]>([]);
   const [analiseAliquota, setAnaliseAliquota] = useState(0);          // percentual global persistido
   const [analiseAliquotaInput, setAnaliseAliquotaInput] = useState(''); // rascunho do campo
-  const [analiseDeducaoTotal, setAnaliseDeducaoTotal] = useState(0);  // soma do escopo (mês ou ano)
-  const [analiseDeducaoInput, setAnaliseDeducaoInput] = useState(''); // rascunho do mês selecionado
+  const [analiseDeducaoNovosTotal, setAnaliseDeducaoNovosTotal] = useState(0);   // soma do escopo (Novos)
+  const [analiseDeducaoUsadosTotal, setAnaliseDeducaoUsadosTotal] = useState(0); // soma do escopo (Usados)
+  const [analiseDeducaoNovosInput, setAnaliseDeducaoNovosInput] = useState('');  // rascunho do mês (Novos)
+  const [analiseDeducaoUsadosInput, setAnaliseDeducaoUsadosInput] = useState(''); // rascunho do mês (Usados)
   const [analiseSaving, setAnaliseSaving] = useState(false);
+  const [analiseShowVendedores, setAnaliseShowVendedores] = useState(false);
 
   // ── Demonstrativo: Matrículas dos vendedores (Resumo Geral) ──
   const [matriculasMap, setMatriculasMap] = useState<FinanciamentoMatriculasMap>({});
@@ -432,7 +587,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
 
   // Carrega a alíquota global ao entrar na aba Análise de Resultado
   useEffect(() => {
-    if (vendasSubTab !== 'analise') return;
+    if (vendasSubTab !== 'analise') { setAnaliseShowVendedores(false); return; }
     fetchAnaliseAliquota().then(v => {
       setAnaliseAliquota(v);
       setAnaliseAliquotaInput(v ? String(v).replace('.', ',') : '');
@@ -454,10 +609,13 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
         setAnaliseMonths(meses.map((m, i) => ({
           rows: datas[i]?.rows ?? [],
           dsrPct: dsrPctFor(dsrCfg, vendasYear, m),
-          deducao: deducoes[i],
+          deducaoNovos: deducoes[i].novos,
+          deducaoUsados: deducoes[i].usados,
         })));
-        setAnaliseDeducaoTotal(deducoes.reduce((a, b) => a + b, 0));
-        setAnaliseDeducaoInput('');
+        setAnaliseDeducaoNovosTotal(deducoes.reduce((a, b) => a + b.novos, 0));
+        setAnaliseDeducaoUsadosTotal(deducoes.reduce((a, b) => a + b.usados, 0));
+        setAnaliseDeducaoNovosInput('');
+        setAnaliseDeducaoUsadosInput('');
       } else {
         const [data, deducao] = await Promise.all([
           getFinanciamentoMes(vendasYear, vendasMonth),
@@ -467,10 +625,13 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
         setAnaliseMonths([{
           rows: data?.rows ?? [],
           dsrPct: dsrPctFor(dsrCfg, vendasYear, vendasMonth),
-          deducao,
+          deducaoNovos: deducao.novos,
+          deducaoUsados: deducao.usados,
         }]);
-        setAnaliseDeducaoTotal(deducao);
-        setAnaliseDeducaoInput(deducao ? String(deducao).replace('.', ',') : '');
+        setAnaliseDeducaoNovosTotal(deducao.novos);
+        setAnaliseDeducaoUsadosTotal(deducao.usados);
+        setAnaliseDeducaoNovosInput(deducao.novos ? String(deducao.novos).replace('.', ',') : '');
+        setAnaliseDeducaoUsadosInput(deducao.usados ? String(deducao.usados).replace('.', ',') : '');
       }
       setAnaliseLoading(false);
     })();
@@ -492,14 +653,17 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   };
 
   const handleSaveAnaliseDeducao = async () => {
-    const valor = parseNum(analiseDeducaoInput);
+    const novos = parseNum(analiseDeducaoNovosInput);
+    const usados = parseNum(analiseDeducaoUsadosInput);
     setAnaliseSaving(true);
     try {
-      await persistAnaliseDeducao(vendasYear, vendasMonth, valor);
-      setAnaliseDeducaoTotal(valor);
-      toast.success('Dedução do mês salva.');
+      await persistAnaliseDeducao(vendasYear, vendasMonth, { novos, usados });
+      setAnaliseDeducaoNovosTotal(novos);
+      setAnaliseDeducaoUsadosTotal(usados);
+      setAnaliseMonths(prev => prev.map(m => ({ ...m, deducaoNovos: novos, deducaoUsados: usados })));
+      toast.success('Deduções do mês salvas.');
     } catch {
-      toast.error('Erro ao salvar a dedução.');
+      toast.error('Erro ao salvar as deduções.');
     } finally {
       setAnaliseSaving(false);
     }
@@ -2399,37 +2563,15 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                     </div>
                   );
                 }
-                // Agrega mês a mês (a DSR usa o % do respectivo mês)
-                let comissaoBruta = 0, comissaoVendedorNovos = 0, comissaoVendedorUsados = 0;
-                let premioNovos = 0, premioUsados = 0, dsr = 0;
-                for (const mm of analiseMonths) {
-                  const r = calcRemuneracaoResumoTotais(mm.rows, regras);
-                  comissaoBruta += r.comissaoBruta;
-                  comissaoVendedorNovos += r.comissaoVendedorNovos;
-                  comissaoVendedorUsados += r.comissaoVendedorUsados;
-                  premioNovos += r.premioNovos;
-                  premioUsados += r.premioUsados;
-                  dsr += (r.comissaoVendedorNovos + r.comissaoVendedorUsados) * mm.dsrPct / 100;
-                }
-                const comissaoPaga = comissaoVendedorNovos + comissaoVendedorUsados;
-                const premios = premioNovos + premioUsados;
-                // Encargos e provisões: base = comissão + prêmios + DSR
-                const baseEnc = comissaoPaga + premios + dsr;
-                const provisoes = baseEnc * PROV_FACTOR;
-                const encargos = (baseEnc + provisoes) * ENC_FACTOR;
-                const provEnc = provisoes + encargos;
-
-                const deducoes = analiseDeducaoTotal;
-                const baseImpostos = comissaoBruta - deducoes;
-                const impostos = baseImpostos * analiseAliquota / 100;
-                const receitaLiquida = comissaoBruta - deducoes - impostos;
-                const totalRemuneracao = comissaoPaga + premios + dsr + provEnc;
-                const resultado = receitaLiquida - totalRemuneracao;
-                const margem = receitaLiquida !== 0 ? (resultado / receitaLiquida) * 100 : 0;
+                const seg = calcAnaliseSegmentos(analiseMonths, regras, analiseAliquota);
+                const T = seg.total;
+                const margem = T.receitaLiquida !== 0 ? (T.resultado / T.receitaLiquida) * 100 : 0;
                 const money = (n: number) => `R$ ${fmtBRL(n)}`;
+                const cost = (n: number) => (n ? `- ${money(n)}` : money(0));
+                const pct = (n: number) => `${n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 
                 return (
-                  <div className="max-w-5xl mx-auto space-y-5">
+                  <div className="max-w-7xl mx-auto space-y-5">
                     <div className="flex items-center justify-between">
                       <h2 className="text-base font-bold text-slate-800">Análise de Resultado — {scopeLabel}</h2>
                     </div>
@@ -2461,113 +2603,221 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                           Deduções {analiseAnoTodo ? '(ano todo)' : `(${MONTHS[vendasMonth - 1]})`}
                         </label>
                         {analiseAnoTodo ? (
-                          <p className="text-sm font-bold text-slate-700">R$ {fmtBRL(analiseDeducaoTotal)}</p>
+                          <div className="flex items-center gap-4 text-sm font-bold text-slate-700">
+                            <span>Novos: R$ {fmtBRL(analiseDeducaoNovosTotal)}</span>
+                            <span>Usados: R$ {fmtBRL(analiseDeducaoUsadosTotal)}</span>
+                          </div>
                         ) : isAdmin() ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              value={analiseDeducaoInput}
-                              onChange={e => setAnaliseDeducaoInput(e.target.value)}
-                              placeholder="0,00"
-                              className="w-36 text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                            />
+                          <div className="flex items-end gap-3">
+                            <div>
+                              <span className="block text-[10px] text-slate-400 mb-0.5">Novos</span>
+                              <input
+                                value={analiseDeducaoNovosInput}
+                                onChange={e => setAnaliseDeducaoNovosInput(e.target.value)}
+                                placeholder="0,00"
+                                className="w-32 text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              />
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-slate-400 mb-0.5">Usados</span>
+                              <input
+                                value={analiseDeducaoUsadosInput}
+                                onChange={e => setAnaliseDeducaoUsadosInput(e.target.value)}
+                                placeholder="0,00"
+                                className="w-32 text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              />
+                            </div>
                             <button onClick={handleSaveAnaliseDeducao} disabled={analiseSaving} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">Salvar</button>
                           </div>
                         ) : (
-                          <p className="text-sm font-bold text-slate-700">R$ {fmtBRL(analiseDeducaoTotal)}</p>
+                          <div className="flex items-center gap-4 text-sm font-bold text-slate-700">
+                            <span>Novos: R$ {fmtBRL(analiseDeducaoNovosTotal)}</span>
+                            <span>Usados: R$ {fmtBRL(analiseDeducaoUsadosTotal)}</span>
+                          </div>
                         )}
                         <p className="text-[10px] text-slate-400 mt-0.5">
-                          {analiseAnoTodo ? 'Soma das deduções dos meses; edite mês a mês.' : 'Dedução referente ao mês selecionado.'}
+                          {analiseAnoTodo ? 'Soma das deduções dos meses; edite mês a mês.' : 'Deduções referentes ao mês selecionado, separadas por Novos e Usados.'}
                         </p>
                       </div>
                     </div>
 
-                    {/* Cards resumo */}
+                    {/* Cards resumo (Total) */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                         <p className="text-xs text-slate-500">Comissão Bruta</p>
-                        <p className="mt-1 text-lg font-bold text-slate-800">{money(comissaoBruta)}</p>
+                        <p className="mt-1 text-lg font-bold text-slate-800">{money(T.comissaoBruta)}</p>
                       </div>
                       <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
                         <p className="text-xs text-blue-600">Receita Líquida</p>
-                        <p className="mt-1 text-lg font-bold text-blue-800">{money(receitaLiquida)}</p>
+                        <p className="mt-1 text-lg font-bold text-blue-800">{money(T.receitaLiquida)}</p>
                       </div>
                       <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
                         <p className="text-xs text-amber-600">Remuneração Paga</p>
-                        <p className="mt-1 text-lg font-bold text-amber-800">{money(totalRemuneracao)}</p>
+                        <p className="mt-1 text-lg font-bold text-amber-800">{money(T.totalRemuneracao)}</p>
                       </div>
-                      <div className={`rounded-xl border px-4 py-3 ${resultado >= 0 ? 'border-emerald-100 bg-emerald-50' : 'border-red-100 bg-red-50'}`}>
-                        <p className={`text-xs ${resultado >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>Resultado da Operação</p>
-                        <p className={`mt-1 text-lg font-bold ${resultado >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>{money(resultado)}</p>
-                        <p className={`text-[11px] font-semibold ${resultado >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>Margem {margem.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</p>
+                      <div className={`rounded-xl border px-4 py-3 ${T.resultado >= 0 ? 'border-emerald-100 bg-emerald-50' : 'border-red-100 bg-red-50'}`}>
+                        <p className={`text-xs ${T.resultado >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>Resultado da Operação</p>
+                        <p className={`mt-1 text-lg font-bold ${T.resultado >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>{money(T.resultado)}</p>
+                        <p className={`text-[11px] font-semibold ${T.resultado >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>Margem {pct(margem)}</p>
                       </div>
                     </div>
 
-                    {/* DRE */}
+                    {/* DRE — Novos / Usados / Total */}
                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-slate-800 text-white">
                             <th className="px-4 py-2.5 text-left font-semibold">Demonstração de Resultado — {scopeLabel}</th>
-                            <th className="px-4 py-2.5 text-right font-semibold w-48">Valor</th>
+                            <th className="px-4 py-2.5 text-right font-semibold w-44">Novos</th>
+                            <th className="px-4 py-2.5 text-right font-semibold w-44">Usados</th>
+                            <th className="px-4 py-2.5 text-right font-semibold w-44">Total</th>
                           </tr>
                         </thead>
                         <tbody>
                           <tr className="border-t border-slate-100 bg-slate-50 font-semibold">
-                            <td className="px-4 py-2 text-slate-800">Comissão Bruta (Novos + Usados)</td>
-                            <td className="px-4 py-2 text-right text-slate-800">{money(comissaoBruta)}</td>
+                            <td className="px-4 py-2 text-slate-800">Comissão Bruta</td>
+                            <td className="px-4 py-2 text-right text-slate-800">{money(seg.novos.comissaoBruta)}</td>
+                            <td className="px-4 py-2 text-right text-slate-800">{money(seg.usados.comissaoBruta)}</td>
+                            <td className="px-4 py-2 text-right text-slate-900 font-bold">{money(T.comissaoBruta)}</td>
                           </tr>
                           <tr className="border-t border-slate-100">
                             <td className="px-4 py-2 text-slate-600">(−) Deduções</td>
-                            <td className="px-4 py-2 text-right text-red-600">{deducoes ? `- ${money(deducoes)}` : money(0)}</td>
-                          </tr>
-                          <tr className="border-t border-slate-100">
-                            <td className="px-4 py-2 text-slate-600">(=) Base de cálculo de impostos</td>
-                            <td className="px-4 py-2 text-right text-slate-700">{money(baseImpostos)}</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.novos.deducoes)}</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.usados.deducoes)}</td>
+                            <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.deducoes)}</td>
                           </tr>
                           <tr className="border-t border-slate-100">
                             <td className="px-4 py-2 text-slate-600">(−) Impostos ({fmtBRL(analiseAliquota)}%)</td>
-                            <td className="px-4 py-2 text-right text-red-600">{impostos ? `- ${money(impostos)}` : money(0)}</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.novos.impostos)}</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.usados.impostos)}</td>
+                            <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.impostos)}</td>
                           </tr>
-                          <tr className="border-t border-slate-200 bg-blue-50 font-bold">
-                            <td className="px-4 py-2.5 text-blue-900">(=) Receita Líquida de Financiamento</td>
-                            <td className="px-4 py-2.5 text-right text-blue-900">{money(receitaLiquida)}</td>
+                          <tr className="border-t border-slate-200 bg-blue-50 font-bold text-blue-900">
+                            <td className="px-4 py-2.5">(=) Receita Líquida de Financiamento</td>
+                            <td className="px-4 py-2.5 text-right">{money(seg.novos.receitaLiquida)}</td>
+                            <td className="px-4 py-2.5 text-right">{money(seg.usados.receitaLiquida)}</td>
+                            <td className="px-4 py-2.5 text-right">{money(T.receitaLiquida)}</td>
                           </tr>
 
-                          <tr><td colSpan={2} className="py-1" /></tr>
+                          <tr><td colSpan={4} className="py-1" /></tr>
 
                           <tr className="border-t border-slate-100">
-                            <td className="px-4 py-2 text-slate-600">(−) Comissão paga aos vendedores (Novos + Usados)</td>
-                            <td className="px-4 py-2 text-right text-red-600">{comissaoPaga ? `- ${money(comissaoPaga)}` : money(0)}</td>
+                            <td className="px-4 py-2 text-slate-600">(−) Comissão paga aos vendedores</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.novos.comissaoPaga)}</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.usados.comissaoPaga)}</td>
+                            <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.comissaoPaga)}</td>
                           </tr>
                           <tr className="border-t border-slate-100">
-                            <td className="px-4 py-2 text-slate-600">(−) Prêmios (Novos + Usados)</td>
-                            <td className="px-4 py-2 text-right text-red-600">{premios ? `- ${money(premios)}` : money(0)}</td>
+                            <td className="px-4 py-2 text-slate-600">(−) Prêmios</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.novos.premios)}</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.usados.premios)}</td>
+                            <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.premios)}</td>
                           </tr>
                           <tr className="border-t border-slate-100">
                             <td className="px-4 py-2 text-slate-600">(−) DSR sobre comissões</td>
-                            <td className="px-4 py-2 text-right text-red-600">{dsr ? `- ${money(dsr)}` : money(0)}</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.novos.dsr)}</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.usados.dsr)}</td>
+                            <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.dsr)}</td>
                           </tr>
                           <tr className="border-t border-slate-100">
                             <td className="px-4 py-2 text-slate-600">(−) Encargos e Provisões <span className="text-[11px] text-slate-400">(sobre comissões + DSR + prêmios)</span></td>
-                            <td className="px-4 py-2 text-right text-red-600">{provEnc ? `- ${money(provEnc)}` : money(0)}</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.novos.provEnc)}</td>
+                            <td className="px-4 py-2 text-right text-red-600">{cost(seg.usados.provEnc)}</td>
+                            <td className="px-4 py-2 text-right text-red-600 font-semibold">{cost(T.provEnc)}</td>
                           </tr>
-                          <tr className="border-t border-slate-200 bg-amber-50 font-bold">
-                            <td className="px-4 py-2.5 text-amber-900">(=) Total Remuneração + Encargos</td>
-                            <td className="px-4 py-2.5 text-right text-amber-900">{money(totalRemuneracao)}</td>
+                          <tr className="border-t border-slate-200 bg-amber-50 font-bold text-amber-900">
+                            <td className="px-4 py-2.5">(=) Total Remuneração + Encargos</td>
+                            <td className="px-4 py-2.5 text-right">{money(seg.novos.totalRemuneracao)}</td>
+                            <td className="px-4 py-2.5 text-right">{money(seg.usados.totalRemuneracao)}</td>
+                            <td className="px-4 py-2.5 text-right">{money(T.totalRemuneracao)}</td>
                           </tr>
 
-                          <tr><td colSpan={2} className="py-1" /></tr>
+                          <tr><td colSpan={4} className="py-1" /></tr>
 
-                          <tr className={`border-t-2 font-bold ${resultado >= 0 ? 'border-emerald-600 bg-emerald-50' : 'border-red-600 bg-red-50'}`}>
-                            <td className={`px-4 py-3 ${resultado >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>(=) Resultado da Operação</td>
-                            <td className={`px-4 py-3 text-right ${resultado >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>{money(resultado)}</td>
+                          <tr className="border-t-2 border-slate-800 font-bold">
+                            <td className="px-4 py-3 text-slate-900">(=) Resultado da Operação</td>
+                            <td className={`px-4 py-3 text-right ${seg.novos.resultado >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{money(seg.novos.resultado)}</td>
+                            <td className={`px-4 py-3 text-right ${seg.usados.resultado >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{money(seg.usados.resultado)}</td>
+                            <td className={`px-4 py-3 text-right ${T.resultado >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{money(T.resultado)}</td>
                           </tr>
                           <tr className="border-t border-slate-100">
                             <td className="px-4 py-2 text-slate-600">Margem sobre Receita Líquida</td>
-                            <td className="px-4 py-2 text-right text-slate-700">{margem.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</td>
+                            <td className="px-4 py-2 text-right text-slate-700">{pct(seg.novos.receitaLiquida !== 0 ? seg.novos.resultado / seg.novos.receitaLiquida * 100 : 0)}</td>
+                            <td className="px-4 py-2 text-right text-slate-700">{pct(seg.usados.receitaLiquida !== 0 ? seg.usados.resultado / seg.usados.receitaLiquida * 100 : 0)}</td>
+                            <td className="px-4 py-2 text-right text-slate-700 font-semibold">{pct(margem)}</td>
                           </tr>
                         </tbody>
                       </table>
+                    </div>
+
+                    {/* Resultado por vendedor (oculto por padrão) */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-slate-700">Resultado por Vendedor</h3>
+                        <button
+                          onClick={() => setAnaliseShowVendedores(v => !v)}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50"
+                        >
+                          {analiseShowVendedores ? 'Ocultar resultado por vendedor' : 'Mostrar resultado por vendedor'}
+                        </button>
+                      </div>
+                      {analiseShowVendedores && (() => {
+                        const vendedores = calcAnalisePorVendedor(analiseMonths, regras, analiseAliquota);
+                        const tot = vendedores.reduce((a, v) => ({
+                          comissaoBruta: a.comissaoBruta + v.comissaoBruta,
+                          impostos: a.impostos + v.impostos,
+                          liquida: a.liquida + v.liquida,
+                          comissaoMaisDsr: a.comissaoMaisDsr + v.comissaoMaisDsr,
+                          premio: a.premio + v.premio,
+                          provEnc: a.provEnc + v.provEnc,
+                          resultado: a.resultado + v.resultado,
+                        }), { comissaoBruta: 0, impostos: 0, liquida: 0, comissaoMaisDsr: 0, premio: 0, provEnc: 0, resultado: 0 });
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-xl overflow-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="bg-slate-700 text-white">
+                                  <th className="px-3 py-2 text-left font-semibold">Vendedor</th>
+                                  <th className="px-3 py-2 text-right font-semibold">Comissão Bruta</th>
+                                  <th className="px-3 py-2 text-right font-semibold">Impostos</th>
+                                  <th className="px-3 py-2 text-right font-semibold">Líquida</th>
+                                  <th className="px-3 py-2 text-right font-semibold">Comissão + DSR</th>
+                                  <th className="px-3 py-2 text-right font-semibold">Prêmio</th>
+                                  <th className="px-3 py-2 text-right font-semibold">Encargos e Provisões</th>
+                                  <th className="px-3 py-2 text-right font-semibold">Resultado</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {vendedores.map((v, i) => (
+                                  <tr key={v.vendedor} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                                    <td className="px-3 py-1.5 text-slate-700">{v.vendedor}</td>
+                                    <td className="px-3 py-1.5 text-right text-slate-700">{money(v.comissaoBruta)}</td>
+                                    <td className="px-3 py-1.5 text-right text-red-600">{cost(v.impostos)}</td>
+                                    <td className="px-3 py-1.5 text-right text-blue-700">{money(v.liquida)}</td>
+                                    <td className="px-3 py-1.5 text-right text-red-600">{cost(v.comissaoMaisDsr)}</td>
+                                    <td className="px-3 py-1.5 text-right text-red-600">{cost(v.premio)}</td>
+                                    <td className="px-3 py-1.5 text-right text-red-600">{cost(v.provEnc)}</td>
+                                    <td className={`px-3 py-1.5 text-right font-semibold ${v.resultado >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{money(v.resultado)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr className="bg-slate-100 font-bold text-slate-800 border-t-2 border-slate-300">
+                                  <td className="px-3 py-2">Total ({vendedores.length} vendedor{vendedores.length === 1 ? '' : 'es'})</td>
+                                  <td className="px-3 py-2 text-right">{money(tot.comissaoBruta)}</td>
+                                  <td className="px-3 py-2 text-right text-red-700">{cost(tot.impostos)}</td>
+                                  <td className="px-3 py-2 text-right text-blue-800">{money(tot.liquida)}</td>
+                                  <td className="px-3 py-2 text-right text-red-700">{cost(tot.comissaoMaisDsr)}</td>
+                                  <td className="px-3 py-2 text-right text-red-700">{cost(tot.premio)}</td>
+                                  <td className="px-3 py-2 text-right text-red-700">{cost(tot.provEnc)}</td>
+                                  <td className={`px-3 py-2 text-right ${tot.resultado >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{money(tot.resultado)}</td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                            <p className="text-[11px] text-slate-400 px-3 py-2">Por vendedor: sem deduções; Impostos = Comissão Bruta × alíquota; Resultado = Líquida − (Comissão+DSR) − Prêmio − Encargos e Provisões.</p>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <p className="text-[11px] text-slate-400">
