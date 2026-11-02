@@ -672,8 +672,8 @@ function isRendaCascadeResult(norm: string) {
  * Receitas (rendas) reduzem os resultados abaixo; despesas os aumentam (remove o custo).
  * Usado como simulação na Demonstração Resultado Geral Ajustado.
  */
-function applyZeroRendas(rows: DemonstrativoRow[], options: { admin: boolean; financeira: boolean; rendasNaoOp: boolean; despesasNaoOp: boolean }): DemonstrativoRow[] {
-  if (!options.admin && !options.financeira && !options.rendasNaoOp && !options.despesasNaoOp) return rows;
+function applyZeroRendas(rows: DemonstrativoRow[], options: { admin: boolean; financeira: boolean; despesasFin: boolean; rendasNaoOp: boolean; despesasNaoOp: boolean }): DemonstrativoRow[] {
+  if (!options.admin && !options.financeira && !options.despesasFin && !options.rendasNaoOp && !options.despesasNaoOp) return rows;
   const result = rows.map(row => ({ ...row }));
 
   const zeroLine = (match: (norm: string) => boolean) => {
@@ -701,6 +701,7 @@ function applyZeroRendas(rows: DemonstrativoRow[], options: { admin: boolean; fi
 
   if (options.admin) zeroLine(norm => norm === 'rendasadministrativas');
   if (options.financeira) zeroLine(norm => norm === 'rendasfinanceiras');
+  if (options.despesasFin) zeroLine(norm => norm === 'despesasfinanceiras');
   if (options.rendasNaoOp) zeroLine(norm => norm === 'rendasnaooperacional' || norm === 'rendasnaooperacionais');
   if (options.despesasNaoOp) zeroLine(norm => norm === 'despesasnaooperacional' || norm === 'despesasnaooperacionais');
 
@@ -727,6 +728,7 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
   const [showDespesasResumo, setShowDespesasResumo] = useState(false);
   const [zerarRendasAdmin, setZerarRendasAdmin] = useState(false);
   const [zerarRendasFin, setZerarRendasFin] = useState(false);
+  const [zerarDespesasFin, setZerarDespesasFin] = useState(false);
   const [zerarRendasNaoOp, setZerarRendasNaoOp] = useState(false);
   const [zerarDespesasNaoOp, setZerarDespesasNaoOp] = useState(false);
   const options = periodOptions(periodicity);
@@ -737,6 +739,7 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
     setShowDespesasResumo(false);
     setZerarRendasAdmin(false);
     setZerarRendasFin(false);
+    setZerarDespesasFin(false);
     setZerarRendasNaoOp(false);
     setZerarDespesasNaoOp(false);
   }, [sectionKey]);
@@ -823,6 +826,7 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
   const displayRows = applyZeroRendas(rows, {
     admin: currentSection.adjusted && zerarRendasAdmin,
     financeira: currentSection.adjusted && zerarRendasFin,
+    despesasFin: currentSection.adjusted && zerarDespesasFin,
     rendasNaoOp: currentSection.adjusted && zerarRendasNaoOp,
     despesasNaoOp: currentSection.adjusted && zerarDespesasNaoOp,
   });
@@ -870,7 +874,7 @@ function DemonstrativoTab({ year, month, concessionarias }: DemonstrativoTabProp
         <div className="text-xs font-semibold text-slate-600">Comparar com<div className="mt-1 inline-flex rounded border border-slate-300 overflow-hidden">{([['regiao', 'Região'], ['satelite', 'Satélite']] as const).map(([value, label]) => <button key={value} onClick={() => setComparisonBase(value)} className={`px-4 py-2 text-sm font-semibold ${comparisonBase === value ? 'bg-teal-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>{label}</button>)}</div></div>
       </div>
       <div className="flex gap-1 overflow-x-auto border-b border-slate-200">{DEMONSTRATIVO_SECTIONS.map(section => <button key={section.key} onClick={() => setSectionKey(section.key)} className={`whitespace-nowrap px-3 py-2 text-xs font-semibold border-b-2 ${sectionKey === section.key ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>{section.name}</button>)}</div>
-      {currentSection.adjusted && <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-600"><span className="text-slate-400">Simulação:</span><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zerarRendasAdmin} onChange={event => setZerarRendasAdmin(event.target.checked)} className="accent-teal-600" />Zerar Rendas Administrativas</label><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zerarRendasFin} onChange={event => setZerarRendasFin(event.target.checked)} className="accent-teal-600" />Zerar Rendas Financeiras</label><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zerarRendasNaoOp} onChange={event => setZerarRendasNaoOp(event.target.checked)} className="accent-teal-600" />Zerar Rendas não Operacional</label><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zerarDespesasNaoOp} onChange={event => setZerarDespesasNaoOp(event.target.checked)} className="accent-teal-600" />Zerar Despesas não Operacional</label></div>}
+      {currentSection.adjusted && <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-600"><span className="text-slate-400">Simulação:</span><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zerarRendasAdmin} onChange={event => setZerarRendasAdmin(event.target.checked)} className="accent-teal-600" />Zerar Rendas Administrativas</label><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zerarRendasFin} onChange={event => setZerarRendasFin(event.target.checked)} className="accent-teal-600" />Zerar Rendas Financeiras</label><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zerarRendasNaoOp} onChange={event => setZerarRendasNaoOp(event.target.checked)} className="accent-teal-600" />Zerar Rendas não Operacional</label><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zerarDespesasFin} onChange={event => setZerarDespesasFin(event.target.checked)} className="accent-teal-600" />Zerar Despesas Financeiras</label><label className="inline-flex items-center gap-1.5 cursor-pointer"><input type="checkbox" checked={zerarDespesasNaoOp} onChange={event => setZerarDespesasNaoOp(event.target.checked)} className="accent-teal-600" />Zerar Despesas não Operacional</label></div>}
       {loading ? <div className="py-12 text-center text-slate-500">Calculando demonstrativo...</div> : rows.length === 0 ? <div className="py-12 text-center text-slate-500">Não há dados ajustados para o período selecionado.</div> : <>
         <div className="grid gap-3 md:grid-cols-3">{(currentSection.sheetIndex === 1
           ? [{ title: 'Lucro Bruto', match: (label: string) => label.includes('lucrobruto') }, { title: 'Margem de Contribuição I', match: (label: string) => label.includes('margemdecontribuicaoi') }, { title: 'Lucro antes do Imposto de Renda (L.A.I.R.)', match: (label: string) => label.includes('lair') || label.includes('lucroantesdoimpostoderenda') }]
