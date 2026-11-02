@@ -191,16 +191,20 @@ function buildResumoSheet(wb: ExcelJS.Workbook, data: GarantiaExportData) {
   // Saldo Banco Itaú
   const itau = computeSaldoItau(limites, garantiaItau, regras);
   styleTitle(ws, ws.addRow(['Saldo — Banco Itaú']), 5);
-  styleHeader(ws.addRow(['Limite', 'Utilizado', 'Juros', 'Abater juros?', 'Saldo disponível']));
+  styleHeader(ws.addRow(['DN', 'Limite', 'Utilizado', 'Juros', 'Saldo disponível']));
   const itauRow = ws.addRow([
+    itau.abater ? 'Sorana' : 'Sorana *',
     itau.limite ?? 0,
     itau.utilizado,
     itau.juros,
-    itau.abater ? 'Sim' : 'Não',
     itau.saldo,
   ]);
-  [1, 2, 3, 5].forEach(c => { itauRow.getCell(c).numFmt = CURRENCY_FMT; });
+  [2, 3, 4, 5].forEach(c => { itauRow.getCell(c).numFmt = CURRENCY_FMT; });
   borderDataRow(itauRow);
+  if (!itau.abater) {
+    const note = ws.addRow(['* Juros não abatido do saldo disponível']);
+    note.font = { italic: true, color: { argb: 'FF64748B' } };
+  }
   ws.addRow([]);
 
   // Saldo Banco Volks por DN
@@ -211,7 +215,7 @@ function buildResumoSheet(wb: ExcelJS.Workbook, data: GarantiaExportData) {
     borderDataRow(ws.addRow(['Nenhum DN cadastrado', '', '', '', '']));
   } else {
     for (const row of volks) {
-      const r = ws.addRow([row.dn, row.limite ?? 0, row.utilizado, row.juros, row.saldo]);
+      const r = ws.addRow([row.abater ? row.dn : `${row.dn} *`, row.limite ?? 0, row.utilizado, row.juros, row.saldo]);
       [2, 3, 4, 5].forEach(c => { r.getCell(c).numFmt = CURRENCY_FMT; });
       borderDataRow(r);
     }
@@ -225,6 +229,10 @@ function buildResumoSheet(wb: ExcelJS.Workbook, data: GarantiaExportData) {
     ]);
     [2, 3, 4, 5].forEach(c => { totalRow.getCell(c).numFmt = CURRENCY_FMT; });
     styleTotal(totalRow);
+    if (volks.some(r => !r.abater)) {
+      const note = ws.addRow(['* Juros não abatido do saldo disponível']);
+      note.font = { italic: true, color: { argb: 'FF64748B' } };
+    }
   }
   ws.addRow([]);
 
