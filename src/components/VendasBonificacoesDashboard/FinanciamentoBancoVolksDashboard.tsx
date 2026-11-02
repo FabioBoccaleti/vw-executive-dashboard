@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, Trash2, FileSpreadsheet, BarChart2, ClipboardList, Pencil, X, Percent, Printer, Zap, PenLine, CheckCircle, ShieldCheck, Lock, LockOpen } from 'lucide-react';
+import { Upload, Trash2, FileSpreadsheet, BarChart2, ClipboardList, Pencil, X, Percent, Printer, Zap, PenLine, CheckCircle, ShieldCheck, Lock, LockOpen, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiLogin } from '@/lib/authClient';
 import type { CampoAssinaturaComissao, AssinaturaDigital } from '../FolhaPagamentoDashboard/comissoesLancamentosStorage';
@@ -17,6 +17,13 @@ import {
   type RemuneracaoProdutoRegra,
   type TipoPremio,
 } from './financiamentoRemuneracaoStorage';
+import {
+  getAnaliseAliquota as fetchAnaliseAliquota,
+  setAnaliseAliquota as persistAnaliseAliquota,
+  getAnaliseDeducao as fetchAnaliseDeducao,
+  setAnaliseDeducao as persistAnaliseDeducao,
+} from './financiamentoAnaliseStorage';
+import { loadVendasDsr, type VendasDsrConfig } from './vendedoresRemuneracaoStorage';
 import {
   loadFinanciamentoMatriculas,
   saveFinanciamentoMatriculas,
@@ -210,8 +217,82 @@ function fmtBRL(n: number): string {
   return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 type ActiveSection = 'vendas' | 'cadastro';
-type VendasSubTab = 'importar' | 'vendas' | 'acelera';
+type VendasSubTab = 'importar' | 'vendas' | 'acelera' | 'analise';
 type CadastroSection = 'remuneracao-produto';
+
+// ── Análise de Resultado: cálculo agregado da remuneração paga ──
+const VEND_COL_ANALISE = 'Vendedor CDC, PPS AV, GE, SEGUROS';
+
+function normProduto(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+interface RemuneracaoProdutoBase {
+  tipo: 'comissao' | 'premio';
+  getBase: (rows: Record<string, unknown>[]) => number;
+  match: (n: string) => boolean;
+}
+
+/** Mesma configuração usada no Demonstrativo de Pagamento, para agregar a remuneração paga. */
+const REMUNERACAO_PRODUTOS_CONFIG: RemuneracaoProdutoBase[] = [
+  { tipo: 'comissao', getBase: (rows) => rows.reduce((a, r) => a + calcTotalComissoes(r), 0), match: (n) => n.includes('retorno') },
+  { tipo: 'premio', getBase: (rows) => rows.filter(r => /basico|básico/i.test(String(r[SPF_COL] ?? ''))).length, match: (n) => n.includes('spf basico') || n.includes('spf b') },
+  { tipo: 'premio', getBase: (rows) => rows.filter(r => /normal/i.test(String(r[SPF_COL] ?? ''))).length, match: (n) => n.includes('spf') && n.includes('normal') },
+  { tipo: 'premio', getBase: (rows) => rows.filter(r => /plus/i.test(String(r[SPF_COL] ?? ''))).length, match: (n) => n.includes('spf') && n.includes('plus') },
+  { tipo: 'premio', getBase: (rows) => rows.filter(r => parseNum(r['Valor Pacote PRTG']) > 0).length, match: (n) => n.includes('prtg') },
+  { tipo: 'premio', getBase: (rows) => rows.filter(r => parseNum(r['Valor Seguro GE GM']) > 0).length, match: (n) => n.includes('garantia') },
+  { tipo: 'premio', getBase: (rows) => rows.reduce((a, r) => a + (parseNum(r['Valor Prepaid Services á Vista']) > 0 ? 1 : 0) + (parseNum(r['Valor Prepaid Services']) > 0 ? 1 : 0), 0), match: (n) => n.includes('revisao') || n.includes('planejada') || n.includes('prepaid') },
+  { tipo: 'premio', getBase: (rows) => rows.filter(r => parseNum(r['Valor Franquia \u2013 GO']) > 0).length, match: (n) => n.includes('franquia') },
+  { tipo: 'premio', getBase: (rows) => rows.filter(r => parseNum(r['Valor GAP \u2013 GO']) > 0).length, match: (n) => n.includes('gap') },
+  { tipo: 'premio', getBase: (rows) => rows.filter(r => parseNum(r['Valor AP \u2013 GO']) > 0).length, match: (n) => !n.includes('gap') && (n === 'ap' || n === 'seguro ap' || n.endsWith(' ap') || n.startsWith('ap ')) },
+];
+
+interface RemuneracaoResumoTotais {
+  comissaoBruta: number;
+  comissaoVendedorNovos: number;
+  comissaoVendedorUsados: number;
+  premioNovos: number;
+  premioUsados: number;
+  totalRemuneracao: number;
+}
+
+/**
+ * Agrega a remuneração paga (comissões e prêmios) de todos os vendedores, usando as mesmas
+ * regras do Demonstrativo de Pagamento. A Comissão Bruta considera todas as linhas (inclusive
+ * sem vendedor), igual ao total dos Resumos de Vendas; a remuneração paga ignora linhas sem vendedor.
+ */
+function calcRemuneracaoResumoTotais(allRows: Record<string, unknown>[], regras: RemuneracaoProdutoRegra[]): RemuneracaoResumoTotais {
+  const comissaoBruta = allRows.reduce((a, r) => a + calcTotalComissoes(r), 0);
+  const vendors = [...new Set(allRows.map(r => String(r[VEND_COL_ANALISE] ?? '').trim()).filter(Boolean))];
+  let comissaoVendedorNovos = 0, comissaoVendedorUsados = 0, premioNovos = 0, premioUsados = 0;
+  for (const vendor of vendors) {
+    const vendorRows = allRows.filter(r => String(r[VEND_COL_ANALISE] ?? '').trim() === vendor);
+    const novos = vendorRows.filter(r => !String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
+    const usados = vendorRows.filter(r => String(r['Tipo de Plano'] ?? '').toLowerCase().includes('semi'));
+    for (const cfg of REMUNERACAO_PRODUTOS_CONFIG) {
+      const regra = regras.find(r => cfg.match(normProduto(r.produto)));
+      if (!regra) continue;
+      const premio = parseNum(regra.valorPremio);
+      const calc = (base: number) => regra.tipoPremio === 'percentual' ? base * premio / 100 : base * premio;
+      const vN = calc(cfg.getBase(novos));
+      const vU = calc(cfg.getBase(usados));
+      if (cfg.tipo === 'comissao') { comissaoVendedorNovos += vN; comissaoVendedorUsados += vU; }
+      else { premioNovos += vN; premioUsados += vU; }
+    }
+  }
+  const totalRemuneracao = comissaoVendedorNovos + comissaoVendedorUsados + premioNovos + premioUsados;
+  return { comissaoBruta, comissaoVendedorNovos, comissaoVendedorUsados, premioNovos, premioUsados, totalRemuneracao };
+}
+
+/** Fatores de provisões/encargos — mesma regra do gráfico "Remunerações e Comissões" (Novos). */
+const PROV_FACTOR = 7 / 36;   // provisões sobre a base (comissão + DSR + prêmios)
+const ENC_FACTOR = 0.358;     // encargos sobre (base + provisões)
+
+/** % de DSR cadastrado para o ano/mês (Central de Vendas VW → Cadastro → DSR). */
+function dsrPctFor(cfgs: VendasDsrConfig[], year: number, month: number): number {
+  const c = cfgs.find(x => x.ano === year && x.mes === month);
+  return c ? parseFloat(c.percentual) || 0 : 0;
+}
 
 interface Props {
   onBack: () => void;
@@ -261,6 +342,16 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   const [vendasMonthsChecking, setVendasMonthsChecking] = useState(false);
   type VendasInnerTab = 'tabela' | 'resumo-novos' | 'resumo-usados' | 'resumo-total' | 'demonstrativo';
   const [vendasInnerTab, setVendasInnerTab] = useState<VendasInnerTab>('tabela');
+
+  // ── Aba Análise de Resultado ──
+  const [analiseAnoTodo, setAnaliseAnoTodo] = useState(false);
+  const [analiseLoading, setAnaliseLoading] = useState(false);
+  const [analiseMonths, setAnaliseMonths] = useState<{ rows: Record<string, unknown>[]; dsrPct: number; deducao: number }[]>([]);
+  const [analiseAliquota, setAnaliseAliquota] = useState(0);          // percentual global persistido
+  const [analiseAliquotaInput, setAnaliseAliquotaInput] = useState(''); // rascunho do campo
+  const [analiseDeducaoTotal, setAnaliseDeducaoTotal] = useState(0);  // soma do escopo (mês ou ano)
+  const [analiseDeducaoInput, setAnaliseDeducaoInput] = useState(''); // rascunho do mês selecionado
+  const [analiseSaving, setAnaliseSaving] = useState(false);
 
   // ── Demonstrativo: Matrículas dos vendedores (Resumo Geral) ──
   const [matriculasMap, setMatriculasMap] = useState<FinanciamentoMatriculasMap>({});
@@ -338,6 +429,81 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
     setRegrasLoading(true);
     loadRemuneracaoRegras().then(r => setRegras(r)).finally(() => setRegrasLoading(false));
   }, []);
+
+  // Carrega a alíquota global ao entrar na aba Análise de Resultado
+  useEffect(() => {
+    if (vendasSubTab !== 'analise') return;
+    fetchAnaliseAliquota().then(v => {
+      setAnaliseAliquota(v);
+      setAnaliseAliquotaInput(v ? String(v).replace('.', ',') : '');
+    });
+  }, [vendasSubTab]);
+
+  // Carrega as linhas e deduções do escopo (mês selecionado ou ano todo) na aba Análise
+  useEffect(() => {
+    if (activeSection !== 'vendas' || vendasSubTab !== 'analise') return;
+    let cancelled = false;
+    setAnaliseLoading(true);
+    (async () => {
+      const dsrCfg = await loadVendasDsr();
+      if (analiseAnoTodo) {
+        const meses = [...vendasMonthsWithData].sort((a, b) => a - b);
+        const datas = await Promise.all(meses.map(m => getFinanciamentoMes(vendasYear, m)));
+        const deducoes = await Promise.all(meses.map(m => fetchAnaliseDeducao(vendasYear, m)));
+        if (cancelled) return;
+        setAnaliseMonths(meses.map((m, i) => ({
+          rows: datas[i]?.rows ?? [],
+          dsrPct: dsrPctFor(dsrCfg, vendasYear, m),
+          deducao: deducoes[i],
+        })));
+        setAnaliseDeducaoTotal(deducoes.reduce((a, b) => a + b, 0));
+        setAnaliseDeducaoInput('');
+      } else {
+        const [data, deducao] = await Promise.all([
+          getFinanciamentoMes(vendasYear, vendasMonth),
+          fetchAnaliseDeducao(vendasYear, vendasMonth),
+        ]);
+        if (cancelled) return;
+        setAnaliseMonths([{
+          rows: data?.rows ?? [],
+          dsrPct: dsrPctFor(dsrCfg, vendasYear, vendasMonth),
+          deducao,
+        }]);
+        setAnaliseDeducaoTotal(deducao);
+        setAnaliseDeducaoInput(deducao ? String(deducao).replace('.', ',') : '');
+      }
+      setAnaliseLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, vendasSubTab, vendasYear, vendasMonth, analiseAnoTodo, vendasMonthsWithData]);
+
+  const handleSaveAnaliseAliquota = async () => {
+    const pct = parseNum(analiseAliquotaInput);
+    setAnaliseSaving(true);
+    try {
+      await persistAnaliseAliquota(pct);
+      setAnaliseAliquota(pct);
+      toast.success('Alíquota de impostos salva.');
+    } catch {
+      toast.error('Erro ao salvar a alíquota.');
+    } finally {
+      setAnaliseSaving(false);
+    }
+  };
+
+  const handleSaveAnaliseDeducao = async () => {
+    const valor = parseNum(analiseDeducaoInput);
+    setAnaliseSaving(true);
+    try {
+      await persistAnaliseDeducao(vendasYear, vendasMonth, valor);
+      setAnaliseDeducaoTotal(valor);
+      toast.success('Dedução do mês salva.');
+    } catch {
+      toast.error('Erro ao salvar a dedução.');
+    } finally {
+      setAnaliseSaving(false);
+    }
+  };
 
   // Carrega % Garantido e status de pagamento do KV ao entrar na aba Acelera ou no Demonstrativo de Pagamento
   useEffect(() => {
@@ -947,6 +1113,19 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             Acelera
           </button>
           )}
+          {(isAdmin() || canAccessVendasSub('financiamento_bv.vendas')) && (
+          <button
+            onClick={() => setVendasSubTab('analise')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              vendasSubTab === 'analise'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            <Calculator className="w-4 h-4" />
+            Análise de Resultado
+          </button>
+          )}
         </div>
       )}
 
@@ -1103,7 +1282,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
       )}
 
       {/* ── SEÇÃO: Vendas / Vendas de Financiamento e Produtos ── */}
-      {canVendas && activeSection === 'vendas' && (vendasSubTab === 'vendas' || vendasSubTab === 'acelera') && (
+      {canVendas && activeSection === 'vendas' && (vendasSubTab === 'vendas' || vendasSubTab === 'acelera' || vendasSubTab === 'analise') && (
         <>
           {/* Barra de filtros (ano + meses) */}
           <div className="print-hidden bg-white border-b border-slate-200 px-6 py-2 flex items-center gap-3 flex-wrap shrink-0">
@@ -1122,15 +1301,25 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500" />
             ) : (
               <div className="flex items-center gap-1 flex-wrap">
+                {vendasSubTab === 'analise' && (
+                  <button
+                    onClick={() => setAnaliseAnoTodo(true)}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
+                      analiseAnoTodo ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    Ano todo
+                  </button>
+                )}
                 {MONTHS_SHORT.map((m, i) => {
                   const monthNum = i + 1;
                   const hasData = vendasMonthsWithData.has(monthNum);
-                  const isActive = vendasMonth === monthNum;
+                  const isActive = !(vendasSubTab === 'analise' && analiseAnoTodo) && vendasMonth === monthNum;
                   return (
                     <button
                       key={monthNum}
                       disabled={!hasData}
-                      onClick={() => setVendasMonth(monthNum)}
+                      onClick={() => { setVendasMonth(monthNum); setAnaliseAnoTodo(false); }}
                       className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
                         isActive
                           ? 'bg-blue-600 text-white'
@@ -2190,6 +2379,203 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── ABA ANÁLISE DE RESULTADO ── */}
+          {vendasSubTab === 'analise' && (
+            <div className="flex-1 p-6 overflow-auto">
+              {analiseLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                </div>
+              ) : (() => {
+                const scopeLabel = analiseAnoTodo ? `Ano de ${vendasYear}` : `${MONTHS[vendasMonth - 1]}/${vendasYear}`;
+                if (!analiseMonths.some(m => m.rows.length > 0)) {
+                  return (
+                    <div className="flex flex-col items-center justify-center h-64 gap-3">
+                      <div className="p-5 rounded-full bg-slate-100"><Calculator className="w-12 h-12 text-slate-300" /></div>
+                      <p className="text-slate-500 text-sm font-medium">Nenhum dado de financiamento para {scopeLabel}.</p>
+                    </div>
+                  );
+                }
+                // Agrega mês a mês (a DSR usa o % do respectivo mês)
+                let comissaoBruta = 0, comissaoVendedorNovos = 0, comissaoVendedorUsados = 0;
+                let premioNovos = 0, premioUsados = 0, dsr = 0;
+                for (const mm of analiseMonths) {
+                  const r = calcRemuneracaoResumoTotais(mm.rows, regras);
+                  comissaoBruta += r.comissaoBruta;
+                  comissaoVendedorNovos += r.comissaoVendedorNovos;
+                  comissaoVendedorUsados += r.comissaoVendedorUsados;
+                  premioNovos += r.premioNovos;
+                  premioUsados += r.premioUsados;
+                  dsr += (r.comissaoVendedorNovos + r.comissaoVendedorUsados) * mm.dsrPct / 100;
+                }
+                const comissaoPaga = comissaoVendedorNovos + comissaoVendedorUsados;
+                const premios = premioNovos + premioUsados;
+                // Encargos e provisões: base = comissão + prêmios + DSR
+                const baseEnc = comissaoPaga + premios + dsr;
+                const provisoes = baseEnc * PROV_FACTOR;
+                const encargos = (baseEnc + provisoes) * ENC_FACTOR;
+                const provEnc = provisoes + encargos;
+
+                const deducoes = analiseDeducaoTotal;
+                const baseImpostos = comissaoBruta - deducoes;
+                const impostos = baseImpostos * analiseAliquota / 100;
+                const receitaLiquida = comissaoBruta - deducoes - impostos;
+                const totalRemuneracao = comissaoPaga + premios + dsr + provEnc;
+                const resultado = receitaLiquida - totalRemuneracao;
+                const margem = receitaLiquida !== 0 ? (resultado / receitaLiquida) * 100 : 0;
+                const money = (n: number) => `R$ ${fmtBRL(n)}`;
+
+                return (
+                  <div className="max-w-5xl mx-auto space-y-5">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-base font-bold text-slate-800">Análise de Resultado — {scopeLabel}</h2>
+                    </div>
+
+                    {/* Cadastro de alíquota e deduções */}
+                    <div className="flex flex-wrap items-end gap-5 bg-white border border-slate-200 rounded-xl p-4">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">Alíquota de impostos (%)</label>
+                        {isAdmin() ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={analiseAliquotaInput}
+                              onChange={e => setAnaliseAliquotaInput(e.target.value)}
+                              placeholder="0,00"
+                              className="w-28 text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            />
+                            <button onClick={handleSaveAnaliseAliquota} disabled={analiseSaving} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">Salvar</button>
+                          </div>
+                        ) : (
+                          <p className="text-sm font-bold text-slate-700">{fmtBRL(analiseAliquota)}%</p>
+                        )}
+                        <p className="text-[10px] text-slate-400 mt-0.5">Valor único, vale para todos os meses.</p>
+                      </div>
+
+                      <div className="w-px h-12 bg-slate-200 self-center" />
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                          Deduções {analiseAnoTodo ? '(ano todo)' : `(${MONTHS[vendasMonth - 1]})`}
+                        </label>
+                        {analiseAnoTodo ? (
+                          <p className="text-sm font-bold text-slate-700">R$ {fmtBRL(analiseDeducaoTotal)}</p>
+                        ) : isAdmin() ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={analiseDeducaoInput}
+                              onChange={e => setAnaliseDeducaoInput(e.target.value)}
+                              placeholder="0,00"
+                              className="w-36 text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            />
+                            <button onClick={handleSaveAnaliseDeducao} disabled={analiseSaving} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">Salvar</button>
+                          </div>
+                        ) : (
+                          <p className="text-sm font-bold text-slate-700">R$ {fmtBRL(analiseDeducaoTotal)}</p>
+                        )}
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {analiseAnoTodo ? 'Soma das deduções dos meses; edite mês a mês.' : 'Dedução referente ao mês selecionado.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Cards resumo */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p className="text-xs text-slate-500">Comissão Bruta</p>
+                        <p className="mt-1 text-lg font-bold text-slate-800">{money(comissaoBruta)}</p>
+                      </div>
+                      <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                        <p className="text-xs text-blue-600">Receita Líquida</p>
+                        <p className="mt-1 text-lg font-bold text-blue-800">{money(receitaLiquida)}</p>
+                      </div>
+                      <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+                        <p className="text-xs text-amber-600">Remuneração Paga</p>
+                        <p className="mt-1 text-lg font-bold text-amber-800">{money(totalRemuneracao)}</p>
+                      </div>
+                      <div className={`rounded-xl border px-4 py-3 ${resultado >= 0 ? 'border-emerald-100 bg-emerald-50' : 'border-red-100 bg-red-50'}`}>
+                        <p className={`text-xs ${resultado >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>Resultado da Operação</p>
+                        <p className={`mt-1 text-lg font-bold ${resultado >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>{money(resultado)}</p>
+                        <p className={`text-[11px] font-semibold ${resultado >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>Margem {margem.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</p>
+                      </div>
+                    </div>
+
+                    {/* DRE */}
+                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-800 text-white">
+                            <th className="px-4 py-2.5 text-left font-semibold">Demonstração de Resultado — {scopeLabel}</th>
+                            <th className="px-4 py-2.5 text-right font-semibold w-48">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-t border-slate-100 bg-slate-50 font-semibold">
+                            <td className="px-4 py-2 text-slate-800">Comissão Bruta (Novos + Usados)</td>
+                            <td className="px-4 py-2 text-right text-slate-800">{money(comissaoBruta)}</td>
+                          </tr>
+                          <tr className="border-t border-slate-100">
+                            <td className="px-4 py-2 text-slate-600">(−) Deduções</td>
+                            <td className="px-4 py-2 text-right text-red-600">{deducoes ? `- ${money(deducoes)}` : money(0)}</td>
+                          </tr>
+                          <tr className="border-t border-slate-100">
+                            <td className="px-4 py-2 text-slate-600">(=) Base de cálculo de impostos</td>
+                            <td className="px-4 py-2 text-right text-slate-700">{money(baseImpostos)}</td>
+                          </tr>
+                          <tr className="border-t border-slate-100">
+                            <td className="px-4 py-2 text-slate-600">(−) Impostos ({fmtBRL(analiseAliquota)}%)</td>
+                            <td className="px-4 py-2 text-right text-red-600">{impostos ? `- ${money(impostos)}` : money(0)}</td>
+                          </tr>
+                          <tr className="border-t border-slate-200 bg-blue-50 font-bold">
+                            <td className="px-4 py-2.5 text-blue-900">(=) Receita Líquida de Financiamento</td>
+                            <td className="px-4 py-2.5 text-right text-blue-900">{money(receitaLiquida)}</td>
+                          </tr>
+
+                          <tr><td colSpan={2} className="py-1" /></tr>
+
+                          <tr className="border-t border-slate-100">
+                            <td className="px-4 py-2 text-slate-600">(−) Comissão paga aos vendedores (Novos + Usados)</td>
+                            <td className="px-4 py-2 text-right text-red-600">{comissaoPaga ? `- ${money(comissaoPaga)}` : money(0)}</td>
+                          </tr>
+                          <tr className="border-t border-slate-100">
+                            <td className="px-4 py-2 text-slate-600">(−) Prêmios (Novos + Usados)</td>
+                            <td className="px-4 py-2 text-right text-red-600">{premios ? `- ${money(premios)}` : money(0)}</td>
+                          </tr>
+                          <tr className="border-t border-slate-100">
+                            <td className="px-4 py-2 text-slate-600">(−) DSR sobre comissões</td>
+                            <td className="px-4 py-2 text-right text-red-600">{dsr ? `- ${money(dsr)}` : money(0)}</td>
+                          </tr>
+                          <tr className="border-t border-slate-100">
+                            <td className="px-4 py-2 text-slate-600">(−) Encargos e Provisões <span className="text-[11px] text-slate-400">(sobre comissões + DSR + prêmios)</span></td>
+                            <td className="px-4 py-2 text-right text-red-600">{provEnc ? `- ${money(provEnc)}` : money(0)}</td>
+                          </tr>
+                          <tr className="border-t border-slate-200 bg-amber-50 font-bold">
+                            <td className="px-4 py-2.5 text-amber-900">(=) Total Remuneração + Encargos</td>
+                            <td className="px-4 py-2.5 text-right text-amber-900">{money(totalRemuneracao)}</td>
+                          </tr>
+
+                          <tr><td colSpan={2} className="py-1" /></tr>
+
+                          <tr className={`border-t-2 font-bold ${resultado >= 0 ? 'border-emerald-600 bg-emerald-50' : 'border-red-600 bg-red-50'}`}>
+                            <td className={`px-4 py-3 ${resultado >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>(=) Resultado da Operação</td>
+                            <td className={`px-4 py-3 text-right ${resultado >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>{money(resultado)}</td>
+                          </tr>
+                          <tr className="border-t border-slate-100">
+                            <td className="px-4 py-2 text-slate-600">Margem sobre Receita Líquida</td>
+                            <td className="px-4 py-2 text-right text-slate-700">{margem.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <p className="text-[11px] text-slate-400">
+                      DSR = comissão paga × %DSR do mês (Central de Vendas VW → Cadastro → DSR). Encargos e Provisões seguem a regra de "Remunerações e Comissões" (Novos): provisões = base × 7/36 e encargos = (base + provisões) × 35,8%, com base = comissão + prêmios + DSR.
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
