@@ -38,6 +38,27 @@ function fmtDateBR(d: Date | null): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 }
 
+/** Data de hoje no formato ISO 'YYYY-MM-DD'. */
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Último dia de um mês ('YYYY-MM') no formato ISO 'YYYY-MM-DD'. */
+function lastDayOfMonthISO(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  if (!y || !m) return todayISO();
+  const day = new Date(y, m, 0).getDate(); // dia 0 do mês seguinte = último dia do mês atual
+  return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** Converte 'YYYY-MM-DD' em Date local (início do dia). */
+function isoToDate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return startOfDay(new Date());
+  return new Date(y, m - 1, d);
+}
+
 interface Props {
   marca: DuplicatasMarca;
 }
@@ -47,6 +68,7 @@ const TOP_N = 10;
 export function AnaliseDuplicatasTab({ marca }: Props) {
   const [months, setMonths] = useState<string[]>([]);
   const [month, setMonth] = useState<string>('');
+  const [baseDate, setBaseDate] = useState<string>('');
   const [data, setData] = useState<DuplicatasImport | null>(null);
   const [map, setMap] = useState<DepartamentoMap>({});
   const [loading, setLoading] = useState(true);
@@ -54,7 +76,10 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [exporting, setExporting] = useState(false);
 
-  const referenceDate = useMemo(() => startOfDay(new Date()), []);
+  const referenceDate = useMemo(
+    () => (baseDate ? isoToDate(baseDate) : startOfDay(new Date())),
+    [baseDate],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +90,12 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
     });
     return () => { cancelled = true; };
   }, [marca.id]);
+
+  // Ao selecionar um mês, define a data-base para o último dia desse mês
+  // (o usuário ainda pode alterá-la manualmente depois).
+  useEffect(() => {
+    if (month) setBaseDate(lastDayOfMonthISO(month));
+  }, [month]);
 
   const loadData = useCallback(async () => {
     if (!month) { setData(null); setLoading(false); return; }
@@ -152,6 +183,16 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
           </select>
         </div>
         <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-slate-500">Data-base (cálculo dos dias)</label>
+          <input
+            type="date"
+            value={baseDate}
+            onChange={(e) => setBaseDate(e.target.value || todayISO())}
+            className="border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2"
+            style={{ ['--tw-ring-color' as string]: marca.primary }}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-slate-500 flex items-center gap-1">
             <Filter className="w-3 h-3" /> Departamento
           </label>
@@ -218,7 +259,7 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
       <div className="grid gap-5 lg:grid-cols-2">
         <FaixasTable
           title="Vencidos por faixa de atraso"
-          subtitle="Dias de atraso = hoje − DTA_VENCIMENTO"
+          subtitle="Dias de atraso = data-base − DTA_VENCIMENTO"
           faixas={analysis.faixasVencido}
           total={analysis.kpis.totalVencido}
           groupKey="fv"
@@ -228,7 +269,7 @@ export function AnaliseDuplicatasTab({ marca }: Props) {
         />
         <FaixasTable
           title="A vencer por faixa"
-          subtitle="Dias até vencer = DTA_VENCIMENTO − hoje"
+          subtitle="Dias até vencer = DTA_VENCIMENTO − data-base"
           faixas={analysis.faixasAVencer}
           total={analysis.kpis.totalAVencer}
           groupKey="fa"
