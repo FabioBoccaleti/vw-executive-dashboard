@@ -638,6 +638,7 @@ function ExpandRow({
                   <thead className="sticky top-0 bg-slate-100">
                     <tr className="text-slate-500">
                       <th className="text-left px-2 py-1 font-medium">Modelo</th>
+                      <th className="text-left px-2 py-1 font-medium">Chassi</th>
                       <th className="text-right px-2 py-1 font-medium">Dias</th>
                       <th className="text-right px-2 py-1 font-medium">Valor</th>
                     </tr>
@@ -650,6 +651,7 @@ function ExpandRow({
                             {it.modelo || it.veiculo}
                           </span>
                         </td>
+                        <td className="px-2 py-1 text-slate-500 whitespace-nowrap">{it.chassi || '—'}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-slate-600">{it.dias != null ? fmtInt(it.dias) : '—'}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-slate-700">{fmtCurrency(it.valor)}</td>
                       </tr>
