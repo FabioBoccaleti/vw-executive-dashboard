@@ -4,11 +4,11 @@ export type UserRole = 'admin' | 'gestor' | 'leitura';
 
 export type ModuleId = 'demonstrativo' | 'despesas' | 'fluxo_caixa' | 'vendas_bonificacoes' | 'folha_pagamento' | 'central_vendas_vw' | 'custos_alugueis' | 'analise_evolutiva_despesas' | 'numeros_estoque_usados' | 'analise_estoque_pecas' | 'controle_pagamentos_evora' | 'controle_veiculos_floorplan' | 'analise_financeira';
 
-export type BrandId = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'base_gerencial' | 'vw_outros' | 'audi_outros';
+export type BrandId = 'vw' | 'audi' | 'consolidado' | 'resumo_dre' | 'analise_projecoes' | 'despesas_administracao' | 'despesas_depto_audi' | 'despesas_depto_vw' | 'ieo' | 'base_gerencial' | 'comparativo_rede_vw' | 'comparativo_rede_audi' | 'ebitda' | 'vw_outros' | 'audi_outros';
 
 export const ALL_MODULES: ModuleId[] = ['demonstrativo', 'despesas', 'fluxo_caixa', 'vendas_bonificacoes', 'folha_pagamento', 'central_vendas_vw', 'custos_alugueis', 'analise_evolutiva_despesas', 'numeros_estoque_usados', 'analise_estoque_pecas', 'controle_pagamentos_evora', 'controle_veiculos_floorplan', 'analise_financeira'];
 
-export const ALL_BRANDS: BrandId[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'despesas_depto_vw', 'ieo', 'base_gerencial', 'vw_outros', 'audi_outros'];
+export const ALL_BRANDS: BrandId[] = ['vw', 'audi', 'consolidado', 'resumo_dre', 'analise_projecoes', 'despesas_administracao', 'despesas_depto_audi', 'despesas_depto_vw', 'ieo', 'base_gerencial', 'comparativo_rede_vw', 'comparativo_rede_audi', 'ebitda', 'vw_outros', 'audi_outros'];
 
 export const MODULE_LABELS: Record<ModuleId, string> = {
   demonstrativo: 'Demonstrativo de Resultados',
@@ -37,8 +37,21 @@ export const BRAND_LABELS: Record<BrandId, string> = {
   despesas_depto_vw: 'Despesas por Departamento na Sorana VW',
   ieo: 'Índice de Eficiência Operacional (IEO)',
   base_gerencial: 'Base Gerencial',
+  comparativo_rede_vw: 'Comparativo Rede VW',
+  comparativo_rede_audi: 'Comparativo Rede Audi',
+  ebitda: 'Ebitda',
   vw_outros: 'VW Outros',
   audi_outros: 'Audi Outros',
+};
+
+// Subpermissões (por marca) do card Ebitda
+export type EbitdaSubModuleId = 'ebitda.vw' | 'ebitda.audi';
+
+export const ALL_EBITDA_SUB_MODULES: EbitdaSubModuleId[] = ['ebitda.vw', 'ebitda.audi'];
+
+export const EBITDA_SUB_MODULE_LABELS: Record<EbitdaSubModuleId, string> = {
+  'ebitda.vw': 'Ebitda VW',
+  'ebitda.audi': 'Ebitda Audi',
 };
 
 // Subpermissões do módulo vendas_bonificacoes
@@ -56,12 +69,15 @@ export type VendasSubModuleId =
   | 'estetica.analise'
   | 'financiamento_bv.vendas'
   | 'financiamento_bv.acelera'
+  | 'financiamento_bv.analise'
   | 'financiamento_bv.cadastro'
   | 'assinatura_signdrive.tabela'
   | 'assinatura_signdrive.analise'
   | 'assinatura_signdrive.cadastro'
   | 'vpecas_cond.relatorios'
   | 'vpecas_cond.resumo'
+  | 'despachante.vw'
+  | 'despachante.audi'
   | 'passagem_vw.cadastro'
   | 'passagem_vw.passagens'
   | 'passagem_vw.situacoes'
@@ -155,12 +171,15 @@ export const VENDAS_SUB_MODULE_LABELS: Record<VendasSubModuleId, string> = {
   'estetica.analise': 'Análise',
   'financiamento_bv.vendas': 'Vendas',
   'financiamento_bv.acelera': 'Acelera',
+  'financiamento_bv.analise': 'Análise',
   'financiamento_bv.cadastro': 'Cadastro',
   'assinatura_signdrive.tabela': 'Tabela',
   'assinatura_signdrive.analise': 'Análise',
   'assinatura_signdrive.cadastro': 'Cadastro',
   'vpecas_cond.relatorios': 'Relatórios',
   'vpecas_cond.resumo': 'Resumo',
+  'despachante.vw': 'Despachante VW',
+  'despachante.audi': 'Despachante Audi',
   'passagem_vw.cadastro': 'Cadastro',
   'passagem_vw.passagens': 'Passagens',
   'passagem_vw.situacoes': 'Situações',
@@ -182,6 +201,7 @@ export interface UserRecord {
   vendasSubModules?: VendasSubModuleId[];
   centralVendasVWSubModules?: CentralVendasVWSubModuleId[];
   folhaSubModules?: FolhaSubModuleId[];
+  ebitdaSubModules?: EbitdaSubModuleId[];
   active: boolean;
   createdAt: number;
   updatedAt: number;
@@ -197,6 +217,7 @@ export interface SessionPayload {
   vendasSubModules?: VendasSubModuleId[];
   centralVendasVWSubModules?: CentralVendasVWSubModuleId[];
   folhaSubModules?: FolhaSubModuleId[];
+  ebitdaSubModules?: EbitdaSubModuleId[];
   expiresAt: number;
 }
 

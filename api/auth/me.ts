@@ -55,6 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       vendasSubModules:          user.vendasSubModules ?? [],
       folhaSubModules:           user.folhaSubModules ?? [],
       centralVendasVWSubModules: user.centralVendasVWSubModules ?? [],
+      ebitdaSubModules:          user.ebitdaSubModules ?? [],
       expiresAt:                 session.expiresAt,
     };
 

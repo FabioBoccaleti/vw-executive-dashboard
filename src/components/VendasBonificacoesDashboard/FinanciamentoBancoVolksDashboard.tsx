@@ -463,16 +463,20 @@ interface Props {
 export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { canAccessVendasSub, isAdmin, session } = useAuth();
-  const canVendas   = isAdmin() || canAccessVendasSub('financiamento_bv.vendas') || canAccessVendasSub('financiamento_bv.acelera');
+  const canAnalise  = isAdmin() || canAccessVendasSub('financiamento_bv.analise');
+  const canVendas   = isAdmin() || canAccessVendasSub('financiamento_bv.vendas') || canAccessVendasSub('financiamento_bv.acelera') || canAnalise;
   const canAcelera  = isAdmin() || canAccessVendasSub('financiamento_bv.acelera');
   const canCadastro = isAdmin() || canAccessVendasSub('financiamento_bv.cadastro');
 
   const [activeSection, setActiveSection] = useState<ActiveSection>(() =>
     canVendas ? 'vendas' : 'cadastro'
   );
-  const [vendasSubTab, setVendasSubTab] = useState<VendasSubTab>(() =>
-    canAcelera && !canAccessVendasSub('financiamento_bv.vendas') && !isAdmin() ? 'acelera' : 'importar'
-  );
+  const [vendasSubTab, setVendasSubTab] = useState<VendasSubTab>(() => {
+    if (isAdmin() || canAccessVendasSub('financiamento_bv.vendas')) return 'importar';
+    if (canAcelera) return 'acelera';
+    if (canAnalise) return 'analise';
+    return 'importar';
+  });
   const [cadastroSection, setCadastroSection] = useState<CadastroSection>('remuneracao-produto');
 
   // ── Aba Importar ──
@@ -1323,7 +1327,7 @@ export function FinanciamentoBancoVolksDashboard({ onBack }: Props) {
             Acelera
           </button>
           )}
-          {(isAdmin() || canAccessVendasSub('financiamento_bv.vendas')) && (
+          {canAnalise && (
           <button
             onClick={() => setVendasSubTab('analise')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${

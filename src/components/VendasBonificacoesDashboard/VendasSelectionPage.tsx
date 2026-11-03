@@ -11,8 +11,9 @@ const BLINDAGEM_SUBS: VendasSubModuleId[] = [
 const PELICULAS_SUBS: VendasSubModuleId[] = ['peliculas.tabela', 'peliculas.analise'];
 const ESTETICA_SUBS: VendasSubModuleId[] = ['estetica.tabela', 'estetica.analise'];
 const ASSINATURA_SUBS: VendasSubModuleId[] = ['assinatura_signdrive.tabela', 'assinatura_signdrive.analise', 'assinatura_signdrive.cadastro'];
-const FINANCIAMENTO_BV_SUBS: VendasSubModuleId[] = ['financiamento_bv.vendas', 'financiamento_bv.acelera', 'financiamento_bv.cadastro'];
+const FINANCIAMENTO_BV_SUBS: VendasSubModuleId[] = ['financiamento_bv.vendas', 'financiamento_bv.acelera', 'financiamento_bv.analise', 'financiamento_bv.cadastro'];
 const VPECAS_COND_SUBS: VendasSubModuleId[] = ['vpecas_cond.relatorios', 'vpecas_cond.resumo'];
+const DESPACHANTE_SUBS: VendasSubModuleId[] = ['despachante.vw', 'despachante.audi'];
 const PASSAGEM_VW_SUBS: VendasSubModuleId[] = ['passagem_vw.cadastro', 'passagem_vw.passagens', 'passagem_vw.situacoes', 'passagem_vw.analise'];
 const PASSAGEM_AUDI_SUBS: VendasSubModuleId[] = ['passagem_audi.cadastro', 'passagem_audi.passagens', 'passagem_audi.situacoes', 'passagem_audi.analise'];
 
@@ -29,6 +30,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
   const canAssinatura = isAdmin() || ASSINATURA_SUBS.some(s => canAccessVendasSub(s));
   const canFinanciamentoBV = isAdmin() || FINANCIAMENTO_BV_SUBS.some(s => canAccessVendasSub(s));
   const canVPecasCond     = isAdmin() || VPECAS_COND_SUBS.some(s => canAccessVendasSub(s));
+  const canDespachante    = isAdmin() || DESPACHANTE_SUBS.some(s => canAccessVendasSub(s));
   const canPassagemVW     = isAdmin() || PASSAGEM_VW_SUBS.some(s => canAccessVendasSub(s));
   const canPassagemAudi   = isAdmin() || PASSAGEM_AUDI_SUBS.some(s => canAccessVendasSub(s));
 
@@ -173,6 +175,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
           )}
 
           {/* Card — Serviços de Despachante */}
+          {canDespachante && (
           <button
             onClick={() => onSelect('despachante')}
             className="w-56 bg-white rounded-2xl border-2 border-violet-400 shadow-md hover:shadow-xl hover:border-violet-500 hover:scale-[1.02] transition-all duration-200 p-8 flex flex-col items-center gap-4 text-center group"
@@ -186,6 +189,7 @@ export function VendasSelectionPage({ onSelect, onChangeBrand }: VendasSelection
               </h2>
             </div>
           </button>
+          )}
 
           {/* Card — Passagem Oficina e Funilaria VW */}
           {canPassagemVW && (

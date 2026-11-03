@@ -9,8 +9,8 @@ import {
   ChevronLeft, Eye, EyeOff, Check, AlertCircle, RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { PublicUser, AccessLogEntry, ModuleId, BrandId, UserRole, VendasSubModuleId, CentralVendasVWSubModuleId, FolhaSubModuleId } from '@/lib/authTypes';
-import { ALL_MODULES, ALL_BRANDS, MODULE_LABELS, BRAND_LABELS, VENDAS_SUB_MODULE_LABELS, CENTRAL_VENDAS_VW_SUB_MODULE_LABELS, FOLHA_SUB_MODULE_LABELS } from '@/lib/authTypes';
+import type { PublicUser, AccessLogEntry, ModuleId, BrandId, UserRole, VendasSubModuleId, CentralVendasVWSubModuleId, FolhaSubModuleId, EbitdaSubModuleId } from '@/lib/authTypes';
+import { ALL_MODULES, ALL_BRANDS, MODULE_LABELS, BRAND_LABELS, VENDAS_SUB_MODULE_LABELS, CENTRAL_VENDAS_VW_SUB_MODULE_LABELS, FOLHA_SUB_MODULE_LABELS, ALL_EBITDA_SUB_MODULES, EBITDA_SUB_MODULE_LABELS } from '@/lib/authTypes';
 import {
   apiListUsers, apiCreateUser, apiUpdateUser, apiDeleteUser, apiGetLogs,
 } from '@/lib/authClient';
@@ -48,12 +48,13 @@ interface UserFormData {
   vendasSubModules: VendasSubModuleId[];
   centralVendasVWSubModules: CentralVendasVWSubModuleId[];
   folhaSubModules: FolhaSubModuleId[];
+  ebitdaSubModules: EbitdaSubModuleId[];
   active: boolean;
 }
 
 const defaultForm = (): UserFormData => ({
   name: '', username: '', password: '', role: 'leitura',
-  modules: [], brands: [], vendasSubModules: [], centralVendasVWSubModules: [], folhaSubModules: [], active: true,
+  modules: [], brands: [], vendasSubModules: [], centralVendasVWSubModules: [], folhaSubModules: [], ebitdaSubModules: [], active: true,
 });
 
 interface UserFormProps {
@@ -103,6 +104,14 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
       folhaSubModules: f.folhaSubModules.includes(s)
         ? f.folhaSubModules.filter(x => x !== s)
         : [...f.folhaSubModules, s],
+    }));
+
+  const toggleEbitdaSub = (s: EbitdaSubModuleId) =>
+    setForm(f => ({
+      ...f,
+      ebitdaSubModules: f.ebitdaSubModules.includes(s)
+        ? f.ebitdaSubModules.filter(x => x !== s)
+        : [...f.ebitdaSubModules, s],
     }));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -220,6 +229,32 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
         </div>
       )}
 
+      {/* Subpermissões Ebitda — por marca (somente quando o card Ebitda está liberado) */}
+      {!isAdmin && form.modules.includes('demonstrativo') && form.brands.includes('ebitda') && (
+        <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/10 dark:border-emerald-800 p-4">
+          <Label className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+            Permissões — Ebitda (por marca)
+          </Label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {ALL_EBITDA_SUB_MODULES.map(s => (
+              <button
+                key={s} type="button"
+                onClick={() => toggleEbitdaSub(s)}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                  form.ebitdaSubModules.includes(s)
+                    ? 'border-emerald-500 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 font-medium'
+                    : 'border-border bg-background text-muted-foreground hover:border-input',
+                )}
+              >
+                {form.ebitdaSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                {EBITDA_SUB_MODULE_LABELS[s]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Subpermissões Vendas e Bonificações */}
       {!isAdmin && form.modules.includes('vendas_bonificacoes') && (
         <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/50 dark:bg-amber-950/10 dark:border-amber-800 p-4">
@@ -297,7 +332,7 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Financiamento Banco Volks</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {(['financiamento_bv.vendas', 'financiamento_bv.acelera', 'financiamento_bv.cadastro'] as VendasSubModuleId[]).map(s => (
+              {(['financiamento_bv.vendas', 'financiamento_bv.acelera', 'financiamento_bv.analise', 'financiamento_bv.cadastro'] as VendasSubModuleId[]).map(s => (
                 <button
                   key={s} type="button"
                   onClick={() => toggleVendasSub(s)}
@@ -349,6 +384,28 @@ function UserForm({ initial, onSave, onCancel, isEdit }: UserFormProps) {
                     'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
                     form.vendasSubModules.includes(s)
                       ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 font-medium'
+                      : 'border-border bg-background text-muted-foreground hover:border-input',
+                  )}
+                >
+                  {form.vendasSubModules.includes(s) && <Check className="w-3 h-3 shrink-0" />}
+                  {VENDAS_SUB_MODULE_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Serviços de Despachante */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Serviços de Despachante</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {(['despachante.vw', 'despachante.audi'] as VendasSubModuleId[]).map(s => (
+                <button
+                  key={s} type="button"
+                  onClick={() => toggleVendasSub(s)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs transition-colors',
+                    form.vendasSubModules.includes(s)
+                      ? 'border-amber-500 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 font-medium'
                       : 'border-border bg-background text-muted-foreground hover:border-input',
                   )}
                 >
@@ -789,6 +846,7 @@ export function AdminPage({ onBack }: AdminPageProps) {
                       vendasSubModules: (editingUser as any).vendasSubModules ?? [],
                       centralVendasVWSubModules: (editingUser as any).centralVendasVWSubModules ?? [],
                       folhaSubModules: (editingUser as any).folhaSubModules ?? [],
+                      ebitdaSubModules: (editingUser as any).ebitdaSubModules ?? [],
                       active: editingUser.active,
                     } : undefined}
                     onSave={formMode === 'create' ? handleCreate : handleEdit}

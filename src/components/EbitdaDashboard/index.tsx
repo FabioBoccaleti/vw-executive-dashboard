@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Car } from 'lucide-react';
+import { useAuth } from '@/contexts/useAuth';
 import { DespesasFinanceiraTab } from './DespesasFinanceiraTab';
 import { DreTab } from './DreTab';
 import { DespesasFinanceiraAudiTab } from './DespesasFinanceiraAudiTab';
@@ -21,6 +22,10 @@ interface Props {
 type View = 'selection' | 'ebitda_vw' | 'ebitda_audi';
 
 export function EbitdaDashboard({ onChangeBrand }: Props) {
+  const { canAccessEbitdaSub } = useAuth();
+  const canVw = canAccessEbitdaSub('ebitda.vw');
+  const canAudi = canAccessEbitdaSub('ebitda.audi');
+
   const [view, setView] = useState<View>('selection');
 
   const headerTitle =
@@ -44,30 +49,39 @@ export function EbitdaDashboard({ onChangeBrand }: Props) {
       <main className="flex-1 p-4 md:p-6 flex flex-col min-h-0">
         {view === 'selection' ? (
           <div className="flex justify-center gap-6 pt-4 flex-wrap">
-            <Card
-              className="cursor-pointer transition-all duration-200 hover:shadow-lg w-[260px]"
-              style={{ ['--tw-ring-color' as string]: '#059669' }}
-              onClick={() => setView('ebitda_vw')}
-            >
-              <CardContent className="p-8 flex flex-col items-center justify-center gap-4 text-center min-h-[200px]">
-                <div className="p-4 rounded-full bg-emerald-100 text-[#059669]">
-                  <Car className="w-11 h-11" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-700">Ebitda VW</h3>
-              </CardContent>
-            </Card>
-            <Card
-              className="cursor-pointer transition-all duration-200 hover:shadow-lg w-[260px]"
-              style={{ ['--tw-ring-color' as string]: '#059669' }}
-              onClick={() => setView('ebitda_audi')}
-            >
-              <CardContent className="p-8 flex flex-col items-center justify-center gap-4 text-center min-h-[200px]">
-                <div className="p-4 rounded-full bg-emerald-100 text-[#059669]">
-                  <Car className="w-11 h-11" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-700">Ebitda Audi</h3>
-              </CardContent>
-            </Card>
+            {!canVw && !canAudi && (
+              <p className="text-sm text-slate-500 pt-8">
+                Você não tem permissão para visualizar nenhuma marca do Ebitda.
+              </p>
+            )}
+            {canVw && (
+              <Card
+                className="cursor-pointer transition-all duration-200 hover:shadow-lg w-[260px]"
+                style={{ ['--tw-ring-color' as string]: '#059669' }}
+                onClick={() => setView('ebitda_vw')}
+              >
+                <CardContent className="p-8 flex flex-col items-center justify-center gap-4 text-center min-h-[200px]">
+                  <div className="p-4 rounded-full bg-emerald-100 text-[#059669]">
+                    <Car className="w-11 h-11" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-700">Ebitda VW</h3>
+                </CardContent>
+              </Card>
+            )}
+            {canAudi && (
+              <Card
+                className="cursor-pointer transition-all duration-200 hover:shadow-lg w-[260px]"
+                style={{ ['--tw-ring-color' as string]: '#059669' }}
+                onClick={() => setView('ebitda_audi')}
+              >
+                <CardContent className="p-8 flex flex-col items-center justify-center gap-4 text-center min-h-[200px]">
+                  <div className="p-4 rounded-full bg-emerald-100 text-[#059669]">
+                    <Car className="w-11 h-11" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-700">Ebitda Audi</h3>
+                </CardContent>
+              </Card>
+            )}
           </div>
         ) : view === 'ebitda_vw' ? (
           <div className="w-full flex flex-col flex-1 min-h-0">

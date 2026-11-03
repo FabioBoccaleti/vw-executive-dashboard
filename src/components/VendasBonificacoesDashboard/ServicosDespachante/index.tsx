@@ -12,6 +12,7 @@ import { parseDespachanteWorkbook } from './parse';
 import { DESPACHANTE_MONTHS, DESPACHANTE_WEEKS, MARCA_LABEL } from './shared';
 import { DadosTab } from './DadosTab';
 import { ConsolidadoTab } from './ConsolidadoTab';
+import { useAuth } from '@/contexts/useAuth';
 
 interface Props {
   onBack: () => void;
@@ -25,13 +26,18 @@ const YEARS = Array.from({ length: 8 }, (_, index) => CURRENT_YEAR - 3 + index);
 const CATEGORY_LABEL: Record<DespachanteCategory, string> = { novos: 'Novos (0km)', usados: 'Usados' };
 
 export function ServicosDespachanteDashboard({ onBack }: Props) {
+  const { canAccessVendasSub, isAdmin } = useAuth();
+  const canVw = isAdmin() || canAccessVendasSub('despachante.vw');
+  const canAudi = isAdmin() || canAccessVendasSub('despachante.audi');
+  const allowedMarcas = (['vw', 'audi'] as DespachanteMarca[]).filter(m => (m === 'vw' ? canVw : canAudi));
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<DespachanteCategory>('novos');
   const [view, setView] = useState<View>('importacao');
   const [year, setYear] = useState(CURRENT_YEAR);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [week, setWeek] = useState(1);
-  const [marca, setMarca] = useState<DespachanteMarca>('vw');
+  const [marca, setMarca] = useState<DespachanteMarca>(canVw ? 'vw' : 'audi');
   const [importedWeeks, setImportedWeeks] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmReplace, setConfirmReplace] = useState(false);
@@ -180,7 +186,7 @@ export function ServicosDespachanteDashboard({ onBack }: Props) {
           {/* Marca (dados da semana e consolidado) */}
           {view !== 'importacao' && (
             <div className="flex gap-1 border-b border-slate-100">
-              {(['vw', 'audi'] as DespachanteMarca[]).map(item => (
+              {allowedMarcas.map(item => (
                 <button
                   key={item}
                   onClick={() => setMarca(item)}

@@ -56,6 +56,7 @@ export async function apiLogin(username: string, password: string): Promise<{ to
       brands: ['vw', 'audi', 'consolidado', 'vw_outros', 'audi_outros'],
       vendasSubModules: [],
       centralVendasVWSubModules: [],
+      ebitdaSubModules: [],
       expiresAt: Date.now() + 1000 * 60 * 60 * 24,
     };
     return { token: 'dev-token', session };

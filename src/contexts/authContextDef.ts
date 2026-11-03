@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { SessionPayload, ModuleId, BrandId, VendasSubModuleId, FolhaSubModuleId, CentralVendasVWSubModuleId } from '@/lib/authTypes';
+import type { SessionPayload, ModuleId, BrandId, VendasSubModuleId, FolhaSubModuleId, CentralVendasVWSubModuleId, EbitdaSubModuleId } from '@/lib/authTypes';
 
 export interface AuthContextValue {
   session: SessionPayload | null;
@@ -11,6 +11,7 @@ export interface AuthContextValue {
   canAccessVendasSub: (sub: VendasSubModuleId) => boolean;
   canAccessFolhaSub: (sub: FolhaSubModuleId) => boolean;
   canAccessCentralVendasVWSub: (sub: CentralVendasVWSubModuleId) => boolean;
+  canAccessEbitdaSub: (sub: EbitdaSubModuleId) => boolean;
   isAdmin: () => boolean;
 }
 
