@@ -540,6 +540,38 @@ export async function getAllImportedMonthsData(): Promise<DespesasAdmMesData[]> 
   return results.filter((d): d is DespesasAdmMesData => d !== null);
 }
 
+/** Lista (ano, mês) de todos os meses com dados importados, ordenados do mais antigo ao mais recente. */
+export async function getImportedMonths(): Promise<Array<{ year: number; month: number }>> {
+  const keys = await kvKeys(`${KEY_PREFIX}:*`);
+  const months: Array<{ year: number; month: number }> = [];
+  for (const k of keys) {
+    const m = k.match(new RegExp(`^${KEY_PREFIX}:(\\d{4}):(\\d{2})$`));
+    if (m) months.push({ year: Number(m[1]), month: Number(m[2]) });
+  }
+  months.sort((a, b) => (a.year - b.year) || (a.month - b.month));
+  return months;
+}
+
+/** Aplica todas as regras de merge de contas em sequência (ordem relevante). */
+export function applyAllMerges(valorMap: Map<string, number>): void {
+  mergeAssistenciaMedica(valorMap);
+  mergeSalariosOrdenados(valorMap);
+  mergeComissoesEmpregados(valorMap);
+  mergeHorasExtras(valorMap);
+  mergeAdicionais(valorMap);
+  mergeIndenizacoesTrabalistas(valorMap);
+  merge13Salario(valorMap);
+  merge13SalarioIndenizado(valorMap);
+  mergeFeriasIndenizadas(valorMap);
+  mergeFerias(valorMap);
+  mergeInss(valorMap);
+  mergeFgts(valorMap);
+  mergeFgtsMulta(valorMap);
+  mergeAssistenciaMedicaNova(valorMap);
+  mergeValeTransporte(valorMap);
+  mergePremiosGratificacoes(valorMap);
+}
+
 // ─── Extrator hierárquico (empresa → depto) ───────────────────────────────────
 export function extractByCompaniesAndDepts(
   data: DespesasAdmMesData,
