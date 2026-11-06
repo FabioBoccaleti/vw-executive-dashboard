@@ -16,6 +16,8 @@ import {
   getActiveBaseGerencialDreAdjustments,
   loadBaseGerencialDreAdjustments,
   type BaseGerencialDreAdjustment,
+  DEPTO_CLASSIFICACAO_LABELS,
+  TIPOS_CONTA_ORDENADOS,
 } from './baseGerencialStorage';
 
 // ─── Estrutura hierárquica do arquivo importado ──────────────────────────────
@@ -45,6 +47,164 @@ export interface ContaDetail {
   conta: string;
   ccusto?: string; // Centro de custo (opcional - só aparece quando não é consolidado)
   valor: number;
+}
+
+export interface DespesaPinheiros {
+  conta: string;
+  valor: number;
+  departamentos: { departamento: string; valor: number }[];
+}
+
+export interface CustoFixoPinheirosData {
+  grupos: {
+    tipo: TipoContaClassificacao;
+    contas: DespesaPinheiros[];
+    subtotal: number;
+  }[];
+  total: number;
+}
+
+const TIPOS_DESPESA_PINHEIROS = TIPOS_CONTA_ORDENADOS.filter(tipo =>
+  tipo.startsWith('despesas_') ||
+  tipo === 'outras_despesas_operacionais' ||
+  tipo === 'amortizacoes_depreciacoes'
+);
+
+export async function processCustoFixoPinheirosData(
+  year: number,
+  mes: number,
+): Promise<CustoFixoPinheirosData> {
+  const meses = mes === 0 ? Array.from({ length: 12 }, (_, i) => i + 1) : [mes];
+  const [mesesData, contasMap, regrasMap, contasTipoItem] = await Promise.all([
+    Promise.all(meses.map(month => getBaseGerencialMes(year, month))),
+    loadClassificacoesConta(),
+    loadRegrasDeptos(),
+    loadContasTipoItem(),
+  ]);
+  const contasTipoItemNums = contasTipoItem === null ? null : new Set(
+    contasTipoItem.map(conta => conta.match(/^\d+/)?.[0])
+  );
+  const grupos = new Map<TipoContaClassificacao, Map<string, DespesaPinheiros>>();
+
+  for (const data of mesesData) {
+    if (!data) continue;
+    let conta = '';
+    let primeiraDivisao: 'ccusto' | 'revenda' | undefined;
+    let ccusto: string | undefined;
+    let revenda: string | undefined;
+    let bloco: {
+      conta: string;
+      ccusto: string;
+      revenda: string;
+      valor: number;
+      tipos: { tipo: 'P' | 'S' | 'V' | 'L'; valor: number }[];
+    } | undefined;
+
+    function consolidarBloco() {
+      if (!bloco || (bloco.revenda !== '4' && bloco.revenda !== '5')) return;
+      const tipoConta = contasMap[bloco.conta];
+      if (!TIPOS_DESPESA_PINHEIROS.includes(tipoConta)) return;
+      const contaNum = bloco.conta.match(/^\d+/)?.[0] ?? '';
+      const usaTipoItem = contasTipoItemNums === null
+        ? contaNum.startsWith('3') || contaNum.startsWith('4')
+        : contasTipoItemNums.has(contaNum);
+      const ccustoKey = bloco.ccusto.match(/^(\d+\s*-)/)?.[1] ?? '';
+      const regra = regrasMap[ccustoKey];
+
+      const adicionar = (valor: number, departamento: DeptoClassificacao | undefined) => {
+        if (valor === 0 || !bloco) return;
+        const label = departamento
+          ? DEPTO_CLASSIFICACAO_LABELS[departamento]
+          : `${bloco.ccusto} (sem classificação)`;
+        let contas = grupos.get(tipoConta);
+        if (!contas) {
+          contas = new Map();
+          grupos.set(tipoConta, contas);
+        }
+        let despesa = contas.get(bloco.conta);
+        if (!despesa) {
+          despesa = { conta: bloco.conta, valor: 0, departamentos: [] };
+          contas.set(bloco.conta, despesa);
+        }
+        despesa.valor += valor;
+        const existente = despesa.departamentos.find(item => item.departamento === label);
+        if (existente) existente.valor += valor;
+        else despesa.departamentos.push({ departamento: label, valor });
+      };
+
+      if (usaTipoItem) {
+        for (const item of bloco.tipos) {
+          const departamento = item.tipo !== 'L' && regra?.byTipoItem
+            ? regra.byTipoItem[item.tipo]
+            : regra?.default;
+          adicionar(item.valor, departamento);
+        }
+        // A diferença pertence ao CCusto padrão, sem somar novamente os subtotais.
+        const restante = bloco.valor - bloco.tipos.reduce((sum, item) => sum + item.valor, 0);
+        if (Math.abs(restante) >= 0.01) adicionar(restante, regra?.default);
+      } else {
+        adicionar(bloco.valor, regra?.default);
+      }
+    }
+
+    for (const row of data.rows) {
+      if (row.isMain) {
+        consolidarBloco();
+        bloco = undefined;
+        conta = row.conta;
+        primeiraDivisao = undefined;
+        ccusto = undefined;
+        revenda = undefined;
+        continue;
+      }
+      if (!conta) continue;
+      const isCCusto = /\(CCusto\)/i.test(row.conta);
+      const isRevenda = /\(Revenda\)/i.test(row.conta);
+      if (isCCusto || isRevenda) {
+        consolidarBloco();
+        bloco = undefined;
+        primeiraDivisao ??= isCCusto ? 'ccusto' : 'revenda';
+        if (isCCusto) {
+          ccusto = row.conta.replace(/\s*\(CCusto\)/i, '').trim();
+          if (primeiraDivisao === 'ccusto') revenda = undefined;
+        } else {
+          revenda = row.conta.match(/^(\d+)\s*-/)?.[1];
+          if (primeiraDivisao === 'revenda') ccusto = undefined;
+        }
+        // Somente a interseção Revenda/CCusto é um lançamento; os pais são totais.
+        if (ccusto && revenda) {
+          bloco = { conta, ccusto, revenda, valor: row.valCredito - row.valDebito, tipos: [] };
+        }
+      } else if (bloco && /\(Tipo\)/i.test(row.conta)) {
+        const tipo = row.conta.match(/^([PSVL])\s*-/i)?.[1].toUpperCase();
+        if (tipo === 'P' || tipo === 'S' || tipo === 'V' || tipo === 'L') {
+          bloco.tipos.push({ tipo, valor: row.valCredito - row.valDebito });
+        }
+      }
+    }
+    consolidarBloco();
+  }
+
+  const resultado = TIPOS_DESPESA_PINHEIROS.flatMap(tipo => {
+    const contas = Array.from(grupos.get(tipo)?.values() ?? [])
+      .map(conta => ({
+        ...conta,
+        departamentos: conta.departamentos
+          .filter(item => item.valor !== 0)
+          .sort((a, b) => a.departamento.localeCompare(b.departamento, 'pt-BR')),
+      }))
+      .filter(conta => conta.valor !== 0 || conta.departamentos.length > 0)
+      .sort((a, b) => a.conta.localeCompare(b.conta, 'pt-BR'));
+    return contas.length === 0 ? [] : [{
+      tipo,
+      contas,
+      subtotal: contas.reduce((sum, conta) => sum + conta.valor, 0),
+    }];
+  });
+  return {
+    grupos: resultado,
+    total: resultado.reduce((sum, grupo) => sum + grupo.subtotal, 0),
+  };
 }
 
 export interface BaseGerencialDreMonth {

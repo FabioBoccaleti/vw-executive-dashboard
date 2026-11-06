@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Upload, Trash2, FileText, AlertCircle, Printer, CheckCircle2, Tag } from 'lucide-react';
+import { Upload, Trash2, FileText, AlertCircle, Printer, CheckCircle2, Tag, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { kvKeys } from '@/lib/kvClient';
 import {
@@ -23,6 +23,7 @@ import { DepartamentoTab } from './DepartamentoTab';
 import { AnaliseCenariosTab } from './AnaliseCenariosTab';
 import { ComparativoTab } from './ComparativoTab';
 import { BaseGerencialDreTab } from './BaseGerencialDreTab';
+import { CustoFixoPinheirosTab } from './CustoFixoPinheirosTab';
 import { RegrasDreTab } from './RegrasDreTab';
 import { syncBaseGerencialAfterImport } from './baseGerencialSync';
 
@@ -338,6 +339,70 @@ function YearMesSelector({ year, mes, onYearChange, onMesChange }: YearMesSelect
   );
 }
 
+function CustoFixoPinheirosView() {
+  const [periodo, setPeriodo] = useState<{ year: number; mes: number } | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function loadLatestPeriod() {
+      try {
+        const keys = await kvKeys('basege:*');
+        const meses = keys
+          .filter(key => /^basege:\d{4}:M(0[1-9]|1[0-2])$/.test(key))
+          .sort()
+          .reverse();
+        for (const key of meses) {
+          if (!active) return;
+          const [, year, month] = key.split(':');
+          const periodo = { year: Number(year), mes: Number(month.slice(1)) };
+          const data = await getBaseGerencialMes(periodo.year, periodo.mes);
+          if (!active) return;
+          if (data && data.rows.length > 0) {
+            setPeriodo(periodo);
+            return;
+          }
+        }
+        if (active) {
+          const today = new Date();
+          setPeriodo({ year: today.getFullYear(), mes: today.getMonth() + 1 });
+        }
+      } catch (error) {
+        if (!active) return;
+        console.error('Erro ao buscar último período de Custo Fixo Pinheiros:', error);
+        toast.error('Erro ao buscar o mês mais recente com dados.');
+        setError(true);
+      }
+    }
+    loadLatestPeriod();
+    return () => { active = false; };
+  }, []);
+
+  if (error) {
+    return <p role="alert" className="text-center text-slate-500 py-16">Erro ao buscar o mês mais recente com dados. Tente abrir a aba novamente.</p>;
+  }
+  if (!periodo) {
+    return (
+      <div role="status" aria-label="Buscando mês mais recente com dados" className="flex items-center justify-center py-16">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">
+        <YearMesSelector
+          year={periodo.year}
+          mes={periodo.mes}
+          onYearChange={year => setPeriodo(current => current && { ...current, year })}
+          onMesChange={mes => setPeriodo(current => current && { ...current, mes })}
+        />
+      </div>
+      <CustoFixoPinheirosTab key={`${periodo.year}-${periodo.mes}`} year={periodo.year} mes={periodo.mes} />
+    </>
+  );
+}
+
 export function BaseGerencialDashboard({ onChangeBrand }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('importar');
@@ -352,7 +417,8 @@ export function BaseGerencialDashboard({ onChangeBrand }: Props) {
   
   // States para abas VW e Audi
   const [vwSubTab, setVwSubTab] = useState<DepartamentoSubTab>('veiculos_novos');
-  const [audiSubTab, setAudiSubTab] = useState<DepartamentoSubTab>('veiculos_novos');
+  const [audiSubTab, setAudiSubTab] = useState<DepartamentoSubTab | 'custo_fixo_pinheiros'>('veiculos_novos');
+  const [showCustoFixoPinheiros, setShowCustoFixoPinheiros] = useState(false);
   const [vwYear, setVwYear] = useState(CURRENT_YEAR);
   const [vwMes, setVwMes] = useState(0); // 0 = ano todo, 1-12 = mês
   const [audiYear, setAudiYear] = useState(CURRENT_YEAR);
@@ -874,6 +940,21 @@ export function BaseGerencialDashboard({ onChangeBrand }: Props) {
         {/* Tab Audi */}
         {activeTab === 'audi' && (
           <div className="flex-1 flex flex-col gap-4 min-h-0">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                aria-pressed={showCustoFixoPinheiros}
+                onClick={() => {
+                  setShowCustoFixoPinheiros(!showCustoFixoPinheiros);
+                  if (!showCustoFixoPinheiros) setAudiSubTab('custo_fixo_pinheiros');
+                  else if (audiSubTab === 'custo_fixo_pinheiros') setAudiSubTab('dre');
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-slate-600 border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
+              >
+                {showCustoFixoPinheiros ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                {showCustoFixoPinheiros ? 'Ocultar Custo Fixo Pinheiros' : 'Mostrar Custo Fixo Pinheiros'}
+              </button>
+            </div>
             {/* Sub-tabs Audi */}
             <div className="flex items-center gap-0 border-b border-slate-200 overflow-x-auto">
               {([
@@ -900,6 +981,19 @@ export function BaseGerencialDashboard({ onChangeBrand }: Props) {
                   {sub.label}
                 </button>
               ))}
+              {showCustoFixoPinheiros && (
+                <button
+                  type="button"
+                  onClick={() => setAudiSubTab('custo_fixo_pinheiros')}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                    audiSubTab === 'custo_fixo_pinheiros'
+                      ? 'text-slate-700 border-emerald-600'
+                      : 'text-slate-400 border-transparent hover:text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  Custo Fixo Pinheiros
+                </button>
+              )}
             </div>
 
             {audiSubTab === 'dre' ? (
@@ -909,6 +1003,8 @@ export function BaseGerencialDashboard({ onChangeBrand }: Props) {
                 years={YEARS}
                 onYearChange={setAudiYear}
               />
+            ) : audiSubTab === 'custo_fixo_pinheiros' ? (
+              <CustoFixoPinheirosView />
             ) : (
               <>
                 <div className="bg-white rounded-xl border border-slate-200 px-4 shadow-sm">

@@ -1,5 +1,15 @@
 # 🧪 Testes Manuais de Persistência de Dados
 
+## Base Gerencial — Custo Fixo Pinheiros
+
+1. Acesse **Base Gerencial > Audi**. A aba **Custo Fixo Pinheiros** deve começar oculta.
+2. Clique em **Mostrar Custo Fixo Pinheiros**. A aba deve aparecer após **DRE** e ser aberta.
+3. A cada acesso à aba, ela deve selecionar automaticamente o ano e mês mais recentes com dados em **Importar Dados**, ignorando meses removidos ou sem registros. Por exemplo, com dados até setembro, deve abrir em setembro, mesmo que o mês atual seja outubro. Sem importações, começa no mês atual e mostra o estado vazio. Depois, é possível selecionar outro ano/mês ou **Ano todo** manualmente. Essa seleção é independente e não altera o período das demais abas. Os valores vêm de **Importar Dados**, somente das revendas **4 e 5**, somadas.
+4. Confira as contas classificadas como despesas: pessoal, serviços de terceiros, ocupação, funcionamento, vendas, amortizações/depreciações, financeiras e outras despesas operacionais/não operacionais. Receitas, custos operacionais, provisões e participações não entram.
+5. Expanda uma conta com vários departamentos. A soma dos departamentos deve corresponder ao valor da conta; cada departamento soma ambas as revendas. Contas com um só departamento mostram seu nome sem expansão.
+6. As regras de departamento e de Tipo Item seguem as configurações de **Importar Dados**. Centros de custo sem regra aparecem como **sem classificação**, sem descartar suas despesas. Totais de conta, centro de custo, revenda e Tipo Item não devem ser somados em duplicidade.
+7. Clique em **Ocultar Custo Fixo Pinheiros** e confira que a aba desaparece. Ao sair da Base Gerencial e voltar, ela deve começar oculta novamente. As abas existentes de Audi e VW não devem mudar.
+
 ## ✅ Testes Automatizados Passando
 
 Todos os **6 testes** de persistência passaram:
