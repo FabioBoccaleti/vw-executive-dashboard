@@ -7,7 +7,8 @@ import {
   loadRegrasDeptos,
   extractByDeptoRule,
   extractByDeptoRuleAll,
-  applyAllMerges,
+  applyDeptMerges,
+  seedMergedAccountTargets,
   getImportedMonths,
 } from './despesasDeptoVwStorage';
 
@@ -25,7 +26,8 @@ export function ComparativosTab(_props: ComparativosTabProps) {
     loadRegrasDeptos,
     extractByDeptoRule,
     extractByDeptoRuleAll,
-    applyAllMerges,
+    applyDeptMerges,
+    seedMergedAccountTargets,
     getImportedMonths,
   }), []);
 

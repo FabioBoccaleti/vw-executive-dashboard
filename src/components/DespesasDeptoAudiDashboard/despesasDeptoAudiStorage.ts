@@ -572,6 +572,21 @@ export function applyAllMerges(valorMap: Map<string, number>): void {
   mergePremiosGratificacoes(valorMap);
 }
 
+/**
+ * Aplica as regras de merge conforme a aba de demonstração de cada departamento.
+ * Veículos Novos usa um conjunto reduzido; os demais (e o consolidado) usam todas.
+ */
+export function applyDeptMerges(deptKey: string, valorMap: Map<string, number>): void {
+  if (deptKey === 'veiculos_novos') {
+    mergeAssistenciaMedica(valorMap);
+    mergeFgtsMulta(valorMap);
+    merge13SalarioIndenizado(valorMap);
+    mergeComissoesEmpregados(valorMap);
+    return;
+  }
+  applyAllMerges(valorMap);
+}
+
 // ─── Extrator hierárquico (empresa → depto) ───────────────────────────────────
 export function extractByCompaniesAndDepts(
   data: DespesasAdmMesData,

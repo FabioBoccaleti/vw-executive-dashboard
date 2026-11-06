@@ -99,7 +99,10 @@ export interface ComparativoStorageAdapter {
     data: DespesasAdmMesData,
     regras: Record<string, DeptoTab>,
   ): Map<string, number>;
-  applyAllMerges(valorMap: Map<string, number>): void;
+  /** Aplica as regras de merge da demonstração para o departamento informado. */
+  applyDeptMerges(deptKey: string, valorMap: Map<string, number>): void;
+  /** Semeia as contas-alvo de merge entre os meses (usado no Consolidado). */
+  seedMergedAccountTargets(monthMaps: Map<string, number>[]): void;
   getImportedMonths(): Promise<Array<{ year: number; month: number }>>;
 }
 
@@ -243,14 +246,12 @@ export function calcVariacao(atual: number, anterior: number): { variacao: numbe
   return { variacao, variacaoPerc: (variacao / Math.abs(anterior)) * 100 };
 }
 
-function grupoDaConta(conta: string, classificacoes: Record<string, TipoClassificacao>): GrupoKey {
-  const prefix = conta.match(/^(\d+ -)/)?.[1] ?? '';
-  return classificacoes[prefix] ?? SEM_CLASSIFICACAO;
-}
-
-const GRUPOS_ORDENADOS: GrupoKey[] = [...TIPOS_ORDENADOS, SEM_CLASSIFICACAO];
-
-/** Agrega um mapa de contas de um departamento num período (soma dos meses). */
+/**
+ * Agrega as contas de um departamento num período, replicando a aba de
+ * demonstração: extrai por mês (regra de departamento), aplica as regras de
+ * merge do departamento e soma. No consolidado, usa a extração total e semeia
+ * as contas-alvo de merge entre os meses antes de somar.
+ */
 function somarPeriodo(
   adapter: ComparativoStorageAdapter,
   dept: DeptoKey,
@@ -258,44 +259,57 @@ function somarPeriodo(
   months: YM[],
   regras: Record<string, DeptoTab>,
 ): Map<string, number> {
-  const total = new Map<string, number>();
+  const monthMaps: Map<string, number>[] = [];
   for (const ym of months) {
     const data = dataByKey.get(`${ym.year}:${ym.month}`);
     if (!data) continue;
     const m = dept === 'consolidado'
       ? adapter.extractByDeptoRuleAll(data, regras)
       : adapter.extractByDeptoRule(data, dept, regras);
-    adapter.applyAllMerges(m);
+    monthMaps.push(m);
+  }
+
+  if (dept === 'consolidado') adapter.seedMergedAccountTargets(monthMaps);
+
+  const total = new Map<string, number>();
+  for (const m of monthMaps) {
+    adapter.applyDeptMerges(dept, m);
     for (const [conta, val] of m) total.set(conta, (total.get(conta) ?? 0) + val);
   }
+  adapter.applyDeptMerges(dept, total);
   return total;
 }
 
-/** Monta os grupos de variação (por tipo) a partir dos mapas atual e anterior de um departamento. */
+/**
+ * Monta os grupos por tipo de despesa a partir dos mapas atual e anterior.
+ * Segue a demonstração: classifica cada conta por `classificacoes[conta]`
+ * (conta completa) e ignora contas sem classificação.
+ */
 function montarGrupos(
   atualMap: Map<string, number>,
   anteriorMap: Map<string, number>,
   classificacoes: Record<string, TipoClassificacao>,
 ): GrupoResultado[] {
   const contasUnion = new Set<string>([...atualMap.keys(), ...anteriorMap.keys()]);
-  const buckets = new Map<GrupoKey, VariacaoConta[]>();
+  const buckets = new Map<TipoClassificacao, VariacaoConta[]>();
 
   for (const conta of contasUnion) {
     const atual = atualMap.get(conta) ?? 0;
     const anterior = anteriorMap.get(conta) ?? 0;
     if (atual === 0 && anterior === 0) continue;
+    const tipo = classificacoes[conta];
+    if (!tipo) continue; // ignora contas sem classificação (ex.: receitas)
     const { variacao, variacaoPerc } = calcVariacao(atual, anterior);
-    const grupo = grupoDaConta(conta, classificacoes);
-    const arr = buckets.get(grupo) ?? [];
+    const arr = buckets.get(tipo) ?? [];
     arr.push({ conta, atual, anterior, variacao, variacaoPerc });
-    buckets.set(grupo, arr);
+    buckets.set(tipo, arr);
   }
 
   const grupos: GrupoResultado[] = [];
-  for (const grupo of GRUPOS_ORDENADOS) {
+  for (const grupo of TIPOS_ORDENADOS) {
     const contas = buckets.get(grupo);
     if (!contas || contas.length === 0) continue;
-    contas.sort((a, b) => Math.abs(b.atual) - Math.abs(a.atual));
+    contas.sort((a, b) => a.conta.localeCompare(b.conta)); // ordena pelo código da conta
     const totalAtual = contas.reduce((s, c) => s + c.atual, 0);
     const totalAnterior = contas.reduce((s, c) => s + c.anterior, 0);
     grupos.push({ grupo, contas, totalAtual, totalAnterior });
